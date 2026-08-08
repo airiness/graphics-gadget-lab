@@ -31,18 +31,28 @@ namespace gglab
 			};
 		}
 
-		[[nodiscard]] napa::voxel::SphereEditRequest MakeCommandEdit(
+		[[nodiscard]] NapaVoxelFireParameters MakeFireParameters(
 			double radius, double strength, std::uint8_t damagePerHit) noexcept
 		{
 			return {
-				.m_Brush = {
-					.m_Radius = radius,
-					.m_Strength = strength,
-				},
+				.m_Radius = radius,
+				.m_Strength = strength,
 				.m_MaterialRules = {
 					.m_DamagePerHit = damagePerHit,
 					.m_StoneBreakThreshold = 255,
 				},
+			};
+		}
+
+		[[nodiscard]] napa::voxel::SphereEditRequest MakeCommandEdit(
+			NapaVoxelFireParameters parameters) noexcept
+		{
+			return {
+				.m_Brush = {
+					.m_Radius = parameters.m_Radius,
+					.m_Strength = parameters.m_Strength,
+				},
+				.m_MaterialRules = parameters.m_MaterialRules,
 			};
 		}
 
@@ -256,23 +266,24 @@ namespace gglab
 				.m_Origin = { 1.0, 2.0, 3.0 },
 				.m_Direction = { 0.0, 0.0, 2.0 },
 			};
-			SphereEditRequest firstEdit = MakeCommandEdit(1.25, 0.5, 17);
+			NapaVoxelFireParameters firstParameters = MakeFireParameters(1.25, 0.5, 17);
 			const NapaVoxelRay secondRay{
 				.m_Origin = { -1.0, -2.0, -3.0 },
 				.m_Direction = { 1.0, 0.0, 0.0 },
 			};
-			const SphereEditRequest secondEdit = MakeCommandEdit(2.5, 1.0, 29);
+			const NapaVoxelFireParameters secondParameters = MakeFireParameters(2.5, 1.0, 29);
+			const SphereEditRequest boundaryEdit = MakeCommandEdit(secondParameters);
 			const bool enqueued =
-				queue.EnqueueFireRay(firstRay, firstEdit) == NapaVoxelCommandQueueError::None &&
+				queue.EnqueueFireRay(firstRay, firstParameters) == NapaVoxelCommandQueueError::None &&
 				queue.EnqueueRestoreAll() == NapaVoxelCommandQueueError::None &&
-				queue.EnqueueFireRay(secondRay, secondEdit) == NapaVoxelCommandQueueError::None &&
+				queue.EnqueueFireRay(secondRay, secondParameters) == NapaVoxelCommandQueueError::None &&
 				queue.EnqueueRestoreProbeChunk({ -2, 3, -4 }) ==
 				NapaVoxelCommandQueueError::None &&
 				queue.EnqueueMoveProbeRay(secondRay) == NapaVoxelCommandQueueError::None &&
-				queue.EnqueueScriptedBoundaryShot(secondEdit) ==
+				queue.EnqueueScriptedBoundaryShot(boundaryEdit) ==
 				NapaVoxelCommandQueueError::None;
 			firstRay.m_Origin = { 100.0, 100.0, 100.0 };
-			firstEdit.m_Brush.m_Radius = 100.0;
+			firstParameters.m_Radius = 100.0;
 
 			std::array<NapaVoxelDequeuedCommand, 6> dequeued{};
 			bool dequeuedAll = enqueued && queue.GetSize() == dequeued.size();
@@ -287,20 +298,35 @@ namespace gglab
 				std::get_if<NapaVoxelFireRayCommand>(&dequeued[2].m_Command.m_Data);
 			const auto* capturedChunk =
 				std::get_if<NapaVoxelRestoreProbeChunkCommand>(&dequeued[3].m_Command.m_Data);
+			SphereEditRequest preparedAtVisibleHit{};
+			const bool preparedFire = capturedFirst && PrepareNapaVoxelFireEditRequest(
+				*capturedFirst, { -7.0, 8.0, 9.0 }, preparedAtVisibleHit).Succeeded();
 			context.Check(dequeuedAll && queue.IsEmpty() &&
 				dequeued[0].m_OperationSerial == 1 && dequeued[5].m_OperationSerial == 6 &&
 				dequeued[0].m_Command.m_EnqueueSerial == 1 &&
 				dequeued[5].m_Command.m_EnqueueSerial == 6 && capturedFirst && capturedSecond &&
 				capturedFirst->m_Ray.m_Origin == Double3{ 1.0, 2.0, 3.0 } &&
-				capturedFirst->m_Edit.m_Brush.m_Radius == 1.25 &&
-				capturedFirst->m_Edit.m_Brush.m_Strength == 0.5 &&
-				capturedFirst->m_Edit.m_MaterialRules.m_DamagePerHit == 17 &&
+				capturedFirst->m_Parameters.m_Radius == 1.25 &&
+				capturedFirst->m_Parameters.m_Strength == 0.5 &&
+				capturedFirst->m_Parameters.m_MaterialRules.m_DamagePerHit == 17 &&
 				capturedSecond->m_Ray == secondRay &&
 				dequeued[1].m_Command.GetType() == NapaVoxelCommandType::RestoreAll &&
 				capturedChunk && capturedChunk->m_Chunk == ChunkCoord{ -2, 3, -4 } &&
 				dequeued[4].m_Command.GetType() == NapaVoxelCommandType::MoveProbeRay &&
-				dequeued[5].m_Command.GetType() == NapaVoxelCommandType::ScriptedBoundaryShot,
+				dequeued[5].m_Command.GetType() == NapaVoxelCommandType::ScriptedBoundaryShot &&
+				preparedFire &&
+				preparedAtVisibleHit.m_Brush.m_CenterWorld == Double3{ -7.0, 8.0, 9.0 } &&
+				preparedAtVisibleHit.m_Brush.m_Radius == 1.25,
 				"Session FIFO preserves command order, immutable Fire snapshots, and Restore data");
+
+			SphereEditRequest unchangedRequest = boundaryEdit;
+			const SphereEditRequest requestSentinel = unchangedRequest;
+			context.Check(capturedFirst && PrepareNapaVoxelFireEditRequest(*capturedFirst, {
+				std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0,
+				}, unchangedRequest).Failed() && unchangedRequest.m_Brush.m_CenterWorld ==
+				requestSentinel.m_Brush.m_CenterWorld &&
+				unchangedRequest.m_Brush.m_Radius == requestSentinel.m_Brush.m_Radius,
+				"Fire request preparation rejects an invalid current Visible hit atomically");
 
 			NapaVoxelCommandQueue noOpQueue;
 			const NapaVoxelRay missRay{
@@ -310,7 +336,7 @@ namespace gglab
 			NapaVoxelDequeuedCommand noOpCommand{};
 			NapaVoxelRaycastHit noOpHit{};
 			const std::vector<ChunkMeshRecord> records = MakeEdgeTieRecords();
-			const bool noOpDequeued = noOpQueue.EnqueueFireRay(missRay, secondEdit) ==
+			const bool noOpDequeued = noOpQueue.EnqueueFireRay(missRay, secondParameters) ==
 				NapaVoxelCommandQueueError::None && noOpQueue.Dequeue(noOpCommand) ==
 				NapaVoxelCommandQueueError::None;
 			const NapaVoxelRaycastResult noOpRaycast = noOpDequeued ?
@@ -322,11 +348,15 @@ namespace gglab
 				"A Fire miss remains a FIFO no-op Operation with an allocated serial");
 
 			NapaVoxelCommandQueue validationQueue;
-			SphereEditRequest invalidEdit = secondEdit;
-			invalidEdit.m_Brush.m_Radius = 0.0;
-			context.Check(validationQueue.EnqueueFireRay({}, secondEdit) ==
+			NapaVoxelFireParameters invalidParameters = secondParameters;
+			invalidParameters.m_Radius = 0.0;
+			SphereEditRequest invalidBoundaryEdit = boundaryEdit;
+			invalidBoundaryEdit.m_Brush.m_Radius = 0.0;
+			context.Check(validationQueue.EnqueueFireRay({}, secondParameters) ==
 				NapaVoxelCommandQueueError::InvalidRay &&
-				validationQueue.EnqueueScriptedBoundaryShot(invalidEdit) ==
+				validationQueue.EnqueueFireRay(missRay, invalidParameters) ==
+				NapaVoxelCommandQueueError::InvalidEdit &&
+				validationQueue.EnqueueScriptedBoundaryShot(invalidBoundaryEdit) ==
 				NapaVoxelCommandQueueError::InvalidEdit && validationQueue.IsEmpty() &&
 				validationQueue.GetLastEnqueueSerial() == 0,
 				"Rejected commands allocate no Enqueue Serial and leave the FIFO unchanged");

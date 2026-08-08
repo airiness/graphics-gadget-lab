@@ -58,6 +58,12 @@ namespace gglab
 		RestartSession,
 	};
 
+	enum class LabParameterEditPolicy : uint8_t
+	{
+		Continuous,
+		CommitOnEditEnd,
+	};
+
 	struct LabEnumItem
 	{
 		int32_t m_Value = 0;
@@ -71,6 +77,7 @@ namespace gglab
 		std::string m_Group;
 		LabParameterType m_Type = LabParameterType::Bool;
 		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
+		LabParameterEditPolicy m_EditPolicy = LabParameterEditPolicy::Continuous;
 		LabValue m_DefaultValue = false;
 		std::optional<LabValue> m_MinValue;
 		std::optional<LabValue> m_MaxValue;

@@ -32,25 +32,29 @@ namespace gglab
 		OperationSerialExhausted,
 	};
 
+	struct NapaVoxelFireParameters
+	{
+		double m_Radius = 0.0;
+		double m_Strength = 0.0;
+		napa::voxel::VoxelEditMaterialRules m_MaterialRules{};
+
+		[[nodiscard]] friend constexpr bool operator==(
+			const NapaVoxelFireParameters& lhs, const NapaVoxelFireParameters& rhs) noexcept
+		{
+			return lhs.m_Radius == rhs.m_Radius && lhs.m_Strength == rhs.m_Strength &&
+				lhs.m_MaterialRules.m_DamagePerHit == rhs.m_MaterialRules.m_DamagePerHit &&
+				lhs.m_MaterialRules.m_StoneBreakThreshold ==
+				rhs.m_MaterialRules.m_StoneBreakThreshold;
+		}
+	};
+
 	struct NapaVoxelFireRayCommand
 	{
 		NapaVoxelRay m_Ray{};
-		napa::voxel::SphereEditRequest m_Edit{};
+		NapaVoxelFireParameters m_Parameters{};
 
 		[[nodiscard]] friend constexpr bool operator==(
-			const NapaVoxelFireRayCommand& lhs, const NapaVoxelFireRayCommand& rhs) noexcept
-		{
-			return lhs.m_Ray == rhs.m_Ray &&
-				lhs.m_Edit.m_Brush.m_CenterWorld.m_X == rhs.m_Edit.m_Brush.m_CenterWorld.m_X &&
-				lhs.m_Edit.m_Brush.m_CenterWorld.m_Y == rhs.m_Edit.m_Brush.m_CenterWorld.m_Y &&
-				lhs.m_Edit.m_Brush.m_CenterWorld.m_Z == rhs.m_Edit.m_Brush.m_CenterWorld.m_Z &&
-				lhs.m_Edit.m_Brush.m_Radius == rhs.m_Edit.m_Brush.m_Radius &&
-				lhs.m_Edit.m_Brush.m_Strength == rhs.m_Edit.m_Brush.m_Strength &&
-				lhs.m_Edit.m_MaterialRules.m_DamagePerHit ==
-				rhs.m_Edit.m_MaterialRules.m_DamagePerHit &&
-				lhs.m_Edit.m_MaterialRules.m_StoneBreakThreshold ==
-				rhs.m_Edit.m_MaterialRules.m_StoneBreakThreshold;
-		}
+			const NapaVoxelFireRayCommand&, const NapaVoxelFireRayCommand&) noexcept = default;
 	};
 
 	struct NapaVoxelMoveProbeRayCommand
@@ -85,8 +89,13 @@ namespace gglab
 			const NapaVoxelScriptedBoundaryShotCommand& lhs,
 			const NapaVoxelScriptedBoundaryShotCommand& rhs) noexcept
 		{
-			return NapaVoxelFireRayCommand{ {}, lhs.m_Edit } ==
-				NapaVoxelFireRayCommand{ {}, rhs.m_Edit };
+			return lhs.m_Edit.m_Brush.m_CenterWorld == rhs.m_Edit.m_Brush.m_CenterWorld &&
+				lhs.m_Edit.m_Brush.m_Radius == rhs.m_Edit.m_Brush.m_Radius &&
+				lhs.m_Edit.m_Brush.m_Strength == rhs.m_Edit.m_Brush.m_Strength &&
+				lhs.m_Edit.m_MaterialRules.m_DamagePerHit ==
+				rhs.m_Edit.m_MaterialRules.m_DamagePerHit &&
+				lhs.m_Edit.m_MaterialRules.m_StoneBreakThreshold ==
+				rhs.m_Edit.m_MaterialRules.m_StoneBreakThreshold;
 		}
 	};
 
@@ -128,7 +137,7 @@ namespace gglab
 		explicit NapaVoxelCommandQueue(NapaVoxelCommandQueueSerialState serialState = {}) noexcept;
 
 		[[nodiscard]] NapaVoxelCommandQueueError EnqueueFireRay(
-			const NapaVoxelRay& ray, const napa::voxel::SphereEditRequest& edit) noexcept;
+			const NapaVoxelRay& ray, const NapaVoxelFireParameters& parameters) noexcept;
 		[[nodiscard]] NapaVoxelCommandQueueError EnqueueMoveProbeRay(
 			const NapaVoxelRay& ray) noexcept;
 		[[nodiscard]] NapaVoxelCommandQueueError EnqueueRestoreAll() noexcept;
@@ -168,4 +177,8 @@ namespace gglab
 		std::uint64_t m_LastOperationSerial = 0;
 		NapaVoxelCommandQueueError m_TerminalError = NapaVoxelCommandQueueError::None;
 	};
+
+	[[nodiscard]] napa::voxel::ValidationResult PrepareNapaVoxelFireEditRequest(
+		const NapaVoxelFireRayCommand& command, napa::voxel::Double3 visibleHitPosition,
+		napa::voxel::SphereEditRequest& request) noexcept;
 }

@@ -148,6 +148,11 @@ namespace gglab
 			snapshotPtr = &sourceSnapshot;
 		}
 		const LabSnapshot& snapshot = *snapshotPtr;
+		if (!m_DeferredParameterEdits.empty() &&
+			m_DeferredParameterEdits.front().m_LabId != snapshot.m_ActiveLabId)
+		{
+			m_DeferredParameterEdits.clear();
+		}
 		bool commandQueued = false;
 
 		ImGui::TextUnformatted("Active Lab");
@@ -228,6 +233,7 @@ namespace gglab
 
 		if (ImGui::Button("Reset Parameters"))
 		{
+			m_DeferredParameterEdits.clear();
 			runtime->RequestResetParameters();
 			commandQueued = true;
 		}
@@ -277,7 +283,7 @@ namespace gglab
 			}
 
 			ImGui::PushID(parameter.m_Desc.m_Id.m_Name.c_str());
-			if (DrawParameter(parameter))
+			if (DrawParameter(snapshot.m_ActiveLabId, parameter))
 			{
 				commandQueued = true;
 			}
@@ -294,10 +300,19 @@ namespace gglab
 		}
 	}
 
-	bool LabPanel::DrawParameter(const LabParameterSnapshot& parameter) noexcept
+	bool LabPanel::DrawParameter(
+		const LabId& activeLabId, const LabParameterSnapshot& parameter) noexcept
 	{
 		const LabParameterDesc& desc = parameter.m_Desc;
-		LabValue value = parameter.m_Value;
+		const bool deferred = desc.m_EditPolicy == LabParameterEditPolicy::CommitOnEditEnd;
+		auto draft = std::ranges::find_if(m_DeferredParameterEdits,
+			[&activeLabId, &desc](const DeferredParameterEdit& edit) noexcept
+			{
+				return edit.m_LabId == activeLabId && edit.m_ParameterId == desc.m_Id;
+			});
+		LabValue value = draft != m_DeferredParameterEdits.end()
+			? draft->m_Value
+			: parameter.m_Value;
 		bool changed = false;
 
 		switch (desc.m_Type)
@@ -383,6 +398,37 @@ namespace gglab
 			value = current;
 			break;
 		}
+		}
+
+		if (deferred)
+		{
+			if (changed)
+			{
+				if (draft != m_DeferredParameterEdits.end())
+				{
+					draft->m_Value = value;
+				}
+				else
+				{
+					m_DeferredParameterEdits.push_back({
+						.m_LabId = activeLabId,
+						.m_ParameterId = desc.m_Id,
+						.m_Value = value,
+						});
+					draft = std::prev(m_DeferredParameterEdits.end());
+				}
+			}
+			if (ImGui::IsItemDeactivatedAfterEdit() && draft != m_DeferredParameterEdits.end())
+			{
+				if (LabRuntime* runtime =
+					m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr)
+				{
+					runtime->RequestSetParameter(desc.m_Id, draft->m_Value);
+					m_DeferredParameterEdits.erase(draft);
+					return true;
+				}
+			}
+			return false;
 		}
 
 		if (changed)

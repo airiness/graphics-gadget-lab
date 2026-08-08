@@ -27,7 +27,7 @@ namespace gglab
 	}
 
 	NapaVoxelCommandQueueError NapaVoxelCommandQueue::EnqueueFireRay(
-		const NapaVoxelRay& ray, const napa::voxel::SphereEditRequest& edit) noexcept
+		const NapaVoxelRay& ray, const NapaVoxelFireParameters& parameters) noexcept
 	{
 		if (const NapaVoxelCommandQueueError terminal = CheckTerminal();
 			terminal != NapaVoxelCommandQueueError::None)
@@ -38,11 +38,18 @@ namespace gglab
 		{
 			return NapaVoxelCommandQueueError::InvalidRay;
 		}
-		if (napa::voxel::ValidateEdit(edit).Failed())
+		const napa::voxel::SphereEditRequest validationRequest{
+			.m_Brush = {
+				.m_Radius = parameters.m_Radius,
+				.m_Strength = parameters.m_Strength,
+			},
+			.m_MaterialRules = parameters.m_MaterialRules,
+		};
+		if (napa::voxel::ValidateEdit(validationRequest).Failed())
 		{
 			return NapaVoxelCommandQueueError::InvalidEdit;
 		}
-		return Enqueue(NapaVoxelFireRayCommand{ ray, edit });
+		return Enqueue(NapaVoxelFireRayCommand{ ray, parameters });
 	}
 
 	NapaVoxelCommandQueueError NapaVoxelCommandQueue::EnqueueMoveProbeRay(
@@ -164,5 +171,27 @@ namespace gglab
 	NapaVoxelCommandQueueError NapaVoxelCommandQueue::CheckTerminal() const noexcept
 	{
 		return m_TerminalError;
+	}
+
+	napa::voxel::ValidationResult PrepareNapaVoxelFireEditRequest(
+		const NapaVoxelFireRayCommand& command, napa::voxel::Double3 visibleHitPosition,
+		napa::voxel::SphereEditRequest& request) noexcept
+	{
+		const napa::voxel::SphereEditRequest prepared{
+			.m_Brush = {
+				.m_CenterWorld = visibleHitPosition,
+				.m_Radius = command.m_Parameters.m_Radius,
+				.m_Strength = command.m_Parameters.m_Strength,
+			},
+			.m_MaterialRules = command.m_Parameters.m_MaterialRules,
+		};
+		const napa::voxel::ValidationResult validation = napa::voxel::ValidateEdit(prepared);
+		if (validation.Failed())
+		{
+			return validation;
+		}
+
+		request = prepared;
+		return {};
 	}
 }

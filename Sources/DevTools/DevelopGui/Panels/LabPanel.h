@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/Lab/LabParameter.h"
 #include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
@@ -25,10 +26,19 @@ namespace gglab
 		bool IsDefaultOpen() const noexcept override { return true; }
 
 	private:
-		bool DrawParameter(const LabParameterSnapshot& parameter) noexcept;
+		bool DrawParameter(
+			const LabId& activeLabId, const LabParameterSnapshot& parameter) noexcept;
+
+		struct DeferredParameterEdit
+		{
+			LabId m_LabId;
+			LabParameterId m_ParameterId;
+			LabValue m_Value = false;
+		};
 
 		LabRuntimeLocatorBase* m_RuntimeLocator = nullptr;
 		std::optional<LabRunConfig> m_RunConfigDraft;
+		std::vector<DeferredParameterEdit> m_DeferredParameterEdits;
 		LabId m_RunConfigLabId;
 	};
 }
