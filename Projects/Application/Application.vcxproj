@@ -142,6 +142,7 @@
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelDamageSelfTests.cpp" />
@@ -315,7 +316,9 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabParameter.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp" />
@@ -633,7 +636,9 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.h" />

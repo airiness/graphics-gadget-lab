@@ -1,12 +1,14 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
+#include "NapaVoxelCore/Math/Vector.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 #include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -27,6 +29,35 @@ namespace gglab
 					.m_MaxExclusive = { 16, 8, 4 },
 				},
 			};
+		}
+
+		void RunDouble3MathTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			constexpr Double3 lhs{ 1.0, 2.0, 3.0 };
+			constexpr Double3 rhs{ -2.0, 4.0, 0.5 };
+			context.Check(lhs - rhs == Double3{ 3.0, -2.0, 2.5 } &&
+				Dot(lhs, rhs) == 7.5 && Cross(lhs, rhs) == Double3{ -11.0, -6.5, 8.0 },
+				"Double3 arithmetic uses one portable Core Math contract");
+
+			context.Check(IsFinite(lhs) && !IsFinite({
+				std::numeric_limits<double>::infinity(), 0.0, 0.0,
+				}), "Double3 finite validation covers every component");
+
+			Double3 normalized{};
+			const double maximum = std::numeric_limits<double>::max();
+			const bool normalizedMaximum = TryNormalize({ maximum, maximum, 0.0 }, normalized);
+			context.Check(normalizedMaximum &&
+				std::abs(Dot(normalized, normalized) - 1.0) <= 1.0e-15 &&
+				normalized.m_X == normalized.m_Y && normalized.m_Z == 0.0,
+				"Double3 normalization scales finite maximum inputs without overflow");
+
+			const Double3 sentinel{ 91.0, 92.0, 93.0 };
+			Double3 unchanged = sentinel;
+			context.Check(!TryNormalize({}, unchanged) && unchanged == sentinel &&
+				!TryNormalize({ std::numeric_limits<double>::quiet_NaN(), 0.0, 1.0 },
+					unchanged) && unchanged == sentinel,
+				"Double3 normalization rejects invalid inputs without changing output");
 		}
 
 		void CheckValidationError(
@@ -973,6 +1004,7 @@ namespace gglab
 
 	void RunNapaVoxelCoordinateSelfTests(SelfTestContext& context) noexcept
 	{
+		RunDouble3MathTests(context);
 		RunCheckedArithmeticTests(context);
 		RunFloorDivisionTests(context);
 		RunCoordinateOwnershipTests(context);

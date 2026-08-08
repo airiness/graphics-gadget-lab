@@ -270,6 +270,9 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -687,7 +690,13 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp">
       <Filter>Application\Lab</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp">
       <Filter>Application\Lab\NapaVoxel</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp">
@@ -1748,7 +1757,13 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.h">
       <Filter>Application\Lab\NapaVoxel</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h">

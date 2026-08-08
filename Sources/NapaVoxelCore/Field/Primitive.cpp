@@ -19,11 +19,6 @@ namespace napa::voxel
 {
 	namespace
 	{
-		[[nodiscard]] bool IsFinite(Double3 value) noexcept
-		{
-			return std::isfinite(value.m_X) && std::isfinite(value.m_Y) && std::isfinite(value.m_Z);
-		}
-
 		[[nodiscard]] bool HasPositiveComponents(Double3 value) noexcept
 		{
 			return value.m_X > 0.0 && value.m_Y > 0.0 && value.m_Z > 0.0;

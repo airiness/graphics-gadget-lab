@@ -28,7 +28,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_RestoreContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 24, "Core API version is 24");
+		context.Check(contract.m_CoreApiVersion == 25, "Core API version is 25");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -51,6 +51,7 @@ namespace gglab
 			"Build contract reports the canonical iso value");
 
 		RunNapaVoxelCoordinateSelfTests(context);
+		RunNapaVoxelCommandSelfTests(context);
 		RunNapaVoxelEditSelfTests(context);
 		RunNapaVoxelDamageSelfTests(context);
 		RunNapaVoxelMutationSelfTests(context);

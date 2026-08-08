@@ -11,12 +11,6 @@ namespace napa::voxel
 {
 	namespace
 	{
-		[[nodiscard]] bool IsFinite(Double3 value) noexcept
-		{
-			return std::isfinite(value.m_X) && std::isfinite(value.m_Y) &&
-				std::isfinite(value.m_Z);
-		}
-
 		[[nodiscard]] ValidationResult NarrowIntegralDouble(
 			double value, std::int32_t& narrowed) noexcept
 		{

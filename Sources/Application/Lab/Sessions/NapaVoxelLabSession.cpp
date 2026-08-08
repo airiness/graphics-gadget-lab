@@ -128,7 +128,7 @@ namespace gglab
 						.m_Radius = radiusInCells * voxelSize,
 					},
 				},
-			});
+				});
 		}
 
 		[[nodiscard]] std::vector<napa::voxel::PrimitiveDesc> MakePrimitives(
@@ -249,7 +249,7 @@ namespace gglab
 			std::make_unique<RenderPipelineForwardPBR>(RenderPipelineForwardPBR::CreateInfo{
 				.m_SceneExtension = std::make_unique<NapaVoxelRenderExtension>(frameSource),
 				})),
-		m_FrameSource(std::move(frameSource))
+				m_FrameSource(std::move(frameSource))
 	{
 		auto* renderer = m_Services.m_Renderer;
 		m_PublicationSession = std::make_unique<NapaVoxelStaticPublicationSession>(
@@ -376,6 +376,7 @@ namespace gglab
 
 	void NapaVoxelLabSession::CancelPrepare() noexcept
 	{
+		m_CommandQueue.ResetForNewSession();
 		if (m_PublicationSession)
 		{
 			m_PublicationSession->CancelPrepare();
@@ -398,6 +399,7 @@ namespace gglab
 
 	void NapaVoxelLabSession::OnExit() noexcept
 	{
+		m_CommandQueue.ResetForNewSession();
 		if (auto* debugDraw = m_Services.m_DebugDraw)
 		{
 			debugDraw->ClearChannel(ChunkBoundsChannel);
@@ -595,41 +597,41 @@ namespace gglab
 
 		diagnostics.m_Title = "Napa Voxel Static Viewer";
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Preset", .m_Value = m_PresetName },
-			{ .m_Name = "Config",
+			{.m_Name = "Preset", .m_Value = m_PresetName },
+			{.m_Name = "Config",
 				.m_Value = std::format("{} cells/chunk, {:.3f} m voxel, {:.2f} surface band",
 					m_CurrentConfig.m_ChunkCellCount, m_CurrentConfig.m_VoxelSize,
 					m_CurrentConfig.m_SurfaceBandVoxels) },
-			{ .m_Name = "Logical domain",
+			{.m_Name = "Logical domain",
 				.m_Value = configValid
 					? std::format("{} cells, {} samples", metrics.m_TotalCellCount,
 						metrics.m_TotalSampleCount)
 					: "invalid" },
-			{ .m_Name = "Resident / meshed chunks",
+			{.m_Name = "Resident / meshed chunks",
 				.m_Value = std::format("{} / {}", m_VoxelWorld
 					? m_VoxelWorld->GetResidentChunkCount()
 					: 0, meshValidation.m_ChunkCount) },
-			{ .m_Name = "World / visible revision",
+			{.m_Name = "World / visible revision",
 				.m_Value = std::format("{} / {}", m_VoxelWorld
 					? m_VoxelWorld->GetWorldVoxelRevision()
 					: 0, m_PublicationSession
 					? m_PublicationSession->GetVisibleWorldRevision()
 					: 0) },
-			{ .m_Name = "Voxel / mesh hash",
+			{.m_Name = "Voxel / mesh hash",
 				.m_Value = std::format("{:016X} / {:016X}", m_InitialVoxelHash,
 					meshValidation.m_ValidationHash) },
-			{ .m_Name = "Geometry",
+			{.m_Name = "Geometry",
 				.m_Value = std::format("{} vertices, {} indices, {} sections",
 					meshValidation.m_VertexCount, meshValidation.m_IndexCount,
 					meshValidation.m_SectionCount) },
-			{ .m_Name = "Preparation timing",
+			{.m_Name = "Preparation timing",
 				.m_Value = std::format("generation {:.3f} ms, mesh/validation {:.3f} ms",
 					m_LastGenerationMilliseconds, m_LastMeshingMilliseconds) },
-			{ .m_Name = "Publication",
+			{.m_Name = "Publication",
 				.m_Value = m_PublicationSession
 					? GetPublicationStatusName(m_PublicationSession->GetPublicationStatus())
 					: "Unavailable" },
-			{ .m_Name = "Surface mode", .m_Value = "Shaded" },
+			{.m_Name = "Surface mode", .m_Value = "Shaded" },
 		};
 		diagnostics.m_Checks = {
 			{

@@ -9,9 +9,7 @@ namespace napa::voxel::detail
 	[[nodiscard]] inline double EvaluateSphereSignedDistance(
 		Double3 center, double radius, Double3 position) noexcept
 	{
-		const double x = position.m_X - center.m_X;
-		const double y = position.m_Y - center.m_Y;
-		const double z = position.m_Z - center.m_Z;
-		return std::sqrt(x * x + y * y + z * z) - radius;
+		const Double3 offset = position - center;
+		return std::sqrt(Dot(offset, offset)) - radius;
 	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Application/Lab/LabSessionBase.h"
+#include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
@@ -46,6 +47,7 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 
 		std::shared_ptr<NapaVoxelRenderFrameSource> m_FrameSource;
+		NapaVoxelCommandQueue m_CommandQueue;
 		std::unique_ptr<napa::voxel::VoxelWorld> m_VoxelWorld;
 		std::unique_ptr<NapaVoxelStaticPublicationSession> m_PublicationSession;
 		napa::voxel::VoxelWorldConfig m_CurrentConfig{};
