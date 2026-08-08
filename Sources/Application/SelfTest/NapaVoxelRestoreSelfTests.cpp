@@ -8,6 +8,7 @@
 #include "NapaVoxelCore/World/VoxelSample.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -283,6 +284,49 @@ namespace gglab
 				"Current-first Restore recovers the implicit Original baseline exactly");
 		}
 
+		void RunMultiChunkRestoreOrderTest(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			const VoxelSample stone{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Stone,
+			};
+			const VoxelSample damagedStone{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 77,
+			};
+			const std::array scrambledCoordinates{
+				SampleCoord{ 9, 9, 9 },
+				SampleCoord{ -7, 8, 1 },
+				SampleCoord{ 8, -7, -7 },
+				SampleCoord{ -1, -1, -1 },
+				SampleCoord{ 15, 0, 8 },
+				SampleCoord{ 0, 9, -7 },
+			};
+
+			std::unique_ptr<VoxelWorld> world;
+			bool initialized = VoxelWorld::Create(MakeRestoreConfig(), world).Succeeded() && world;
+			for (const SampleCoord coordinate : scrambledCoordinates)
+			{
+				initialized = initialized && InitializeSample(*world, coordinate, stone) &&
+					MutateSample(*world, coordinate, damagedStone);
+			}
+
+			VoxelMutationResult result{};
+			const std::vector<VoxelSampleChange> expectedChanges{
+				{ { 8, -7, -7 }, damagedStone, stone },
+				{ { 0, 9, -7 }, damagedStone, stone },
+				{ { -1, -1, -1 }, damagedStone, stone },
+				{ { -7, 8, 1 }, damagedStone, stone },
+				{ { 15, 0, 8 }, damagedStone, stone },
+				{ { 9, 9, 9 }, damagedStone, stone },
+			};
+			context.Check(initialized && RestoreAll(*world, result).Succeeded() &&
+				result.m_SampleChanges == expectedChanges,
+				"Restore All orders cross-Chunk Sample Changes by global z/y/x coordinates");
+		}
+
 		void RunSparseRestoreAllTest(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -374,6 +418,7 @@ namespace gglab
 	{
 		RunExactRestoreTests(context);
 		RunCurrentFirstRestoreTest(context);
+		RunMultiChunkRestoreOrderTest(context);
 		RunSparseRestoreAllTest(context);
 		RunRestoreAtomicityTests(context);
 	}

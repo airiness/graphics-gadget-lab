@@ -7,6 +7,7 @@
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
+#include "NapaVoxelCore/World/VoxelRestore.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
@@ -75,6 +76,123 @@ namespace gglab
 			PrimitiveWorldGenerationResult generation{};
 			return GeneratePrimitiveVoxelWorld(
 				config, std::span{ &primitive, 1 }, world, generation).Succeeded();
+		}
+
+		[[nodiscard]] bool CreateStoneWallWorld(
+			std::unique_ptr<napa::voxel::VoxelWorld>& world)
+		{
+			using namespace napa::voxel;
+			const PrimitiveDesc primitive{
+				.m_StableId = { 2 },
+				.m_Priority = { 0 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = {},
+						.m_HalfExtents = { 2.0, 6.0, 6.0 },
+					},
+				},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			return GeneratePrimitiveVoxelWorld(MakeDamageConfig(),
+				std::span{ &primitive, 1 }, world, generation).Succeeded();
+		}
+
+		struct ChunkSurfaceEvidence
+		{
+			napa::voxel::ChunkCoord m_Chunk{};
+			napa::voxel::MeshValidationResult m_Validation{};
+			std::uint64_t m_SkippedDegenerateTriangleCount = 0;
+			napa::voxel::ChunkBoundaryContourSet m_BoundaryContours =
+				napa::voxel::MakeEmptyChunkBoundaryContourSet();
+
+			[[nodiscard]] friend bool operator==(
+				const ChunkSurfaceEvidence&, const ChunkSurfaceEvidence&) = default;
+		};
+
+		struct WorldSurfaceEvidence
+		{
+			napa::voxel::WorldMeshValidationResult m_Validation{};
+			napa::voxel::BoundaryContourValidationResult m_BoundaryValidation{};
+			std::vector<ChunkSurfaceEvidence> m_Chunks;
+
+			[[nodiscard]] friend bool operator==(
+				const WorldSurfaceEvidence&, const WorldSurfaceEvidence&) = default;
+		};
+
+		[[nodiscard]] bool BuildCellOwnerChunkDomain(const napa::voxel::VoxelWorldConfig& config,
+			std::vector<napa::voxel::ChunkCoord>& chunks)
+		{
+			using namespace napa::voxel;
+			LogicalDomainMetrics metrics{};
+			if (ComputeLogicalDomainMetrics(config, metrics).Failed())
+			{
+				return false;
+			}
+
+			chunks.clear();
+			chunks.reserve(static_cast<std::size_t>(metrics.m_CellOwnerChunkCount));
+			for (std::int32_t z = metrics.m_CellOwnerChunkBounds.m_Min.m_Z;
+				z < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Z; ++z)
+			{
+				for (std::int32_t y = metrics.m_CellOwnerChunkBounds.m_Min.m_Y;
+					y < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Y; ++y)
+				{
+					for (std::int32_t x = metrics.m_CellOwnerChunkBounds.m_Min.m_X;
+						x < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_X; ++x)
+					{
+						chunks.push_back({ x, y, z });
+					}
+				}
+			}
+			return chunks.size() == metrics.m_CellOwnerChunkCount;
+		}
+
+		[[nodiscard]] bool PublishCompleteMesh(const napa::voxel::VoxelWorld& world,
+			napa::voxel::VisibleMeshSet& visible, bool& publicationQuiescent)
+		{
+			using namespace napa::voxel;
+			std::vector<ChunkCoord> chunks;
+			CpuMeshBatch batch{};
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			std::unique_ptr<PreparedCpuMeshPublication> publication;
+			publicationQuiescent = false;
+			if (!BuildCellOwnerChunkDomain(world.GetConfig(), chunks) ||
+				BuildCpuMeshBatch(world, world.GetWorldVoxelRevision(), chunks, batch).Failed() ||
+				ValidateCpuMeshBatch(batch, visible, pending).Failed() || !pending ||
+				PrepareCpuMeshBatchPublication(pending, visible, publication).Failed() ||
+				pending || !publication)
+			{
+				return false;
+			}
+
+			CommitCpuMeshBatchPublication(publication, visible);
+			publicationQuiescent = !pending && !publication;
+			return publicationQuiescent && visible.HasPublishedMeshes() &&
+				visible.GetVisibleWorldRevision() == world.GetWorldVoxelRevision();
+		}
+
+		[[nodiscard]] WorldSurfaceEvidence CaptureSurfaceEvidence(
+			const napa::voxel::VisibleMeshSet& visible)
+		{
+			using namespace napa::voxel;
+			WorldSurfaceEvidence evidence{
+				.m_Validation = visible.GetWorldMeshValidation(),
+				.m_BoundaryValidation = visible.GetBoundaryValidation(),
+			};
+			evidence.m_Chunks.reserve(visible.GetChunks().size());
+			for (const ChunkMeshRecord& chunk : visible.GetChunks())
+			{
+				evidence.m_Chunks.push_back({
+					.m_Chunk = chunk.m_Chunk,
+					.m_Validation = chunk.m_Validation,
+					.m_SkippedDegenerateTriangleCount =
+						chunk.m_SkippedDegenerateTriangleCount,
+					.m_BoundaryContours = chunk.m_BoundaryContours,
+					});
+			}
+			return evidence;
 		}
 
 		[[nodiscard]] bool HashDamageWorld(
@@ -495,6 +613,132 @@ namespace gglab
 				"Stone density and zero-Strength Damage hits match the full-domain Oracle exactly");
 		}
 
+		void RunDestructionRestoreQuiescenceTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			std::unique_ptr<VoxelWorld> world;
+			VisibleMeshSet initialVisible;
+			bool initialPublicationQuiescent = false;
+			std::uint64_t initialVoxelHash = 0;
+			const bool initialized = CreateStoneWallWorld(world) && world &&
+				ComputeLogicalVoxelWorldHash(*world, initialVoxelHash).Succeeded() &&
+				PublishCompleteMesh(*world, initialVisible, initialPublicationQuiescent);
+			context.Check(initialized && initialPublicationQuiescent,
+				"Stone Wall initial Voxel and Visible Mesh evidence publishes quiescently");
+			if (!initialized)
+			{
+				return;
+			}
+
+			const WorldSurfaceEvidence initialSurface = CaptureSurfaceEvidence(initialVisible);
+			const std::size_t initialResidentChunkCount = world->GetResidentChunkCount();
+			const SphereEditRequest destructionRequest = MakeStoneEdit({ 1.0, 0.0, 0.0 }, 0.5);
+			const SphereEditRequest markerRequest = MakeStoneEdit({ -1.0, 2.0, 2.0 }, 0.5);
+			bool repeatedCyclesMatched = true;
+			for (std::uint32_t cycle = 0; cycle < 2 && repeatedCyclesMatched; ++cycle)
+			{
+				const std::uint64_t cycleBaseRevision = world->GetWorldVoxelRevision();
+				VoxelMutationResult firstHit{};
+				VoxelMutationResult secondHit{};
+				VoxelMutationResult markerHit{};
+				VisibleMeshSet damageOnlyVisible;
+				bool damageOnlyPublicationQuiescent = false;
+				repeatedCyclesMatched = ApplySphereEdit(
+					*world, destructionRequest, firstHit).Succeeded() &&
+					firstHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+					firstHit.m_BaseWorldVoxelRevision == cycleBaseRevision &&
+					firstHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 1 &&
+					firstHit.m_SampleChanges.size() == 1 &&
+					firstHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ 1, 0, 0 } &&
+					firstHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
+					firstHit.m_MeshDirtyChunks.empty() &&
+					PublishCompleteMesh(
+						*world, damageOnlyVisible, damageOnlyPublicationQuiescent) &&
+					damageOnlyPublicationQuiescent &&
+					CaptureSurfaceEvidence(damageOnlyVisible) == initialSurface &&
+					ApplySphereEdit(*world, destructionRequest, secondHit).Succeeded() &&
+					secondHit.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+					secondHit.m_BaseWorldVoxelRevision == cycleBaseRevision + 1 &&
+					secondHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 2 &&
+					secondHit.m_SampleChanges.size() == 1 &&
+					secondHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ 1, 0, 0 } &&
+					secondHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
+					secondHit.m_MeshDirtyChunks.size() == 4 &&
+					ApplySphereEdit(*world, markerRequest, markerHit).Succeeded() &&
+					markerHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+					markerHit.m_BaseWorldVoxelRevision == cycleBaseRevision + 2 &&
+					markerHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 3 &&
+					markerHit.m_SampleChanges.size() == 1 &&
+					markerHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ -1, 2, 2 } &&
+					markerHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { -1, 0, 0 } } &&
+					markerHit.m_MeshDirtyChunks.empty();
+
+				VoxelDamageMarkerSnapshot damagedMarkers{};
+				VisibleMeshSet destroyedVisible;
+				bool destroyedPublicationQuiescent = false;
+				std::uint64_t destroyedVoxelHash = 0;
+				repeatedCyclesMatched = repeatedCyclesMatched &&
+					BuildVoxelDamageMarkerSnapshot(*world, world->GetWorldVoxelRevision(),
+						damagedMarkers).Succeeded() &&
+					damagedMarkers.m_SourceWorldVoxelRevision == cycleBaseRevision + 3 &&
+					damagedMarkers.m_TotalDamagedSampleCount == 1 &&
+					!damagedMarkers.m_Truncated && damagedMarkers.m_Markers.size() == 1 &&
+					damagedMarkers.m_Markers[0].m_Sample == SampleCoord{ -1, 2, 2 } &&
+					ComputeLogicalVoxelWorldHash(*world, destroyedVoxelHash).Succeeded() &&
+					destroyedVoxelHash != initialVoxelHash &&
+					PublishCompleteMesh(
+						*world, destroyedVisible, destroyedPublicationQuiescent) &&
+					destroyedPublicationQuiescent &&
+					CaptureSurfaceEvidence(destroyedVisible) != initialSurface;
+
+				VoxelMutationResult restore{};
+				CpuMeshBatch restoreBatch{};
+				std::unique_ptr<PendingCpuMeshBatch> pending;
+				std::unique_ptr<PreparedCpuMeshPublication> publication;
+				repeatedCyclesMatched = repeatedCyclesMatched && RestoreAll(*world, restore).Succeeded() &&
+					restore.m_BaseWorldVoxelRevision == cycleBaseRevision + 3 &&
+					restore.m_TargetWorldVoxelRevision == cycleBaseRevision + 4 &&
+					restore.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+					restore.m_SampleChanges == std::vector<VoxelSampleChange>{
+						{ secondHit.m_SampleChanges[0].m_Coordinate,
+							secondHit.m_SampleChanges[0].m_After,
+							firstHit.m_SampleChanges[0].m_Before },
+						{ markerHit.m_SampleChanges[0].m_Coordinate,
+							markerHit.m_SampleChanges[0].m_After,
+							markerHit.m_SampleChanges[0].m_Before },
+					} &&
+					BuildCpuMeshBatch(*world, restore, restoreBatch).Succeeded() &&
+							restoreBatch.m_RequestedChunks == restore.m_MeshDirtyChunks &&
+							ValidateCpuMeshBatch(restoreBatch, destroyedVisible, pending).Succeeded() &&
+							pending &&
+							PrepareCpuMeshBatchPublication(
+								pending, destroyedVisible, publication).Succeeded() &&
+							!pending && publication;
+						if (repeatedCyclesMatched)
+						{
+							CommitCpuMeshBatchPublication(publication, destroyedVisible);
+						}
+
+						std::uint64_t restoredVoxelHash = 0;
+						VoxelDamageMarkerSnapshot restoredMarkers{};
+						repeatedCyclesMatched = repeatedCyclesMatched && !pending && !publication &&
+							destroyedVisible.GetVisibleWorldRevision() == cycleBaseRevision + 4 &&
+							ComputeLogicalVoxelWorldHash(*world, restoredVoxelHash).Succeeded() &&
+							restoredVoxelHash == initialVoxelHash &&
+							CaptureSurfaceEvidence(destroyedVisible) == initialSurface &&
+							world->GetResidentChunkCount() == initialResidentChunkCount &&
+							BuildVoxelDamageMarkerSnapshot(*world, world->GetWorldVoxelRevision(),
+								restoredMarkers).Succeeded() &&
+							restoredMarkers.m_SourceWorldVoxelRevision == cycleBaseRevision + 4 &&
+							restoredMarkers.m_TotalDamagedSampleCount == 0 &&
+							!restoredMarkers.m_Truncated && restoredMarkers.m_Markers.empty() &&
+							world->GetWorldVoxelRevision() == cycleBaseRevision + 4;
+			}
+
+			context.Check(repeatedCyclesMatched,
+				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
+		}
+
 		void RunDamageMarkerSnapshotTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -548,6 +792,7 @@ namespace gglab
 		RunStoneTransitionTests(context);
 		RunStoneMutationGoldenTests(context);
 		RunStoneFullDomainOracleTests(context);
+		RunDestructionRestoreQuiescenceTests(context);
 		RunDamageMarkerSnapshotTests(context);
 	}
 }
