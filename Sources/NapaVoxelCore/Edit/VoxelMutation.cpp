@@ -1,5 +1,6 @@
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 
+#include "NapaVoxelCore/Testing/VoxelMutationTestAccess.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 #include "NapaVoxelCore/World/VoxelChunk.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <memory>
 #include <type_traits>
@@ -17,7 +19,8 @@ namespace napa::voxel
 {
 	namespace
 	{
-		thread_local VoxelMutationAllocationProbe* ActiveAllocationProbe = nullptr;
+		thread_local testing::VoxelMutationAllocationProbe* ActiveAllocationProbe = nullptr;
+		thread_local bool SimulateExhaustedWorldRevision = false;
 		thread_local bool IsMutationCommitPhase = false;
 
 		struct PreparedSampleWrite
@@ -490,8 +493,9 @@ namespace napa::voxel
 			return {};
 		}
 
-		const auto targetRevision =
-			CheckedAdd(world.m_WorldVoxelRevision, std::uint64_t{ 1 });
+		const std::uint64_t revisionForTarget = SimulateExhaustedWorldRevision ?
+			std::numeric_limits<std::uint64_t>::max() : world.m_WorldVoxelRevision;
+		const auto targetRevision = CheckedAdd(revisionForTarget, std::uint64_t{ 1 });
 		if (!targetRevision.has_value())
 		{
 			return { ValidationError::ArithmeticOverflow };
@@ -504,7 +508,7 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
+	ValidationResult testing::VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
 		VoxelWorld& world, const SphereEditRequest& request,
 		VoxelMutationResult& result, VoxelMutationAllocationProbe& probe)
 	{
@@ -524,9 +528,18 @@ namespace napa::voxel
 		return mutationResult;
 	}
 
-	void VoxelMutationTestAccess::SetWorldVoxelRevision(
-		VoxelWorld& world, std::uint64_t revision) noexcept
+	ValidationResult testing::VoxelMutationTestAccess::ApplySphereEditWithExhaustedRevision(
+		VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result)
 	{
-		world.m_WorldVoxelRevision = revision;
+		if (SimulateExhaustedWorldRevision)
+		{
+			return { ValidationError::InvalidVoxelMutation };
+		}
+
+		SimulateExhaustedWorldRevision = true;
+		const ValidationResult mutationResult =
+			napa::voxel::ApplySphereEdit(world, request, result);
+		SimulateExhaustedWorldRevision = false;
+		return mutationResult;
 	}
 }

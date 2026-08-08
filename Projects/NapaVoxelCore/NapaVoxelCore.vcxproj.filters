@@ -25,6 +25,9 @@
     <Filter Include="NapaVoxelCore\World">
       <UniqueIdentifier>{D35A7A7D-4285-47FD-A4EB-76B2AE29DDE0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="NapaVoxelCore\Testing">
+      <UniqueIdentifier>{7FB85EF0-50B0-4482-B2F5-359518691316}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h">
@@ -77,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h">
       <Filter>NapaVoxelCore\Meshing</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h">
+      <Filter>NapaVoxelCore\Testing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
       <Filter>NapaVoxelCore\Validation</Filter>

@@ -3,7 +3,6 @@
 #include "NapaVoxelCore/Edit/SphereEdit.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 
-#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <type_traits>
@@ -38,23 +37,6 @@ namespace napa::voxel
 
 		[[nodiscard]] friend bool operator==(
 			const VoxelMutationResult&, const VoxelMutationResult&) noexcept = default;
-	};
-
-	struct VoxelMutationAllocationProbe
-	{
-		std::size_t m_FailAtPrepareAllocation = 0;
-		std::size_t m_PrepareAllocationCount = 0;
-		std::size_t m_CommitAllocationCount = 0;
-	};
-
-	class VoxelMutationTestAccess final
-	{
-	public:
-		[[nodiscard]] static ValidationResult ApplySphereEditWithAllocationProbe(
-			VoxelWorld& world, const SphereEditRequest& request,
-			VoxelMutationResult& result, VoxelMutationAllocationProbe& probe);
-		static void SetWorldVoxelRevision(
-			VoxelWorld& world, std::uint64_t revision) noexcept;
 	};
 
 	[[nodiscard]] ValidationResult EvaluateSphereEditSampleTransition(

@@ -966,6 +966,7 @@ namespace gglab
 				pending->GetTargetWorldVoxelRevision() == 1 &&
 				pending->GetCandidateChunkCount() == EightChunkDomain.size() &&
 				pending->GetChunks().size() == EightChunkDomain.size() &&
+				pending->GetReplacementChunks().size() == EightChunkDomain.size() &&
 				!visible.HasPublishedMeshes() &&
 				visible.GetVisibleWorldRevision() == 0,
 				"Validated Pending CPU meshes leave Visible state unchanged");
@@ -1167,6 +1168,8 @@ namespace gglab
 				competingPartialValidated &&
 				partialPending->GetTargetWorldVoxelRevision() == 2 &&
 				partialPending->GetCandidateChunkCount() == 1 &&
+				partialPending->GetReplacementChunks().size() == 1 &&
+				partialPending->GetReplacementChunks()[0].m_Chunk == partialChunks[0] &&
 				visible.GetVisibleWorldRevision() == 1 &&
 				visible.GetWorldMeshValidation() == initialValidation,
 				"Partial Pending validation compares retained current Neighbors without publishing");
@@ -1229,7 +1232,8 @@ namespace gglab
 				ValidateCpuMeshBatch(
 					damageOnlyBatch, visible, damageOnlyPending).Succeeded() &&
 				damageOnlyPending != nullptr &&
-				damageOnlyPending->GetCandidateChunkCount() == 0;
+				damageOnlyPending->GetCandidateChunkCount() == 0 &&
+				damageOnlyPending->GetReplacementChunks().empty();
 			WorldMeshValidationResult damageOnlyValidation{};
 			context.Check(
 				damageOnlyValidated &&

@@ -1,5 +1,6 @@
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 
+#include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Meshing/ReferenceMesher.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
@@ -125,6 +126,64 @@ namespace napa::voxel
 			}
 			return {};
 		}
+
+		[[nodiscard]] ValidationResult BuildCpuMeshBatchFromValidatedRequest(
+			const VoxelWorld& world, std::uint64_t targetWorldVoxelRevision,
+			std::span<const ChunkCoord> requestedChunks, CpuMeshBatch& batch)
+		{
+			CpuMeshBatch prepared{
+				.m_Config = world.GetConfig(),
+				.m_TargetWorldVoxelRevision = targetWorldVoxelRevision,
+			};
+			prepared.m_RequestedChunks.assign(requestedChunks.begin(), requestedChunks.end());
+			prepared.m_Candidates.reserve(requestedChunks.size());
+			const ReferenceMesher mesher(world);
+			for (const ChunkCoord chunk : requestedChunks)
+			{
+				ChunkMeshRecord candidate{};
+				const ValidationResult meshResult = mesher.MeshChunk(chunk, candidate);
+				if (meshResult.Failed())
+				{
+					return meshResult;
+				}
+				if (candidate.m_SourceWorldVoxelRevision != targetWorldVoxelRevision)
+				{
+					return { ValidationError::MismatchedCpuMeshSourceRevision };
+				}
+				prepared.m_Candidates.push_back(std::move(candidate));
+			}
+			if (world.GetWorldVoxelRevision() != targetWorldVoxelRevision)
+			{
+				return { ValidationError::MismatchedCpuMeshTargetRevision };
+			}
+
+			batch = std::move(prepared);
+			return {};
+		}
+	}
+
+	CpuMeshReplacementView::CpuMeshReplacementView(
+		std::span<const ChunkMeshRecord> chunks,
+		std::span<const std::size_t> indices) noexcept :
+		m_Chunks(chunks),
+		m_Indices(indices)
+	{
+	}
+
+	std::size_t CpuMeshReplacementView::size() const noexcept
+	{
+		return m_Indices.size();
+	}
+
+	bool CpuMeshReplacementView::empty() const noexcept
+	{
+		return m_Indices.empty();
+	}
+
+	const ChunkMeshRecord& CpuMeshReplacementView::operator[](
+		std::size_t index) const noexcept
+	{
+		return m_Chunks[m_Indices[index]];
 	}
 
 	PendingCpuMeshBatch::PendingCpuMeshBatch(ConstructionToken, State state) noexcept :
@@ -150,6 +209,14 @@ namespace napa::voxel
 	std::span<const ChunkMeshRecord> PendingCpuMeshBatch::GetChunks() const noexcept
 	{
 		return m_State.m_Chunks;
+	}
+
+	CpuMeshReplacementView PendingCpuMeshBatch::GetReplacementChunks() const noexcept
+	{
+		return CpuMeshReplacementView{
+			m_State.m_Chunks,
+			m_State.m_ReplacementChunkIndices,
+		};
 	}
 
 	const WorldMeshValidationResult& PendingCpuMeshBatch::GetWorldMeshValidation() const noexcept
@@ -215,34 +282,41 @@ namespace napa::voxel
 			return requestedResult;
 		}
 
-		CpuMeshBatch prepared{
-			.m_Config = config,
-			.m_TargetWorldVoxelRevision = targetWorldVoxelRevision,
-		};
-		prepared.m_RequestedChunks.assign(requestedChunks.begin(), requestedChunks.end());
-		prepared.m_Candidates.reserve(requestedChunks.size());
-		const ReferenceMesher mesher(world);
-		for (const ChunkCoord chunk : requestedChunks)
+		return BuildCpuMeshBatchFromValidatedRequest(
+			world, targetWorldVoxelRevision, requestedChunks, batch);
+	}
+
+	ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
+		const VoxelMutationResult& mutation, CpuMeshBatch& batch)
+	{
+		const auto expectedTarget = CheckedAdd(
+			mutation.m_BaseWorldVoxelRevision, std::uint64_t{ 1 });
+		if (!mutation.Changed() || !expectedTarget.has_value() ||
+			*expectedTarget != mutation.m_TargetWorldVoxelRevision)
 		{
-			ChunkMeshRecord candidate{};
-			const ValidationResult meshResult = mesher.MeshChunk(chunk, candidate);
-			if (meshResult.Failed())
-			{
-				return meshResult;
-			}
-			if (candidate.m_SourceWorldVoxelRevision != targetWorldVoxelRevision)
-			{
-				return { ValidationError::MismatchedCpuMeshSourceRevision };
-			}
-			prepared.m_Candidates.push_back(std::move(candidate));
+			return { ValidationError::InvalidVoxelMutation };
 		}
-		if (world.GetWorldVoxelRevision() != targetWorldVoxelRevision)
+		if (mutation.m_TargetWorldVoxelRevision != world.GetWorldVoxelRevision())
 		{
 			return { ValidationError::MismatchedCpuMeshTargetRevision };
 		}
 
-		batch = std::move(prepared);
-		return {};
+		std::vector<ChunkCoord> dataDirtyChunks;
+		std::vector<ChunkCoord> meshDirtyChunks;
+		const ValidationResult dirtyResult = DeriveVoxelMutationDirtyChunks(
+			world.GetConfig(), mutation.m_SampleChanges, dataDirtyChunks, meshDirtyChunks);
+		if (dirtyResult.Failed())
+		{
+			return dirtyResult;
+		}
+		if (dataDirtyChunks != mutation.m_DataDirtyChunks ||
+			meshDirtyChunks != mutation.m_MeshDirtyChunks)
+		{
+			return { ValidationError::InvalidVoxelMutation };
+		}
+
+		return BuildCpuMeshBatchFromValidatedRequest(
+			world, mutation.m_TargetWorldVoxelRevision, meshDirtyChunks, batch);
 	}
 
 	ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
@@ -321,6 +395,20 @@ namespace napa::voxel
 		std::unique_ptr<PendingCpuMeshBatch> prepared =
 			std::make_unique<PendingCpuMeshBatch>(
 				PendingCpuMeshBatch::ConstructionToken{}, std::move(state));
+		prepared->m_State.m_ReplacementChunkIndices.reserve(batch.m_RequestedChunks.size());
+		for (const ChunkCoord chunk : batch.m_RequestedChunks)
+		{
+			const auto iterator = std::lower_bound(
+				prepared->m_State.m_Chunks.begin(), prepared->m_State.m_Chunks.end(), chunk,
+				[](const ChunkMeshRecord& record, ChunkCoord coordinate) noexcept
+				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+			if (iterator == prepared->m_State.m_Chunks.end() || iterator->m_Chunk != chunk)
+			{
+				return { ValidationError::MismatchedCpuMeshCandidateSet };
+			}
+			prepared->m_State.m_ReplacementChunkIndices.push_back(
+				static_cast<std::size_t>(iterator - prepared->m_State.m_Chunks.begin()));
+		}
 		pending = std::move(prepared);
 		return {};
 	}

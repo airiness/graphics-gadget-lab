@@ -8,6 +8,7 @@
 #include "NapaVoxelCore/World/VoxelWorld.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -16,13 +17,17 @@
 namespace napa::voxel
 {
 	struct CpuMeshBatch;
+	struct VoxelMutationResult;
 	class PendingCpuMeshBatch;
 	class PreparedCpuMeshPublication;
 	class VisibleMeshSet;
+	class CpuMeshReplacementView;
 
 	[[nodiscard]] ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
 		std::uint64_t targetWorldVoxelRevision, std::span<const ChunkCoord> requestedChunks,
 		CpuMeshBatch& batch);
+	[[nodiscard]] ValidationResult BuildCpuMeshBatch(const VoxelWorld& world,
+		const VoxelMutationResult& mutation, CpuMeshBatch& batch);
 	[[nodiscard]] ValidationResult ValidateCpuMeshBatch(const CpuMeshBatch& batch,
 		const VisibleMeshSet& visible, std::unique_ptr<PendingCpuMeshBatch>& pending);
 	[[nodiscard]] ValidationResult PrepareCpuMeshBatchPublication(
@@ -39,6 +44,23 @@ namespace napa::voxel
 		std::uint64_t m_TargetWorldVoxelRevision = 0;
 		std::vector<ChunkCoord> m_RequestedChunks;
 		std::vector<ChunkMeshRecord> m_Candidates;
+	};
+
+	class CpuMeshReplacementView final
+	{
+	public:
+		[[nodiscard]] std::size_t size() const noexcept;
+		[[nodiscard]] bool empty() const noexcept;
+		[[nodiscard]] const ChunkMeshRecord& operator[](std::size_t index) const noexcept;
+
+	private:
+		friend class PendingCpuMeshBatch;
+
+		CpuMeshReplacementView(std::span<const ChunkMeshRecord> chunks,
+			std::span<const std::size_t> indices) noexcept;
+
+		std::span<const ChunkMeshRecord> m_Chunks;
+		std::span<const std::size_t> m_Indices;
 	};
 
 	class PendingCpuMeshBatch final
@@ -59,6 +81,7 @@ namespace napa::voxel
 			std::uint64_t m_TargetWorldVoxelRevision = 0;
 			std::uint64_t m_CandidateChunkCount = 0;
 			std::vector<ChunkMeshRecord> m_Chunks;
+			std::vector<std::size_t> m_ReplacementChunkIndices;
 			WorldMeshValidationResult m_WorldMeshValidation{};
 			BoundaryContourValidationResult m_BoundaryValidation{};
 		};
@@ -73,6 +96,7 @@ namespace napa::voxel
 		[[nodiscard]] std::uint64_t GetTargetWorldVoxelRevision() const noexcept;
 		[[nodiscard]] std::uint64_t GetCandidateChunkCount() const noexcept;
 		[[nodiscard]] std::span<const ChunkMeshRecord> GetChunks() const noexcept;
+		[[nodiscard]] CpuMeshReplacementView GetReplacementChunks() const noexcept;
 		[[nodiscard]] const WorldMeshValidationResult& GetWorldMeshValidation() const noexcept;
 		[[nodiscard]] const BoundaryContourValidationResult&
 			GetBoundaryValidation() const noexcept;

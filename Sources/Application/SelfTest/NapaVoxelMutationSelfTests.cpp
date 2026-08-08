@@ -4,6 +4,8 @@
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
+#include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+#include "NapaVoxelCore/Testing/VoxelMutationTestAccess.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
@@ -78,6 +80,44 @@ namespace gglab
 				.m_MaxExclusive = { 16, 16, 16 },
 			};
 			return config;
+		}
+
+		inline constexpr std::array MutationChunkDomain{
+			napa::voxel::ChunkCoord{ -1, -1, -1 },
+			napa::voxel::ChunkCoord{ 0, -1, -1 },
+			napa::voxel::ChunkCoord{ -1, 0, -1 },
+			napa::voxel::ChunkCoord{ 0, 0, -1 },
+			napa::voxel::ChunkCoord{ -1, -1, 0 },
+			napa::voxel::ChunkCoord{ 0, -1, 0 },
+			napa::voxel::ChunkCoord{ -1, 0, 0 },
+			napa::voxel::ChunkCoord{ 0, 0, 0 },
+		};
+
+		[[nodiscard]] const napa::voxel::ChunkMeshRecord* FindMutationMeshRecord(
+			std::span<const napa::voxel::ChunkMeshRecord> records,
+			napa::voxel::ChunkCoord chunk) noexcept
+		{
+			using namespace napa::voxel;
+			const auto iterator = std::lower_bound(records.begin(), records.end(), chunk,
+				[](const ChunkMeshRecord& record, ChunkCoord coordinate) noexcept
+				{ return ChunkCoordZYXLess{}(record.m_Chunk, coordinate); });
+			return iterator != records.end() && iterator->m_Chunk == chunk ?
+				std::addressof(*iterator) : nullptr;
+		}
+
+		[[nodiscard]] napa::voxel::ValidationResult PrepareAndCommitMutationMeshBatch(
+			std::unique_ptr<napa::voxel::PendingCpuMeshBatch>& pending,
+			napa::voxel::VisibleMeshSet& visible)
+		{
+			using namespace napa::voxel;
+			std::unique_ptr<PreparedCpuMeshPublication> publication;
+			const ValidationResult prepareResult =
+				PrepareCpuMeshBatchPublication(pending, visible, publication);
+			if (prepareResult.Succeeded())
+			{
+				CommitCpuMeshBatchPublication(publication, visible);
+			}
+			return prepareResult;
 		}
 
 		[[nodiscard]] bool CreateSoilWorld(
@@ -421,6 +461,33 @@ namespace gglab
 				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } } && meshDirty.empty(),
 				"A Damage-only Sample change dirties Data without invalidating Mesh");
 
+			const VoxelSampleChange materialOnlyChange{
+				.m_Coordinate = { 1, 1, 1 },
+				.m_Before = {
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 7,
+				},
+				.m_After = {
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Soil,
+					.m_Damage = 7,
+				},
+			};
+			const ValidationResult materialResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &materialOnlyChange, 1 }, dataDirty, meshDirty);
+			context.Check(materialResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				meshDirty == std::vector<ChunkCoord>{ origin },
+				"A Material-only Sample change invalidates both Data and Mesh owners");
+
+			dataDirty = { { 3, 4, 5 } };
+			meshDirty = { { -3, -4, -5 } };
+			const ValidationResult emptyResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span<const VoxelSampleChange>{}, dataDirty, meshDirty);
+			context.Check(emptyResult.Succeeded() && dataDirty.empty() && meshDirty.empty(),
+				"The public Dirty helper maps an empty Change Set to empty outputs");
+
 			VoxelWorldConfig clippedConfig = MakeMutationConfig();
 			clippedConfig.m_LogicalCellBounds = {
 				.m_Min = {},
@@ -520,6 +587,7 @@ namespace gglab
 		void RunRevisionAndAllocationFailureTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
+			using namespace napa::voxel::testing;
 			const SphereEditRequest request =
 				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0);
 
@@ -529,8 +597,7 @@ namespace gglab
 				context.Check(false, "Revision exhaustion fixture creates its primitive world");
 				return;
 			}
-			VoxelMutationTestAccess::SetWorldVoxelRevision(
-				*revisionWorld, std::numeric_limits<std::uint64_t>::max());
+			const std::uint64_t revisionBefore = revisionWorld->GetWorldVoxelRevision();
 			std::uint64_t revisionHashBefore = 0;
 			std::uint64_t revisionHashAfter = 0;
 			const std::size_t revisionResidents = revisionWorld->GetResidentChunkCount();
@@ -544,12 +611,12 @@ namespace gglab
 			const bool revisionHashBeforeComputed =
 				HashWorld(*revisionWorld, revisionHashBefore);
 			const ValidationResult revisionResult =
-				ApplySphereEdit(*revisionWorld, request, revisionOutput);
+				VoxelMutationTestAccess::ApplySphereEditWithExhaustedRevision(
+					*revisionWorld, request, revisionOutput);
 			const bool revisionHashAfterComputed = HashWorld(*revisionWorld, revisionHashAfter);
 			context.Check(revisionHashBeforeComputed && revisionHashAfterComputed &&
 				revisionResult.m_Error == ValidationError::ArithmeticOverflow &&
-				revisionWorld->GetWorldVoxelRevision() ==
-				std::numeric_limits<std::uint64_t>::max() &&
+				revisionWorld->GetWorldVoxelRevision() == revisionBefore &&
 				revisionWorld->GetResidentChunkCount() == revisionResidents &&
 				revisionHashBefore == revisionHashAfter &&
 				revisionOutput == expectedRevisionOutput,
@@ -635,6 +702,160 @@ namespace gglab
 			}
 			context.Check(everyFailureWasAtomic,
 				"Every observed Prepare allocation fault preserves World and output atomically");
+		}
+
+		void RunSoilMeshReplacementTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+			std::unique_ptr<VoxelWorld> world;
+			if (!CreateSoilWorld(world))
+			{
+				context.Check(false, "Soil replacement fixture creates its primitive world");
+				return;
+			}
+
+			VisibleMeshSet visible;
+			CpuMeshBatch initialBatch{};
+			std::unique_ptr<PendingCpuMeshBatch> initialPending;
+			const bool initialPublished = BuildCpuMeshBatch(
+				*world, world->GetWorldVoxelRevision(), MutationChunkDomain, initialBatch).Succeeded() &&
+				ValidateCpuMeshBatch(initialBatch, visible, initialPending).Succeeded() &&
+				PrepareAndCommitMutationMeshBatch(initialPending, visible).Succeeded();
+			WorldMeshValidationResult initialValidation{};
+			const ChunkCoord unrelatedChunk{ -1, -1, -1 };
+			const ChunkMeshRecord* initialUnrelated = initialPublished ?
+				FindMutationMeshRecord(visible.GetChunks(), unrelatedChunk) : nullptr;
+			if (!initialPublished || initialUnrelated == nullptr ||
+				ComputeVisibleWorldMeshHash(visible, initialValidation).Failed())
+			{
+				context.Check(false, "Soil replacement fixture publishes its initial complete mesh");
+				return;
+			}
+			const std::uint64_t unrelatedSourceRevision =
+				initialUnrelated->m_SourceWorldVoxelRevision;
+			const MeshValidationResult unrelatedValidation = initialUnrelated->m_Validation;
+			const ChunkBoundaryContourSet unrelatedContours =
+				initialUnrelated->m_BoundaryContours;
+
+			VoxelMutationResult mutation{};
+			const ValidationResult mutationResult = ApplySphereEdit(
+				*world, MakeSoilEdit({ 3.0, 0.0, 0.0 }, 0.5, 1.0), mutation);
+			CpuMeshBatch dirtyBatch{};
+			const ValidationResult buildResult = mutationResult.Succeeded() ?
+				BuildCpuMeshBatch(*world, mutation, dirtyBatch) : mutationResult;
+			bool exactBatch = buildResult.Succeeded() && mutation.Changed() &&
+				dirtyBatch.m_TargetWorldVoxelRevision == mutation.m_TargetWorldVoxelRevision &&
+				dirtyBatch.m_RequestedChunks == mutation.m_MeshDirtyChunks &&
+				dirtyBatch.m_Candidates.size() == mutation.m_MeshDirtyChunks.size() &&
+				mutation.m_MeshDirtyChunks.size() == 4;
+			for (std::size_t index = 0;
+				exactBatch && index < dirtyBatch.m_Candidates.size(); ++index)
+			{
+				exactBatch = dirtyBatch.m_Candidates[index].m_Chunk ==
+					mutation.m_MeshDirtyChunks[index] &&
+					dirtyBatch.m_Candidates[index].m_SourceWorldVoxelRevision ==
+					mutation.m_TargetWorldVoxelRevision;
+			}
+			context.Check(exactBatch,
+				"A Soil mutation builds only its exact four Mesh Dirty replacements");
+			if (!exactBatch)
+			{
+				return;
+			}
+
+			VoxelMutationResult mismatchedDirtyMutation = mutation;
+			mismatchedDirtyMutation.m_MeshDirtyChunks.pop_back();
+			CpuMeshBatch unchangedBatch = dirtyBatch;
+			const ChunkMeshRecord* unchangedCandidateData = unchangedBatch.m_Candidates.data();
+			context.Check(BuildCpuMeshBatch(
+				*world, mismatchedDirtyMutation, unchangedBatch).m_Error ==
+				ValidationError::InvalidVoxelMutation &&
+				unchangedBatch.m_RequestedChunks == dirtyBatch.m_RequestedChunks &&
+				unchangedBatch.m_Candidates.data() == unchangedCandidateData,
+				"Mutation-bound batch construction rejects a mismatched Dirty Set atomically");
+
+			CpuMeshBatch missingCandidate = dirtyBatch;
+			missingCandidate.m_Candidates.pop_back();
+			std::unique_ptr<PendingCpuMeshBatch> rejectedPending;
+			const ValidationResult missingResult =
+				ValidateCpuMeshBatch(missingCandidate, visible, rejectedPending);
+			CpuMeshBatch extraCandidate = dirtyBatch;
+			extraCandidate.m_Candidates.push_back(dirtyBatch.m_Candidates.back());
+			const ValidationResult extraResult =
+				ValidateCpuMeshBatch(extraCandidate, visible, rejectedPending);
+			context.Check(
+				missingResult.m_Error == ValidationError::MismatchedCpuMeshCandidateSet &&
+				extraResult.m_Error == ValidationError::MismatchedCpuMeshCandidateSet &&
+				rejectedPending == nullptr && visible.GetVisibleWorldRevision() == 1,
+				"Exact Dirty Pending rejects missing and extra replacement Candidates atomically");
+
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			const bool validated =
+				ValidateCpuMeshBatch(dirtyBatch, visible, pending).Succeeded() && pending != nullptr;
+			bool replacementViewMatches = validated &&
+				pending->GetChunks().size() == MutationChunkDomain.size() &&
+				pending->GetReplacementChunks().size() == mutation.m_MeshDirtyChunks.size();
+			for (std::size_t index = 0;
+				replacementViewMatches && index < pending->GetReplacementChunks().size(); ++index)
+			{
+				const ChunkMeshRecord& replacement = pending->GetReplacementChunks()[index];
+				replacementViewMatches = replacement.m_Chunk == mutation.m_MeshDirtyChunks[index] &&
+					FindMutationMeshRecord(pending->GetChunks(), replacement.m_Chunk) ==
+					std::addressof(replacement);
+			}
+			const ChunkMeshRecord* prospectiveUnrelated = validated ?
+				FindMutationMeshRecord(pending->GetChunks(), unrelatedChunk) : nullptr;
+			const bool unrelatedPreserved = prospectiveUnrelated != nullptr &&
+				prospectiveUnrelated->m_SourceWorldVoxelRevision == unrelatedSourceRevision &&
+				prospectiveUnrelated->m_Validation == unrelatedValidation &&
+				prospectiveUnrelated->m_BoundaryContours == unrelatedContours;
+			context.Check(replacementViewMatches && unrelatedPreserved &&
+				visible.GetVisibleWorldRevision() == mutation.m_BaseWorldVoxelRevision &&
+				visible.GetWorldMeshValidation() == initialValidation,
+				"Pending exposes exact replacements and preserves unrelated prospective records");
+			if (!replacementViewMatches || !unrelatedPreserved)
+			{
+				return;
+			}
+
+			std::unique_ptr<PendingCpuMeshBatch> competingPending;
+			const bool competingValidated =
+				ValidateCpuMeshBatch(dirtyBatch, visible, competingPending).Succeeded() &&
+				competingPending != nullptr;
+			const bool published =
+				PrepareAndCommitMutationMeshBatch(pending, visible).Succeeded();
+			WorldMeshValidationResult editedValidation{};
+			const ChunkMeshRecord* publishedUnrelated = published ?
+				FindMutationMeshRecord(visible.GetChunks(), unrelatedChunk) : nullptr;
+			context.Check(published && !pending &&
+				visible.GetVisibleWorldRevision() == mutation.m_TargetWorldVoxelRevision &&
+				ComputeVisibleWorldMeshHash(visible, editedValidation).Succeeded() &&
+				editedValidation.m_ValidationHash != initialValidation.m_ValidationHash &&
+				publishedUnrelated != nullptr &&
+				publishedUnrelated->m_SourceWorldVoxelRevision == unrelatedSourceRevision &&
+				publishedUnrelated->m_Validation == unrelatedValidation &&
+				publishedUnrelated->m_BoundaryContours == unrelatedContours,
+				"Headless CPU publication atomically advances the Soil mesh and retains unrelated Chunks");
+			context.Check(editedValidation == WorldMeshValidationResult{
+				.m_ValidationHash = 710722746226056059ull,
+				.m_ChunkCount = 8,
+				.m_VertexCount = 4902,
+				.m_SectionCount = 8,
+				.m_IndexCount = 4902,
+				.m_TriangleCount = 1634,
+				.m_SkippedDegenerateTriangleCount = 110,
+				}, "The edited Soil World matches its exact mesh publication Golden");
+
+			const PendingCpuMeshBatch* competingIdentity = competingPending.get();
+			std::unique_ptr<PreparedCpuMeshPublication> stalePublication;
+			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
+			context.Check(competingValidated &&
+				PrepareCpuMeshBatchPublication(competingPending, visible, stalePublication).m_Error ==
+				ValidationError::StaleCpuMeshBatch &&
+				competingPending.get() == competingIdentity && !stalePublication &&
+				ValidateCpuMeshBatch(dirtyBatch, visible, sameRevisionPending).m_Error ==
+				ValidationError::StaleCpuMeshBatch && !sameRevisionPending,
+				"Published and competing same-revision Soil batches cannot overwrite newer Visible state");
 		}
 
 		void RunFullDomainMutationOracleTests(SelfTestContext& context) noexcept
@@ -733,6 +954,7 @@ namespace gglab
 		RunExactDirtyChunkTests(context);
 		RunMutationFailureAtomicityTests(context);
 		RunRevisionAndAllocationFailureTests(context);
+		RunSoilMeshReplacementTests(context);
 		RunFullDomainMutationOracleTests(context);
 	}
 }

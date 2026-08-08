@@ -19,7 +19,6 @@ namespace napa::voxel
 	struct PrimitiveWorldGenerationResult;
 	struct SphereEditRequest;
 	struct VoxelMutationResult;
-	class VoxelMutationTestAccess;
 
 	class VoxelWorld final
 	{
@@ -71,7 +70,6 @@ namespace napa::voxel
 
 		friend ValidationResult ApplySphereEdit(VoxelWorld& world,
 			const SphereEditRequest& request, VoxelMutationResult& result);
-		friend class VoxelMutationTestAccess;
 		friend ValidationResult GeneratePrimitiveVoxelWorld(const VoxelWorldConfig& config,
 			std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 			PrimitiveWorldGenerationResult& result);
