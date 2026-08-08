@@ -79,6 +79,8 @@ namespace napa::voxel
 		InvalidVoxelEditMaterialRules = 70,
 		UnpreparedSphereEditContext = 71,
 		InvalidVoxelMutation = 72,
+		VoxelMutationAllocationFailure = 73,
+		InvalidVoxelSampleChange = 74,
 	};
 
 	struct ValidationResult

@@ -51,6 +51,35 @@ namespace gglab
 			};
 		}
 
+		[[nodiscard]] napa::voxel::VoxelSampleChange MakeDensityChange(
+			napa::voxel::SampleCoord coordinate) noexcept
+		{
+			using namespace napa::voxel;
+			return {
+				.m_Coordinate = coordinate,
+				.m_Before = {
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Soil,
+					.m_Damage = 0,
+				},
+				.m_After = {
+					.m_Density = 100,
+					.m_Material = VoxelMaterial::Empty,
+					.m_Damage = 0,
+				},
+			};
+		}
+
+		[[nodiscard]] napa::voxel::VoxelWorldConfig MakeDirtyConfig() noexcept
+		{
+			napa::voxel::VoxelWorldConfig config = MakeMutationConfig();
+			config.m_LogicalCellBounds = {
+				.m_Min = { -16, -16, -16 },
+				.m_MaxExclusive = { 16, 16, 16 },
+			};
+			return config;
+		}
+
 		[[nodiscard]] bool CreateSoilWorld(
 			std::unique_ptr<napa::voxel::VoxelWorld>& world)
 		{
@@ -227,7 +256,17 @@ namespace gglab
 				changesValid = changesValid && changed && chunk != nullptr &&
 					chunk->GetVoxelRevision() == mutation.m_TargetWorldVoxelRevision;
 			}
+			std::vector<ChunkCoord> derivedDataDirty;
+			std::vector<ChunkCoord> derivedMeshDirty;
+			const ValidationResult dirtyResult = DeriveVoxelMutationDirtyChunks(
+				world->GetConfig(), mutation.m_SampleChanges,
+				derivedDataDirty, derivedMeshDirty);
 			context.Check(changesValid && hashesComputed &&
+				dirtyResult.Succeeded() &&
+				mutation.m_DataDirtyChunks == derivedDataDirty &&
+				mutation.m_MeshDirtyChunks == derivedMeshDirty &&
+				!mutation.m_DataDirtyChunks.empty() &&
+				!mutation.m_MeshDirtyChunks.empty() &&
 				mutation.m_SampleChanges.size() == 97 &&
 				editedHash == 397877192563327680ull,
 				"One Soil Brush commits canonical changes and one shared World revision");
@@ -237,10 +276,13 @@ namespace gglab
 				.m_BaseWorldVoxelRevision = 99,
 				.m_TargetWorldVoxelRevision = 100,
 				.m_SampleChanges = { mutation.m_SampleChanges.front() },
+				.m_DataDirtyChunks = { { 2, 3, 4 } },
+				.m_MeshDirtyChunks = { { -2, -3, -4 } },
 			};
 			const ValidationResult repeatedResult = ApplySphereEdit(
 				*world, MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0), repeated);
 			context.Check(repeatedResult.Succeeded() && !repeated.Changed() &&
+				repeated.m_DataDirtyChunks.empty() && repeated.m_MeshDirtyChunks.empty() &&
 				repeated.m_BaseWorldVoxelRevision == settledRevision &&
 				repeated.m_TargetWorldVoxelRevision == settledRevision &&
 				world->GetWorldVoxelRevision() == settledRevision,
@@ -303,6 +345,134 @@ namespace gglab
 					"Chunk revisions record the last World revision that changed their Samples");
 		}
 
+		void RunExactDirtyChunkTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			const VoxelWorldConfig config = MakeDirtyConfig();
+			const ChunkCoord origin{};
+
+			const VoxelSampleChange interiorChange = MakeDensityChange({ 1, 1, 1 });
+			std::vector<ChunkCoord> dataDirty;
+			std::vector<ChunkCoord> meshDirty;
+			const ValidationResult interiorResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &interiorChange, 1 }, dataDirty, meshDirty);
+			context.Check(interiorResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				meshDirty == std::vector<ChunkCoord>{ origin },
+				"An interior Sample change dirties one Data owner and one Mesh owner");
+
+			const VoxelSampleChange faceChange = MakeDensityChange({ 8, 1, 1 });
+			const ValidationResult faceResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &faceChange, 1 }, dataDirty, meshDirty);
+			context.Check(faceResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 0, 0 } } &&
+				meshDirty == std::vector<ChunkCoord>{ origin, { 1, 0, 0 } },
+				"A Chunk-face Sample change dirties both adjacent Mesh owners");
+
+			const VoxelSampleChange edgeChange = MakeDensityChange({ 8, 8, 1 });
+			const ValidationResult edgeResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &edgeChange, 1 }, dataDirty, meshDirty);
+			context.Check(edgeResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 0 } } &&
+				meshDirty == std::vector<ChunkCoord>{
+					origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
+				}, "A Chunk-edge Sample change dirties all four adjacent Mesh owners");
+
+			const VoxelSampleChange cornerChange = MakeDensityChange({ 8, 8, 8 });
+			const std::vector<ChunkCoord> expectedCornerMesh{
+				origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
+				{ 0, 0, 1 }, { 1, 0, 1 }, { 0, 1, 1 }, { 1, 1, 1 },
+			};
+			const ValidationResult cornerResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &cornerChange, 1 }, dataDirty, meshDirty);
+			context.Check(cornerResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 1 } } &&
+				meshDirty == expectedCornerMesh,
+				"A Chunk-corner Sample change dirties all eight adjacent Mesh owners");
+
+			const VoxelSampleChange negativeCornerChange = MakeDensityChange({ 0, 0, 0 });
+			const std::vector<ChunkCoord> expectedNegativeCornerMesh{
+				{ -1, -1, -1 }, { 0, -1, -1 }, { -1, 0, -1 }, { 0, 0, -1 },
+				{ -1, -1, 0 }, { 0, -1, 0 }, { -1, 0, 0 }, origin,
+			};
+			const ValidationResult negativeResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &negativeCornerChange, 1 }, dataDirty, meshDirty);
+			context.Check(negativeResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				meshDirty == expectedNegativeCornerMesh,
+				"Negative Chunk owners use the same exact corner-dirty contract");
+
+			const VoxelSampleChange damageOnlyChange{
+				.m_Coordinate = { -1, -1, -1 },
+				.m_Before = {
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 10,
+				},
+				.m_After = {
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 11,
+				},
+			};
+			const ValidationResult damageResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &damageOnlyChange, 1 }, dataDirty, meshDirty);
+			context.Check(damageResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } } && meshDirty.empty(),
+				"A Damage-only Sample change dirties Data without invalidating Mesh");
+
+			VoxelWorldConfig clippedConfig = MakeMutationConfig();
+			clippedConfig.m_LogicalCellBounds = {
+				.m_Min = {},
+				.m_MaxExclusive = { 8, 8, 8 },
+			};
+			const std::array clippedChanges{
+				MakeDensityChange({ 0, 0, 0 }),
+				MakeDensityChange({ 8, 8, 8 }),
+			};
+			const ValidationResult clippedResult = DeriveVoxelMutationDirtyChunks(
+				clippedConfig, clippedChanges, dataDirty, meshDirty);
+			context.Check(clippedResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
+				meshDirty == std::vector<ChunkCoord>{ origin },
+				"Mesh Dirty cells are clipped exactly to Logical Cell Bounds");
+
+			const std::array repeatedChanges{
+				cornerChange,
+				MakeDensityChange({ 7, 7, 7 }),
+			};
+			const ValidationResult repeatedResult = DeriveVoxelMutationDirtyChunks(
+				config, repeatedChanges, dataDirty, meshDirty);
+			const std::array reversedChanges{
+				repeatedChanges[1],
+				repeatedChanges[0],
+			};
+			std::vector<ChunkCoord> reversedDataDirty;
+			std::vector<ChunkCoord> reversedMeshDirty;
+			const ValidationResult reversedResult = DeriveVoxelMutationDirtyChunks(
+				config, reversedChanges, reversedDataDirty, reversedMeshDirty);
+			context.Check(repeatedResult.Succeeded() && reversedResult.Succeeded() &&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
+				meshDirty == expectedCornerMesh && dataDirty == reversedDataDirty &&
+				meshDirty == reversedMeshDirty,
+				"Dirty Chunk sets are sorted, unique, and independent of change order");
+
+			const VoxelSampleChange invalidChange{
+				.m_Coordinate = {},
+				.m_Before = DefaultVoxelSample,
+				.m_After = DefaultVoxelSample,
+			};
+			const std::vector<ChunkCoord> sentinelData{ { 7, 8, 9 } };
+			const std::vector<ChunkCoord> sentinelMesh{ { -7, -8, -9 } };
+			dataDirty = sentinelData;
+			meshDirty = sentinelMesh;
+			const ValidationResult invalidResult = DeriveVoxelMutationDirtyChunks(
+				config, std::span{ &invalidChange, 1 }, dataDirty, meshDirty);
+			context.Check(invalidResult.m_Error == ValidationError::InvalidVoxelSampleChange &&
+				dataDirty == sentinelData && meshDirty == sentinelMesh,
+				"Invalid Sample changes leave Dirty outputs unchanged");
+		}
+
 		void RunMutationFailureAtomicityTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -325,6 +495,8 @@ namespace gglab
 					.m_Before = DefaultVoxelSample,
 					.m_After = DefaultVoxelSample,
 				} },
+				.m_DataDirtyChunks = { { 4, 5, 6 } },
+				.m_MeshDirtyChunks = { { -4, -5, -6 } },
 			};
 			const VoxelMutationResult expectedOutput = output;
 			SphereEditRequest invalid = MakeSoilEdit();
@@ -343,6 +515,126 @@ namespace gglab
 				world->GetWorldVoxelRevision() == beforeRevision &&
 				world->GetResidentChunkCount() == beforeResidents,
 				"Mutation Prepare failures preserve Samples, Residency, Revision, and output");
+		}
+
+		void RunRevisionAndAllocationFailureTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			const SphereEditRequest request =
+				MakeSoilEdit({ -0.25, 0.5, -0.75 }, 1.75, 1.0);
+
+			std::unique_ptr<VoxelWorld> revisionWorld;
+			if (!CreateSoilWorld(revisionWorld))
+			{
+				context.Check(false, "Revision exhaustion fixture creates its primitive world");
+				return;
+			}
+			VoxelMutationTestAccess::SetWorldVoxelRevision(
+				*revisionWorld, std::numeric_limits<std::uint64_t>::max());
+			std::uint64_t revisionHashBefore = 0;
+			std::uint64_t revisionHashAfter = 0;
+			const std::size_t revisionResidents = revisionWorld->GetResidentChunkCount();
+			VoxelMutationResult revisionOutput{
+				.m_BaseWorldVoxelRevision = 17,
+				.m_TargetWorldVoxelRevision = 18,
+				.m_DataDirtyChunks = { { 2, 3, 4 } },
+				.m_MeshDirtyChunks = { { -2, -3, -4 } },
+			};
+			const VoxelMutationResult expectedRevisionOutput = revisionOutput;
+			const bool revisionHashBeforeComputed =
+				HashWorld(*revisionWorld, revisionHashBefore);
+			const ValidationResult revisionResult =
+				ApplySphereEdit(*revisionWorld, request, revisionOutput);
+			const bool revisionHashAfterComputed = HashWorld(*revisionWorld, revisionHashAfter);
+			context.Check(revisionHashBeforeComputed && revisionHashAfterComputed &&
+				revisionResult.m_Error == ValidationError::ArithmeticOverflow &&
+				revisionWorld->GetWorldVoxelRevision() ==
+				std::numeric_limits<std::uint64_t>::max() &&
+				revisionWorld->GetResidentChunkCount() == revisionResidents &&
+				revisionHashBefore == revisionHashAfter &&
+				revisionOutput == expectedRevisionOutput,
+				"Revision exhaustion rejects a changing mutation atomically");
+
+			std::unique_ptr<VoxelWorld> successfulWorld;
+			if (!CreateSoilWorld(successfulWorld))
+			{
+				context.Check(false, "Allocation probe fixture creates its primitive world");
+				return;
+			}
+			VoxelMutationResult successfulOutput{};
+			VoxelMutationAllocationProbe successfulProbe{};
+			const ValidationResult successfulResult =
+				VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
+					*successfulWorld, request, successfulOutput, successfulProbe);
+			const std::size_t prepareAllocationCount =
+				successfulProbe.m_PrepareAllocationCount;
+			context.Check(successfulResult.Succeeded() && successfulOutput.Changed() &&
+				prepareAllocationCount > 0 && successfulProbe.m_CommitAllocationCount == 0,
+				"A successful mutation observes Prepare allocations and no Commit allocations");
+
+			bool everyFailureWasAtomic = successfulResult.Succeeded() &&
+				prepareAllocationCount > 0 && successfulProbe.m_CommitAllocationCount == 0;
+			for (std::size_t allocation = 1;
+				everyFailureWasAtomic && allocation <= prepareAllocationCount; ++allocation)
+			{
+				std::unique_ptr<VoxelWorld> faultWorld;
+				if (!CreateSoilWorld(faultWorld))
+				{
+					everyFailureWasAtomic = false;
+					break;
+				}
+
+				std::uint64_t hashBefore = 0;
+				std::uint64_t hashAfter = 0;
+				const std::uint64_t revisionBefore = faultWorld->GetWorldVoxelRevision();
+				const std::size_t residentsBefore = faultWorld->GetResidentChunkCount();
+				std::vector<std::uint64_t> chunkRevisionsBefore;
+				bool chunkRevisionsPreserved = true;
+				for (const ChunkCoord owner : successfulOutput.m_DataDirtyChunks)
+				{
+					const VoxelChunk* chunk = faultWorld->FindChunk(owner);
+					if (chunk == nullptr)
+					{
+						chunkRevisionsPreserved = false;
+						break;
+					}
+					chunkRevisionsBefore.push_back(chunk->GetVoxelRevision());
+				}
+				VoxelMutationResult faultOutput{
+					.m_BaseWorldVoxelRevision = 21,
+					.m_TargetWorldVoxelRevision = 22,
+					.m_DataDirtyChunks = { { 5, 6, 7 } },
+					.m_MeshDirtyChunks = { { -5, -6, -7 } },
+				};
+				const VoxelMutationResult expectedFaultOutput = faultOutput;
+				VoxelMutationAllocationProbe faultProbe{
+					.m_FailAtPrepareAllocation = allocation,
+				};
+				const bool hashBeforeComputed = HashWorld(*faultWorld, hashBefore);
+				const ValidationResult faultResult =
+					VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
+						*faultWorld, request, faultOutput, faultProbe);
+				const bool hashAfterComputed = HashWorld(*faultWorld, hashAfter);
+				for (std::size_t index = 0;
+					chunkRevisionsPreserved && index < successfulOutput.m_DataDirtyChunks.size();
+					++index)
+				{
+					const VoxelChunk* chunk =
+						faultWorld->FindChunk(successfulOutput.m_DataDirtyChunks[index]);
+					chunkRevisionsPreserved = chunk != nullptr &&
+						chunk->GetVoxelRevision() == chunkRevisionsBefore[index];
+				}
+				everyFailureWasAtomic = hashBeforeComputed && hashAfterComputed &&
+					faultResult.m_Error == ValidationError::VoxelMutationAllocationFailure &&
+					faultProbe.m_PrepareAllocationCount == allocation &&
+					faultProbe.m_CommitAllocationCount == 0 &&
+					faultWorld->GetWorldVoxelRevision() == revisionBefore &&
+					faultWorld->GetResidentChunkCount() == residentsBefore &&
+					chunkRevisionsPreserved && hashBefore == hashAfter &&
+					faultOutput == expectedFaultOutput;
+			}
+			context.Check(everyFailureWasAtomic,
+				"Every observed Prepare allocation fault preserves World and output atomically");
 		}
 
 		void RunFullDomainMutationOracleTests(SelfTestContext& context) noexcept
@@ -410,8 +702,16 @@ namespace gglab
 
 				std::uint64_t boundedHash = 0;
 				std::uint64_t oracleHash = 0;
+				std::vector<ChunkCoord> oracleDataDirty;
+				std::vector<ChunkCoord> oracleMeshDirty;
+				const ValidationResult oracleDirtyResult = DeriveVoxelMutationDirtyChunks(
+					oracleWorld->GetConfig(), oracleChanges,
+					oracleDataDirty, oracleMeshDirty);
 				allCasesMatched = allCasesMatched &&
+					oracleDirtyResult.Succeeded() &&
 					boundedMutation.m_SampleChanges == oracleChanges &&
+					boundedMutation.m_DataDirtyChunks == oracleDataDirty &&
+					boundedMutation.m_MeshDirtyChunks == oracleMeshDirty &&
 					CompareWorldSamples(*boundedWorld, *oracleWorld) &&
 					HashWorld(*boundedWorld, boundedHash) &&
 					HashWorld(*oracleWorld, oracleHash) && boundedHash == oracleHash;
@@ -430,7 +730,9 @@ namespace gglab
 		RunSoilTransitionTests(context);
 		RunAtomicSoilMutationTests(context);
 		RunCurrentFirstAndChunkRevisionTests(context);
+		RunExactDirtyChunkTests(context);
 		RunMutationFailureAtomicityTests(context);
+		RunRevisionAndAllocationFailureTests(context);
 		RunFullDomainMutationOracleTests(context);
 	}
 }

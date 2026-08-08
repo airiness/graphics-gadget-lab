@@ -17,12 +17,89 @@ namespace napa::voxel
 {
 	namespace
 	{
+		thread_local VoxelMutationAllocationProbe* ActiveAllocationProbe = nullptr;
+		thread_local bool IsMutationCommitPhase = false;
+
 		struct PreparedSampleWrite
 		{
 			VoxelChunk* m_Chunk = nullptr;
 			std::size_t m_FlatIndex = 0;
 			VoxelSample m_After{};
 		};
+
+		[[nodiscard]] ValidationResult RecordPotentialAllocation() noexcept
+		{
+			if (ActiveAllocationProbe == nullptr)
+			{
+				return {};
+			}
+
+			std::size_t& count = IsMutationCommitPhase ?
+				ActiveAllocationProbe->m_CommitAllocationCount :
+				ActiveAllocationProbe->m_PrepareAllocationCount;
+			const auto nextCount = CheckedAdd(count, std::size_t{ 1 });
+			if (!nextCount.has_value())
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+			count = *nextCount;
+
+			if (!IsMutationCommitPhase &&
+				ActiveAllocationProbe->m_FailAtPrepareAllocation == count)
+			{
+				return { ValidationError::VoxelMutationAllocationFailure };
+			}
+			return {};
+		}
+
+		template <typename Value>
+		[[nodiscard]] ValidationResult EnsureAppendCapacity(std::vector<Value>& values)
+		{
+			if (values.size() < values.capacity())
+			{
+				return {};
+			}
+			if (values.size() == values.max_size())
+			{
+				return { ValidationError::ArithmeticOverflow };
+			}
+
+			const ValidationResult allocationResult = RecordPotentialAllocation();
+			if (allocationResult.Failed())
+			{
+				return allocationResult;
+			}
+
+			std::size_t nextCapacity = 1;
+			if (values.capacity() != 0)
+			{
+				const auto doubled = CheckedMul(values.capacity(), std::size_t{ 2 });
+				nextCapacity = doubled.has_value() ?
+					std::min(*doubled, values.max_size()) : values.max_size();
+			}
+			values.reserve(nextCapacity);
+			return {};
+		}
+
+		template <typename Value>
+		[[nodiscard]] ValidationResult AppendTracked(
+			std::vector<Value>& values, const Value& value)
+		{
+			const ValidationResult capacityResult = EnsureAppendCapacity(values);
+			if (capacityResult.Failed())
+			{
+				return capacityResult;
+			}
+			values.push_back(value);
+			return {};
+		}
+
+		void SortAndUniqueChunks(std::vector<ChunkCoord>& chunks) noexcept
+		{
+			const ChunkCoordZYXLess less{};
+			std::sort(chunks.begin(), chunks.end(), less);
+			chunks.erase(std::unique(chunks.begin(), chunks.end()), chunks.end());
+		}
 
 		[[nodiscard]] ValidationResult EvaluateSampleTransition(
 			const SphereEditRequest& request,
@@ -82,6 +159,126 @@ namespace napa::voxel
 			return {};
 		}
 
+		[[nodiscard]] ValidationResult DeriveDirtyChunksFromValidatedConfig(
+			const VoxelWorldConfig& config, std::span<const VoxelSampleChange> changes,
+			std::vector<ChunkCoord>& dataDirtyChunks,
+			std::vector<ChunkCoord>& meshDirtyChunks, bool validateChanges)
+		{
+			SampleAabb logicalSampleBounds{};
+			const ValidationResult boundsResult = LogicalCellBoundsToSampleBounds(
+				config.m_LogicalCellBounds, logicalSampleBounds);
+			if (boundsResult.Failed())
+			{
+				return boundsResult;
+			}
+
+			std::vector<ChunkCoord> preparedDataDirtyChunks;
+			std::vector<ChunkCoord> preparedMeshDirtyChunks;
+			for (const VoxelSampleChange& change : changes)
+			{
+				if (!logicalSampleBounds.Contains(change.m_Coordinate) ||
+					change.m_Before == change.m_After)
+				{
+					return { ValidationError::InvalidVoxelSampleChange };
+				}
+				if (validateChanges)
+				{
+					const ValidationResult beforeResult = ValidateVoxelSample(change.m_Before);
+					if (beforeResult.Failed())
+					{
+						return beforeResult;
+					}
+					const ValidationResult afterResult = ValidateVoxelSample(change.m_After);
+					if (afterResult.Failed())
+					{
+						return afterResult;
+					}
+				}
+
+				OwnedSampleAddress sampleAddress{};
+				const ValidationResult sampleAddressResult = ResolveSampleOwner(
+					change.m_Coordinate, config.m_ChunkCellCount, sampleAddress);
+				if (sampleAddressResult.Failed())
+				{
+					return sampleAddressResult;
+				}
+				const ValidationResult dataAppendResult = AppendTracked(
+					preparedDataDirtyChunks, sampleAddress.m_Owner);
+				if (dataAppendResult.Failed())
+				{
+					return dataAppendResult;
+				}
+
+				const bool affectsMesh = change.m_Before.m_Density != change.m_After.m_Density ||
+					change.m_Before.m_Material != change.m_After.m_Material;
+				if (!affectsMesh)
+				{
+					continue;
+				}
+
+				for (std::int64_t zOffset = -1; zOffset <= 0; ++zOffset)
+				{
+					for (std::int64_t yOffset = -1; yOffset <= 0; ++yOffset)
+					{
+						for (std::int64_t xOffset = -1; xOffset <= 0; ++xOffset)
+						{
+							const std::int64_t x =
+								static_cast<std::int64_t>(change.m_Coordinate.m_X) + xOffset;
+							const std::int64_t y =
+								static_cast<std::int64_t>(change.m_Coordinate.m_Y) + yOffset;
+							const std::int64_t z =
+								static_cast<std::int64_t>(change.m_Coordinate.m_Z) + zOffset;
+							const CellAabb& bounds = config.m_LogicalCellBounds;
+							if (x < bounds.m_Min.m_X || y < bounds.m_Min.m_Y ||
+								z < bounds.m_Min.m_Z || x >= bounds.m_MaxExclusive.m_X ||
+								y >= bounds.m_MaxExclusive.m_Y || z >= bounds.m_MaxExclusive.m_Z)
+							{
+								continue;
+							}
+
+							OwnedCellAddress cellAddress{};
+							const CellCoord cell{
+								static_cast<std::int32_t>(x),
+								static_cast<std::int32_t>(y),
+								static_cast<std::int32_t>(z),
+							};
+							const ValidationResult cellAddressResult = ResolveCellOwner(
+								cell, config.m_ChunkCellCount, cellAddress);
+							if (cellAddressResult.Failed())
+							{
+								return cellAddressResult;
+							}
+							const ValidationResult meshAppendResult = AppendTracked(
+								preparedMeshDirtyChunks, cellAddress.m_Owner);
+							if (meshAppendResult.Failed())
+							{
+								return meshAppendResult;
+							}
+						}
+					}
+				}
+			}
+
+			SortAndUniqueChunks(preparedDataDirtyChunks);
+			SortAndUniqueChunks(preparedMeshDirtyChunks);
+			dataDirtyChunks.swap(preparedDataDirtyChunks);
+			meshDirtyChunks.swap(preparedMeshDirtyChunks);
+			return {};
+		}
+	}
+
+	ValidationResult DeriveVoxelMutationDirtyChunks(
+		const VoxelWorldConfig& config, std::span<const VoxelSampleChange> changes,
+		std::vector<ChunkCoord>& dataDirtyChunks,
+		std::vector<ChunkCoord>& meshDirtyChunks)
+	{
+		const ValidationResult configResult = ValidateConfig(config);
+		if (configResult.Failed())
+		{
+			return configResult;
+		}
+		return DeriveDirtyChunksFromValidatedConfig(
+			config, changes, dataDirtyChunks, meshDirtyChunks, true);
 	}
 
 	ValidationResult EvaluateSphereEditSampleTransition(
@@ -113,10 +310,12 @@ namespace napa::voxel
 	{
 		using ChunkMap = VoxelWorld::ChunkMap;
 		static_assert(std::allocator_traits<ChunkMap::allocator_type>::is_always_equal::value);
-		static_assert(std::allocator_traits<
-			std::vector<VoxelSampleChange>::allocator_type>::is_always_equal::value);
 		static_assert(std::is_nothrow_invocable_r_v<bool, ChunkCoordZYXLess,
 			ChunkCoord, ChunkCoord>);
+		static_assert(std::is_nothrow_assignable_v<VoxelSample&, const VoxelSample&>);
+		static_assert(std::is_nothrow_assignable_v<std::uint64_t&, std::uint64_t>);
+		static_assert(std::is_nothrow_swappable_v<std::vector<VoxelSampleChange>>);
+		static_assert(std::is_nothrow_swappable_v<std::vector<ChunkCoord>>);
 
 		SphereEditContext editContext{};
 		const ValidationResult contextResult =
@@ -146,8 +345,9 @@ namespace napa::voxel
 				result.m_BaseWorldVoxelRevision = preparedResult.m_BaseWorldVoxelRevision;
 				result.m_TargetWorldVoxelRevision = preparedResult.m_TargetWorldVoxelRevision;
 				result.m_SampleChanges.swap(preparedResult.m_SampleChanges);
+				result.m_DataDirtyChunks.swap(preparedResult.m_DataDirtyChunks);
+				result.m_MeshDirtyChunks.swap(preparedResult.m_MeshDirtyChunks);
 			};
-		static_assert(noexcept(commitMutation()));
 
 		for (std::int64_t z = editContext.m_ScanBounds.m_Min.m_Z;
 			z < editContext.m_ScanBounds.m_MaxExclusive.m_Z; ++z)
@@ -220,12 +420,24 @@ namespace napa::voxel
 						auto scratchChunk = scratchChunks.find(address.m_Owner);
 						if (scratchChunk == scratchChunks.end())
 						{
+							const ValidationResult chunkAllocationResult =
+								RecordPotentialAllocation();
+							if (chunkAllocationResult.Failed())
+							{
+								return chunkAllocationResult;
+							}
 							std::unique_ptr<VoxelChunk> created;
 							const ValidationResult createResult = VoxelChunk::Create(
 								world.m_Config.m_ChunkCellCount, created);
 							if (createResult.Failed())
 							{
 								return createResult;
+							}
+							const ValidationResult mapAllocationResult =
+								RecordPotentialAllocation();
+							if (mapAllocationResult.Failed())
+							{
+								return mapAllocationResult;
 							}
 							const auto [iterator, inserted] = scratchChunks.try_emplace(
 								address.m_Owner, std::move(created));
@@ -238,23 +450,43 @@ namespace napa::voxel
 						chunk = scratchChunk->second.get();
 					}
 
-					preparedResult.m_SampleChanges.push_back({
+					const ValidationResult changeAppendResult = AppendTracked(
+						preparedResult.m_SampleChanges, VoxelSampleChange{
 						.m_Coordinate = coordinate,
 						.m_Before = before,
 						.m_After = after,
 						});
-					preparedWrites.push_back({
+					if (changeAppendResult.Failed())
+					{
+						return changeAppendResult;
+					}
+					const ValidationResult writeAppendResult = AppendTracked(
+						preparedWrites, PreparedSampleWrite{
 						.m_Chunk = chunk,
 						.m_FlatIndex = flatIndex,
 						.m_After = after,
 						});
+					if (writeAppendResult.Failed())
+					{
+						return writeAppendResult;
+					}
 				}
 			}
 		}
 
+		const ValidationResult dirtyResult = DeriveDirtyChunksFromValidatedConfig(
+			world.m_Config, preparedResult.m_SampleChanges,
+			preparedResult.m_DataDirtyChunks, preparedResult.m_MeshDirtyChunks, false);
+		if (dirtyResult.Failed())
+		{
+			return dirtyResult;
+		}
+
 		if (!preparedResult.Changed())
 		{
+			IsMutationCommitPhase = true;
 			commitMutation();
+			IsMutationCommitPhase = false;
 			return {};
 		}
 
@@ -266,7 +498,35 @@ namespace napa::voxel
 		}
 		preparedResult.m_TargetWorldVoxelRevision = *targetRevision;
 
+		IsMutationCommitPhase = true;
 		commitMutation();
+		IsMutationCommitPhase = false;
 		return {};
+	}
+
+	ValidationResult VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
+		VoxelWorld& world, const SphereEditRequest& request,
+		VoxelMutationResult& result, VoxelMutationAllocationProbe& probe)
+	{
+		if (ActiveAllocationProbe != nullptr)
+		{
+			return { ValidationError::InvalidVoxelMutation };
+		}
+
+		probe.m_PrepareAllocationCount = 0;
+		probe.m_CommitAllocationCount = 0;
+		IsMutationCommitPhase = false;
+		ActiveAllocationProbe = &probe;
+		const ValidationResult mutationResult =
+			napa::voxel::ApplySphereEdit(world, request, result);
+		ActiveAllocationProbe = nullptr;
+		IsMutationCommitPhase = false;
+		return mutationResult;
+	}
+
+	void VoxelMutationTestAccess::SetWorldVoxelRevision(
+		VoxelWorld& world, std::uint64_t revision) noexcept
+	{
+		world.m_WorldVoxelRevision = revision;
 	}
 }

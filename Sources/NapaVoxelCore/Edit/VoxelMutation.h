@@ -3,7 +3,9 @@
 #include "NapaVoxelCore/Edit/SphereEdit.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <span>
 #include <type_traits>
 #include <vector>
 
@@ -26,6 +28,8 @@ namespace napa::voxel
 		std::uint64_t m_BaseWorldVoxelRevision = 0;
 		std::uint64_t m_TargetWorldVoxelRevision = 0;
 		std::vector<VoxelSampleChange> m_SampleChanges;
+		std::vector<ChunkCoord> m_DataDirtyChunks;
+		std::vector<ChunkCoord> m_MeshDirtyChunks;
 
 		[[nodiscard]] bool Changed() const noexcept
 		{
@@ -36,11 +40,32 @@ namespace napa::voxel
 			const VoxelMutationResult&, const VoxelMutationResult&) noexcept = default;
 	};
 
+	struct VoxelMutationAllocationProbe
+	{
+		std::size_t m_FailAtPrepareAllocation = 0;
+		std::size_t m_PrepareAllocationCount = 0;
+		std::size_t m_CommitAllocationCount = 0;
+	};
+
+	class VoxelMutationTestAccess final
+	{
+	public:
+		[[nodiscard]] static ValidationResult ApplySphereEditWithAllocationProbe(
+			VoxelWorld& world, const SphereEditRequest& request,
+			VoxelMutationResult& result, VoxelMutationAllocationProbe& probe);
+		static void SetWorldVoxelRevision(
+			VoxelWorld& world, std::uint64_t revision) noexcept;
+	};
+
 	[[nodiscard]] ValidationResult EvaluateSphereEditSampleTransition(
 		const SphereEditContext& context, SampleCoord sample,
 		VoxelSample before, VoxelSample& after) noexcept;
 	[[nodiscard]] ValidationResult ApplySphereEdit(VoxelWorld& world,
 		const SphereEditRequest& request, VoxelMutationResult& result);
+	[[nodiscard]] ValidationResult DeriveVoxelMutationDirtyChunks(
+		const VoxelWorldConfig& config, std::span<const VoxelSampleChange> changes,
+		std::vector<ChunkCoord>& dataDirtyChunks,
+		std::vector<ChunkCoord>& meshDirtyChunks);
 
 	static_assert(std::is_standard_layout_v<VoxelSampleChange>);
 	static_assert(std::is_trivially_copyable_v<VoxelSampleChange>);
