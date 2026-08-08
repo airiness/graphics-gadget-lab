@@ -672,7 +672,7 @@ namespace gglab
 				.m_Damage = 1,
 			};
 			VoxelSample emptyCurrent = emptyOriginal;
-			RestoreResult emptyRestore{};
+			VoxelMutationResult emptyRestore{};
 			context.Check(
 				VoxelWorld::Create(
 					config,
@@ -700,8 +700,7 @@ namespace gglab
 						emptyCurrent).Succeeded() &&
 					emptyOriginal == DefaultVoxelSample &&
 					emptyCurrent == DefaultVoxelSample &&
-					emptyPrimitiveWorld->RestoreAll(
-						emptyRestore).Succeeded() &&
+					RestoreAll(*emptyPrimitiveWorld, emptyRestore).Succeeded() &&
 					!emptyRestore.Changed() &&
 					emptyPrimitiveWorld->GetWorldVoxelRevision() == 1,
 				"An empty primitive set generates a sealed sparse empty baseline");
@@ -774,7 +773,7 @@ namespace gglab
 				"Sealed primitive worlds reject later Original writes");
 
 			std::uint64_t restoredHash = 0;
-			RestoreResult restore{};
+			VoxelMutationResult restore{};
 			context.Check(
 				generated &&
 					generatedWorld->WriteCurrentSample(
@@ -782,7 +781,7 @@ namespace gglab
 						DefaultVoxelSample,
 						changed).Succeeded() &&
 					changed &&
-					generatedWorld->RestoreAll(restore).Succeeded() &&
+					RestoreAll(*generatedWorld, restore).Succeeded() &&
 					restore.Changed() &&
 					ComputeLogicalVoxelWorldHash(
 						*generatedWorld,

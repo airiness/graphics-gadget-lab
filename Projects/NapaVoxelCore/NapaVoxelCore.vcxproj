@@ -84,6 +84,7 @@
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelRestore.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
@@ -103,6 +104,7 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelOperationDetail.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h" />
@@ -118,6 +120,7 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
     <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />

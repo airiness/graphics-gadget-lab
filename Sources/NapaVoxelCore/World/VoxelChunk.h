@@ -56,8 +56,6 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult ResolveFlatIndex(
 			LocalCoord local, std::size_t& flatIndex) const noexcept;
 		[[nodiscard]] ValidationResult AdvanceRevision() noexcept;
-		[[nodiscard]] ValidationResult RestoreCurrentSamples(
-			std::span<const LocalCoord> coordinates, bool& changed) noexcept;
 		[[nodiscard]] ValidationResult InitializePreparedSample(
 			LocalCoord local, VoxelSample prepared) noexcept;
 		void CommitInitialState() noexcept;

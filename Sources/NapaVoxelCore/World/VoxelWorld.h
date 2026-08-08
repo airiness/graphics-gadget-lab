@@ -58,18 +58,18 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult WriteCurrentSample(
 			SampleCoord coordinate, VoxelSample input, bool& changed);
 
-		[[nodiscard]] ValidationResult RestoreAll(RestoreResult& result);
-		[[nodiscard]] ValidationResult RestoreSampleOwnerChunk(
-			ChunkCoord chunk, RestoreResult& result);
-		[[nodiscard]] ValidationResult RestoreRegion(
-			const SampleAabb& region, RestoreResult& result);
-
 	private:
 		using ChunkMap =
 			std::map<ChunkCoord, std::unique_ptr<VoxelChunk>, ChunkCoordZYXLess>;
 
 		friend ValidationResult ApplySphereEdit(VoxelWorld& world,
 			const SphereEditRequest& request, VoxelMutationResult& result);
+		friend ValidationResult RestoreAll(
+			VoxelWorld& world, VoxelMutationResult& result);
+		friend ValidationResult RestoreSampleOwnerChunk(
+			VoxelWorld& world, ChunkCoord chunk, VoxelMutationResult& result);
+		friend ValidationResult RestoreRegion(
+			VoxelWorld& world, const SampleAabb& region, VoxelMutationResult& result);
 		friend ValidationResult GeneratePrimitiveVoxelWorld(const VoxelWorldConfig& config,
 			std::span<const PrimitiveDesc> primitives, std::unique_ptr<VoxelWorld>& world,
 			PrimitiveWorldGenerationResult& result);
@@ -81,7 +81,7 @@ namespace napa::voxel
 		[[nodiscard]] ValidationResult FindOrCreateChunk(
 			ChunkCoord coordinate, VoxelChunk*& chunk, bool& allocated);
 		[[nodiscard]] ValidationResult RestoreRegionInternal(
-			const SampleAabb& region, RestoreResult& result);
+			const SampleAabb& region, VoxelMutationResult& result);
 		[[nodiscard]] ValidationResult InitializePreparedSample(
 			SampleCoord coordinate, VoxelSample prepared);
 		void CommitGeneratedOriginalState() noexcept;

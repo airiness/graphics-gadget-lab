@@ -1,7 +1,7 @@
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 
+#include "NapaVoxelCore/Edit/VoxelOperationDetail.h"
 #include "NapaVoxelCore/Testing/VoxelMutationTestAccess.h"
-#include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 #include "NapaVoxelCore/World/VoxelChunk.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
@@ -17,29 +17,22 @@
 
 namespace napa::voxel
 {
-	namespace
+	namespace detail
 	{
-		thread_local testing::VoxelMutationAllocationProbe* ActiveAllocationProbe = nullptr;
+		thread_local testing::VoxelOperationAllocationProbe* ActiveOperationAllocationProbe = nullptr;
 		thread_local bool SimulateExhaustedWorldRevision = false;
-		thread_local bool IsMutationCommitPhase = false;
+		thread_local bool IsVoxelOperationCommitPhase = false;
 
-		struct PreparedSampleWrite
+		ValidationResult RecordPotentialAllocation() noexcept
 		{
-			VoxelChunk* m_Chunk = nullptr;
-			std::size_t m_FlatIndex = 0;
-			VoxelSample m_After{};
-		};
-
-		[[nodiscard]] ValidationResult RecordPotentialAllocation() noexcept
-		{
-			if (ActiveAllocationProbe == nullptr)
+			if (ActiveOperationAllocationProbe == nullptr)
 			{
 				return {};
 			}
 
-			std::size_t& count = IsMutationCommitPhase ?
-				ActiveAllocationProbe->m_CommitAllocationCount :
-				ActiveAllocationProbe->m_PrepareAllocationCount;
+			std::size_t& count = IsVoxelOperationCommitPhase ?
+				ActiveOperationAllocationProbe->m_CommitAllocationCount :
+				ActiveOperationAllocationProbe->m_PrepareAllocationCount;
 			const auto nextCount = CheckedAdd(count, std::size_t{ 1 });
 			if (!nextCount.has_value())
 			{
@@ -47,55 +40,26 @@ namespace napa::voxel
 			}
 			count = *nextCount;
 
-			if (!IsMutationCommitPhase &&
-				ActiveAllocationProbe->m_FailAtPrepareAllocation == count)
+			if (!IsVoxelOperationCommitPhase &&
+				ActiveOperationAllocationProbe->m_FailAtPrepareAllocation == count)
 			{
 				return { ValidationError::VoxelMutationAllocationFailure };
 			}
 			return {};
 		}
+	}
 
-		template <typename Value>
-		[[nodiscard]] ValidationResult EnsureAppendCapacity(std::vector<Value>& values)
+	namespace
+	{
+		using detail::AppendTracked;
+		using detail::RecordPotentialAllocation;
+
+		struct PreparedSampleWrite
 		{
-			if (values.size() < values.capacity())
-			{
-				return {};
-			}
-			if (values.size() == values.max_size())
-			{
-				return { ValidationError::ArithmeticOverflow };
-			}
-
-			const ValidationResult allocationResult = RecordPotentialAllocation();
-			if (allocationResult.Failed())
-			{
-				return allocationResult;
-			}
-
-			std::size_t nextCapacity = 1;
-			if (values.capacity() != 0)
-			{
-				const auto doubled = CheckedMul(values.capacity(), std::size_t{ 2 });
-				nextCapacity = doubled.has_value() ?
-					std::min(*doubled, values.max_size()) : values.max_size();
-			}
-			values.reserve(nextCapacity);
-			return {};
-		}
-
-		template <typename Value>
-		[[nodiscard]] ValidationResult AppendTracked(
-			std::vector<Value>& values, const Value& value)
-		{
-			const ValidationResult capacityResult = EnsureAppendCapacity(values);
-			if (capacityResult.Failed())
-			{
-				return capacityResult;
-			}
-			values.push_back(value);
-			return {};
-		}
+			VoxelChunk* m_Chunk = nullptr;
+			std::size_t m_FlatIndex = 0;
+			VoxelSample m_After{};
+		};
 
 		void SortAndUniqueChunks(std::vector<ChunkCoord>& chunks) noexcept
 		{
@@ -189,7 +153,11 @@ namespace napa::voxel
 			return {};
 		}
 
-		[[nodiscard]] ValidationResult DeriveDirtyChunksFromValidatedConfig(
+	}
+
+	namespace detail
+	{
+		ValidationResult DeriveDirtyChunksFromValidatedConfig(
 			const VoxelWorldConfig& config, std::span<const VoxelSampleChange> changes,
 			std::vector<ChunkCoord>& dataDirtyChunks,
 			std::vector<ChunkCoord>& meshDirtyChunks, bool validateChanges)
@@ -295,6 +263,11 @@ namespace napa::voxel
 			meshDirtyChunks.swap(preparedMeshDirtyChunks);
 			return {};
 		}
+	}
+
+	namespace
+	{
+		using detail::DeriveDirtyChunksFromValidatedConfig;
 	}
 
 	ValidationResult DeriveVoxelMutationDirtyChunks(
@@ -515,13 +488,13 @@ namespace napa::voxel
 
 		if (!preparedResult.Changed())
 		{
-			IsMutationCommitPhase = true;
+			detail::IsVoxelOperationCommitPhase = true;
 			commitMutation();
-			IsMutationCommitPhase = false;
+			detail::IsVoxelOperationCommitPhase = false;
 			return {};
 		}
 
-		const std::uint64_t revisionForTarget = SimulateExhaustedWorldRevision ?
+		const std::uint64_t revisionForTarget = detail::SimulateExhaustedWorldRevision ?
 			std::numeric_limits<std::uint64_t>::max() : world.m_WorldVoxelRevision;
 		const auto targetRevision = CheckedAdd(revisionForTarget, std::uint64_t{ 1 });
 		if (!targetRevision.has_value())
@@ -530,9 +503,9 @@ namespace napa::voxel
 		}
 		preparedResult.m_TargetWorldVoxelRevision = *targetRevision;
 
-		IsMutationCommitPhase = true;
+		detail::IsVoxelOperationCommitPhase = true;
 		commitMutation();
-		IsMutationCommitPhase = false;
+		detail::IsVoxelOperationCommitPhase = false;
 		return {};
 	}
 
@@ -540,34 +513,34 @@ namespace napa::voxel
 		VoxelWorld& world, const SphereEditRequest& request,
 		VoxelMutationResult& result, VoxelMutationAllocationProbe& probe)
 	{
-		if (ActiveAllocationProbe != nullptr)
+		if (detail::ActiveOperationAllocationProbe != nullptr)
 		{
 			return { ValidationError::InvalidVoxelMutation };
 		}
 
 		probe.m_PrepareAllocationCount = 0;
 		probe.m_CommitAllocationCount = 0;
-		IsMutationCommitPhase = false;
-		ActiveAllocationProbe = &probe;
+		detail::IsVoxelOperationCommitPhase = false;
+		detail::ActiveOperationAllocationProbe = &probe;
 		const ValidationResult mutationResult =
 			napa::voxel::ApplySphereEdit(world, request, result);
-		ActiveAllocationProbe = nullptr;
-		IsMutationCommitPhase = false;
+		detail::ActiveOperationAllocationProbe = nullptr;
+		detail::IsVoxelOperationCommitPhase = false;
 		return mutationResult;
 	}
 
 	ValidationResult testing::VoxelMutationTestAccess::ApplySphereEditWithExhaustedRevision(
 		VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result)
 	{
-		if (SimulateExhaustedWorldRevision)
+		if (detail::SimulateExhaustedWorldRevision)
 		{
 			return { ValidationError::InvalidVoxelMutation };
 		}
 
-		SimulateExhaustedWorldRevision = true;
+		detail::SimulateExhaustedWorldRevision = true;
 		const ValidationResult mutationResult =
 			napa::voxel::ApplySphereEdit(world, request, result);
-		SimulateExhaustedWorldRevision = false;
+		detail::SimulateExhaustedWorldRevision = false;
 		return mutationResult;
 	}
 }

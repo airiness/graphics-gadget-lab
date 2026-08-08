@@ -7,12 +7,13 @@
 
 namespace napa::voxel::testing
 {
-	struct VoxelMutationAllocationProbe
+	struct VoxelOperationAllocationProbe
 	{
 		std::size_t m_FailAtPrepareAllocation = 0;
 		std::size_t m_PrepareAllocationCount = 0;
 		std::size_t m_CommitAllocationCount = 0;
 	};
+	using VoxelMutationAllocationProbe = VoxelOperationAllocationProbe;
 
 	class VoxelMutationTestAccess final
 	{

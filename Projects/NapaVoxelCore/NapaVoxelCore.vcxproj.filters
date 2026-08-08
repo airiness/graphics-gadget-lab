@@ -42,6 +42,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h">
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelOperationDetail.h">
+      <Filter>NapaVoxelCore\Edit</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h">
       <Filter>NapaVoxelCore\Field</Filter>
     </ClInclude>
@@ -87,6 +90,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h">
       <Filter>NapaVoxelCore\Testing</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h">
+      <Filter>NapaVoxelCore\Testing</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
       <Filter>NapaVoxelCore\Validation</Filter>
     </ClInclude>
@@ -123,6 +129,9 @@
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp">
+      <Filter>NapaVoxelCore\Edit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelRestore.cpp">
       <Filter>NapaVoxelCore\Edit</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp">

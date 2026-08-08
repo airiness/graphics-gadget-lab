@@ -17,7 +17,7 @@ namespace gglab
 		std::printf(
 			"NapaVoxelCore build contract: core-api=%u, voxel-hash-schema=%u, "
 			"mesh-hash-schema=%u, reference-mesher=%u, edit=%u, mutation=%u, "
-			"dirty=%u, iso=%u\n",
+			"dirty=%u, restore=%u, iso=%u\n",
 			static_cast<unsigned>(contract.m_CoreApiVersion),
 			static_cast<unsigned>(contract.m_VoxelHashSchemaVersion),
 			static_cast<unsigned>(contract.m_MeshHashSchemaVersion),
@@ -25,9 +25,10 @@ namespace gglab
 			static_cast<unsigned>(contract.m_EditContractVersion),
 			static_cast<unsigned>(contract.m_MutationContractVersion),
 			static_cast<unsigned>(contract.m_DirtyContractVersion),
+			static_cast<unsigned>(contract.m_RestoreContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 23, "Core API version is 23");
+		context.Check(contract.m_CoreApiVersion == 24, "Core API version is 24");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -39,10 +40,12 @@ namespace gglab
 			"Reference mesher version is 3");
 		context.Check(contract.m_EditContractVersion == 3,
 			"Sphere edit contract version is 3");
-		context.Check(contract.m_MutationContractVersion == 3,
-			"Voxel mutation contract version is 3");
+		context.Check(contract.m_MutationContractVersion == 4,
+			"Voxel mutation contract version is 4");
 		context.Check(contract.m_DirtyContractVersion == 1,
 			"Voxel dirty contract version is 1");
+		context.Check(contract.m_RestoreContractVersion == 1,
+			"Voxel Restore contract version is 1");
 		context.Check(
 			contract.m_IsoValue == napa::voxel::IsoValue,
 			"Build contract reports the canonical iso value");

@@ -182,50 +182,6 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult VoxelChunk::RestoreCurrentSamples(
-		std::span<const LocalCoord> coordinates, bool& changed) noexcept
-	{
-		bool hasDifference = false;
-		for (const LocalCoord coordinate : coordinates)
-		{
-			std::size_t flatIndex = 0;
-			const ValidationResult indexResult = ResolveFlatIndex(coordinate, flatIndex);
-			if (indexResult.Failed())
-			{
-				return indexResult;
-			}
-
-			hasDifference =
-				hasDifference || m_CurrentSamples[flatIndex] != m_OriginalSamples[flatIndex];
-		}
-
-		if (!hasDifference)
-		{
-			changed = false;
-			return {};
-		}
-
-		const ValidationResult revisionResult = AdvanceRevision();
-		if (revisionResult.Failed())
-		{
-			return revisionResult;
-		}
-
-		for (const LocalCoord coordinate : coordinates)
-		{
-			std::size_t flatIndex = 0;
-			const ValidationResult indexResult = ResolveFlatIndex(coordinate, flatIndex);
-			if (indexResult.Failed())
-			{
-				return indexResult;
-			}
-			m_CurrentSamples[flatIndex] = m_OriginalSamples[flatIndex];
-		}
-
-		changed = true;
-		return {};
-	}
-
 	ValidationResult VoxelChunk::InitializePreparedSample(
 		LocalCoord local, VoxelSample prepared) noexcept
 	{

@@ -1,18 +1,15 @@
 #pragma once
 
-#include "NapaVoxelCore/World/Coordinates.h"
-
-#include <vector>
+#include "NapaVoxelCore/Edit/VoxelMutation.h"
 
 namespace napa::voxel
 {
-	struct RestoreResult
-	{
-		std::vector<SampleCoord> m_ChangedSampleCoordinates;
+	class VoxelWorld;
 
-		[[nodiscard]] bool Changed() const noexcept
-		{
-			return !m_ChangedSampleCoordinates.empty();
-		}
-	};
+	[[nodiscard]] ValidationResult RestoreAll(
+		VoxelWorld& world, VoxelMutationResult& result);
+	[[nodiscard]] ValidationResult RestoreSampleOwnerChunk(
+		VoxelWorld& world, ChunkCoord chunk, VoxelMutationResult& result);
+	[[nodiscard]] ValidationResult RestoreRegion(
+		VoxelWorld& world, const SampleAabb& region, VoxelMutationResult& result);
 }
