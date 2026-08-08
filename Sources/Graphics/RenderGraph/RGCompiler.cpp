@@ -63,9 +63,22 @@ namespace gglab
 					continue;
 				}
 				const auto& node = m_Graph.m_ResourceNodes[access.m_ResourceNodeIndex.Value()];
-				if (node.m_ContentValidity == RGContentValidity::Defined)
+				if (access.m_ResourceType == RGResourceType::RGTexture)
 				{
-					continue;
+					const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+						node.m_VirtualResource);
+					if (RenderGraph::IsTextureSubresourceRangeDefined(
+						node.m_TextureValidity, texture->m_Desc, access.m_Subresources))
+					{
+						continue;
+					}
+				}
+				else
+				{
+					if (node.m_ContentValidity == RGContentValidity::Defined)
+					{
+						continue;
+					}
 				}
 				const auto resourceIter = m_ResourceIndices.find(node.m_VirtualResource);
 				AddDiagnostic(RGCompileDiagnosticCode::UndefinedContentRead,

@@ -3,6 +3,7 @@
 #include "Core/Log/Logger.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 
 namespace gglab
 {
@@ -114,5 +115,62 @@ namespace gglab
 			return InvalidTextureDesc;
 		}
 		return static_cast<RGVirtualResource<RGTextureResource>*>(resource)->m_Desc;
+	}
+
+	bool RenderGraph::IsTextureSubresourceRangeDefined(const RGTextureContentValidity& validity,
+		const RHITextureDesc& desc, const std::optional<RHISubresourceRange>& requested) noexcept
+	{
+		if (validity.m_AllDefined)
+		{
+			return true;
+		}
+
+		const RHISubresourceRange range = NormalizeTextureSubresourceRange(desc, requested);
+		if (range.m_MipCount == 0 || range.m_ArraySliceCount == 0)
+		{
+			return true;
+		}
+
+		bool defined = true;
+		ForEachRHITextureSubresource(desc, range,
+			[&](uint32_t mip, uint32_t arraySlice, RHITextureAspect aspect)
+			{
+				if (!validity.m_DefinedSubresources.contains(
+					GetRHITextureSubresourceIndex(desc, mip, arraySlice, aspect)))
+				{
+					defined = false;
+				}
+			});
+		return defined;
+	}
+
+	void RenderGraph::MarkTextureSubresourceRangeDefined(RGTextureContentValidity& validity,
+		const RHITextureDesc& desc, const std::optional<RHISubresourceRange>& requested) noexcept
+	{
+		if (validity.m_AllDefined)
+		{
+			return;
+		}
+
+		const RHISubresourceRange range = NormalizeTextureSubresourceRange(desc, requested);
+		ForEachRHITextureSubresource(desc, range,
+			[&](uint32_t mip, uint32_t arraySlice, RHITextureAspect aspect)
+			{
+				validity.m_DefinedSubresources.insert(
+					GetRHITextureSubresourceIndex(desc, mip, arraySlice, aspect));
+			});
+		if (validity.m_DefinedSubresources.size() == GetRHITextureSubresourceCount(desc))
+		{
+			validity.m_AllDefined = true;
+			validity.m_DefinedSubresources.clear();
+		}
+	}
+
+	RGTextureContentValidity RenderGraph::MakeImportedTextureValidity(
+		RGContentValidity initialContentValidity) noexcept
+	{
+		return {
+			.m_AllDefined = initialContentValidity == RGContentValidity::Defined,
+		};
 	}
 }

@@ -3,6 +3,7 @@
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHITexture.h"
 
+#include <unordered_set>
 #include <variant>
 
 namespace gglab
@@ -31,6 +32,16 @@ namespace gglab
 	{
 		Undefined,
 		Defined,
+	};
+
+	// Subresource-level content validity for textures. A texture version starts
+	// fully Undefined (or fully Defined for imported resources declared Defined)
+	// and Write/ReadWrite accesses mark only their declared subresource ranges as
+	// Defined. Version inheritance preserves previously Defined ranges.
+	struct RGTextureContentValidity
+	{
+		bool m_AllDefined = false;
+		std::unordered_set<uint32_t> m_DefinedSubresources;
 	};
 
 	enum class RGOrderingRequirement : uint8_t

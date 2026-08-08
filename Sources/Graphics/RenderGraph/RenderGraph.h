@@ -106,7 +106,10 @@ namespace gglab
 		RGResourceNodeIndex m_Previous = InvalidRGResourceNodeIndex;
 		RGPassNodeIndex m_Writer = InvalidRGPassNodeIndex;
 		std::vector<RGPassNodeIndex> m_Readers;
+		// Version-level content validity for buffers. Textures use the
+		// subresource-level m_TextureValidity below.
 		RGContentValidity m_ContentValidity = RGContentValidity::Undefined;
+		RGTextureContentValidity m_TextureValidity{};
 
 		StringID NameId() const noexcept
 		{
@@ -458,6 +461,18 @@ namespace gglab
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
 
+		// Texture subresource-level content validity helpers. A nullopt range
+		// represents the complete texture; ranges are normalized with
+		// NormalizeTextureSubresourceRange before interpretation.
+		static bool IsTextureSubresourceRangeDefined(const RGTextureContentValidity& validity,
+			const RHITextureDesc& desc,
+			const std::optional<RHISubresourceRange>& requested) noexcept;
+		static void MarkTextureSubresourceRangeDefined(RGTextureContentValidity& validity,
+			const RHITextureDesc& desc,
+			const std::optional<RHISubresourceRange>& requested) noexcept;
+		static RGTextureContentValidity MakeImportedTextureValidity(
+			RGContentValidity initialContentValidity) noexcept;
+
 	private:
 		RHIDevice* m_Device = nullptr;
 		TransientResourcePool* m_TransientResourcePool = nullptr;
@@ -708,6 +723,10 @@ namespace gglab
 			.m_VirtualResource = virtualResource,
 			.m_ContentValidity = initialContentValidity,
 		};
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			resourceNode.m_TextureValidity = MakeImportedTextureValidity(initialContentValidity);
+		}
 		m_ResourceNodes.push_back(resourceNode);
 
 		// Emplace in name handle unordered map.
@@ -875,6 +894,8 @@ namespace gglab
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
 			nextResourceNode.m_Previous = previousNodeIndex;
+			nextResourceNode.m_ContentValidity = curResourceNode->m_ContentValidity;
+			nextResourceNode.m_TextureValidity = curResourceNode->m_TextureValidity;
 			slot.m_ResourceNodeIndex =
 				RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 			m_ResourceNodes.push_back(nextResourceNode);
@@ -882,7 +903,17 @@ namespace gglab
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		}
 		curResourceNode->m_Writer = stablePassNodeIndex;
-		curResourceNode->m_ContentValidity = RGContentValidity::Defined;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+				curResourceNode->m_VirtualResource);
+			MarkTextureSubresourceRangeDefined(
+				curResourceNode->m_TextureValidity, texture->m_Desc, subresources);
+		}
+		else
+		{
+			curResourceNode->m_ContentValidity = RGContentValidity::Defined;
+		}
 
 		// Imported resource -> pass side effect
 		if (curResourceNode->m_VirtualResource && curResourceNode->m_VirtualResource->m_Imported)
@@ -959,9 +990,19 @@ namespace gglab
 		nextResourceNode.m_Previous = previousNodeIndex;
 		nextResourceNode.m_Writer = stablePassNodeIndex;
 		nextResourceNode.m_ContentValidity = RGContentValidity::Defined;
+		nextResourceNode.m_TextureValidity = previousNode.m_TextureValidity;
 		slot.m_ResourceNodeIndex =
 			RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		m_ResourceNodes.push_back(nextResourceNode);
+
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+				virtualResource);
+			auto& writtenNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
+			MarkTextureSubresourceRangeDefined(
+				writtenNode.m_TextureValidity, texture->m_Desc, subresources);
+		}
 
 		if (virtualResource && virtualResource->m_Imported)
 		{

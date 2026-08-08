@@ -1,4 +1,4 @@
-#include "Core/Precompiled.h"
+﻿#include "Core/Precompiled.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
 #include "DevTools/DevToolsRuntime.h"
@@ -2791,6 +2791,13 @@ namespace gglab
 				.m_ArraySliceCount = 1,
 				.m_Aspects = RHITextureAspect::Color,
 			};
+			const RHISubresourceRange secondMip = {
+				.m_BaseMip = 1,
+				.m_MipCount = 1,
+				.m_BaseArraySlice = 0,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
 			const RHISubresourceRange thirdMip = {
 				.m_BaseMip = 2,
 				.m_MipCount = 1,
@@ -2802,7 +2809,12 @@ namespace gglab
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
 					mipTexture = builder.CreateTexture("MipTexture", mipTextureDesc);
+					// Every subresource later consumed in this fixture must be
+					// defined first: mip0 (UAV), mip1 (copy destination) and
+					// mip2 (UAV, later sampled and copied).
 					builder.WriteInPlace(mipTexture, RGTextureAccess::StorageWrite, firstMip);
+					builder.WriteInPlace(mipTexture, RGTextureAccess::CopyDest, secondMip);
+					builder.WriteInPlace(mipTexture, RGTextureAccess::StorageWrite, thirdMip);
 					data.m_Texture = mipTexture;
 				});
 			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>("SampleThirdMip",
@@ -3264,6 +3276,311 @@ namespace gglab
 				submission.m_Publications[0].m_PublishedState == shaderReadState &&
 				submission.m_Publications[1].m_Type == RHIResourceType::Buffer,
 				"Transfer submission publishes one terminal state per resource with its completion fence");
+
+			// --- Subresource-granular texture content validity ---
+			const RHITextureDesc mipTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+				.m_MipLevels = 2,
+			};
+			const RHISubresourceRange colorMip0{
+				.m_MipCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange colorMip1{
+				.m_BaseMip = 1,
+				.m_MipCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Undefined texture written on mip0 accepts reads of mip0");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(!mipReadGraph.Compile() && hasUndefinedRead(mipReadGraph),
+					"Undefined texture written on mip0 rejects reads of mip1");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip1);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0AfterMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Version inheritance preserves previously defined mip0 after mip1 write");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip1);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Undefined texture written on mip1 accepts reads of mip1");
+			}
+
+			// Array slice partial write/read.
+			const RHITextureDesc arrayTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+				.m_ArraySize = 2,
+			};
+			const RHISubresourceRange slice0Range{
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange slice1Range{
+				.m_BaseArraySlice = 1,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				RenderGraph sliceReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId sliceTextureId{};
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, slice0Range);
+						builder.SideEffect();
+					});
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(sliceTextureId, RGTextureAccess::Sample,
+							RHIStage::PixelShader, slice1Range);
+						builder.SideEffect();
+					});
+				context.Check(!sliceReadGraph.Compile() && hasUndefinedRead(sliceReadGraph),
+					"Array slice writes do not define other slices");
+			}
+			{
+				RenderGraph sliceReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId sliceTextureId{};
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, slice1Range);
+						builder.SideEffect();
+					});
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(sliceTextureId, RGTextureAccess::Sample,
+							RHIStage::PixelShader, slice1Range);
+						builder.SideEffect();
+					});
+				context.Check(sliceReadGraph.Compile(),
+					"Array slice writes define their own slice");
+			}
+
+			// Depth/stencil aspect granularity.
+			const RHITextureDesc depthStencilTextureDesc{
+				.m_Format = RHIFormat::D24UnormS8Uint,
+				.m_Extent = { 8, 8, 1 },
+			};
+			const RHISubresourceRange depthAspectRange{ .m_Aspects = RHITextureAspect::Depth };
+			const RHISubresourceRange stencilAspectRange{ .m_Aspects = RHITextureAspect::Stencil };
+			{
+				RenderGraph aspectReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId aspectTextureId{};
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("WriteDepthAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						aspectTextureId =
+							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadDepthAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				context.Check(!aspectReadGraph.Compile() && hasUndefinedRead(aspectReadGraph),
+					"Depth aspect writes do not define the stencil aspect");
+			}
+			{
+				RenderGraph aspectWriteGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId aspectTextureId{};
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteBothAspects",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						aspectTextureId =
+							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				context.Check(aspectWriteGraph.Compile(),
+					"Stencil aspect writes define the stencil aspect");
+			}
+
+			// Imported Defined texture with partial reads.
+			{
+				RecordingDevice recordingDevice;
+				RenderGraph importedPartialGraph({
+					.m_Device = &recordingDevice,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				importedPartialGraph.AddPass<TextureStorageAccessPassData>("ReadImportedPartial",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+					{
+						data.m_Texture =
+							builder.ImportTexture("PartialImportedTexture", RHITextureHandle{ 10, 1 },
+								mipTextureDesc, UndefinedRHITextureState(), RGContentValidity::Defined);
+						data.m_Texture = builder.Read(
+							data.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(importedPartialGraph.Compile(),
+					"Imported Defined textures support partial reads");
+			}
+
+			// Read-before-write remains a declaration contract even when the
+			// reading pass can be culled.
+			{
+				RenderGraph cullableReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				cullableReadGraph.AddPass<StorageAccessPassData>("CullableUndefinedRead",
+					[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+					{
+						data.m_Buffer = builder.CreateBuffer("CullableBuffer");
+						data.m_Buffer =
+							builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
+					});
+				context.Check(!cullableReadGraph.Compile() && hasUndefinedRead(cullableReadGraph),
+					"Cullable passes still report read-before-write declarations");
+			}
 		}
 
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
