@@ -634,6 +634,7 @@ namespace gglab
 			const std::size_t initialResidentChunkCount = world->GetResidentChunkCount();
 			const SphereEditRequest destructionRequest = MakeStoneEdit({ 1.0, 0.0, 0.0 }, 0.5);
 			const SphereEditRequest markerRequest = MakeStoneEdit({ -1.0, 2.0, 2.0 }, 0.5);
+			bool firstCycleDestroyedGolden = false;
 			bool repeatedCyclesMatched = true;
 			for (std::uint32_t cycle = 0; cycle < 2 && repeatedCyclesMatched; ++cycle)
 			{
@@ -690,6 +691,26 @@ namespace gglab
 						*world, destroyedVisible, destroyedPublicationQuiescent) &&
 					destroyedPublicationQuiescent &&
 					CaptureSurfaceEvidence(destroyedVisible) != initialSurface;
+				if (cycle == 0 && repeatedCyclesMatched)
+				{
+					const WorldMeshValidationResult& validation =
+						destroyedVisible.GetWorldMeshValidation();
+					const auto chunk = std::find_if(destroyedVisible.GetChunks().begin(),
+						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
+						{ return record.m_Chunk == ChunkCoord{}; });
+					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
+						validation.m_ValidationHash == 0x9498f89c5c146f0aull &&
+						validation.m_VertexCount == 2952 && validation.m_IndexCount == 2952 &&
+						validation.m_TriangleCount == 984 &&
+						chunk != destroyedVisible.GetChunks().end() &&
+						chunk->m_Validation.m_ValidationHash == 0x459d13d8fe45f701ull &&
+						chunk->m_Validation.m_TriangleCount == 128 &&
+						chunk->m_Validation.m_QuantizedBounds == QuantizedMeshAabb{
+							.m_Min = {},
+							.m_Max = { 131072, 393216, 393216 },
+						};
+					repeatedCyclesMatched = firstCycleDestroyedGolden;
+				}
 
 				VoxelMutationResult restore{};
 				CpuMeshBatch restoreBatch{};
@@ -735,6 +756,8 @@ namespace gglab
 							world->GetWorldVoxelRevision() == cycleBaseRevision + 4;
 			}
 
+			context.Check(firstCycleDestroyedGolden,
+				"The first Stone Wall destruction cycle matches its exact hole Mesh Golden");
 			context.Check(repeatedCyclesMatched,
 				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
 		}
