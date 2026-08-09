@@ -128,10 +128,10 @@ namespace gglab
 					chunk.m_Sections = source.m_Sections;
 					chunk.m_VertexBuffer = builder.ImportBuffer(vertexName.c_str(),
 						source.m_VertexBuffer.Get(), source.m_VertexBufferDesc,
-						RGBufferAccess::None);
+						RGBufferAccess::None, RGContentValidity::Defined);
 					chunk.m_IndexBuffer = builder.ImportBuffer(indexName.c_str(),
 						source.m_IndexBuffer.Get(), source.m_IndexBufferDesc,
-						RGBufferAccess::None);
+						RGBufferAccess::None, RGContentValidity::Defined);
 					chunk.m_VertexBuffer = builder.Read(
 						chunk.m_VertexBuffer, RGBufferAccess::Vertex, RHIStage::VertexShader);
 					chunk.m_IndexBuffer = builder.Read(
@@ -151,8 +151,12 @@ namespace gglab
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const RHITextureViewHandle dsv = executeContext.GetViewHandle(data.m_Dsv);
-				graphicsContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
+				graphicsContext->BeginRendering({
+					.m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
+					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
+				});
 				const size_t pipelineIndex = static_cast<size_t>(surfaceMode);
 				graphicsContext->SetPipeline(renderer->GetPipelineCache()->Resolve(
 					m_PipelineSlots[pipelineIndex], m_PipelineKeys[pipelineIndex], GetInfo()));

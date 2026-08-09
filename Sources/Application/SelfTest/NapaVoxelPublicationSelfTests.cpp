@@ -39,7 +39,10 @@ namespace gglab
 		class NapaVoxelPublicationTestDevice final : public RHIDevice
 		{
 		public:
-			RHIBackendType GetBackendType() const noexcept override { return {}; }
+			RHIBackendType GetBackendType() const noexcept override
+			{
+				return RHIBackendType::DX12;
+			}
 			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 			{
 				return "NapaVoxel.PublicationTestDevice";
@@ -58,8 +61,8 @@ namespace gglab
 			{
 				return { .m_Supported = true };
 			}
-			RHITextureHandle CreateTexture(
-				const RHITextureDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
+				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
 				return { m_NextTextureIndex++, 1 };
 			}
@@ -1832,7 +1835,7 @@ namespace gglab
 				.m_SamplerRegistry = &samplerRegistry,
 				});
 			Renderer renderer;
-			ShaderManager shaderManager;
+			ShaderManager shaderManager(device.GetBackendType());
 			InputManager inputManager;
 			Time time;
 			NapaVoxelLabSwitchTestState state{

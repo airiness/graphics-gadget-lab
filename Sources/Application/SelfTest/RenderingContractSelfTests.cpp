@@ -570,9 +570,11 @@ namespace gglab
 						.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest,
 					};
 					data.m_Vertex = builder.ImportBuffer("NapaVoxel.Vertex",
-						RHIBufferHandle{ 41, 1 }, vertexDesc, RGBufferAccess::None);
+						RHIBufferHandle{ 41, 1 }, vertexDesc, RGBufferAccess::None,
+						RGContentValidity::Defined);
 					data.m_Index = builder.ImportBuffer("NapaVoxel.Index",
-						RHIBufferHandle{ 42, 1 }, indexDesc, RGBufferAccess::None);
+						RHIBufferHandle{ 42, 1 }, indexDesc, RGBufferAccess::None,
+						RGContentValidity::Defined);
 					data.m_Vertex = builder.Read(
 						data.m_Vertex, RGBufferAccess::Vertex, RHIStage::VertexShader);
 					data.m_Index = builder.Read(
