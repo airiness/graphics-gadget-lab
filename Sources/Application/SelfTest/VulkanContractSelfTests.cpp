@@ -1693,16 +1693,27 @@ namespace gglab
 		// samplerMirrorClampToEdge feature at sampler creation.
 		context.Check(
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::Wrap) ==
-				VK_SAMPLER_ADDRESS_MODE_REPEAT &&
+			VK_SAMPLER_ADDRESS_MODE_REPEAT &&
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::Mirror) ==
-				VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT &&
+			VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT &&
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::Clamp) ==
-				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE &&
+			VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE &&
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::Border) ==
-				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER &&
+			VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER &&
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::MirrorOnce) ==
-				VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
+			VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
 			"Sampler address modes map to the exact native address modes");
+
+		// Non-power-of-two sample counts are rejected by the public
+		// validator, so no backend conversion can silently downgrade them.
+		const RHITextureDesc invalidSample{
+			.m_Format = RHIFormat::R8G8B8A8Unorm,
+			.m_Usage = RHITextureUsage::Sampled,
+			.m_Extent = { 4, 4, 1 },
+			.m_SampleCount = 3,
+		};
+		context.Check(!ValidateRHITextureDesc(invalidSample).IsValid(),
+			"Non-power-of-two sample counts are rejected by validation");
 	}
 
 	void RunVulkanPortabilityContractTests(SelfTestContext& context) noexcept

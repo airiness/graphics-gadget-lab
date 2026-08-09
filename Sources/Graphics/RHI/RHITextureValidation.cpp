@@ -134,6 +134,12 @@ namespace gglab
 			return "typed unordered-access store unsupported";
 		case RHITextureSupportReason::MultisamplingUnsupported:
 			return "multisampling unsupported";
+		case RHITextureSupportReason::CopySourceUnsupported:
+			return "copy-source format unsupported";
+		case RHITextureSupportReason::CopyDestUnsupported:
+			return "copy-destination format unsupported";
+		case RHITextureSupportReason::FormatCombinationUnsupported:
+			return "format combination unsupported";
 		}
 		return "unknown texture support reason";
 	}
@@ -180,6 +186,13 @@ namespace gglab
 			return Error(RHITextureValidationError::InvalidMipLevelCount);
 		}
 		if (desc.m_SampleCount == 0)
+		{
+			return Error(RHITextureValidationError::InvalidSampleCount);
+		}
+		// Only the power-of-two sample counts every backend expresses are
+		// legal; anything else must fail loudly instead of being silently
+		// downgraded by a backend conversion.
+		if (desc.m_SampleCount > 64 || (desc.m_SampleCount & (desc.m_SampleCount - 1)) != 0)
 		{
 			return Error(RHITextureValidationError::InvalidSampleCount);
 		}

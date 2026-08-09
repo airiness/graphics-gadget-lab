@@ -11,19 +11,23 @@ namespace gglab
 		[[nodiscard]] RHITextureSupportReason TextureSupportReasonForUsage(
 			RHITextureUsage usage) noexcept
 		{
-			if (Test(usage, RHITextureUsage::DepthStencil))
+			switch (usage)
 			{
-				return RHITextureSupportReason::DepthStencilUnsupported;
-			}
-			if (Test(usage, RHITextureUsage::RenderTarget))
-			{
+			case RHITextureUsage::Sampled:
+				return RHITextureSupportReason::ShaderResourceUnsupported;
+			case RHITextureUsage::RenderTarget:
 				return RHITextureSupportReason::RenderTargetUnsupported;
-			}
-			if (Test(usage, RHITextureUsage::UnorderedAccess))
-			{
+			case RHITextureUsage::DepthStencil:
+				return RHITextureSupportReason::DepthStencilUnsupported;
+			case RHITextureUsage::UnorderedAccess:
 				return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
+			case RHITextureUsage::CopySource:
+				return RHITextureSupportReason::CopySourceUnsupported;
+			case RHITextureUsage::CopyDest:
+				return RHITextureSupportReason::CopyDestUnsupported;
+			default:
+				return RHITextureSupportReason::FormatCombinationUnsupported;
 			}
-			return RHITextureSupportReason::ShaderResourceUnsupported;
 		}
 
 		inline constexpr std::array<RHIFormat, 2> R8G8B8A8TypelessViewFormats{
@@ -355,6 +359,7 @@ namespace gglab
 		return VulkanNormalizedTextureView{
 			.m_EffectiveFormat = effectiveFormat,
 			.m_EffectiveDimension = effectiveDimension,
+			.m_Type = view.m_Type,
 			.m_Range = range,
 			.m_ViewType = viewType,
 			.m_AspectMask = ToVulkanImageAspectFlags(aspect),
@@ -396,6 +401,11 @@ namespace gglab
 
 	VkSampleCountFlagBits ToVulkanSampleCount(uint32_t count) noexcept
 	{
+		// The public validator only admits power-of-two counts in [1, 64];
+		// an invalid count must never be silently downgraded to 1x.
+		GGLAB_ASSERT_MSG(count > 0 && count <= 64 &&
+			(count & (count - 1)) == 0,
+			"Vulkan sample count conversion received an invalid count.");
 		switch (count)
 		{
 		case 1:
@@ -434,6 +444,8 @@ namespace gglab
 			// format set.
 			contract.m_CreateFlags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
 			const VulkanFormatInfo& formatInfo = GetVulkanFormatInfo(desc.m_Format);
+			GGLAB_ASSERT_MSG(formatInfo.m_RHIViewFormats.size() <= contract.m_ViewFormats.size(),
+				"The Vulkan view family exceeds the native format list capacity.");
 			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
 			{
 				contract.m_ViewFormats[contract.m_ViewFormatCount++] =
@@ -463,9 +475,38 @@ namespace gglab
 		const VulkanImageCreationContract contract =
 			BuildVulkanImageCreationContract(desc);
 
+		// Feature check first, per single usage: each requested use must
+		// have its required format features on the optimal tiling, so the
+		// failure reason names the exact missing capability instead of a
+		// priority fallback.
+		VkFormatProperties3 formatProperties3{};
+		formatProperties3.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3;
+		VkFormatProperties2 formatProperties2{};
+		formatProperties2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		formatProperties2.pNext = &formatProperties3;
+		vkGetPhysicalDeviceFormatProperties2(
+			physicalDevice, formatInfo.m_ResourceFormat, &formatProperties2);
+		const VkFormatFeatureFlags2 availableFeatures =
+			formatProperties3.optimalTilingFeatures;
+		for (const RHITextureUsage usage : { RHITextureUsage::Sampled, RHITextureUsage::RenderTarget,
+			RHITextureUsage::DepthStencil, RHITextureUsage::UnorderedAccess,
+			RHITextureUsage::CopySource, RHITextureUsage::CopyDest })
+		{
+			if (!Test(desc.m_Usage, usage))
+			{
+				continue;
+			}
+			const VkFormatFeatureFlags2 requiredFeatures = ToVulkanFormatFeatureFlags(usage);
+			if ((availableFeatures & requiredFeatures) != requiredFeatures)
+			{
+				return { .m_Reason = TextureSupportReasonForUsage(usage) };
+			}
+		}
+
 		// The query mirrors creation exactly: the same usage, create flags
 		// and restricted view format list, so a supported result is what
-		// vmaCreateImage will accept.
+		// vmaCreateImage will accept. Every single use is satisfied at
+		// this point; a failure here is a combination problem.
 		VkImageFormatListCreateInfo formatList{};
 		formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
 		formatList.viewFormatCount = contract.m_ViewFormatCount;
@@ -489,7 +530,7 @@ namespace gglab
 			physicalDevice, &imageFormatInfo, &imageFormatProperties);
 		if (queryResult == VK_ERROR_FORMAT_NOT_SUPPORTED)
 		{
-			return { .m_Reason = TextureSupportReasonForUsage(desc.m_Usage) };
+			return { .m_Reason = RHITextureSupportReason::FormatCombinationUnsupported };
 		}
 		if (queryResult != VK_SUCCESS)
 		{
@@ -513,19 +554,6 @@ namespace gglab
 			desc.m_ArraySize > imageFormatProperties.imageFormatProperties.maxArrayLayers)
 		{
 			return { .m_Reason = RHITextureSupportReason::TextureDimensionUnsupported };
-		}
-
-		// Required format features must be present for the tiling and the
-		// requested usage.
-		VkFormatProperties2 formatProperties{};
-		formatProperties.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
-		vkGetPhysicalDeviceFormatProperties2(
-			physicalDevice, formatInfo.m_ResourceFormat, &formatProperties);
-		const VkFormatFeatureFlags2 requiredFeatures = ToVulkanFormatFeatureFlags(desc.m_Usage);
-		if ((formatProperties.formatProperties.optimalTilingFeatures & requiredFeatures) !=
-			requiredFeatures)
-		{
-			return { .m_Reason = TextureSupportReasonForUsage(desc.m_Usage) };
 		}
 
 		return { .m_Supported = true };

@@ -51,6 +51,11 @@ namespace gglab
 		TypedUnorderedAccessUnsupported,
 		TypedUnorderedAccessStoreUnsupported,
 		MultisamplingUnsupported,
+		CopySourceUnsupported,
+		CopyDestUnsupported,
+		// The format supports every requested single use, but the combined
+		// image-format query (usage, flags, view format list) failed.
+		FormatCombinationUnsupported,
 	};
 
 	struct RHITextureSupportResult

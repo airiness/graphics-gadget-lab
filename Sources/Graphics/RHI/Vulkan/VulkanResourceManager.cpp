@@ -1138,8 +1138,32 @@ namespace gglab
 		const VulkanNormalizedTextureView& normalized, VulkanTexture& nativeTexture,
 		std::string_view debugName) noexcept
 	{
+		// The view narrows the parent image's usage to exactly what the
+		// view type needs, so the view format only has to carry the
+		// corresponding format features.
+		VkImageUsageFlags viewUsage = 0;
+		switch (normalized.m_Type)
+		{
+		case RHITextureViewType::RenderTarget:
+			viewUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+			break;
+		case RHITextureViewType::DepthStencil:
+			viewUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+			break;
+		case RHITextureViewType::ShaderResource:
+			viewUsage = VK_IMAGE_USAGE_SAMPLED_BIT;
+			break;
+		case RHITextureViewType::UnorderedAccess:
+			viewUsage = VK_IMAGE_USAGE_STORAGE_BIT;
+			break;
+		}
+		VkImageViewUsageCreateInfo usageCreateInfo{};
+		usageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO;
+		usageCreateInfo.usage = viewUsage;
+
 		VkImageViewCreateInfo viewCreateInfo{};
 		viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewCreateInfo.pNext = &usageCreateInfo;
 		viewCreateInfo.image = nativeTexture.Get();
 		viewCreateInfo.viewType = normalized.m_ViewType;
 		// Depth resources always view through the depth image format; the

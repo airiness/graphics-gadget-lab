@@ -317,10 +317,69 @@ namespace gglab
 
 			RHITextureHandle firstTexture;
 			RHITextureHandle secondTexture;
-			RHITextureViewHandle firstView;
-			RHITextureViewHandle secondView;
-			uint32_t firstDescriptorIndex = 0;
+			RHITextureHandle thirdTexture;
+			std::array<uint32_t, 4> firstViewSlots{};
+			std::array<uint32_t, 4> firstDescriptorIndices{};
 			constexpr uint32_t kIterations = 24;
+
+			// Deferred retirement: an incomplete gate must keep the
+			// resource alive until the timeline actually completes. The
+			// pending slot stays occupied and the next creation must land
+			// elsewhere.
+			{
+				RHITextureHandle pending = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R8G8B8A8Unorm,
+							.m_Usage = RHITextureUsage::Sampled,
+							.m_Extent = { 16, 16, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::PixelShader,
+							.m_Access = RHIAccess::ShaderResource,
+							.m_Layout = RHILayout::ShaderResource,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!pending.IsValid())
+				{
+					LogQualificationError("qualify resource: deferred texture creation failed.");
+					return 1;
+				}
+				// One above the last committed value is never submitted by
+				// this process, so the gate stays incomplete.
+				const RHIFencePoint incompletePoint(
+					runtime.GetTimeline().GetRHIHandle(),
+					runtime.GetTimeline().GetCurrentSignalValue() + 1);
+				resources.RecordTextureUse(pending, incompletePoint);
+				resources.DestroyTexture(pending);
+				resources.RetireCompletedResources();
+
+				RHITextureHandle probe = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R8G8B8A8Unorm,
+							.m_Usage = RHITextureUsage::Sampled,
+							.m_Extent = { 16, 16, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::PixelShader,
+							.m_Access = RHIAccess::ShaderResource,
+							.m_Layout = RHILayout::ShaderResource,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!probe.IsValid() || probe.Index() == pending.Index())
+				{
+					LogQualificationError(
+						"qualify resource: incomplete retirement gate released the slot.");
+					return 1;
+				}
+				resources.DestroyTexture(probe);
+				resources.RetireCompletedResources();
+				LogQualificationInfo(
+					"qualify resource: deferred retirement held the slot until completion.");
+			}
 			for (uint32_t i = 0; i < kIterations; ++i)
 			{
 				// Upload/readback buffers exercise the persistent mapping
@@ -357,7 +416,9 @@ namespace gglab
 				resources.UnmapBuffer(readback, {});
 
 				// Color texture with an SRV and a typeless depth texture with
-				// a DSV exercise the view-family and aspect contracts.
+				// a DSV exercise the view-family and aspect contracts; the
+				// typeless color texture exercises the mutable-format path
+				// with its restricted UNORM/SRGB view family.
 				RHITextureHandle color = resources.CreateTexture(
 					RHIOwnedTextureCreateInfo{
 						.m_Desc = RHITextureDesc{
@@ -386,7 +447,21 @@ namespace gglab
 						},
 					},
 					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
-				if (!color.IsValid() || !depth.IsValid())
+				RHITextureHandle typeless = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R8G8B8A8Typeless,
+							.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::RenderTarget,
+							.m_Extent = { 32, 32, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::PixelShader,
+							.m_Access = RHIAccess::ShaderResource,
+							.m_Layout = RHILayout::ShaderResource,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!color.IsValid() || !depth.IsValid() || !typeless.IsValid())
 				{
 					LogQualificationError("qualify resource: texture creation failed.");
 					return 1;
@@ -403,11 +478,20 @@ namespace gglab
 				// Depth views must name their non-typeless view format.
 				dsvDesc.m_Format = RHIFormat::D32Float;
 				const RHITextureViewHandle dsv = resources.CreateTextureView(depth, dsvDesc);
+				RHITextureViewDesc unormView = srvDesc;
+				unormView.m_Format = RHIFormat::R8G8B8A8Unorm;
+				const RHITextureViewHandle unorm =
+					resources.CreateTextureView(typeless, unormView);
+				RHITextureViewDesc srgbView = srvDesc;
+				srgbView.m_Format = RHIFormat::R8G8B8A8UnormSrgb;
+				const RHITextureViewHandle srgb =
+					resources.CreateTextureView(typeless, srgbView);
 				RHISamplerDesc samplerDesc{};
 				samplerDesc.m_AddressU = RHITextureAddressMode::Border;
 				samplerDesc.m_BorderColor[3] = 1.0f;
 				const RHISamplerHandle sampler = resources.CreateSampler(samplerDesc);
-				if (!srv.IsValid() || !dsv.IsValid() || !sampler.IsValid())
+				if (!srv.IsValid() || !dsv.IsValid() || !unorm.IsValid() ||
+					!srgb.IsValid() || !sampler.IsValid())
 				{
 					LogQualificationError("qualify resource: view or sampler creation failed.");
 					return 1;
@@ -429,35 +513,77 @@ namespace gglab
 				{
 					firstTexture = color;
 					secondTexture = depth;
-					firstView = srv;
-					secondView = dsv;
-					firstDescriptorIndex = srvDescriptor.m_Index;
+					thirdTexture = typeless;
+					firstViewSlots = { srv.Index(), dsv.Index(), unorm.Index(), srgb.Index() };
+					firstDescriptorIndices = {
+						srvDescriptor.m_Index,
+						resources.GetTextureViewDescriptor(unorm).m_Index,
+						resources.GetTextureViewDescriptor(srgb).m_Index,
+						0,
+					};
 				}
 				else
 				{
 					// After immediate retirement every slot must be recycled:
-					// the new handles land in exactly the same slot set (the
+					// the new handles land in exactly the same slot sets (the
 					// table reuses in LIFO order, so the concrete mapping may
-					// alternate) and the bindless descriptor index stays
-					// stable.
-					const bool textureSlotsReused =
-						(color.Index() == firstTexture.Index() ||
-							color.Index() == secondTexture.Index()) &&
-						(depth.Index() == firstTexture.Index() ||
-							depth.Index() == secondTexture.Index()) &&
-						color.Index() != depth.Index();
-					const bool viewSlotsReused =
-						(srv.Index() == firstView.Index() || srv.Index() == secondView.Index()) &&
-						(dsv.Index() == firstView.Index() || dsv.Index() == secondView.Index()) &&
-						srv.Index() != dsv.Index();
-					if (!textureSlotsReused || !viewSlotsReused ||
-						srvDescriptor.m_Index != firstDescriptorIndex)
+					// alternate) and the bindless descriptor indices stay
+					// stable as a set.
+					const auto sameSlotSet = [](const std::array<uint32_t, 3>& expected,
+						uint32_t a, uint32_t b, uint32_t c)
+						{
+							return (a == expected[0] || a == expected[1] || a == expected[2]) &&
+								(b == expected[0] || b == expected[1] || b == expected[2]) &&
+								(c == expected[0] || c == expected[1] || c == expected[2]) &&
+								a != b && a != c && b != c;
+						};
+					const std::array<uint32_t, 3> textureSlots{
+						color.Index(), depth.Index(), typeless.Index(),
+					};
+					if (!sameSlotSet(
+						{ firstTexture.Index(), secondTexture.Index(), thirdTexture.Index() },
+						textureSlots[0], textureSlots[1], textureSlots[2]))
 					{
-						// Full slot and descriptor reuse after immediate
-						// retirement.
 						LogQualificationError(
-							"qualify resource: slots or descriptor indices were not reused.");
+							"qualify resource: texture slots were not reused.");
 						return 1;
+					}
+					const std::array<uint32_t, 4> viewSlots{
+						srv.Index(), dsv.Index(), unorm.Index(), srgb.Index(),
+					};
+					for (uint32_t v = 0; v < 4; ++v)
+					{
+						bool found = false;
+						for (uint32_t expected : firstViewSlots)
+						{
+							found = found || viewSlots[v] == expected;
+						}
+						if (!found)
+						{
+							LogQualificationError(
+								"qualify resource: view slots were not reused.");
+							return 1;
+						}
+					}
+					const std::array<uint32_t, 4> descriptorIndices{
+						srvDescriptor.m_Index,
+						resources.GetTextureViewDescriptor(unorm).m_Index,
+						resources.GetTextureViewDescriptor(srgb).m_Index,
+						0,
+					};
+					for (uint32_t d = 0; d < 3; ++d)
+					{
+						bool found = false;
+						for (uint32_t expected : firstDescriptorIndices)
+						{
+							found = found || descriptorIndices[d] == expected;
+						}
+						if (!found)
+						{
+							LogQualificationError(
+								"qualify resource: descriptor indices were not reused.");
+							return 1;
+						}
 					}
 				}
 
@@ -465,9 +591,12 @@ namespace gglab
 				resources.RecordBufferUse(upload, completedPoint);
 				resources.DestroyTextureView(srv);
 				resources.DestroyTextureView(dsv);
+				resources.DestroyTextureView(unorm);
+				resources.DestroyTextureView(srgb);
 				resources.DestroySampler(sampler);
 				resources.DestroyTexture(color);
 				resources.DestroyTexture(depth);
+				resources.DestroyTexture(typeless);
 				resources.DestroyBuffer(upload);
 				resources.DestroyBuffer(readback);
 				resources.RetireCompletedResources();
