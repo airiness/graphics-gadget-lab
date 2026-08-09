@@ -19,17 +19,28 @@ namespace gglab
 		m_Allocator = createInfo.m_Allocator;
 		m_Device = createInfo.m_Device;
 		m_CreateInfo = createInfo.m_CreateInfo;
+		m_SizeInBytes = m_CreateInfo.size;
 		m_InitialState = createInfo.m_InitialState;
 		m_MemoryUsage = createInfo.m_MemoryUsage;
 
+		// Mapping contract: upload/readback buffers are persistently
+		// mapped at creation, GpuOnly buffers are never mapped. The flag is
+		// forced here so the mapping state always follows the logical
+		// memory usage regardless of the caller's allocation policy.
+		VmaAllocationCreateInfo allocationCreateInfo = createInfo.m_AllocationCreateInfo;
+		if (m_MemoryUsage != RHIMemoryUsage::GpuOnly)
+		{
+			allocationCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		}
+
 		VmaAllocationInfo* allocationInfo = nullptr;
 		VmaAllocationInfo allocationInfoStorage{};
-		if ((createInfo.m_AllocationCreateInfo.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0)
+		if ((allocationCreateInfo.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0)
 		{
 			allocationInfo = &allocationInfoStorage;
 		}
 		const VkResult createResult = vmaCreateBuffer(m_Allocator, &m_CreateInfo,
-			&createInfo.m_AllocationCreateInfo, &m_Buffer, &m_Allocation, allocationInfo);
+			&allocationCreateInfo, &m_Buffer, &m_Allocation, allocationInfo);
 		if (createResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
@@ -49,7 +60,8 @@ namespace gglab
 	}
 
 	void VulkanBuffer::AdoptExternal(
-		VkDevice device, VkBuffer buffer, RHIResourceState initialState) noexcept
+		VkDevice device, VkBuffer buffer, VkDeviceSize sizeInBytes,
+		RHIResourceState initialState) noexcept
 	{
 		if (IsValid())
 		{
@@ -61,6 +73,7 @@ namespace gglab
 		m_Allocation = VK_NULL_HANDLE;
 		m_Borrowed = true;
 		m_Buffer = buffer;
+		m_SizeInBytes = sizeInBytes;
 		m_InitialState = initialState;
 		m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 		m_CreateInfo = {};
@@ -90,6 +103,7 @@ namespace gglab
 		m_Allocator = VK_NULL_HANDLE;
 		m_Borrowed = false;
 		m_CreateInfo = {};
+		m_SizeInBytes = 0;
 		m_InitialState = {};
 		m_Mapping = VulkanBufferMapping::None;
 		m_MappedData = nullptr;
@@ -110,12 +124,26 @@ namespace gglab
 		{
 			return nullptr;
 		}
+		// The RHI range contract mirrors DX12: Begin <= End <= size.
+		GGLAB_ASSERT(readRange.m_Begin <= readRange.m_End);
+		GGLAB_ASSERT(readRange.m_End <= m_SizeInBytes);
+
 		if (m_Borrowed || m_Allocation == VK_NULL_HANDLE)
 		{
 			// Borrowed buffers carry no allocation metadata: the backend
 			// cannot prove host visibility, flush or invalidate ranges, so
 			// backend mapping is rejected. A future contract extension
 			// would require the caller to supply known mapping metadata.
+			return nullptr;
+		}
+		if (m_MemoryUsage == RHIMemoryUsage::GpuOnly)
+		{
+			// Mapping eligibility follows the logical memory usage:
+			// GpuOnly buffers are device-local and never mapped, even if
+			// the VMA memory topology would allow it.
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanBuffer::Map rejected a GpuOnly buffer; only upload/readback "
+				"buffers are mapped by the backend.");
 			return nullptr;
 		}
 
@@ -132,22 +160,13 @@ namespace gglab
 			return m_MappedData;
 		}
 
-		void* mappedData = nullptr;
-		const VkResult mapResult =
-			vmaMapMemory(m_Allocator, m_Allocation, &mappedData);
-		if (mapResult != VK_SUCCESS)
-		{
-			GGLAB_LOG_GRAPHICS_WARN("VulkanBuffer::Map failed with {}.", ToString(mapResult));
-			return nullptr;
-		}
-		m_Mapping = VulkanBufferMapping::Explicit;
-		m_MappedData = mappedData;
-		if (m_MemoryUsage == RHIMemoryUsage::GpuToCpu && readRange.m_End > readRange.m_Begin)
-		{
-			vmaInvalidateAllocation(m_Allocator, m_Allocation,
-				readRange.m_Begin, readRange.m_End - readRange.m_Begin);
-		}
-		return mappedData;
+		// The backend only creates persistent mappings for upload/readback
+		// buffers, so reaching here means the mapping state diverged from
+		// the creation contract. The explicit-mapping path is intentionally
+		// not produced: VMA reference counting must stay symmetric.
+		GGLAB_ASSERT_MSG(false,
+			"VulkanBuffer::Map found a buffer that is neither persistent nor GpuOnly.");
+		return nullptr;
 	}
 
 	void VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
@@ -156,23 +175,19 @@ namespace gglab
 		{
 			return;
 		}
+		// The RHI range contract mirrors DX12: Begin <= End <= size.
+		GGLAB_ASSERT(writtenRange.m_Begin <= writtenRange.m_End);
+		GGLAB_ASSERT(writtenRange.m_End <= m_SizeInBytes);
 
 		// Upload buffers flush the written range so the GPU sees the host
-		// writes.
+		// writes. Persistent mappings never carry an unmap obligation;
+		// their teardown belongs to vmaDestroyBuffer.
 		if (m_MemoryUsage == RHIMemoryUsage::CpuToGpu &&
 			writtenRange.m_End > writtenRange.m_Begin)
 		{
 			vmaFlushAllocation(m_Allocator, m_Allocation,
 				writtenRange.m_Begin, writtenRange.m_End - writtenRange.m_Begin);
 		}
-
-		if (m_Mapping == VulkanBufferMapping::Explicit)
-		{
-			vmaUnmapMemory(m_Allocator, m_Allocation);
-			m_Mapping = VulkanBufferMapping::None;
-			m_MappedData = nullptr;
-		}
-		// Persistent mappings keep their VMA-owned pointer.
 	}
 
 	void VulkanTexture::Create(const CreateInfo& createInfo) noexcept

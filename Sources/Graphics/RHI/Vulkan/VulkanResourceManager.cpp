@@ -605,8 +605,8 @@ namespace gglab
 		}
 
 		auto buffer = std::make_unique<VulkanBuffer>();
-		buffer->AdoptExternal(
-			m_Device->Get(), desc.m_Buffer, desc.m_RHI.m_External.m_InitialState);
+		buffer->AdoptExternal(m_Device->Get(), desc.m_Buffer,
+			desc.m_RHI.m_Desc.m_SizeInBytes, desc.m_RHI.m_External.m_InitialState);
 		if (!buffer->IsValid())
 		{
 			++m_Diagnostics.m_ImportFailureCount;
@@ -1504,8 +1504,8 @@ namespace gglab
 			if (slot.m_State != RHIHandleSlotState::Free)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
-					"VulkanResourceManager finalizing texture slot {} ('{}') in state {}.", index,
-					slot.m_DebugName, static_cast<uint32_t>(slot.m_State));
+					"VulkanResourceManager finalizing texture slot {} ('{}') in state {}.",
+					index, slot.m_DebugName, static_cast<uint32_t>(slot.m_State));
 			}
 		}
 		for (uint32_t index = 0; index < m_Buffers.Size(); ++index)
@@ -1514,8 +1514,42 @@ namespace gglab
 			if (slot.m_State != RHIHandleSlotState::Free)
 			{
 				GGLAB_LOG_GRAPHICS_WARN(
-					"VulkanResourceManager finalizing buffer slot {} ('{}') in state {}.", index,
-					slot.m_DebugName, static_cast<uint32_t>(slot.m_State));
+					"VulkanResourceManager finalizing buffer slot {} ('{}') in state {}.",
+					index, slot.m_DebugName, static_cast<uint32_t>(slot.m_State));
+			}
+		}
+		for (uint32_t index = 0; index < m_TextureViews.Size(); ++index)
+		{
+			const auto& slot = m_TextureViews.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::Free)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager finalizing texture view slot {} (texture {}) in "
+					"state {}.",
+					index, slot.m_Key.m_Texture.Index(),
+					static_cast<uint32_t>(slot.m_State));
+			}
+		}
+		for (uint32_t index = 0; index < m_BufferViews.Size(); ++index)
+		{
+			const auto& slot = m_BufferViews.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::Free)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager finalizing buffer view slot {} (buffer {}) in "
+					"state {}.",
+					index, slot.m_Key.m_Buffer.Index(),
+					static_cast<uint32_t>(slot.m_State));
+			}
+		}
+		for (uint32_t index = 0; index < m_Samplers.Size(); ++index)
+		{
+			const auto& slot = m_Samplers.SlotAt(index);
+			if (slot.m_State != RHIHandleSlotState::Free)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager finalizing sampler slot {} in state {}.",
+					index, static_cast<uint32_t>(slot.m_State));
 			}
 		}
 	}

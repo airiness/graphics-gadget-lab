@@ -1839,11 +1839,18 @@ namespace gglab
 		context.Check(!NormalizeVulkanTextureView(depthResource, baseOutOfRange).has_value(),
 			"Out-of-range base mip is rejected");
 
-		// Unknown dimension is rejected.
-		RHITextureViewDesc unknownDimension{};
-		unknownDimension.m_Dimension = RHITextureViewDimension::Unknown;
-		context.Check(!NormalizeVulkanTextureView(depthResource, unknownDimension).has_value(),
-			"Unknown view dimension is rejected");
+		// Unknown dimension (the RHI default) derives from the resource
+		// dimension and array size; the public validator accepts it.
+		RHITextureViewDesc derivedView{};
+		derivedView.m_Dimension = RHITextureViewDimension::Unknown;
+		const auto derived = NormalizeVulkanTextureView(
+			RHITextureDesc{ .m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled, .m_Extent = { 4, 4, 1 },
+				.m_ArraySize = 4 },
+			derivedView);
+		context.Check(derived.has_value() &&
+			derived->m_ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+			"Unknown view dimension derives from the resource array size");
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept

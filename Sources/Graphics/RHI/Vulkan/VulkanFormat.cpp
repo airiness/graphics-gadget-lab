@@ -246,7 +246,30 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		const VkImageViewType viewType = ToVulkanImageViewType(view.m_Dimension);
+		// View type: Unknown (the RHI default) derives from the resource
+		// dimension and array size, mirroring the public validator which
+		// accepts it; explicit dimensions map directly. Cube views must be
+		// requested explicitly because a resource cannot express them.
+		VkImageViewType viewType = ToVulkanImageViewType(view.m_Dimension);
+		if (view.m_Dimension == RHITextureViewDimension::Unknown)
+		{
+			switch (resource.m_Dimension)
+			{
+			case RHITextureDimension::Texture1D:
+				viewType = resource.m_ArraySize > 1
+					? VK_IMAGE_VIEW_TYPE_1D_ARRAY
+					: VK_IMAGE_VIEW_TYPE_1D;
+				break;
+			case RHITextureDimension::Texture2D:
+				viewType = resource.m_ArraySize > 1
+					? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+					: VK_IMAGE_VIEW_TYPE_2D;
+				break;
+			case RHITextureDimension::Texture3D:
+				viewType = VK_IMAGE_VIEW_TYPE_3D;
+				break;
+			}
+		}
 		if (viewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
 		{
 			return std::nullopt;

@@ -46,8 +46,10 @@ namespace gglab
 	// Persistent mappings are established by VMA at allocation time
 	// (VMA_ALLOCATION_CREATE_MAPPED_BIT); their teardown is handled by
 	// vmaDestroyBuffer and they must never be passed to vmaUnmapMemory.
-	// Explicit mappings come from vmaMapMemory and must be paired with
-	// vmaUnmapMemory before the allocation is released.
+	// The backend only produces persistent mappings: upload/readback
+	// buffers are created persistently mapped and GpuOnly buffers are never
+	// mapped, so the explicit-mapping path is reserved for future
+	// contracts.
 	enum class VulkanBufferMapping : uint8_t
 	{
 		None,
@@ -75,7 +77,8 @@ namespace gglab
 
 		void Create(const CreateInfo& createInfo) noexcept;
 		void AdoptExternal(
-			VkDevice device, VkBuffer buffer, RHIResourceState initialState) noexcept;
+			VkDevice device, VkBuffer buffer, VkDeviceSize sizeInBytes,
+			RHIResourceState initialState) noexcept;
 		void Release() noexcept override;
 		void SetDebugName(const char* name) noexcept override;
 
@@ -86,15 +89,18 @@ namespace gglab
 		{
 			return m_CreateInfo;
 		}
-		[[nodiscard]] VkDeviceSize GetSizeInBytes() const noexcept { return m_CreateInfo.size; }
+		// Logical size in bytes; owned buffers take it from the creation
+		// info, imported buffers from the authoritative RHI description.
+		[[nodiscard]] VkDeviceSize GetSizeInBytes() const noexcept { return m_SizeInBytes; }
 		[[nodiscard]] RHIResourceState GetInitialState() const noexcept { return m_InitialState; }
 		[[nodiscard]] RHIMemoryUsage GetMemoryUsage() const noexcept { return m_MemoryUsage; }
 
 		// Maps the buffer and returns a host pointer, or nullptr when the
-		// buffer cannot be mapped (borrowed resources have no allocation
-		// metadata and are never mapped by the backend). Persistent
-		// mappings return the VMA-owned pointer directly; explicit
-		// mappings are created here and must be released through Unmap.
+		// buffer cannot be mapped: borrowed resources carry no allocation
+		// metadata, and GpuOnly buffers are never mapped by the backend.
+		// Upload/readback buffers are persistently mapped at creation and
+		// return their VMA-owned pointer directly. The read/written ranges
+		// must satisfy Begin <= End <= size.
 		[[nodiscard]] void* Map(RHIMappedBufferRange readRange) noexcept;
 		void Unmap(RHIMappedBufferRange writtenRange) noexcept;
 		[[nodiscard]] VulkanBufferMapping GetMapping() const noexcept { return m_Mapping; }
@@ -102,6 +108,7 @@ namespace gglab
 	private:
 		VkBuffer m_Buffer = VK_NULL_HANDLE;
 		VkBufferCreateInfo m_CreateInfo{};
+		VkDeviceSize m_SizeInBytes = 0;
 		RHIResourceState m_InitialState{};
 		RHIMemoryUsage m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 		VulkanBufferMapping m_Mapping = VulkanBufferMapping::None;
