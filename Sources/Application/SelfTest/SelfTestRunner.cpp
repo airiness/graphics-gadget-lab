@@ -6,6 +6,7 @@
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
+#include "Core/Log/Logger.h"
 
 namespace gglab
 {
@@ -55,6 +56,10 @@ namespace gglab
 			return false;
 		}
 
+		if (!Logger::GetLogger(Logger::LoggerType::Application))
+		{
+			Logger::Initialize();
+		}
 		ConsoleSelfTestReporter reporter;
 		return RunSelfTestSuite(*suite, reporter);
 	}

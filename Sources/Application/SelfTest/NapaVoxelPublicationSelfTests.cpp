@@ -1,11 +1,22 @@
 #include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
+#include "Application/Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
+#include "Core/Input/InputManager.h"
+#include "Core/Input/Keyboard.h"
+#include "Core/Input/Mouse.h"
+#include "Core/Task/TaskSystem.h"
+#include "Core/Time.h"
+#include "Graphics/Asset/AssetManager.h"
+#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITransferContext.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -40,17 +51,17 @@ namespace gglab
 			RHITextureSupportResult QueryTextureSupport(
 				const RHITextureDesc&) const noexcept override
 			{
-				return {};
+				return { .m_Supported = true };
 			}
 			RHITextureSupportResult QueryTextureViewSupport(
 				const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
 			{
-				return {};
+				return { .m_Supported = true };
 			}
 			RHITextureHandle CreateTexture(
 				const RHITextureDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return {};
+				return { m_NextTextureIndex++, 1 };
 			}
 			RHIBufferHandle CreateBuffer(
 				const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override
@@ -69,14 +80,17 @@ namespace gglab
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
-				return {};
+				return { m_NextTextureViewIndex++, 1 };
 			}
 			RHIBufferViewHandle CreateBufferView(
 				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 			{
 				return {};
 			}
-			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
+			{
+				return { m_NextSamplerIndex++, 1 };
+			}
 			void DestroyTexture(RHITextureHandle) noexcept override {}
 			void DestroyBuffer(RHIBufferHandle buffer) noexcept override
 			{
@@ -148,9 +162,12 @@ namespace gglab
 			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
-				RHITextureViewHandle) const noexcept override
+				RHITextureViewHandle view) const noexcept override
 			{
-				return {};
+				return {
+					.m_HeapType = RHIDescriptorHeapType::CbvSrvUav,
+					.m_Index = view.Index(),
+				};
 			}
 			RHIDescriptorHandle GetBufferViewDescriptor(
 				RHIBufferViewHandle) const noexcept override
@@ -158,9 +175,12 @@ namespace gglab
 				return {};
 			}
 			RHIDescriptorHandle GetSamplerDescriptor(
-				RHISamplerHandle) const noexcept override
+				RHISamplerHandle sampler) const noexcept override
 			{
-				return {};
+				return {
+					.m_HeapType = RHIDescriptorHeapType::Sampler,
+					.m_Index = sampler.Index(),
+				};
 			}
 			void RetireCompletedWork() noexcept override {}
 
@@ -190,6 +210,9 @@ namespace gglab
 			std::unordered_map<RHIBufferHandle, uint64_t> m_LiveBuffers;
 			std::vector<RHIFencePoint> m_CompletedFencePoints;
 			uint64_t m_LiveBufferBytes = 0;
+			uint32_t m_NextTextureIndex = 0;
+			uint32_t m_NextTextureViewIndex = 0;
+			uint32_t m_NextSamplerIndex = 0;
 			uint32_t m_NextBufferIndex = 0;
 			uint32_t m_CreatedBufferCount = 0;
 			uint32_t m_DestroyedBufferCount = 0;
@@ -231,9 +254,9 @@ namespace gglab
 				return !m_FailUploads;
 			}
 			bool UploadTexture(
-				const RHITextureUploadData&, RHITextureHandle) noexcept override
+				const RHITextureUploadData& data, RHITextureHandle destination) noexcept override
 			{
-				return false;
+				return m_IsRecording && data.IsValid() && destination.IsValid();
 			}
 			RHITextureReadbackRequest ReadbackTexture(
 				RHITextureHandle, const RHITextureDesc&) noexcept override
@@ -371,6 +394,211 @@ namespace gglab
 				world && BuildCpuMeshBatch(*world, 1, chunks, batch).Succeeded() &&
 				ValidateCpuMeshBatch(batch, visible, pending).Succeeded() && pending;
 		}
+
+		class NapaVoxelLabSwitchTestPipeline final : public RenderPipelineBase
+		{
+		public:
+			std::string_view GetName() const noexcept override
+			{
+				return "NapaVoxel.LabSwitchTest";
+			}
+			void BuildRenderGraph(RenderGraph&, const RenderFrameContext&,
+				const RenderServices&) noexcept override
+			{
+			}
+		};
+
+		struct NapaVoxelLabSwitchTestState
+		{
+			NapaVoxelPublicationTestDevice* m_Device = nullptr;
+			AssetUploadScheduler* m_Scheduler = nullptr;
+			uint64_t m_NextOwnerGeneration = 1;
+			std::vector<uint64_t> m_StartedGenerations;
+			uint32_t m_CancelledSessionCount = 0;
+			uint32_t m_DestroyedSessionCount = 0;
+			uint32_t m_UnexpectedCommitCount = 0;
+			bool m_CancelledOnlyAfterSubmission = true;
+			bool m_CancelledWithoutVisibleState = true;
+		};
+
+		NapaVoxelLabSwitchTestState* s_NapaVoxelLabSwitchTestState = nullptr;
+
+		[[nodiscard]] LabDescriptor MakeLabSwitchTestDescriptor(
+			std::string_view id, std::string_view displayName) noexcept
+		{
+			return {
+				.m_Id = LabId(id),
+				.m_DisplayName = std::string(displayName),
+				.m_Category = "Self Test",
+				.m_Description = "Exercises LabRuntime publication cancellation.",
+			};
+		}
+
+		class NapaVoxelLabSwitchControlSession final : public LabSessionBase
+		{
+		public:
+			explicit NapaVoxelLabSwitchControlSession(
+				const LabSessionCreateInfo& createInfo) noexcept :
+				LabSessionBase(GetDescriptor(), createInfo,
+					std::make_unique<NapaVoxelLabSwitchTestPipeline>())
+			{
+			}
+
+			void Update(float) noexcept override {}
+
+			static LabId GetId() noexcept
+			{
+				return LabId("gglab.lab.self_test.control");
+			}
+			static LabDescriptor GetDescriptor() noexcept
+			{
+				return MakeLabSwitchTestDescriptor(
+					"gglab.lab.self_test.control", "Lab Switch Control");
+			}
+			static std::unique_ptr<LabSessionBase> Create(
+				const LabSessionCreateInfo& createInfo) noexcept
+			{
+				return std::make_unique<NapaVoxelLabSwitchControlSession>(createInfo);
+			}
+		};
+
+		class NapaVoxelLabSwitchPendingSession final : public LabSessionBase
+		{
+		public:
+			explicit NapaVoxelLabSwitchPendingSession(
+				const LabSessionCreateInfo& createInfo) noexcept :
+				LabSessionBase(GetDescriptor(), createInfo,
+					std::make_unique<NapaVoxelLabSwitchTestPipeline>()),
+				m_State(s_NapaVoxelLabSwitchTestState)
+			{
+			}
+
+			~NapaVoxelLabSwitchPendingSession() override
+			{
+				if (m_State)
+				{
+					++m_State->m_DestroyedSessionCount;
+				}
+			}
+
+			void BeginPrepare() noexcept override
+			{
+				if (!m_State || !m_State->m_Device || !m_State->m_Scheduler)
+				{
+					m_Progress = {
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Missing Lab switch test services",
+					};
+					return;
+				}
+
+				m_OwnerGeneration = m_State->m_NextOwnerGeneration++;
+				m_State->m_StartedGenerations.push_back(m_OwnerGeneration);
+				m_Publication = std::make_unique<NapaVoxelPublicationSession>(
+					m_State->m_Device, m_State->m_Scheduler, &m_CommandQueue);
+				std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pending;
+				if (!BuildPublicationPending(true, pending) ||
+					!m_Publication->BeginPrepare(
+						pending, 30'000 + m_OwnerGeneration, m_OwnerGeneration))
+				{
+					m_Progress = {
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Failed to begin the pending voxel publication",
+					};
+					return;
+				}
+
+				m_Progress = LoadingProgress{
+					.m_Status = LoadingStatus::Preparing,
+					.m_Fraction = 0.5f,
+					.m_Stage = "Awaiting voxel Copy Fence",
+				};
+			}
+
+			void TickPrepare() noexcept override
+			{
+				if (!m_Publication)
+				{
+					return;
+				}
+				m_Publication->TickPrepare();
+				if (m_Publication->IsReady())
+				{
+					m_Progress = LoadingProgress::Ready();
+				}
+				else if (m_Publication->GetPublicationStatus() ==
+					NapaVoxelInitialPublicationStatus::Failed)
+				{
+					m_Progress = {
+						.m_Status = LoadingStatus::Failed,
+						.m_Fraction = 0.0f,
+						.m_Stage = "Voxel publication failed",
+					};
+				}
+			}
+
+			LoadingProgress GetPreparationProgress() const noexcept override
+			{
+				return m_Progress;
+			}
+
+			void CommitPrepare() noexcept override
+			{
+				if (m_State)
+				{
+					++m_State->m_UnexpectedCommitCount;
+				}
+			}
+
+			void CancelPrepare() noexcept override
+			{
+				if (!m_Publication)
+				{
+					return;
+				}
+				if (m_State)
+				{
+					m_State->m_CancelledOnlyAfterSubmission &=
+						m_Publication->GetPublicationStatus() ==
+						NapaVoxelInitialPublicationStatus::AwaitingFence;
+				}
+				m_Publication->CancelPrepare();
+				if (m_State)
+				{
+					m_State->m_CancelledWithoutVisibleState &=
+						!m_Publication->IsReady() && !m_Publication->HasVisibleMeshes() &&
+						!m_Publication->GetFrameView();
+					++m_State->m_CancelledSessionCount;
+				}
+				m_Publication.reset();
+			}
+
+			void Update(float) noexcept override {}
+
+			static LabId GetId() noexcept
+			{
+				return LabId("gglab.lab.self_test.pending_voxel");
+			}
+			static LabDescriptor GetDescriptor() noexcept
+			{
+				return MakeLabSwitchTestDescriptor(
+					"gglab.lab.self_test.pending_voxel", "Pending Voxel Publication");
+			}
+			static std::unique_ptr<LabSessionBase> Create(
+				const LabSessionCreateInfo& createInfo) noexcept
+			{
+				return std::make_unique<NapaVoxelLabSwitchPendingSession>(createInfo);
+			}
+
+		private:
+			NapaVoxelLabSwitchTestState* m_State = nullptr;
+			NapaVoxelCommandQueue m_CommandQueue;
+			std::unique_ptr<NapaVoxelPublicationSession> m_Publication;
+			LoadingProgress m_Progress{};
+			uint64_t m_OwnerGeneration = 0;
+		};
 
 		[[nodiscard]] bool BuildInteractivePublicationInput(
 			std::unique_ptr<napa::voxel::VoxelWorld>& world,
@@ -1580,6 +1808,135 @@ namespace gglab
 				"A committed same-revision mesh publication cannot be prepared or applied twice");
 		}
 
+		void RunLabRuntimeGenerationCancellationStressTests(
+			SelfTestContext& context) noexcept
+		{
+			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
+			NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
+			TransferManager transferManager(std::move(transferContext));
+			NapaVoxelPublicationTestDevice device;
+			AssetUploadScheduler scheduler({
+				.m_Device = &device,
+				.m_TransferManager = &transferManager,
+				});
+			TaskSystem taskSystem({ .m_WorkerCount = 1 });
+			// LabSessionBase needs an Asset owner scope, but this fixture has no file assets.
+			// Close background submission before AssetManager queues its optional test textures.
+			taskSystem.Shutdown();
+			SamplerRegistry samplerRegistry({ .m_Device = &device });
+			AssetManager assetManager({
+				.m_Device = &device,
+				.m_TaskSystem = &taskSystem,
+				.m_TransferManager = &transferManager,
+				.m_AssetUploadScheduler = &scheduler,
+				.m_SamplerRegistry = &samplerRegistry,
+				});
+			Renderer renderer;
+			ShaderManager shaderManager;
+			InputManager inputManager;
+			Time time;
+			NapaVoxelLabSwitchTestState state{
+				.m_Device = &device,
+				.m_Scheduler = &scheduler,
+			};
+			s_NapaVoxelLabSwitchTestState = &state;
+
+			const LabSessionCreateInfo createInfo{
+				.m_Services = {
+					.m_Renderer = &renderer,
+					.m_AssetManager = &assetManager,
+					.m_ShaderManager = &shaderManager,
+					.m_TaskSystem = &taskSystem,
+					.m_InputManager = &inputManager,
+					.m_Time = &time,
+					// The lifecycle-only sessions never issue DebugDraw or environment requests.
+					.m_DebugDraw = reinterpret_cast<DebugDrawContext*>(&renderer),
+					.m_EnvironmentAssetController =
+						reinterpret_cast<EnvironmentAssetController*>(&renderer),
+				},
+				.m_WindowWidth = 64,
+				.m_WindowHeight = 64,
+				.m_RunConfig = { .m_WarmupFrames = 0 },
+			};
+
+			bool runtimeValid = false;
+			constexpr uint32_t cancellationCount = 12;
+			{
+				LabRuntime runtime(createInfo);
+				runtimeValid = runtime.RegisterLab(
+					NapaVoxelLabSwitchControlSession::GetDescriptor(),
+					&NapaVoxelLabSwitchControlSession::Create);
+				runtimeValid = runtimeValid && runtime.RegisterLab(
+					NapaVoxelLabSwitchPendingSession::GetDescriptor(),
+					&NapaVoxelLabSwitchPendingSession::Create);
+				runtimeValid = runtimeValid &&
+					runtime.Initialize(NapaVoxelLabSwitchControlSession::GetId());
+				runtime.TickTransitions();
+				runtime.OnEnter();
+				runtimeValid &= runtime.IsReady() && runtime.GetActiveSession() &&
+					runtime.GetActiveSession()->GetDescriptor().m_Id ==
+					NapaVoxelLabSwitchControlSession::GetId();
+
+				for (uint32_t index = 0; index < cancellationCount && runtimeValid; ++index)
+				{
+					runtime.RequestSwitchLab(NapaVoxelLabSwitchPendingSession::GetId());
+					runtime.ProcessPendingCommands();
+					scheduler.DrainReadyWork();
+					const AssetUploadStatistics submitted = scheduler.GetStatistics();
+					runtimeValid &= runtime.HasPendingSession() &&
+						submitted.m_PendingCount == index + 1 &&
+						transferView->GetSubmissionCount() == index + 2;
+
+					// This is the production Lab switch path: LabRuntime consumes the command,
+					// cancels and destroys the pending session, and activates a fresh control Lab.
+					runtime.RequestSwitchLab(NapaVoxelLabSwitchControlSession::GetId());
+					runtime.ProcessPendingCommands();
+					runtimeValid &= runtime.IsReady() && !runtime.HasPendingSession() &&
+						runtime.GetActiveSession() &&
+						runtime.GetActiveSession()->GetDescriptor().m_Id ==
+						NapaVoxelLabSwitchControlSession::GetId();
+				}
+
+				const bool generationsAreExact =
+					state.m_StartedGenerations.size() == cancellationCount &&
+					std::ranges::equal(state.m_StartedGenerations,
+						std::views::iota(uint64_t{ 1 }, uint64_t{ cancellationCount + 1 }));
+				context.Check(runtimeValid && generationsAreExact &&
+					state.m_CancelledSessionCount == cancellationCount &&
+					state.m_DestroyedSessionCount == cancellationCount &&
+					state.m_UnexpectedCommitCount == 0 &&
+					state.m_CancelledOnlyAfterSubmission &&
+					state.m_CancelledWithoutVisibleState,
+					"LabRuntime switch stress cancels every submitted Session generation without publication");
+
+				device.CompleteFence({
+					RHIFenceHandle{ 1, 1 }, transferView->GetSubmissionCount(),
+					});
+				GGLAB_UNUSED(scheduler.Tick());
+				context.Check(runtimeValid && IsSchedulerQuiescent(scheduler.GetStatistics()) &&
+					device.GetLiveBufferCount() == 0 &&
+					device.GetCreatedBufferCount() == device.GetDestroyedBufferCount() &&
+					runtime.IsReady() && runtime.GetActiveSession() &&
+					runtime.GetActiveSession()->GetDescriptor().m_Id ==
+					NapaVoxelLabSwitchControlSession::GetId(),
+					"Stale generation completions retire after the Copy Fence and cannot replace the active Lab");
+
+				runtime.OnExit();
+				runtime.Shutdown();
+			}
+			s_NapaVoxelLabSwitchTestState = nullptr;
+
+			assetManager.BeginShutdown();
+			taskSystem.Shutdown();
+			taskSystem.PumpCompletions();
+			assetManager.DrainLoadCompletions();
+			scheduler.DrainReadyWork();
+			device.CompleteFence();
+			GGLAB_UNUSED(scheduler.Tick());
+			scheduler.Finalize();
+			assetManager.PrepareForShutdown({});
+		}
+
 		void RunPublicationLifecycleStressTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -1775,6 +2132,7 @@ namespace gglab
 		RunDataOnlyPublicationContractTests(context);
 		RunAtomicDataOnlyPublicationTests(context);
 		RunAtomicMeshPublicationTests(context);
+		RunLabRuntimeGenerationCancellationStressTests(context);
 		RunPublicationLifecycleStressTests(context);
 	}
 }
