@@ -13,7 +13,7 @@ namespace napa::voxel
 			.m_ReferenceMesherVersion = 4,
 			.m_EditContractVersion = 3,
 			.m_MutationContractVersion = 4,
-			.m_DirtyContractVersion = 1,
+			.m_DirtyContractVersion = 2,
 			.m_RestoreContractVersion = 1,
 			.m_IsoValue = IsoValue,
 		};

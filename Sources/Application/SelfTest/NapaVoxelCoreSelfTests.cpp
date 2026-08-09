@@ -42,8 +42,8 @@ namespace gglab
 			"Sphere edit contract version is 3");
 		context.Check(contract.m_MutationContractVersion == 4,
 			"Voxel mutation contract version is 4");
-		context.Check(contract.m_DirtyContractVersion == 1,
-			"Voxel dirty contract version is 1");
+		context.Check(contract.m_DirtyContractVersion == 2,
+			"Gradient-aware voxel dirty contract version is 2");
 		context.Check(contract.m_RestoreContractVersion == 1,
 			"Voxel Restore contract version is 1");
 		context.Check(
