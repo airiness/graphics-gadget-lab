@@ -251,20 +251,20 @@ namespace gglab
 	VulkanDescriptorIndexArena::VulkanDescriptorIndexArena(uint32_t capacity) noexcept :
 		m_Capacity(capacity)
 	{
-		// Index 0 is reserved as the allocation-failure sentinel, so the
-		// arena hands out indices in [1, capacity].
-		m_FreeIndices.reserve(capacity > 0 ? capacity : 0);
+		// The whole [0, capacity) domain is legal; index 0 is a valid
+		// descriptor index and exhaustion is reported through std::nullopt.
+		m_FreeIndices.reserve(capacity);
 		for (uint32_t index = capacity; index > 0; --index)
 		{
-			m_FreeIndices.push_back(index);
+			m_FreeIndices.push_back(index - 1);
 		}
 	}
 
-	uint32_t VulkanDescriptorIndexArena::Allocate() noexcept
+	std::optional<uint32_t> VulkanDescriptorIndexArena::Allocate() noexcept
 	{
 		if (m_FreeIndices.empty())
 		{
-			return 0;
+			return std::nullopt;
 		}
 		const uint32_t index = m_FreeIndices.back();
 		m_FreeIndices.pop_back();
@@ -274,7 +274,7 @@ namespace gglab
 
 	void VulkanDescriptorIndexArena::Release(uint32_t index) noexcept
 	{
-		if (index == 0 || index > m_Capacity)
+		if (index >= m_Capacity)
 		{
 			return;
 		}
@@ -299,8 +299,82 @@ namespace gglab
 
 	void VulkanResourceManager::Finalize() noexcept
 	{
+		// Keep the leak evidence before draining: every non-free slot is
+		// reported while its debug identity is still available, then all
+		// surviving native objects are destroyed. The device is expected
+		// to be quiesced at this point (the frame runtime is destroyed
+		// before the device).
 		ReportLiveResources();
 
+		auto drainViewTable = [this](auto& table, auto destroyNative, auto releaseIndex)
+			{
+				for (uint32_t index = 0; index < table.Size(); ++index)
+				{
+					auto& slot = table.SlotAt(index);
+					if (slot.m_State == RHIHandleSlotState::Free)
+					{
+						continue;
+					}
+					destroyNative(slot);
+					releaseIndex(slot);
+					slot.m_RetirementPoints.clear();
+				}
+			};
+
+		drainViewTable(m_TextureViews,
+			[this](TextureViewSlot& slot) noexcept
+			{
+				if (slot.m_ImageView != VK_NULL_HANDLE)
+				{
+					vkDestroyImageView(m_Device->Get(), slot.m_ImageView, nullptr);
+					slot.m_ImageView = VK_NULL_HANDLE;
+				}
+			},
+			[this](TextureViewSlot& slot) noexcept
+			{
+				if (slot.m_DescriptorIndex)
+				{
+					m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
+					slot.m_DescriptorIndex.reset();
+				}
+			});
+		drainViewTable(m_BufferViews,
+			[this](BufferViewSlot& slot) noexcept
+			{
+				if (slot.m_BufferView != VK_NULL_HANDLE)
+				{
+					vkDestroyBufferView(m_Device->Get(), slot.m_BufferView, nullptr);
+					slot.m_BufferView = VK_NULL_HANDLE;
+				}
+			},
+			[this](BufferViewSlot& slot) noexcept
+			{
+				if (slot.m_DescriptorIndex)
+				{
+					m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
+					slot.m_DescriptorIndex.reset();
+				}
+			});
+		drainViewTable(m_Samplers,
+			[this](SamplerSlot& slot) noexcept
+			{
+				if (slot.m_Sampler != VK_NULL_HANDLE)
+				{
+					vkDestroySampler(m_Device->Get(), slot.m_Sampler, nullptr);
+					slot.m_Sampler = VK_NULL_HANDLE;
+				}
+			},
+			[this](SamplerSlot& slot) noexcept
+			{
+				if (slot.m_DescriptorIndex)
+				{
+					m_SamplerDescriptorArena.Release(*slot.m_DescriptorIndex);
+					slot.m_DescriptorIndex.reset();
+				}
+			});
+
+		// Resources release their native handles and VMA allocations
+		// through the RAII destructor.
 		m_Textures.Clear();
 		m_Buffers.Clear();
 		m_TextureViews.Clear();
@@ -507,8 +581,16 @@ namespace gglab
 		const auto resolvedIdentity =
 			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
 		++m_Diagnostics.m_TextureImportCount;
-		return AllocateTextureSlot(
-			std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
+		RHITextureHandle handle =
+			AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
+		if (handle.IsValid())
+		{
+			// The authoritative RHI description is preserved so view
+			// validation and normalization work for imported resources.
+			TextureSlot& slot = m_Textures.SlotAt(handle.Index());
+			slot.m_RHIDesc = desc.m_RHI.m_Desc;
+		}
+		return handle;
 	}
 
 	RHIBufferHandle VulkanResourceManager::ImportBuffer(const ImportedBufferDesc& desc) noexcept
@@ -540,8 +622,16 @@ namespace gglab
 		const auto resolvedIdentity =
 			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
 		++m_Diagnostics.m_BufferImportCount;
-		return AllocateBufferSlot(
-			std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);
+		RHIBufferHandle handle =
+			AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);
+		if (handle.IsValid())
+		{
+			// The authoritative RHI description is preserved so later
+			// buffer view validation works for imported resources.
+			BufferSlot& slot = m_Buffers.SlotAt(handle.Index());
+			slot.m_RHIDesc = desc.m_RHI.m_Desc;
+		}
+		return handle;
 	}
 
 	void VulkanResourceManager::DestroyTexture(RHITextureHandle texture) noexcept
@@ -661,30 +751,16 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN("VulkanResourceManager::MapBuffer received a non-live handle.");
 			return nullptr;
 		}
-
-		void* mappedData = nativeBuffer->GetMappedData();
-		if (mappedData == nullptr)
+		if (nativeBuffer->IsExternal())
 		{
-			const VkResult mapResult = vmaMapMemory(m_Device->GetMemAllocator(),
-				nativeBuffer->GetAllocation(), &mappedData);
-			if (mapResult != VK_SUCCESS)
-			{
-				GGLAB_LOG_GRAPHICS_WARN("VulkanResourceManager::MapBuffer failed with {}.",
-					ToString(mapResult));
-				return nullptr;
-			}
-			nativeBuffer->SetMappedData(mappedData);
+			// Borrowed buffers have no allocation metadata: the backend
+			// cannot prove host visibility or flush/invalidate ranges, so
+			// backend mapping is not supported for imported buffers.
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::MapBuffer rejected an imported buffer.");
+			return nullptr;
 		}
-
-		// Readback buffers refresh the read range from device memory so the
-		// caller observes completed GPU writes.
-		if (nativeBuffer->GetMemoryUsage() == RHIMemoryUsage::GpuToCpu &&
-			readRange.m_End > readRange.m_Begin)
-		{
-			vmaInvalidateAllocation(m_Device->GetMemAllocator(), nativeBuffer->GetAllocation(),
-				readRange.m_Begin, readRange.m_End - readRange.m_Begin);
-		}
-		return mappedData;
+		return nativeBuffer->Map(readRange);
 	}
 
 	void VulkanResourceManager::UnmapBuffer(
@@ -696,20 +772,7 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN("VulkanResourceManager::UnmapBuffer received a non-live handle.");
 			return;
 		}
-		if (nativeBuffer->GetMappedData() == nullptr)
-		{
-			return;
-		}
-
-		// Upload buffers flush the written range so the GPU sees the host
-		// writes. Persistently mapped allocations keep their mapping; the
-		// allocation is released together with the resource.
-		if (nativeBuffer->GetMemoryUsage() == RHIMemoryUsage::CpuToGpu &&
-			writtenRange.m_End > writtenRange.m_Begin)
-		{
-			vmaFlushAllocation(m_Device->GetMemAllocator(), nativeBuffer->GetAllocation(),
-				writtenRange.m_Begin, writtenRange.m_End - writtenRange.m_Begin);
-		}
+		nativeBuffer->Unmap(writtenRange);
 	}
 
 	VulkanTexture* VulkanResourceManager::ResolveTexture(RHITextureHandle texture) noexcept
@@ -762,14 +825,28 @@ namespace gglab
 				RHITextureValidationErrorText(validation.m_Error));
 			return {};
 		}
-		if (!IsVulkanViewFormatCompatible(slot->m_RHIDesc.m_Format, desc.m_Format))
+
+		// Normalize once: default semantics (Unknown format, All aspects,
+		// Remaining ranges) are expanded and the canonical result drives
+		// both the cache key and the native view creation, so validation
+		// and creation never diverge.
+		const std::optional<VulkanNormalizedTextureView> normalized =
+			NormalizeVulkanTextureView(slot->m_RHIDesc, desc);
+		if (!normalized)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::CreateTextureView rejected an unnormalizable view.");
+			return {};
+		}
+		if (!IsVulkanViewFormatCompatible(slot->m_RHIDesc.m_Format, normalized->m_EffectiveFormat))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"VulkanResourceManager::CreateTextureView rejected view format {} on resource {}.",
-				GetRHIFormatInfo(desc.m_Format).m_Name,
+				GetRHIFormatInfo(normalized->m_EffectiveFormat).m_Name,
 				GetRHIFormatInfo(slot->m_RHIDesc.m_Format).m_Name);
 			return {};
 		}
+
 		if (desc.m_ResourceMinLODClamp != 0.0f &&
 			!m_Device->GetPortabilityCapabilities().m_ImageViewMinLod)
 		{
@@ -779,7 +856,13 @@ namespace gglab
 			return {};
 		}
 
-		const RHITextureViewKey key{ texture, desc };
+		// Canonical cache key: the normalized description is the identity
+		// of the view, so equivalent defaulted descriptions share one
+		// entry.
+		RHITextureViewDesc canonicalDesc = desc;
+		canonicalDesc.m_Format = normalized->m_EffectiveFormat;
+		canonicalDesc.m_Subresources = normalized->m_Range;
+		const RHITextureViewKey key{ texture, canonicalDesc };
 		const auto cached = m_TextureViewCache.find(key);
 		if (cached != m_TextureViewCache.end())
 		{
@@ -790,21 +873,31 @@ namespace gglab
 			m_TextureViewCache.erase(cached);
 		}
 
-		const uint32_t descriptorIndex = m_ResourceDescriptorArena.Allocate();
-		if (descriptorIndex == 0)
+		// Only shader-visible views consume the bindless resource index
+		// arena; attachment views are used through their native image view.
+		std::optional<uint32_t> descriptorIndex = std::nullopt;
+		if (desc.m_Type == RHITextureViewType::ShaderResource ||
+			desc.m_Type == RHITextureViewType::UnorderedAccess)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"VulkanResourceManager::CreateTextureView exhausted the resource descriptor arena.");
-			return {};
+			descriptorIndex = m_ResourceDescriptorArena.Allocate();
+			if (!descriptorIndex)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"VulkanResourceManager::CreateTextureView exhausted the resource "
+					"descriptor arena.");
+				return {};
+			}
 		}
 
 		const std::string debugName = FormatRHIResourceDebugName(RHIResourceType::Texture,
 			texture.Index(), texture.Generation(), slot->m_DebugIdentity);
-		const VkImageView imageView = CreateNativeImageView(
-			slot->m_RHIDesc.m_Format, *slot->m_Resource, desc, debugName);
+		const VkImageView imageView = CreateNativeImageView(*normalized, *slot->m_Resource, debugName);
 		if (imageView == VK_NULL_HANDLE)
 		{
-			m_ResourceDescriptorArena.Release(descriptorIndex);
+			if (descriptorIndex)
+			{
+				m_ResourceDescriptorArena.Release(*descriptorIndex);
+			}
 			return {};
 		}
 
@@ -849,13 +942,9 @@ namespace gglab
 			m_BufferViewCache.erase(cached);
 		}
 
-		const uint32_t descriptorIndex = m_ResourceDescriptorArena.Allocate();
-		if (descriptorIndex == 0)
-		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"VulkanResourceManager::CreateBufferView exhausted the resource descriptor arena.");
-			return {};
-		}
+		// Buffer views never consume the bindless image arena: the binding
+		// ABI revision only covers sampled/storage images, and plain
+		// buffer descriptors belong to the fixed set-0 layout.
 
 		VkBufferView nativeView = VK_NULL_HANDLE;
 		if (desc.m_Format != RHIFormat::Unknown)
@@ -874,7 +963,6 @@ namespace gglab
 				vkCreateBufferView(m_Device->Get(), &viewCreateInfo, nullptr, &nativeView);
 			if (createResult != VK_SUCCESS)
 			{
-				m_ResourceDescriptorArena.Release(descriptorIndex);
 				GGLAB_LOG_GRAPHICS_WARN(
 					"VulkanResourceManager::CreateBufferView failed to create the native view ({}).",
 					ToString(createResult));
@@ -887,7 +975,6 @@ namespace gglab
 		viewSlot.m_Key = key;
 		viewSlot.m_BufferView = nativeView;
 		viewSlot.m_ParentBuffer = slot->m_Resource->Get();
-		viewSlot.m_DescriptorIndex = descriptorIndex;
 		m_BufferViewCache.emplace(key, view);
 		m_BufferResourceViews[buffer].push_back(view);
 		return view;
@@ -913,8 +1000,8 @@ namespace gglab
 			return {};
 		}
 
-		const uint32_t descriptorIndex = m_SamplerDescriptorArena.Allocate();
-		if (descriptorIndex == 0)
+		const std::optional<uint32_t> descriptorIndex = m_SamplerDescriptorArena.Allocate();
+		if (!descriptorIndex)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"VulkanResourceManager::CreateSampler exhausted the sampler descriptor arena.");
@@ -924,7 +1011,7 @@ namespace gglab
 		const VkSampler sampler = CreateNativeSampler(desc);
 		if (sampler == VK_NULL_HANDLE)
 		{
-			m_SamplerDescriptorArena.Release(descriptorIndex);
+			m_SamplerDescriptorArena.Release(*descriptorIndex);
 			return {};
 		}
 
@@ -974,41 +1061,38 @@ namespace gglab
 		RHITextureViewHandle view) const noexcept
 	{
 		const TextureViewSlot* slot = m_TextureViews.Resolve(view);
-		if (slot == nullptr)
+		// Attachment views (RenderTarget/DepthStencil) hold no bindless
+		// index and report an invalid descriptor.
+		if (slot == nullptr || !slot->m_DescriptorIndex)
 		{
 			return {};
 		}
 		return RHIDescriptorHandle{
 			.m_HeapType = RHIDescriptorHeapType::CbvSrvUav,
-			.m_Index = slot->m_DescriptorIndex,
+			.m_Index = *slot->m_DescriptorIndex,
 		};
 	}
 
 	RHIDescriptorHandle VulkanResourceManager::GetBufferViewDescriptor(
 		RHIBufferViewHandle view) const noexcept
 	{
-		const BufferViewSlot* slot = m_BufferViews.Resolve(view);
-		if (slot == nullptr)
-		{
-			return {};
-		}
-		return RHIDescriptorHandle{
-			.m_HeapType = RHIDescriptorHeapType::CbvSrvUav,
-			.m_Index = slot->m_DescriptorIndex,
-		};
+		// Buffer views never consume the bindless image arena; their
+		// descriptors belong to the fixed set-0 layout.
+		GGLAB_UNUSED(view);
+		return {};
 	}
 
 	RHIDescriptorHandle VulkanResourceManager::GetSamplerDescriptor(
 		RHISamplerHandle sampler) const noexcept
 	{
 		const SamplerSlot* slot = m_Samplers.Resolve(sampler);
-		if (slot == nullptr)
+		if (slot == nullptr || !slot->m_DescriptorIndex)
 		{
 			return {};
 		}
 		return RHIDescriptorHandle{
 			.m_HeapType = RHIDescriptorHeapType::Sampler,
-			.m_Index = slot->m_DescriptorIndex,
+			.m_Index = *slot->m_DescriptorIndex,
 		};
 	}
 
@@ -1021,25 +1105,17 @@ namespace gglab
 		RetireCompletedResourceTable(m_Buffers, m_Diagnostics.m_BufferRetireCount);
 	}
 
-	VkImageView VulkanResourceManager::CreateNativeImageView(RHIFormat resourceFormat,
-		VulkanTexture& nativeTexture, const RHITextureViewDesc& desc,
+	VkImageView VulkanResourceManager::CreateNativeImageView(
+		const VulkanNormalizedTextureView& normalized, VulkanTexture& nativeTexture,
 		std::string_view debugName) noexcept
 	{
-		const VkImageCreateInfo& imageInfo = nativeTexture.GetCreateInfo();
-
-		VkImageAspectFlags aspectMask = ToVulkanImageAspectFlags(desc.m_Subresources.m_Aspects);
-		if (aspectMask == 0)
-		{
-			aspectMask = GetVulkanFormatInfo(desc.m_Format).m_Aspects;
-		}
-
 		VkImageViewCreateInfo viewCreateInfo{};
 		viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		viewCreateInfo.image = nativeTexture.Get();
-		viewCreateInfo.viewType = ToVulkanImageViewType(desc.m_Dimension);
+		viewCreateInfo.viewType = normalized.m_ViewType;
 		// Depth resources always view through the depth image format; the
 		// sampled R32Float interpretation stays on the depth aspect.
-		viewCreateInfo.format = ToVulkanViewFormat(resourceFormat, desc.m_Format);
+		viewCreateInfo.format = normalized.m_NativeFormat;
 		viewCreateInfo.components = {
 			.r = VK_COMPONENT_SWIZZLE_IDENTITY,
 			.g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -1047,15 +1123,11 @@ namespace gglab
 			.a = VK_COMPONENT_SWIZZLE_IDENTITY,
 		};
 		viewCreateInfo.subresourceRange = {
-			.aspectMask = aspectMask,
-			.baseMipLevel = desc.m_Subresources.m_BaseMip,
-			.levelCount = desc.m_Subresources.m_MipCount == RHISubresourceRange::Remaining
-				? imageInfo.mipLevels - desc.m_Subresources.m_BaseMip
-				: desc.m_Subresources.m_MipCount,
-			.baseArrayLayer = desc.m_Subresources.m_BaseArraySlice,
-			.layerCount = desc.m_Subresources.m_ArraySliceCount == RHISubresourceRange::Remaining
-				? imageInfo.arrayLayers - desc.m_Subresources.m_BaseArraySlice
-				: desc.m_Subresources.m_ArraySliceCount,
+			.aspectMask = normalized.m_AspectMask,
+			.baseMipLevel = normalized.m_Range.m_BaseMip,
+			.levelCount = normalized.m_Range.m_MipCount,
+			.baseArrayLayer = normalized.m_Range.m_BaseArraySlice,
+			.layerCount = normalized.m_Range.m_ArraySliceCount,
 		};
 
 		VkImageView imageView = VK_NULL_HANDLE;
@@ -1336,9 +1408,9 @@ namespace gglab
 			{
 				vkDestroyImageView(m_Device->Get(), slot.m_ImageView, nullptr);
 			}
-			if (slot.m_DescriptorIndex != 0)
+			if (slot.m_DescriptorIndex)
 			{
-				m_ResourceDescriptorArena.Release(slot.m_DescriptorIndex);
+				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
 			slot.m_RetirementPoints.clear();
 			m_TextureViews.Retire(index);
@@ -1364,9 +1436,9 @@ namespace gglab
 			{
 				vkDestroyBufferView(m_Device->Get(), slot.m_BufferView, nullptr);
 			}
-			if (slot.m_DescriptorIndex != 0)
+			if (slot.m_DescriptorIndex)
 			{
-				m_ResourceDescriptorArena.Release(slot.m_DescriptorIndex);
+				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
 			slot.m_RetirementPoints.clear();
 			m_BufferViews.Retire(index);
@@ -1392,9 +1464,9 @@ namespace gglab
 			{
 				vkDestroySampler(m_Device->Get(), slot.m_Sampler, nullptr);
 			}
-			if (slot.m_DescriptorIndex != 0)
+			if (slot.m_DescriptorIndex)
 			{
-				m_SamplerDescriptorArena.Release(slot.m_DescriptorIndex);
+				m_SamplerDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
 			slot.m_RetirementPoints.clear();
 			m_Samplers.Retire(index);

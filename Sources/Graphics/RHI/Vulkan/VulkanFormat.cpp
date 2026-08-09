@@ -234,6 +234,84 @@ namespace gglab
 		}
 	}
 
+	std::optional<VulkanNormalizedTextureView> NormalizeVulkanTextureView(
+		const RHITextureDesc& resource, const RHITextureViewDesc& view) noexcept
+	{
+		// Effective format: Unknown defaults to the resource format.
+		const RHIFormat effectiveFormat =
+			view.m_Format == RHIFormat::Unknown ? resource.m_Format : view.m_Format;
+		if (!IsVulkanFormatSupported(resource.m_Format) ||
+			!IsVulkanFormatSupported(effectiveFormat))
+		{
+			return std::nullopt;
+		}
+
+		const VkImageViewType viewType = ToVulkanImageViewType(view.m_Dimension);
+		if (viewType == VK_IMAGE_VIEW_TYPE_MAX_ENUM)
+		{
+			return std::nullopt;
+		}
+
+		// Effective resource aspects: depth-stencil formats expose their
+		// depth/stencil aspects (R32Typeless included), so a sampled
+		// R32Float view on a depth resource resolves to the depth aspect
+		// and never to color.
+		const RHIFormatInfo& resourceInfo = GetRHIFormatInfo(resource.m_Format);
+		const RHITextureAspect effectiveResourceAspects =
+			resourceInfo.m_DepthStencilAspects != RHITextureAspect::None
+			? resourceInfo.m_DepthStencilAspects
+			: resourceInfo.m_Aspects;
+
+		// Aspect: All (the default) resolves to the resource's effective
+		// aspects; any other explicit aspect must be a non-empty subset of
+		// them, otherwise the view is rejected instead of silently
+		// reinterpreted.
+		const uint8_t aspectValue = static_cast<uint8_t>(view.m_Subresources.m_Aspects);
+		const uint8_t resourceAspectValue = static_cast<uint8_t>(effectiveResourceAspects);
+		RHITextureAspect aspect = view.m_Subresources.m_Aspects;
+		if (aspect == RHITextureAspect::All)
+		{
+			aspect = effectiveResourceAspects;
+		}
+		else if (aspectValue == 0 ||
+			(aspectValue & resourceAspectValue) != aspectValue)
+		{
+			return std::nullopt;
+		}
+
+		// Range: base subresources must be in range before Remaining is
+		// expanded, so an out-of-range base can never underflow.
+		if (view.m_Subresources.m_BaseMip >= resource.m_MipLevels ||
+			view.m_Subresources.m_BaseArraySlice >= resource.m_ArraySize)
+		{
+			return std::nullopt;
+		}
+		RHISubresourceRange range = view.m_Subresources;
+		if (range.m_MipCount == RHISubresourceRange::Remaining)
+		{
+			range.m_MipCount = resource.m_MipLevels - range.m_BaseMip;
+		}
+		if (range.m_ArraySliceCount == RHISubresourceRange::Remaining)
+		{
+			range.m_ArraySliceCount = resource.m_ArraySize - range.m_BaseArraySlice;
+		}
+		if (range.m_MipCount == 0 || range.m_ArraySliceCount == 0 ||
+			range.m_BaseMip + range.m_MipCount > resource.m_MipLevels ||
+			range.m_BaseArraySlice + range.m_ArraySliceCount > resource.m_ArraySize)
+		{
+			return std::nullopt;
+		}
+		range.m_Aspects = aspect;
+
+		return VulkanNormalizedTextureView{
+			.m_EffectiveFormat = effectiveFormat,
+			.m_Range = range,
+			.m_ViewType = viewType,
+			.m_AspectMask = ToVulkanImageAspectFlags(aspect),
+			.m_NativeFormat = ToVulkanViewFormat(resource.m_Format, effectiveFormat),
+		};
+	}
+
 	std::string_view ToVulkanFormatName(VkFormat format) noexcept
 	{
 		for (const VulkanFormatInfo& info : VulkanFormatInfos)

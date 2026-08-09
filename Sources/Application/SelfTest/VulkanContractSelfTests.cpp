@@ -1744,33 +1744,106 @@ namespace gglab
 			samplerArena.GetCapacity() == 2'048,
 			"Descriptor arenas match the frozen capacity contract");
 
-		// Index 0 is the failure sentinel; live accounting follows
-		// allocate/release exactly.
-		const uint32_t first = resourceArena.Allocate();
-		const uint32_t second = resourceArena.Allocate();
-		context.Check(first != 0 && second != 0 && first != second &&
+		// Index 0 is a legal descriptor index; exhaustion is reported
+		// through std::nullopt, never by occupying a valid index.
+		const std::optional<uint32_t> first = resourceArena.Allocate();
+		const std::optional<uint32_t> second = resourceArena.Allocate();
+		context.Check(first.has_value() && second.has_value() && *first != *second &&
 			resourceArena.GetLiveCount() == 2,
-			"Descriptor arena allocates distinct nonzero indices");
+			"Descriptor arena allocates distinct valid indices");
 
-		resourceArena.Release(first);
+		resourceArena.Release(*first);
 		context.Check(resourceArena.GetLiveCount() == 1,
 			"Descriptor arena releases indices back to the free list");
-		const uint32_t reused = resourceArena.Allocate();
-		context.Check(reused == first && resourceArena.GetLiveCount() == 2,
+		const std::optional<uint32_t> reused = resourceArena.Allocate();
+		context.Check(reused.has_value() && *reused == *first &&
+			resourceArena.GetLiveCount() == 2,
 			"Descriptor arena reuses the most recently released index");
 
-		// A full arena reports the failure sentinel and keeps its count.
+		// A full arena reports std::nullopt and keeps its count.
 		VulkanDescriptorIndexArena tinyArena(2);
-		const uint32_t a = tinyArena.Allocate();
-		const uint32_t b = tinyArena.Allocate();
-		context.Check(a != 0 && b != 0 && tinyArena.Allocate() == 0 &&
-			tinyArena.GetLiveCount() == 2,
-			"Descriptor arena reports exhaustion without corrupting its state");
+		const std::optional<uint32_t> a = tinyArena.Allocate();
+		const std::optional<uint32_t> b = tinyArena.Allocate();
+		context.Check(a.has_value() && b.has_value() && *a == 0 && *b == 1 &&
+			!tinyArena.Allocate().has_value() && tinyArena.GetLiveCount() == 2,
+			"Descriptor arena hands out [0, capacity) and reports exhaustion without "
+			"corrupting its state");
 
-		tinyArena.Release(a);
-		tinyArena.Release(b);
+		tinyArena.Release(*a);
+		tinyArena.Release(*b);
 		context.Check(tinyArena.GetLiveCount() == 0,
 			"Descriptor arena live count returns to zero after full release");
+	}
+
+	void RunVulkanViewNormalizationTests(SelfTestContext& context) noexcept
+	{
+		const RHITextureDesc depthResource{
+			.m_Format = RHIFormat::R32Typeless,
+			.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::DepthStencil,
+			.m_Extent = { 1280, 720, 1 },
+			.m_ArraySize = 1,
+			.m_MipLevels = 4,
+		};
+
+		// Unknown format and All aspects resolve to the resource contract;
+		// the sampled R32Float view stays on the depth aspect with the
+		// native D32 format.
+		RHITextureViewDesc sampledView{};
+		sampledView.m_Type = RHITextureViewType::ShaderResource;
+		sampledView.m_Dimension = RHITextureViewDimension::Texture2D;
+		sampledView.m_Format = RHIFormat::R32Float;
+		sampledView.m_Subresources = { .m_MipCount = 1, .m_ArraySliceCount = 1 };
+		const auto normalized = NormalizeVulkanTextureView(depthResource, sampledView);
+		context.Check(normalized.has_value() &&
+			normalized->m_EffectiveFormat == RHIFormat::R32Float &&
+			normalized->m_NativeFormat == VK_FORMAT_D32_SFLOAT &&
+			normalized->m_AspectMask == VK_IMAGE_ASPECT_DEPTH_BIT,
+			"R32Typeless sampled views normalize to the depth aspect on D32");
+
+		// Remaining ranges expand to the resource extents.
+		context.Check(normalized.has_value() &&
+			normalized->m_Range.m_MipCount == 1 &&
+			normalized->m_Range.m_ArraySliceCount == 1,
+			"Explicit ranges are preserved by normalization");
+		RHITextureViewDesc remainingView = sampledView;
+		remainingView.m_Subresources = {};
+		const auto remaining = NormalizeVulkanTextureView(depthResource, remainingView);
+		context.Check(remaining.has_value() &&
+			remaining->m_Range.m_MipCount == depthResource.m_MipLevels &&
+			remaining->m_Range.m_ArraySliceCount == depthResource.m_ArraySize &&
+			remaining->m_AspectMask == VK_IMAGE_ASPECT_DEPTH_BIT,
+			"Remaining ranges expand to the resource extents");
+
+		// Defaulted view format resolves to the resource format.
+		RHITextureViewDesc defaultedView{};
+		defaultedView.m_Dimension = RHITextureViewDimension::Texture2D;
+		const auto defaulted = NormalizeVulkanTextureView(
+			RHITextureDesc{ .m_Format = RHIFormat::R16G16B16A16Float,
+				.m_Usage = RHITextureUsage::Sampled, .m_Extent = { 4, 4, 1 } },
+			defaultedView);
+		context.Check(defaulted.has_value() &&
+			defaulted->m_EffectiveFormat == RHIFormat::R16G16B16A16Float &&
+			defaulted->m_NativeFormat == VK_FORMAT_R16G16B16A16_SFLOAT &&
+			defaulted->m_AspectMask == VK_IMAGE_ASPECT_COLOR_BIT,
+			"Defaulted view format and aspects resolve to the resource contract");
+
+		// Explicit illegal aspects are rejected, never silently replaced.
+		RHITextureViewDesc colorAspectOnDepth = sampledView;
+		colorAspectOnDepth.m_Subresources.m_Aspects = RHITextureAspect::Color;
+		context.Check(!NormalizeVulkanTextureView(depthResource, colorAspectOnDepth).has_value(),
+			"Explicit color aspect on a depth resource is rejected");
+
+		// Out-of-range base subresources are rejected.
+		RHITextureViewDesc baseOutOfRange = sampledView;
+		baseOutOfRange.m_Subresources = { .m_BaseMip = 4, .m_MipCount = 1 };
+		context.Check(!NormalizeVulkanTextureView(depthResource, baseOutOfRange).has_value(),
+			"Out-of-range base mip is rejected");
+
+		// Unknown dimension is rejected.
+		RHITextureViewDesc unknownDimension{};
+		unknownDimension.m_Dimension = RHITextureViewDimension::Unknown;
+		context.Check(!NormalizeVulkanTextureView(depthResource, unknownDimension).has_value(),
+			"Unknown view dimension is rejected");
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
@@ -1784,6 +1857,7 @@ namespace gglab
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);
 		RunVulkanDescriptorArenaTests(context);
+		RunVulkanViewNormalizationTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);
 		RunVulkanFrameContractTests(context);

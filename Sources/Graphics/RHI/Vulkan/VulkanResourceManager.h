@@ -6,6 +6,7 @@
 #include "Graphics/RHI/RHIResourceDebug.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
 
 #include <vulkan/vulkan.h>
@@ -30,8 +31,9 @@ namespace gglab
 	public:
 		explicit VulkanDescriptorIndexArena(uint32_t capacity) noexcept;
 
-		// Returns a stable index or 0 when the arena is exhausted.
-		[[nodiscard]] uint32_t Allocate() noexcept;
+		// Returns a stable index in [0, capacity) or std::nullopt when the
+		// arena is exhausted. Index 0 is a legal descriptor index.
+		[[nodiscard]] std::optional<uint32_t> Allocate() noexcept;
 		void Release(uint32_t index) noexcept;
 
 		[[nodiscard]] uint32_t GetCapacity() const noexcept { return m_Capacity; }
@@ -81,7 +83,9 @@ namespace gglab
 			uint64_t m_DoubleDestroyCount = 0;
 		};
 
-		// One native view created on a parent texture.
+		// One native view created on a parent texture. Only shader-visible
+		// views (ShaderResource/UnorderedAccess) hold a descriptor index;
+		// attachment views have no bindless index.
 		struct TextureViewSlot
 		{
 			RHITextureViewHandle::GenerationType m_Generation = 1;
@@ -90,13 +94,14 @@ namespace gglab
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			VkImageView m_ImageView = VK_NULL_HANDLE;
 			VkImage m_ParentImage = VK_NULL_HANDLE;
-			uint32_t m_DescriptorIndex = 0;
+			std::optional<uint32_t> m_DescriptorIndex;
 		};
 
 		// A buffer view. The RHI view identity and its descriptor index
 		// are kept; the native VkBufferView is only created for texel views
 		// (non-Unknown format); plain buffer descriptors are consumed
-		// directly by the descriptor layer.
+		// directly by the descriptor layer. Buffer views never consume the
+		// bindless image arena.
 		struct BufferViewSlot
 		{
 			RHIBufferViewHandle::GenerationType m_Generation = 1;
@@ -105,7 +110,7 @@ namespace gglab
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			VkBufferView m_BufferView = VK_NULL_HANDLE;
 			VkBuffer m_ParentBuffer = VK_NULL_HANDLE;
-			uint32_t m_DescriptorIndex = 0;
+			std::optional<uint32_t> m_DescriptorIndex;
 		};
 
 		struct SamplerSlot
@@ -115,7 +120,7 @@ namespace gglab
 			RHISamplerDesc m_Desc{};
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			VkSampler m_Sampler = VK_NULL_HANDLE;
-			uint32_t m_DescriptorIndex = 0;
+			std::optional<uint32_t> m_DescriptorIndex;
 		};
 
 		template <typename HandleT, typename ResourceT> struct ResourceSlot
@@ -204,9 +209,8 @@ namespace gglab
 			RHIResourceOwnership ownership,
 			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;
 
-		[[nodiscard]] VkImageView CreateNativeImageView(RHIFormat resourceFormat,
-			VulkanTexture& nativeTexture, const RHITextureViewDesc& desc,
-			std::string_view debugName) noexcept;
+		[[nodiscard]] VkImageView CreateNativeImageView(const VulkanNormalizedTextureView& normalized,
+			VulkanTexture& nativeTexture, std::string_view debugName) noexcept;
 		[[nodiscard]] VkSampler CreateNativeSampler(const RHISamplerDesc& desc) noexcept;
 
 		static void RecordLastUsePoint(

@@ -72,6 +72,27 @@ namespace gglab
 	// RHI view dimension to native image view type.
 	[[nodiscard]] VkImageViewType ToVulkanImageViewType(RHITextureViewDimension dimension) noexcept;
 
+	// Fully resolved texture view contract: default semantics (Unknown
+	// format, All aspects, Remaining ranges) are expanded once and the
+	// result is used for cache keys and native view creation alike, so
+	// validation and creation never diverge. Explicit values that conflict
+	// with the resource (for example a color aspect on a depth resource)
+	// are rejected instead of silently replaced.
+	struct VulkanNormalizedTextureView
+	{
+		RHIFormat m_EffectiveFormat = RHIFormat::Unknown;
+		RHISubresourceRange m_Range{};
+		VkImageViewType m_ViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+		VkImageAspectFlags m_AspectMask = 0;
+		VkFormat m_NativeFormat = VK_FORMAT_UNDEFINED;
+	};
+
+	// Normalizes a texture view against its resource. Returns std::nullopt
+	// for explicit values the resource cannot express (out-of-range base
+	// subresources, incompatible explicit aspects, unsupported dimensions).
+	[[nodiscard]] std::optional<VulkanNormalizedTextureView> NormalizeVulkanTextureView(
+		const RHITextureDesc& resource, const RHITextureViewDesc& view) noexcept;
+
 	// Native format name for diagnostics; falls back to a numeric label.
 	[[nodiscard]] std::string_view ToVulkanFormatName(VkFormat format) noexcept;
 }

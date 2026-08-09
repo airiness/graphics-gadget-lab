@@ -40,8 +40,10 @@ namespace gglab
 		}
 		if (allocationInfo != nullptr)
 		{
-			// Persistently mapped host-visible allocation: the mapping stays
-			// valid until the allocation is destroyed.
+			// VMA keeps this mapping for the allocation lifetime; it must
+			// never be passed to vmaUnmapMemory and is torn down by
+			// vmaDestroyBuffer.
+			m_Mapping = VulkanBufferMapping::Persistent;
 			m_MappedData = allocationInfo->pMappedData;
 		}
 	}
@@ -62,6 +64,7 @@ namespace gglab
 		m_InitialState = initialState;
 		m_MemoryUsage = RHIMemoryUsage::GpuOnly;
 		m_CreateInfo = {};
+		m_Mapping = VulkanBufferMapping::None;
 		m_MappedData = nullptr;
 	}
 
@@ -69,10 +72,11 @@ namespace gglab
 	{
 		if (m_Allocation != VK_NULL_HANDLE)
 		{
-			if (m_MappedData != nullptr)
+			if (m_Mapping == VulkanBufferMapping::Explicit && m_MappedData != nullptr)
 			{
+				// Only explicit mappings carry an unmap obligation; the
+				// persistent VMA mapping is released by vmaDestroyBuffer.
 				vmaUnmapMemory(m_Allocator, m_Allocation);
-				m_MappedData = nullptr;
 			}
 			vmaDestroyBuffer(m_Allocator, m_Buffer, m_Allocation);
 		}
@@ -87,6 +91,8 @@ namespace gglab
 		m_Borrowed = false;
 		m_CreateInfo = {};
 		m_InitialState = {};
+		m_Mapping = VulkanBufferMapping::None;
+		m_MappedData = nullptr;
 	}
 
 	void VulkanBuffer::SetDebugName(const char* name) noexcept
@@ -96,6 +102,77 @@ namespace gglab
 			SetVulkanObjectDebugName(m_Device, VK_OBJECT_TYPE_BUFFER,
 				reinterpret_cast<uint64_t>(m_Buffer), name);
 		}
+	}
+
+	void* VulkanBuffer::Map(RHIMappedBufferRange readRange) noexcept
+	{
+		if (m_Buffer == VK_NULL_HANDLE)
+		{
+			return nullptr;
+		}
+		if (m_Borrowed || m_Allocation == VK_NULL_HANDLE)
+		{
+			// Borrowed buffers carry no allocation metadata: the backend
+			// cannot prove host visibility, flush or invalidate ranges, so
+			// backend mapping is rejected. A future contract extension
+			// would require the caller to supply known mapping metadata.
+			return nullptr;
+		}
+
+		if (m_Mapping == VulkanBufferMapping::Persistent)
+		{
+			// The VMA-owned pointer is used directly; readback buffers
+			// refresh the read range from device memory.
+			if (m_MemoryUsage == RHIMemoryUsage::GpuToCpu &&
+				readRange.m_End > readRange.m_Begin)
+			{
+				vmaInvalidateAllocation(m_Allocator, m_Allocation,
+					readRange.m_Begin, readRange.m_End - readRange.m_Begin);
+			}
+			return m_MappedData;
+		}
+
+		void* mappedData = nullptr;
+		const VkResult mapResult =
+			vmaMapMemory(m_Allocator, m_Allocation, &mappedData);
+		if (mapResult != VK_SUCCESS)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("VulkanBuffer::Map failed with {}.", ToString(mapResult));
+			return nullptr;
+		}
+		m_Mapping = VulkanBufferMapping::Explicit;
+		m_MappedData = mappedData;
+		if (m_MemoryUsage == RHIMemoryUsage::GpuToCpu && readRange.m_End > readRange.m_Begin)
+		{
+			vmaInvalidateAllocation(m_Allocator, m_Allocation,
+				readRange.m_Begin, readRange.m_End - readRange.m_Begin);
+		}
+		return mappedData;
+	}
+
+	void VulkanBuffer::Unmap(RHIMappedBufferRange writtenRange) noexcept
+	{
+		if (m_MappedData == nullptr)
+		{
+			return;
+		}
+
+		// Upload buffers flush the written range so the GPU sees the host
+		// writes.
+		if (m_MemoryUsage == RHIMemoryUsage::CpuToGpu &&
+			writtenRange.m_End > writtenRange.m_Begin)
+		{
+			vmaFlushAllocation(m_Allocator, m_Allocation,
+				writtenRange.m_Begin, writtenRange.m_End - writtenRange.m_Begin);
+		}
+
+		if (m_Mapping == VulkanBufferMapping::Explicit)
+		{
+			vmaUnmapMemory(m_Allocator, m_Allocation);
+			m_Mapping = VulkanBufferMapping::None;
+			m_MappedData = nullptr;
+		}
+		// Persistent mappings keep their VMA-owned pointer.
 	}
 
 	void VulkanTexture::Create(const CreateInfo& createInfo) noexcept
@@ -123,6 +200,7 @@ namespace gglab
 				"VulkanTexture::Create failed to allocate the native image ({}).",
 				ToString(createResult));
 			Release();
+			return;
 		}
 	}
 
@@ -140,6 +218,9 @@ namespace gglab
 		m_Borrowed = true;
 		m_Image = image;
 		m_InitialState = initialState;
+		// No native creation history is fabricated for imported images;
+		// the authoritative RHI description lives in the resource
+		// manager slot.
 		m_CreateInfo = {};
 	}
 
