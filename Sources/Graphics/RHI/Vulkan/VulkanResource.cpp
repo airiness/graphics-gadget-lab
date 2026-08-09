@@ -19,6 +19,10 @@ namespace gglab
 		m_Allocator = createInfo.m_Allocator;
 		m_Device = createInfo.m_Device;
 		m_CreateInfo = createInfo.m_CreateInfo;
+		// The stored creation metadata is diagnostic history: it must not
+		// retain the caller's pNext chain (format lists, extension
+		// structs) after the create call returns.
+		m_CreateInfo.pNext = nullptr;
 		m_SizeInBytes = m_CreateInfo.size;
 		m_InitialState = createInfo.m_InitialState;
 		m_MemoryUsage = createInfo.m_MemoryUsage;
@@ -39,7 +43,9 @@ namespace gglab
 		{
 			allocationInfo = &allocationInfoStorage;
 		}
-		const VkResult createResult = vmaCreateBuffer(m_Allocator, &m_CreateInfo,
+		// The create call uses the caller's description so its pNext chain
+		// stays intact for the call.
+		const VkResult createResult = vmaCreateBuffer(m_Allocator, &createInfo.m_CreateInfo,
 			&allocationCreateInfo, &m_Buffer, &m_Allocation, allocationInfo);
 		if (createResult != VK_SUCCESS)
 		{
@@ -205,13 +211,15 @@ namespace gglab
 		m_Allocator = createInfo.m_Allocator;
 		m_Device = createInfo.m_Device;
 		m_CreateInfo = createInfo.m_CreateInfo;
-		// The pNext chain only exists for the create call (format lists,
-		// future extension structs); the stored creation history must not
-		// retain pointers into the caller's stack.
+		// The stored creation metadata is diagnostic history: it must not
+		// retain the caller's pNext chain (format lists, extension
+		// structs) after the create call returns.
 		m_CreateInfo.pNext = nullptr;
 		m_InitialState = createInfo.m_InitialState;
 
-		const VkResult createResult = vmaCreateImage(m_Allocator, &m_CreateInfo,
+		// The create call uses the caller's description so its pNext chain
+		// (format lists) stays intact for the call.
+		const VkResult createResult = vmaCreateImage(m_Allocator, &createInfo.m_CreateInfo,
 			&createInfo.m_AllocationCreateInfo, &m_Image, &m_Allocation, nullptr);
 		if (createResult != VK_SUCCESS)
 		{

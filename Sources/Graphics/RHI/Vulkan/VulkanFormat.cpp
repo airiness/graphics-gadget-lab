@@ -344,6 +344,24 @@ namespace gglab
 		};
 	}
 
+	VkSamplerAddressMode ToVulkanSamplerAddressMode(RHITextureAddressMode mode) noexcept
+	{
+		switch (mode)
+		{
+		case RHITextureAddressMode::Wrap:
+			return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		case RHITextureAddressMode::Mirror:
+			return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+		case RHITextureAddressMode::Clamp:
+			return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		case RHITextureAddressMode::Border:
+			return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+		case RHITextureAddressMode::MirrorOnce:
+			return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+		}
+		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	}
+
 	std::string_view ToVulkanFormatName(VkFormat format) noexcept
 	{
 		for (const VulkanFormatInfo& info : VulkanFormatInfos)

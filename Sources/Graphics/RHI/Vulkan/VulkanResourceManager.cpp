@@ -184,24 +184,6 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] VkSamplerAddressMode ToVkAddressMode(RHITextureAddressMode mode) noexcept
-		{
-			switch (mode)
-			{
-			case RHITextureAddressMode::Wrap:
-				return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			case RHITextureAddressMode::Mirror:
-				return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-			case RHITextureAddressMode::Clamp:
-				return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			case RHITextureAddressMode::Border:
-				return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-			case RHITextureAddressMode::MirrorOnce:
-				return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-			}
-			return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		}
-
 		[[nodiscard]] VkCompareOp ToVkCompareOp(RHICompareOp op) noexcept
 		{
 			switch (op)
@@ -442,6 +424,8 @@ namespace gglab
 			// list can be used; the list is the frozen compatible view family
 			// contract of the resource format, not an arbitrary format set.
 			imageCreateInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+			GGLAB_ASSERT_MSG(formatInfo.m_RHIViewFormats.size() <= nativeViewFormats.size(),
+				"The Vulkan view family exceeds the native format list capacity.");
 			uint32_t viewFormatCount = 0;
 			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
 			{
@@ -1187,9 +1171,9 @@ namespace gglab
 		createInfo.magFilter = ToVkMagFilter(desc.m_Filter);
 		createInfo.minFilter = ToVkMinFilter(desc.m_Filter);
 		createInfo.mipmapMode = ToVkMipmapMode(desc.m_Filter);
-		createInfo.addressModeU = ToVkAddressMode(desc.m_AddressU);
-		createInfo.addressModeV = ToVkAddressMode(desc.m_AddressV);
-		createInfo.addressModeW = ToVkAddressMode(desc.m_AddressW);
+		createInfo.addressModeU = ToVulkanSamplerAddressMode(desc.m_AddressU);
+		createInfo.addressModeV = ToVulkanSamplerAddressMode(desc.m_AddressV);
+		createInfo.addressModeW = ToVulkanSamplerAddressMode(desc.m_AddressW);
 		createInfo.mipLodBias = desc.m_MipLODBias;
 		createInfo.maxAnisotropy = static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u));
 		if (desc.m_MaxAnisotropy > 1)

@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RHI/RHIFormat.h"
+#include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
 
 #include <vulkan/vulkan.h>
@@ -97,6 +98,12 @@ namespace gglab
 	// subresources, incompatible explicit aspects, unsupported dimensions).
 	[[nodiscard]] std::optional<VulkanNormalizedTextureView> NormalizeVulkanTextureView(
 		const RHITextureDesc& resource, const RHITextureViewDesc& view) noexcept;
+
+	// RHI sampler address mode to native address mode. Mirror-once maps to
+	// mirror-clamp-to-edge, which requires the samplerMirrorClampToEdge
+	// feature on the device.
+	[[nodiscard]] VkSamplerAddressMode ToVulkanSamplerAddressMode(
+		RHITextureAddressMode mode) noexcept;
 
 	// Native format name for diagnostics; falls back to a numeric label.
 	[[nodiscard]] std::string_view ToVulkanFormatName(VkFormat format) noexcept;

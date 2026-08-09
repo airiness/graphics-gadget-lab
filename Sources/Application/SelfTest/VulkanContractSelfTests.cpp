@@ -1687,6 +1687,22 @@ namespace gglab
 			ToVulkanImageViewType(RHITextureViewDimension::TextureCubeArray) ==
 			VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
 			"Texture view dimensions map to the exact native view types");
+
+		// Sampler address modes map to the frozen native contract;
+		// mirror-once lowers to mirror-clamp-to-edge, which needs the
+		// samplerMirrorClampToEdge feature at sampler creation.
+		context.Check(
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Wrap) ==
+				VK_SAMPLER_ADDRESS_MODE_REPEAT &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Mirror) ==
+				VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Clamp) ==
+				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::Border) ==
+				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER &&
+			ToVulkanSamplerAddressMode(RHITextureAddressMode::MirrorOnce) ==
+				VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
+			"Sampler address modes map to the exact native address modes");
 	}
 
 	void RunVulkanPortabilityContractTests(SelfTestContext& context) noexcept
