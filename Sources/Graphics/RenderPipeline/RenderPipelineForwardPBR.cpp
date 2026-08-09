@@ -302,6 +302,13 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
+		// Opaque extensions contribute to the main HDR color and depth before
+		// transparent and post-processing consumers.
+		if (m_SceneExtension)
+		{
+			m_SceneExtension->AddOpaqueScenePasses(rg, context, services);
+		}
+
 		if (depthCoverageFramePlan.AddsForwardTransparentPass())
 		{
 			m_ForwardTransparentPass.AddPass(rg, context, services);

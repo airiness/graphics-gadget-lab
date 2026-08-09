@@ -148,6 +148,9 @@
     <Filter Include="Application\Lab">
       <UniqueIdentifier>{34A27B34-9CA4-44BA-B51C-041607A5D962}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Lab\NapaVoxel">
+      <UniqueIdentifier>{A91A3A68-6880-438B-896B-25336CD64E6B}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Lab\Sessions">
       <UniqueIdentifier>{5A6E10E0-25EE-4589-B9B4-B3BD7320055D}</UniqueIdentifier>
     </Filter>
@@ -265,6 +268,48 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelDamageSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelEditSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMutationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelHashSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMesherSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelPrimitiveSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelRestoreSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelStorageSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.cpp">
@@ -645,6 +690,24 @@
     <ClCompile Include="..\..\Sources\Application\Lab\LabSession.cpp">
       <Filter>Application\Lab</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -664,6 +727,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp">
@@ -1059,6 +1125,12 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\PublicationAccountingSelfTests.h">
@@ -1685,6 +1757,24 @@
     <ClInclude Include="..\..\Sources\Application\Lab\LabSessionBase.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRaycast.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\NapaVoxel\NapaVoxelRenderState.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\AssetPublicationLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -1710,6 +1800,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\MiniPBRGridLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h">
@@ -1746,6 +1839,9 @@
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
+      <Filter>Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h">
@@ -2302,6 +2398,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">

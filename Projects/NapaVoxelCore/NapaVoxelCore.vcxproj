@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{37C8824E-AAAB-46F3-86B1-B03C02FE468B}</ProjectGuid>
+    <RootNamespace>NapaVoxelCore</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <NapaVoxelRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</NapaVoxelRepositoryRoot>
+    <OutDir>$(NapaVoxelRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(NapaVoxelRepositoryRoot)Build\Intermediate\$(Platform)\$(Configuration)\NapaVoxelCore\</IntDir>
+    <TargetName>NapaVoxelCore</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <FloatingPointModel>Precise</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <FloatingPointModel>Precise</FloatingPointModel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelRestore.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelOperationDetail.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalVoxelSerialization.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Math\Vector.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\DataOnlyPublicationTestAccess.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelRestore.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

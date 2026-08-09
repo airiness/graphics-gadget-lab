@@ -2,9 +2,11 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
+#include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
+#include "Core/Log/Logger.h"
 
 namespace gglab
 {
@@ -18,6 +20,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "asset-data",
 				.m_Run = &RunAssetDataSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "napa-voxel",
+				.m_Run = &RunNapaVoxelCoreSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "publication-accounting",
@@ -50,6 +56,10 @@ namespace gglab
 			return false;
 		}
 
+		if (!Logger::GetLogger(Logger::LoggerType::Application))
+		{
+			Logger::Initialize();
+		}
 		ConsoleSelfTestReporter reporter;
 		return RunSelfTestSuite(*suite, reporter);
 	}

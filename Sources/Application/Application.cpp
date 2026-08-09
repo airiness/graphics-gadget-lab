@@ -157,7 +157,12 @@ namespace gglab
 
 		// InputManager
 		m_InputManager = std::make_unique<InputManager>();
-		m_InputManager->Initialize(mainWindow.GetNativeHandle());
+		const bool gameInputAvailable = m_InputManager->Initialize(mainWindow.GetNativeHandle());
+		if (!gameInputAvailable)
+		{
+			GGLAB_LOG_WARN(
+				"Application will continue without GameInput keyboard and mouse controls.");
+		}
 		if (m_LaunchOptions.m_StartWithAbsoluteMouse)
 		{
 			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
@@ -342,6 +347,9 @@ namespace gglab
 
 		// DevelopGui new frame
 		const bool developGuiFrameOpen = m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		m_InputManager->SetUICaptureState(
+			developGuiFrameOpen && m_DevelopGuiSystem->WantsKeyboardCapture(),
+			developGuiFrameOpen && m_DevelopGuiSystem->WantsMouseCapture());
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();

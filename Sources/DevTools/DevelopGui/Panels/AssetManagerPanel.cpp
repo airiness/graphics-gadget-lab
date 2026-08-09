@@ -54,6 +54,8 @@ namespace gglab
 				return "Texture";
 			case AssetStreamingWorkKind::Mesh:
 				return "Mesh";
+			case AssetStreamingWorkKind::RuntimeMesh:
+				return "Runtime Mesh";
 			default:
 				return "Unknown";
 			}

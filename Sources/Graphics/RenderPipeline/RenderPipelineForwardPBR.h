@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
@@ -25,9 +26,22 @@ namespace gglab
 	class RenderPipelineForwardPBR : public RenderPipelineBase
 	{
 	public:
+		struct CreateInfo
+		{
+			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
+			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		};
+
 		explicit RenderPipelineForwardPBR(
 			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
-			m_ForwardPlusDebugReadback(std::move(forwardPlusDebugReadback)),
+			RenderPipelineForwardPBR(CreateInfo{
+				.m_ForwardPlusDebugReadback = std::move(forwardPlusDebugReadback),
+				})
+		{
+		}
+		explicit RenderPipelineForwardPBR(CreateInfo createInfo) noexcept :
+			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
+			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
@@ -47,6 +61,7 @@ namespace gglab
 			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
 
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
+		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;
