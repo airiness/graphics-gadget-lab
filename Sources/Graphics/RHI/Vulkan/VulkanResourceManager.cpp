@@ -190,44 +190,6 @@ namespace gglab
 		}
 	}
 
-	VulkanDescriptorIndexArena::VulkanDescriptorIndexArena(uint32_t capacity) noexcept :
-		m_Capacity(capacity), m_Allocated(capacity, 0)
-	{
-		// The whole [0, capacity) domain is legal; index 0 is a valid
-		// descriptor index and exhaustion is reported through std::nullopt.
-		m_FreeIndices.reserve(capacity);
-		for (uint32_t index = capacity; index > 0; --index)
-		{
-			m_FreeIndices.push_back(index - 1);
-		}
-	}
-
-	std::optional<uint32_t> VulkanDescriptorIndexArena::Allocate() noexcept
-	{
-		if (m_FreeIndices.empty())
-		{
-			return std::nullopt;
-		}
-		const uint32_t index = m_FreeIndices.back();
-		m_FreeIndices.pop_back();
-		GGLAB_ASSERT_MSG(m_Allocated[index] == 0,
-			"Vulkan descriptor arena free list contains a live index.");
-		m_Allocated[index] = 1;
-		++m_LiveCount;
-		return index;
-	}
-
-	void VulkanDescriptorIndexArena::Release(uint32_t index) noexcept
-	{
-		if (index >= m_Capacity || m_Allocated[index] == 0)
-		{
-			return;
-		}
-		m_Allocated[index] = 0;
-		m_FreeIndices.push_back(index);
-		--m_LiveCount;
-	}
-
 	VulkanResourceManager::~VulkanResourceManager() noexcept = default;
 
 	bool VulkanResourceManager::CheckOwnerThread(std::string_view operation) const noexcept
@@ -247,10 +209,6 @@ namespace gglab
 			m_Device = nullptr;
 			return;
 		}
-		m_ResourceDescriptorArena = VulkanDescriptorIndexArena(
-			GGLabDescriptorCapacityContract.m_ResourceDescriptorCount);
-		m_SamplerDescriptorArena = VulkanDescriptorIndexArena(
-			GGLabDescriptorCapacityContract.m_SamplerDescriptorCount);
 	}
 
 	void VulkanResourceManager::Finalize() noexcept
@@ -266,7 +224,7 @@ namespace gglab
 		// before the device).
 		ReportLiveResources();
 
-		auto drainViewTable = [this](auto& table, auto destroyNative, auto releaseIndex)
+		auto drainViewTable = [](auto& table)
 			{
 				for (uint32_t index = 0; index < table.Size(); ++index)
 				{
@@ -275,63 +233,14 @@ namespace gglab
 					{
 						continue;
 					}
-					destroyNative(slot);
-					releaseIndex(slot);
+					slot.m_Backing.reset();
 					slot.m_RetirementPoints.clear();
 				}
 			};
 
-		drainViewTable(m_TextureViews,
-			[this](TextureViewSlot& slot) noexcept
-			{
-				if (slot.m_ImageView != VK_NULL_HANDLE)
-				{
-					vkDestroyImageView(m_Device->Get(), slot.m_ImageView, nullptr);
-					slot.m_ImageView = VK_NULL_HANDLE;
-				}
-			},
-			[this](TextureViewSlot& slot) noexcept
-			{
-				if (slot.m_DescriptorIndex)
-				{
-					m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
-					slot.m_DescriptorIndex.reset();
-				}
-			});
-		drainViewTable(m_BufferViews,
-			[this](BufferViewSlot& slot) noexcept
-			{
-				if (slot.m_BufferView != VK_NULL_HANDLE)
-				{
-					vkDestroyBufferView(m_Device->Get(), slot.m_BufferView, nullptr);
-					slot.m_BufferView = VK_NULL_HANDLE;
-				}
-			},
-			[this](BufferViewSlot& slot) noexcept
-			{
-				if (slot.m_DescriptorIndex)
-				{
-					m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
-					slot.m_DescriptorIndex.reset();
-				}
-			});
-		drainViewTable(m_Samplers,
-			[this](SamplerSlot& slot) noexcept
-			{
-				if (slot.m_Sampler != VK_NULL_HANDLE)
-				{
-					vkDestroySampler(m_Device->Get(), slot.m_Sampler, nullptr);
-					slot.m_Sampler = VK_NULL_HANDLE;
-				}
-			},
-			[this](SamplerSlot& slot) noexcept
-			{
-				if (slot.m_DescriptorIndex)
-				{
-					m_SamplerDescriptorArena.Release(*slot.m_DescriptorIndex);
-					slot.m_DescriptorIndex.reset();
-				}
-			});
+		drainViewTable(m_TextureViews);
+		drainViewTable(m_BufferViews);
+		drainViewTable(m_Samplers);
 
 		// Resources release their native handles and VMA allocations
 		// through the RAII destructor.
@@ -663,8 +572,17 @@ namespace gglab
 						m_TextureViewCache.erase(viewSlot->m_Key);
 						if (m_TextureViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
 						{
-							m_TextureViews.SlotAt(view.Index()).m_RetirementPoints =
-								slot.m_RetirementPoints;
+							TextureViewSlot& retiringView = m_TextureViews.SlotAt(view.Index());
+							retiringView.m_RetirementPoints = slot.m_RetirementPoints;
+							if (retiringView.m_DescriptorIndex)
+							{
+								if (!m_Device->GetDescriptorManager().RetireResource(
+									*retiringView.m_DescriptorIndex, {}, slot.m_RetirementPoints))
+								{
+									GGLAB_LOG_GRAPHICS_ERROR(
+										"Failed to retire a Vulkan texture descriptor with its parent.");
+								}
+							}
 						}
 					}
 					m_TextureResourceViews.erase(iterator);
@@ -951,7 +869,8 @@ namespace gglab
 		if (desc.m_Type == RHITextureViewType::ShaderResource ||
 			desc.m_Type == RHITextureViewType::UnorderedAccess)
 		{
-			descriptorIndex = m_ResourceDescriptorArena.Allocate();
+			descriptorIndex =
+				m_Device->GetDescriptorManager().AllocateResourceDescriptor();
 			if (!descriptorIndex)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
@@ -968,17 +887,39 @@ namespace gglab
 		{
 			if (descriptorIndex)
 			{
-				m_ResourceDescriptorArena.Release(*descriptorIndex);
+				if (!m_Device->GetDescriptorManager().RetireResource(*descriptorIndex, {}))
+				{
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Failed to cancel a Vulkan descriptor after image-view creation failed.");
+				}
 			}
 			return {};
+		}
+		auto backing = std::make_shared<VulkanDescriptorBacking>(
+			m_Device->Get(), imageView, slot->m_Resource,
+			slot->m_Resource->GetAllocationSizeInBytes());
+		if (descriptorIndex)
+		{
+			const bool written = desc.m_Type == RHITextureViewType::ShaderResource
+				? m_Device->GetDescriptorManager().WriteSampledImage(*descriptorIndex, backing)
+				: m_Device->GetDescriptorManager().WriteStorageImage(*descriptorIndex, backing);
+			if (!written)
+			{
+				if (!m_Device->GetDescriptorManager().RetireResource(*descriptorIndex, {}))
+				{
+					GGLAB_LOG_GRAPHICS_ERROR(
+						"Failed to cancel a Vulkan descriptor after its image write failed.");
+				}
+				return {};
+			}
 		}
 
 		const RHITextureViewHandle view = m_TextureViews.Allocate();
 		TextureViewSlot& viewSlot = m_TextureViews.SlotAt(view.Index());
 		viewSlot.m_Key = key;
-		viewSlot.m_ImageView = imageView;
 		viewSlot.m_ParentImage = slot->m_Resource->Get();
 		viewSlot.m_DescriptorIndex = descriptorIndex;
+		viewSlot.m_Backing = std::move(backing);
 		m_TextureViewCache.emplace(key, view);
 		m_TextureResourceViews[texture].push_back(view);
 		return view;
@@ -1104,8 +1045,10 @@ namespace gglab
 		const RHIBufferViewHandle view = m_BufferViews.Allocate();
 		BufferViewSlot& viewSlot = m_BufferViews.SlotAt(view.Index());
 		viewSlot.m_Key = key;
-		viewSlot.m_BufferView = nativeView;
 		viewSlot.m_ParentBuffer = slot->m_Resource->Get();
+		viewSlot.m_Backing = std::make_shared<VulkanDescriptorBacking>(
+			m_Device->Get(), nativeView, slot->m_Resource,
+			slot->m_Resource->GetAllocationSizeInBytes());
 		m_BufferViewCache.emplace(key, view);
 		m_BufferResourceViews[buffer].push_back(view);
 		return view;
@@ -1145,7 +1088,8 @@ namespace gglab
 			return {};
 		}
 
-		const std::optional<uint32_t> descriptorIndex = m_SamplerDescriptorArena.Allocate();
+		const std::optional<uint32_t> descriptorIndex =
+			m_Device->GetDescriptorManager().AllocateSamplerDescriptor();
 		if (!descriptorIndex)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
@@ -1156,15 +1100,29 @@ namespace gglab
 		const VkSampler sampler = CreateNativeSampler(desc);
 		if (sampler == VK_NULL_HANDLE)
 		{
-			m_SamplerDescriptorArena.Release(*descriptorIndex);
+			if (!m_Device->GetDescriptorManager().RetireSampler(*descriptorIndex, {}))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Failed to cancel a Vulkan descriptor after sampler creation failed.");
+			}
+			return {};
+		}
+		auto backing = std::make_shared<VulkanDescriptorBacking>(m_Device->Get(), sampler);
+		if (!m_Device->GetDescriptorManager().WriteSampler(*descriptorIndex, backing))
+		{
+			if (!m_Device->GetDescriptorManager().RetireSampler(*descriptorIndex, {}))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Failed to cancel a Vulkan descriptor after its sampler write failed.");
+			}
 			return {};
 		}
 
 		const RHISamplerHandle handle = m_Samplers.Allocate();
 		SamplerSlot& slot = m_Samplers.SlotAt(handle.Index());
 		slot.m_Desc = desc;
-		slot.m_Sampler = sampler;
 		slot.m_DescriptorIndex = descriptorIndex;
+		slot.m_Backing = std::move(backing);
 		m_SamplerCache.emplace(desc, handle);
 		return handle;
 	}
@@ -1183,6 +1141,15 @@ namespace gglab
 				if (const TextureSlot* textureSlot = m_Textures.Resolve(texture))
 				{
 					slot.m_RetirementPoints = textureSlot->m_LastUsePoints;
+				}
+				if (slot.m_DescriptorIndex)
+				{
+					if (!m_Device->GetDescriptorManager().RetireResource(
+						*slot.m_DescriptorIndex, {}, slot.m_RetirementPoints))
+					{
+						GGLAB_LOG_GRAPHICS_ERROR(
+							"Failed to retire a Vulkan texture-view descriptor.");
+					}
 				}
 				if (auto iterator = m_TextureResourceViews.find(texture);
 					iterator != m_TextureResourceViews.end())
@@ -1233,13 +1200,23 @@ namespace gglab
 			[this, sampler](SamplerSlot& slot) noexcept
 			{
 				m_SamplerCache.erase(slot.m_Desc);
+				if (slot.m_DescriptorIndex)
+				{
+					if (!m_Device->GetDescriptorManager().RetireSampler(
+						*slot.m_DescriptorIndex, {}))
+					{
+						GGLAB_LOG_GRAPHICS_ERROR(
+							"Failed to retire a Vulkan sampler descriptor.");
+					}
+				}
 			});
 	}
 
 	bool VulkanResourceManager::IsSamplerAlive(RHISamplerHandle sampler) const noexcept
 	{
 		const SamplerSlot* slot = m_Samplers.Resolve(sampler);
-		return slot != nullptr && slot->m_Sampler != VK_NULL_HANDLE;
+		return slot != nullptr && slot->m_Backing &&
+			slot->m_Backing->GetSampler() != VK_NULL_HANDLE;
 	}
 
 	RHIDescriptorHandle VulkanResourceManager::GetTextureViewDescriptor(
@@ -1281,14 +1258,39 @@ namespace gglab
 		};
 	}
 
+	bool VulkanResourceManager::PublishTextureViewDescriptor(
+		RHITextureViewHandle view, uint64_t publicationGeneration) noexcept
+	{
+		if (!CheckOwnerThread("VulkanResourceManager::PublishTextureViewDescriptor"))
+		{
+			return false;
+		}
+		const TextureViewSlot* slot = m_TextureViews.Resolve(view);
+		return slot && slot->m_DescriptorIndex &&
+			m_Device->GetDescriptorManager().PublishResource(
+				*slot->m_DescriptorIndex, publicationGeneration);
+	}
+
+	bool VulkanResourceManager::PublishSamplerDescriptor(
+		RHISamplerHandle sampler, uint64_t publicationGeneration) noexcept
+	{
+		if (!CheckOwnerThread("VulkanResourceManager::PublishSamplerDescriptor"))
+		{
+			return false;
+		}
+		const SamplerSlot* slot = m_Samplers.Resolve(sampler);
+		return slot && slot->m_DescriptorIndex &&
+			m_Device->GetDescriptorManager().PublishSampler(
+				*slot->m_DescriptorIndex, publicationGeneration);
+	}
+
 	void VulkanResourceManager::RetireCompletedResources() noexcept
 	{
 		if (!CheckOwnerThread("VulkanResourceManager::RetireCompletedResources"))
 		{
 			return;
 		}
-		// Views retire before their parent resources: the native image view
-		// must be destroyed before the image it references.
+		m_Device->GetDescriptorManager().RetireCompleted();
 		RetireCompletedViewTables();
 		RetireCompletedResourceTable(m_Textures, m_Diagnostics.m_TextureRetireCount);
 		RetireCompletedResourceTable(m_Buffers, m_Diagnostics.m_BufferRetireCount);
@@ -1616,18 +1618,10 @@ namespace gglab
 			{
 				continue;
 			}
-			if (slot.m_ImageView != VK_NULL_HANDLE)
-			{
-				vkDestroyImageView(m_Device->Get(), slot.m_ImageView, nullptr);
-			}
-			if (slot.m_DescriptorIndex)
-			{
-				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
-			}
 			slot.m_Key = {};
-			slot.m_ImageView = VK_NULL_HANDLE;
 			slot.m_ParentImage = VK_NULL_HANDLE;
 			slot.m_DescriptorIndex.reset();
+			slot.m_Backing.reset();
 			slot.m_RetirementPoints.clear();
 			m_TextureViews.Retire(index);
 		}
@@ -1648,18 +1642,9 @@ namespace gglab
 			{
 				continue;
 			}
-			if (slot.m_BufferView != VK_NULL_HANDLE)
-			{
-				vkDestroyBufferView(m_Device->Get(), slot.m_BufferView, nullptr);
-			}
-			if (slot.m_DescriptorIndex)
-			{
-				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
-			}
 			slot.m_Key = {};
-			slot.m_BufferView = VK_NULL_HANDLE;
 			slot.m_ParentBuffer = VK_NULL_HANDLE;
-			slot.m_DescriptorIndex.reset();
+			slot.m_Backing.reset();
 			slot.m_RetirementPoints.clear();
 			m_BufferViews.Retire(index);
 		}
@@ -1680,17 +1665,9 @@ namespace gglab
 			{
 				continue;
 			}
-			if (slot.m_Sampler != VK_NULL_HANDLE)
-			{
-				vkDestroySampler(m_Device->Get(), slot.m_Sampler, nullptr);
-			}
-			if (slot.m_DescriptorIndex)
-			{
-				m_SamplerDescriptorArena.Release(*slot.m_DescriptorIndex);
-			}
 			slot.m_Desc = {};
-			slot.m_Sampler = VK_NULL_HANDLE;
 			slot.m_DescriptorIndex.reset();
+			slot.m_Backing.reset();
 			slot.m_RetirementPoints.clear();
 			m_Samplers.Retire(index);
 		}

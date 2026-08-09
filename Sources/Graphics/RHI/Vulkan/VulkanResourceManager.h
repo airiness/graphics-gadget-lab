@@ -6,6 +6,7 @@
 #include "Graphics/RHI/RHIResourceDebug.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
 
@@ -22,35 +23,10 @@ namespace gglab
 {
 	class VulkanDevice;
 
-	// Backend-neutral descriptor virtual index arena contract: a stable
-	// shader-visible index per resource view and per sampler. This layer
-	// only establishes allocation/reuse and retirement accounting; the
-	// shader-visible descriptor set and the publication state machine are
-	// built on top of this arena separately.
-	class VulkanDescriptorIndexArena
-	{
-	public:
-		explicit VulkanDescriptorIndexArena(uint32_t capacity) noexcept;
-
-		// Returns a stable index in [0, capacity) or std::nullopt when the
-		// arena is exhausted. Index 0 is a legal descriptor index.
-		[[nodiscard]] std::optional<uint32_t> Allocate() noexcept;
-		void Release(uint32_t index) noexcept;
-
-		[[nodiscard]] uint32_t GetCapacity() const noexcept { return m_Capacity; }
-		[[nodiscard]] uint32_t GetLiveCount() const noexcept { return m_LiveCount; }
-
-	private:
-		uint32_t m_Capacity = 0;
-		uint32_t m_LiveCount = 0;
-		std::vector<uint32_t> m_FreeIndices;
-		std::vector<uint8_t> m_Allocated;
-	};
-
 	// Owns GGLab resource handles, native Vulkan objects, views, samplers,
-	// debug identity, last-use tracking and deferred destruction. VMA owns
-	// the underlying memory allocation only; every lifetime decision stays
-	// here.
+	// debug identity, last-use tracking and deferred destruction. Descriptor
+	// publication may retain shared view and parent-resource backing until
+	// every joined retirement gate completes.
 	class VulkanResourceManager
 	{
 	public:
@@ -94,13 +70,12 @@ namespace gglab
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			RHITextureViewKey m_Key{};
 			std::vector<RHIFencePoint> m_RetirementPoints;
-			VkImageView m_ImageView = VK_NULL_HANDLE;
 			VkImage m_ParentImage = VK_NULL_HANDLE;
 			std::optional<uint32_t> m_DescriptorIndex;
+			std::shared_ptr<VulkanDescriptorBacking> m_Backing;
 		};
 
-		// A buffer view. The RHI view identity and its descriptor index
-		// are kept; the native VkBufferView is only created for texel views
+		// A buffer view. The native VkBufferView is only created for texel views
 		// (non-Unknown format); plain buffer descriptors are consumed
 		// directly by the descriptor layer. Buffer views never consume the
 		// bindless image arena.
@@ -110,9 +85,8 @@ namespace gglab
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			RHIBufferViewKey m_Key{};
 			std::vector<RHIFencePoint> m_RetirementPoints;
-			VkBufferView m_BufferView = VK_NULL_HANDLE;
 			VkBuffer m_ParentBuffer = VK_NULL_HANDLE;
-			std::optional<uint32_t> m_DescriptorIndex;
+			std::shared_ptr<VulkanDescriptorBacking> m_Backing;
 		};
 
 		struct SamplerSlot
@@ -121,8 +95,8 @@ namespace gglab
 			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
 			RHISamplerDesc m_Desc{};
 			std::vector<RHIFencePoint> m_RetirementPoints;
-			VkSampler m_Sampler = VK_NULL_HANDLE;
 			std::optional<uint32_t> m_DescriptorIndex;
+			std::shared_ptr<VulkanDescriptorBacking> m_Backing;
 		};
 
 		template <typename HandleT, typename ResourceT> struct ResourceSlot
@@ -136,7 +110,7 @@ namespace gglab
 			std::string m_DebugName;
 			std::vector<RHIFencePoint> m_LastUsePoints;
 			std::vector<RHIFencePoint> m_RetirementPoints;
-			std::unique_ptr<ResourceT> m_Resource;
+			std::shared_ptr<ResourceT> m_Resource;
 		};
 
 		// Texture/buffer slot records carry the RHI description so view
@@ -206,6 +180,10 @@ namespace gglab
 		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept;
 		RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept;
 		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept;
+		bool PublishTextureViewDescriptor(
+			RHITextureViewHandle view, uint64_t publicationGeneration) noexcept;
+		bool PublishSamplerDescriptor(
+			RHISamplerHandle sampler, uint64_t publicationGeneration) noexcept;
 
 		void RetireCompletedResources() noexcept;
 
@@ -274,9 +252,6 @@ namespace gglab
 			m_TextureResourceViews;
 		std::unordered_map<RHIBufferHandle, std::vector<RHIBufferViewHandle>>
 			m_BufferResourceViews;
-
-		VulkanDescriptorIndexArena m_ResourceDescriptorArena{ 0 };
-		VulkanDescriptorIndexArena m_SamplerDescriptorArena{ 0 };
 
 		Diagnostics m_Diagnostics;
 	};

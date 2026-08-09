@@ -198,6 +198,12 @@ namespace gglab
 			return result;
 		}
 
+		if (!device->m_DescriptorManager.Initialize(device.get()))
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "Failed to initialize the Vulkan descriptor manager.";
+			return result;
+		}
 		device->m_ResourceManager.Initialize(device.get());
 
 		result.m_Device = std::move(device);
@@ -502,6 +508,7 @@ namespace gglab
 		if (m_MemAllocator != VK_NULL_HANDLE)
 		{
 			m_ResourceManager.Finalize();
+			m_DescriptorManager.Finalize();
 			vmaDestroyAllocator(m_MemAllocator);
 			m_MemAllocator = VK_NULL_HANDLE;
 		}

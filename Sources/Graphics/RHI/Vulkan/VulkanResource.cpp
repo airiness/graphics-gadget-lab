@@ -37,16 +37,11 @@ namespace gglab
 			allocationCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
 		}
 
-		VmaAllocationInfo* allocationInfo = nullptr;
 		VmaAllocationInfo allocationInfoStorage{};
-		if ((allocationCreateInfo.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0)
-		{
-			allocationInfo = &allocationInfoStorage;
-		}
 		// The create call uses the caller's description so its pNext chain
 		// stays intact for the call.
 		const VkResult createResult = vmaCreateBuffer(m_Allocator, &createInfo.m_CreateInfo,
-			&allocationCreateInfo, &m_Buffer, &m_Allocation, allocationInfo);
+			&allocationCreateInfo, &m_Buffer, &m_Allocation, &allocationInfoStorage);
 		if (createResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
@@ -55,13 +50,14 @@ namespace gglab
 			Release();
 			return;
 		}
-		if (allocationInfo != nullptr)
+		m_AllocationSizeInBytes = allocationInfoStorage.size;
+		if ((allocationCreateInfo.flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0)
 		{
 			// VMA keeps this mapping for the allocation lifetime; it must
 			// never be passed to vmaUnmapMemory and is torn down by
 			// vmaDestroyBuffer.
 			m_Mapping = VulkanBufferMapping::Persistent;
-			m_MappedData = allocationInfo->pMappedData;
+			m_MappedData = allocationInfoStorage.pMappedData;
 		}
 	}
 
@@ -77,6 +73,7 @@ namespace gglab
 		m_Device = device;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
+		m_AllocationSizeInBytes = 0;
 		m_Borrowed = true;
 		m_Buffer = buffer;
 		m_SizeInBytes = sizeInBytes;
@@ -106,6 +103,7 @@ namespace gglab
 		}
 		m_Buffer = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
+		m_AllocationSizeInBytes = 0;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Borrowed = false;
 		m_CreateInfo = {};
@@ -219,8 +217,9 @@ namespace gglab
 
 		// The create call uses the caller's description so its pNext chain
 		// (format lists) stays intact for the call.
+		VmaAllocationInfo allocationInfo{};
 		const VkResult createResult = vmaCreateImage(m_Allocator, &createInfo.m_CreateInfo,
-			&createInfo.m_AllocationCreateInfo, &m_Image, &m_Allocation, nullptr);
+			&createInfo.m_AllocationCreateInfo, &m_Image, &m_Allocation, &allocationInfo);
 		if (createResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
@@ -229,6 +228,7 @@ namespace gglab
 			Release();
 			return;
 		}
+		m_AllocationSizeInBytes = allocationInfo.size;
 	}
 
 	void VulkanTexture::AdoptExternal(
@@ -242,6 +242,7 @@ namespace gglab
 		m_Device = device;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
+		m_AllocationSizeInBytes = 0;
 		m_Borrowed = true;
 		m_Image = image;
 		m_InitialState = initialState;
@@ -264,6 +265,7 @@ namespace gglab
 		}
 		m_Image = VK_NULL_HANDLE;
 		m_Allocation = VK_NULL_HANDLE;
+		m_AllocationSizeInBytes = 0;
 		m_Allocator = VK_NULL_HANDLE;
 		m_Borrowed = false;
 		m_CreateInfo = {};

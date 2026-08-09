@@ -9,7 +9,10 @@
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
+#include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
+#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
@@ -1886,6 +1889,194 @@ namespace gglab
 			"Descriptor arena live count returns to zero after full release");
 	}
 
+	void RunVulkanDescriptorPublicationTests(SelfTestContext& context) noexcept
+	{
+		VulkanDescriptorPublicationArena arena(2);
+		const std::optional<uint32_t> first = arena.Allocate();
+		context.Check(first && *first == 0 &&
+			arena.GetState(*first) ==
+			VulkanDescriptorPublicationState::AllocatedUnpublished,
+			"Descriptor publication starts in the private allocated state");
+		context.Check(!arena.Publish(*first, 1),
+			"Descriptor publication rejects a slot before its native write is ready");
+
+		auto backing = std::make_shared<uint32_t>(17);
+		std::weak_ptr<uint32_t> retainedBacking = backing;
+		context.Check(arena.MarkDescriptorReady(*first, backing) && arena.Publish(*first, 1) &&
+			arena.GetState(*first) == VulkanDescriptorPublicationState::Live,
+			"Descriptor publication follows allocated, ready, and live states");
+		backing.reset();
+		context.Check(!retainedBacking.expired() &&
+			!arena.MarkDescriptorReady(*first, std::make_shared<uint32_t>(18)),
+			"A live descriptor retains its backing and rejects in-place overwrite");
+
+		const RHIFenceHandle graphicsFence(4, 1);
+		const RHIFencePoint lastPossibleUse(graphicsFence, 9);
+		context.Check(arena.Retire(*first, { lastPossibleUse }) &&
+			arena.GetState(*first) == VulkanDescriptorPublicationState::Retired,
+			"A live descriptor enters retirement with its last possible graphics use");
+		const RHIFencePoint laterOwnerUse(graphicsFence, 12);
+		context.Check(arena.JoinRetirement(*first, {}, { &laterOwnerUse, 1 }),
+			"A retired descriptor joins a later parent-resource retirement gate");
+		arena.ReleaseCompleted([](const RHIFencePoint& point) noexcept
+			{
+				return point.m_Value <= 9;
+			});
+		context.Check(!retainedBacking.expired() &&
+			arena.GetDiagnostics().m_RetiredCount == 1,
+			"A later joined gate keeps the descriptor backing alive");
+		arena.ReleaseCompleted([](const RHIFencePoint&) noexcept { return true; });
+		context.Check(retainedBacking.expired() &&
+			arena.GetState(*first) == VulkanDescriptorPublicationState::Free,
+			"Completed retirement releases the descriptor backing and index together");
+
+		const std::optional<uint32_t> reused = arena.Allocate();
+		auto unpublishedBacking = std::make_shared<uint32_t>(21);
+		std::weak_ptr<uint32_t> unpublishedWeak = unpublishedBacking;
+		const bool ready = arena.MarkDescriptorReady(*reused, unpublishedBacking);
+		unpublishedBacking.reset();
+		context.Check(ready && arena.CancelUnpublished(*reused) && unpublishedWeak.expired(),
+			"Unpublished descriptor cancellation releases private backing immediately");
+		context.Check(arena.GetDiagnostics().m_InvalidTransitionCount == 2,
+			"Descriptor publication diagnostics count invalid transitions");
+	}
+
+	void RunVulkanDescriptorGenerationTests(SelfTestContext& context) noexcept
+	{
+		VulkanDescriptorPublicationTracker tracker(2);
+		const auto completed = [](const RHIFencePoint&) noexcept { return true; };
+		context.Check(tracker.BeginFrameSnapshot(0, completed) &&
+			tracker.BeginFrameSnapshot(1, completed),
+			"Frame slots capture the current descriptor publication generation");
+		const uint64_t replacementGeneration = tracker.PublishReplacement();
+		RHIDescriptorRetirement retirement{};
+		context.Check(replacementGeneration == 2 &&
+			!tracker.TryDeriveRetirement(1, retirement),
+			"An unsubmitted old-generation snapshot prevents descriptor retirement");
+
+		const RHIFenceHandle graphicsFence(5, 1);
+		context.Check(tracker.SubmitFrameSnapshot(0, { graphicsFence, 11 }) &&
+			!tracker.TryDeriveRetirement(1, retirement),
+			"Every old-generation snapshot must become submitted or be abandoned");
+		context.Check(tracker.AbortFrameSnapshot(1) &&
+			tracker.TryDeriveRetirement(1, retirement) &&
+			retirement.m_LastPossibleGraphicsUse == RHIFencePoint(graphicsFence, 11),
+			"Old-generation retirement derives the last submitted graphics fence");
+
+		context.Check(tracker.BeginFrameSnapshot(1, completed) &&
+			tracker.SubmitFrameSnapshot(1, { graphicsFence, 12 }) &&
+			tracker.TryDeriveRetirement(1, retirement) && retirement.m_LastPossibleGraphicsUse.m_Value == 11,
+			"New-generation submissions do not extend an old descriptor retirement gate");
+		context.Check(!tracker.BeginFrameSnapshot(0,
+			[](const RHIFencePoint&) noexcept { return false; }) &&
+			tracker.BeginFrameSnapshot(0, completed),
+			"A frame slot cannot replace its snapshot before the prior submission completes");
+	}
+
+	void RunVulkanBindingLayoutTests(SelfTestContext& context) noexcept
+	{
+		RHIBindingLayoutDesc desc{};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::PushConstants,
+			.m_Visibility = RHIShaderStage::All,
+			.m_Binding = 2,
+			.m_SizeInBytes = 16,
+		};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::SampledTexture,
+			.m_Visibility = RHIShaderStage::Pixel,
+			.m_Binding = 0,
+		};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::PushConstants,
+			.m_Visibility = RHIShaderStage::All,
+			.m_Binding = 1,
+			.m_SizeInBytes = 16,
+		};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::BindlessResourceTable,
+			.m_Visibility = RHIShaderStage::All,
+			.m_Count = 0,
+		};
+
+		const VulkanBindingLayoutPlan plan = BuildVulkanBindingLayoutPlan(desc, 64 * 1024);
+		context.Check(plan.IsValid() && plan.m_Set0BindingCount == 3 &&
+			plan.m_DynamicOffsetCount == 2,
+			"Vulkan binding layout separates fixed set 0 from the global descriptor set");
+		context.Check(plan.m_Set0Bindings[0].m_Binding == 1 &&
+			plan.m_Set0Bindings[1].m_Binding == 2 &&
+			plan.m_Set0Bindings[2].m_Binding == 32,
+			"Set-0 bindings use the shared register-class shifts and native order");
+		context.Check(plan.GetDynamicOffsetSlot(2) == 0 &&
+			plan.GetDynamicOffsetSlot(0) == 1,
+			"Dynamic offsets follow native binding order instead of logical call order");
+
+		VulkanDynamicUniformState state;
+		const std::array<uint32_t, 2> firstUpdate{ 3, 7 };
+		const std::array<uint32_t, 1> secondUpdate{ 11 };
+		const bool initialized = state.Initialize(plan);
+		const bool firstApplied = state.UpdateShadow(0, firstUpdate, 1);
+		const bool secondApplied = state.UpdateShadow(0, secondUpdate, 3);
+		std::array<uint32_t, 4> shadowWords{};
+		const std::span<const std::byte> shadow = state.GetShadow(0);
+		if (shadow.size() == sizeof(shadowWords))
+		{
+			std::memcpy(shadowWords.data(), shadow.data(), shadow.size());
+		}
+		context.Check(initialized && firstApplied && secondApplied &&
+			shadowWords == std::array<uint32_t, 4>{ 0, 3, 7, 11 },
+			"Push-constant destOffset uses 32-bit words and partial updates preserve shadow data");
+		context.Check(!state.UpdateShadow(0, firstUpdate, 3),
+			"Push-constant shadow updates reject ranges beyond the logical slot");
+
+		RHIBindingLayoutDesc oversized = desc;
+		oversized.m_Slots[0].m_SizeInBytes = 128;
+		context.Check(BuildVulkanBindingLayoutPlan(oversized, 64).m_Error ==
+			VulkanBindingLayoutError::InvalidPushConstantSize,
+			"Vulkan binding layout rejects dynamic uniform ranges beyond the device limit");
+		RHIBindingLayoutDesc duplicate{};
+		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
+		duplicate.m_Slots[duplicate.m_SlotCount++] = desc.m_Slots[0];
+		context.Check(BuildVulkanBindingLayoutPlan(duplicate, 64 * 1024).m_Error ==
+			VulkanBindingLayoutError::DuplicateNativeBinding,
+			"Vulkan binding layout rejects duplicate native set-0 bindings");
+	}
+
+	void RunVulkanDynamicUniformArenaTests(SelfTestContext& context) noexcept
+	{
+		VulkanDynamicUniformArena arena({
+			.m_PageSizeInBytes = 64,
+			.m_MaxPageCount = 2,
+			.m_Alignment = 16,
+			});
+		const VulkanDynamicUniformArenaAllocation first = arena.Allocate(12);
+		const VulkanDynamicUniformArenaAllocation second = arena.Allocate(48);
+		const VulkanDynamicUniformArenaAllocation third = arena.Allocate(16);
+		const VulkanDynamicUniformArenaAllocation overflow = arena.Allocate(64);
+		context.Check(first.m_OffsetInBytes == 0 && second.m_OffsetInBytes == 16 &&
+			third.m_OffsetInBytes == 64 && third.m_PageIndex == 1,
+			"Dynamic uniform allocation honors alignment and advances to the next page");
+		context.Check(!overflow.IsValid() && arena.GetDiagnostics().m_OverflowCount == 1 &&
+			arena.GetDiagnostics().m_PageCount == 2,
+			"Dynamic uniform allocation reports hard-cap overflow without wrapping");
+		const uint32_t highWater = arena.GetDiagnostics().m_HighWaterMarkInBytes;
+		arena.Reset();
+		const VulkanDynamicUniformArenaAllocation reused = arena.Allocate(16);
+		context.Check(reused.m_OffsetInBytes == 0 && reused.m_PageIndex == 0 &&
+			arena.GetDiagnostics().m_HighWaterMarkInBytes == highWater,
+			"Dynamic uniform pages reset for frame-slot reuse while preserving high-water diagnostics");
+
+		VulkanDynamicUniformArena overflowingConfig({
+			.m_PageSizeInBytes = UINT32_MAX,
+			.m_MaxPageCount = 2,
+			.m_Alignment = UINT32_MAX,
+			});
+		context.Check(overflowingConfig.GetCapacityInBytes() == 0 &&
+			!overflowingConfig.Allocate(16).IsValid() &&
+			overflowingConfig.GetDiagnostics().m_OverflowCount == 1,
+			"Dynamic uniform configuration rejects address-space overflow without wrapping");
+	}
+
 	void RunVulkanViewNormalizationTests(SelfTestContext& context) noexcept
 	{
 		const RHITextureDesc depthResource{
@@ -2001,6 +2192,10 @@ namespace gglab
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);
 		RunVulkanDescriptorArenaTests(context);
+		RunVulkanDescriptorPublicationTests(context);
+		RunVulkanDescriptorGenerationTests(context);
+		RunVulkanBindingLayoutTests(context);
+		RunVulkanDynamicUniformArenaTests(context);
 		RunVulkanViewNormalizationTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);

@@ -9,7 +9,10 @@
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
+#include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
+#include "Graphics/Shader/ShaderCompiler.h"
 #endif
 
 #include <array>
@@ -376,6 +379,12 @@ namespace gglab
 			{
 				LogQualificationError(
 					"qualify resource: deferred texture view creation failed.");
+				return 1;
+			}
+			if (!resources.PublishTextureViewDescriptor(pendingView, 1))
+			{
+				LogQualificationError(
+					"qualify resource: deferred descriptor publication failed.");
 				return 1;
 			}
 			resources.RecordTextureUse(pending, incompletePoint);
@@ -1102,9 +1111,32 @@ namespace gglab
 						"qualify transfer: bootstrap texture batch publication failed.");
 					return 1;
 				}
+				const bool everyDescriptorPublished = std::ranges::all_of(resources.m_Views,
+					[&device](RHITextureViewHandle view) noexcept
+					{
+						return device.GetResourceManager().PublishTextureViewDescriptor(view, 1);
+					});
+				if (!everyDescriptorPublished)
+				{
+					LogQualificationError(
+						"qualify transfer: bootstrap descriptor publication failed.");
+					return 1;
+				}
+				const VulkanDescriptorPublicationDiagnostics descriptorDiagnostics =
+					device.GetDescriptorManager().GetResourceDiagnostics();
+				if (descriptorDiagnostics.m_LiveCount < resources.m_Views.size() ||
+					descriptorDiagnostics.m_RetainedBackingCount < resources.m_Views.size() ||
+					descriptorDiagnostics.m_EstimatedRetainedBytes == 0)
+				{
+					LogQualificationError(
+						"qualify transfer: bootstrap descriptor backing diagnostics are incomplete.");
+					return 1;
+				}
 				LogQualificationInfo(std::format(
-					"qualify transfer: {} bootstrap textures uploaded and published.",
-					resources.m_Textures.size()));
+					"qualify transfer: {} bootstrap textures uploaded and published "
+					"(retained backing estimate={} bytes).",
+					resources.m_Textures.size(),
+					descriptorDiagnostics.m_EstimatedRetainedBytes));
 			}
 
 			// Use a real IBL stage artifact, not a synthetic RHI-only payload,
@@ -1242,7 +1274,9 @@ namespace gglab
 											completionRanOnOwner = scheduler.IsOwnerThread();
 											if (completion.m_Status == AssetUploadStatus::Succeeded &&
 												completion.m_FencePoint.IsValid() &&
-												device.IsFencePointCompleted(completion.m_FencePoint))
+												device.IsFencePointCompleted(completion.m_FencePoint) &&
+												device.GetResourceManager().PublishTextureViewDescriptor(
+													streamingView, 1))
 											{
 												publishedDescriptor = privateDescriptor;
 											}
@@ -1294,6 +1328,167 @@ namespace gglab
 			return 0;
 		}
 
+		[[nodiscard]] int RunVulkanDescriptorPipelineQualification(
+			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+		{
+			VulkanDescriptorManager& descriptors = device.GetDescriptorManager();
+			if (!descriptors.IsLayoutSupported() ||
+				descriptors.GetGlobalSetLayout() == VK_NULL_HANDLE ||
+				descriptors.GetGlobalSet() == VK_NULL_HANDLE)
+			{
+				LogQualificationError(
+					"qualify descriptors: the exact global descriptor layout is unavailable.");
+				return 1;
+			}
+
+			RHIBindingLayoutDesc layoutDesc{};
+			layoutDesc.m_DebugName = "Qualification.DynamicUniformLayout";
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::PushConstants,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Binding = 2,
+				.m_SizeInBytes = 64,
+				.m_DebugName = "PassConstants",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::PushConstants,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Binding = 1,
+				.m_SizeInBytes = 16,
+				.m_DebugName = "DrawConstants",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::BindlessResourceTable,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Count = 0,
+				.m_DebugName = "BindlessResources",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::BindlessSamplerTable,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Count = 0,
+				.m_DebugName = "BindlessSamplers",
+			};
+
+			VulkanPipelineSystem pipelineSystem(&device);
+			const RHIBindingLayoutHandle layoutHandle =
+				pipelineSystem.CreateBindingLayout(layoutDesc);
+			VulkanBindingLayout* layout = pipelineSystem.ResolveBindingLayout(layoutHandle);
+			if (!layout || layout->GetPipelineLayout() == VK_NULL_HANDLE ||
+				layout->GetPlan().GetDynamicOffsetSlot(1) != 0 ||
+				layout->GetPlan().GetDynamicOffsetSlot(0) != 1)
+			{
+				LogQualificationError(
+					"qualify pipeline: set-0 or pipeline-layout creation failed.");
+				return 1;
+			}
+
+			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
+				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
+			VulkanDynamicUniformBuffer uniformBuffer;
+			if (!uniformBuffer.Initialize(&device, runtime.GetFrameSlotCount(), {
+				.m_PageSizeInBytes = uniformAlignment * 2,
+				.m_MaxPageCount = 2,
+				.m_Alignment = uniformAlignment,
+				}))
+			{
+				LogQualificationError("qualify dynamic uniform: buffer initialization failed.");
+				return 1;
+			}
+			VulkanSet0DescriptorFrames set0Frames;
+			const bool set0Initialized = set0Frames.Initialize(
+				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount());
+			const bool prematurePoolResetRejected =
+				set0Initialized && !set0Frames.BeginFrame(0);
+			if (!set0Initialized || !prematurePoolResetRejected ||
+				!uniformBuffer.BeginFrame(0) || !set0Frames.BeginFrame(0) ||
+				set0Frames.BeginFrame(0))
+			{
+				LogQualificationError(
+					"qualify dynamic uniform: set-0 frame-slot gating failed.");
+				return 1;
+			}
+
+			VulkanDynamicUniformState uniformState;
+			const std::array<uint32_t, 2> firstValues{ 3, 5 };
+			const std::array<uint32_t, 1> secondValues{ 8 };
+			const bool stateInitialized = uniformState.Initialize(layout->GetPlan());
+			const VulkanDynamicUniformUpdate first = uniformState.SetPushConstants(
+				1, firstValues, 0, uniformBuffer, 0);
+			const VulkanDynamicUniformUpdate second = uniformState.SetPushConstants(
+				1, secondValues, 1, uniformBuffer, 0);
+			VulkanDynamicUniformUpdate overflow = second;
+			for (uint32_t allocationIndex = 0; allocationIndex < 16 && overflow.IsValid();
+				++allocationIndex)
+			{
+				overflow = uniformState.SetPushConstants(
+					1, secondValues, 1, uniformBuffer, 0);
+			}
+			const VulkanDynamicUniformDiagnostics* diagnostics = uniformBuffer.GetDiagnostics(0);
+			if (!stateInitialized || !first.IsValid() || !second.IsValid() ||
+				first.m_Allocation.m_DynamicOffset == second.m_Allocation.m_DynamicOffset ||
+				first.m_Allocation.m_DynamicOffset % uniformAlignment != 0 ||
+				second.m_Allocation.m_DynamicOffset % uniformAlignment != 0 || overflow.IsValid() ||
+				!diagnostics || diagnostics->m_OverflowCount == 0 ||
+				set0Frames.GetDescriptorSet(0) == VK_NULL_HANDLE)
+			{
+				LogQualificationError(
+					"qualify dynamic uniform: immutable allocation, alignment or overflow failed.");
+				return 1;
+			}
+
+			const RHIFencePoint completedFrame(
+				runtime.GetTimeline().GetRHIHandle(), runtime.GetTimelineSignalValue());
+			if (!completedFrame.IsValid() || !uniformBuffer.EndFrame(0, completedFrame) ||
+				!uniformBuffer.BeginFrame(0) || !set0Frames.BeginFrame(0) ||
+				!uniformBuffer.EndFrame(0, completedFrame))
+			{
+				LogQualificationError(
+					"qualify dynamic uniform: completed frame-slot reuse failed.");
+				return 1;
+			}
+
+			ShaderCompiler compiler;
+			ShaderDesc shaderDesc{
+				.m_SourcePath = L"Passes/PassFinalColor.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = {L"."},
+			};
+			const ShaderCompileArtifact artifact =
+				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(shaderDesc));
+			const ShaderBytecode spirV{
+				.m_Data = artifact.m_Binary.Data(),
+				.m_SizeInBytes = artifact.m_Binary.SizeInBytes(),
+				.m_Format = artifact.GetBinaryFormat(),
+				.m_Hash = artifact.m_Hash,
+			};
+			const VkShaderModule shaderModule =
+				pipelineSystem.CreateShaderModule(spirV, "Qualification.FinalColorVS");
+			ShaderBytecode rejectedBytecode = spirV;
+			rejectedBytecode.m_Format = ShaderBinaryFormat::Dxil;
+			const bool rejectedDxil =
+				pipelineSystem.CreateShaderModule(rejectedBytecode) == VK_NULL_HANDLE;
+			if (shaderModule == VK_NULL_HANDLE || !rejectedDxil)
+			{
+				LogQualificationError(
+					"qualify pipeline: SPIR-V module creation or DXIL rejection failed.");
+				return 1;
+			}
+			pipelineSystem.DestroyShaderModule(shaderModule);
+			const uint32_t highWater = diagnostics->m_HighWaterMarkInBytes;
+			const uint64_t overflowCount = diagnostics->m_OverflowCount;
+			set0Frames.Finalize();
+			uniformBuffer.Finalize();
+			device.RetireCompletedWork();
+			LogQualificationInfo(std::format(
+				"qualify descriptors: global layout, pipeline layout, shader module and dynamic "
+				"uniform storage passed (alignment={}, highWater={}, overflow={}).",
+				uniformAlignment, highWater, overflowCount));
+			return 0;
+		}
+
 		// Runs the minimal-frame qualification script: continuous presents,
 		// first-image abort, already-presented abort, normal/abort
 		// alternation, continuous abort, resize, minimize/restore and VSync
@@ -1315,7 +1510,7 @@ namespace gglab
 
 			LogQualificationInfo("Vulkan minimal-frame qualification started.");
 
-			// Phase 1: continuous normal presents.
+			// Establish a run of continuous normal presents.
 			for (uint32_t i = 0; i < 4; ++i)
 			{
 				if (!runNormal())
@@ -1325,14 +1520,14 @@ namespace gglab
 			}
 			// Deferred-retirement probe: the gate value is reserved, not
 			// submitted, so the slot must stay occupied; the submissions
-			// in the remaining phases complete the gate.
+			// later submissions complete the gate.
 			VulkanDeferredRetirementProbeState deferredPending;
 			if (RunVulkanDeferredRetirementProbe(
 				*runtime.GetDevice(), runtime, deferredPending) != 0)
 			{
 				return 1;
 			}
-			// Phase 2: continuous aborts.
+			// Exercise consecutive aborts.
 			for (uint32_t i = 0; i < 3; ++i)
 			{
 				if (!runAbort())
@@ -1340,7 +1535,7 @@ namespace gglab
 					return 1;
 				}
 			}
-			// Phase 3: normal/abort alternation.
+			// Alternate normal and aborted frames.
 			for (uint32_t i = 0; i < 4; ++i)
 			{
 				if (!runNormal() || !runAbort())
@@ -1348,7 +1543,7 @@ namespace gglab
 					return 1;
 				}
 			}
-			// Phase 4: grouped frames ending in aborts.
+			// Exercise grouped frames ending in aborts.
 			for (uint32_t i = 0; i < 3; ++i)
 			{
 				if (!runNormal())
@@ -1368,7 +1563,7 @@ namespace gglab
 				}
 			}
 
-			// Phase 5: real window resize. Every recreate is followed by an
+			// Exercise real window resize. Every recreate is followed by an
 			// abort, so a freshly created swapchain exercises the first-image
 			// Undefined -> Present abort path.
 			constexpr std::array<std::pair<uint32_t, uint32_t>, 3> resizeSizes{
@@ -1392,7 +1587,7 @@ namespace gglab
 				}
 			}
 
-			// Phase 6: VSync on/off. The actual present mode is logged after
+			// Toggle VSync on and off. The actual present mode is logged after
 			// each recreate.
 			if (!RunQualificationRecreateChecked(runtime, hwnd, true, stats))
 			{
@@ -1417,7 +1612,7 @@ namespace gglab
 				}
 			}
 
-			// Phase 7: minimize/restore. A minimized window has a zero
+			// Exercise minimize and restore. A minimized window has a zero
 			// drawable extent: BeginFrame must never be called, no zero-size
 			// swapchain is created, and restore recreates at the real extent.
 			ShowWindow(hwnd, SW_MINIMIZE);
@@ -1452,6 +1647,10 @@ namespace gglab
 				LogQualificationError(
 					"qualify WaitIdle failed before the final summary; the runtime may have "
 					"entered the fatal state.");
+				return 1;
+			}
+			if (RunVulkanDescriptorPipelineQualification(*runtime.GetDevice(), runtime) != 0)
+			{
 				return 1;
 			}
 

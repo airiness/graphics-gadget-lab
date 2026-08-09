@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
+#include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 
 #include <vulkan/vulkan.h>
@@ -101,6 +102,14 @@ namespace gglab
 		}
 
 		[[nodiscard]] VmaAllocator GetMemAllocator() const noexcept { return m_MemAllocator; }
+		[[nodiscard]] VulkanDescriptorManager& GetDescriptorManager() noexcept
+		{
+			return m_DescriptorManager;
+		}
+		[[nodiscard]] const VulkanDescriptorManager& GetDescriptorManager() const noexcept
+		{
+			return m_DescriptorManager;
+		}
 		[[nodiscard]] VulkanResourceManager& GetResourceManager() noexcept
 		{
 			return m_ResourceManager;
@@ -220,6 +229,7 @@ namespace gglab
 		VkPhysicalDeviceLimits m_PhysicalDeviceLimits{};
 
 		VmaAllocator m_MemAllocator = VK_NULL_HANDLE;
+		VulkanDescriptorManager m_DescriptorManager;
 		VulkanResourceManager m_ResourceManager;
 	};
 }

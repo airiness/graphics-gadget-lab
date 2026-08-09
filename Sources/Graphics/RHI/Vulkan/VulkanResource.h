@@ -16,7 +16,8 @@ namespace gglab
 	//
 	// Ownership is strict RAII: the destructor releases the native handle
 	// and, when owned, the VMA allocation. Copying and moving are deleted;
-	// resources are managed exclusively through unique_ptr slots.
+	// resource-manager slots own shared instances so descriptor backing can
+	// retain a parent allocation until its publication retirement gate completes.
 	class VulkanResource
 	{
 	public:
@@ -28,6 +29,10 @@ namespace gglab
 		[[nodiscard]] bool IsExternal() const noexcept { return m_Borrowed; }
 		[[nodiscard]] bool OwnsAllocation() const noexcept { return !m_Borrowed; }
 		[[nodiscard]] VmaAllocation GetAllocation() const noexcept { return m_Allocation; }
+		[[nodiscard]] VkDeviceSize GetAllocationSizeInBytes() const noexcept
+		{
+			return m_AllocationSizeInBytes;
+		}
 
 		// Applies the debug name through VK_EXT_debug_utils when available.
 		virtual void SetDebugName(const char* name) noexcept = 0;
@@ -39,6 +44,7 @@ namespace gglab
 		VkDevice m_Device = VK_NULL_HANDLE;
 		VmaAllocator m_Allocator = VK_NULL_HANDLE;
 		VmaAllocation m_Allocation = VK_NULL_HANDLE;
+		VkDeviceSize m_AllocationSizeInBytes = 0;
 		bool m_Borrowed = false;
 	};
 
