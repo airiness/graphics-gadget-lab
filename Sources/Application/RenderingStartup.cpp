@@ -104,6 +104,40 @@ namespace gglab
 			uint32_t m_SuboptimalCount = 0;
 		};
 
+		// Outcome of a swapchain recreation request. Recreated means the
+		// swapchain was rebuilt at the real drawable extent; Suspended means
+		// the drawable extent is zero (never create a zero-size swapchain,
+		// never BeginFrame); Failed is an explicit error. The distinction
+		// matters because a suspended window is an environment state, not a
+		// failure: a real main loop waits for restore instead of retrying.
+		enum class VulkanQualificationRecreateOutcome : uint8_t
+		{
+			Recreated,
+			Suspended,
+			Failed,
+		};
+
+		[[nodiscard]] VulkanQualificationRecreateOutcome RunQualificationRecreate(
+			VulkanFrameRuntime& runtime, HWND hwnd, bool vsync,
+			QualificationFrameStats& stats) noexcept;
+
+		// Script-level helper: a recreate must actually happen for the script
+		// to continue; both Suspended and Failed stop the deterministic
+		// qualification script (it cannot drive frames while suspended).
+		[[nodiscard]] bool RunQualificationRecreateChecked(VulkanFrameRuntime& runtime,
+			HWND hwnd, bool vsync, QualificationFrameStats& stats) noexcept
+		{
+			switch (RunQualificationRecreate(runtime, hwnd, vsync, stats))
+			{
+			case VulkanQualificationRecreateOutcome::Recreated:
+				return true;
+			case VulkanQualificationRecreateOutcome::Suspended:
+			case VulkanQualificationRecreateOutcome::Failed:
+				return false;
+			}
+			return false;
+		}
+
 		// Deterministic per-step clear colors so presented frames are easy to
 		// distinguish: red, green, blue, white cycling.
 		[[nodiscard]] std::array<float, 4> StepColor(uint32_t step) noexcept
@@ -126,8 +160,6 @@ namespace gglab
 		// extent, the runtime only owns the recreation mechanics.
 		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
 			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept;
-		[[nodiscard]] bool RunQualificationRecreate(VulkanFrameRuntime& runtime, HWND hwnd,
-			bool vsync, QualificationFrameStats& stats) noexcept;
 
 		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
 			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept
@@ -139,7 +171,7 @@ namespace gglab
 					"qualify[{:03d}] acquire OUT_OF_DATE; recreating with the real extent and "
 					"retrying once.",
 					step));
-				if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
 				{
 					return false;
 				}
@@ -194,7 +226,7 @@ namespace gglab
 				}
 				LogQualificationInfo(std::format(
 					"qualify[{:03d}] recreation pending; recreating at the safe point.", step));
-				if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
 				{
 					return false;
 				}
@@ -212,14 +244,15 @@ namespace gglab
 			return true;
 		}
 
-		[[nodiscard]] bool RunQualificationRecreate(VulkanFrameRuntime& runtime, HWND hwnd,
-			bool vsync, QualificationFrameStats& stats) noexcept
+		[[nodiscard]] VulkanQualificationRecreateOutcome RunQualificationRecreate(
+			VulkanFrameRuntime& runtime, HWND hwnd, bool vsync,
+			QualificationFrameStats& stats) noexcept
 		{
 			RECT clientRect{};
 			if (!GetClientRect(hwnd, &clientRect))
 			{
 				LogQualificationError("GetClientRect failed before swapchain recreate.");
-				return false;
+				return VulkanQualificationRecreateOutcome::Failed;
 			}
 			const uint32_t width =
 				static_cast<uint32_t>(std::max<LONG>(clientRect.right - clientRect.left, 0));
@@ -228,17 +261,17 @@ namespace gglab
 			if (width == 0 || height == 0)
 			{
 				// Suspended window: never create a zero-size swapchain. The
-				// caller skips further frames until the window is restored.
+				// caller stops driving frames until the window is restored.
 				LogQualificationInfo(
-					"qualify[recreate] drawable extent is zero; recreation skipped.");
-				return true;
+					"qualify[recreate] drawable extent is zero; recreation suspended.");
+				return VulkanQualificationRecreateOutcome::Suspended;
 			}
 
 			std::string error;
 			if (!runtime.RecreateSwapChain(width, height, vsync, error))
 			{
 				LogQualificationError(std::format("Swapchain recreate failed: {}", error));
-				return false;
+				return VulkanQualificationRecreateOutcome::Failed;
 			}
 			++stats.m_RecreateCount;
 			const auto& swapChain = runtime.GetSwapChain();
@@ -246,7 +279,7 @@ namespace gglab
 				"qualify[recreate] {}x{} vsync={} presentMode={} format={} images={}",
 				width, height, vsync ? "on" : "off", PresentModeName(swapChain.GetPresentMode()),
 				GetRHIFormatInfo(swapChain.GetFormat()).m_Name, swapChain.GetImageCount()));
-			return true;
+			return VulkanQualificationRecreateOutcome::Recreated;
 		}
 
 		[[nodiscard]] bool ResizeQualificationWindow(HWND hwnd, uint32_t width,
@@ -347,7 +380,7 @@ namespace gglab
 				{
 					return 1;
 				}
-				if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
 				{
 					return 1;
 				}
@@ -359,7 +392,7 @@ namespace gglab
 
 			// Phase 6: VSync on/off. The actual present mode is logged after
 			// each recreate.
-			if (!RunQualificationRecreate(runtime, hwnd, true, stats))
+			if (!RunQualificationRecreateChecked(runtime, hwnd, true, stats))
 			{
 				return 1;
 			}
@@ -370,7 +403,7 @@ namespace gglab
 					return 1;
 				}
 			}
-			if (!RunQualificationRecreate(runtime, hwnd, false, stats))
+			if (!RunQualificationRecreateChecked(runtime, hwnd, false, stats))
 			{
 				return 1;
 			}
@@ -400,7 +433,7 @@ namespace gglab
 					"qualify[minimize] drawable extent is 0x0; BeginFrame skipped.");
 			}
 			ShowWindow(hwnd, SW_RESTORE);
-			if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+			if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
 			{
 				return 1;
 			}
