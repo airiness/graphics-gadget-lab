@@ -12,6 +12,7 @@
 #include <vulkan/vulkan.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -43,6 +44,7 @@ namespace gglab
 		uint32_t m_Capacity = 0;
 		uint32_t m_LiveCount = 0;
 		std::vector<uint32_t> m_FreeIndices;
+		std::vector<uint8_t> m_Allocated;
 	};
 
 	// Owns GGLab resource handles, native Vulkan objects, views, samplers,
@@ -234,10 +236,9 @@ namespace gglab
 		template <typename HandleT, typename SlotT, typename OnValidT>
 		void DestroyResource(RHIHandleTable<HandleT, SlotT>& table, HandleT handle,
 			const char* functionName, OnValidT onValid) noexcept;
-		// View/sampler destroy path: no last-use tracking on the slot
-		// itself, so a direct destroy retires with an empty gate (the next
-		// RetireCompletedResources completes it). Views retired through
-		// their parent resource share the parent's gate instead.
+		// View/sampler destroy path. Texture and buffer callbacks join the
+		// parent resource's current last-use gate; samplers remain ungated
+		// until descriptor publication adds their last-possible-use gate.
 		template <typename HandleT, typename SlotT, typename OnValidT>
 		void DestroyViewHandle(RHIHandleTable<HandleT, SlotT>& table, HandleT handle,
 			const char* functionName, OnValidT onValid) noexcept;

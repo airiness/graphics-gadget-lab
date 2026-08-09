@@ -145,6 +145,7 @@
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\RenderingStartup.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
@@ -455,6 +456,7 @@
     <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\RenderingStartup.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />

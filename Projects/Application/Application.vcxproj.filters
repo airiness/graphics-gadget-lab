@@ -273,6 +273,9 @@
     <ClCompile Include="..\..\Sources\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -1174,6 +1177,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\RenderingStartup.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h">
       <Filter>Application\SelfTest</Filter>

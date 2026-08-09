@@ -14,7 +14,7 @@ namespace gglab
 	{
 		void LogBootstrapInfo(const std::string& message) noexcept
 		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Application))
+			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
 			{
 				logger->info("{}", message);
 			}
@@ -22,7 +22,7 @@ namespace gglab
 
 		void LogBootstrapError(const std::string& message) noexcept
 		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Application))
+			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
 			{
 				logger->error("{}", message);
 			}

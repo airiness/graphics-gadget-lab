@@ -1818,7 +1818,15 @@ namespace gglab
 			"corrupting its state");
 
 		tinyArena.Release(*a);
+		tinyArena.Release(*a);
+		tinyArena.Release(tinyArena.GetCapacity());
+		const std::optional<uint32_t> recycled = tinyArena.Allocate();
+		context.Check(recycled.has_value() && *recycled == *a &&
+			!tinyArena.Allocate().has_value() && tinyArena.GetLiveCount() == 2,
+			"Descriptor arena ignores duplicate/out-of-range release without duplicating indices");
+
 		tinyArena.Release(*b);
+		tinyArena.Release(*recycled);
 		context.Check(tinyArena.GetLiveCount() == 0,
 			"Descriptor arena live count returns to zero after full release");
 	}

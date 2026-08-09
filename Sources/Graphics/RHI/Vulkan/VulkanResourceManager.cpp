@@ -99,11 +99,13 @@ namespace gglab
 			}
 			if (Test(usage, RHIBufferUsage::Structured))
 			{
-				flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+				flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+					VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 			}
 			if (Test(usage, RHIBufferUsage::UnorderedAccess))
 			{
-				flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+				flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+					VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
 			}
 			if (Test(usage, RHIBufferUsage::IndirectArgument))
 			{
@@ -184,6 +186,20 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] constexpr bool IsAnisotropicSamplerFilter(
+			RHISamplerFilter filter) noexcept
+		{
+			return filter == RHISamplerFilter::Anisotropic ||
+				filter == RHISamplerFilter::ComparisonAnisotropic;
+		}
+
+		[[nodiscard]] constexpr bool IsComparisonSamplerFilter(
+			RHISamplerFilter filter) noexcept
+		{
+			return filter == RHISamplerFilter::ComparisonMinMagLinearMipPoint ||
+				filter == RHISamplerFilter::ComparisonAnisotropic;
+		}
+
 		[[nodiscard]] VkCompareOp ToVkCompareOp(RHICompareOp op) noexcept
 		{
 			switch (op)
@@ -232,7 +248,7 @@ namespace gglab
 	}
 
 	VulkanDescriptorIndexArena::VulkanDescriptorIndexArena(uint32_t capacity) noexcept :
-		m_Capacity(capacity)
+		m_Capacity(capacity), m_Allocated(capacity, 0)
 	{
 		// The whole [0, capacity) domain is legal; index 0 is a valid
 		// descriptor index and exhaustion is reported through std::nullopt.
@@ -251,16 +267,20 @@ namespace gglab
 		}
 		const uint32_t index = m_FreeIndices.back();
 		m_FreeIndices.pop_back();
+		GGLAB_ASSERT_MSG(m_Allocated[index] == 0,
+			"Vulkan descriptor arena free list contains a live index.");
+		m_Allocated[index] = 1;
 		++m_LiveCount;
 		return index;
 	}
 
 	void VulkanDescriptorIndexArena::Release(uint32_t index) noexcept
 	{
-		if (index >= m_Capacity)
+		if (index >= m_Capacity || m_Allocated[index] == 0)
 		{
 			return;
 		}
+		m_Allocated[index] = 0;
 		m_FreeIndices.push_back(index);
 		--m_LiveCount;
 	}
@@ -662,11 +682,11 @@ namespace gglab
 							continue;
 						}
 						m_TextureViewCache.erase(viewSlot->m_Key);
-						viewSlot->m_RetirementPoints = slot.m_RetirementPoints;
-						viewSlot->m_State = RHIHandleSlotState::PendingRetirement;
-						viewSlot->m_Generation =
-							RHIHandleTable<RHITextureViewHandle, TextureViewSlot>::NextGeneration(
-								viewSlot->m_Generation);
+						if (m_TextureViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+						{
+							m_TextureViews.SlotAt(view.Index()).m_RetirementPoints =
+								slot.m_RetirementPoints;
+						}
 					}
 					m_TextureResourceViews.erase(iterator);
 				}
@@ -689,11 +709,11 @@ namespace gglab
 							continue;
 						}
 						m_BufferViewCache.erase(viewSlot->m_Key);
-						viewSlot->m_RetirementPoints = slot.m_RetirementPoints;
-						viewSlot->m_State = RHIHandleSlotState::PendingRetirement;
-						viewSlot->m_Generation =
-							RHIHandleTable<RHIBufferViewHandle, BufferViewSlot>::NextGeneration(
-								viewSlot->m_Generation);
+						if (m_BufferViews.BeginRetirement(view) == RHIHandleValidationResult::Valid)
+						{
+							m_BufferViews.SlotAt(view.Index()).m_RetirementPoints =
+								slot.m_RetirementPoints;
+						}
 					}
 					m_BufferResourceViews.erase(iterator);
 				}
@@ -943,10 +963,19 @@ namespace gglab
 		}
 		const uint64_t bufferSize = slot->m_Resource->GetSizeInBytes();
 		if (desc.m_OffsetInBytes > bufferSize ||
-			(desc.m_SizeInBytes != 0 && desc.m_OffsetInBytes + desc.m_SizeInBytes > bufferSize))
+			(desc.m_SizeInBytes != 0 && desc.m_SizeInBytes > bufferSize - desc.m_OffsetInBytes))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"VulkanResourceManager::CreateBufferView rejected an out-of-range view.");
+			return {};
+		}
+		const uint64_t resolvedSize = desc.m_SizeInBytes == 0
+			? bufferSize - desc.m_OffsetInBytes
+			: desc.m_SizeInBytes;
+		if (resolvedSize == 0)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::CreateBufferView rejected an empty view.");
 			return {};
 		}
 
@@ -968,16 +997,62 @@ namespace gglab
 		VkBufferView nativeView = VK_NULL_HANDLE;
 		if (desc.m_Format != RHIFormat::Unknown)
 		{
+			const VulkanFormatInfo& formatInfo = GetVulkanFormatInfo(desc.m_Format);
+			const bool shaderResource = desc.m_Type == RHIBufferViewType::ShaderResource;
+			const bool unorderedAccess = desc.m_Type == RHIBufferViewType::UnorderedAccess;
+			const bool usageMatches =
+				(shaderResource && Test(slot->m_RHIDesc.m_Usage, RHIBufferUsage::Structured)) ||
+				(unorderedAccess &&
+					Test(slot->m_RHIDesc.m_Usage, RHIBufferUsage::UnorderedAccess));
+			if (desc.m_StrideInBytes != 0 || !usageMatches || formatInfo.m_IsTypeless ||
+				formatInfo.m_IsDepthStencil || formatInfo.m_ResourceFormat == VK_FORMAT_UNDEFINED)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager::CreateBufferView rejected an invalid typed view "
+					"contract.");
+				return {};
+			}
+
+			VkFormatProperties3 formatProperties3{};
+			formatProperties3.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3;
+			VkFormatProperties2 formatProperties2{};
+			formatProperties2.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+			formatProperties2.pNext = &formatProperties3;
+			vkGetPhysicalDeviceFormatProperties2(m_Device->GetPhysicalDevice(),
+				formatInfo.m_ResourceFormat, &formatProperties2);
+			const VkFormatFeatureFlags2 requiredFeature = shaderResource
+				? VK_FORMAT_FEATURE_2_UNIFORM_TEXEL_BUFFER_BIT
+				: VK_FORMAT_FEATURE_2_STORAGE_TEXEL_BUFFER_BIT;
+			if ((formatProperties3.bufferFeatures & requiredFeature) != requiredFeature)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager::CreateBufferView rejected unsupported texel-buffer "
+					"format features.");
+				return {};
+			}
+
+			VkPhysicalDeviceProperties physicalProperties{};
+			vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &physicalProperties);
+			const uint32_t bytesPerElement = GetRHIFormatInfo(desc.m_Format).m_BytesPerBlock;
+			if (bytesPerElement == 0 || desc.m_OffsetInBytes %
+				physicalProperties.limits.minTexelBufferOffsetAlignment != 0 ||
+				resolvedSize % bytesPerElement != 0 ||
+				resolvedSize / bytesPerElement > physicalProperties.limits.maxTexelBufferElements)
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"VulkanResourceManager::CreateBufferView rejected a texel-buffer range that "
+					"violates native alignment or size limits.");
+				return {};
+			}
+
 			// Texel views carry a native VkBufferView; plain buffer views
 			// are described by the descriptor layer directly.
 			VkBufferViewCreateInfo viewCreateInfo{};
 			viewCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
 			viewCreateInfo.buffer = slot->m_Resource->Get();
-			viewCreateInfo.format = ToVulkanFormat(desc.m_Format);
+			viewCreateInfo.format = formatInfo.m_ResourceFormat;
 			viewCreateInfo.offset = static_cast<VkDeviceSize>(desc.m_OffsetInBytes);
-			viewCreateInfo.range = desc.m_SizeInBytes == 0
-				? VK_WHOLE_SIZE
-				: static_cast<VkDeviceSize>(desc.m_SizeInBytes);
+			viewCreateInfo.range = static_cast<VkDeviceSize>(resolvedSize);
 			const VkResult createResult =
 				vkCreateBufferView(m_Device->Get(), &viewCreateInfo, nullptr, &nativeView);
 			if (createResult != VK_SUCCESS)
@@ -1058,7 +1133,21 @@ namespace gglab
 		DestroyViewHandle(m_TextureViews, view, "VulkanResourceManager::DestroyTextureView",
 			[this, view](TextureViewSlot& slot) noexcept
 			{
+				const RHITextureHandle texture = slot.m_Key.m_Texture;
 				m_TextureViewCache.erase(slot.m_Key);
+				if (const TextureSlot* textureSlot = m_Textures.Resolve(texture))
+				{
+					slot.m_RetirementPoints = textureSlot->m_LastUsePoints;
+				}
+				if (auto iterator = m_TextureResourceViews.find(texture);
+					iterator != m_TextureResourceViews.end())
+				{
+					std::erase(iterator->second, view);
+					if (iterator->second.empty())
+					{
+						m_TextureResourceViews.erase(iterator);
+					}
+				}
 			});
 	}
 
@@ -1067,7 +1156,21 @@ namespace gglab
 		DestroyViewHandle(m_BufferViews, view, "VulkanResourceManager::DestroyBufferView",
 			[this, view](BufferViewSlot& slot) noexcept
 			{
+				const RHIBufferHandle buffer = slot.m_Key.m_Buffer;
 				m_BufferViewCache.erase(slot.m_Key);
+				if (const BufferSlot* bufferSlot = m_Buffers.Resolve(buffer))
+				{
+					slot.m_RetirementPoints = bufferSlot->m_LastUsePoints;
+				}
+				if (auto iterator = m_BufferResourceViews.find(buffer);
+					iterator != m_BufferResourceViews.end())
+				{
+					std::erase(iterator->second, view);
+					if (iterator->second.empty())
+					{
+						m_BufferResourceViews.erase(iterator);
+					}
+				}
 			});
 	}
 
@@ -1210,12 +1313,12 @@ namespace gglab
 		createInfo.addressModeV = ToVulkanSamplerAddressMode(desc.m_AddressV);
 		createInfo.addressModeW = ToVulkanSamplerAddressMode(desc.m_AddressW);
 		createInfo.mipLodBias = desc.m_MipLODBias;
-		createInfo.maxAnisotropy = static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u));
-		if (desc.m_MaxAnisotropy > 1)
-		{
-			createInfo.anisotropyEnable = VK_TRUE;
-		}
-		createInfo.compareEnable = desc.m_CompareOp == RHICompareOp::Never ? VK_FALSE : VK_TRUE;
+		const bool anisotropic = IsAnisotropicSamplerFilter(desc.m_Filter);
+		createInfo.anisotropyEnable = anisotropic ? VK_TRUE : VK_FALSE;
+		createInfo.maxAnisotropy = anisotropic
+			? static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u))
+			: 1.0f;
+		createInfo.compareEnable = IsComparisonSamplerFilter(desc.m_Filter) ? VK_TRUE : VK_FALSE;
 		createInfo.compareOp = ToVkCompareOp(desc.m_CompareOp);
 		createInfo.minLod = desc.m_MinLOD;
 		createInfo.maxLod = desc.m_MaxLOD;
@@ -1354,9 +1457,8 @@ namespace gglab
 		{
 		case RHIHandleValidationResult::Valid:
 		{
-			// A directly destroyed view has no recorded GPU use of its own;
-			// the empty retirement gate completes at the next
-			// RetireCompletedResources.
+			// The callback establishes the retirement gate and removes any
+			// cache/parent ownership links before the handle can be reused.
 			SlotT& slot = table.SlotAt(handle.Index());
 			slot.m_RetirementPoints.clear();
 			onValid(slot);
@@ -1465,6 +1567,10 @@ namespace gglab
 			{
 				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
+			slot.m_Key = {};
+			slot.m_ImageView = VK_NULL_HANDLE;
+			slot.m_ParentImage = VK_NULL_HANDLE;
+			slot.m_DescriptorIndex.reset();
 			slot.m_RetirementPoints.clear();
 			m_TextureViews.Retire(index);
 		}
@@ -1493,6 +1599,10 @@ namespace gglab
 			{
 				m_ResourceDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
+			slot.m_Key = {};
+			slot.m_BufferView = VK_NULL_HANDLE;
+			slot.m_ParentBuffer = VK_NULL_HANDLE;
+			slot.m_DescriptorIndex.reset();
 			slot.m_RetirementPoints.clear();
 			m_BufferViews.Retire(index);
 		}
@@ -1521,6 +1631,9 @@ namespace gglab
 			{
 				m_SamplerDescriptorArena.Release(*slot.m_DescriptorIndex);
 			}
+			slot.m_Desc = {};
+			slot.m_Sampler = VK_NULL_HANDLE;
+			slot.m_DescriptorIndex.reset();
 			slot.m_RetirementPoints.clear();
 			m_Samplers.Retire(index);
 		}
