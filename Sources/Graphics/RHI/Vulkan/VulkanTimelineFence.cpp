@@ -48,11 +48,21 @@ namespace gglab
 		return result;
 	}
 
-	void VulkanTimelineFence::Wait(uint64_t value) const noexcept
+	VkResult VulkanTimelineFence::Wait(uint64_t value) const noexcept
 	{
-		if (m_Semaphore == VK_NULL_HANDLE || GetCompletedValue() >= value)
+		if (m_Semaphore == VK_NULL_HANDLE)
 		{
-			return;
+			return VK_ERROR_INITIALIZATION_FAILED;
+		}
+		uint64_t completedValue = 0;
+		const VkResult counterResult = GetCompletedValue(completedValue);
+		if (counterResult != VK_SUCCESS)
+		{
+			return counterResult;
+		}
+		if (completedValue >= value)
+		{
+			return VK_SUCCESS;
 		}
 		const VkSemaphoreWaitInfo waitInfo{
 			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
@@ -60,18 +70,23 @@ namespace gglab
 			.pSemaphores = &m_Semaphore,
 			.pValues = &value,
 		};
-		vkWaitSemaphores(m_Device, &waitInfo, UINT64_MAX);
+		return vkWaitSemaphores(m_Device, &waitInfo, UINT64_MAX);
 	}
 
-	uint64_t VulkanTimelineFence::GetCompletedValue() const noexcept
+	VkResult VulkanTimelineFence::GetCompletedValue(uint64_t& outValue) const noexcept
 	{
 		if (m_Semaphore == VK_NULL_HANDLE)
 		{
-			return 0;
+			return VK_ERROR_INITIALIZATION_FAILED;
 		}
 		uint64_t value = 0;
-		vkGetSemaphoreCounterValue(m_Device, m_Semaphore, &value);
-		return value;
+		const VkResult result = vkGetSemaphoreCounterValue(m_Device, m_Semaphore, &value);
+		if (result != VK_SUCCESS)
+		{
+			return result;
+		}
+		outValue = value;
+		return VK_SUCCESS;
 	}
 
 	void VulkanTimelineFence::Destroy() noexcept

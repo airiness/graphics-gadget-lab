@@ -120,8 +120,10 @@ namespace gglab
 		// Runs one frame of the script and logs the two-index domains plus
 		// the semaphore identities that own each of them. An OUT_OF_DATE
 		// acquire is retried once after recreating with the real window
-		// extent: the platform owns the drawable extent, the runtime only
-		// owns the recreation mechanics.
+		// extent, and a SUBOPTIMAL acquire or a SUBOPTIMAL/OUT_OF_DATE
+		// present schedules a recreation at the next safe point (after the
+		// frame transaction completes): the platform owns the drawable
+		// extent, the runtime only owns the recreation mechanics.
 		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
 			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept;
 		[[nodiscard]] bool RunQualificationRecreate(VulkanFrameRuntime& runtime, HWND hwnd,
@@ -150,7 +152,11 @@ namespace gglab
 					static_cast<int>(begin.m_Status), static_cast<int>(begin.m_Result)));
 				return false;
 			}
-			if (begin.m_RecreatePending)
+			// A SUBOPTIMAL acquire still hands over a valid image: the frame
+			// transaction runs to completion first, then the recreation is
+			// consumed at the safe point below.
+			const bool acquireRecreatePending = begin.m_RecreatePending;
+			if (acquireRecreatePending)
 			{
 				++stats.m_SuboptimalCount;
 			}
@@ -176,9 +182,22 @@ namespace gglab
 					static_cast<int>(endResult.m_Result)));
 				return false;
 			}
-			if (endResult.m_RecreatePending)
+			// Consume recreation requirements at the safe point: the frame
+			// transaction has completed and no frame is active. The real
+			// drawable extent is queried every time; a zero extent skips the
+			// recreation (and no BeginFrame happens while suspended).
+			if (acquireRecreatePending || endResult.m_RecreatePending)
 			{
-				++stats.m_SuboptimalCount;
+				if (endResult.m_RecreatePending)
+				{
+					++stats.m_SuboptimalCount;
+				}
+				LogQualificationInfo(std::format(
+					"qualify[{:03d}] recreation pending; recreating at the safe point.", step));
+				if (!RunQualificationRecreate(runtime, hwnd, runtime.GetVsync(), stats))
+				{
+					return false;
+				}
 			}
 			LogQualificationInfo(std::format(
 				"qualify[{:03d}] {:5s} frameSlot={} backBuffer={} imageAvailable=0x{:016x} "
@@ -208,9 +227,11 @@ namespace gglab
 				static_cast<uint32_t>(std::max<LONG>(clientRect.bottom - clientRect.top, 0));
 			if (width == 0 || height == 0)
 			{
-				LogQualificationError(
-					"Swapchain recreate requested at a zero drawable extent; skipping.");
-				return false;
+				// Suspended window: never create a zero-size swapchain. The
+				// caller skips further frames until the window is restored.
+				LogQualificationInfo(
+					"qualify[recreate] drawable extent is zero; recreation skipped.");
+				return true;
 			}
 
 			std::string error;
@@ -391,7 +412,13 @@ namespace gglab
 				}
 			}
 
-			runtime.WaitIdle();
+			if (runtime.WaitIdle() != VK_SUCCESS)
+			{
+				LogQualificationError(
+					"qualify WaitIdle failed before the final summary; the runtime may have "
+					"entered the fatal state.");
+				return 1;
+			}
 			const auto& swapChain = runtime.GetSwapChain();
 			LogQualificationInfo(std::format(
 				"qualify summary: normal={} abort={} recreate={} mismatchedFrames={} "

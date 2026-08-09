@@ -107,6 +107,29 @@ namespace gglab
 		return submitResult == VK_SUCCESS ? candidateValue : previousGate;
 	}
 
+	bool IsVulkanDeviceLostError(const VkResult result) noexcept
+	{
+		return result == VK_ERROR_DEVICE_LOST;
+	}
+
+	VulkanRuntimeHealthState UpdateVulkanRuntimeHealth(
+		const VulkanRuntimeHealthState& state, const VkResult error) noexcept
+	{
+		VulkanRuntimeHealthState next = state;
+		if (error != VK_SUCCESS)
+		{
+			next.m_Fatal = true;
+			next.m_DeviceLost = next.m_DeviceLost || IsVulkanDeviceLostError(error);
+		}
+		return next;
+	}
+
+	VulkanBeginGateOutcome ClassifyVulkanBeginGateResult(const VkResult waitResult) noexcept
+	{
+		return waitResult == VK_SUCCESS ? VulkanBeginGateOutcome::Ready
+			: VulkanBeginGateOutcome::Fatal;
+	}
+
 	VulkanFrameIndexModel::VulkanFrameIndexModel(uint32_t frameSlotCount) noexcept
 		: m_FrameSlotCount(std::max(frameSlotCount, 1u))
 	{
@@ -200,9 +223,10 @@ namespace gglab
 
 	VulkanFrameRuntime::~VulkanFrameRuntime()
 	{
-		// Defensive quiesce: an early-return failure path must never destroy
-		// command pools, semaphores or the swapchain while their GPU work is
-		// still in flight. Finalize is idempotent.
+		// Defensive quiesce: an early-return failure path (including partial
+		// construction) must never destroy command pools, semaphores or the
+		// swapchain while their GPU work is still in flight. Finalize is
+		// idempotent, noexcept and safe on partially constructed members.
 		Finalize();
 	}
 
@@ -213,13 +237,19 @@ namespace gglab
 			return;
 		}
 		m_Finalized = true;
-		// In the fatal state (including device loss) every wait on the
-		// device returns immediately with an error, so skipping the waits is
-		// a defensive choice, not a correctness shortcut.
-		if (m_Device != nullptr && !m_Fatal)
+		// Only a lost VkDevice skips the quiesce: its waits cannot complete
+		// normally. An ordinary fatal error (surface lost, out of memory,
+		// initialization failure) still has valid in-flight work that must
+		// complete before the command pools and semaphores are destroyed.
+		if (m_Device != nullptr && !m_DeviceLost)
 		{
+			// Best-effort quiesce in the destructor: the wait results cannot
+			// be surfaced here, but the call itself is not skipped.
 			vkQueueWaitIdle(m_Device->GetGraphicsQueue());
-			m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+			if (m_Timeline != nullptr)
+			{
+				(void)m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+			}
 		}
 		DestroyFrameSlots();
 	}
@@ -334,7 +364,9 @@ namespace gglab
 		VulkanBeginFrameResult result{};
 		if (m_Fatal || m_SwapChain == nullptr)
 		{
-			result.m_Result = m_Fatal ? VK_ERROR_DEVICE_LOST : VK_ERROR_INITIALIZATION_FAILED;
+			// Fatal does not imply a lost device; report the state that
+			// matches the actual health.
+			result.m_Result = m_DeviceLost ? VK_ERROR_DEVICE_LOST : VK_ERROR_UNKNOWN;
 			return result;
 		}
 
@@ -344,7 +376,7 @@ namespace gglab
 		// before vkAcquireNextImageKHR is called.
 		if (m_ActiveFrame.has_value())
 		{
-			result.m_Result = VK_ERROR_DEVICE_LOST;
+			result.m_Result = VK_ERROR_UNKNOWN;
 			return result;
 		}
 
@@ -362,10 +394,19 @@ namespace gglab
 
 		// Reuse gate: the slot may not be reused until its last successfully
 		// submitted timeline value has completed. No frame may ever be
-		// recorded into a command buffer that is still being executed.
+		// recorded into a command buffer that is still being executed. A
+		// failed wait stops BeginFrame before the command-pool reset and the
+		// acquire.
 		if (slot.m_LastSubmittedTimelineValue != 0)
 		{
-			m_Timeline->Wait(slot.m_LastSubmittedTimelineValue);
+			const VkResult waitResult = m_Timeline->Wait(slot.m_LastSubmittedTimelineValue);
+			if (ClassifyVulkanBeginGateResult(waitResult) != VulkanBeginGateOutcome::Ready)
+			{
+				MarkFatal(waitResult);
+				result.m_Status = VulkanAcquireOutcome::Fatal;
+				result.m_Result = waitResult;
+				return result;
+			}
 		}
 		vkResetCommandPool(m_Device->Get(), slot.m_CommandPool, 0);
 
@@ -383,8 +424,8 @@ namespace gglab
 				// Defensive: the active-frame check above already prevents a
 				// double Begin, so a rejected slot indicates a corrupted
 				// transaction state.
-				m_Fatal = true;
-				result.m_Result = VK_ERROR_DEVICE_LOST;
+				MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
+				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
 				return result;
 			}
 			m_IndexModel.CommitFrame(frameSlotIndex, backBufferIndex);
@@ -404,7 +445,7 @@ namespace gglab
 			result.m_Result = acquireResult;
 			return result;
 		default:
-			m_Fatal = true;
+			MarkFatal(acquireResult);
 			result.m_Status = VulkanAcquireOutcome::Fatal;
 			result.m_Result = acquireResult;
 			return result;
@@ -495,7 +536,14 @@ namespace gglab
 			outError = "Cannot recreate the swapchain while a frame is active.";
 			return false;
 		}
-		WaitIdle();
+		const VkResult idleResult = WaitIdle();
+		if (idleResult != VK_SUCCESS)
+		{
+			MarkFatal(idleResult);
+			outError = std::format("WaitIdle before swapchain recreate failed with {}.",
+				ToString(idleResult));
+			return false;
+		}
 		const bool recreated = m_SwapChain->Recreate(width, height, vsync, outError);
 		if (recreated)
 		{
@@ -505,19 +553,23 @@ namespace gglab
 		}
 		else
 		{
-			m_Fatal = true;
+			MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
 		}
 		return recreated;
 	}
 
-	void VulkanFrameRuntime::WaitIdle() noexcept
+	VkResult VulkanFrameRuntime::WaitIdle() noexcept
 	{
-		if (m_Device == nullptr)
+		if (m_Device == nullptr || m_Timeline == nullptr)
 		{
-			return;
+			return VK_ERROR_INITIALIZATION_FAILED;
 		}
-		vkQueueWaitIdle(m_Device->GetGraphicsQueue());
-		m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+		const VkResult queueResult = vkQueueWaitIdle(m_Device->GetGraphicsQueue());
+		if (queueResult != VK_SUCCESS)
+		{
+			return queueResult;
+		}
+		return m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
 	}
 
 	void VulkanFrameRuntime::RecordNormalFrame(VkCommandBuffer commandBuffer,
@@ -651,8 +703,8 @@ namespace gglab
 			// The reserved value was never signaled; the reuse gate must not
 			// move to it. The runtime enters the fatal state so no further
 			// frame can wait on it.
+			MarkFatal(submitResult);
 			result.m_Fatal = true;
-			m_Fatal = true;
 			return result;
 		}
 		result.m_Submitted = true;
@@ -686,13 +738,16 @@ namespace gglab
 			result.m_RecreatePending = true;
 			break;
 		case VulkanFrameTransactionOutcome::PresentFailed:
+			// The submission stays valid and its timeline signal was
+			// committed; the failure only stops the runtime. Cleanup still
+			// quiesces unless the error is a lost device.
+			MarkFatal(presentResult);
 			result.m_Fatal = true;
-			m_Fatal = true;
 			break;
 		case VulkanFrameTransactionOutcome::SubmitFailed:
 			// Unreachable: handled before present.
+			MarkFatal(submitResult);
 			result.m_Fatal = true;
-			m_Fatal = true;
 			break;
 		}
 		return result;
@@ -708,6 +763,14 @@ namespace gglab
 	VkSemaphore VulkanFrameRuntime::GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept
 	{
 		return m_SwapChain ? m_SwapChain->GetRenderingFinished(backBufferIndex) : VK_NULL_HANDLE;
+	}
+
+	void VulkanFrameRuntime::MarkFatal(const VkResult error) noexcept
+	{
+		const VulkanRuntimeHealthState next =
+			UpdateVulkanRuntimeHealth(VulkanRuntimeHealthState{ m_Fatal, m_DeviceLost }, error);
+		m_Fatal = next.m_Fatal;
+		m_DeviceLost = next.m_DeviceLost;
 	}
 
 	void VulkanFrameRuntime::DestroyFrameSlots() noexcept

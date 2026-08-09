@@ -73,6 +73,33 @@ namespace gglab
 	[[nodiscard]] uint64_t UpdateSlotReuseGate(uint64_t previousGate,
 		VkResult submitResult, uint64_t candidateValue) noexcept;
 
+	// Runtime health distinguishes "the runtime cannot continue" (fatal,
+	// e.g. a surface-lost present or an out-of-memory result) from "the
+	// VkDevice itself is lost". Only VK_ERROR_DEVICE_LOST marks the device
+	// lost; every other fatal error still allows a normal GPU quiesce during
+	// cleanup.
+	[[nodiscard]] bool IsVulkanDeviceLostError(VkResult result) noexcept;
+
+	struct VulkanRuntimeHealthState
+	{
+		bool m_Fatal = false;
+		bool m_DeviceLost = false;
+	};
+
+	[[nodiscard]] VulkanRuntimeHealthState UpdateVulkanRuntimeHealth(
+		const VulkanRuntimeHealthState& state, VkResult error) noexcept;
+
+	// The frame-slot reuse gate wait outcome: only a successful timeline
+	// wait may continue to command-pool reset and acquire; any failure stops
+	// BeginFrame before those steps.
+	enum class VulkanBeginGateOutcome : uint8_t
+	{
+		Ready,
+		Fatal,
+	};
+
+	[[nodiscard]] VulkanBeginGateOutcome ClassifyVulkanBeginGateResult(VkResult waitResult) noexcept;
+
 	// Frame-slot ring selection and frame pairing bookkeeping. The
 	// imageAvailable semaphore identity always follows the frame slot and the
 	// renderingFinished semaphore identity always follows the swapchain image
@@ -256,12 +283,17 @@ namespace gglab
 
 		// Explicit quiesce: waits for the graphics queue and the committed
 		// timeline before releasing GPU-owned children. The destructor calls
-		// it defensively so early-return failure paths never destroy command
-		// pools or semaphores that are still in flight.
+		// it defensively so early-return failure paths (including partial
+		// construction) never destroy command pools or semaphores that are
+		// still in flight. Quiesce is skipped only when the VkDevice itself
+		// is lost; an ordinary fatal error still quiesces.
 		void Finalize() noexcept;
-		void WaitIdle() noexcept;
+		// Waits for the graphics queue and the last committed timeline
+		// value. Returns VK_SUCCESS or the first failed wait result.
+		[[nodiscard]] VkResult WaitIdle() noexcept;
 
 		[[nodiscard]] bool IsFatal() const noexcept { return m_Fatal; }
+		[[nodiscard]] bool IsDeviceLost() const noexcept { return m_DeviceLost; }
 		[[nodiscard]] bool HasActiveFrame() const noexcept { return m_ActiveFrame.has_value(); }
 
 		[[nodiscard]] VulkanSwapChain& GetSwapChain() noexcept { return *m_SwapChain; }
@@ -301,6 +333,7 @@ namespace gglab
 		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
 			uint32_t frameSlotIndex, uint32_t backBufferIndex,
 			VkCommandBuffer commandBuffer) noexcept;
+		void MarkFatal(VkResult error) noexcept;
 		void DestroyFrameSlots() noexcept;
 
 		VulkanDevice* m_Device = nullptr;
@@ -313,6 +346,7 @@ namespace gglab
 		std::optional<VulkanActiveFrame> m_ActiveFrame;
 		bool m_Vsync = false;
 		bool m_Fatal = false;
+		bool m_DeviceLost = false;
 		bool m_Finalized = false;
 	};
 }

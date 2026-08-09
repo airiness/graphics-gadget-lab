@@ -1477,6 +1477,59 @@ namespace gglab
 					VK_PRESENT_MODE_FIFO_KHR,
 					"vsync off falls back to FIFO");
 			}
+
+			// Runtime health: fatal is not device lost. A surface-lost
+			// present or an out-of-memory result stops the runtime but the
+			// VkDevice is still usable, so cleanup still quiesces; only
+			// VK_ERROR_DEVICE_LOST marks the device lost.
+			{
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_SURFACE_LOST_KHR),
+					"SURFACE_LOST is not device lost");
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_OUT_OF_HOST_MEMORY),
+					"OUT_OF_HOST_MEMORY is not device lost");
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_OUT_OF_DEVICE_MEMORY),
+					"OUT_OF_DEVICE_MEMORY is not device lost");
+				context.Check(!IsVulkanDeviceLostError(VK_ERROR_INITIALIZATION_FAILED),
+					"INITIALIZATION_FAILED is not device lost");
+				context.Check(IsVulkanDeviceLostError(VK_ERROR_DEVICE_LOST),
+					"DEVICE_LOST is device lost");
+
+				const VulkanRuntimeHealthState surfaceLost =
+					UpdateVulkanRuntimeHealth({}, VK_ERROR_SURFACE_LOST_KHR);
+				context.Check(surfaceLost.m_Fatal && !surfaceLost.m_DeviceLost,
+					"a present SURFACE_LOST marks fatal but not device lost");
+				const VulkanRuntimeHealthState deviceLost =
+					UpdateVulkanRuntimeHealth({}, VK_ERROR_DEVICE_LOST);
+				context.Check(deviceLost.m_Fatal && deviceLost.m_DeviceLost,
+					"DEVICE_LOST marks fatal and device lost");
+				const VulkanRuntimeHealthState hostOom =
+					UpdateVulkanRuntimeHealth({}, VK_ERROR_OUT_OF_HOST_MEMORY);
+				context.Check(hostOom.m_Fatal && !hostOom.m_DeviceLost,
+					"OUT_OF_HOST_MEMORY marks fatal but not device lost");
+				const VulkanRuntimeHealthState escalated =
+					UpdateVulkanRuntimeHealth(surfaceLost, VK_ERROR_DEVICE_LOST);
+				context.Check(escalated.m_Fatal && escalated.m_DeviceLost,
+					"a later DEVICE_LOST escalates fatal health to device lost");
+				const VulkanRuntimeHealthState unchanged =
+					UpdateVulkanRuntimeHealth(deviceLost, VK_SUCCESS);
+				context.Check(unchanged.m_Fatal && unchanged.m_DeviceLost,
+					"SUCCESS never changes runtime health");
+			}
+
+			// The frame-slot reuse gate wait decides whether BeginFrame may
+			// continue to command-pool reset and acquire: any failed wait
+			// stops the frame before those steps.
+			{
+				context.Check(ClassifyVulkanBeginGateResult(VK_SUCCESS) ==
+					VulkanBeginGateOutcome::Ready,
+					"timeline wait success continues BeginFrame");
+				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_DEVICE_LOST) ==
+					VulkanBeginGateOutcome::Fatal,
+					"device-lost wait stops BeginFrame before reset/acquire");
+				context.Check(ClassifyVulkanBeginGateResult(VK_ERROR_SURFACE_LOST_KHR) ==
+					VulkanBeginGateOutcome::Fatal,
+					"any failed wait stops BeginFrame before reset/acquire");
+			}
 		}
 #endif
 

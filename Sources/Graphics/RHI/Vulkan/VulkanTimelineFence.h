@@ -53,9 +53,13 @@ namespace gglab
 		[[nodiscard]] uint64_t GetCurrentSignalValue() const noexcept { return m_SubmittedValue; }
 
 		// Blocks until the graphics timeline reaches the given value. The
-		// caller must only wait on committed values.
-		void Wait(uint64_t value) const noexcept;
-		[[nodiscard]] uint64_t GetCompletedValue() const noexcept;
+		// caller must only wait on committed values. Returns VK_SUCCESS or
+		// the Vulkan error (e.g. VK_ERROR_DEVICE_LOST); the result is never
+		// swallowed.
+		[[nodiscard]] VkResult Wait(uint64_t value) const noexcept;
+		// Reads the current timeline counter. Returns VK_SUCCESS or the
+		// Vulkan error; outValue is set only on success.
+		[[nodiscard]] VkResult GetCompletedValue(uint64_t& outValue) const noexcept;
 
 		[[nodiscard]] VkSemaphore Get() const noexcept { return m_Semaphore; }
 
