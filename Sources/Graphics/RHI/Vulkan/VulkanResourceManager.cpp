@@ -372,6 +372,14 @@ namespace gglab
 		m_Device = nullptr;
 	}
 
+	RHITextureSupportResult VulkanResourceManager::QueryTextureSupport(
+		const RHITextureDesc& desc) const noexcept
+	{
+		GGLAB_ASSERT_MSG(m_Device != nullptr,
+			"VulkanResourceManager must be initialized before querying texture support.");
+		return QueryVulkanTextureSupport(m_Device->GetPhysicalDevice(), desc);
+	}
+
 	RHITextureHandle VulkanResourceManager::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
@@ -405,7 +413,23 @@ namespace gglab
 			return {};
 		}
 
+		// The per-description support query gates creation with the exact
+		// contract creation will use: format, tiling, usage, create flags,
+		// sample count and size limits.
+		const RHITextureSupportResult support = QueryTextureSupport(desc);
+		if (!support.IsSupported())
+		{
+			++m_Diagnostics.m_CreateFailureCount;
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::CreateTexture rejected unsupported texture "
+				"description ({}).",
+				RHITextureSupportReasonText(support.m_Reason));
+			return {};
+		}
+
 		const VulkanFormatInfo& formatInfo = GetVulkanFormatInfo(desc.m_Format);
+		const VulkanImageCreationContract contract =
+			BuildVulkanImageCreationContract(desc);
 
 		VkImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -414,29 +438,16 @@ namespace gglab
 		// history stored by VulkanTexture never retains a dangling chain.
 		std::array<VkFormat, 4> nativeViewFormats{};
 		VkImageFormatListCreateInfo formatList{};
-		if (Test(desc.m_CreateFlags, RHITextureCreateFlags::CubeCompatible))
+		if (contract.m_ViewFormatCount > 0)
 		{
-			imageCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-		}
-		if (NeedsVulkanMutableFormat(desc.m_Format))
-		{
-			// Typeless families need mutable-format so the restricted view
-			// list can be used; the list is the frozen compatible view family
-			// contract of the resource format, not an arbitrary format set.
-			imageCreateInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-			GGLAB_ASSERT_MSG(formatInfo.m_RHIViewFormats.size() <= nativeViewFormats.size(),
-				"The Vulkan view family exceeds the native format list capacity.");
-			uint32_t viewFormatCount = 0;
-			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
-			{
-				nativeViewFormats[viewFormatCount++] = ToVulkanFormat(viewFormat);
-			}
+			nativeViewFormats = contract.m_ViewFormats;
 			formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
-			formatList.viewFormatCount = viewFormatCount;
+			formatList.viewFormatCount = contract.m_ViewFormatCount;
 			formatList.pViewFormats = nativeViewFormats.data();
 			imageCreateInfo.pNext = &formatList;
 		}
-		imageCreateInfo.imageType = ToVkImageType(desc.m_Dimension);
+		imageCreateInfo.flags = contract.m_CreateFlags;
+		imageCreateInfo.imageType = ToVulkanImageType(desc.m_Dimension);
 		imageCreateInfo.format = formatInfo.m_ResourceFormat;
 		imageCreateInfo.extent = {
 			.width = desc.m_Extent.m_Width,
@@ -447,9 +458,9 @@ namespace gglab
 		};
 		imageCreateInfo.mipLevels = desc.m_MipLevels;
 		imageCreateInfo.arrayLayers = desc.m_ArraySize;
-		imageCreateInfo.samples = ToVkSampleCount(desc.m_SampleCount);
+		imageCreateInfo.samples = ToVulkanSampleCount(desc.m_SampleCount);
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageCreateInfo.usage = ToVulkanImageUsageFlags(desc.m_Usage);
+		imageCreateInfo.usage = contract.m_Usage;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -1008,8 +1019,8 @@ namespace gglab
 			return {};
 		}
 		if ((desc.m_AddressU == RHITextureAddressMode::MirrorOnce ||
-				desc.m_AddressV == RHITextureAddressMode::MirrorOnce ||
-				desc.m_AddressW == RHITextureAddressMode::MirrorOnce) &&
+			desc.m_AddressV == RHITextureAddressMode::MirrorOnce ||
+			desc.m_AddressW == RHITextureAddressMode::MirrorOnce) &&
 			!m_Device->IsSamplerMirrorClampToEdgeEnabled())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(

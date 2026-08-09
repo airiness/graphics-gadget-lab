@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 
 #include <vulkan/vulkan.h>
 
@@ -104,6 +105,34 @@ namespace gglab
 	// feature on the device.
 	[[nodiscard]] VkSamplerAddressMode ToVulkanSamplerAddressMode(
 		RHITextureAddressMode mode) noexcept;
+
+	// RHI texture dimension to native image type, and RHI sample count to
+	// the native sample count bit.
+	[[nodiscard]] VkImageType ToVulkanImageType(RHITextureDimension dimension) noexcept;
+	[[nodiscard]] VkSampleCountFlagBits ToVulkanSampleCount(uint32_t count) noexcept;
+
+	// The frozen image creation contract for an RHI texture: native usage,
+	// create flags and (for typeless families) the restricted compatible
+	// view format list. Creation and support queries both consume this
+	// contract, so a query never diverges from what creation will do.
+	struct VulkanImageCreationContract
+	{
+		VkImageUsageFlags m_Usage = 0;
+		VkImageCreateFlags m_CreateFlags = 0;
+		std::array<VkFormat, 4> m_ViewFormats{};
+		uint32_t m_ViewFormatCount = 0;
+	};
+
+	[[nodiscard]] VulkanImageCreationContract BuildVulkanImageCreationContract(
+		const RHITextureDesc& desc) noexcept;
+
+	// Per-description texture support on a physical device: native format,
+	// tiling, usage, create flags, sample count, size limits and required
+	// format features are all validated against the frozen creation
+	// contract. Uses the public validation and support result types so
+	// callers see backend-neutral reasons.
+	[[nodiscard]] RHITextureSupportResult QueryVulkanTextureSupport(
+		VkPhysicalDevice physicalDevice, const RHITextureDesc& desc) noexcept;
 
 	// Native format name for diagnostics; falls back to a numeric label.
 	[[nodiscard]] std::string_view ToVulkanFormatName(VkFormat format) noexcept;

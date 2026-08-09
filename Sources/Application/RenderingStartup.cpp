@@ -301,7 +301,185 @@ namespace gglab
 			return true;
 		}
 
-		// Runs the minimal-frame qualification script: normal presents,
+		// Exercises the resource layer on the real device: buffer/texture
+		// creation, texture views, samplers, persistent buffer mapping, use
+		// tracking and deferred destruction. Every retirement gate uses the
+		// committed timeline value, which is already complete, so retirement
+		// drains in the same call and the next iteration must reuse the exact
+		// same slots and descriptor indices.
+		[[nodiscard]] int RunVulkanResourceQualification(
+			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+		{
+			VulkanResourceManager& resources = device.GetResourceManager();
+			const RHIFencePoint completedPoint(
+				runtime.GetTimeline().GetRHIHandle(),
+				runtime.GetTimeline().GetCurrentSignalValue());
+
+			RHITextureHandle firstTexture;
+			RHITextureHandle secondTexture;
+			RHITextureViewHandle firstView;
+			RHITextureViewHandle secondView;
+			uint32_t firstDescriptorIndex = 0;
+			constexpr uint32_t kIterations = 24;
+			for (uint32_t i = 0; i < kIterations; ++i)
+			{
+				// Upload/readback buffers exercise the persistent mapping
+				// contract: GpuOnly is never mapped, host-visible buffers are
+				// mapped at creation.
+				RHIBufferHandle upload = resources.CreateBuffer(
+					RHIBufferDesc{ .m_SizeInBytes = 4096,
+						.m_Usage = RHIBufferUsage::CopySource,
+						.m_MemoryUsage = RHIMemoryUsage::CpuToGpu },
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				RHIBufferHandle readback = resources.CreateBuffer(
+					RHIBufferDesc{ .m_SizeInBytes = 4096,
+						.m_Usage = RHIBufferUsage::CopyDest,
+						.m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!upload.IsValid() || !readback.IsValid())
+				{
+					LogQualificationError("qualify resource: buffer creation failed.");
+					return 1;
+				}
+				void* mapped = resources.MapBuffer(upload, { 0, 4096 });
+				if (mapped == nullptr)
+				{
+					LogQualificationError("qualify resource: upload buffer mapping failed.");
+					return 1;
+				}
+				std::memset(mapped, 0xAB, 4096);
+				resources.UnmapBuffer(upload, { 0, 4096 });
+				if (resources.MapBuffer(readback, { 0, 4096 }) == nullptr)
+				{
+					LogQualificationError("qualify resource: readback buffer mapping failed.");
+					return 1;
+				}
+				resources.UnmapBuffer(readback, {});
+
+				// Color texture with an SRV and a typeless depth texture with
+				// a DSV exercise the view-family and aspect contracts.
+				RHITextureHandle color = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R8G8B8A8Unorm,
+							.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::RenderTarget,
+							.m_Extent = { 64, 64, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::PixelShader,
+							.m_Access = RHIAccess::ShaderResource,
+							.m_Layout = RHILayout::ShaderResource,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				RHITextureHandle depth = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R32Typeless,
+							.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled,
+							.m_Extent = { 64, 64, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::DepthStencil,
+							.m_Access = RHIAccess::DepthStencilWrite,
+							.m_Layout = RHILayout::DepthStencilWrite,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!color.IsValid() || !depth.IsValid())
+				{
+					LogQualificationError("qualify resource: texture creation failed.");
+					return 1;
+				}
+
+				RHITextureViewDesc srvDesc{};
+				srvDesc.m_Type = RHITextureViewType::ShaderResource;
+				srvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+				srvDesc.m_Format = RHIFormat::R8G8B8A8Unorm;
+				const RHITextureViewHandle srv = resources.CreateTextureView(color, srvDesc);
+				RHITextureViewDesc dsvDesc{};
+				dsvDesc.m_Type = RHITextureViewType::DepthStencil;
+				dsvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+				// Depth views must name their non-typeless view format.
+				dsvDesc.m_Format = RHIFormat::D32Float;
+				const RHITextureViewHandle dsv = resources.CreateTextureView(depth, dsvDesc);
+				RHISamplerDesc samplerDesc{};
+				samplerDesc.m_AddressU = RHITextureAddressMode::Border;
+				samplerDesc.m_BorderColor[3] = 1.0f;
+				const RHISamplerHandle sampler = resources.CreateSampler(samplerDesc);
+				if (!srv.IsValid() || !dsv.IsValid() || !sampler.IsValid())
+				{
+					LogQualificationError("qualify resource: view or sampler creation failed.");
+					return 1;
+				}
+
+				// Bindless contract: only shader-visible views hold a
+				// descriptor index.
+				const RHIDescriptorHandle srvDescriptor =
+					resources.GetTextureViewDescriptor(srv);
+				if (!srvDescriptor.IsValid() ||
+					resources.GetTextureViewDescriptor(dsv).IsValid())
+				{
+					LogQualificationError(
+						"qualify resource: descriptor index contract violated.");
+					return 1;
+				}
+
+				if (i == 0)
+				{
+					firstTexture = color;
+					secondTexture = depth;
+					firstView = srv;
+					secondView = dsv;
+					firstDescriptorIndex = srvDescriptor.m_Index;
+				}
+				else
+				{
+					// After immediate retirement every slot must be recycled:
+					// the new handles land in exactly the same slot set (the
+					// table reuses in LIFO order, so the concrete mapping may
+					// alternate) and the bindless descriptor index stays
+					// stable.
+					const bool textureSlotsReused =
+						(color.Index() == firstTexture.Index() ||
+							color.Index() == secondTexture.Index()) &&
+						(depth.Index() == firstTexture.Index() ||
+							depth.Index() == secondTexture.Index()) &&
+						color.Index() != depth.Index();
+					const bool viewSlotsReused =
+						(srv.Index() == firstView.Index() || srv.Index() == secondView.Index()) &&
+						(dsv.Index() == firstView.Index() || dsv.Index() == secondView.Index()) &&
+						srv.Index() != dsv.Index();
+					if (!textureSlotsReused || !viewSlotsReused ||
+						srvDescriptor.m_Index != firstDescriptorIndex)
+					{
+						// Full slot and descriptor reuse after immediate
+						// retirement.
+						LogQualificationError(
+							"qualify resource: slots or descriptor indices were not reused.");
+						return 1;
+					}
+				}
+
+				resources.RecordTextureUse(color, completedPoint);
+				resources.RecordBufferUse(upload, completedPoint);
+				resources.DestroyTextureView(srv);
+				resources.DestroyTextureView(dsv);
+				resources.DestroySampler(sampler);
+				resources.DestroyTexture(color);
+				resources.DestroyTexture(depth);
+				resources.DestroyBuffer(upload);
+				resources.DestroyBuffer(readback);
+				resources.RetireCompletedResources();
+			}
+
+			LogQualificationInfo(std::format(
+				"qualify resource: {} create/destroy cycles retired with slot and "
+				"descriptor reuse.", kIterations));
+			return 0;
+		}
+
+		// Runs the minimal-frame qualification script: continuous presents,
 		// first-image abort, already-presented abort, normal/abort
 		// alternation, continuous abort, resize, minimize/restore and VSync
 		// switching. Every step keeps the partial application command buffer
@@ -452,6 +630,15 @@ namespace gglab
 					"entered the fatal state.");
 				return 1;
 			}
+
+			// Resource layer qualification: buffers, textures, views,
+			// samplers, persistent mapping and deferred retirement on the
+			// real device.
+			if (RunVulkanResourceQualification(*runtime.GetDevice(), runtime) != 0)
+			{
+				return 1;
+			}
+
 			const auto& swapChain = runtime.GetSwapChain();
 			LogQualificationInfo(std::format(
 				"qualify summary: normal={} abort={} recreate={} mismatchedFrames={} "

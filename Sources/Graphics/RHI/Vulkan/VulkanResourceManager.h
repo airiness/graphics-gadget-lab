@@ -160,6 +160,10 @@ namespace gglab
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept;
+		// Per-description support query against the physical device. Uses
+		// the same creation contract as CreateTexture.
+		[[nodiscard]] RHITextureSupportResult QueryTextureSupport(
+			const RHITextureDesc& desc) const noexcept;
 		RHITextureHandle ImportTexture(const ImportedTextureDesc& desc) noexcept;
 		RHIBufferHandle ImportBuffer(const ImportedBufferDesc& desc) noexcept;
 

@@ -8,6 +8,24 @@ namespace gglab
 {
 	namespace
 	{
+		[[nodiscard]] RHITextureSupportReason TextureSupportReasonForUsage(
+			RHITextureUsage usage) noexcept
+		{
+			if (Test(usage, RHITextureUsage::DepthStencil))
+			{
+				return RHITextureSupportReason::DepthStencilUnsupported;
+			}
+			if (Test(usage, RHITextureUsage::RenderTarget))
+			{
+				return RHITextureSupportReason::RenderTargetUnsupported;
+			}
+			if (Test(usage, RHITextureUsage::UnorderedAccess))
+			{
+				return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
+			}
+			return RHITextureSupportReason::ShaderResourceUnsupported;
+		}
+
 		inline constexpr std::array<RHIFormat, 2> R8G8B8A8TypelessViewFormats{
 			RHIFormat::R8G8B8A8Unorm,
 			RHIFormat::R8G8B8A8UnormSrgb,
@@ -360,6 +378,157 @@ namespace gglab
 			return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
 		}
 		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	}
+
+	VkImageType ToVulkanImageType(RHITextureDimension dimension) noexcept
+	{
+		switch (dimension)
+		{
+		case RHITextureDimension::Texture1D:
+			return VK_IMAGE_TYPE_1D;
+		case RHITextureDimension::Texture2D:
+			return VK_IMAGE_TYPE_2D;
+		case RHITextureDimension::Texture3D:
+			return VK_IMAGE_TYPE_3D;
+		}
+		return VK_IMAGE_TYPE_2D;
+	}
+
+	VkSampleCountFlagBits ToVulkanSampleCount(uint32_t count) noexcept
+	{
+		switch (count)
+		{
+		case 1:
+			return VK_SAMPLE_COUNT_1_BIT;
+		case 2:
+			return VK_SAMPLE_COUNT_2_BIT;
+		case 4:
+			return VK_SAMPLE_COUNT_4_BIT;
+		case 8:
+			return VK_SAMPLE_COUNT_8_BIT;
+		case 16:
+			return VK_SAMPLE_COUNT_16_BIT;
+		case 32:
+			return VK_SAMPLE_COUNT_32_BIT;
+		case 64:
+			return VK_SAMPLE_COUNT_64_BIT;
+		default:
+			return VK_SAMPLE_COUNT_1_BIT;
+		}
+	}
+
+	VulkanImageCreationContract BuildVulkanImageCreationContract(
+		const RHITextureDesc& desc) noexcept
+	{
+		VulkanImageCreationContract contract{};
+		contract.m_Usage = ToVulkanImageUsageFlags(desc.m_Usage);
+		if (Test(desc.m_CreateFlags, RHITextureCreateFlags::CubeCompatible))
+		{
+			contract.m_CreateFlags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+		}
+		if (NeedsVulkanMutableFormat(desc.m_Format))
+		{
+			// Typeless families need mutable-format so the restricted view
+			// list can be used; the list is the frozen compatible view
+			// family contract of the resource format, not an arbitrary
+			// format set.
+			contract.m_CreateFlags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+			const VulkanFormatInfo& formatInfo = GetVulkanFormatInfo(desc.m_Format);
+			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
+			{
+				contract.m_ViewFormats[contract.m_ViewFormatCount++] =
+					ToVulkanFormat(viewFormat);
+			}
+		}
+		return contract;
+	}
+
+	RHITextureSupportResult QueryVulkanTextureSupport(
+		VkPhysicalDevice physicalDevice, const RHITextureDesc& desc) noexcept
+	{
+		const RHITextureValidationResult validation = ValidateRHITextureDesc(desc);
+		if (!validation.IsValid())
+		{
+			return { .m_ValidationError = validation.m_Error };
+		}
+		if (physicalDevice == VK_NULL_HANDLE)
+		{
+			return { .m_Reason = RHITextureSupportReason::DeviceUnavailable };
+		}
+		const VulkanFormatInfo& formatInfo = GetVulkanFormatInfo(desc.m_Format);
+		if (!formatInfo.m_IsTypeless && !IsVulkanFormatSupported(desc.m_Format))
+		{
+			return { .m_Reason = RHITextureSupportReason::FormatSupportQueryFailed };
+		}
+		const VulkanImageCreationContract contract =
+			BuildVulkanImageCreationContract(desc);
+
+		// The query mirrors creation exactly: the same usage, create flags
+		// and restricted view format list, so a supported result is what
+		// vmaCreateImage will accept.
+		VkImageFormatListCreateInfo formatList{};
+		formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
+		formatList.viewFormatCount = contract.m_ViewFormatCount;
+		formatList.pViewFormats = contract.m_ViewFormats.data();
+		VkPhysicalDeviceImageFormatInfo2 imageFormatInfo{};
+		imageFormatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
+		imageFormatInfo.format = formatInfo.m_ResourceFormat;
+		imageFormatInfo.type = ToVulkanImageType(desc.m_Dimension);
+		imageFormatInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageFormatInfo.usage = contract.m_Usage;
+		imageFormatInfo.flags = contract.m_CreateFlags;
+		// The query does not filter by sample count; the returned
+		// sampleCounts mask is checked instead.
+		if (contract.m_ViewFormatCount > 0)
+		{
+			imageFormatInfo.pNext = &formatList;
+		}
+		VkImageFormatProperties2 imageFormatProperties{};
+		imageFormatProperties.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
+		const VkResult queryResult = vkGetPhysicalDeviceImageFormatProperties2(
+			physicalDevice, &imageFormatInfo, &imageFormatProperties);
+		if (queryResult == VK_ERROR_FORMAT_NOT_SUPPORTED)
+		{
+			return { .m_Reason = TextureSupportReasonForUsage(desc.m_Usage) };
+		}
+		if (queryResult != VK_SUCCESS)
+		{
+			return { .m_Reason = RHITextureSupportReason::FormatSupportQueryFailed };
+		}
+
+		// Sample count must be inside the returned mask.
+		const VkSampleCountFlagBits sampleCount = ToVulkanSampleCount(desc.m_SampleCount);
+		if ((imageFormatProperties.imageFormatProperties.sampleCounts & sampleCount) == 0)
+		{
+			return { .m_Reason = RHITextureSupportReason::MultisamplingUnsupported };
+		}
+
+		// Size limits must cover the description: extent, mip levels and
+		// array layers are the hard boundaries creation depends on.
+		const VkExtent3D& maxExtent = imageFormatProperties.imageFormatProperties.maxExtent;
+		if (desc.m_Extent.m_Width > maxExtent.width ||
+			desc.m_Extent.m_Height > maxExtent.height ||
+			desc.m_Extent.m_Depth > maxExtent.depth ||
+			desc.m_MipLevels > imageFormatProperties.imageFormatProperties.maxMipLevels ||
+			desc.m_ArraySize > imageFormatProperties.imageFormatProperties.maxArrayLayers)
+		{
+			return { .m_Reason = RHITextureSupportReason::TextureDimensionUnsupported };
+		}
+
+		// Required format features must be present for the tiling and the
+		// requested usage.
+		VkFormatProperties2 formatProperties{};
+		formatProperties.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		vkGetPhysicalDeviceFormatProperties2(
+			physicalDevice, formatInfo.m_ResourceFormat, &formatProperties);
+		const VkFormatFeatureFlags2 requiredFeatures = ToVulkanFormatFeatureFlags(desc.m_Usage);
+		if ((formatProperties.formatProperties.optimalTilingFeatures & requiredFeatures) !=
+			requiredFeatures)
+		{
+			return { .m_Reason = TextureSupportReasonForUsage(desc.m_Usage) };
+		}
+
+		return { .m_Supported = true };
 	}
 
 	std::string_view ToVulkanFormatName(VkFormat format) noexcept

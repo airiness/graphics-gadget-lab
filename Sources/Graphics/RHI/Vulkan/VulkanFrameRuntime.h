@@ -307,6 +307,9 @@ namespace gglab
 
 		[[nodiscard]] VulkanSwapChain& GetSwapChain() noexcept { return *m_SwapChain; }
 		[[nodiscard]] const VulkanSwapChain& GetSwapChain() const noexcept { return *m_SwapChain; }
+		// The borrowed device the runtime renders through; valid until the
+		// runtime is destroyed.
+		[[nodiscard]] VulkanDevice* GetDevice() const noexcept { return m_Device; }
 		[[nodiscard]] const VulkanTimelineFence& GetTimeline() const noexcept { return *m_Timeline; }
 		[[nodiscard]] uint64_t GetTimelineSignalValue() const noexcept
 		{
