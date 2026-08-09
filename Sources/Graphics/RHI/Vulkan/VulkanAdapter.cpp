@@ -384,6 +384,10 @@ namespace gglab
 		// Cube-array image views are an optional core capability tracked
 		// outside the hard profile requirements.
 		snapshot.m_ImageCubeArrayAvailable = features2.features.imageCubeArray == VK_TRUE;
+		// Mirror-once sampling needs the mirror-clamp-to-edge address mode;
+		// the feature is enabled on the device when available.
+		snapshot.m_SamplerMirrorClampToEdgeAvailable =
+			vulkan12Features.samplerMirrorClampToEdge == VK_TRUE;
 
 		VulkanDescriptorCapacityLimits& limits = snapshot.m_DescriptorLimits;
 		limits.m_MaxDescriptorSetUpdateAfterBindSampledImages =

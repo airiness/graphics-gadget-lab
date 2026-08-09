@@ -60,6 +60,9 @@ namespace gglab
 			// Hardware availability of cube-array image views; the device
 			// enables the feature when available.
 			bool m_ImageCubeArrayAvailable = false;
+			// Hardware availability of the mirror-clamp-to-edge sampler
+			// address mode; the device enables the feature when available.
+			bool m_SamplerMirrorClampToEdgeAvailable = false;
 			uint32_t m_GraphicsPresentQueueFamilyIndex = 0;
 			uint32_t m_GraphicsPresentQueueCount = 1;
 		};
@@ -115,6 +118,10 @@ namespace gglab
 			return m_EnabledPortabilityCapabilities;
 		}
 		[[nodiscard]] bool IsImageCubeArrayEnabled() const noexcept { return m_ImageCubeArrayEnabled; }
+	[[nodiscard]] bool IsSamplerMirrorClampToEdgeEnabled() const noexcept
+	{
+		return m_SamplerMirrorClampToEdgeEnabled;
+	}
 
 		// Registers the frame runtime's graphics timeline as the completion
 		// source for RHIFencePoint resolution. Borrowed: the frame runtime
@@ -141,6 +148,7 @@ namespace gglab
 		RHIPortabilityCapabilities m_PortabilityCapabilities{};
 		RHIPortabilityCapabilities m_EnabledPortabilityCapabilities{};
 		bool m_ImageCubeArrayEnabled = false;
+		bool m_SamplerMirrorClampToEdgeEnabled = false;
 		VulkanTimelineFence* m_GraphicsTimeline = nullptr;
 
 		VmaAllocator m_MemAllocator = VK_NULL_HANDLE;

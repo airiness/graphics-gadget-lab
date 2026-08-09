@@ -71,6 +71,8 @@ namespace gglab
 		vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 		vulkan12Features.timelineSemaphore = capabilities.m_TimelineSemaphore ? VK_TRUE : VK_FALSE;
 		vulkan12Features.scalarBlockLayout = capabilities.m_ScalarBlockLayout ? VK_TRUE : VK_FALSE;
+		vulkan12Features.samplerMirrorClampToEdge =
+			createInfo.m_SamplerMirrorClampToEdgeAvailable ? VK_TRUE : VK_FALSE;
 		vulkan12Features.runtimeDescriptorArray =
 			capabilities.m_RuntimeDescriptorArray ? VK_TRUE : VK_FALSE;
 		vulkan12Features.descriptorBindingPartiallyBound =
@@ -116,6 +118,8 @@ namespace gglab
 		device->m_PhysicalDevice = createInfo.m_PhysicalDevice;
 		device->m_EnabledPortabilityCapabilities = enabledCapabilities;
 		device->m_ImageCubeArrayEnabled = createInfo.m_ImageCubeArrayAvailable;
+		device->m_SamplerMirrorClampToEdgeEnabled =
+			createInfo.m_SamplerMirrorClampToEdgeAvailable;
 		// The exposed set stays empty: no conditional capability has a
 		// complete native lowering yet.
 		device->m_PortabilityCapabilities = {};

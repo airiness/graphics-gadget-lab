@@ -205,6 +205,10 @@ namespace gglab
 		m_Allocator = createInfo.m_Allocator;
 		m_Device = createInfo.m_Device;
 		m_CreateInfo = createInfo.m_CreateInfo;
+		// The pNext chain only exists for the create call (format lists,
+		// future extension structs); the stored creation history must not
+		// retain pointers into the caller's stack.
+		m_CreateInfo.pNext = nullptr;
 		m_InitialState = createInfo.m_InitialState;
 
 		const VkResult createResult = vmaCreateImage(m_Allocator, &m_CreateInfo,

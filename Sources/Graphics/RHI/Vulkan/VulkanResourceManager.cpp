@@ -427,6 +427,11 @@ namespace gglab
 
 		VkImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		// The format list lives for the whole create call; it is also the
+		// only pNext the creation path carries, so the native creation
+		// history stored by VulkanTexture never retains a dangling chain.
+		std::array<VkFormat, 4> nativeViewFormats{};
+		VkImageFormatListCreateInfo formatList{};
 		if (Test(desc.m_CreateFlags, RHITextureCreateFlags::CubeCompatible))
 		{
 			imageCreateInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -437,13 +442,11 @@ namespace gglab
 			// list can be used; the list is the frozen compatible view family
 			// contract of the resource format, not an arbitrary format set.
 			imageCreateInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-			std::array<VkFormat, 4> nativeViewFormats{};
 			uint32_t viewFormatCount = 0;
 			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
 			{
 				nativeViewFormats[viewFormatCount++] = ToVulkanFormat(viewFormat);
 			}
-			VkImageFormatListCreateInfo formatList{};
 			formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
 			formatList.viewFormatCount = viewFormatCount;
 			formatList.pViewFormats = nativeViewFormats.data();
@@ -1018,6 +1021,16 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN(
 				"VulkanResourceManager::CreateSampler rejected a sampler the Vulkan profile "
 				"cannot express.");
+			return {};
+		}
+		if ((desc.m_AddressU == RHITextureAddressMode::MirrorOnce ||
+				desc.m_AddressV == RHITextureAddressMode::MirrorOnce ||
+				desc.m_AddressW == RHITextureAddressMode::MirrorOnce) &&
+			!m_Device->IsSamplerMirrorClampToEdgeEnabled())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::CreateSampler rejected mirror-once addressing without "
+				"the samplerMirrorClampToEdge feature.");
 			return {};
 		}
 

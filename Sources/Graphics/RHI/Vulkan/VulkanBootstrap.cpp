@@ -119,6 +119,16 @@ namespace gglab
 				: capabilities.m_GlobalDescriptorSetLayoutSupported ? "supported" : "unsupported";
 			LogBootstrapInfo(std::format("    globalSet1LayoutSupport={} requiredFormatFeatures={}",
 				layoutState, capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
+			const auto& portability = snapshot.m_PortabilityCapabilities;
+			LogBootstrapInfo(std::format(
+				"    conditional features: imageCubeArray={} samplerMirrorClampToEdge={} "
+				"fillModeNonSolid={} depthClamp={} depthBiasClamp={} independentBlend={}",
+				snapshot.m_ImageCubeArrayAvailable ? "yes" : "no",
+				snapshot.m_SamplerMirrorClampToEdgeAvailable ? "yes" : "no",
+				portability.m_FillModeNonSolid ? "yes" : "no",
+				portability.m_DepthClamp ? "yes" : "no",
+				portability.m_DepthBiasClamp ? "yes" : "no",
+				portability.m_IndependentBlend ? "yes" : "no"));
 			if (!snapshot.m_LayoutProbeError.empty())
 			{
 				LogBootstrapInfo(std::format("    layout probe failed: {}",
@@ -207,6 +217,8 @@ namespace gglab
 				snapshot.m_PortabilityCapabilities;
 			deviceCreateInfo.m_ImageCubeArrayAvailable =
 				snapshot.m_ImageCubeArrayAvailable;
+			deviceCreateInfo.m_SamplerMirrorClampToEdgeAvailable =
+				snapshot.m_SamplerMirrorClampToEdgeAvailable;
 			deviceCreateInfo.m_GraphicsPresentQueueFamilyIndex =
 				snapshot.m_GraphicsPresentQueueFamilyIndex;
 			deviceCreateInfo.m_GraphicsPresentQueueCount =

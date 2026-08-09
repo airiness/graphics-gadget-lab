@@ -60,6 +60,9 @@ namespace gglab
 		// Hardware availability of cube-array image views (optional core
 		// capability; not part of the hard profile requirements).
 		bool m_ImageCubeArrayAvailable = false;
+		// Hardware availability of the mirror-clamp-to-edge sampler
+		// address mode (optional core capability).
+		bool m_SamplerMirrorClampToEdgeAvailable = false;
 		// Conditional portability capabilities consumed by view/sampler
 		// creation and recorded for pipeline creation. They never gate
 		// adapter selection.
