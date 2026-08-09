@@ -205,6 +205,8 @@ namespace gglab
 			deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
 			deviceCreateInfo.m_PortabilityCapabilities =
 				snapshot.m_PortabilityCapabilities;
+			deviceCreateInfo.m_ImageCubeArrayAvailable =
+				snapshot.m_ImageCubeArrayAvailable;
 			deviceCreateInfo.m_GraphicsPresentQueueFamilyIndex =
 				snapshot.m_GraphicsPresentQueueFamilyIndex;
 			deviceCreateInfo.m_GraphicsPresentQueueCount =

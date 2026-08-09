@@ -18,6 +18,7 @@
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
+#include <array>
 #include <format>
 
 namespace gglab
@@ -433,9 +434,20 @@ namespace gglab
 		if (NeedsVulkanMutableFormat(desc.m_Format))
 		{
 			// Typeless families need mutable-format so the restricted view
-			// list can be used; the view family itself is validated at view
-			// creation.
+			// list can be used; the list is the frozen compatible view family
+			// contract of the resource format, not an arbitrary format set.
 			imageCreateInfo.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+			std::array<VkFormat, 4> nativeViewFormats{};
+			uint32_t viewFormatCount = 0;
+			for (const RHIFormat viewFormat : formatInfo.m_RHIViewFormats)
+			{
+				nativeViewFormats[viewFormatCount++] = ToVulkanFormat(viewFormat);
+			}
+			VkImageFormatListCreateInfo formatList{};
+			formatList.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO;
+			formatList.viewFormatCount = viewFormatCount;
+			formatList.pViewFormats = nativeViewFormats.data();
+			imageCreateInfo.pNext = &formatList;
 		}
 		imageCreateInfo.imageType = ToVkImageType(desc.m_Dimension);
 		imageCreateInfo.format = formatInfo.m_ResourceFormat;
@@ -853,6 +865,14 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN(
 				"VulkanResourceManager::CreateTextureView rejected image-view min LOD without "
 				"VK_EXT_image_view_min_lod.");
+			return {};
+		}
+		if (desc.m_Dimension == RHITextureViewDimension::TextureCubeArray &&
+			!m_Device->IsImageCubeArrayEnabled())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanResourceManager::CreateTextureView rejected a cube-array view without "
+				"the imageCubeArray feature.");
 			return {};
 		}
 

@@ -57,6 +57,9 @@ namespace gglab
 		VulkanDeviceProfileCapabilities m_ProfileCapabilities{};
 		VulkanDescriptorCapacityLimits m_DescriptorLimits{};
 		VulkanDescriptorCapacityAvailability m_DescriptorCapacityAvailability{};
+		// Hardware availability of cube-array image views (optional core
+		// capability; not part of the hard profile requirements).
+		bool m_ImageCubeArrayAvailable = false;
 		// Conditional portability capabilities consumed by view/sampler
 		// creation and recorded for pipeline creation. They never gate
 		// adapter selection.

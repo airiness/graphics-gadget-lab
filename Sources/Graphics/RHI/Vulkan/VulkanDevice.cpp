@@ -33,6 +33,11 @@ namespace gglab
 			return result;
 		}
 		const VulkanDeviceProfileCapabilities& capabilities = *createInfo.m_ProfileCapabilities;
+		// The policy-reduced set is what the logical device actually enables;
+		// the exposed set (GetPortabilityCapabilities) stays empty until a
+		// consuming feature has a complete native lowering.
+		const RHIPortabilityCapabilities enabledCapabilities =
+			ApplyVulkanPortabilityPolicy(createInfo.m_PortabilityCapabilities);
 
 		std::array<const char*, 2> enabledExtensions{
 			SwapchainExtensionName.data(),
@@ -44,6 +49,17 @@ namespace gglab
 		features2.features.samplerAnisotropy = capabilities.m_SamplerAnisotropy ? VK_TRUE : VK_FALSE;
 		features2.features.shaderStorageImageExtendedFormats =
 			capabilities.m_ShaderStorageImageExtendedFormats ? VK_TRUE : VK_FALSE;
+		// Conditional core features the backend adopts: enabled when the
+		// hardware reports them so future consuming layers find them ready.
+		features2.features.imageCubeArray =
+			createInfo.m_ImageCubeArrayAvailable ? VK_TRUE : VK_FALSE;
+		features2.features.independentBlend =
+			enabledCapabilities.m_IndependentBlend ? VK_TRUE : VK_FALSE;
+		features2.features.depthClamp = enabledCapabilities.m_DepthClamp ? VK_TRUE : VK_FALSE;
+		features2.features.depthBiasClamp =
+			enabledCapabilities.m_DepthBiasClamp ? VK_TRUE : VK_FALSE;
+		features2.features.fillModeNonSolid =
+			enabledCapabilities.m_FillModeNonSolid ? VK_TRUE : VK_FALSE;
 
 		VkPhysicalDeviceVulkan13Features vulkan13Features{};
 		vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -98,7 +114,11 @@ namespace gglab
 		auto device = std::make_unique<VulkanDevice>();
 		device->m_Instance = createInfo.m_Instance;
 		device->m_PhysicalDevice = createInfo.m_PhysicalDevice;
-		device->m_PortabilityCapabilities = createInfo.m_PortabilityCapabilities;
+		device->m_EnabledPortabilityCapabilities = enabledCapabilities;
+		device->m_ImageCubeArrayEnabled = createInfo.m_ImageCubeArrayAvailable;
+		// The exposed set stays empty: no conditional capability has a
+		// complete native lowering yet.
+		device->m_PortabilityCapabilities = {};
 		const VkResult createResult =
 			vkCreateDevice(createInfo.m_PhysicalDevice, &deviceCreateInfo, nullptr, &device->m_Device);
 		if (createResult != VK_SUCCESS)

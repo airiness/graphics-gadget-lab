@@ -223,6 +223,16 @@ namespace gglab
 
 	VulkanFrameRuntime::~VulkanFrameRuntime()
 	{
+		// Unregister the borrowed graphics timeline before anything else:
+		// the device outlives the runtime (destruction order is runtime
+		// first), but the registration must still be paired so no dangling
+		// completion-source pointer survives the runtime.
+		if (m_Device != nullptr && m_Timeline != nullptr &&
+			m_Device->GetGraphicsTimeline() == m_Timeline.get())
+		{
+			m_Device->SetGraphicsTimeline(nullptr);
+		}
+
 		// Defensive quiesce: an early-return failure path (including partial
 		// construction) must never destroy command pools, semaphores or the
 		// swapchain while their GPU work is still in flight. Finalize is

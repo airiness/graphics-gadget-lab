@@ -1731,6 +1731,27 @@ namespace gglab
 			!ValidateRHISamplerPortability(arbitraryColor, withoutCustomBorder).IsValid() &&
 			ValidateRHISamplerPortability(arbitraryColor, withCustomBorder).IsValid(),
 			"Arbitrary sampler border colors require custom-border-color");
+
+		// The device policy never claims support that lacks a native
+		// lowering: custom border colors, image-view min LOD, instance
+		// divisors and sample quality stay disabled even when the hardware
+		// reports them, while adopted core features pass through.
+		RHIPortabilityCapabilities available{};
+		available.m_ImageViewMinLod = true;
+		available.m_CustomBorderColor = true;
+		available.m_VertexAttributeDivisor = true;
+		available.m_FillModeNonSolid = true;
+		available.m_DepthClamp = true;
+		available.m_DepthBiasClamp = true;
+		available.m_IndependentBlend = true;
+		available.m_SampleQuality = true;
+		const RHIPortabilityCapabilities enabled = ApplyVulkanPortabilityPolicy(available);
+		context.Check(!enabled.m_ImageViewMinLod && !enabled.m_CustomBorderColor &&
+			!enabled.m_VertexAttributeDivisor && !enabled.m_SampleQuality,
+			"Unlowered capabilities are never enabled by the device policy");
+		context.Check(enabled.m_FillModeNonSolid && enabled.m_DepthClamp &&
+			enabled.m_DepthBiasClamp && enabled.m_IndependentBlend,
+			"Adopted core capabilities pass through the device policy");
 	}
 
 	void RunVulkanDescriptorArenaTests(SelfTestContext& context) noexcept
@@ -1862,7 +1883,7 @@ namespace gglab
 		const auto explicitNormalized = NormalizeVulkanTextureView(derivedResource, explicitView);
 		context.Check(explicitNormalized.has_value() &&
 			explicitNormalized->m_EffectiveDimension ==
-				derived->m_EffectiveDimension,
+			derived->m_EffectiveDimension,
 			"Explicit and derived dimensions normalize to the same effective dimension");
 		RHITextureViewDesc canonicalUnknown = derivedView;
 		canonicalUnknown.m_Format = derived->m_EffectiveFormat;
@@ -1873,7 +1894,7 @@ namespace gglab
 		canonicalExplicit.m_Dimension = explicitNormalized->m_EffectiveDimension;
 		canonicalExplicit.m_Subresources = explicitNormalized->m_Range;
 		context.Check(RHITextureViewKey{ RHITextureHandle{ 3, 1 }, canonicalUnknown } ==
-				RHITextureViewKey{ RHITextureHandle{ 3, 1 }, canonicalExplicit },
+			RHITextureViewKey{ RHITextureHandle{ 3, 1 }, canonicalExplicit },
 			"Unknown and explicit dimensions share one canonical cache key");
 	}
 

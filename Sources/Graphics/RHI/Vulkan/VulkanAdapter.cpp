@@ -381,6 +381,9 @@ namespace gglab
 			imageViewMinLodFeatures.minLod == VK_TRUE;
 		portability.m_VertexAttributeDivisor = hasVertexAttributeDivisor &&
 			vertexAttributeDivisorFeatures.vertexAttributeInstanceRateDivisor == VK_TRUE;
+		// Cube-array image views are an optional core capability tracked
+		// outside the hard profile requirements.
+		snapshot.m_ImageCubeArrayAvailable = features2.features.imageCubeArray == VK_TRUE;
 
 		VulkanDescriptorCapacityLimits& limits = snapshot.m_DescriptorLimits;
 		limits.m_MaxDescriptorSetUpdateAfterBindSampledImages =
