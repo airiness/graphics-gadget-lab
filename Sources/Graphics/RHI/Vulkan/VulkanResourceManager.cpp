@@ -857,10 +857,11 @@ namespace gglab
 		}
 
 		// Canonical cache key: the normalized description is the identity
-		// of the view, so equivalent defaulted descriptions share one
-		// entry.
+		// of the view, so equivalent defaulted descriptions (Unknown
+		// dimension, Unknown format, Remaining ranges) share one entry.
 		RHITextureViewDesc canonicalDesc = desc;
 		canonicalDesc.m_Format = normalized->m_EffectiveFormat;
+		canonicalDesc.m_Dimension = normalized->m_EffectiveDimension;
 		canonicalDesc.m_Subresources = normalized->m_Range;
 		const RHITextureViewKey key{ texture, canonicalDesc };
 		const auto cached = m_TextureViewCache.find(key);

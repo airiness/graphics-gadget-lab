@@ -1841,16 +1841,40 @@ namespace gglab
 
 		// Unknown dimension (the RHI default) derives from the resource
 		// dimension and array size; the public validator accepts it.
+		const RHITextureDesc derivedResource{
+			.m_Format = RHIFormat::R8G8B8A8Unorm,
+			.m_Usage = RHITextureUsage::Sampled,
+			.m_Extent = { 4, 4, 1 },
+			.m_ArraySize = 4,
+		};
 		RHITextureViewDesc derivedView{};
 		derivedView.m_Dimension = RHITextureViewDimension::Unknown;
-		const auto derived = NormalizeVulkanTextureView(
-			RHITextureDesc{ .m_Format = RHIFormat::R8G8B8A8Unorm,
-				.m_Usage = RHITextureUsage::Sampled, .m_Extent = { 4, 4, 1 },
-				.m_ArraySize = 4 },
-			derivedView);
+		const auto derived = NormalizeVulkanTextureView(derivedResource, derivedView);
 		context.Check(derived.has_value() &&
-			derived->m_ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY,
+			derived->m_ViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY &&
+			derived->m_EffectiveDimension == RHITextureViewDimension::Texture2DArray,
 			"Unknown view dimension derives from the resource array size");
+
+		// Unknown and the equivalent explicit dimension collapse to the
+		// same canonical cache identity.
+		RHITextureViewDesc explicitView = derivedView;
+		explicitView.m_Dimension = RHITextureViewDimension::Texture2DArray;
+		const auto explicitNormalized = NormalizeVulkanTextureView(derivedResource, explicitView);
+		context.Check(explicitNormalized.has_value() &&
+			explicitNormalized->m_EffectiveDimension ==
+				derived->m_EffectiveDimension,
+			"Explicit and derived dimensions normalize to the same effective dimension");
+		RHITextureViewDesc canonicalUnknown = derivedView;
+		canonicalUnknown.m_Format = derived->m_EffectiveFormat;
+		canonicalUnknown.m_Dimension = derived->m_EffectiveDimension;
+		canonicalUnknown.m_Subresources = derived->m_Range;
+		RHITextureViewDesc canonicalExplicit = explicitView;
+		canonicalExplicit.m_Format = explicitNormalized->m_EffectiveFormat;
+		canonicalExplicit.m_Dimension = explicitNormalized->m_EffectiveDimension;
+		canonicalExplicit.m_Subresources = explicitNormalized->m_Range;
+		context.Check(RHITextureViewKey{ RHITextureHandle{ 3, 1 }, canonicalUnknown } ==
+				RHITextureViewKey{ RHITextureHandle{ 3, 1 }, canonicalExplicit },
+			"Unknown and explicit dimensions share one canonical cache key");
 	}
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept

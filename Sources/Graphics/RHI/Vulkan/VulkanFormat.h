@@ -81,6 +81,11 @@ namespace gglab
 	struct VulkanNormalizedTextureView
 	{
 		RHIFormat m_EffectiveFormat = RHIFormat::Unknown;
+		// Resolved RHI view dimension: Unknown defaults derive from the
+		// resource dimension and array size, so cache keys built from the
+		// normalized result collapse Unknown and equivalent explicit
+		// dimensions to one identity.
+		RHITextureViewDimension m_EffectiveDimension = RHITextureViewDimension::Unknown;
 		RHISubresourceRange m_Range{};
 		VkImageViewType m_ViewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
 		VkImageAspectFlags m_AspectMask = 0;

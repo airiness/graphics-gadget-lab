@@ -250,22 +250,30 @@ namespace gglab
 		// dimension and array size, mirroring the public validator which
 		// accepts it; explicit dimensions map directly. Cube views must be
 		// requested explicitly because a resource cannot express them.
+		RHITextureViewDimension effectiveDimension = view.m_Dimension;
 		VkImageViewType viewType = ToVulkanImageViewType(view.m_Dimension);
 		if (view.m_Dimension == RHITextureViewDimension::Unknown)
 		{
 			switch (resource.m_Dimension)
 			{
 			case RHITextureDimension::Texture1D:
+				effectiveDimension = resource.m_ArraySize > 1
+					? RHITextureViewDimension::Texture1DArray
+					: RHITextureViewDimension::Texture1D;
 				viewType = resource.m_ArraySize > 1
 					? VK_IMAGE_VIEW_TYPE_1D_ARRAY
 					: VK_IMAGE_VIEW_TYPE_1D;
 				break;
 			case RHITextureDimension::Texture2D:
+				effectiveDimension = resource.m_ArraySize > 1
+					? RHITextureViewDimension::Texture2DArray
+					: RHITextureViewDimension::Texture2D;
 				viewType = resource.m_ArraySize > 1
 					? VK_IMAGE_VIEW_TYPE_2D_ARRAY
 					: VK_IMAGE_VIEW_TYPE_2D;
 				break;
 			case RHITextureDimension::Texture3D:
+				effectiveDimension = RHITextureViewDimension::Texture3D;
 				viewType = VK_IMAGE_VIEW_TYPE_3D;
 				break;
 			}
@@ -328,6 +336,7 @@ namespace gglab
 
 		return VulkanNormalizedTextureView{
 			.m_EffectiveFormat = effectiveFormat,
+			.m_EffectiveDimension = effectiveDimension,
 			.m_Range = range,
 			.m_ViewType = viewType,
 			.m_AspectMask = ToVulkanImageAspectFlags(aspect),
