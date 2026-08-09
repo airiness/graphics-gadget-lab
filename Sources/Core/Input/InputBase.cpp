@@ -4,17 +4,28 @@
 
 namespace gglab
 {
-	InputBase::InputBase(GameInputKind inputKind) noexcept
+	InputBase::InputBase(IGameInput* gameInput, GameInputKind inputKind) noexcept :
+		m_GameInput(gameInput)
 	{
-		GGLAB_HR(GameInputCreate(&m_GameInput));
-		GGLAB_HR(m_GameInput->RegisterDeviceCallback(
+		if (!m_GameInput)
+		{
+			return;
+		}
+
+		const HRESULT result = m_GameInput->RegisterDeviceCallback(
 			nullptr,
 			inputKind,
 			GameInputDeviceConnected,
 			GameInputBlockingEnumeration,
 			this,
 			OnGameInputDevice,
-			&m_CallbackToken));
+			&m_CallbackToken);
+		if (FAILED(result))
+		{
+			GGLAB_LOG_ERROR("Failed to register a GameInput device callback: {}",
+				FormatHResult(result));
+			m_GameInput.Reset();
+		}
 	}
 
 	InputBase::~InputBase() noexcept
@@ -27,6 +38,11 @@ namespace gglab
 			}
 			m_CallbackToken = 0;
 		}
+	}
+
+	bool InputBase::IsAvailable() const noexcept
+	{
+		return m_GameInput && m_CallbackToken != 0;
 	}
 
 	bool InputBase::IsConnected() const noexcept

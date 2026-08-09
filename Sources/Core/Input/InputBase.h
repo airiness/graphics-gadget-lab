@@ -6,10 +6,11 @@ namespace gglab
 	class InputBase
 	{
 	public:
-		explicit InputBase(GameInputKind inputKind) noexcept;
+		InputBase(IGameInput* gameInput, GameInputKind inputKind) noexcept;
 		virtual ~InputBase() noexcept;
 
 		virtual void Update() noexcept = 0;
+		bool IsAvailable() const noexcept;
 		bool IsConnected() const noexcept;
 
 	protected:

@@ -3,7 +3,8 @@
 
 namespace gglab
 {
-	Keyboard::Keyboard() noexcept : InputBase(GameInputKind::GameInputKindKeyboard)
+	Keyboard::Keyboard(IGameInput* gameInput) noexcept :
+		InputBase(gameInput, GameInputKind::GameInputKindKeyboard)
 	{
 	}
 

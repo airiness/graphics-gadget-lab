@@ -47,6 +47,8 @@ namespace gglab
 		[[nodiscard]] State GetState() const noexcept { return m_State; }
 		[[nodiscard]] bool IsActive() const noexcept { return m_State != State::Inactive; }
 		[[nodiscard]] bool IsFrameOpen() const noexcept { return m_State == State::FrameOpen; }
+		[[nodiscard]] bool WantsKeyboardCapture() const noexcept;
+		[[nodiscard]] bool WantsMouseCapture() const noexcept;
 
 		[[nodiscard]] ImTextureID ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept;
 

@@ -140,6 +140,16 @@ namespace gglab
 		m_State = State::Active;
 	}
 
+	bool DevelopGuiSystem::WantsKeyboardCapture() const noexcept
+	{
+		return IsActive() && ImGui::GetIO().WantCaptureKeyboard;
+	}
+
+	bool DevelopGuiSystem::WantsMouseCapture() const noexcept
+	{
+		return IsActive() && ImGui::GetIO().WantCaptureMouse;
+	}
+
 	ImTextureID DevelopGuiSystem::ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept
 	{
 		return IsActive() && m_RenderBackend ? m_RenderBackend->ResolveTextureId(descriptor)

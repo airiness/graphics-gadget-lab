@@ -592,38 +592,43 @@ namespace gglab
 			return;
 		}
 
-		if (keyboard->IsKeyPressed(KeyCode::B))
+		const bool keyboardCapturedByUI = m_Services.m_InputManager->IsKeyboardCapturedByUI();
+		if (!keyboardCapturedByUI)
 		{
-			m_ShowChunkBounds = !m_ShowChunkBounds;
-			GGLAB_UNUSED(GetMutableParameters().Set(ShowChunkBoundsId, m_ShowChunkBounds));
-		}
-		if (keyboard->IsKeyPressed(KeyCode::M))
-		{
-			m_SurfaceMode = m_SurfaceMode == NapaVoxelSurfaceMode::Shaded
-				? NapaVoxelSurfaceMode::Wireframe
-				: NapaVoxelSurfaceMode::Shaded;
-			GGLAB_UNUSED(GetMutableParameters().Set(
-				SurfaceModeId, static_cast<int32_t>(m_SurfaceMode)));
-			if (m_FrameSource)
+			if (keyboard->IsKeyPressed(KeyCode::B))
 			{
-				m_FrameSource->SetSurfaceMode(m_SurfaceMode);
+				m_ShowChunkBounds = !m_ShowChunkBounds;
+				GGLAB_UNUSED(GetMutableParameters().Set(ShowChunkBoundsId, m_ShowChunkBounds));
+			}
+			if (keyboard->IsKeyPressed(KeyCode::M))
+			{
+				m_SurfaceMode = m_SurfaceMode == NapaVoxelSurfaceMode::Shaded
+					? NapaVoxelSurfaceMode::Wireframe
+					: NapaVoxelSurfaceMode::Shaded;
+				GGLAB_UNUSED(GetMutableParameters().Set(
+					SurfaceModeId, static_cast<int32_t>(m_SurfaceMode)));
+				if (m_FrameSource)
+				{
+					m_FrameSource->SetSurfaceMode(m_SurfaceMode);
+				}
+			}
+
+			if (keyboard->IsKeyPressed(KeyCode::R))
+			{
+				GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreAll());
+			}
+			if (keyboard->IsKeyPressed(KeyCode::C) && m_ProbeChunk)
+			{
+				GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreProbeChunk(*m_ProbeChunk));
+			}
+			if (keyboard->IsKeyPressed(KeyCode::Space))
+			{
+				GGLAB_UNUSED(m_CommandQueue.EnqueueScriptedBoundaryShot(BuildBoundaryShot()));
 			}
 		}
 
-		if (keyboard->IsKeyPressed(KeyCode::R))
-		{
-			GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreAll());
-		}
-		if (keyboard->IsKeyPressed(KeyCode::C) && m_ProbeChunk)
-		{
-			GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreProbeChunk(*m_ProbeChunk));
-		}
-		if (keyboard->IsKeyPressed(KeyCode::Space))
-		{
-			GGLAB_UNUSED(m_CommandQueue.EnqueueScriptedBoundaryShot(BuildBoundaryShot()));
-		}
-
-		if (!mouse->IsMouseButtonPressed(MouseButton::LeftButton))
+		if (m_Services.m_InputManager->IsMouseCapturedByUI() ||
+			!mouse->IsMouseButtonPressed(MouseButton::LeftButton))
 		{
 			return;
 		}
@@ -632,8 +637,9 @@ namespace gglab
 		{
 			return;
 		}
-		const bool moveProbe = keyboard->IsKeyHeld(KeyCode::LeftShift) ||
-			keyboard->IsKeyHeld(KeyCode::RightShift);
+		const bool moveProbe = !keyboardCapturedByUI &&
+			(keyboard->IsKeyHeld(KeyCode::LeftShift) ||
+				keyboard->IsKeyHeld(KeyCode::RightShift));
 		if (moveProbe)
 		{
 			GGLAB_UNUSED(m_CommandQueue.EnqueueMoveProbeRay(ray));

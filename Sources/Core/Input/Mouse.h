@@ -55,7 +55,7 @@ namespace gglab
 		};
 
 	public:
-		Mouse() noexcept;
+		explicit Mouse(IGameInput* gameInput) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Mouse);
 		virtual ~Mouse() noexcept = default;
 

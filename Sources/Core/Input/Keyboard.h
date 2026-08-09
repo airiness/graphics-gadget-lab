@@ -425,7 +425,7 @@ namespace gglab
 		};
 
 	public:
-		Keyboard() noexcept;
+		explicit Keyboard(IGameInput* gameInput) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Keyboard);
 		virtual ~Keyboard() noexcept = default;
 
