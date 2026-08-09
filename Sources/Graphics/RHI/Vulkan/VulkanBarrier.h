@@ -3,9 +3,11 @@
 
 #include <vulkan/vulkan.h>
 
+#include <optional>
+
 namespace gglab
 {
 	[[nodiscard]] VkPipelineStageFlags2 ToVulkanPipelineStages(RHIStage stages) noexcept;
 	[[nodiscard]] VkAccessFlags2 ToVulkanAccessFlags(RHIAccess access) noexcept;
-	[[nodiscard]] VkImageLayout ToVulkanImageLayout(RHILayout layout) noexcept;
+	[[nodiscard]] std::optional<VkImageLayout> ToVulkanImageLayout(RHILayout layout) noexcept;
 }

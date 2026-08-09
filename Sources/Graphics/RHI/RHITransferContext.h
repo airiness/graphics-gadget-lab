@@ -20,6 +20,8 @@ namespace gglab
 	struct RHITransferSubmission
 	{
 		RHIFencePoint m_Completion;
+		// Publications are meaningful only after native submission succeeds.
+		// An invalid completion point therefore requires an empty manifest.
 		std::vector<RHITransferResourcePublication> m_Publications;
 	};
 

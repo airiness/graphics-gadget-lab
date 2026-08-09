@@ -263,6 +263,17 @@ namespace gglab
 				m_RecordingFailed = true;
 				return;
 			}
+			const std::optional<VkImageLayout> oldLayout =
+				ToVulkanImageLayout(barrier.m_Before.m_Layout);
+			const std::optional<VkImageLayout> newLayout =
+				ToVulkanImageLayout(barrier.m_After.m_Layout);
+			if (!oldLayout || !newLayout)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"VulkanTransferContext::TextureBarrier could not lower an RHI layout.");
+				m_RecordingFailed = true;
+				return;
+			}
 			VulkanResourceManager& resources = m_Device->GetResourceManager();
 			VulkanTexture* texture = resources.ResolveTexture(barrier.m_Texture);
 			const RHITextureDesc* desc = resources.ResolveTextureDesc(barrier.m_Texture);
@@ -290,8 +301,8 @@ namespace gglab
 			native.srcAccessMask = ToVulkanAccessFlags(barrier.m_Before.m_Access);
 			native.dstStageMask = ToVulkanPipelineStages(barrier.m_After.m_Stages);
 			native.dstAccessMask = ToVulkanAccessFlags(barrier.m_After.m_Access);
-			native.oldLayout = ToVulkanImageLayout(barrier.m_Before.m_Layout);
-			native.newLayout = ToVulkanImageLayout(barrier.m_After.m_Layout);
+			native.oldLayout = *oldLayout;
+			native.newLayout = *newLayout;
 			native.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			native.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			native.image = texture->Get();

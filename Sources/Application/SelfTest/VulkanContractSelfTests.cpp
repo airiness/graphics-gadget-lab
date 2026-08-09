@@ -685,11 +685,13 @@ namespace gglab
 			context.Check(
 				ToVulkanImageLayout(RHILayout::Undefined) == VK_IMAGE_LAYOUT_UNDEFINED &&
 				ToVulkanImageLayout(RHILayout::CopyDest) ==
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
 				ToVulkanImageLayout(RHILayout::RenderTarget) ==
-					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
 				ToVulkanImageLayout(RHILayout::Present) == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 				"Vulkan barrier lowering maps transfer, attachment, and presentation layouts");
+			context.Check(!ToVulkanImageLayout(RHILayout::Unknown).has_value(),
+				"Vulkan barrier lowering rejects an unknown image layout");
 		}
 
 		void RunVulkanTextureCopyContractTests(SelfTestContext& context) noexcept

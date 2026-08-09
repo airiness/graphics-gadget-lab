@@ -104,7 +104,7 @@ namespace gglab
 		return result;
 	}
 
-	VkImageLayout ToVulkanImageLayout(RHILayout layout) noexcept
+	std::optional<VkImageLayout> ToVulkanImageLayout(RHILayout layout) noexcept
 	{
 		switch (layout)
 		{
@@ -130,6 +130,6 @@ namespace gglab
 		case RHILayout::Unknown:
 			break;
 		}
-		return VK_IMAGE_LAYOUT_UNDEFINED;
+		return std::nullopt;
 	}
 }

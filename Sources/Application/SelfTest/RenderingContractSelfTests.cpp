@@ -356,7 +356,7 @@ namespace gglab
 			RHIFencePoint Submit(bool) noexcept override
 			{
 				++m_SubmitCallCount;
-				return { RHIFenceHandle{ 1, 1 }, 7 };
+				return m_FailSubmit ? RHIFencePoint{} : RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 7 };
 			}
 			void Abort() noexcept override { ++m_AbortCallCount; }
 			void ReclaimCompleted() noexcept override {}
@@ -379,6 +379,7 @@ namespace gglab
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 			std::vector<RHIBufferBarrier> m_BufferBarriers;
 			bool m_FailUploads = false;
+			bool m_FailSubmit = false;
 			uint32_t m_SubmitCallCount = 0;
 			uint32_t m_AbortCallCount = 0;
 		};
@@ -621,14 +622,14 @@ namespace gglab
 			{
 				const RGCompiledPass& voxelPass = plan->GetPasses()[1];
 				const auto hasAccess = [&voxelPass](RGResourceType type, uint64_t access) noexcept
-				{
-					return std::ranges::any_of(voxelPass.m_Accesses,
-						[type, access](const RGCompiledAccess& compiledAccess) noexcept
-						{
-							return compiledAccess.m_ResourceType == type &&
-								compiledAccess.m_AccessValue == access;
-						});
-				};
+					{
+						return std::ranges::any_of(voxelPass.m_Accesses,
+							[type, access](const RGCompiledAccess& compiledAccess) noexcept
+							{
+								return compiledAccess.m_ResourceType == type &&
+									compiledAccess.m_AccessValue == access;
+							});
+					};
 				resourceContractMatches =
 					hasAccess(RGResourceType::RGTexture,
 						static_cast<uint64_t>(RGTextureAccess::RenderTarget)) &&
@@ -651,10 +652,10 @@ namespace gglab
 				const RHIResourceState index = ToRHIResourceState(RGBufferAccess::Index);
 				const auto matchesTransition = [](const RGBarrierIntent& barrier,
 					const RHIResourceState& before, const RHIResourceState& after) noexcept
-				{
-					return barrier.m_Kind == RGBarrierKind::Transition &&
-						barrier.m_Before == before && barrier.m_After == after;
-				};
+					{
+						return barrier.m_Kind == RGBarrierKind::Transition &&
+							barrier.m_Before == before && barrier.m_After == after;
+					};
 				barrierContractMatches = voxelPass.m_PreBarriers.size() == 2 &&
 					voxelPass.m_PostBarriers.size() == 2 &&
 					std::ranges::any_of(voxelPass.m_PreBarriers,
@@ -3663,7 +3664,7 @@ namespace gglab
 						.m_Format = RHIFormat::R8G8B8A8Unorm,
 						.m_Usage = RHITextureUsage::CopySource,
 						.m_Extent = { 1, 1, 1 },
-						});
+					});
 				const RHITransferSubmission submission = readbackBatch.Submit(false);
 				context.Check(!request.IsValid() && readbackBatch.IsFailed() &&
 					readbackContext.m_TextureBarriers.size() == 1 &&
@@ -3671,6 +3672,19 @@ namespace gglab
 					readbackContext.m_SubmitCallCount == 0 &&
 					!submission.m_Completion.IsValid(),
 					"Readback allocation failure poisons and aborts its partially recorded state transition");
+			}
+			{
+				RecordingTransferContext submitFailureContext;
+				TransferBatch submitFailureBatch(submitFailureContext);
+				const uint32_t payload = 23;
+				const bool uploadRecorded = submitFailureBatch.UploadBuffer(
+					RHIBufferHandle{ 8, 1 }, 0, &payload, sizeof(payload));
+				submitFailureContext.m_FailSubmit = true;
+				const RHITransferSubmission submission = submitFailureBatch.Submit(false);
+				context.Check(uploadRecorded && submitFailureBatch.IsFailed() &&
+					submitFailureContext.m_SubmitCallCount == 1 &&
+					!submission.m_Completion.IsValid() && submission.m_Publications.empty(),
+					"Native submission failure discards the publication manifest");
 			}
 			{
 				RecordingTransferContext moveContext;

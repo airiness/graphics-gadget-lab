@@ -1,7 +1,9 @@
 #include "Core/Precompiled.h"
 #include "Core/Log/Logger.h"
+#include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
@@ -997,6 +999,114 @@ namespace gglab
 				}
 			}
 
+			// Exercise the actual generated reserved-texture payloads as one synchronous
+			// batch, matching the startup path that must finish before material fallback
+			// descriptors become available.
+			{
+				std::vector<BuiltinTextureAsset> bootstrapTextures =
+					BuiltinTextureFactory::BuildBootstrapTextures();
+				if (bootstrapTextures.empty())
+				{
+					LogQualificationError(
+						"qualify transfer: bootstrap texture factory returned no textures.");
+					return 1;
+				}
+
+				struct BootstrapTextureResources
+				{
+					VulkanDevice& m_Device;
+					std::vector<RHITextureOwner> m_Textures;
+					std::vector<RHITextureViewHandle> m_Views;
+
+					~BootstrapTextureResources()
+					{
+						for (const RHITextureViewHandle view : m_Views)
+						{
+							m_Device.DestroyTextureView(view);
+						}
+					}
+				} resources{ device };
+				resources.m_Textures.reserve(bootstrapTextures.size());
+				resources.m_Views.reserve(bootstrapTextures.size());
+
+				TransferBatch batch = transferManager.BeginBatch();
+				for (const BuiltinTextureAsset& bootstrapTexture : bootstrapTextures)
+				{
+					if (!ValidateTextureUploadForDevice(bootstrapTexture.m_Data, device).IsValid())
+					{
+						LogQualificationError(std::format(
+							"qualify transfer: bootstrap texture '{}' is invalid for the selected device.",
+							bootstrapTexture.m_Name));
+						return 1;
+					}
+
+					const RHITextureDesc desc = BuildTextureRHITextureDesc(bootstrapTexture.m_Data);
+					resources.m_Textures.emplace_back(&device, device.CreateTexture({
+						.m_Desc = desc,
+						.m_InitialState = UndefinedRHITextureState(),
+						}, {
+							.m_Domain = RHIResourceDebugDomain::Diagnostics,
+							.m_Category = "BootstrapTexture",
+							.m_Label = bootstrapTexture.m_Name,
+						}));
+						const RHITextureHandle texture = resources.m_Textures.back().Get();
+						if (!texture.IsValid())
+						{
+							LogQualificationError(std::format(
+								"qualify transfer: bootstrap texture '{}' creation failed.",
+								bootstrapTexture.m_Name));
+							return 1;
+						}
+
+						const RHITextureViewHandle view = device.CreateTextureView(
+							texture, BuildTextureRHISRVDesc(bootstrapTexture.m_Data));
+						if (view.IsValid())
+						{
+							resources.m_Views.push_back(view);
+						}
+						if (!view.IsValid() || !device.GetTextureViewDescriptor(view).IsValid())
+						{
+							LogQualificationError(std::format(
+								"qualify transfer: bootstrap texture '{}' SRV creation failed.",
+								bootstrapTexture.m_Name));
+							return 1;
+						}
+						if (!batch.UploadTexture(texture, bootstrapTexture.m_Data.MakeUploadData(),
+							UndefinedRHITextureState(), shaderResourceState))
+						{
+							LogQualificationError(std::format(
+								"qualify transfer: bootstrap texture '{}' upload recording failed.",
+								bootstrapTexture.m_Name));
+							return 1;
+						}
+				}
+
+				const RHITransferSubmission submission = batch.Submit(true);
+				const bool everyTexturePublished = submission.m_Completion.IsValid() &&
+					device.IsFencePointCompleted(submission.m_Completion) &&
+					submission.m_Publications.size() == resources.m_Textures.size() &&
+					std::ranges::all_of(resources.m_Textures,
+						[&](const RHITextureOwner& textureOwner) noexcept
+						{
+							return std::ranges::count_if(submission.m_Publications,
+								[&](const RHITransferResourcePublication& publication) noexcept
+								{
+									return publication.m_Type == RHIResourceType::Texture &&
+										publication.m_Texture == textureOwner.Get() &&
+										publication.m_PublishedState == shaderResourceState;
+								}) == 1;
+						});
+				if (!everyTexturePublished)
+				{
+					LogQualificationError(
+						"qualify transfer: bootstrap texture batch publication failed.");
+					return 1;
+				}
+				LogQualificationInfo(std::format(
+					"qualify transfer: {} bootstrap textures uploaded and published.",
+					resources.m_Textures.size()));
+			}
+
 			// Use a real IBL stage artifact, not a synthetic RHI-only payload,
 			// to keep the cache/streaming ABI in the qualification path.
 			IBLStageArtifactHandle iblArtifact = CreateIBLStageArtifact(
@@ -1180,7 +1290,7 @@ namespace gglab
 			}
 
 			LogQualificationInfo(
-				"qualify transfer: buffer, texture, IBL artifact and owner-thread scheduler paths passed.");
+				"qualify transfer: buffer, texture artifact, bootstrap texture, IBL artifact and owner-thread scheduler paths passed.");
 			return 0;
 		}
 

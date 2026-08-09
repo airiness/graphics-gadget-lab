@@ -321,8 +321,15 @@ namespace gglab
 		}
 		GGLAB_ASSERT_NOT_NULL(m_TransferContext);
 		RHITransferContext* transferContext = std::exchange(m_TransferContext, nullptr);
+		const RHIFencePoint completion = transferContext->Submit(wait);
+		if (!completion.IsValid())
+		{
+			Fail();
+			m_Publications.clear();
+			return {};
+		}
 		return {
-			.m_Completion = transferContext->Submit(wait),
+			.m_Completion = completion,
 			.m_Publications = std::move(m_Publications),
 		};
 	}
