@@ -55,6 +55,7 @@ namespace gglab
 		uint32_t m_DescriptorReadyCount = 0;
 		uint32_t m_LiveCount = 0;
 		uint32_t m_RetiredCount = 0;
+		uint32_t m_RetirementRequestedCount = 0;
 		uint32_t m_RetainedBackingCount = 0;
 		uint64_t m_EstimatedRetainedBytes = 0;
 		uint32_t m_HighWaterMark = 0;
@@ -72,6 +73,11 @@ namespace gglab
 		[[nodiscard]] bool Publish(uint32_t index, uint64_t publicationGeneration) noexcept;
 		[[nodiscard]] bool Retire(uint32_t index, const RHIDescriptorRetirement& retirement,
 			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
+		[[nodiscard]] bool RequestRetirement(uint32_t index, uint64_t lastReachableGeneration,
+			const RHIDescriptorRetirement& retirement,
+			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
+		[[nodiscard]] bool CompleteRetirementRequest(
+			uint32_t index, const RHIDescriptorRetirement& retirement) noexcept;
 		[[nodiscard]] bool JoinRetirement(uint32_t index,
 			const RHIDescriptorRetirement& retirement,
 			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
@@ -82,6 +88,9 @@ namespace gglab
 
 		[[nodiscard]] VulkanDescriptorPublicationState GetState(uint32_t index) const noexcept;
 		[[nodiscard]] uint64_t GetPublicationGeneration(uint32_t index) const noexcept;
+		[[nodiscard]] uint64_t GetLastReachableGeneration(uint32_t index) const noexcept;
+		[[nodiscard]] bool IsRetirementRequested(uint32_t index) const noexcept;
+		[[nodiscard]] uint32_t GetCapacity() const noexcept { return m_Indices.GetCapacity(); }
 		[[nodiscard]] const std::shared_ptr<void>& GetBacking(uint32_t index) const noexcept;
 		[[nodiscard]] VulkanDescriptorPublicationDiagnostics GetDiagnostics() const noexcept;
 
@@ -90,8 +99,10 @@ namespace gglab
 		{
 			VulkanDescriptorPublicationState m_State = VulkanDescriptorPublicationState::Free;
 			uint64_t m_PublicationGeneration = 0;
+			uint64_t m_LastReachableGeneration = 0;
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			std::shared_ptr<void> m_Backing;
+			bool m_RetirementRequested = false;
 		};
 
 		[[nodiscard]] bool IsIndexInRange(uint32_t index) const noexcept;
@@ -119,11 +130,17 @@ namespace gglab
 		[[nodiscard]] uint64_t PublishReplacement() noexcept;
 		[[nodiscard]] bool TryDeriveRetirement(
 			uint64_t publicationGeneration, RHIDescriptorRetirement& outRetirement) const noexcept;
+		void ResetFrameSlots(uint32_t frameSlotCount) noexcept;
 
 		[[nodiscard]] uint64_t GetCurrentGeneration() const noexcept
 		{
 			return m_CurrentGeneration;
 		}
+		[[nodiscard]] uint32_t GetFrameSlotCount() const noexcept
+		{
+			return static_cast<uint32_t>(m_FrameSlots.size());
+		}
+		[[nodiscard]] bool HasUnsubmittedSnapshots() const noexcept;
 
 	private:
 		struct FrameSlot
@@ -197,19 +214,19 @@ namespace gglab
 			const std::shared_ptr<VulkanDescriptorBacking>& backing) noexcept;
 		[[nodiscard]] bool WriteSampler(uint32_t index,
 			const std::shared_ptr<VulkanDescriptorBacking>& backing) noexcept;
-		[[nodiscard]] bool PublishResource(uint32_t index, uint64_t generation) noexcept;
-		[[nodiscard]] bool PublishSampler(uint32_t index, uint64_t generation) noexcept;
+		[[nodiscard]] bool PublishResource(uint32_t index) noexcept;
+		[[nodiscard]] bool PublishSampler(uint32_t index) noexcept;
+		[[nodiscard]] bool InitializeFrameTracking(uint32_t frameSlotCount) noexcept;
+		[[nodiscard]] bool DetachFrameTracking() noexcept;
+		[[nodiscard]] bool BeginFrameSnapshot(uint32_t frameSlotIndex) noexcept;
+		[[nodiscard]] bool SubmitFrameSnapshot(
+			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
+		[[nodiscard]] bool AbortFrameSnapshot(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool RetireResource(uint32_t index,
 			const RHIDescriptorRetirement& retirement,
 			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
 		[[nodiscard]] bool RetireSampler(uint32_t index,
 			const RHIDescriptorRetirement& retirement,
-			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
-		[[nodiscard]] bool RetirePublishedResource(uint32_t index,
-			const VulkanDescriptorPublicationTracker& tracker,
-			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
-		[[nodiscard]] bool RetirePublishedSampler(uint32_t index,
-			const VulkanDescriptorPublicationTracker& tracker,
 			std::span<const RHIFencePoint> ownerRetirementPoints = {}) noexcept;
 		void RetireCompleted() noexcept;
 
@@ -230,6 +247,12 @@ namespace gglab
 		[[nodiscard]] bool WriteImage(uint32_t index, VkDescriptorType descriptorType,
 			VkImageLayout imageLayout,
 			const std::shared_ptr<VulkanDescriptorBacking>& backing) noexcept;
+		[[nodiscard]] bool RetireDescriptor(VulkanDescriptorPublicationArena& arena,
+			uint32_t index, const RHIDescriptorRetirement& retirement,
+			std::span<const RHIFencePoint> ownerRetirementPoints) noexcept;
+		void ProcessPendingRetirements(VulkanDescriptorPublicationArena& arena,
+			std::vector<uint32_t>& pendingIndices) noexcept;
+		void ProcessPendingRetirements() noexcept;
 
 		VulkanDevice* m_Device = nullptr;
 		VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
@@ -237,6 +260,9 @@ namespace gglab
 		VkDescriptorSet m_GlobalSet = VK_NULL_HANDLE;
 		VulkanDescriptorPublicationArena m_Resources;
 		VulkanDescriptorPublicationArena m_Samplers;
+		VulkanDescriptorPublicationTracker m_PublicationTracker;
+		std::vector<uint32_t> m_PendingResourceRetirements;
+		std::vector<uint32_t> m_PendingSamplerRetirements;
 		bool m_LayoutSupported = false;
 	};
 }

@@ -20,7 +20,7 @@ namespace gglab
 	{
 		uint32_t m_PageSizeInBytes = 64 * 1024;
 		uint32_t m_MaxPageCount = 4;
-		uint32_t m_Alignment = 256;
+		uint32_t m_Alignment = 1;
 	};
 
 	struct VulkanDynamicUniformArenaAllocation
@@ -90,6 +90,7 @@ namespace gglab
 		[[nodiscard]] bool BeginFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool EndFrame(
 			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
+		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] VulkanDynamicUniformAllocation Write(
 			uint32_t frameSlotIndex, std::span<const std::byte> payload) noexcept;
 
@@ -97,6 +98,7 @@ namespace gglab
 		[[nodiscard]] bool IsFrameActive(uint32_t frameSlotIndex) const noexcept;
 		[[nodiscard]] uint64_t GetFrameGeneration(uint32_t frameSlotIndex) const noexcept;
 		[[nodiscard]] uint32_t GetCapacityInBytes() const noexcept { return m_CapacityInBytes; }
+		[[nodiscard]] uint32_t GetAlignmentInBytes() const noexcept { return m_AlignmentInBytes; }
 		[[nodiscard]] const VulkanDynamicUniformDiagnostics* GetDiagnostics(
 			uint32_t frameSlotIndex) const noexcept;
 
@@ -114,6 +116,7 @@ namespace gglab
 		VulkanDevice* m_Device = nullptr;
 		std::vector<FrameSlot> m_FrameSlots;
 		uint32_t m_CapacityInBytes = 0;
+		uint32_t m_AlignmentInBytes = 0;
 	};
 
 	struct VulkanDynamicUniformUpdate
@@ -150,17 +153,23 @@ namespace gglab
 		std::array<ShadowSlot, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
 	};
 
-	class VulkanSet0DescriptorFrames
+	// Owns the frame-local descriptor pools and dynamic-uniform writes for set 0.
+	// Fixed-resource bindings, when present in the layout, remain the caller's
+	// responsibility and must be populated before the set is bound.
+	class VulkanSet0DynamicUniformFrames
 	{
 	public:
-		VulkanSet0DescriptorFrames() noexcept = default;
-		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanSet0DescriptorFrames);
-		~VulkanSet0DescriptorFrames() noexcept;
+		VulkanSet0DynamicUniformFrames() noexcept = default;
+		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanSet0DynamicUniformFrames);
+		~VulkanSet0DynamicUniformFrames() noexcept;
 
 		[[nodiscard]] bool Initialize(VulkanDevice* device, const VulkanBindingLayout& layout,
 			VulkanDynamicUniformBuffer* uniformBuffer, uint32_t frameSlotCount) noexcept;
 		void Finalize() noexcept;
 		[[nodiscard]] bool BeginFrame(uint32_t frameSlotIndex) noexcept;
+		[[nodiscard]] bool EndFrame(
+			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
+		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] VkDescriptorSet GetDescriptorSet(uint32_t frameSlotIndex) const noexcept;
 
 	private:
@@ -169,6 +178,8 @@ namespace gglab
 			VkDescriptorPool m_Pool = VK_NULL_HANDLE;
 			VkDescriptorSet m_Set = VK_NULL_HANDLE;
 			uint64_t m_LastResetGeneration = 0;
+			RHIFencePoint m_LastSubmittedFence{};
+			bool m_Active = false;
 		};
 
 		VulkanDevice* m_Device = nullptr;

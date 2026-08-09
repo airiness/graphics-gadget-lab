@@ -2,11 +2,12 @@
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
-#include <array>
 #include <unordered_set>
 
 namespace gglab
@@ -103,7 +104,8 @@ namespace gglab
 		std::span<const RHIFencePoint> ownerRetirementPoints) noexcept
 	{
 		if (!IsIndexInRange(index) ||
-			m_Slots[index].m_State != VulkanDescriptorPublicationState::Live)
+			m_Slots[index].m_State != VulkanDescriptorPublicationState::Live ||
+			m_Slots[index].m_RetirementRequested)
 		{
 			RecordInvalidTransition();
 			return false;
@@ -112,6 +114,52 @@ namespace gglab
 		Slot& slot = m_Slots[index];
 		slot.m_RetirementPoints.clear();
 		AppendRetirementPoints(slot, retirement, ownerRetirementPoints);
+		slot.m_State = VulkanDescriptorPublicationState::Retired;
+		return true;
+	}
+
+	bool VulkanDescriptorPublicationArena::RequestRetirement(uint32_t index,
+		uint64_t lastReachableGeneration, const RHIDescriptorRetirement& retirement,
+		std::span<const RHIFencePoint> ownerRetirementPoints) noexcept
+	{
+		if (!IsIndexInRange(index) || lastReachableGeneration == 0 ||
+			m_Slots[index].m_State != VulkanDescriptorPublicationState::Live ||
+			lastReachableGeneration < m_Slots[index].m_PublicationGeneration)
+		{
+			RecordInvalidTransition();
+			return false;
+		}
+
+		Slot& slot = m_Slots[index];
+		if (slot.m_RetirementRequested &&
+			slot.m_LastReachableGeneration != lastReachableGeneration)
+		{
+			RecordInvalidTransition();
+			return false;
+		}
+		if (!slot.m_RetirementRequested)
+		{
+			slot.m_LastReachableGeneration = lastReachableGeneration;
+			slot.m_RetirementRequested = true;
+		}
+		AppendRetirementPoints(slot, retirement, ownerRetirementPoints);
+		return true;
+	}
+
+	bool VulkanDescriptorPublicationArena::CompleteRetirementRequest(
+		uint32_t index, const RHIDescriptorRetirement& retirement) noexcept
+	{
+		if (!IsIndexInRange(index) ||
+			m_Slots[index].m_State != VulkanDescriptorPublicationState::Live ||
+			!m_Slots[index].m_RetirementRequested)
+		{
+			RecordInvalidTransition();
+			return false;
+		}
+
+		Slot& slot = m_Slots[index];
+		AppendRetirementPoints(slot, retirement, {});
+		slot.m_RetirementRequested = false;
 		slot.m_State = VulkanDescriptorPublicationState::Retired;
 		return true;
 	}
@@ -220,6 +268,17 @@ namespace gglab
 		return IsIndexInRange(index) ? m_Slots[index].m_PublicationGeneration : 0;
 	}
 
+	uint64_t VulkanDescriptorPublicationArena::GetLastReachableGeneration(
+		uint32_t index) const noexcept
+	{
+		return IsIndexInRange(index) ? m_Slots[index].m_LastReachableGeneration : 0;
+	}
+
+	bool VulkanDescriptorPublicationArena::IsRetirementRequested(uint32_t index) const noexcept
+	{
+		return IsIndexInRange(index) && m_Slots[index].m_RetirementRequested;
+	}
+
 	const std::shared_ptr<void>& VulkanDescriptorPublicationArena::GetBacking(
 		uint32_t index) const noexcept
 	{
@@ -237,6 +296,7 @@ namespace gglab
 		for (const Slot& slot : m_Slots)
 		{
 			diagnostics.m_RetainedBackingCount += slot.m_Backing ? 1u : 0u;
+			diagnostics.m_RetirementRequestedCount += slot.m_RetirementRequested ? 1u : 0u;
 			switch (slot.m_State)
 			{
 			case VulkanDescriptorPublicationState::Free:
@@ -372,6 +432,19 @@ namespace gglab
 		return true;
 	}
 
+	void VulkanDescriptorPublicationTracker::ResetFrameSlots(uint32_t frameSlotCount) noexcept
+	{
+		m_FrameSlots.assign(frameSlotCount, {});
+	}
+
+	bool VulkanDescriptorPublicationTracker::HasUnsubmittedSnapshots() const noexcept
+	{
+		return std::ranges::any_of(m_FrameSlots, [](const FrameSlot& slot) noexcept
+			{
+				return slot.m_HasSnapshot && !slot.m_Submitted;
+			});
+	}
+
 	VulkanDescriptorBacking::VulkanDescriptorBacking(VkDevice device, VkImageView imageView,
 		std::shared_ptr<void> parentOwner, uint64_t estimatedRetainedBytes) noexcept :
 		m_Device(device), m_Kind(Kind::ImageView), m_ImageView(imageView),
@@ -472,6 +545,9 @@ namespace gglab
 		}
 		m_Resources.Reset();
 		m_Samplers.Reset();
+		m_PublicationTracker = VulkanDescriptorPublicationTracker{};
+		m_PendingResourceRetirements.clear();
+		m_PendingSamplerRetirements.clear();
 		m_LayoutSupported = false;
 		m_Device = nullptr;
 	}
@@ -528,16 +604,86 @@ namespace gglab
 		return m_Samplers.MarkDescriptorReady(index, backing);
 	}
 
-	bool VulkanDescriptorManager::PublishResource(uint32_t index, uint64_t generation) noexcept
+	bool VulkanDescriptorManager::PublishResource(uint32_t index) noexcept
 	{
 		return CheckOwnerThread("VulkanDescriptorManager::PublishResource") &&
-			m_Resources.Publish(index, generation);
+			m_Resources.Publish(index, m_PublicationTracker.GetCurrentGeneration());
 	}
 
-	bool VulkanDescriptorManager::PublishSampler(uint32_t index, uint64_t generation) noexcept
+	bool VulkanDescriptorManager::PublishSampler(uint32_t index) noexcept
 	{
 		return CheckOwnerThread("VulkanDescriptorManager::PublishSampler") &&
-			m_Samplers.Publish(index, generation);
+			m_Samplers.Publish(index, m_PublicationTracker.GetCurrentGeneration());
+	}
+
+	bool VulkanDescriptorManager::InitializeFrameTracking(uint32_t frameSlotCount) noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::InitializeFrameTracking") ||
+			frameSlotCount == 0 || m_PublicationTracker.GetFrameSlotCount() != 0)
+		{
+			return false;
+		}
+		m_PublicationTracker.ResetFrameSlots(frameSlotCount);
+		return true;
+	}
+
+	bool VulkanDescriptorManager::DetachFrameTracking() noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::DetachFrameTracking"))
+		{
+			return false;
+		}
+		if (m_PublicationTracker.HasUnsubmittedSnapshots())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Cannot detach Vulkan descriptor frame tracking with an unsubmitted snapshot.");
+			return false;
+		}
+		ProcessPendingRetirements();
+		m_PublicationTracker.ResetFrameSlots(0);
+		return true;
+	}
+
+	bool VulkanDescriptorManager::BeginFrameSnapshot(uint32_t frameSlotIndex) noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::BeginFrameSnapshot"))
+		{
+			return false;
+		}
+		auto isCompleted = [this](const RHIFencePoint& point) noexcept
+			{
+				return m_Device->IsFencePointCompleted(point);
+			};
+		return m_PublicationTracker.BeginFrameSnapshot(frameSlotIndex, isCompleted);
+	}
+
+	bool VulkanDescriptorManager::SubmitFrameSnapshot(uint32_t frameSlotIndex,
+		const RHIFencePoint& submittedFence) noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::SubmitFrameSnapshot"))
+		{
+			return false;
+		}
+		const VulkanTimelineFence* timeline = m_Device->GetGraphicsTimeline();
+		if (timeline == nullptr || submittedFence.m_Fence != timeline->GetRHIHandle() ||
+			submittedFence.m_Value > timeline->GetCurrentSignalValue() ||
+			!m_PublicationTracker.SubmitFrameSnapshot(frameSlotIndex, submittedFence))
+		{
+			return false;
+		}
+		ProcessPendingRetirements();
+		return true;
+	}
+
+	bool VulkanDescriptorManager::AbortFrameSnapshot(uint32_t frameSlotIndex) noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::AbortFrameSnapshot") ||
+			!m_PublicationTracker.AbortFrameSnapshot(frameSlotIndex))
+		{
+			return false;
+		}
+		ProcessPendingRetirements();
+		return true;
 	}
 
 	bool VulkanDescriptorManager::RetireResource(uint32_t index,
@@ -548,14 +694,15 @@ namespace gglab
 		{
 			return false;
 		}
-		const VulkanDescriptorPublicationState state = m_Resources.GetState(index);
-		if (state == VulkanDescriptorPublicationState::Retired)
+		const bool wasRequested = m_Resources.IsRetirementRequested(index);
+		const bool retired = RetireDescriptor(
+			m_Resources, index, retirement, ownerRetirementPoints);
+		if (retired && !wasRequested && m_Resources.IsRetirementRequested(index))
 		{
-			return m_Resources.JoinRetirement(index, retirement, ownerRetirementPoints);
+			m_PendingResourceRetirements.push_back(index);
+			ProcessPendingRetirements(m_Resources, m_PendingResourceRetirements);
 		}
-		return state == VulkanDescriptorPublicationState::Live
-			? m_Resources.Retire(index, retirement, ownerRetirementPoints)
-			: m_Resources.CancelUnpublished(index);
+		return retired;
 	}
 
 	bool VulkanDescriptorManager::RetireSampler(uint32_t index,
@@ -566,44 +713,73 @@ namespace gglab
 		{
 			return false;
 		}
-		const VulkanDescriptorPublicationState state = m_Samplers.GetState(index);
+		const bool wasRequested = m_Samplers.IsRetirementRequested(index);
+		const bool retired = RetireDescriptor(
+			m_Samplers, index, retirement, ownerRetirementPoints);
+		if (retired && !wasRequested && m_Samplers.IsRetirementRequested(index))
+		{
+			m_PendingSamplerRetirements.push_back(index);
+			ProcessPendingRetirements(m_Samplers, m_PendingSamplerRetirements);
+		}
+		return retired;
+	}
+
+	bool VulkanDescriptorManager::RetireDescriptor(VulkanDescriptorPublicationArena& arena,
+		uint32_t index, const RHIDescriptorRetirement& retirement,
+		std::span<const RHIFencePoint> ownerRetirementPoints) noexcept
+	{
+		const VulkanDescriptorPublicationState state = arena.GetState(index);
 		if (state == VulkanDescriptorPublicationState::Retired)
 		{
-			return m_Samplers.JoinRetirement(index, retirement, ownerRetirementPoints);
+			return arena.JoinRetirement(index, retirement, ownerRetirementPoints);
 		}
-		return state == VulkanDescriptorPublicationState::Live
-			? m_Samplers.Retire(index, retirement, ownerRetirementPoints)
-			: m_Samplers.CancelUnpublished(index);
-	}
+		if (state != VulkanDescriptorPublicationState::Live)
+		{
+			return arena.CancelUnpublished(index);
+		}
+		if (arena.IsRetirementRequested(index))
+		{
+			return arena.RequestRetirement(index, arena.GetLastReachableGeneration(index),
+				retirement, ownerRetirementPoints);
+		}
 
-	bool VulkanDescriptorManager::RetirePublishedResource(uint32_t index,
-		const VulkanDescriptorPublicationTracker& tracker,
-		std::span<const RHIFencePoint> ownerRetirementPoints) noexcept
-	{
-		if (!CheckOwnerThread("VulkanDescriptorManager::RetirePublishedResource") ||
-			m_Resources.GetState(index) != VulkanDescriptorPublicationState::Live)
+		const uint64_t lastReachableGeneration = m_PublicationTracker.GetCurrentGeneration();
+		if (m_PublicationTracker.PublishReplacement() == 0 ||
+			!arena.RequestRetirement(index, lastReachableGeneration,
+				retirement, ownerRetirementPoints))
 		{
 			return false;
 		}
-		RHIDescriptorRetirement retirement{};
-		return tracker.TryDeriveRetirement(
-			m_Resources.GetPublicationGeneration(index), retirement) &&
-			m_Resources.Retire(index, retirement, ownerRetirementPoints);
+		return true;
 	}
 
-	bool VulkanDescriptorManager::RetirePublishedSampler(uint32_t index,
-		const VulkanDescriptorPublicationTracker& tracker,
-		std::span<const RHIFencePoint> ownerRetirementPoints) noexcept
+	void VulkanDescriptorManager::ProcessPendingRetirements(
+		VulkanDescriptorPublicationArena& arena,
+		std::vector<uint32_t>& pendingIndices) noexcept
 	{
-		if (!CheckOwnerThread("VulkanDescriptorManager::RetirePublishedSampler") ||
-			m_Samplers.GetState(index) != VulkanDescriptorPublicationState::Live)
-		{
-			return false;
-		}
-		RHIDescriptorRetirement retirement{};
-		return tracker.TryDeriveRetirement(
-			m_Samplers.GetPublicationGeneration(index), retirement) &&
-			m_Samplers.Retire(index, retirement, ownerRetirementPoints);
+		std::erase_if(pendingIndices, [this, &arena](uint32_t index) noexcept
+			{
+				if (!arena.IsRetirementRequested(index))
+				{
+					return true;
+				}
+				RHIDescriptorRetirement retirement{};
+				if (!m_PublicationTracker.TryDeriveRetirement(
+					arena.GetLastReachableGeneration(index), retirement))
+				{
+					return false;
+				}
+				const bool completed = arena.CompleteRetirementRequest(index, retirement);
+				GGLAB_ASSERT_MSG(completed,
+					"Vulkan descriptor retirement request changed state while being processed.");
+				return completed;
+			});
+	}
+
+	void VulkanDescriptorManager::ProcessPendingRetirements() noexcept
+	{
+		ProcessPendingRetirements(m_Resources, m_PendingResourceRetirements);
+		ProcessPendingRetirements(m_Samplers, m_PendingSamplerRetirements);
 	}
 
 	void VulkanDescriptorManager::RetireCompleted() noexcept
@@ -612,6 +788,7 @@ namespace gglab
 		{
 			return;
 		}
+		ProcessPendingRetirements();
 		auto isCompleted = [this](const RHIFencePoint& point) noexcept
 			{
 				return m_Device->IsFencePointCompleted(point);
@@ -698,58 +875,8 @@ namespace gglab
 
 	bool VulkanDescriptorManager::CreateGlobalSet() noexcept
 	{
-		const auto& abi = GGLabVulkanShaderBindingABI;
-		const std::array<VkDescriptorType, 2> mutableTypes{
-			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-		};
-		const std::array<VkMutableDescriptorTypeListEXT, 2> mutableLists{
-			VkMutableDescriptorTypeListEXT{
-				.descriptorTypeCount = static_cast<uint32_t>(mutableTypes.size()),
-				.pDescriptorTypes = mutableTypes.data(),
-			},
-			VkMutableDescriptorTypeListEXT{},
-		};
-		VkMutableDescriptorTypeCreateInfoEXT mutableInfo{};
-		mutableInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
-		mutableInfo.mutableDescriptorTypeListCount = static_cast<uint32_t>(mutableLists.size());
-		mutableInfo.pMutableDescriptorTypeLists = mutableLists.data();
-
-		constexpr VkDescriptorBindingFlags GlobalBindingFlags =
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-			VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
-			VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
-		const std::array<VkDescriptorBindingFlags, 2> bindingFlags{
-			GlobalBindingFlags,
-			GlobalBindingFlags,
-		};
-		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
-		bindingFlagsInfo.sType =
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		bindingFlagsInfo.pNext = &mutableInfo;
-		bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
-		bindingFlagsInfo.pBindingFlags = bindingFlags.data();
-
-		const std::array<VkDescriptorSetLayoutBinding, 2> bindings{
-			VkDescriptorSetLayoutBinding{
-				.binding = abi.m_ResourceHeapBinding,
-				.descriptorType = VK_DESCRIPTOR_TYPE_MUTABLE_EXT,
-				.descriptorCount = abi.m_DescriptorCapacity.m_ResourceDescriptorCount,
-				.stageFlags = VK_SHADER_STAGE_ALL,
-			},
-			VkDescriptorSetLayoutBinding{
-				.binding = abi.m_SamplerHeapBinding,
-				.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-				.descriptorCount = abi.m_DescriptorCapacity.m_SamplerDescriptorCount,
-				.stageFlags = VK_SHADER_STAGE_ALL,
-			},
-		};
-		VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.pNext = &bindingFlagsInfo;
-		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
+		const VulkanGlobalDescriptorLayoutPlan plan;
+		const VkDescriptorSetLayoutCreateInfo& layoutInfo = plan.GetLayoutInfo();
 
 		VkDescriptorSetLayoutSupport layoutSupport{};
 		layoutSupport.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT;
@@ -771,24 +898,11 @@ namespace gglab
 			return false;
 		}
 
-		const std::array<VkDescriptorPoolSize, 2> poolSizes{
-			VkDescriptorPoolSize{
-				.type = VK_DESCRIPTOR_TYPE_MUTABLE_EXT,
-				.descriptorCount = abi.m_DescriptorCapacity.m_ResourceDescriptorCount,
-			},
-			VkDescriptorPoolSize{
-				.type = VK_DESCRIPTOR_TYPE_SAMPLER,
-				.descriptorCount = abi.m_DescriptorCapacity.m_SamplerDescriptorCount,
-			},
-		};
-		VkMutableDescriptorTypeCreateInfoEXT poolMutableInfo{};
-		poolMutableInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
-		poolMutableInfo.mutableDescriptorTypeListCount = static_cast<uint32_t>(mutableLists.size());
-		poolMutableInfo.pMutableDescriptorTypeLists = mutableLists.data();
+		const auto& poolSizes = plan.GetPoolSizes();
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.pNext = &poolMutableInfo;
-		poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+		poolInfo.pNext = &plan.GetMutableInfo();
+		poolInfo.flags = plan.GetPoolCreateFlags();
 		poolInfo.maxSets = 1;
 		poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 		poolInfo.pPoolSizes = poolSizes.data();

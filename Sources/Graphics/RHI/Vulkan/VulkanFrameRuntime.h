@@ -360,5 +360,6 @@ namespace gglab
 		bool m_Fatal = false;
 		bool m_DeviceLost = false;
 		bool m_Finalized = false;
+		bool m_DescriptorFrameTrackingAttached = false;
 	};
 }

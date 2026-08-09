@@ -223,21 +223,17 @@ namespace gglab
 
 	VulkanFrameRuntime::~VulkanFrameRuntime()
 	{
-		// Unregister the borrowed graphics timeline before anything else:
-		// the device outlives the runtime (destruction order is runtime
-		// first), but the registration must still be paired so no dangling
-		// completion-source pointer survives the runtime.
+		// Quiesce and drain frame-scoped descriptor state while the graphics
+		// timeline is still available as the device completion source.
+		Finalize();
+
+		// The device outlives the runtime, so unregister the borrowed timeline
+		// before its owner is destroyed.
 		if (m_Device != nullptr && m_Timeline != nullptr &&
 			m_Device->GetGraphicsTimeline() == m_Timeline.get())
 		{
 			m_Device->SetGraphicsTimeline(nullptr);
 		}
-
-		// Defensive quiesce: an early-return failure path (including partial
-		// construction) must never destroy command pools, semaphores or the
-		// swapchain while their GPU work is still in flight. Finalize is
-		// idempotent, noexcept and safe on partially constructed members.
-		Finalize();
 	}
 
 	void VulkanFrameRuntime::Finalize() noexcept
@@ -259,6 +255,20 @@ namespace gglab
 			if (m_Timeline != nullptr)
 			{
 				(void)m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+			}
+		}
+		if (m_Device != nullptr && m_DescriptorFrameTrackingAttached)
+		{
+			if (m_ActiveFrame.has_value())
+			{
+				(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
+					m_ActiveFrame->m_FrameSlotIndex);
+				m_ActiveFrame.reset();
+			}
+			m_Device->RetireCompletedWork();
+			if (m_Device->GetDescriptorManager().DetachFrameTracking())
+			{
+				m_DescriptorFrameTrackingAttached = false;
 			}
 		}
 		DestroyFrameSlots();
@@ -368,6 +378,14 @@ namespace gglab
 		// Model state sized to the runtime.
 		runtime->m_IndexModel = VulkanFrameIndexModel(createInfo.m_FrameSlotCount);
 		runtime->m_LayoutTracker.Reset(runtime->m_SwapChain->GetImageCount());
+		if (!createInfo.m_Device->GetDescriptorManager().InitializeFrameTracking(
+			createInfo.m_FrameSlotCount))
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "Descriptor frame tracking initialization failed.";
+			return result;
+		}
+		runtime->m_DescriptorFrameTrackingAttached = true;
 
 		result.m_Runtime = std::move(runtime);
 		return result;
@@ -423,6 +441,13 @@ namespace gglab
 			}
 		}
 		vkResetCommandPool(m_Device->Get(), slot.m_CommandPool, 0);
+		if (!m_Device->GetDescriptorManager().BeginFrameSnapshot(frameSlotIndex))
+		{
+			MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
+			result.m_Status = VulkanAcquireOutcome::Fatal;
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			return result;
+		}
 
 		uint32_t backBufferIndex = 0;
 		const VkResult acquireResult = vkAcquireNextImageKHR(m_Device->Get(), m_SwapChain->Get(),
@@ -439,6 +464,7 @@ namespace gglab
 				// double Begin, so a rejected slot indicates a corrupted
 				// transaction state.
 				MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
+				(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
 				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
 				return result;
 			}
@@ -456,9 +482,11 @@ namespace gglab
 			// swapchain with the real extent before retrying; the runtime
 			// never picks an extent itself.
 			result.m_Status = VulkanAcquireOutcome::OutOfDate;
+			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
 			result.m_Result = acquireResult;
 			return result;
 		default:
+			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(frameSlotIndex);
 			MarkFatal(acquireResult);
 			result.m_Status = VulkanAcquireOutcome::Fatal;
 			result.m_Result = acquireResult;
@@ -482,6 +510,8 @@ namespace gglab
 		{
 			// End after Abort is rejected; the abort already released the
 			// image.
+			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
+				active.m_FrameSlotIndex);
 			m_ActiveFrame.reset();
 			return result;
 		}
@@ -489,6 +519,15 @@ namespace gglab
 		VulkanSubmitPresentResult submitPresent =
 			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
 				slot.m_NormalCommandBuffer);
+		const bool snapshotAccepted = submitPresent.m_Submitted
+			? m_Device->GetDescriptorManager().SubmitFrameSnapshot(
+				active.m_FrameSlotIndex, submitPresent.m_SubmittedFencePoint)
+			: m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex);
+		if (!snapshotAccepted)
+		{
+			MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
+			submitPresent.m_Fatal = true;
+		}
 		m_ActiveFrame.reset();
 		if (submitPresent.m_Presented)
 		{
@@ -511,6 +550,8 @@ namespace gglab
 		if (!m_StateMachine.TryAbort(active.m_FrameSlotIndex))
 		{
 			// Abort after End is rejected; the frame was already presented.
+			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
+				active.m_FrameSlotIndex);
 			m_ActiveFrame.reset();
 			return result;
 		}
@@ -520,6 +561,11 @@ namespace gglab
 		VulkanSubmitPresentResult submitPresent =
 			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
 				slot.m_AbortCommandBuffer);
+		if (!m_Device->GetDescriptorManager().AbortFrameSnapshot(active.m_FrameSlotIndex))
+		{
+			MarkFatal(VK_ERROR_INITIALIZATION_FAILED);
+			submitPresent.m_Fatal = true;
+		}
 		m_ActiveFrame.reset();
 		if (submitPresent.m_Presented)
 		{

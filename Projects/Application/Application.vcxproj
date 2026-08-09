@@ -606,6 +606,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

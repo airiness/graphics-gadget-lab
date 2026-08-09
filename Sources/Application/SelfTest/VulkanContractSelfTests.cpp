@@ -1971,6 +1971,48 @@ namespace gglab
 			[](const RHIFencePoint&) noexcept { return false; }) &&
 			tracker.BeginFrameSnapshot(0, completed),
 			"A frame slot cannot replace its snapshot before the prior submission completes");
+
+		VulkanDescriptorPublicationArena pendingArena(1);
+		VulkanDescriptorPublicationTracker pendingTracker(1);
+		const std::optional<uint32_t> pendingIndex = pendingArena.Allocate();
+		auto pendingBacking = std::make_shared<uint32_t>(23);
+		std::weak_ptr<uint32_t> pendingWeak = pendingBacking;
+		const bool pendingPublished = pendingIndex &&
+			pendingArena.MarkDescriptorReady(*pendingIndex, pendingBacking) &&
+			pendingArena.Publish(*pendingIndex, pendingTracker.GetCurrentGeneration());
+		pendingBacking.reset();
+		const uint64_t lastReachableGeneration = pendingTracker.GetCurrentGeneration();
+		context.Check(pendingPublished && pendingTracker.BeginFrameSnapshot(0, completed) &&
+			pendingTracker.PublishReplacement() == 2 &&
+			pendingArena.RequestRetirement(*pendingIndex, lastReachableGeneration, {}) &&
+			pendingArena.GetState(*pendingIndex) == VulkanDescriptorPublicationState::Live &&
+			pendingArena.GetDiagnostics().m_RetirementRequestedCount == 1 &&
+			!pendingTracker.TryDeriveRetirement(lastReachableGeneration, retirement) &&
+			!pendingWeak.expired(),
+			"A retirement request stays live while an old descriptor snapshot is unsubmitted");
+		context.Check(pendingTracker.SubmitFrameSnapshot(0, { graphicsFence, 15 }) &&
+			pendingTracker.TryDeriveRetirement(lastReachableGeneration, retirement) &&
+			pendingArena.CompleteRetirementRequest(*pendingIndex, retirement) &&
+			pendingArena.GetState(*pendingIndex) == VulkanDescriptorPublicationState::Retired &&
+			retirement.m_LastPossibleGraphicsUse == RHIFencePoint(graphicsFence, 15),
+			"A submitted snapshot supplies the descriptor retirement fence");
+
+		VulkanDescriptorPublicationArena abandonedArena(1);
+		VulkanDescriptorPublicationTracker abandonedTracker(1);
+		const std::optional<uint32_t> abandonedIndex = abandonedArena.Allocate();
+		auto abandonedBacking = std::make_shared<uint32_t>(29);
+		const bool abandonedPublished = abandonedIndex &&
+			abandonedArena.MarkDescriptorReady(*abandonedIndex, abandonedBacking) &&
+			abandonedArena.Publish(*abandonedIndex, abandonedTracker.GetCurrentGeneration());
+		const uint64_t abandonedGeneration = abandonedTracker.GetCurrentGeneration();
+		context.Check(abandonedPublished && abandonedTracker.BeginFrameSnapshot(0, completed) &&
+			abandonedTracker.PublishReplacement() == 2 &&
+			abandonedArena.RequestRetirement(*abandonedIndex, abandonedGeneration, {}) &&
+			abandonedTracker.AbortFrameSnapshot(0) &&
+			abandonedTracker.TryDeriveRetirement(abandonedGeneration, retirement) &&
+			!retirement.m_LastPossibleGraphicsUse.IsValid() &&
+			abandonedArena.CompleteRetirementRequest(*abandonedIndex, retirement),
+			"A descriptor-unused abort abandons the snapshot without inventing a fence gate");
 	}
 
 	void RunVulkanBindingLayoutTests(SelfTestContext& context) noexcept
@@ -2065,6 +2107,17 @@ namespace gglab
 		context.Check(reused.m_OffsetInBytes == 0 && reused.m_PageIndex == 0 &&
 			arena.GetDiagnostics().m_HighWaterMarkInBytes == highWater,
 			"Dynamic uniform pages reset for frame-slot reuse while preserving high-water diagnostics");
+
+		VulkanDynamicUniformArena normalizedPages({
+			.m_PageSizeInBytes = 48,
+			.m_MaxPageCount = 2,
+			.m_Alignment = 32,
+			});
+		const VulkanDynamicUniformArenaAllocation normalizedFirst = normalizedPages.Allocate(48);
+		const VulkanDynamicUniformArenaAllocation normalizedSecond = normalizedPages.Allocate(16);
+		context.Check(normalizedFirst.m_OffsetInBytes == 0 &&
+			normalizedSecond.m_OffsetInBytes == 64 && normalizedSecond.m_PageIndex == 1,
+			"Dynamic uniform page starts remain aligned when page size is not an alignment multiple");
 
 		VulkanDynamicUniformArena overflowingConfig({
 			.m_PageSizeInBytes = UINT32_MAX,

@@ -180,10 +180,8 @@ namespace gglab
 		RHIDescriptorHandle GetTextureViewDescriptor(RHITextureViewHandle view) const noexcept;
 		RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle view) const noexcept;
 		RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept;
-		bool PublishTextureViewDescriptor(
-			RHITextureViewHandle view, uint64_t publicationGeneration) noexcept;
-		bool PublishSamplerDescriptor(
-			RHISamplerHandle sampler, uint64_t publicationGeneration) noexcept;
+		bool PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept;
+		bool PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept;
 
 		void RetireCompletedResources() noexcept;
 

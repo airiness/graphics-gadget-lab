@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
+#include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
@@ -423,72 +424,10 @@ namespace gglab
 
 	bool ProbeGlobalDescriptorSetLayoutSupport(VkDevice device) noexcept
 	{
-		const uint32_t resourceCount =
-			GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_ResourceDescriptorCount;
-		const uint32_t samplerCount =
-			GGLabVulkanShaderBindingABI.m_DescriptorCapacity.m_SamplerDescriptorCount;
-		const uint32_t globalSet = GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet;
-		GGLAB_UNUSED(globalSet);
-
-		constexpr std::array MutableDescriptorTypes{
-			VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-			VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-		};
-
-		std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
-		bindings[0] = {
-			.binding = GGLabVulkanShaderBindingABI.m_ResourceHeapBinding,
-			.descriptorType = VK_DESCRIPTOR_TYPE_MUTABLE_EXT,
-			.descriptorCount = resourceCount,
-			.stageFlags = VK_SHADER_STAGE_ALL,
-			.pImmutableSamplers = nullptr,
-		};
-		bindings[1] = {
-			.binding = GGLabVulkanShaderBindingABI.m_SamplerHeapBinding,
-			.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
-			.descriptorCount = samplerCount,
-			.stageFlags = VK_SHADER_STAGE_ALL,
-			.pImmutableSamplers = nullptr,
-		};
-
-		std::array<VkMutableDescriptorTypeListEXT, 2> mutableLists{};
-		mutableLists[0] = {
-			.descriptorTypeCount = static_cast<uint32_t>(MutableDescriptorTypes.size()),
-			.pDescriptorTypes = MutableDescriptorTypes.data(),
-		};
-		mutableLists[1] = {
-			.descriptorTypeCount = 0,
-			.pDescriptorTypes = nullptr,
-		};
-		VkMutableDescriptorTypeCreateInfoEXT mutableCreateInfo{};
-		mutableCreateInfo.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
-		mutableCreateInfo.mutableDescriptorTypeListCount =
-			static_cast<uint32_t>(mutableLists.size());
-		mutableCreateInfo.pMutableDescriptorTypeLists = mutableLists.data();
-
-		std::array<VkDescriptorBindingFlags, 2> bindingFlags{
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
-				VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT,
-			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
-				VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT,
-		};
-		VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsInfo{};
-		bindingFlagsInfo.sType =
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-		bindingFlagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
-		bindingFlagsInfo.pBindingFlags = bindingFlags.data();
-
-		VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
-		layoutInfo.pNext = &bindingFlagsInfo;
-		bindingFlagsInfo.pNext = &mutableCreateInfo;
-
+		const VulkanGlobalDescriptorLayoutPlan plan;
 		VkDescriptorSetLayoutSupport support{};
 		support.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT;
-		vkGetDescriptorSetLayoutSupport(device, &layoutInfo, &support);
+		vkGetDescriptorSetLayoutSupport(device, &plan.GetLayoutInfo(), &support);
 		return support.supported == VK_TRUE;
 	}
 }

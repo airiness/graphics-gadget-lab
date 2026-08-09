@@ -1258,8 +1258,7 @@ namespace gglab
 		};
 	}
 
-	bool VulkanResourceManager::PublishTextureViewDescriptor(
-		RHITextureViewHandle view, uint64_t publicationGeneration) noexcept
+	bool VulkanResourceManager::PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept
 	{
 		if (!CheckOwnerThread("VulkanResourceManager::PublishTextureViewDescriptor"))
 		{
@@ -1267,12 +1266,10 @@ namespace gglab
 		}
 		const TextureViewSlot* slot = m_TextureViews.Resolve(view);
 		return slot && slot->m_DescriptorIndex &&
-			m_Device->GetDescriptorManager().PublishResource(
-				*slot->m_DescriptorIndex, publicationGeneration);
+			m_Device->GetDescriptorManager().PublishResource(*slot->m_DescriptorIndex);
 	}
 
-	bool VulkanResourceManager::PublishSamplerDescriptor(
-		RHISamplerHandle sampler, uint64_t publicationGeneration) noexcept
+	bool VulkanResourceManager::PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept
 	{
 		if (!CheckOwnerThread("VulkanResourceManager::PublishSamplerDescriptor"))
 		{
@@ -1280,8 +1277,7 @@ namespace gglab
 		}
 		const SamplerSlot* slot = m_Samplers.Resolve(sampler);
 		return slot && slot->m_DescriptorIndex &&
-			m_Device->GetDescriptorManager().PublishSampler(
-				*slot->m_DescriptorIndex, publicationGeneration);
+			m_Device->GetDescriptorManager().PublishSampler(*slot->m_DescriptorIndex);
 	}
 
 	void VulkanResourceManager::RetireCompletedResources() noexcept

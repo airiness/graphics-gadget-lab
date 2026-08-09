@@ -3,10 +3,12 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
 #include <cstring>
+#include <numeric>
 
 namespace gglab
 {
@@ -25,6 +27,11 @@ namespace gglab
 		m_Config.m_PageSizeInBytes = std::max(m_Config.m_PageSizeInBytes, 1u);
 		m_Config.m_MaxPageCount = std::max(m_Config.m_MaxPageCount, 1u);
 		m_Config.m_Alignment = std::max(m_Config.m_Alignment, 1u);
+		const uint64_t alignedPageSize = AlignUp(
+			m_Config.m_PageSizeInBytes, m_Config.m_Alignment);
+		m_Config.m_PageSizeInBytes = alignedPageSize <= UINT32_MAX
+			? static_cast<uint32_t>(alignedPageSize)
+			: 0;
 	}
 
 	VulkanDynamicUniformArenaAllocation VulkanDynamicUniformArena::Allocate(
@@ -90,7 +97,19 @@ namespace gglab
 		{
 			return false;
 		}
-		VulkanDynamicUniformArena capacityProbe(config);
+		VulkanDynamicUniformArenaConfig effectiveConfig = config;
+		const uint64_t requestedAlignment = std::max<uint64_t>(config.m_Alignment, 1);
+		const uint64_t deviceAlignment = std::max<VkDeviceSize>(
+			device->GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1);
+		const uint64_t alignmentFactor = requestedAlignment /
+			std::gcd(requestedAlignment, deviceAlignment);
+		if (deviceAlignment > UINT32_MAX / alignmentFactor)
+		{
+			return false;
+		}
+		const uint64_t alignment = alignmentFactor * deviceAlignment;
+		effectiveConfig.m_Alignment = static_cast<uint32_t>(alignment);
+		VulkanDynamicUniformArena capacityProbe(effectiveConfig);
 		m_CapacityInBytes = capacityProbe.GetCapacityInBytes();
 		if (m_CapacityInBytes == 0)
 		{
@@ -98,11 +117,12 @@ namespace gglab
 		}
 
 		m_Device = device;
+		m_AlignmentInBytes = effectiveConfig.m_Alignment;
 		m_FrameSlots.resize(frameSlotCount);
 		for (uint32_t frameSlotIndex = 0; frameSlotIndex < frameSlotCount; ++frameSlotIndex)
 		{
 			FrameSlot& slot = m_FrameSlots[frameSlotIndex];
-			slot.m_Arena = std::make_unique<VulkanDynamicUniformArena>(config);
+			slot.m_Arena = std::make_unique<VulkanDynamicUniformArena>(effectiveConfig);
 			slot.m_Buffer = device->CreateBuffer({
 				.m_SizeInBytes = m_CapacityInBytes,
 				.m_Usage = RHIBufferUsage::Constant,
@@ -147,6 +167,7 @@ namespace gglab
 		}
 		m_FrameSlots.clear();
 		m_CapacityInBytes = 0;
+		m_AlignmentInBytes = 0;
 		m_Device = nullptr;
 	}
 
@@ -181,7 +202,13 @@ namespace gglab
 	{
 		if (m_Device == nullptr ||
 			!m_Device->RequireOwnerThread("VulkanDynamicUniformBuffer::EndFrame") ||
-			frameSlotIndex >= m_FrameSlots.size() || !submittedFence.IsValid())
+			frameSlotIndex >= m_FrameSlots.size())
+		{
+			return false;
+		}
+		const VulkanTimelineFence* timeline = m_Device->GetGraphicsTimeline();
+		if (timeline == nullptr || submittedFence.m_Fence != timeline->GetRHIHandle() ||
+			submittedFence.m_Value > timeline->GetCurrentSignalValue())
 		{
 			return false;
 		}
@@ -190,8 +217,21 @@ namespace gglab
 		{
 			return false;
 		}
+		m_Device->RecordBufferUse(slot.m_Buffer, submittedFence);
 		slot.m_LastSubmittedFence = submittedFence;
 		slot.m_Active = false;
+		return true;
+	}
+
+	bool VulkanDynamicUniformBuffer::AbortFrame(uint32_t frameSlotIndex) noexcept
+	{
+		if (m_Device == nullptr ||
+			!m_Device->RequireOwnerThread("VulkanDynamicUniformBuffer::AbortFrame") ||
+			frameSlotIndex >= m_FrameSlots.size() || !m_FrameSlots[frameSlotIndex].m_Active)
+		{
+			return false;
+		}
+		m_FrameSlots[frameSlotIndex].m_Active = false;
 		return true;
 	}
 
@@ -335,18 +375,18 @@ namespace gglab
 			: std::span<const std::byte>{};
 	}
 
-	VulkanSet0DescriptorFrames::~VulkanSet0DescriptorFrames() noexcept
+	VulkanSet0DynamicUniformFrames::~VulkanSet0DynamicUniformFrames() noexcept
 	{
 		Finalize();
 	}
 
-	bool VulkanSet0DescriptorFrames::Initialize(VulkanDevice* device,
+	bool VulkanSet0DynamicUniformFrames::Initialize(VulkanDevice* device,
 		const VulkanBindingLayout& layout, VulkanDynamicUniformBuffer* uniformBuffer,
 		uint32_t frameSlotCount) noexcept
 	{
 		if (m_Device != nullptr || device == nullptr || !layout.IsValid() ||
 			uniformBuffer == nullptr || frameSlotCount == 0 ||
-			!device->RequireOwnerThread("VulkanSet0DescriptorFrames::Initialize"))
+			!device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::Initialize"))
 		{
 			return false;
 		}
@@ -394,15 +434,37 @@ namespace gglab
 		return true;
 	}
 
-	void VulkanSet0DescriptorFrames::Finalize() noexcept
+	void VulkanSet0DynamicUniformFrames::Finalize() noexcept
 	{
 		if (m_Device == nullptr)
 		{
 			return;
 		}
-		if (!m_Device->RequireOwnerThread("VulkanSet0DescriptorFrames::Finalize"))
+		if (!m_Device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::Finalize"))
 		{
 			return;
+		}
+		bool requiresWait = false;
+		for (uint32_t frameSlotIndex = 0; frameSlotIndex < m_FrameSlots.size(); ++frameSlotIndex)
+		{
+			FrameSlot& slot = m_FrameSlots[frameSlotIndex];
+			if (slot.m_Active)
+			{
+				(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
+				slot.m_Active = false;
+			}
+			requiresWait = requiresWait || (slot.m_LastSubmittedFence.IsValid() &&
+				!m_Device->IsFencePointCompleted(slot.m_LastSubmittedFence));
+		}
+		if (requiresWait)
+		{
+			const VkResult result = vkQueueWaitIdle(m_Device->GetGraphicsQueue());
+			if (result != VK_SUCCESS)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Waiting to destroy Vulkan set 0 descriptor pools failed with {}.",
+					ToString(result));
+			}
 		}
 		for (FrameSlot& slot : m_FrameSlots)
 		{
@@ -417,18 +479,25 @@ namespace gglab
 		m_Device = nullptr;
 	}
 
-	bool VulkanSet0DescriptorFrames::BeginFrame(uint32_t frameSlotIndex) noexcept
+	bool VulkanSet0DynamicUniformFrames::BeginFrame(uint32_t frameSlotIndex) noexcept
 	{
 		if (m_Device == nullptr || frameSlotIndex >= m_FrameSlots.size() ||
-			!m_Device->RequireOwnerThread("VulkanSet0DescriptorFrames::BeginFrame"))
+			!m_Device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::BeginFrame"))
 		{
 			return false;
 		}
 		FrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		if (slot.m_Active || (slot.m_LastSubmittedFence.IsValid() &&
+			!m_Device->IsFencePointCompleted(slot.m_LastSubmittedFence)) ||
+			!m_UniformBuffer->BeginFrame(frameSlotIndex))
+		{
+			return false;
+		}
 		const uint64_t frameGeneration = m_UniformBuffer->GetFrameGeneration(frameSlotIndex);
-		if (!m_UniformBuffer->IsFrameActive(frameSlotIndex) || frameGeneration == 0 ||
+		if (frameGeneration == 0 ||
 			frameGeneration <= slot.m_LastResetGeneration)
 		{
+			(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
 			return false;
 		}
 		VkResult result = vkResetDescriptorPool(m_Device->Get(), slot.m_Pool, 0);
@@ -436,6 +505,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"vkResetDescriptorPool(set 0) failed with {}.", ToString(result));
+			(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
 			return false;
 		}
 		slot.m_Set = VK_NULL_HANDLE;
@@ -450,6 +520,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"vkAllocateDescriptorSets(set 0) failed with {}.", ToString(result));
+			(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
 			return false;
 		}
 
@@ -485,13 +556,46 @@ namespace gglab
 				static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 		}
 		slot.m_LastResetGeneration = frameGeneration;
+		slot.m_LastSubmittedFence = {};
+		slot.m_Active = true;
 		return true;
 	}
 
-	VkDescriptorSet VulkanSet0DescriptorFrames::GetDescriptorSet(
+	bool VulkanSet0DynamicUniformFrames::EndFrame(
+		uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept
+	{
+		if (m_Device == nullptr || frameSlotIndex >= m_FrameSlots.size() ||
+			!m_Device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::EndFrame") ||
+			!submittedFence.IsValid() || !m_FrameSlots[frameSlotIndex].m_Active ||
+			!m_UniformBuffer->EndFrame(frameSlotIndex, submittedFence))
+		{
+			return false;
+		}
+		FrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		slot.m_LastSubmittedFence = submittedFence;
+		slot.m_Active = false;
+		return true;
+	}
+
+	bool VulkanSet0DynamicUniformFrames::AbortFrame(uint32_t frameSlotIndex) noexcept
+	{
+		if (m_Device == nullptr || frameSlotIndex >= m_FrameSlots.size() ||
+			!m_Device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::AbortFrame") ||
+			!m_FrameSlots[frameSlotIndex].m_Active ||
+			!m_UniformBuffer->AbortFrame(frameSlotIndex))
+		{
+			return false;
+		}
+		FrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		slot.m_Set = VK_NULL_HANDLE;
+		slot.m_Active = false;
+		return true;
+	}
+
+	VkDescriptorSet VulkanSet0DynamicUniformFrames::GetDescriptorSet(
 		uint32_t frameSlotIndex) const noexcept
 	{
-		return frameSlotIndex < m_FrameSlots.size()
+		return frameSlotIndex < m_FrameSlots.size() && m_FrameSlots[frameSlotIndex].m_Active
 			? m_FrameSlots[frameSlotIndex].m_Set
 			: VK_NULL_HANDLE;
 	}

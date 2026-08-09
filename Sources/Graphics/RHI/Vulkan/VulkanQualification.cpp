@@ -381,7 +381,7 @@ namespace gglab
 					"qualify resource: deferred texture view creation failed.");
 				return 1;
 			}
-			if (!resources.PublishTextureViewDescriptor(pendingView, 1))
+			if (!resources.PublishTextureViewDescriptor(pendingView))
 			{
 				LogQualificationError(
 					"qualify resource: deferred descriptor publication failed.");
@@ -1114,7 +1114,7 @@ namespace gglab
 				const bool everyDescriptorPublished = std::ranges::all_of(resources.m_Views,
 					[&device](RHITextureViewHandle view) noexcept
 					{
-						return device.GetResourceManager().PublishTextureViewDescriptor(view, 1);
+						return device.GetResourceManager().PublishTextureViewDescriptor(view);
 					});
 				if (!everyDescriptorPublished)
 				{
@@ -1276,7 +1276,7 @@ namespace gglab
 												completion.m_FencePoint.IsValid() &&
 												device.IsFencePointCompleted(completion.m_FencePoint) &&
 												device.GetResourceManager().PublishTextureViewDescriptor(
-													streamingView, 1))
+													streamingView))
 											{
 												publishedDescriptor = privateDescriptor;
 											}
@@ -1341,6 +1341,94 @@ namespace gglab
 				return 1;
 			}
 
+			VulkanResourceManager& resources = device.GetResourceManager();
+			RHISamplerDesc publicationSamplerDesc{};
+			const RHISamplerHandle submittedSampler =
+				resources.CreateSampler(publicationSamplerDesc);
+			const RHIDescriptorHandle submittedSamplerDescriptor =
+				resources.GetSamplerDescriptor(submittedSampler);
+			const bool submittedSamplerPublished = submittedSampler.IsValid() &&
+				submittedSamplerDescriptor.IsValid() &&
+				resources.PublishSamplerDescriptor(submittedSampler);
+			if (!submittedSamplerPublished)
+			{
+				if (submittedSampler.IsValid())
+				{
+					resources.DestroySampler(submittedSampler);
+				}
+				LogQualificationError(
+					"qualify descriptors: submitted sampler publication setup failed.");
+				return 1;
+			}
+			const VulkanBeginFrameResult submittedBegin = runtime.BeginFrame();
+			if (!submittedBegin.IsAcquired())
+			{
+				resources.DestroySampler(submittedSampler);
+				LogQualificationError(
+					"qualify descriptors: submitted sampler frame acquire failed.");
+				return 1;
+			}
+			resources.DestroySampler(submittedSampler);
+			const VulkanDescriptorPublicationDiagnostics pendingSubmittedDiagnostics =
+				descriptors.GetSamplerDiagnostics();
+			const VulkanDescriptorPublicationState pendingSubmittedState =
+				descriptors.GetSamplerState(submittedSamplerDescriptor.m_Index);
+			const VulkanSubmitPresentResult submittedFrame =
+				runtime.EndFrame({ 0.08f, 0.12f, 0.18f, 1.0f });
+			if (pendingSubmittedState != VulkanDescriptorPublicationState::Live ||
+				pendingSubmittedDiagnostics.m_RetirementRequestedCount == 0 ||
+				!submittedFrame.m_Submitted || runtime.WaitIdle() != VK_SUCCESS)
+			{
+				LogQualificationError(
+					"qualify descriptors: submitted sampler retirement was not fence-gated.");
+				return 1;
+			}
+			device.RetireCompletedWork();
+			if (descriptors.GetSamplerState(submittedSamplerDescriptor.m_Index) !=
+				VulkanDescriptorPublicationState::Free)
+			{
+				LogQualificationError(
+					"qualify descriptors: submitted sampler retirement did not complete.");
+				return 1;
+			}
+
+			const RHISamplerHandle abandonedSampler =
+				resources.CreateSampler(publicationSamplerDesc);
+			const RHIDescriptorHandle abandonedSamplerDescriptor =
+				resources.GetSamplerDescriptor(abandonedSampler);
+			const bool abandonedSamplerPublished = abandonedSampler.IsValid() &&
+				abandonedSamplerDescriptor.IsValid() &&
+				resources.PublishSamplerDescriptor(abandonedSampler);
+			if (!abandonedSamplerPublished)
+			{
+				if (abandonedSampler.IsValid())
+				{
+					resources.DestroySampler(abandonedSampler);
+				}
+				LogQualificationError(
+					"qualify descriptors: abandoned sampler publication setup failed.");
+				return 1;
+			}
+			const VulkanBeginFrameResult abandonedBegin = runtime.BeginFrame();
+			if (!abandonedBegin.IsAcquired())
+			{
+				resources.DestroySampler(abandonedSampler);
+				LogQualificationError(
+					"qualify descriptors: abandoned sampler frame acquire failed.");
+				return 1;
+			}
+			resources.DestroySampler(abandonedSampler);
+			const VulkanSubmitPresentResult abandonedFrame = runtime.AbortFrame();
+			device.RetireCompletedWork();
+			if (!abandonedFrame.m_Submitted ||
+				descriptors.GetSamplerState(abandonedSamplerDescriptor.m_Index) !=
+				VulkanDescriptorPublicationState::Free)
+			{
+				LogQualificationError(
+					"qualify descriptors: descriptor-unused abort retained a sampler snapshot.");
+				return 1;
+			}
+
 			RHIBindingLayoutDesc layoutDesc{};
 			layoutDesc.m_DebugName = "Qualification.DynamicUniformLayout";
 			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
@@ -1389,20 +1477,17 @@ namespace gglab
 			if (!uniformBuffer.Initialize(&device, runtime.GetFrameSlotCount(), {
 				.m_PageSizeInBytes = uniformAlignment * 2,
 				.m_MaxPageCount = 2,
-				.m_Alignment = uniformAlignment,
+				.m_Alignment = 1,
 				}))
 			{
 				LogQualificationError("qualify dynamic uniform: buffer initialization failed.");
 				return 1;
 			}
-			VulkanSet0DescriptorFrames set0Frames;
+			VulkanSet0DynamicUniformFrames set0Frames;
 			const bool set0Initialized = set0Frames.Initialize(
 				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount());
-			const bool prematurePoolResetRejected =
-				set0Initialized && !set0Frames.BeginFrame(0);
-			if (!set0Initialized || !prematurePoolResetRejected ||
-				!uniformBuffer.BeginFrame(0) || !set0Frames.BeginFrame(0) ||
-				set0Frames.BeginFrame(0))
+			if (!set0Initialized || !set0Frames.BeginFrame(0) ||
+				set0Frames.BeginFrame(0) || uniformBuffer.GetAlignmentInBytes() != uniformAlignment)
 			{
 				LogQualificationError(
 					"qualify dynamic uniform: set-0 frame-slot gating failed.");
@@ -1439,9 +1524,9 @@ namespace gglab
 
 			const RHIFencePoint completedFrame(
 				runtime.GetTimeline().GetRHIHandle(), runtime.GetTimelineSignalValue());
-			if (!completedFrame.IsValid() || !uniformBuffer.EndFrame(0, completedFrame) ||
-				!uniformBuffer.BeginFrame(0) || !set0Frames.BeginFrame(0) ||
-				!uniformBuffer.EndFrame(0, completedFrame))
+			if (!completedFrame.IsValid() || !set0Frames.EndFrame(0, completedFrame) ||
+				!set0Frames.BeginFrame(0) || !set0Frames.EndFrame(0, completedFrame) ||
+				!set0Frames.BeginFrame(0) || !set0Frames.AbortFrame(0))
 			{
 				LogQualificationError(
 					"qualify dynamic uniform: completed frame-slot reuse failed.");
