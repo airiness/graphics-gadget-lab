@@ -4,8 +4,8 @@
 namespace gglab
 {
 	// Single source of truth for the DX12 portability capability policy. DX12
-	// supports every conditional portability capability; Vulkan v1 applies the
-	// GGLab Vulkan v1 Device Profile subset instead.
+	// supports every conditional portability capability; Vulkan applies the
+	// configured GGLab Vulkan Device Profile subset instead.
 	constexpr inline RHIPortabilityCapabilities DX12PortabilityCapabilities{
 		.m_ImageViewMinLod = true,
 		.m_CustomBorderColor = true,

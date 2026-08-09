@@ -212,6 +212,7 @@ namespace gglab
 			VulkanDevice::CreateInfo deviceCreateInfo{};
 			deviceCreateInfo.m_Instance = instance;
 			deviceCreateInfo.m_PhysicalDevice = physicalDevice;
+			deviceCreateInfo.m_AdapterIdentity = &snapshot.m_Identity;
 			deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
 			deviceCreateInfo.m_PortabilityCapabilities =
 				snapshot.m_PortabilityCapabilities;

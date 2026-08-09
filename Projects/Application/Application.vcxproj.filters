@@ -276,6 +276,15 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -1179,6 +1188,15 @@
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h">

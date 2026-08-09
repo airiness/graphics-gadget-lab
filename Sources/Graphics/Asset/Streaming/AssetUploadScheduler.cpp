@@ -63,14 +63,29 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
 			m_UploadRecordingQueue.empty() && !m_RecordingBatch &&
 			m_RecordedUploads.empty() && m_PendingUploads.empty() &&
-			m_GpuFinalizeQueue.empty(),
+			m_GpuFinalizeQueue.empty() && !HasWorkerHandoffs(),
 			"AssetUploadScheduler destroyed with pending streaming work. Call Finalize after draining ready work and waiting for GPU idle.");
 	}
 
 	void AssetUploadScheduler::EnqueueCpuPayload(
 		AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept
 	{
-		EnqueueWork(m_CpuPayloadQueue, m_CpuPayloadTelemetry, std::move(desc), std::move(work));
+		if (!work)
+		{
+			return;
+		}
+		QueuedWork queued{
+			.m_Desc = std::move(desc),
+			.m_QueuedAt = std::chrono::steady_clock::now(),
+			.m_Work = std::move(work),
+		};
+		if (IsOwnerThread())
+		{
+			InsertQueuedWork(m_CpuPayloadQueue, m_CpuPayloadTelemetry, std::move(queued));
+			return;
+		}
+		std::scoped_lock lock(m_HandoffMutex);
+		m_CpuPayloadHandoffs.push_back(std::move(queued));
 	}
 
 	void AssetUploadScheduler::EnqueueResourcePublication(
@@ -103,8 +118,19 @@ namespace gglab
 	void AssetUploadScheduler::EnqueueUploadRecording(
 		AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept
 	{
-		EnqueueWork(
-			m_UploadRecordingQueue, m_UploadRecordingTelemetry, std::move(desc), std::move(work));
+		GGLAB_ASSERT_MSG(IsOwnerThread(),
+			"Asset upload recording must be enqueued on the scheduler owner thread.");
+		if (!IsOwnerThread() || !work)
+		{
+			return;
+		}
+		QueuedWork queued{
+			.m_Desc = std::move(desc),
+			.m_QueuedAt = std::chrono::steady_clock::now(),
+			.m_Work = std::move(work),
+		};
+		InsertQueuedWork(
+			m_UploadRecordingQueue, m_UploadRecordingTelemetry, std::move(queued));
 	}
 
 	uint32_t AssetUploadScheduler::CancelReadyWork(
@@ -126,6 +152,7 @@ namespace gglab
 		{
 			return 0;
 		}
+		DrainWorkerHandoffs();
 
 		return CancelQueuedWork(m_CpuPayloadQueue, m_CpuPayloadTelemetry, identity, false) +
 			CancelResourcePublication(identity, AssetResourcePublicationAbortReason::Cancelled) +
@@ -152,6 +179,7 @@ namespace gglab
 		{
 			return 0;
 		}
+		DrainWorkerHandoffs();
 
 		uint32_t updatedCount =
 			UpdateQueuedWorkPriority(m_CpuPayloadQueue, identity, priority) +
@@ -280,10 +308,13 @@ namespace gglab
 			return 0;
 		}
 
+		DrainWorkerHandoffs();
 		GGLAB_UNUSED(PollCompletedUploads());
 		m_LastFrameUsage = {};
 		GGLAB_UNUSED(DrainCpuPayloadQueue(false));
+		DrainWorkerHandoffs();
 		GGLAB_UNUSED(DrainResourcePublicationQueue(false));
+		DrainWorkerHandoffs();
 		GGLAB_UNUSED(DrainUploadRecordingQueue(false));
 		GGLAB_UNUSED(PollCompletedUploads());
 		return DrainGpuFinalizeQueue(false);
@@ -299,9 +330,14 @@ namespace gglab
 		}
 
 		m_LastFrameUsage = {};
-		while (!m_CpuPayloadQueue.empty() || !m_ResourcePublicationQueue.empty() ||
-			!m_UploadRecordingQueue.empty())
+		for (;;)
 		{
+			DrainWorkerHandoffs();
+			if (m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
+				m_UploadRecordingQueue.empty())
+			{
+				break;
+			}
 			GGLAB_UNUSED(DrainCpuPayloadQueue(true));
 			GGLAB_UNUSED(DrainResourcePublicationQueue(true));
 			GGLAB_UNUSED(DrainUploadRecordingQueue(true));
@@ -357,6 +393,7 @@ namespace gglab
 			return;
 		}
 
+		DrainWorkerHandoffs();
 		m_GpuCompletionHold = {};
 		GGLAB_ASSERT_MSG(m_CpuPayloadQueue.empty() && m_ResourcePublicationQueue.empty() &&
 			m_UploadRecordingQueue.empty(),
@@ -490,21 +527,9 @@ namespace gglab
 		return std::this_thread::get_id() == m_OwnerThreadId;
 	}
 
-	void AssetUploadScheduler::EnqueueWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
-		AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept
+	void AssetUploadScheduler::InsertQueuedWork(
+		std::deque<QueuedWork>& queue, QueueTelemetry& telemetry, QueuedWork&& queued) noexcept
 	{
-		GGLAB_ASSERT_MSG(IsOwnerThread(),
-			"Asset streaming work must be enqueued on the scheduler owner thread.");
-		if (!IsOwnerThread() || !work)
-		{
-			return;
-		}
-
-		QueuedWork queued{
-			.m_Desc = std::move(desc),
-			.m_QueuedAt = std::chrono::steady_clock::now(),
-			.m_Work = std::move(work),
-		};
 		const uint64_t sourceBytes = queued.m_Desc.m_Estimate.m_SourceBytes;
 		const auto insertion = std::ranges::find_if(queue,
 			[priority = queued.m_Desc.m_Priority](const QueuedWork& existing) noexcept
@@ -519,6 +544,35 @@ namespace gglab
 			m_UploadRecordingBacklogBytes += sourceBytes;
 		}
 		m_ReadyPayloadHighWatermark = std::max(m_ReadyPayloadHighWatermark, m_ReadyPayloadBytes);
+	}
+
+	void AssetUploadScheduler::DrainWorkerHandoffs() noexcept
+	{
+		GGLAB_ASSERT_MSG(IsOwnerThread(),
+			"Asset worker handoffs must be consumed on the scheduler owner thread.");
+		if (!IsOwnerThread())
+		{
+			return;
+		}
+
+		std::deque<QueuedWork> cpuPayloads;
+		{
+			std::scoped_lock lock(m_HandoffMutex);
+			cpuPayloads.swap(m_CpuPayloadHandoffs);
+		}
+
+		while (!cpuPayloads.empty())
+		{
+			InsertQueuedWork(m_CpuPayloadQueue, m_CpuPayloadTelemetry,
+				std::move(cpuPayloads.front()));
+			cpuPayloads.pop_front();
+		}
+	}
+
+	bool AssetUploadScheduler::HasWorkerHandoffs() const noexcept
+	{
+		std::scoped_lock lock(m_HandoffMutex);
+		return !m_CpuPayloadHandoffs.empty();
 	}
 
 	double AssetUploadScheduler::ExecuteWork(

@@ -44,7 +44,7 @@ namespace gglab
 				return std::nullopt;
 			}
 
-			// The v1 swapchain contract only accepts VK_COLOR_SPACE_SRGB_NONLINEAR_KHR.
+			// The swapchain contract only accepts VK_COLOR_SPACE_SRGB_NONLINEAR_KHR.
 			const auto compatible = [](VkSurfaceFormatKHR candidate) noexcept
 				{
 					return candidate.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;

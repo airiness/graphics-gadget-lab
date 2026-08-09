@@ -30,6 +30,7 @@
 #include <array>
 #include <limits>
 #include <memory>
+#include <thread>
 #include <unordered_map>
 
 namespace gglab
@@ -1068,6 +1069,69 @@ namespace gglab
 				device.GetDestroyedBufferCount() == device.GetCreatedBufferCount() &&
 				!session.IsReady() && !session.HasVisibleMeshes() && !session.GetFrameView(),
 				"Post-cancel Copy Fence completion retires buffers without publication or a dangling frame view");
+			scheduler.Finalize();
+		}
+
+		void RunAssetUploadSchedulerWorkerHandoffTest(SelfTestContext& context) noexcept
+		{
+			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
+			TransferManager transferManager(std::move(transferContext));
+			NapaVoxelPublicationTestDevice device;
+			AssetUploadScheduler scheduler({
+				.m_Device = &device,
+				.m_TransferManager = &transferManager,
+				});
+			const std::thread::id ownerThreadId = std::this_thread::get_id();
+			std::thread::id cpuCallbackThreadId;
+			std::thread::id uploadCallbackThreadId;
+			bool workerSawOwner = true;
+			bool cpuCallbackRan = false;
+			bool uploadCallbackRan = false;
+
+			std::thread worker([&]()
+				{
+					workerSawOwner = scheduler.IsOwnerThread();
+					scheduler.EnqueueCpuPayload({
+						.m_Name = "Worker immutable payload handoff",
+						.m_Identity = {
+							.m_Kind = AssetStreamingWorkKind::Texture,
+							.m_StableId = 9001,
+							.m_Generation = 1,
+							},
+						.m_Estimate = { .m_SourceBytes = 16 },
+						},
+						[&]()
+						{
+							cpuCallbackRan = true;
+							cpuCallbackThreadId = std::this_thread::get_id();
+							scheduler.EnqueueUploadRecording({
+								.m_Name = "Owner upload promotion",
+								.m_Identity = {
+									.m_Kind = AssetStreamingWorkKind::Texture,
+									.m_StableId = 9001,
+									.m_Generation = 1,
+									},
+								},
+								[&]()
+								{
+									uploadCallbackRan = true;
+									uploadCallbackThreadId = std::this_thread::get_id();
+								});
+						});
+				});
+			worker.join();
+
+			context.Check(!workerSawOwner && !cpuCallbackRan && !uploadCallbackRan,
+				"Worker enqueue hands off immutable payload without executing owner work inline");
+			scheduler.DrainReadyWork();
+			const AssetUploadStatistics statistics = scheduler.GetStatistics();
+			context.Check(cpuCallbackRan && uploadCallbackRan &&
+				cpuCallbackThreadId == ownerThreadId && uploadCallbackThreadId == ownerThreadId &&
+				statistics.m_CpuPayloadQueue.m_EnqueuedCount == 1 &&
+				statistics.m_CpuPayloadQueue.m_ProcessedCount == 1 &&
+				statistics.m_UploadRecordingQueue.m_EnqueuedCount == 1 &&
+				statistics.m_UploadRecordingQueue.m_ProcessedCount == 1,
+				"Scheduler drains worker handoff and every publication/upload callback on its owner thread");
 			scheduler.Finalize();
 		}
 
@@ -2125,6 +2189,7 @@ namespace gglab
 		RunInitialPublicationFailureTests(context);
 		RunInitialPublicationCancellationTests(context);
 		RunInitialPublicationIdentityTests(context);
+		RunAssetUploadSchedulerWorkerHandoffTest(context);
 		RunPublicationSessionCancellationIntegrationTest(context);
 		RunInteractivePublicationIntegrationTest(context);
 		RunReplacementBatchContractTests(context);

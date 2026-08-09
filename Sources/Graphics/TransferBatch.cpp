@@ -87,12 +87,24 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN("TransferBatch rejected an invalid RHI buffer write.");
 			return false;
 		}
+		const RHIBufferBarrier toCopyDest{
+			.m_Buffer = dstBuffer,
+			.m_Before = CommonState,
+			.m_After = CopyDestState,
+		};
+		m_TransferContext->BufferBarrier(std::span{ &toCopyDest, 1 });
 
 		if (!m_TransferContext->UploadBuffer(src, numBytes, dstBuffer, dstOffset))
 		{
 			Fail();
 			return false;
 		}
+		const RHIBufferBarrier toPublished{
+			.m_Buffer = dstBuffer,
+			.m_Before = CopyDestState,
+			.m_After = CommonState,
+		};
+		m_TransferContext->BufferBarrier(std::span{ &toPublished, 1 });
 		return PublishBuffer(dstBuffer, CommonState);
 	}
 
@@ -154,20 +166,28 @@ namespace gglab
 		{
 			return {};
 		}
+		const RHIResourceState copySourceState{
+			.m_Stages = RHIStage::Copy,
+			.m_Access = RHIAccess::CopySource,
+			.m_Layout = RHILayout::CopySource,
+		};
+		const RHITextureBarrier toCopySource{
+			.m_Texture = srcTexture,
+			.m_Before = CommonState,
+			.m_After = copySourceState,
+		};
+		m_TransferContext->TextureBarrier(std::span{ &toCopySource, 1 });
 		RHITextureReadbackRequest request = m_TransferContext->ReadbackTexture(srcTexture, desc);
-		if (request.IsValid())
+		if (!request.IsValid())
 		{
-			const RHIResourceState copySourceState{
-				.m_Stages = RHIStage::Copy,
-				.m_Access = RHIAccess::CopySource,
-				.m_Layout = RHILayout::CopySource,
-			};
-			if (!PublishTexture(srcTexture, copySourceState) ||
-				!PublishBuffer(request.m_Buffer.Get(), CopyDestState))
-			{
-				Fail();
-				return {};
-			}
+			Fail();
+			return {};
+		}
+		if (!PublishTexture(srcTexture, copySourceState) ||
+			!PublishBuffer(request.m_Buffer.Get(), CopyDestState))
+		{
+			Fail();
+			return {};
 		}
 		return request;
 	}

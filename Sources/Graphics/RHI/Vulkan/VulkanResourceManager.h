@@ -190,6 +190,8 @@ namespace gglab
 		const VulkanTexture* ResolveTexture(RHITextureHandle texture) const noexcept;
 		VulkanBuffer* ResolveBuffer(RHIBufferHandle buffer) noexcept;
 		const VulkanBuffer* ResolveBuffer(RHIBufferHandle buffer) const noexcept;
+		const RHITextureDesc* ResolveTextureDesc(RHITextureHandle texture) const noexcept;
+		const RHIBufferDesc* ResolveBufferDesc(RHIBufferHandle buffer) const noexcept;
 
 		RHITextureViewHandle CreateTextureView(
 			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept;
@@ -208,6 +210,7 @@ namespace gglab
 		void RetireCompletedResources() noexcept;
 
 	private:
+		[[nodiscard]] bool CheckOwnerThread(std::string_view operation) const noexcept;
 		RHITextureHandle AllocateTextureSlot(std::unique_ptr<VulkanTexture> texture,
 			RHIResourceOwnership ownership,
 			const RHIResourceDebugIdentityDesc& debugIdentity) noexcept;

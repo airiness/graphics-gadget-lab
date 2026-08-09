@@ -7,6 +7,7 @@
 #include "Graphics/RHI/RHITexture.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -17,6 +18,12 @@
 namespace gglab
 {
 	class RHICommandContext;
+
+	[[nodiscard]] inline RHICommandContextHandle AllocateRHICommandContextHandle() noexcept
+	{
+		static std::atomic<RHICommandContextHandle::IndexType> nextIndex = 0;
+		return RHICommandContextHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
+	}
 
 	struct RHITextureBarrier
 	{

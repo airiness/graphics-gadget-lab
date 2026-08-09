@@ -3,6 +3,7 @@
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
+#include <algorithm>
 #include <array>
 #include <format>
 #include <vector>
@@ -14,6 +15,25 @@ namespace gglab
 		constexpr std::string_view SwapchainExtensionName = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 		constexpr std::string_view MutableDescriptorTypeExtensionName =
 			VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
+
+		[[nodiscard]] std::string FormatUuid(
+			const std::array<uint8_t, VK_UUID_SIZE>& uuid) noexcept
+		{
+			std::string text;
+			text.reserve(VK_UUID_SIZE * 2);
+			for (const uint8_t byte : uuid)
+			{
+				text += std::format("{:02x}", byte);
+			}
+			return text;
+		}
+
+		[[nodiscard]] std::string BuildAdapterCompatibilityIdentity(
+			const VulkanAdapterIdentity& identity) noexcept
+		{
+			return std::format("vulkan:{}:{}:{:08x}:{:08x}", identity.UuidHex(),
+				FormatUuid(identity.m_DriverUuid), identity.m_ApiVersion, identity.m_DriverVersion);
+		}
 	}
 
 	VulkanDevice::~VulkanDevice()
@@ -25,11 +45,12 @@ namespace gglab
 	{
 		Result result{};
 		if (createInfo.m_Instance == VK_NULL_HANDLE ||
-			createInfo.m_PhysicalDevice == VK_NULL_HANDLE || !createInfo.m_ProfileCapabilities)
+			createInfo.m_PhysicalDevice == VK_NULL_HANDLE || !createInfo.m_AdapterIdentity ||
+			!createInfo.m_ProfileCapabilities)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
 			result.m_Error =
-				"VulkanDevice requires an instance, a physical device and a capability snapshot.";
+				"VulkanDevice requires an instance, a physical device, adapter identity and capability snapshot.";
 			return result;
 		}
 		const VulkanDeviceProfileCapabilities& capabilities = *createInfo.m_ProfileCapabilities;
@@ -114,8 +135,27 @@ namespace gglab
 		deviceCreateInfo.pNext = &features2;
 
 		auto device = std::make_unique<VulkanDevice>();
+		device->m_OwnerThreadId = std::this_thread::get_id();
 		device->m_Instance = createInfo.m_Instance;
 		device->m_PhysicalDevice = createInfo.m_PhysicalDevice;
+		device->m_AdapterCompatibilityIdentity =
+			BuildAdapterCompatibilityIdentity(*createInfo.m_AdapterIdentity);
+
+		VkPhysicalDeviceSubgroupProperties subgroupProperties{};
+		subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+		VkPhysicalDeviceProperties2 physicalDeviceProperties{};
+		physicalDeviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		physicalDeviceProperties.pNext = &subgroupProperties;
+		vkGetPhysicalDeviceProperties2(createInfo.m_PhysicalDevice, &physicalDeviceProperties);
+		device->m_PhysicalDeviceLimits = physicalDeviceProperties.properties.limits;
+		if (subgroupProperties.subgroupSize > 0)
+		{
+			device->m_ShaderWaveCapabilities = {
+				.m_Supported = true,
+				.m_MinLaneCount = subgroupProperties.subgroupSize,
+				.m_MaxLaneCount = subgroupProperties.subgroupSize,
+			};
+		}
 		device->m_EnabledPortabilityCapabilities = enabledCapabilities;
 		device->m_ImageCubeArrayEnabled = createInfo.m_ImageCubeArrayAvailable;
 		device->m_SamplerMirrorClampToEdgeEnabled =
@@ -164,8 +204,277 @@ namespace gglab
 		return result;
 	}
 
+	bool VulkanDevice::RequireOwnerThread(std::string_view operation) const noexcept
+	{
+		if (IsOwnerThread())
+		{
+			return true;
+		}
+		GGLAB_LOG_GRAPHICS_ERROR(
+			"{} rejected an off-owner Vulkan/RHI call.", operation);
+		return false;
+	}
+
+	RHITextureSupportResult VulkanDevice::QueryTextureSupport(
+		const RHITextureDesc& desc) const noexcept
+	{
+		return m_ResourceManager.QueryTextureSupport(desc);
+	}
+
+	RHITextureSupportResult VulkanDevice::QueryTextureViewSupport(
+		const RHITextureDesc& textureDesc, const RHITextureViewDesc& viewDesc) const noexcept
+	{
+		const RHITextureValidationResult validation =
+			ValidateRHITextureViewDesc(textureDesc, viewDesc);
+		if (!validation.IsValid())
+		{
+			return { .m_ValidationError = validation.m_Error };
+		}
+		const RHIPortabilityValidationResult portability =
+			ValidateRHITextureViewPortability(viewDesc, m_PortabilityCapabilities);
+		if (!portability.IsValid())
+		{
+			return { .m_PortabilityError = portability.m_Error };
+		}
+		const RHITextureSupportResult textureSupport = QueryTextureSupport(textureDesc);
+		if (!textureSupport.IsSupported())
+		{
+			return textureSupport;
+		}
+		const std::optional<VulkanNormalizedTextureView> normalized =
+			NormalizeVulkanTextureView(textureDesc, viewDesc);
+		if (!normalized ||
+			!IsVulkanViewFormatCompatible(textureDesc.m_Format, normalized->m_EffectiveFormat))
+		{
+			return { .m_Reason = RHITextureSupportReason::FormatCombinationUnsupported };
+		}
+		if (normalized->m_EffectiveDimension == RHITextureViewDimension::TextureCubeArray &&
+			!m_ImageCubeArrayEnabled)
+		{
+			return { .m_Reason = RHITextureSupportReason::TextureDimensionUnsupported };
+		}
+		return { .m_Supported = true };
+	}
+
+	RHITextureHandle VulkanDevice::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::CreateTexture")
+			? m_ResourceManager.CreateTexture(createInfo, debugIdentity)
+			: RHITextureHandle{};
+	}
+
+	RHIBufferHandle VulkanDevice::CreateBuffer(
+		const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::CreateBuffer")
+			? m_ResourceManager.CreateBuffer(desc, debugIdentity)
+			: RHIBufferHandle{};
+	}
+
+	RHITextureViewHandle VulkanDevice::CreateTextureView(
+		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::CreateTextureView")
+			? m_ResourceManager.CreateTextureView(texture, desc)
+			: RHITextureViewHandle{};
+	}
+
+	RHIBufferViewHandle VulkanDevice::CreateBufferView(
+		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::CreateBufferView")
+			? m_ResourceManager.CreateBufferView(buffer, desc)
+			: RHIBufferViewHandle{};
+	}
+
+	RHISamplerHandle VulkanDevice::CreateSampler(const RHISamplerDesc& desc) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::CreateSampler")
+			? m_ResourceManager.CreateSampler(desc)
+			: RHISamplerHandle{};
+	}
+
+	void VulkanDevice::DestroyTexture(RHITextureHandle texture) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::DestroyTexture"))
+		{
+			m_ResourceManager.DestroyTexture(texture);
+		}
+	}
+
+	void VulkanDevice::DestroyBuffer(RHIBufferHandle buffer) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::DestroyBuffer"))
+		{
+			m_ResourceManager.DestroyBuffer(buffer);
+		}
+	}
+
+	void VulkanDevice::DestroyTextureView(RHITextureViewHandle view) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::DestroyTextureView"))
+		{
+			m_ResourceManager.DestroyTextureView(view);
+		}
+	}
+
+	void VulkanDevice::DestroyBufferView(RHIBufferViewHandle view) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::DestroyBufferView"))
+		{
+			m_ResourceManager.DestroyBufferView(view);
+		}
+	}
+
+	void VulkanDevice::DestroySampler(RHISamplerHandle sampler) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::DestroySampler"))
+		{
+			m_ResourceManager.DestroySampler(sampler);
+		}
+	}
+
+	void VulkanDevice::SetTextureDebugBinding(
+		RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::SetTextureDebugBinding"))
+		{
+			m_ResourceManager.SetTextureDebugBinding(texture, binding);
+		}
+	}
+
+	void VulkanDevice::SetBufferDebugBinding(
+		RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::SetBufferDebugBinding"))
+		{
+			m_ResourceManager.SetBufferDebugBinding(buffer, binding);
+		}
+	}
+
+	std::string_view VulkanDevice::GetTextureDebugName(RHITextureHandle texture) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::GetTextureDebugName")
+			? m_ResourceManager.GetTextureDebugName(texture)
+			: std::string_view{};
+	}
+
+	std::string_view VulkanDevice::GetBufferDebugName(RHIBufferHandle buffer) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::GetBufferDebugName")
+			? m_ResourceManager.GetBufferDebugName(buffer)
+			: std::string_view{};
+	}
+
+	void* VulkanDevice::MapBuffer(
+		RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::MapBuffer")
+			? m_ResourceManager.MapBuffer(buffer, readRange)
+			: nullptr;
+	}
+
+	void VulkanDevice::UnmapBuffer(
+		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::UnmapBuffer"))
+		{
+			m_ResourceManager.UnmapBuffer(buffer, writtenRange);
+		}
+	}
+
+	uint32_t VulkanDevice::GetBufferViewAlignment(RHIBufferViewType viewType) const noexcept
+	{
+		VkDeviceSize alignment = 1;
+		switch (viewType)
+		{
+		case RHIBufferViewType::ConstantBuffer:
+			alignment = m_PhysicalDeviceLimits.minUniformBufferOffsetAlignment;
+			break;
+		case RHIBufferViewType::ShaderResource:
+		case RHIBufferViewType::UnorderedAccess:
+			alignment = std::max(m_PhysicalDeviceLimits.minStorageBufferOffsetAlignment,
+				m_PhysicalDeviceLimits.minTexelBufferOffsetAlignment);
+			break;
+		}
+		return static_cast<uint32_t>(std::max<VkDeviceSize>(alignment, 1));
+	}
+
+	bool VulkanDevice::IsAlive(RHITextureHandle texture) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::IsAlive(texture)") &&
+			m_ResourceManager.IsAlive(texture);
+	}
+
+	bool VulkanDevice::IsAlive(RHIBufferHandle buffer) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::IsAlive(buffer)") &&
+			m_ResourceManager.IsAlive(buffer);
+	}
+
+	bool VulkanDevice::IsAlive(RHISamplerHandle sampler) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::IsAlive(sampler)") &&
+			m_ResourceManager.IsSamplerAlive(sampler);
+	}
+
+	RHIDescriptorHandle VulkanDevice::GetTextureViewDescriptor(
+		RHITextureViewHandle view) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::GetTextureViewDescriptor")
+			? m_ResourceManager.GetTextureViewDescriptor(view)
+			: RHIDescriptorHandle{};
+	}
+
+	RHIDescriptorHandle VulkanDevice::GetBufferViewDescriptor(
+		RHIBufferViewHandle view) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::GetBufferViewDescriptor")
+			? m_ResourceManager.GetBufferViewDescriptor(view)
+			: RHIDescriptorHandle{};
+	}
+
+	RHIDescriptorHandle VulkanDevice::GetSamplerDescriptor(
+		RHISamplerHandle sampler) const noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::GetSamplerDescriptor")
+			? m_ResourceManager.GetSamplerDescriptor(sampler)
+			: RHIDescriptorHandle{};
+	}
+
+	void VulkanDevice::RecordTextureUse(
+		RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::RecordTextureUse"))
+		{
+			m_ResourceManager.RecordTextureUse(texture, fencePoint);
+		}
+	}
+
+	void VulkanDevice::RecordBufferUse(
+		RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::RecordBufferUse"))
+		{
+			m_ResourceManager.RecordBufferUse(buffer, fencePoint);
+		}
+	}
+
+	void VulkanDevice::RetireCompletedWork() noexcept
+	{
+		if (RequireOwnerThread("VulkanDevice::RetireCompletedWork"))
+		{
+			m_ResourceManager.RetireCompletedResources();
+		}
+	}
+
 	bool VulkanDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
 	{
+		if (!RequireOwnerThread("VulkanDevice::IsFencePointCompleted"))
+		{
+			return false;
+		}
 		if (!fencePoint.IsValid())
 		{
 			return true;

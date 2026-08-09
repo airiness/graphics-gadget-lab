@@ -6,11 +6,13 @@
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+#include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
 #if GGLAB_ENABLE_VULKAN
@@ -664,6 +666,57 @@ namespace gglab
 				GGLabVulkanCoordinatePolicy.m_UseDxPositionW &&
 				!GGLabVulkanCoordinatePolicy.m_BackendAppliesAdditionalReversedZ,
 				"Vulkan coordinate lowering applies each required correction exactly once");
+		}
+
+		void RunVulkanBarrierContractTests(SelfTestContext& context) noexcept
+		{
+			const VkPipelineStageFlags2 shaderStages =
+				ToVulkanPipelineStages(RHIStage::VertexShader | RHIStage::PixelShader);
+			context.Check(shaderStages == (VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
+				VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT),
+				"Vulkan barrier lowering preserves combined shader stages");
+
+			const VkAccessFlags2 transferAccess =
+				ToVulkanAccessFlags(RHIAccess::CopySource | RHIAccess::CopyDest);
+			context.Check(transferAccess ==
+				(VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT),
+				"Vulkan barrier lowering preserves combined transfer access");
+
+			context.Check(
+				ToVulkanImageLayout(RHILayout::Undefined) == VK_IMAGE_LAYOUT_UNDEFINED &&
+				ToVulkanImageLayout(RHILayout::CopyDest) ==
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+				ToVulkanImageLayout(RHILayout::RenderTarget) ==
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+				ToVulkanImageLayout(RHILayout::Present) == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+				"Vulkan barrier lowering maps transfer, attachment, and presentation layouts");
+		}
+
+		void RunVulkanTextureCopyContractTests(SelfTestContext& context) noexcept
+		{
+			const RHITextureDesc desc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 4, 4, 1 },
+				.m_ArraySize = 2,
+				.m_MipLevels = 2,
+			};
+			const auto layout = BuildVulkanTextureCopyLayout(desc, 16);
+			const bool regionsAligned = layout && std::ranges::all_of(layout->m_Regions,
+				[](const VkBufferImageCopy2& region) noexcept
+				{
+					return region.bufferOffset % 16 == 0;
+				});
+			context.Check(layout && layout->m_TotalBytes == 160 &&
+				layout->m_Regions.size() == 4 && layout->m_Subresources.size() == 4 &&
+				regionsAligned,
+				"Vulkan texture copy layout covers every mip and array layer with aligned offsets");
+
+			context.Check(
+				ToVulkanImageType(RHITextureDimension::Texture1D) == VK_IMAGE_TYPE_1D &&
+				ToVulkanImageType(RHITextureDimension::Texture2D) == VK_IMAGE_TYPE_2D &&
+				ToVulkanImageType(RHITextureDimension::Texture3D) == VK_IMAGE_TYPE_3D &&
+				ToVulkanSampleCount(4) == VK_SAMPLE_COUNT_4_BIT,
+				"Vulkan resource conversions use the shared format helpers");
 		}
 
 		void RunShaderArtifactContractTests(SelfTestContext& context) noexcept
@@ -1939,6 +1992,8 @@ namespace gglab
 		RunShaderBindingABITests(context);
 		RunDeviceProfileTests(context);
 		RunCoordinatePolicyTests(context);
+		RunVulkanBarrierContractTests(context);
+		RunVulkanTextureCopyContractTests(context);
 		RunShaderArtifactContractTests(context);
 		RunVulkanCliContractTests(context);
 		RunVulkanFormatContractTests(context);

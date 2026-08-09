@@ -56,7 +56,7 @@ namespace gglab
 
 	DX12TransferContext::DX12TransferContext(
 		DX12Device* dx12Device, DX12QueueSystem* queueSystem) noexcept :
-		m_Handle(AllocateDX12CommandContextHandle()), m_Device(dx12Device)
+		m_Handle(AllocateRHICommandContextHandle()), m_Device(dx12Device)
 	{
 		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device pointer can not be null.");
 		GGLAB_ASSERT_MSG(queueSystem != nullptr, "DX12QueueSystem pointer can not be null.");

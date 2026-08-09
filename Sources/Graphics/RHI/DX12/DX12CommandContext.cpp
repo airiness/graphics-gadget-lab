@@ -13,7 +13,6 @@
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <algorithm>
-#include <atomic>
 
 namespace gglab
 {
@@ -92,15 +91,9 @@ namespace gglab
 		}
 	}
 
-	RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept
-	{
-		static std::atomic<RHICommandContextHandle::IndexType> nextIndex = 0;
-		return RHICommandContextHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
-	}
-
 	DX12CommandContext::DX12CommandContext(
 		DX12Device* device, DX12CommandList* commandList, RHIQueueType queueType) noexcept :
-		m_Handle(AllocateDX12CommandContextHandle()), m_Device(device),
+		m_Handle(AllocateRHICommandContextHandle()), m_Device(device),
 		m_CommandList(commandList), m_QueueType(queueType)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "DX12CommandContext requires a valid DX12Device.");

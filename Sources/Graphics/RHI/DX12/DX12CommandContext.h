@@ -16,8 +16,6 @@ namespace gglab
 	class DX12RootSignature;
 	class DX12GpuProfiler;
 
-	[[nodiscard]] RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept;
-
 	class DX12CommandContext
 	{
 	public:

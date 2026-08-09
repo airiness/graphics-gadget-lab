@@ -13,31 +13,6 @@
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] bool HasDebugIdentity(const RHIResourceDebugIdentityDesc& identity) noexcept
-		{
-			return identity.m_Domain != RHIResourceDebugDomain::Unknown ||
-				!identity.m_Category.empty() || !identity.m_Label.empty() ||
-				!identity.m_Source.empty() || identity.m_StableId.has_value();
-		}
-
-		[[nodiscard]] RHIResourceDebugIdentityDesc ResolveDebugIdentity(
-			const RHIResourceDebugIdentityDesc& identity, std::string_view legacyName,
-			RHIResourceType resourceType) noexcept
-		{
-			if (HasDebugIdentity(identity))
-			{
-				return identity;
-			}
-			return {
-				.m_Domain = RHIResourceDebugDomain::Unknown,
-				.m_Category = RHIResourceTypeDebugText(resourceType),
-				.m_Label = legacyName.empty() ? std::string_view("Unspecified") : legacyName,
-			};
-		}
-	}
-
 	DX12ResourceManager::~DX12ResourceManager() noexcept = default;
 
 	void DX12ResourceManager::Initialize(DX12Device* device) noexcept
@@ -108,9 +83,9 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureCreateCount;
 		return AllocateTextureSlot(
 			std::move(texture), RHIResourceOwnership::Owned, resolvedIdentity);
@@ -167,9 +142,9 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferCreateCount;
 		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
 	}
@@ -201,9 +176,9 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureImportCount;
 		return AllocateTextureSlot(
 			std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
@@ -236,9 +211,9 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferImportCount;
 		return AllocateBufferSlot(
 			std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);

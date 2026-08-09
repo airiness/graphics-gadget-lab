@@ -25,63 +25,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] bool HasDebugIdentity(const RHIResourceDebugIdentityDesc& identity) noexcept
-		{
-			return identity.m_Domain != RHIResourceDebugDomain::Unknown ||
-				!identity.m_Category.empty() || !identity.m_Label.empty() ||
-				!identity.m_Source.empty() || identity.m_StableId.has_value();
-		}
-
-		[[nodiscard]] RHIResourceDebugIdentityDesc ResolveDebugIdentity(
-			const RHIResourceDebugIdentityDesc& identity, std::string_view legacyName,
-			RHIResourceType resourceType) noexcept
-		{
-			if (HasDebugIdentity(identity))
-			{
-				return identity;
-			}
-			return {
-				.m_Domain = RHIResourceDebugDomain::Unknown,
-				.m_Category = RHIResourceTypeDebugText(resourceType),
-				.m_Label = legacyName.empty() ? std::string_view("Unspecified") : legacyName,
-			};
-		}
-
-		[[nodiscard]] VkImageType ToVkImageType(RHITextureDimension dimension) noexcept
-		{
-			switch (dimension)
-			{
-			case RHITextureDimension::Texture1D:
-				return VK_IMAGE_TYPE_1D;
-			case RHITextureDimension::Texture2D:
-				return VK_IMAGE_TYPE_2D;
-			case RHITextureDimension::Texture3D:
-				return VK_IMAGE_TYPE_3D;
-			}
-			return VK_IMAGE_TYPE_2D;
-		}
-
-		[[nodiscard]] VkSampleCountFlagBits ToVkSampleCount(uint32_t count) noexcept
-		{
-			switch (count)
-			{
-			case 2:
-				return VK_SAMPLE_COUNT_2_BIT;
-			case 4:
-				return VK_SAMPLE_COUNT_4_BIT;
-			case 8:
-				return VK_SAMPLE_COUNT_8_BIT;
-			case 16:
-				return VK_SAMPLE_COUNT_16_BIT;
-			case 32:
-				return VK_SAMPLE_COUNT_32_BIT;
-			case 64:
-				return VK_SAMPLE_COUNT_64_BIT;
-			default:
-				return VK_SAMPLE_COUNT_1_BIT;
-			}
-		}
-
 		[[nodiscard]] VkBufferUsageFlags ToVkBufferUsageFlags(RHIBufferUsage usage) noexcept
 		{
 			VkBufferUsageFlags flags = 0;
@@ -287,6 +230,11 @@ namespace gglab
 
 	VulkanResourceManager::~VulkanResourceManager() noexcept = default;
 
+	bool VulkanResourceManager::CheckOwnerThread(std::string_view operation) const noexcept
+	{
+		return m_Device != nullptr && m_Device->RequireOwnerThread(operation);
+	}
+
 	void VulkanResourceManager::Initialize(VulkanDevice* device) noexcept
 	{
 		GGLAB_ASSERT_MSG(device != nullptr, "VulkanResourceManager requires a VulkanDevice.");
@@ -294,6 +242,11 @@ namespace gglab
 			"VulkanResourceManager requires an initialized VMA allocator.");
 
 		m_Device = device;
+		if (!CheckOwnerThread("VulkanResourceManager::Initialize"))
+		{
+			m_Device = nullptr;
+			return;
+		}
 		m_ResourceDescriptorArena = VulkanDescriptorIndexArena(
 			GGLabDescriptorCapacityContract.m_ResourceDescriptorCount);
 		m_SamplerDescriptorArena = VulkanDescriptorIndexArena(
@@ -302,6 +255,10 @@ namespace gglab
 
 	void VulkanResourceManager::Finalize() noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::Finalize"))
+		{
+			return;
+		}
 		// Keep the leak evidence before draining: every non-free slot is
 		// reported while its debug identity is still available, then all
 		// surviving native objects are destroyed. The device is expected
@@ -403,6 +360,10 @@ namespace gglab
 	RHITextureHandle VulkanResourceManager::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::CreateTexture"))
+		{
+			return {};
+		}
 		GGLAB_ASSERT_MSG(m_Device != nullptr,
 			"VulkanResourceManager must be initialized before creating textures.");
 
@@ -505,7 +466,7 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
 		++m_Diagnostics.m_TextureCreateCount;
 		RHITextureHandle handle =
 			AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Owned, resolvedIdentity);
@@ -520,6 +481,10 @@ namespace gglab
 	RHIBufferHandle VulkanResourceManager::CreateBuffer(
 		const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::CreateBuffer"))
+		{
+			return {};
+		}
 		GGLAB_ASSERT_MSG(m_Device != nullptr,
 			"VulkanResourceManager must be initialized before creating buffers.");
 
@@ -570,7 +535,7 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
 		++m_Diagnostics.m_BufferCreateCount;
 		RHIBufferHandle handle =
 			AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
@@ -584,6 +549,10 @@ namespace gglab
 
 	RHITextureHandle VulkanResourceManager::ImportTexture(const ImportedTextureDesc& desc) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::ImportTexture"))
+		{
+			return {};
+		}
 		if (desc.m_Image == VK_NULL_HANDLE || !IsRHIResourceStateValid(
 			desc.m_RHI.m_External.m_InitialState, RHIResourceStateUsage::TextureInitial))
 		{
@@ -609,7 +578,8 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(
+				desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
 		++m_Diagnostics.m_TextureImportCount;
 		RHITextureHandle handle =
 			AllocateTextureSlot(std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
@@ -625,6 +595,10 @@ namespace gglab
 
 	RHIBufferHandle VulkanResourceManager::ImportBuffer(const ImportedBufferDesc& desc) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::ImportBuffer"))
+		{
+			return {};
+		}
 		if (desc.m_Buffer == VK_NULL_HANDLE || !IsRHIResourceStateValid(
 			desc.m_RHI.m_External.m_InitialState, RHIResourceStateUsage::Buffer))
 		{
@@ -650,7 +624,8 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(
+				desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
 		++m_Diagnostics.m_BufferImportCount;
 		RHIBufferHandle handle =
 			AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);
@@ -666,6 +641,10 @@ namespace gglab
 
 	void VulkanResourceManager::DestroyTexture(RHITextureHandle texture) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::DestroyTexture"))
+		{
+			return;
+		}
 		DestroyResource(m_Textures, texture, "VulkanResourceManager::DestroyTexture",
 			[this, texture](TextureSlot& slot) noexcept
 			{
@@ -695,6 +674,10 @@ namespace gglab
 
 	void VulkanResourceManager::DestroyBuffer(RHIBufferHandle buffer) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::DestroyBuffer"))
+		{
+			return;
+		}
 		DestroyResource(m_Buffers, buffer, "VulkanResourceManager::DestroyBuffer",
 			[this, buffer](BufferSlot& slot) noexcept
 			{
@@ -723,6 +706,10 @@ namespace gglab
 	void VulkanResourceManager::SetTextureDebugBinding(
 		RHITextureHandle texture, const RHIResourceDebugBindingDesc& binding) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::SetTextureDebugBinding"))
+		{
+			return;
+		}
 		SetResourceDebugBinding(m_Textures, texture, RHIResourceType::Texture, binding,
 			"VulkanResourceManager::SetTextureDebugBinding");
 	}
@@ -730,6 +717,10 @@ namespace gglab
 	void VulkanResourceManager::SetBufferDebugBinding(
 		RHIBufferHandle buffer, const RHIResourceDebugBindingDesc& binding) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::SetBufferDebugBinding"))
+		{
+			return;
+		}
 		SetResourceDebugBinding(m_Buffers, buffer, RHIResourceType::Buffer, binding,
 			"VulkanResourceManager::SetBufferDebugBinding");
 	}
@@ -749,6 +740,10 @@ namespace gglab
 	void VulkanResourceManager::RecordTextureUse(
 		RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::RecordTextureUse"))
+		{
+			return;
+		}
 		RecordResourceUse(
 			m_Textures, texture, fencePoint, "VulkanResourceManager::RecordTextureUse", "texture");
 	}
@@ -756,6 +751,10 @@ namespace gglab
 	void VulkanResourceManager::RecordBufferUse(
 		RHIBufferHandle buffer, const RHIFencePoint& fencePoint) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::RecordBufferUse"))
+		{
+			return;
+		}
 		RecordResourceUse(
 			m_Buffers, buffer, fencePoint, "VulkanResourceManager::RecordBufferUse", "buffer");
 	}
@@ -775,6 +774,10 @@ namespace gglab
 	void* VulkanResourceManager::MapBuffer(
 		RHIBufferHandle buffer, RHIMappedBufferRange readRange) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::MapBuffer"))
+		{
+			return nullptr;
+		}
 		VulkanBuffer* nativeBuffer = ResolveBuffer(buffer);
 		if (nativeBuffer == nullptr)
 		{
@@ -796,6 +799,10 @@ namespace gglab
 	void VulkanResourceManager::UnmapBuffer(
 		RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::UnmapBuffer"))
+		{
+			return;
+		}
 		VulkanBuffer* nativeBuffer = ResolveBuffer(buffer);
 		if (nativeBuffer == nullptr)
 		{
@@ -807,6 +814,10 @@ namespace gglab
 
 	VulkanTexture* VulkanResourceManager::ResolveTexture(RHITextureHandle texture) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::ResolveTexture"))
+		{
+			return nullptr;
+		}
 		return const_cast<VulkanTexture*>(std::as_const(*this).ResolveTexture(texture));
 	}
 
@@ -823,6 +834,10 @@ namespace gglab
 
 	VulkanBuffer* VulkanResourceManager::ResolveBuffer(RHIBufferHandle buffer) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::ResolveBuffer"))
+		{
+			return nullptr;
+		}
 		return const_cast<VulkanBuffer*>(std::as_const(*this).ResolveBuffer(buffer));
 	}
 
@@ -836,9 +851,27 @@ namespace gglab
 		return slot->m_Resource.get();
 	}
 
+	const RHITextureDesc* VulkanResourceManager::ResolveTextureDesc(
+		RHITextureHandle texture) const noexcept
+	{
+		const TextureSlot* slot = m_Textures.Resolve(texture);
+		return slot && slot->m_Resource ? &slot->m_RHIDesc : nullptr;
+	}
+
+	const RHIBufferDesc* VulkanResourceManager::ResolveBufferDesc(
+		RHIBufferHandle buffer) const noexcept
+	{
+		const BufferSlot* slot = m_Buffers.Resolve(buffer);
+		return slot && slot->m_Resource ? &slot->m_RHIDesc : nullptr;
+	}
+
 	RHITextureViewHandle VulkanResourceManager::CreateTextureView(
 		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::CreateTextureView"))
+		{
+			return {};
+		}
 		const TextureSlot* slot = m_Textures.Resolve(texture);
 		if (!slot || !slot->m_Resource)
 		{
@@ -954,6 +987,10 @@ namespace gglab
 	RHIBufferViewHandle VulkanResourceManager::CreateBufferView(
 		RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::CreateBufferView"))
+		{
+			return {};
+		}
 		const BufferSlot* slot = m_Buffers.Resolve(buffer);
 		if (!slot || !slot->m_Resource)
 		{
@@ -1076,6 +1113,10 @@ namespace gglab
 
 	RHISamplerHandle VulkanResourceManager::CreateSampler(const RHISamplerDesc& desc) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::CreateSampler"))
+		{
+			return {};
+		}
 		const auto cached = m_SamplerCache.find(desc);
 		if (cached != m_SamplerCache.end())
 		{
@@ -1130,6 +1171,10 @@ namespace gglab
 
 	void VulkanResourceManager::DestroyTextureView(RHITextureViewHandle view) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::DestroyTextureView"))
+		{
+			return;
+		}
 		DestroyViewHandle(m_TextureViews, view, "VulkanResourceManager::DestroyTextureView",
 			[this, view](TextureViewSlot& slot) noexcept
 			{
@@ -1153,6 +1198,10 @@ namespace gglab
 
 	void VulkanResourceManager::DestroyBufferView(RHIBufferViewHandle view) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::DestroyBufferView"))
+		{
+			return;
+		}
 		DestroyViewHandle(m_BufferViews, view, "VulkanResourceManager::DestroyBufferView",
 			[this, view](BufferViewSlot& slot) noexcept
 			{
@@ -1176,6 +1225,10 @@ namespace gglab
 
 	void VulkanResourceManager::DestroySampler(RHISamplerHandle sampler) noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::DestroySampler"))
+		{
+			return;
+		}
 		DestroyViewHandle(m_Samplers, sampler, "VulkanResourceManager::DestroySampler",
 			[this, sampler](SamplerSlot& slot) noexcept
 			{
@@ -1230,6 +1283,10 @@ namespace gglab
 
 	void VulkanResourceManager::RetireCompletedResources() noexcept
 	{
+		if (!CheckOwnerThread("VulkanResourceManager::RetireCompletedResources"))
+		{
+			return;
+		}
 		// Views retire before their parent resources: the native image view
 		// must be destroyed before the image it references.
 		RetireCompletedViewTables();

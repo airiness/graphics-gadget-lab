@@ -1,15 +1,20 @@
 #include "Core/Precompiled.h"
 #include "Core/Log/Logger.h"
+#include "Graphics/Asset/IBLStageArtifact.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIFormat.h"
+#include "Graphics/TransferManager.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
+#include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #endif
 
 #include <array>
 #include <charconv>
 #include <cstdint>
 #include <string_view>
+#include <thread>
 
 namespace gglab
 {
@@ -70,6 +75,30 @@ namespace gglab
 			{
 				logger->error("{}", message);
 			}
+		}
+
+		[[nodiscard]] TextureAssetData MakeQualificationTextureData(
+			RHIFormat format, RHIExtent3D extent, uint64_t rowPitch,
+			std::vector<std::byte> pixels) noexcept
+		{
+			TextureAssetData result{};
+			result.m_ResourceFormat = format;
+			result.m_ViewFormat = format;
+			result.m_SrvDimension = RHITextureViewDimension::Texture2D;
+			result.m_Extent = extent;
+			result.m_Pixels = std::move(pixels);
+			result.m_Subresources.push_back({
+				.m_DataOffset = 0,
+				.m_DataSize = result.m_Pixels.size(),
+				.m_RowPitch = rowPitch,
+				.m_SlicePitch = result.m_Pixels.size(),
+				.m_Width = extent.m_Width,
+				.m_Height = extent.m_Height,
+				.m_Depth = extent.m_Depth,
+				.m_MipLevel = 0,
+				.m_ArraySlice = 0,
+				});
+			return result;
 		}
 
 		[[nodiscard]] std::string_view PresentModeName(VkPresentModeKHR mode) noexcept
@@ -800,6 +829,361 @@ namespace gglab
 			return 0;
 		}
 
+		[[nodiscard]] int RunVulkanTransferQualification(
+			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+		{
+			constexpr RHIResourceState commonState{
+				.m_Stages = RHIStage::All,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState copySourceState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::CopySource,
+			};
+			constexpr RHIResourceState copyDestState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
+			};
+			constexpr RHIResourceState shaderResourceState{
+				.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			};
+
+			TransferManager transferManager(
+				std::make_unique<VulkanTransferContext>(&device));
+
+			// Buffer staging and raw-copy publication exercise explicit terminal
+			// states on the shared graphics queue/timeline.
+			{
+				constexpr std::array<std::byte, 16> payload{
+					std::byte{ 0x10 }, std::byte{ 0x21 }, std::byte{ 0x32 }, std::byte{ 0x43 },
+					std::byte{ 0x54 }, std::byte{ 0x65 }, std::byte{ 0x76 }, std::byte{ 0x87 },
+					std::byte{ 0x98 }, std::byte{ 0xA9 }, std::byte{ 0xBA }, std::byte{ 0xCB },
+					std::byte{ 0xDC }, std::byte{ 0xED }, std::byte{ 0xFE }, std::byte{ 0x0F },
+				};
+				RHIBufferOwner gpuBuffer(&device, device.CreateBuffer({
+					.m_SizeInBytes = payload.size(),
+					.m_Usage = RHIBufferUsage::CopySource | RHIBufferUsage::CopyDest,
+					}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
+						.m_Label = "Qualification.BufferUpload" }));
+				RHIBufferOwner readbackBuffer(&device, device.CreateBuffer({
+					.m_SizeInBytes = payload.size(),
+					.m_Usage = RHIBufferUsage::CopyDest,
+					.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
+					}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
+						.m_Label = "Qualification.BufferReadback" }));
+				if (!gpuBuffer || !readbackBuffer)
+				{
+					LogQualificationError("qualify transfer: buffer creation failed.");
+					return 1;
+				}
+
+				TransferBatch uploadBatch = transferManager.BeginBatch();
+				const bool uploadRecorded = uploadBatch.UploadBuffer(
+					gpuBuffer.Get(), 0, payload.data(), payload.size());
+				const RHITransferSubmission uploadSubmission = uploadBatch.Submit(true);
+				if (!uploadRecorded || !uploadSubmission.m_Completion.IsValid() ||
+					uploadSubmission.m_Publications.size() != 1 ||
+					uploadSubmission.m_Publications.front().m_Buffer != gpuBuffer.Get() ||
+					uploadSubmission.m_Publications.front().m_PublishedState != commonState ||
+					!device.IsFencePointCompleted(uploadSubmission.m_Completion))
+				{
+					LogQualificationError(
+						"qualify transfer: buffer upload completion/publication contract failed.");
+					return 1;
+				}
+
+				TransferBatch readbackBatch = transferManager.BeginBatch();
+				const std::array barriers{
+					RHIBufferBarrier{
+						.m_Buffer = gpuBuffer.Get(),
+						.m_Before = commonState,
+						.m_After = copySourceState,
+						},
+					RHIBufferBarrier{
+						.m_Buffer = readbackBuffer.Get(),
+						.m_Before = commonState,
+						.m_After = copyDestState,
+						},
+				};
+				readbackBatch.BufferBarrier(barriers);
+				readbackBatch.CopyBuffer(
+					readbackBuffer.Get(), 0, gpuBuffer.Get(), 0, payload.size());
+				const bool sourcePublished =
+					readbackBatch.PublishBuffer(gpuBuffer.Get(), copySourceState);
+				const bool destinationPublished =
+					readbackBatch.PublishBuffer(readbackBuffer.Get(), copyDestState);
+				const RHITransferSubmission readbackSubmission = readbackBatch.Submit(true);
+				const auto* mapped = static_cast<const std::byte*>(
+					device.MapBuffer(readbackBuffer.Get(), { 0, payload.size() }));
+				const bool bytesMatch = mapped &&
+					std::ranges::equal(payload, std::span(mapped, payload.size()));
+				device.UnmapBuffer(readbackBuffer.Get(), {});
+				if (!sourcePublished || !destinationPublished ||
+					!readbackSubmission.m_Completion.IsValid() ||
+					readbackSubmission.m_Publications.size() != 2 || !bytesMatch)
+				{
+					LogQualificationError(
+						"qualify transfer: explicit buffer copy/readback contract failed.");
+					return 1;
+				}
+			}
+
+			// A decoded texture artifact validates row/slice copies and the
+			// Undefined -> CopyDest -> Common upload/readback lifecycle.
+			TextureAssetData textureData = MakeQualificationTextureData(
+				RHIFormat::R8G8B8A8Unorm, { 2, 2, 1 }, 8,
+				{
+					std::byte{ 0xFF }, std::byte{ 0x00 }, std::byte{ 0x00 }, std::byte{ 0xFF },
+					std::byte{ 0x00 }, std::byte{ 0xFF }, std::byte{ 0x00 }, std::byte{ 0xFF },
+					std::byte{ 0x00 }, std::byte{ 0x00 }, std::byte{ 0xFF }, std::byte{ 0xFF },
+					std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0xFF },
+				});
+			if (!textureData.IsValid())
+			{
+				LogQualificationError("qualify transfer: texture artifact fixture is invalid.");
+				return 1;
+			}
+			const RHITextureDesc textureDesc{
+				.m_Format = textureData.m_ResourceFormat,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopySource |
+					RHITextureUsage::CopyDest,
+				.m_Extent = textureData.m_Extent,
+			};
+			RHITextureOwner texture(&device, device.CreateTexture({
+				.m_Desc = textureDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
+					.m_Label = "Qualification.TextureArtifact" }));
+			if (!texture)
+			{
+				LogQualificationError("qualify transfer: texture artifact creation failed.");
+				return 1;
+			}
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				const bool recorded = batch.UploadTexture(texture.Get(), textureData.MakeUploadData(),
+					UndefinedRHITextureState(), commonState);
+				const RHITransferSubmission submission = batch.Submit(true);
+				if (!recorded || !submission.m_Completion.IsValid() ||
+					submission.m_Publications.size() != 1 ||
+					submission.m_Publications.front().m_Texture != texture.Get() ||
+					submission.m_Publications.front().m_PublishedState != commonState)
+				{
+					LogQualificationError(
+						"qualify transfer: texture artifact publication contract failed.");
+					return 1;
+				}
+			}
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				RHITextureReadbackRequest request = batch.ReadbackTexture(texture.Get(), textureDesc);
+				const RHITransferSubmission submission = batch.Submit(true);
+				const std::byte* mapped = transferManager.MapTextureReadback(device, request);
+				const TextureAssetData resolved =
+					transferManager.ResolveMappedTextureReadback(request, mapped);
+				transferManager.UnmapTextureReadback(device, request);
+				if (!request.IsValid() || !submission.m_Completion.IsValid() ||
+					submission.m_Publications.size() != 2 ||
+					resolved.m_Pixels != textureData.m_Pixels)
+				{
+					LogQualificationError(
+						"qualify transfer: texture artifact readback bytes did not match.");
+					return 1;
+				}
+			}
+
+			// Use a real IBL stage artifact, not a synthetic RHI-only payload,
+			// to keep the cache/streaming ABI in the qualification path.
+			IBLStageArtifactHandle iblArtifact = CreateIBLStageArtifact(
+				IBLArtifactStage::BrdfLut,
+				MakeQualificationTextureData(RHIFormat::R16G16Float, { 2, 2, 1 }, 8,
+					std::vector<std::byte>(16, std::byte{ 0x3C })));
+			if (!iblArtifact)
+			{
+				LogQualificationError("qualify transfer: IBL stage artifact fixture is invalid.");
+				return 1;
+			}
+			const RHITextureDesc iblDesc{
+				.m_Format = iblArtifact->m_Texture.m_ResourceFormat,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
+				.m_Extent = iblArtifact->m_Texture.m_Extent,
+			};
+			RHITextureOwner iblTexture(&device, device.CreateTexture({
+				.m_Desc = iblDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
+					.m_Label = "Qualification.IBL.BrdfLut" }));
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				const bool recorded = iblTexture && batch.UploadTexture(iblTexture.Get(),
+					iblArtifact->m_Texture.MakeUploadData(), UndefinedRHITextureState(),
+					shaderResourceState);
+				const RHITransferSubmission submission = batch.Submit(true);
+				if (!recorded || !submission.m_Completion.IsValid() ||
+					submission.m_Publications.size() != 1 ||
+					submission.m_Publications.front().m_PublishedState != shaderResourceState)
+				{
+					LogQualificationError(
+						"qualify transfer: IBL artifact upload/publication failed.");
+					return 1;
+				}
+			}
+
+			// Workers only enqueue immutable payloads. Resource creation, upload
+			// recording, queue submission, completion polling and descriptor
+			// publication all execute on the captured graphics owner thread.
+			AssetUploadScheduler scheduler({
+				.m_Device = &device,
+				.m_TransferManager = &transferManager,
+				});
+			const auto streamingPayload = std::make_shared<const TextureAssetData>(textureData);
+			RHITextureOwner streamingTexture;
+			RHITextureViewHandle streamingView;
+			RHIDescriptorHandle privateDescriptor;
+			RHIDescriptorHandle publishedDescriptor;
+			bool workerSawOwner = true;
+			bool offOwnerMutationRejected = false;
+			bool resourceWorkRanOnOwner = false;
+			bool uploadWorkRanOnOwner = false;
+			bool completionRanOnOwner = false;
+			bool uploadHandleValid = false;
+			std::thread worker([&]()
+				{
+					workerSawOwner = scheduler.IsOwnerThread();
+					offOwnerMutationRejected = !device.CreateBuffer({
+						.m_SizeInBytes = 16,
+						.m_Usage = RHIBufferUsage::CopyDest,
+						}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
+							.m_Label = "Qualification.ExpectedOffOwnerRejection" }).IsValid();
+					scheduler.EnqueueCpuPayload({
+						.m_Name = "Vulkan texture payload handoff",
+						.m_Identity = {
+							.m_Kind = AssetStreamingWorkKind::Texture,
+							.m_StableId = 8,
+							.m_Generation = 1,
+							},
+						.m_Estimate = {
+							.m_SourceBytes = streamingPayload->m_Pixels.size(),
+							},
+						},
+						[&]()
+						{
+							resourceWorkRanOnOwner = scheduler.IsOwnerThread();
+							streamingTexture = RHITextureOwner(&device, device.CreateTexture({
+								.m_Desc = textureDesc,
+								.m_InitialState = UndefinedRHITextureState(),
+								}, { .m_Domain = RHIResourceDebugDomain::Asset,
+									.m_Label = "Qualification.StreamedTexture" }));
+							if (!streamingTexture)
+							{
+								return;
+							}
+							streamingView = device.CreateTextureView(streamingTexture.Get(), {
+								.m_Type = RHITextureViewType::ShaderResource,
+								.m_Dimension = streamingPayload->m_SrvDimension,
+								.m_Format = streamingPayload->m_ViewFormat,
+								});
+							privateDescriptor = device.GetTextureViewDescriptor(streamingView);
+							if (!streamingView.IsValid() || !privateDescriptor.IsValid())
+							{
+								return;
+							}
+							scheduler.EnqueueUploadRecording({
+								.m_Name = "Vulkan streamed texture upload",
+								.m_Identity = {
+									.m_Kind = AssetStreamingWorkKind::Texture,
+									.m_StableId = 8,
+									.m_Generation = 1,
+									},
+								.m_Estimate = {
+									.m_SourceBytes = streamingPayload->m_Pixels.size(),
+									.m_StagingBytes = streamingPayload->m_Pixels.size(),
+									.m_OperationCount = 1,
+									},
+								},
+								[&]()
+								{
+									uploadWorkRanOnOwner = scheduler.IsOwnerThread();
+									const AssetUploadHandle handle = scheduler.RecordUpload({
+										.m_Name = "Vulkan streamed texture upload",
+										.m_Identity = {
+											.m_Kind = AssetStreamingWorkKind::Texture,
+											.m_StableId = 8,
+											.m_Generation = 1,
+											},
+										.m_Estimate = {
+											.m_StagingBytes = streamingPayload->m_Pixels.size(),
+											.m_OperationCount = 1,
+											},
+										},
+										[&](TransferBatch& batch)
+										{
+											return batch.UploadTexture(streamingTexture.Get(),
+												streamingPayload->MakeUploadData(),
+												UndefinedRHITextureState(), shaderResourceState);
+										},
+										[&](const AssetUploadCompletionInfo& completion)
+										{
+											completionRanOnOwner = scheduler.IsOwnerThread();
+											if (completion.m_Status == AssetUploadStatus::Succeeded &&
+												completion.m_FencePoint.IsValid() &&
+												device.IsFencePointCompleted(completion.m_FencePoint))
+											{
+												publishedDescriptor = privateDescriptor;
+											}
+										});
+									uploadHandleValid = handle.IsValid();
+								});
+						});
+				});
+			worker.join();
+			scheduler.DrainReadyWork();
+			const bool publicationWithheld = privateDescriptor.IsValid() &&
+				!publishedDescriptor.IsValid();
+			if (runtime.WaitIdle() != VK_SUCCESS)
+			{
+				LogQualificationError("qualify transfer: WaitIdle failed after scheduler upload.");
+				return 1;
+			}
+			GGLAB_UNUSED(scheduler.Tick());
+			const AssetUploadStatistics statistics = scheduler.GetStatistics();
+			const bool descriptorPublished = publishedDescriptor.IsValid() &&
+				publishedDescriptor.m_HeapType == privateDescriptor.m_HeapType &&
+				publishedDescriptor.m_Index == privateDescriptor.m_Index;
+			const bool schedulerPassed = !workerSawOwner && offOwnerMutationRejected &&
+				resourceWorkRanOnOwner && uploadWorkRanOnOwner && completionRanOnOwner &&
+				uploadHandleValid && publicationWithheld && descriptorPublished &&
+				statistics.m_PendingCount == 0 && statistics.m_SubmittedCount == 1 &&
+				statistics.m_SucceededCount == 1;
+			if (statistics.m_PendingCount == 0)
+			{
+				scheduler.Finalize();
+			}
+			if (streamingView.IsValid())
+			{
+				device.DestroyTextureView(streamingView);
+			}
+			streamingTexture.Reset();
+			iblTexture.Reset();
+			texture.Reset();
+			transferManager.Reclaim();
+			if (!schedulerPassed)
+			{
+				LogQualificationError(
+					"qualify transfer: worker handoff or completion-gated publication failed.");
+				return 1;
+			}
+
+			LogQualificationInfo(
+				"qualify transfer: buffer, texture, IBL artifact and owner-thread scheduler paths passed.");
+			return 0;
+		}
+
 		// Runs the minimal-frame qualification script: continuous presents,
 		// first-image abort, already-presented abort, normal/abort
 		// alternation, continuous abort, resize, minimize/restore and VSync
@@ -973,6 +1357,10 @@ namespace gglab
 			// samplers, persistent mapping and deferred retirement on the
 			// real device.
 			if (RunVulkanResourceQualification(*runtime.GetDevice(), runtime) != 0)
+			{
+				return 1;
+			}
+			if (RunVulkanTransferQualification(*runtime.GetDevice(), runtime) != 0)
 			{
 				return 1;
 			}

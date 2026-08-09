@@ -343,7 +343,10 @@ namespace gglab
 			{
 				m_TextureBarriers.insert(m_TextureBarriers.end(), barriers.begin(), barriers.end());
 			}
-			void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
+			{
+				m_BufferBarriers.insert(m_BufferBarriers.end(), barriers.begin(), barriers.end());
+			}
 			void FlushBarriers() noexcept override {}
 			void CopyBuffer(
 				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
@@ -374,6 +377,7 @@ namespace gglab
 			}
 
 			std::vector<RHITextureBarrier> m_TextureBarriers;
+			std::vector<RHIBufferBarrier> m_BufferBarriers;
 			bool m_FailUploads = false;
 			uint32_t m_SubmitCallCount = 0;
 			uint32_t m_AbortCallCount = 0;
@@ -3212,7 +3216,7 @@ namespace gglab
 			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).IsValid(),
 				"CubeCompatible resources accept complete cube views");
 
-			const RHIPortabilityCapabilities vulkanV1Capabilities{};
+			const RHIPortabilityCapabilities vulkanCapabilities{};
 			RHITextureViewDesc minLodView{};
 			minLodView.m_ResourceMinLODClamp = 1.0f;
 			RHISamplerDesc customBorderSampler{};
@@ -3224,42 +3228,42 @@ namespace gglab
 				RHIVertexInputRate::PerInstance;
 			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InstanceStepRate = 2;
 			context.Check(
-				ValidateRHITextureViewPortability(minLodView, vulkanV1Capabilities).m_Error ==
+				ValidateRHITextureViewPortability(minLodView, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::ImageViewMinLodUnsupported &&
-				ValidateRHISamplerPortability(customBorderSampler, vulkanV1Capabilities).m_Error ==
+				ValidateRHISamplerPortability(customBorderSampler, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::CustomBorderColorUnsupported &&
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::InstanceDivisorUnsupported,
-				"Vulkan v1 profile rejects unsupported view, sampler, and instance-divisor semantics");
+				"Vulkan profile rejects unsupported view, sampler, and instance-divisor semantics");
 			pipelineDesc = {};
 			pipelineDesc.m_Rasterizer.m_FillMode = RHIFillMode::Wireframe;
 			const bool rejectsWireframe =
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::WireframeUnsupported;
 			pipelineDesc = {};
 			pipelineDesc.m_Rasterizer.m_DepthClipEnable = false;
 			const bool rejectsDepthClamp =
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::DepthClampUnsupported;
 			pipelineDesc = {};
 			pipelineDesc.m_Rasterizer.m_DepthBiasClamp = 1.0f;
 			const bool rejectsBiasClamp =
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::DepthBiasClampUnsupported;
 			pipelineDesc = {};
 			pipelineDesc.m_RenderTargetCount = 2;
 			pipelineDesc.m_Blend.m_RenderTargets[1].m_BlendEnable = true;
 			const bool rejectsIndependentBlend =
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::IndependentBlendUnsupported;
 			pipelineDesc = {};
 			pipelineDesc.m_SampleQuality = 1;
 			const bool rejectsSampleQuality =
-				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanV1Capabilities).m_Error ==
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::SampleQualityUnsupported;
 			context.Check(rejectsWireframe && rejectsDepthClamp && rejectsBiasClamp &&
 				rejectsIndependentBlend && rejectsSampleQuality,
-				"Vulkan v1 profile rejects unsupported rasterizer, blend, and sample-quality semantics");
+				"Vulkan profile rejects unsupported rasterizer, blend, and sample-quality semantics");
 
 			RecordingTransferContext transferContext;
 			TransferBatch batch(transferContext);
@@ -3278,8 +3282,12 @@ namespace gglab
 					sizeof(bufferData));
 			const RHITransferSubmission submission = batch.Submit(false);
 			context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
+				transferContext.m_BufferBarriers.size() == 4 &&
 				transferContext.m_TextureBarriers[0].m_Before == UndefinedRHITextureState() &&
 				transferContext.m_TextureBarriers[1].m_After == shaderReadState &&
+				transferContext.m_BufferBarriers.front().m_Before.m_Layout == RHILayout::Common &&
+				transferContext.m_BufferBarriers.front().m_After.m_Layout == RHILayout::CopyDest &&
+				transferContext.m_BufferBarriers.back().m_After.m_Layout == RHILayout::Common &&
 				submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
 				submission.m_Publications[0].m_Type == RHIResourceType::Texture &&
 				submission.m_Publications[0].m_PublishedState == shaderReadState &&
@@ -3597,20 +3605,20 @@ namespace gglab
 				RHIVertexInputLayoutDesc::MaxVertexBuffers;
 			maxCountPipeline.m_RenderTargetCount = RHIGraphicsPipelineDesc::MaxRenderTargets;
 			context.Check(ValidateRHIGraphicsPipelinePortability(
-				maxCountPipeline, vulkanV1Capabilities).IsValid(),
+				maxCountPipeline, vulkanCapabilities).IsValid(),
 				"Pipeline portability accepts maximum vertex buffer and render target counts");
 			RHIGraphicsPipelineDesc vertexOverflowPipeline{};
 			vertexOverflowPipeline.m_VertexInput.m_VertexBufferCount =
 				RHIVertexInputLayoutDesc::MaxVertexBuffers + 1;
 			context.Check(ValidateRHIGraphicsPipelinePortability(
-				vertexOverflowPipeline, vulkanV1Capabilities).m_Error ==
+				vertexOverflowPipeline, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::VertexBufferCountExceedsLimit,
 				"Pipeline portability rejects vertex buffer counts above the input layout limit");
 			RHIGraphicsPipelineDesc targetOverflowPipeline{};
 			targetOverflowPipeline.m_RenderTargetCount =
 				RHIGraphicsPipelineDesc::MaxRenderTargets + 1;
 			context.Check(ValidateRHIGraphicsPipelinePortability(
-				targetOverflowPipeline, vulkanV1Capabilities).m_Error ==
+				targetOverflowPipeline, vulkanCapabilities).m_Error ==
 				RHIPortabilityValidationError::RenderTargetCountExceedsLimit,
 				"Pipeline portability rejects render target counts above the pipeline limit");
 
@@ -3646,6 +3654,23 @@ namespace gglab
 					!failedSubmission.m_Completion.IsValid() &&
 					failedSubmission.m_Publications.empty(),
 					"Poisoned batches abort without submitting and return an invalid submission");
+			}
+			{
+				RecordingTransferContext readbackContext;
+				TransferBatch readbackBatch(readbackContext);
+				const RHITextureReadbackRequest request = readbackBatch.ReadbackTexture(
+					RHITextureHandle{ 6, 1 }, RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::CopySource,
+						.m_Extent = { 1, 1, 1 },
+						});
+				const RHITransferSubmission submission = readbackBatch.Submit(false);
+				context.Check(!request.IsValid() && readbackBatch.IsFailed() &&
+					readbackContext.m_TextureBarriers.size() == 1 &&
+					readbackContext.m_AbortCallCount == 1 &&
+					readbackContext.m_SubmitCallCount == 0 &&
+					!submission.m_Completion.IsValid(),
+					"Readback allocation failure poisons and aborts its partially recorded state transition");
 			}
 			{
 				RecordingTransferContext moveContext;

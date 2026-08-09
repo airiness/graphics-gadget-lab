@@ -40,6 +40,32 @@ namespace gglab
 		std::optional<uint64_t> m_StableId;
 	};
 
+	[[nodiscard]] constexpr std::string_view RHIResourceTypeDebugText(
+		RHIResourceType type) noexcept;
+
+	[[nodiscard]] constexpr inline bool HasRHIResourceDebugIdentity(
+		const RHIResourceDebugIdentityDesc& identity) noexcept
+	{
+		return identity.m_Domain != RHIResourceDebugDomain::Unknown ||
+			!identity.m_Category.empty() || !identity.m_Label.empty() ||
+			!identity.m_Source.empty() || identity.m_StableId.has_value();
+	}
+
+	[[nodiscard]] constexpr inline RHIResourceDebugIdentityDesc ResolveRHIResourceDebugIdentity(
+		const RHIResourceDebugIdentityDesc& identity, std::string_view legacyName,
+		RHIResourceType resourceType) noexcept
+	{
+		if (HasRHIResourceDebugIdentity(identity))
+		{
+			return identity;
+		}
+		return {
+			.m_Domain = RHIResourceDebugDomain::Unknown,
+			.m_Category = RHIResourceTypeDebugText(resourceType),
+			.m_Label = legacyName.empty() ? std::string_view("Unspecified") : legacyName,
+		};
+	}
+
 	struct RHIResourceDebugBindingDesc
 	{
 		std::string_view m_Owner;
