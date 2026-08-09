@@ -403,9 +403,6 @@ namespace gglab
 	{
 		// The public validator only admits power-of-two counts in [1, 64];
 		// an invalid count must never be silently downgraded to 1x.
-		GGLAB_ASSERT_MSG(count > 0 && count <= 64 &&
-			(count & (count - 1)) == 0,
-			"Vulkan sample count conversion received an invalid count.");
 		switch (count)
 		{
 		case 1:
@@ -423,6 +420,7 @@ namespace gglab
 		case 64:
 			return VK_SAMPLE_COUNT_64_BIT;
 		default:
+			GGLAB_UNREACHABLE("Vulkan sample count conversion received an invalid count.");
 			return VK_SAMPLE_COUNT_1_BIT;
 		}
 	}

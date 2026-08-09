@@ -301,6 +301,109 @@ namespace gglab
 			return true;
 		}
 
+		// Registers a deferred-retirement probe on a reserved-but-unsubmitted
+		// timeline value. The gate is deterministically incomplete here; later
+		// frames submit past it. The probe slot must stay occupied until
+		// RunVulkanDeferredRetirementRelease runs after WaitIdle.
+		[[nodiscard]] int RunVulkanDeferredRetirementProbe(
+			VulkanDevice& device, VulkanFrameRuntime& runtime, uint32_t& outPendingSlot) noexcept
+		{
+			VulkanResourceManager& resources = device.GetResourceManager();
+			// One above the last committed value is reserved, not submitted:
+			// the gate is deterministically incomplete at this point, and the
+			// submissions that follow this probe complete it.
+			const RHIFencePoint incompletePoint(
+				runtime.GetTimeline().GetRHIHandle(),
+				runtime.GetTimeline().GetCurrentSignalValue() + 1);
+
+			RHITextureHandle pending = resources.CreateTexture(
+				RHIOwnedTextureCreateInfo{
+					.m_Desc = RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::Sampled,
+						.m_Extent = { 16, 16, 1 },
+					},
+					.m_InitialState = RHIResourceState{
+						.m_Stages = RHIStage::PixelShader,
+						.m_Access = RHIAccess::ShaderResource,
+						.m_Layout = RHILayout::ShaderResource,
+					},
+				},
+				{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+			if (!pending.IsValid())
+			{
+				LogQualificationError("qualify resource: deferred texture creation failed.");
+				return 1;
+			}
+			resources.RecordTextureUse(pending, incompletePoint);
+			resources.DestroyTexture(pending);
+			resources.RetireCompletedResources();
+
+			RHITextureHandle probe = resources.CreateTexture(
+				RHIOwnedTextureCreateInfo{
+					.m_Desc = RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::Sampled,
+						.m_Extent = { 16, 16, 1 },
+					},
+					.m_InitialState = RHIResourceState{
+						.m_Stages = RHIStage::PixelShader,
+						.m_Access = RHIAccess::ShaderResource,
+						.m_Layout = RHILayout::ShaderResource,
+					},
+				},
+				{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+			if (!probe.IsValid() || probe.Index() == pending.Index())
+			{
+				LogQualificationError(
+					"qualify resource: incomplete retirement gate released the slot.");
+				return 1;
+			}
+			resources.DestroyTexture(probe);
+			resources.RetireCompletedResources();
+			outPendingSlot = pending.Index();
+			LogQualificationInfo(std::format(
+				"qualify resource: incomplete gate at timeline {} retained slot {}.",
+				incompletePoint.m_Value, pending.Index()));
+			return 0;
+		}
+
+		// After the submissions that followed the probe, the gate value has
+		// been passed: the pending slot must now be released and reusable.
+		[[nodiscard]] int RunVulkanDeferredRetirementRelease(
+			VulkanDevice& device, uint32_t pendingSlot) noexcept
+		{
+			VulkanResourceManager& resources = device.GetResourceManager();
+			resources.RetireCompletedResources();
+
+			RHITextureHandle probe = resources.CreateTexture(
+				RHIOwnedTextureCreateInfo{
+					.m_Desc = RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::Sampled,
+						.m_Extent = { 16, 16, 1 },
+					},
+					.m_InitialState = RHIResourceState{
+						.m_Stages = RHIStage::PixelShader,
+						.m_Access = RHIAccess::ShaderResource,
+						.m_Layout = RHILayout::ShaderResource,
+					},
+				},
+				{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+			if (!probe.IsValid() || probe.Index() != pendingSlot)
+			{
+				LogQualificationError(
+					"qualify resource: completed gate did not release the pending slot.");
+				return 1;
+			}
+			resources.DestroyTexture(probe);
+			resources.RetireCompletedResources();
+			LogQualificationInfo(std::format(
+				"qualify resource: deferred gate completed; slot {} was released and reused.",
+				pendingSlot));
+			return 0;
+		}
+
 		// Exercises the resource layer on the real device: buffer/texture
 		// creation, texture views, samplers, persistent buffer mapping, use
 		// tracking and deferred destruction. Every retirement gate uses the
@@ -319,67 +422,8 @@ namespace gglab
 			RHITextureHandle secondTexture;
 			RHITextureHandle thirdTexture;
 			std::array<uint32_t, 4> firstViewSlots{};
-			std::array<uint32_t, 4> firstDescriptorIndices{};
+			std::array<uint32_t, 3> firstDescriptorIndices{};
 			constexpr uint32_t kIterations = 24;
-
-			// Deferred retirement: an incomplete gate must keep the
-			// resource alive until the timeline actually completes. The
-			// pending slot stays occupied and the next creation must land
-			// elsewhere.
-			{
-				RHITextureHandle pending = resources.CreateTexture(
-					RHIOwnedTextureCreateInfo{
-						.m_Desc = RHITextureDesc{
-							.m_Format = RHIFormat::R8G8B8A8Unorm,
-							.m_Usage = RHITextureUsage::Sampled,
-							.m_Extent = { 16, 16, 1 },
-						},
-						.m_InitialState = RHIResourceState{
-							.m_Stages = RHIStage::PixelShader,
-							.m_Access = RHIAccess::ShaderResource,
-							.m_Layout = RHILayout::ShaderResource,
-						},
-					},
-					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
-				if (!pending.IsValid())
-				{
-					LogQualificationError("qualify resource: deferred texture creation failed.");
-					return 1;
-				}
-				// One above the last committed value is never submitted by
-				// this process, so the gate stays incomplete.
-				const RHIFencePoint incompletePoint(
-					runtime.GetTimeline().GetRHIHandle(),
-					runtime.GetTimeline().GetCurrentSignalValue() + 1);
-				resources.RecordTextureUse(pending, incompletePoint);
-				resources.DestroyTexture(pending);
-				resources.RetireCompletedResources();
-
-				RHITextureHandle probe = resources.CreateTexture(
-					RHIOwnedTextureCreateInfo{
-						.m_Desc = RHITextureDesc{
-							.m_Format = RHIFormat::R8G8B8A8Unorm,
-							.m_Usage = RHITextureUsage::Sampled,
-							.m_Extent = { 16, 16, 1 },
-						},
-						.m_InitialState = RHIResourceState{
-							.m_Stages = RHIStage::PixelShader,
-							.m_Access = RHIAccess::ShaderResource,
-							.m_Layout = RHILayout::ShaderResource,
-						},
-					},
-					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
-				if (!probe.IsValid() || probe.Index() == pending.Index())
-				{
-					LogQualificationError(
-						"qualify resource: incomplete retirement gate released the slot.");
-					return 1;
-				}
-				resources.DestroyTexture(probe);
-				resources.RetireCompletedResources();
-				LogQualificationInfo(
-					"qualify resource: deferred retirement held the slot until completion.");
-			}
 			for (uint32_t i = 0; i < kIterations; ++i)
 			{
 				// Upload/readback buffers exercise the persistent mapping
@@ -519,7 +563,6 @@ namespace gglab
 						srvDescriptor.m_Index,
 						resources.GetTextureViewDescriptor(unorm).m_Index,
 						resources.GetTextureViewDescriptor(srgb).m_Index,
-						0,
 					};
 				}
 				else
@@ -565,12 +608,16 @@ namespace gglab
 							return 1;
 						}
 					}
-					const std::array<uint32_t, 4> descriptorIndices{
+					const std::array<uint32_t, 3> descriptorIndices{
 						srvDescriptor.m_Index,
 						resources.GetTextureViewDescriptor(unorm).m_Index,
 						resources.GetTextureViewDescriptor(srgb).m_Index,
-						0,
 					};
+					// Exact set equality: every index appears in the first
+					// round and the round is a permutation of it, with no
+					// duplicates. Index 0 is a legal descriptor index and is
+					// never used as padding.
+					bool descriptorSetMatches = true;
 					for (uint32_t d = 0; d < 3; ++d)
 					{
 						bool found = false;
@@ -578,12 +625,26 @@ namespace gglab
 						{
 							found = found || descriptorIndices[d] == expected;
 						}
-						if (!found)
+						descriptorSetMatches = descriptorSetMatches && found;
+					}
+					for (uint32_t expected : firstDescriptorIndices)
+					{
+						bool found = false;
+						for (uint32_t d = 0; d < 3; ++d)
 						{
-							LogQualificationError(
-								"qualify resource: descriptor indices were not reused.");
-							return 1;
+							found = found || descriptorIndices[d] == expected;
 						}
+						descriptorSetMatches = descriptorSetMatches && found;
+					}
+					descriptorSetMatches = descriptorSetMatches &&
+						descriptorIndices[0] != descriptorIndices[1] &&
+						descriptorIndices[0] != descriptorIndices[2] &&
+						descriptorIndices[1] != descriptorIndices[2];
+					if (!descriptorSetMatches)
+					{
+						LogQualificationError(
+							"qualify resource: descriptor indices were not reused.");
+						return 1;
 					}
 				}
 
@@ -600,6 +661,56 @@ namespace gglab
 				resources.DestroyBuffer(upload);
 				resources.DestroyBuffer(readback);
 				resources.RetireCompletedResources();
+			}
+
+			// The typeless family must also serve unordered access: an SRGB
+			// SRV and a UNORM UAV on the same mutable-format resource.
+			{
+				RHITextureHandle typelessUav = resources.CreateTexture(
+					RHIOwnedTextureCreateInfo{
+						.m_Desc = RHITextureDesc{
+							.m_Format = RHIFormat::R8G8B8A8Typeless,
+							.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
+							.m_Extent = { 32, 32, 1 },
+						},
+						.m_InitialState = RHIResourceState{
+							.m_Stages = RHIStage::PixelShader | RHIStage::ComputeShader,
+							.m_Access = RHIAccess::ShaderResource,
+							.m_Layout = RHILayout::ShaderResource,
+						},
+					},
+					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
+				if (!typelessUav.IsValid())
+				{
+					LogQualificationError(
+						"qualify resource: typeless UAV texture creation failed.");
+					return 1;
+				}
+				RHITextureViewDesc srgbSrvDesc{};
+				srgbSrvDesc.m_Type = RHITextureViewType::ShaderResource;
+				srgbSrvDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+				srgbSrvDesc.m_Format = RHIFormat::R8G8B8A8UnormSrgb;
+				const RHITextureViewHandle srgbSrv =
+					resources.CreateTextureView(typelessUav, srgbSrvDesc);
+				RHITextureViewDesc unormUavDesc{};
+				unormUavDesc.m_Type = RHITextureViewType::UnorderedAccess;
+				unormUavDesc.m_Dimension = RHITextureViewDimension::Texture2D;
+				unormUavDesc.m_Format = RHIFormat::R8G8B8A8Unorm;
+				const RHITextureViewHandle unormUav =
+					resources.CreateTextureView(typelessUav, unormUavDesc);
+				if (!srgbSrv.IsValid() || !unormUav.IsValid() ||
+					!resources.GetTextureViewDescriptor(unormUav).IsValid())
+				{
+					LogQualificationError(
+						"qualify resource: typeless UAV family creation failed.");
+					return 1;
+				}
+				resources.DestroyTextureView(srgbSrv);
+				resources.DestroyTextureView(unormUav);
+				resources.DestroyTexture(typelessUav);
+				resources.RetireCompletedResources();
+				LogQualificationInfo(
+					"qualify resource: typeless UAV family (SRGB SRV + UNORM UAV) created.");
 			}
 
 			LogQualificationInfo(std::format(
@@ -636,6 +747,15 @@ namespace gglab
 				{
 					return 1;
 				}
+			}
+			// Deferred-retirement probe: the gate value is reserved, not
+			// submitted, so the slot must stay occupied; the submissions
+			// in the remaining phases complete the gate.
+			uint32_t deferredPendingSlot = UINT32_MAX;
+			if (RunVulkanDeferredRetirementProbe(
+				*runtime.GetDevice(), runtime, deferredPendingSlot) != 0)
+			{
+				return 1;
 			}
 			// Phase 2: continuous aborts.
 			for (uint32_t i = 0; i < 3; ++i)
@@ -757,6 +877,14 @@ namespace gglab
 				LogQualificationError(
 					"qualify WaitIdle failed before the final summary; the runtime may have "
 					"entered the fatal state.");
+				return 1;
+			}
+
+			// The submissions after the probe passed the reserved gate
+			// value: the pending slot must now be released and reusable.
+			if (RunVulkanDeferredRetirementRelease(
+				*runtime.GetDevice(), deferredPendingSlot) != 0)
+			{
 				return 1;
 			}
 
