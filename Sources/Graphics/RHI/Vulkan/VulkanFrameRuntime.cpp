@@ -284,6 +284,10 @@ namespace gglab
 		}
 		runtime->m_Timeline = std::move(timelineResult.m_Fence);
 
+		// Register the timeline as the device's graphics completion source
+		// so resource retirement can resolve RHIFencePoints against it.
+		createInfo.m_Device->SetGraphicsTimeline(runtime->m_Timeline.get());
+
 		// Frame slots: binary imageAvailable semaphore, command pool and the
 		// two-purpose command buffers.
 		runtime->m_StateMachine.Reset(createInfo.m_FrameSlotCount);
@@ -711,6 +715,8 @@ namespace gglab
 		m_Timeline->CommitSubmittedValue(timelineValue);
 		slot.m_LastSubmittedTimelineValue =
 			UpdateSlotReuseGate(slot.m_LastSubmittedTimelineValue, submitResult, timelineValue);
+		result.m_SubmittedFencePoint =
+			RHIFencePoint(m_Timeline->GetRHIHandle(), timelineValue);
 
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -763,6 +769,26 @@ namespace gglab
 	VkSemaphore VulkanFrameRuntime::GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept
 	{
 		return m_SwapChain ? m_SwapChain->GetRenderingFinished(backBufferIndex) : VK_NULL_HANDLE;
+	}
+
+	bool VulkanFrameRuntime::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return true;
+		}
+		if (m_Timeline == nullptr || fencePoint.m_Fence != m_Timeline->GetRHIHandle())
+		{
+			// An unknown fence is not a completed fence; resource
+			// retirement must never assume a foreign point finished.
+			return false;
+		}
+		uint64_t completedValue = 0;
+		if (m_Timeline->GetCompletedValue(completedValue) != VK_SUCCESS)
+		{
+			return false;
+		}
+		return completedValue >= fencePoint.m_Value;
 	}
 
 	void VulkanFrameRuntime::MarkFatal(const VkResult error) noexcept

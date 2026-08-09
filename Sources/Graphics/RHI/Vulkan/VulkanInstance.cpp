@@ -150,10 +150,16 @@ namespace gglab
 			SurfaceExtensionName.data(),
 			Win32SurfaceExtensionName.data(),
 		};
+		if (hasDebugUtils)
+		{
+			// Debug utils is enabled unconditionally so GGLab debug names
+			// can be applied to Vulkan objects in every build. The debug
+			// messenger itself is only created when validation is requested.
+			enabledExtensions.push_back(DebugUtilsExtensionName.data());
+		}
 		if (enableValidation)
 		{
 			enabledLayers.push_back(ValidationLayerName.data());
-			enabledExtensions.push_back(DebugUtilsExtensionName.data());
 		}
 
 		VkApplicationInfo applicationInfo{};

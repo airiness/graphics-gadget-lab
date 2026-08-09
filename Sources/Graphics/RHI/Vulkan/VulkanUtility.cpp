@@ -158,4 +158,26 @@ namespace gglab
 	{
 		return std::format("API {} / driver 0x{:08x}", FormatVkVersion(apiVersion), driverVersion);
 	}
+
+	void SetVulkanObjectDebugName(
+		VkDevice device, VkObjectType objectType, uint64_t objectHandle,
+		const char* name) noexcept
+	{
+		if (device == VK_NULL_HANDLE || objectHandle == 0 || name == nullptr || *name == '\0')
+		{
+			return;
+		}
+		const auto setName = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
+			vkGetDeviceProcAddr(device, "vkSetDebugUtilsObjectNameEXT"));
+		if (setName == nullptr)
+		{
+			return;
+		}
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = objectType;
+		nameInfo.objectHandle = objectHandle;
+		nameInfo.pObjectName = name;
+		setName(device, &nameInfo);
+	}
 }

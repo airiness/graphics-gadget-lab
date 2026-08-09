@@ -1,8 +1,10 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <array>
+#include <format>
 #include <vector>
 
 namespace gglab
@@ -22,10 +24,12 @@ namespace gglab
 	VulkanDevice::Result VulkanDevice::Create(const CreateInfo& createInfo) noexcept
 	{
 		Result result{};
-		if (createInfo.m_PhysicalDevice == VK_NULL_HANDLE || !createInfo.m_ProfileCapabilities)
+		if (createInfo.m_Instance == VK_NULL_HANDLE ||
+			createInfo.m_PhysicalDevice == VK_NULL_HANDLE || !createInfo.m_ProfileCapabilities)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
-			result.m_Error = "VulkanDevice requires a physical device and capability snapshot.";
+			result.m_Error =
+				"VulkanDevice requires an instance, a physical device and a capability snapshot.";
 			return result;
 		}
 		const VulkanDeviceProfileCapabilities& capabilities = *createInfo.m_ProfileCapabilities;
@@ -92,6 +96,9 @@ namespace gglab
 		deviceCreateInfo.pNext = &features2;
 
 		auto device = std::make_unique<VulkanDevice>();
+		device->m_Instance = createInfo.m_Instance;
+		device->m_PhysicalDevice = createInfo.m_PhysicalDevice;
+		device->m_PortabilityCapabilities = createInfo.m_PortabilityCapabilities;
 		const VkResult createResult =
 			vkCreateDevice(createInfo.m_PhysicalDevice, &deviceCreateInfo, nullptr, &device->m_Device);
 		if (createResult != VK_SUCCESS)
@@ -111,12 +118,61 @@ namespace gglab
 			return result;
 		}
 
+		// VMA owns raw memory allocation only; the resource manager owns
+		// every GGLab handle, native object, view and lifetime decision.
+		VmaAllocatorCreateInfo allocatorCreateInfo{};
+		allocatorCreateInfo.physicalDevice = createInfo.m_PhysicalDevice;
+		allocatorCreateInfo.device = device->m_Device;
+		allocatorCreateInfo.instance = createInfo.m_Instance;
+		allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+		const VkResult allocatorResult =
+			vmaCreateAllocator(&allocatorCreateInfo, &device->m_MemAllocator);
+		if (allocatorResult != VK_SUCCESS)
+		{
+			result.m_Result = allocatorResult;
+			result.m_Error = std::format("vmaCreateAllocator failed with {}.", ToString(allocatorResult));
+			return result;
+		}
+
+		device->m_ResourceManager.Initialize(device.get());
+
 		result.m_Device = std::move(device);
 		return result;
 	}
 
+	bool VulkanDevice::IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return true;
+		}
+		if (m_GraphicsTimeline == nullptr ||
+			fencePoint.m_Fence != m_GraphicsTimeline->GetRHIHandle())
+		{
+			// An unknown fence never counts as completed.
+			return false;
+		}
+		uint64_t completedValue = 0;
+		if (m_GraphicsTimeline->GetCompletedValue(completedValue) != VK_SUCCESS)
+		{
+			return false;
+		}
+		return completedValue >= fencePoint.m_Value;
+	}
+
 	void VulkanDevice::Destroy() noexcept
 	{
+		// The resource manager releases its native objects and VMA
+		// allocations before the allocator and the device go away. The
+		// frame runtime must already be destroyed (it owns the timeline
+		// this device only borrows).
+		if (m_MemAllocator != VK_NULL_HANDLE)
+		{
+			m_ResourceManager.Finalize();
+			vmaDestroyAllocator(m_MemAllocator);
+			m_MemAllocator = VK_NULL_HANDLE;
+		}
+		m_GraphicsTimeline = nullptr;
 		if (m_Device != VK_NULL_HANDLE)
 		{
 			vkDestroyDevice(m_Device, nullptr);

@@ -195,13 +195,16 @@ namespace gglab
 				capabilities.m_RequiredFormatFeaturesSupported ? "yes" : "no"));
 		}
 
-		[[nodiscard]] VulkanDevice::CreateInfo MakeDeviceCreateInfo(
+		[[nodiscard]] VulkanDevice::CreateInfo MakeDeviceCreateInfo(VkInstance instance,
 			VkPhysicalDevice physicalDevice,
 			const VulkanAdapterCapabilitySnapshot& snapshot) noexcept
 		{
 			VulkanDevice::CreateInfo deviceCreateInfo{};
+			deviceCreateInfo.m_Instance = instance;
 			deviceCreateInfo.m_PhysicalDevice = physicalDevice;
 			deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
+			deviceCreateInfo.m_PortabilityCapabilities =
+				snapshot.m_PortabilityCapabilities;
 			deviceCreateInfo.m_GraphicsPresentQueueFamilyIndex =
 				snapshot.m_GraphicsPresentQueueFamilyIndex;
 			deviceCreateInfo.m_GraphicsPresentQueueCount =
@@ -316,7 +319,7 @@ namespace gglab
 				// adapter unverified (probed stays false), so it cannot be selected.
 				{
 					VulkanDevice::Result probeResult = VulkanDevice::Create(
-						MakeDeviceCreateInfo(physicalDevices[index], snapshot));
+						MakeDeviceCreateInfo(instance->Get(), physicalDevices[index], snapshot));
 					if (!probeResult.Succeeded())
 					{
 						snapshot.m_LayoutProbeError = probeResult.m_Error;
@@ -389,7 +392,8 @@ namespace gglab
 			// minimal frame runtime can run on it later.
 			{
 				VulkanDevice::Result deviceResult = VulkanDevice::Create(
-					MakeDeviceCreateInfo(physicalDevices[selection.m_SelectedIndex], selectedSnapshot));
+					MakeDeviceCreateInfo(instance->Get(), physicalDevices[selection.m_SelectedIndex],
+						selectedSnapshot));
 				if (!deviceResult.Succeeded())
 				{
 					LogBootstrapError(std::format(

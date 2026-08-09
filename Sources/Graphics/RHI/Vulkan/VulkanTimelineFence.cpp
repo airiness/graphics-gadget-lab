@@ -3,10 +3,23 @@
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <array>
+#include <atomic>
 #include <format>
 
 namespace gglab
 {
+	namespace
+	{
+		// Backend-neutral fence identity: a process-stable monotonic index.
+		// Mirrors the DX12 fence handle allocation so RHIFencePoints stay
+		// comparable across backends without a shared handle table.
+		[[nodiscard]] RHIFenceHandle AllocateRHIFenceHandle() noexcept
+		{
+			static std::atomic<RHIFenceHandle::IndexType> nextIndex = 0;
+			return RHIFenceHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
+		}
+	}
+
 	VulkanTimelineFence::~VulkanTimelineFence()
 	{
 		Destroy();
@@ -24,6 +37,7 @@ namespace gglab
 
 		auto fence = std::make_unique<VulkanTimelineFence>();
 		fence->m_Device = createInfo.m_Device;
+		fence->m_RHIHandle = AllocateRHIFenceHandle();
 
 		VkSemaphoreTypeCreateInfo typeCreateInfo{};
 		typeCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;

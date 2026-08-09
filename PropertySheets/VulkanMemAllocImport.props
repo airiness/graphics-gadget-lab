@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    Vulkan Memory Allocator integration for the Vulkan RHI backend.
+
+    Contract:
+      - VMA is a pinned submodule at Externals/Vender/VulkanMemoryAllocator
+        (tag v3.4.0). Its single header is included through this include
+        path; VMA_IMPLEMENTATION is defined in exactly one translation unit
+        (VulkanResourceManager.cpp).
+      - The submodule only adds an include path; it introduces no
+        user-installed SDK or developer setup requirement.
+  -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+</Project>

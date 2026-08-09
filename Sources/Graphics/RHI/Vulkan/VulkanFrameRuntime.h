@@ -230,6 +230,10 @@ namespace gglab
 		// True when the runtime entered the fatal state; no further
 		// BeginFrame is allowed.
 		bool m_Fatal = false;
+		// Valid only when m_Submitted: the committed graphics timeline
+		// point. It is the fence point resource last-use tracking records
+		// for work submitted by this frame transaction.
+		RHIFencePoint m_SubmittedFencePoint{};
 		VkResult m_Result = VK_SUCCESS;
 	};
 
@@ -295,6 +299,11 @@ namespace gglab
 		[[nodiscard]] bool IsFatal() const noexcept { return m_Fatal; }
 		[[nodiscard]] bool IsDeviceLost() const noexcept { return m_DeviceLost; }
 		[[nodiscard]] bool HasActiveFrame() const noexcept { return m_ActiveFrame.has_value(); }
+
+		// True when the fence point belongs to this runtime's graphics
+		// timeline and its value has completed; invalid points are
+		// completed by definition.
+		[[nodiscard]] bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept;
 
 		[[nodiscard]] VulkanSwapChain& GetSwapChain() noexcept { return *m_SwapChain; }
 		[[nodiscard]] const VulkanSwapChain& GetSwapChain() const noexcept { return *m_SwapChain; }

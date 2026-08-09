@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 
 #include <vulkan/vulkan.h>
@@ -56,6 +57,10 @@ namespace gglab
 		VulkanDeviceProfileCapabilities m_ProfileCapabilities{};
 		VulkanDescriptorCapacityLimits m_DescriptorLimits{};
 		VulkanDescriptorCapacityAvailability m_DescriptorCapacityAvailability{};
+		// Conditional portability capabilities consumed by view/sampler
+		// creation and recorded for pipeline creation. They never gate
+		// adapter selection.
+		RHIPortabilityCapabilities m_PortabilityCapabilities{};
 		std::vector<VulkanFormatSupportDiagnostic> m_FormatDiagnostics;
 		VulkanDeviceProfileEvaluation m_ProfileEvaluation{};
 		// Distinguishes "the layout probe was never executed" from "support

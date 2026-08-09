@@ -49,6 +49,7 @@
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -63,6 +64,7 @@
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -436,6 +438,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -589,6 +594,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />

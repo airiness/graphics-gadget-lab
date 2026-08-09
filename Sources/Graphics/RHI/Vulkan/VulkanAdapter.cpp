@@ -101,7 +101,12 @@ namespace gglab
 		[[nodiscard]] VkPhysicalDeviceFeatures2 QueryDeviceFeatures(VkPhysicalDevice physicalDevice,
 			VkPhysicalDeviceVulkan13Features& vulkan13Features,
 			VkPhysicalDeviceVulkan12Features& vulkan12Features,
-			VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT& mutableDescriptorFeatures) noexcept
+			VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT& mutableDescriptorFeatures,
+			VkPhysicalDeviceCustomBorderColorFeaturesEXT& customBorderColorFeatures,
+			VkPhysicalDeviceImageViewMinLodFeaturesEXT& imageViewMinLodFeatures,
+			VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT& vertexAttributeDivisorFeatures,
+			bool hasCustomBorderColor, bool hasImageViewMinLod,
+			bool hasVertexAttributeDivisor) noexcept
 		{
 			VkPhysicalDeviceFeatures2 features2{};
 			features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -118,6 +123,30 @@ namespace gglab
 			mutableDescriptorFeatures.sType =
 				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT;
 			vulkan12Features.pNext = &mutableDescriptorFeatures;
+
+			VkBaseOutStructure* tail =
+				reinterpret_cast<VkBaseOutStructure*>(&mutableDescriptorFeatures);
+			if (hasCustomBorderColor)
+			{
+				customBorderColorFeatures.sType =
+					VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT;
+				tail->pNext = reinterpret_cast<VkBaseOutStructure*>(&customBorderColorFeatures);
+				tail = reinterpret_cast<VkBaseOutStructure*>(&customBorderColorFeatures);
+			}
+			if (hasImageViewMinLod)
+			{
+				imageViewMinLodFeatures.sType =
+					VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_VIEW_MIN_LOD_FEATURES_EXT;
+				tail->pNext = reinterpret_cast<VkBaseOutStructure*>(&imageViewMinLodFeatures);
+				tail = reinterpret_cast<VkBaseOutStructure*>(&imageViewMinLodFeatures);
+			}
+			if (hasVertexAttributeDivisor)
+			{
+				vertexAttributeDivisorFeatures.sType =
+					VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT;
+				tail->pNext =
+					reinterpret_cast<VkBaseOutStructure*>(&vertexAttributeDivisorFeatures);
+			}
 
 			vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
 			return features2;
@@ -266,6 +295,18 @@ namespace gglab
 		const bool hasSwapchain = ContainsExtension(deviceExtensions, SwapchainExtensionName);
 		const bool hasMutableDescriptorType =
 			ContainsExtension(deviceExtensions, MutableDescriptorTypeExtensionName);
+		constexpr std::string_view CustomBorderColorExtensionName =
+			VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME;
+		constexpr std::string_view ImageViewMinLodExtensionName =
+			VK_EXT_IMAGE_VIEW_MIN_LOD_EXTENSION_NAME;
+		constexpr std::string_view VertexAttributeDivisorExtensionName =
+			VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME;
+		const bool hasCustomBorderColor =
+			ContainsExtension(deviceExtensions, CustomBorderColorExtensionName);
+		const bool hasImageViewMinLod =
+			ContainsExtension(deviceExtensions, ImageViewMinLodExtensionName);
+		const bool hasVertexAttributeDivisor =
+			ContainsExtension(deviceExtensions, VertexAttributeDivisorExtensionName);
 		snapshot.m_ProfileCapabilities.m_HasSwapchainExtension = hasSwapchain;
 		snapshot.m_ProfileCapabilities.m_HasMutableDescriptorTypeExtension =
 			hasMutableDescriptorType;
@@ -281,8 +322,13 @@ namespace gglab
 		VkPhysicalDeviceVulkan13Features vulkan13Features{};
 		VkPhysicalDeviceVulkan12Features vulkan12Features{};
 		VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutableDescriptorFeatures{};
+		VkPhysicalDeviceCustomBorderColorFeaturesEXT customBorderColorFeatures{};
+		VkPhysicalDeviceImageViewMinLodFeaturesEXT imageViewMinLodFeatures{};
+		VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vertexAttributeDivisorFeatures{};
 		const VkPhysicalDeviceFeatures2 features2 = QueryDeviceFeatures(
-			physicalDevice, vulkan13Features, vulkan12Features, mutableDescriptorFeatures);
+			physicalDevice, vulkan13Features, vulkan12Features, mutableDescriptorFeatures,
+			customBorderColorFeatures, imageViewMinLodFeatures, vertexAttributeDivisorFeatures,
+			hasCustomBorderColor, hasImageViewMinLod, hasVertexAttributeDivisor);
 
 		auto& capabilities = snapshot.m_ProfileCapabilities;
 		capabilities.m_DynamicRendering = vulkan13Features.dynamicRendering == VK_TRUE;
@@ -320,6 +366,21 @@ namespace gglab
 			vulkan12Features.shaderUniformBufferArrayNonUniformIndexing == VK_TRUE;
 		capabilities.m_ShaderStorageBufferArrayNonUniformIndexing =
 			vulkan12Features.shaderStorageBufferArrayNonUniformIndexing == VK_TRUE;
+
+		// Conditional portability capabilities. Extension-gated
+		// features are only read when the extension is present, so an
+		// unavailable extension never reports a stale device value.
+		auto& portability = snapshot.m_PortabilityCapabilities;
+		portability.m_FillModeNonSolid = features2.features.fillModeNonSolid == VK_TRUE;
+		portability.m_DepthClamp = features2.features.depthClamp == VK_TRUE;
+		portability.m_DepthBiasClamp = features2.features.depthBiasClamp == VK_TRUE;
+		portability.m_IndependentBlend = features2.features.independentBlend == VK_TRUE;
+		portability.m_CustomBorderColor = hasCustomBorderColor &&
+			customBorderColorFeatures.customBorderColors == VK_TRUE;
+		portability.m_ImageViewMinLod = hasImageViewMinLod &&
+			imageViewMinLodFeatures.minLod == VK_TRUE;
+		portability.m_VertexAttributeDivisor = hasVertexAttributeDivisor &&
+			vertexAttributeDivisorFeatures.vertexAttributeInstanceRateDivisor == VK_TRUE;
 
 		VulkanDescriptorCapacityLimits& limits = snapshot.m_DescriptorLimits;
 		limits.m_MaxDescriptorSetUpdateAfterBindSampledImages =

@@ -4,8 +4,12 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "Graphics/RHI/RHISampler.h"
+#include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
+#include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -1590,6 +1594,185 @@ namespace gglab
 		}
 	}
 
+	void RunVulkanFormatContractTests(SelfTestContext& context) noexcept
+	{
+		// Every RHI format has a valid Vulkan resource mapping. The aspect
+		// mask matches the shared RHI metadata through the effective aspect
+		// contract: depth-stencil formats (including typeless R32Typeless)
+		// expose their depth/stencil aspects instead of the generic color
+		// aspect of the typeless family.
+		bool allFormatsMapped = true;
+		bool allAspectsMatch = true;
+		for (uint32_t raw = static_cast<uint32_t>(RHIFormat::Unknown) + 1;
+			raw < static_cast<uint32_t>(RHIFormat::Count); ++raw)
+		{
+			const RHIFormat format = static_cast<RHIFormat>(raw);
+			allFormatsMapped &= IsVulkanFormatSupported(format);
+			const RHIFormatInfo& rhiInfo = GetRHIFormatInfo(format);
+			const RHITextureAspect effectiveAspects = rhiInfo.m_DepthStencilAspects !=
+				RHITextureAspect::None
+				? rhiInfo.m_DepthStencilAspects
+				: rhiInfo.m_Aspects;
+			const VkImageAspectFlags expected = ToVulkanImageAspectFlags(effectiveAspects);
+			allAspectsMatch &= GetVulkanFormatInfo(format).m_Aspects == expected;
+		}
+		context.Check(allFormatsMapped,
+			"Every RHI format maps to a supported Vulkan resource format");
+		context.Check(allAspectsMatch,
+			"Every RHI format aspect mask matches the shared RHI format metadata");
+
+		// Typeless depth family: R32Typeless views as D32Float (DSV) and
+		// R32Float (sampled), never as a color format.
+		context.Check(IsVulkanViewFormatCompatible(RHIFormat::R32Typeless, RHIFormat::D32Float) &&
+			IsVulkanViewFormatCompatible(RHIFormat::R32Typeless, RHIFormat::R32Float) &&
+			!IsVulkanViewFormatCompatible(RHIFormat::R32Typeless, RHIFormat::R8G8B8A8Unorm),
+			"R32Typeless accepts only the depth view family");
+		context.Check(ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::R32Float) ==
+			VK_FORMAT_D32_SFLOAT &&
+			ToVulkanViewFormat(RHIFormat::R32Typeless, RHIFormat::D32Float) ==
+			VK_FORMAT_D32_SFLOAT,
+			"R32Typeless sampled views stay on the D32 depth image format");
+
+		// RGBA8 typeless family: UNORM/SRGB views only, with mutable-format
+		// creation required.
+		context.Check(IsVulkanViewFormatCompatible(
+			RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8Unorm) &&
+			IsVulkanViewFormatCompatible(
+				RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) &&
+			!IsVulkanViewFormatCompatible(RHIFormat::R8G8B8A8Typeless, RHIFormat::R32Float),
+			"R8G8B8A8Typeless accepts only the UNORM/SRGB view family");
+		context.Check(NeedsVulkanMutableFormat(RHIFormat::R8G8B8A8Typeless) &&
+			!NeedsVulkanMutableFormat(RHIFormat::R32Typeless) &&
+			!NeedsVulkanMutableFormat(RHIFormat::R16G16B16A16Float),
+			"Only non-depth typeless families require mutable-format images");
+		context.Check(ToVulkanViewFormat(
+			RHIFormat::R8G8B8A8Typeless, RHIFormat::R8G8B8A8UnormSrgb) ==
+			VK_FORMAT_R8G8B8A8_SRGB,
+			"RGBA8 typeless SRGB views resolve to the native SRGB format");
+
+		// Non-typeless formats only view as themselves.
+		context.Check(IsVulkanViewFormatCompatible(
+			RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Float) &&
+			!IsVulkanViewFormatCompatible(
+				RHIFormat::R16G16B16A16Float, RHIFormat::R16G16B16A16Typeless) &&
+			!IsVulkanViewFormatCompatible(RHIFormat::R16G16B16A16Float, RHIFormat::R8Unorm),
+			"Non-typeless formats accept exactly their own view format");
+
+		// Usage lowering: native image usage flags and required format
+		// features stay exact; Present contributes no ordinary feature.
+		context.Check(ToVulkanImageUsageFlags(
+			RHITextureUsage::Sampled | RHITextureUsage::RenderTarget) ==
+			(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
+			"Texture usage maps to the exact native image usage flags");
+		context.Check(ToVulkanFormatFeatureFlags(
+			RHITextureUsage::UnorderedAccess | RHITextureUsage::CopyDest) ==
+			(VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT),
+			"Texture usage maps to the exact required format features");
+		context.Check(ToVulkanFormatFeatureFlags(RHITextureUsage::Present) == 0,
+			"Present contributes no ordinary format feature");
+
+		// Depth formats carry only depth/stencil aspects, never color.
+		context.Check((GetVulkanFormatInfo(RHIFormat::D32Float).m_Aspects &
+			VK_IMAGE_ASPECT_COLOR_BIT) == 0 &&
+			(GetVulkanFormatInfo(RHIFormat::D24UnormS8Uint).m_Aspects &
+				(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) ==
+			(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT),
+			"Depth/stencil formats expose depth and stencil aspects only");
+
+		// View dimension lowering covers every RHI dimension.
+		context.Check(ToVulkanImageViewType(RHITextureViewDimension::Texture2D) ==
+			VK_IMAGE_VIEW_TYPE_2D &&
+			ToVulkanImageViewType(RHITextureViewDimension::TextureCube) ==
+			VK_IMAGE_VIEW_TYPE_CUBE &&
+			ToVulkanImageViewType(RHITextureViewDimension::TextureCubeArray) ==
+			VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
+			"Texture view dimensions map to the exact native view types");
+	}
+
+	void RunVulkanPortabilityContractTests(SelfTestContext& context) noexcept
+	{
+		// View min LOD is rejected without the extension and accepted with
+		// it; zero clamp is always accepted.
+		RHIPortabilityCapabilities withoutMinLod{};
+		withoutMinLod.m_ImageViewMinLod = false;
+		RHIPortabilityCapabilities withMinLod{};
+		withMinLod.m_ImageViewMinLod = true;
+
+		RHITextureViewDesc minLodView{};
+		minLodView.m_ResourceMinLODClamp = 2.0f;
+		context.Check(!ValidateRHITextureViewPortability(minLodView, withoutMinLod).IsValid() &&
+			ValidateRHITextureViewPortability(minLodView, withMinLod).IsValid() &&
+			ValidateRHITextureViewPortability({}, withoutMinLod).IsValid(),
+			"Image-view min LOD requires VK_EXT_image_view_min_lod");
+
+		// Sampler border colors: the three fixed colors are always legal,
+		// arbitrary colors need the custom-border-color feature.
+		RHIPortabilityCapabilities withoutCustomBorder{};
+		withoutCustomBorder.m_CustomBorderColor = false;
+		RHIPortabilityCapabilities withCustomBorder{};
+		withCustomBorder.m_CustomBorderColor = true;
+
+		RHISamplerDesc transparentBlack{};
+		transparentBlack.m_AddressU = RHITextureAddressMode::Border;
+		transparentBlack.m_BorderColor[0] = 0.0f;
+		transparentBlack.m_BorderColor[1] = 0.0f;
+		transparentBlack.m_BorderColor[2] = 0.0f;
+		transparentBlack.m_BorderColor[3] = 0.0f;
+		context.Check(ValidateRHISamplerPortability(transparentBlack, withoutCustomBorder).IsValid(),
+			"Transparent black border color is always supported");
+
+		RHISamplerDesc arbitraryColor{};
+		arbitraryColor.m_AddressU = RHITextureAddressMode::Border;
+		arbitraryColor.m_BorderColor[0] = 0.25f;
+		arbitraryColor.m_BorderColor[1] = 0.5f;
+		arbitraryColor.m_BorderColor[2] = 0.75f;
+		arbitraryColor.m_BorderColor[3] = 1.0f;
+		context.Check(
+			!ValidateRHISamplerPortability(arbitraryColor, withoutCustomBorder).IsValid() &&
+			ValidateRHISamplerPortability(arbitraryColor, withCustomBorder).IsValid(),
+			"Arbitrary sampler border colors require custom-border-color");
+	}
+
+	void RunVulkanDescriptorArenaTests(SelfTestContext& context) noexcept
+	{
+		// Arena capacity matches the frozen backend-neutral contract.
+		VulkanDescriptorIndexArena resourceArena(
+			GGLabDescriptorCapacityContract.m_ResourceDescriptorCount);
+		VulkanDescriptorIndexArena samplerArena(
+			GGLabDescriptorCapacityContract.m_SamplerDescriptorCount);
+		context.Check(resourceArena.GetCapacity() == 65'536 &&
+			samplerArena.GetCapacity() == 2'048,
+			"Descriptor arenas match the frozen capacity contract");
+
+		// Index 0 is the failure sentinel; live accounting follows
+		// allocate/release exactly.
+		const uint32_t first = resourceArena.Allocate();
+		const uint32_t second = resourceArena.Allocate();
+		context.Check(first != 0 && second != 0 && first != second &&
+			resourceArena.GetLiveCount() == 2,
+			"Descriptor arena allocates distinct nonzero indices");
+
+		resourceArena.Release(first);
+		context.Check(resourceArena.GetLiveCount() == 1,
+			"Descriptor arena releases indices back to the free list");
+		const uint32_t reused = resourceArena.Allocate();
+		context.Check(reused == first && resourceArena.GetLiveCount() == 2,
+			"Descriptor arena reuses the most recently released index");
+
+		// A full arena reports the failure sentinel and keeps its count.
+		VulkanDescriptorIndexArena tinyArena(2);
+		const uint32_t a = tinyArena.Allocate();
+		const uint32_t b = tinyArena.Allocate();
+		context.Check(a != 0 && b != 0 && tinyArena.Allocate() == 0 &&
+			tinyArena.GetLiveCount() == 2,
+			"Descriptor arena reports exhaustion without corrupting its state");
+
+		tinyArena.Release(a);
+		tinyArena.Release(b);
+		context.Check(tinyArena.GetLiveCount() == 0,
+			"Descriptor arena live count returns to zero after full release");
+	}
+
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunDescriptorCapacityTests(context);
@@ -1598,6 +1781,9 @@ namespace gglab
 		RunCoordinatePolicyTests(context);
 		RunShaderArtifactContractTests(context);
 		RunVulkanCliContractTests(context);
+		RunVulkanFormatContractTests(context);
+		RunVulkanPortabilityContractTests(context);
+		RunVulkanDescriptorArenaTests(context);
 #if GGLAB_ENABLE_VULKAN
 		RunVulkanBootstrapSelectionTests(context);
 		RunVulkanFrameContractTests(context);

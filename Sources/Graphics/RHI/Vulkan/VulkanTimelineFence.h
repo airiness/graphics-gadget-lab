@@ -1,4 +1,6 @@
 #pragma once
+#include "Graphics/RHI/RHIFence.h"
+
 #include <vulkan/vulkan.h>
 
 #include <cstdint>
@@ -14,6 +16,10 @@ namespace gglab
 	// reused. Values are reserved as candidates and only committed when the
 	// submission succeeded; a failed submission may leave an unused gap but
 	// the gate never waits on a value that was not submitted.
+	//
+	// The fence owns a stable backend-neutral RHIFenceHandle so submitted
+	// timeline values can form valid RHIFencePoints for resource last-use
+	// tracking and deferred destruction.
 	class VulkanTimelineFence
 	{
 	public:
@@ -52,6 +58,10 @@ namespace gglab
 		// always safe.
 		[[nodiscard]] uint64_t GetCurrentSignalValue() const noexcept { return m_SubmittedValue; }
 
+		// The stable backend-neutral identity of this timeline; combined
+		// with a committed value it forms a valid RHIFencePoint.
+		[[nodiscard]] RHIFenceHandle GetRHIHandle() const noexcept { return m_RHIHandle; }
+
 		// Blocks until the graphics timeline reaches the given value. The
 		// caller must only wait on committed values. Returns VK_SUCCESS or
 		// the Vulkan error (e.g. VK_ERROR_DEVICE_LOST); the result is never
@@ -68,6 +78,7 @@ namespace gglab
 
 		VkDevice m_Device = VK_NULL_HANDLE;
 		VkSemaphore m_Semaphore = VK_NULL_HANDLE;
+		RHIFenceHandle m_RHIHandle{};
 		uint64_t m_ReservedValue = 0;
 		uint64_t m_SubmittedValue = 0;
 	};

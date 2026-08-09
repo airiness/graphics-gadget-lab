@@ -52,6 +52,9 @@
     <Filter Include="Externals\D3D12MemAlloc">
       <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Externals\VulkanMemAlloc">
+      <UniqueIdentifier>{44e74b8a-9df7-4d93-91a2-bb37de6c2e10}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core\Input">
       <UniqueIdentifier>{b2b02cd2-6196-43e9-8f44-f9314263c7b5}</UniqueIdentifier>
     </Filter>
@@ -685,6 +688,15 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp">
@@ -2035,6 +2047,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h">
+      <Filter>Externals\VulkanMemAlloc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h">
       <Filter>Graphics\RHI</Filter>
