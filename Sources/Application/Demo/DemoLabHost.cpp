@@ -7,6 +7,7 @@
 #include "Application/Lab/Sessions/GTAOLabSession.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
@@ -41,6 +42,12 @@ namespace gglab
 			RenderGraphComputeLabSession::GetDescriptor(), &RenderGraphComputeLabSession::Create);
 		GGLAB_ASSERT_MSG(renderGraphComputeRegistered,
 			"Failed to register the RenderGraph Compute Lab session.");
+
+		const bool coordinateConformanceRegistered = m_Runtime.RegisterLab(
+			CoordinateConformanceLabSession::GetDescriptor(),
+			&CoordinateConformanceLabSession::Create);
+		GGLAB_ASSERT_MSG(coordinateConformanceRegistered,
+			"Failed to register the Coordinate Conformance Lab session.");
 
 		const bool sampleableDepthRegistered = m_Runtime.RegisterLab(
 			SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create);

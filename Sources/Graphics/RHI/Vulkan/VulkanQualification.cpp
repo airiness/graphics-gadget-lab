@@ -8,7 +8,9 @@
 #include "Graphics/TransferManager.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #if GGLAB_ENABLE_VULKAN
+#include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
+#include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
@@ -17,6 +19,7 @@
 
 #include <array>
 #include <charconv>
+#include <cstring>
 #include <cstdint>
 #include <string_view>
 #include <thread>
@@ -1183,6 +1186,14 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
+			const AssetStreamingIdentity streamingIdentity{
+				.m_Kind = AssetStreamingWorkKind::Texture,
+				.m_StableId = 8,
+				.m_Generation = 1,
+			};
+			// Hold completion so the test observes the unpublished interval
+			// deterministically instead of racing a fast graphics queue.
+			scheduler.ArmGpuCompletionHold(streamingIdentity);
 			const auto streamingPayload = std::make_shared<const TextureAssetData>(textureData);
 			RHITextureOwner streamingTexture;
 			RHITextureViewHandle streamingView;
@@ -1204,11 +1215,7 @@ namespace gglab
 							.m_Label = "Qualification.ExpectedOffOwnerRejection" }).IsValid();
 					scheduler.EnqueueCpuPayload({
 						.m_Name = "Vulkan texture payload handoff",
-						.m_Identity = {
-							.m_Kind = AssetStreamingWorkKind::Texture,
-							.m_StableId = 8,
-							.m_Generation = 1,
-							},
+						.m_Identity = streamingIdentity,
 						.m_Estimate = {
 							.m_SourceBytes = streamingPayload->m_Pixels.size(),
 							},
@@ -1237,11 +1244,7 @@ namespace gglab
 							}
 							scheduler.EnqueueUploadRecording({
 								.m_Name = "Vulkan streamed texture upload",
-								.m_Identity = {
-									.m_Kind = AssetStreamingWorkKind::Texture,
-									.m_StableId = 8,
-									.m_Generation = 1,
-									},
+								.m_Identity = streamingIdentity,
 								.m_Estimate = {
 									.m_SourceBytes = streamingPayload->m_Pixels.size(),
 									.m_StagingBytes = streamingPayload->m_Pixels.size(),
@@ -1253,11 +1256,7 @@ namespace gglab
 									uploadWorkRanOnOwner = scheduler.IsOwnerThread();
 									const AssetUploadHandle handle = scheduler.RecordUpload({
 										.m_Name = "Vulkan streamed texture upload",
-										.m_Identity = {
-											.m_Kind = AssetStreamingWorkKind::Texture,
-											.m_StableId = 8,
-											.m_Generation = 1,
-											},
+										.m_Identity = streamingIdentity,
 										.m_Estimate = {
 											.m_StagingBytes = streamingPayload->m_Pixels.size(),
 											.m_OperationCount = 1,
@@ -1291,9 +1290,12 @@ namespace gglab
 				!publishedDescriptor.IsValid();
 			if (runtime.WaitIdle() != VK_SUCCESS)
 			{
+				scheduler.ClearGpuCompletionHold();
+				scheduler.Finalize();
 				LogQualificationError("qualify transfer: WaitIdle failed after scheduler upload.");
 				return 1;
 			}
+			scheduler.ClearGpuCompletionHold();
 			GGLAB_UNUSED(scheduler.Tick());
 			const AssetUploadStatistics statistics = scheduler.GetStatistics();
 			const bool descriptorPublished = publishedDescriptor.IsValid() &&
@@ -1548,6 +1550,7 @@ namespace gglab
 				.m_SizeInBytes = artifact.m_Binary.SizeInBytes(),
 				.m_Format = artifact.GetBinaryFormat(),
 				.m_Hash = artifact.m_Hash,
+				.m_EntryPoint = L"VSMain",
 			};
 			const VkShaderModule shaderModule =
 				pipelineSystem.CreateShaderModule(spirV, "Qualification.FinalColorVS");
@@ -1571,6 +1574,633 @@ namespace gglab
 				"qualify descriptors: global layout, pipeline layout, shader module and dynamic "
 				"uniform storage passed (alignment={}, highWater={}, overflow={}).",
 				uniformAlignment, highWater, overflowCount));
+			return 0;
+		}
+
+		[[nodiscard]] int RunVulkanGraphicsQualification(
+			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+		{
+			constexpr uint32_t targetWidth = 64;
+			constexpr uint32_t targetHeight = 64;
+			constexpr RHIFormat colorFormat = RHIFormat::R8G8B8A8Unorm;
+			constexpr RHIFormat depthFormat = RHIFormat::D32Float;
+			constexpr RHIResourceState shaderResourceState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			};
+
+			struct CoordinateConformanceParameters
+			{
+				uint32_t m_TextureIndex = 0;
+				uint32_t m_SamplerIndex = 0;
+				uint32_t m_Mode = 0;
+				float m_Depth = 0.0f;
+				float m_TargetExtent[2] = { 1.0f, 1.0f };
+				float m_Padding[2]{};
+			};
+			static_assert(sizeof(CoordinateConformanceParameters) == 32);
+			struct CoordinateVertex
+			{
+				float m_Position[3];
+				float m_UV[2];
+			};
+			static_assert(sizeof(CoordinateVertex) == 20);
+
+			VulkanResourceManager& resources = device.GetResourceManager();
+			VulkanPipelineSystem pipelineSystem(&device);
+			RHIBindingLayoutDesc layoutDesc{};
+			layoutDesc.m_DebugName = "Qualification.GraphicsLayout";
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::PushConstants,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Binding = 2,
+				.m_SizeInBytes = sizeof(CoordinateConformanceParameters),
+				.m_DebugName = "PassConstants",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::BindlessResourceTable,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Count = 0,
+				.m_DebugName = "BindlessResources",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::BindlessSamplerTable,
+				.m_Visibility = RHIShaderStage::All,
+				.m_Count = 0,
+				.m_DebugName = "BindlessSamplers",
+			};
+			const RHIBindingLayoutHandle layoutHandle =
+				pipelineSystem.CreateBindingLayout(layoutDesc);
+			VulkanBindingLayout* layout = pipelineSystem.ResolveBindingLayout(layoutHandle);
+			if (layout == nullptr || layout->GetPlan().m_DynamicOffsetCount != 1 ||
+				layout->GetPlan().GetDynamicOffsetSlot(0) != 0)
+			{
+				LogQualificationError("qualify graphics: binding layout creation failed.");
+				return 1;
+			}
+
+			ShaderCompiler compiler;
+			const auto compileShader = [&compiler](ShaderStage stage, const wchar_t* entry)
+				{
+					ShaderDesc desc{
+						.m_SourcePath = L"Passes/PassCoordinateConformance.hlsl",
+						.m_Stage = stage,
+						.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(stage),
+						.m_Entry = entry,
+						.m_IncludeDirs = { L"." },
+					};
+					return compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+				};
+			ShaderCompileArtifact geometryArtifact =
+				compileShader(ShaderStage::Vertex, L"VSGeometry");
+			ShaderCompileArtifact fullscreenArtifact =
+				compileShader(ShaderStage::Vertex, L"VSFullscreen");
+			ShaderCompileArtifact pixelArtifact =
+				compileShader(ShaderStage::Pixel, L"PSConformance");
+			if (!geometryArtifact.m_Binary.IsValid() || !fullscreenArtifact.m_Binary.IsValid() ||
+				!pixelArtifact.m_Binary.IsValid() ||
+				geometryArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				fullscreenArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				pixelArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
+			{
+				LogQualificationError("qualify graphics: coordinate shader compilation failed.");
+				return 1;
+			}
+			const ShaderBytecode geometryShader{
+				.m_Data = geometryArtifact.m_Binary.Data(),
+				.m_SizeInBytes = geometryArtifact.m_Binary.SizeInBytes(),
+				.m_Format = geometryArtifact.GetBinaryFormat(),
+				.m_Hash = geometryArtifact.m_Hash,
+				.m_EntryPoint = L"VSGeometry",
+			};
+			const ShaderBytecode fullscreenShader{
+				.m_Data = fullscreenArtifact.m_Binary.Data(),
+				.m_SizeInBytes = fullscreenArtifact.m_Binary.SizeInBytes(),
+				.m_Format = fullscreenArtifact.GetBinaryFormat(),
+				.m_Hash = fullscreenArtifact.m_Hash,
+				.m_EntryPoint = L"VSFullscreen",
+			};
+			const ShaderBytecode pixelShader{
+				.m_Data = pixelArtifact.m_Binary.Data(),
+				.m_SizeInBytes = pixelArtifact.m_Binary.SizeInBytes(),
+				.m_Format = pixelArtifact.GetBinaryFormat(),
+				.m_Hash = pixelArtifact.m_Hash,
+				.m_EntryPoint = L"PSConformance",
+			};
+
+			RHIGraphicsPipelineDesc geometryDesc{};
+			geometryDesc.m_BindingLayout = layoutHandle;
+			geometryDesc.m_VertexInput.m_VertexBuffers[0] = {
+				.m_InputSlot = 0,
+				.m_StrideInBytes = sizeof(CoordinateVertex),
+			};
+			geometryDesc.m_VertexInput.m_VertexBufferCount = 1;
+			geometryDesc.m_VertexInput.m_Attributes[0] = {
+				.m_SemanticName = "POSITION",
+				.m_Location = 0,
+				.m_Format = RHIFormat::R32G32B32Float,
+				.m_InputSlot = 0,
+				.m_AlignedByteOffset = 0,
+			};
+			geometryDesc.m_VertexInput.m_Attributes[1] = {
+				.m_SemanticName = "TEXCOORD",
+				.m_Location = 1,
+				.m_Format = RHIFormat::R32G32Float,
+				.m_InputSlot = 0,
+				.m_AlignedByteOffset = 12,
+			};
+			geometryDesc.m_VertexInput.m_AttributeCount = 2;
+			geometryDesc.m_Rasterizer.m_CullMode = RHICullMode::None;
+			geometryDesc.m_DepthStencil = {
+				.m_DepthTestEnable = false,
+				.m_DepthWriteEnable = false,
+				.m_DepthCompareOp = RHICompareOp::Always,
+			};
+			geometryDesc.m_RenderTargetFormats[0] = colorFormat;
+			geometryDesc.m_RenderTargetCount = 1;
+			geometryDesc.m_DepthStencilFormat = depthFormat;
+
+			RHIGraphicsPipelineDesc depthDesc = geometryDesc;
+			depthDesc.m_VertexInput = {};
+			depthDesc.m_DepthStencil = {
+				.m_DepthTestEnable = true,
+				.m_DepthWriteEnable = true,
+				.m_DepthCompareOp = RHICompareOp::Greater,
+			};
+			RHIGraphicsPipelineDesc positionDesc = depthDesc;
+			positionDesc.m_DepthStencil = geometryDesc.m_DepthStencil;
+			const RHIPipelineHandle geometryPipeline = pipelineSystem.CreateGraphicsPipeline({
+				.m_Desc = geometryDesc,
+				.m_VertexShader = geometryShader,
+				.m_PixelShader = pixelShader,
+				});
+			const RHIPipelineHandle depthPipeline = pipelineSystem.CreateGraphicsPipeline({
+				.m_Desc = depthDesc,
+				.m_VertexShader = fullscreenShader,
+				.m_PixelShader = pixelShader,
+				});
+			const RHIPipelineHandle positionPipeline = pipelineSystem.CreateGraphicsPipeline({
+				.m_Desc = positionDesc,
+				.m_VertexShader = fullscreenShader,
+				.m_PixelShader = pixelShader,
+				});
+			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
+				!positionPipeline.IsValid())
+			{
+				LogQualificationError("qualify graphics: native pipeline creation failed.");
+				return 1;
+			}
+
+			const RHITextureDesc colorDesc{
+				.m_Format = colorFormat,
+				.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::CopySource,
+				.m_Extent = { targetWidth, targetHeight, 1 },
+				.m_DebugName = "Qualification.GraphicsColor",
+			};
+			const RHITextureDesc depthTextureDesc{
+				.m_Format = depthFormat,
+				.m_Usage = RHITextureUsage::DepthStencil,
+				.m_Extent = { targetWidth, targetHeight, 1 },
+				.m_DebugName = "Qualification.GraphicsDepth",
+			};
+			const RHITextureDesc markerDesc{
+				.m_Format = colorFormat,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
+				.m_Extent = { 2, 2, 1 },
+				.m_DebugName = "Qualification.GraphicsMarker",
+			};
+			RHITextureOwner colorTexture(&device, device.CreateTexture({
+				.m_Desc = colorDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}));
+			RHITextureOwner depthTexture(&device, device.CreateTexture({
+				.m_Desc = depthTextureDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}));
+			RHITextureOwner markerTexture(&device, device.CreateTexture({
+				.m_Desc = markerDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}));
+			const RHITextureViewHandle colorView = device.CreateTextureView(colorTexture.Get(), {
+				.m_Type = RHITextureViewType::RenderTarget,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = colorFormat,
+				});
+			const RHITextureViewHandle depthView = device.CreateTextureView(depthTexture.Get(), {
+				.m_Type = RHITextureViewType::DepthStencil,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = depthFormat,
+				});
+			const RHITextureViewHandle markerView = device.CreateTextureView(markerTexture.Get(), {
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::Texture2D,
+				.m_Format = colorFormat,
+				});
+			const RHISamplerHandle markerSampler =
+				device.CreateSampler({ .m_Filter = RHISamplerFilter::MinMagMipPoint });
+			struct ViewCleanup
+			{
+				VulkanDevice& m_Device;
+				std::array<RHITextureViewHandle, 3> m_Views;
+				RHISamplerHandle m_Sampler;
+				~ViewCleanup()
+				{
+					for (const RHITextureViewHandle view : m_Views)
+					{
+						if (view.IsValid())
+						{
+							m_Device.DestroyTextureView(view);
+						}
+					}
+					if (m_Sampler.IsValid())
+					{
+						m_Device.DestroySampler(m_Sampler);
+					}
+				}
+			} cleanup{ device, { colorView, depthView, markerView }, markerSampler };
+			const RHIDescriptorHandle markerDescriptor =
+				resources.GetTextureViewDescriptor(markerView);
+			const RHIDescriptorHandle samplerDescriptor =
+				resources.GetSamplerDescriptor(markerSampler);
+			if (!colorTexture || !depthTexture || !markerTexture || !colorView.IsValid() ||
+				!depthView.IsValid() || !markerView.IsValid() || !markerDescriptor.IsValid() ||
+				!markerSampler.IsValid() || !samplerDescriptor.IsValid())
+			{
+				LogQualificationError("qualify graphics: offscreen resource creation failed.");
+				return 1;
+			}
+
+			TextureAssetData markerData = MakeQualificationTextureData(colorFormat, { 2, 2, 1 }, 8,
+				{
+					std::byte{ 0xFF }, std::byte{ 0x00 }, std::byte{ 0x00 }, std::byte{ 0xFF },
+					std::byte{ 0x00 }, std::byte{ 0xFF }, std::byte{ 0x00 }, std::byte{ 0xFF },
+					std::byte{ 0x00 }, std::byte{ 0x00 }, std::byte{ 0xFF }, std::byte{ 0xFF },
+					std::byte{ 0xFF }, std::byte{ 0xFF }, std::byte{ 0x00 }, std::byte{ 0xFF },
+				});
+			TransferManager transferManager(std::make_unique<VulkanTransferContext>(&device));
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				const bool recorded = batch.UploadTexture(markerTexture.Get(), markerData.MakeUploadData(),
+					UndefinedRHITextureState(), shaderResourceState);
+				const RHITransferSubmission submission = batch.Submit(true);
+				if (!recorded || !submission.m_Completion.IsValid() ||
+					!device.IsFencePointCompleted(submission.m_Completion) ||
+					!resources.PublishTextureViewDescriptor(markerView) ||
+					!resources.PublishSamplerDescriptor(markerSampler))
+				{
+					LogQualificationError(
+						"qualify graphics: marker upload or descriptor publication failed.");
+					return 1;
+				}
+			}
+
+			constexpr std::array vertices{
+				CoordinateVertex{{-0.9f, 0.75f, 0.5f}, {0.0f, 0.0f}},
+				CoordinateVertex{{-0.1f, -0.7f, 0.5f}, {1.0f, 1.0f}},
+				CoordinateVertex{{-0.75f, -0.55f, 0.5f}, {0.0f, 1.0f}},
+				CoordinateVertex{{0.1f, 0.75f, 0.5f}, {0.0f, 0.0f}},
+				CoordinateVertex{{0.25f, -0.55f, 0.5f}, {0.0f, 1.0f}},
+				CoordinateVertex{{0.9f, -0.7f, 0.5f}, {1.0f, 1.0f}},
+				CoordinateVertex{{-1.0f, 1.0f, 0.5f}, {0.0f, 0.0f}},
+				CoordinateVertex{{1.0f, 1.0f, 0.5f}, {1.0f, 0.0f}},
+				CoordinateVertex{{1.0f, -1.0f, 0.5f}, {1.0f, 1.0f}},
+				CoordinateVertex{{-1.0f, -1.0f, 0.5f}, {0.0f, 1.0f}},
+			};
+			constexpr std::array<uint32_t, 6> indices{ 0, 1, 2, 0, 2, 3 };
+			RHIBufferOwner vertexBuffer(&device, device.CreateBuffer({
+				.m_SizeInBytes = sizeof(vertices),
+				.m_StrideInBytes = sizeof(CoordinateVertex),
+				.m_Usage = RHIBufferUsage::Vertex,
+				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
+				.m_DebugName = "Qualification.GraphicsVertices",
+				}));
+			RHIBufferOwner indexBuffer(&device, device.CreateBuffer({
+				.m_SizeInBytes = sizeof(indices),
+				.m_StrideInBytes = sizeof(uint32_t),
+				.m_Usage = RHIBufferUsage::Index,
+				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
+				.m_DebugName = "Qualification.GraphicsIndices",
+				}));
+			if (!vertexBuffer || !indexBuffer)
+			{
+				LogQualificationError("qualify graphics: geometry buffer creation failed.");
+				return 1;
+			}
+			void* mappedVertices = device.MapBuffer(vertexBuffer.Get(), {});
+			void* mappedIndices = device.MapBuffer(indexBuffer.Get(), {});
+			if (mappedVertices == nullptr || mappedIndices == nullptr)
+			{
+				if (mappedVertices)
+				{
+					device.UnmapBuffer(vertexBuffer.Get(), {});
+				}
+				if (mappedIndices)
+				{
+					device.UnmapBuffer(indexBuffer.Get(), {});
+				}
+				LogQualificationError("qualify graphics: geometry buffer creation failed.");
+				return 1;
+			}
+			std::memcpy(mappedVertices, vertices.data(), sizeof(vertices));
+			std::memcpy(mappedIndices, indices.data(), sizeof(indices));
+			device.UnmapBuffer(vertexBuffer.Get(), { 0, sizeof(vertices) });
+			device.UnmapBuffer(indexBuffer.Get(), { 0, sizeof(indices) });
+
+			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
+				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
+			VulkanDynamicUniformBuffer uniformBuffer;
+			if (!uniformBuffer.Initialize(&device, runtime.GetFrameSlotCount(), {
+				.m_PageSizeInBytes = std::max(4096u, uniformAlignment * 8),
+				.m_MaxPageCount = 2,
+				.m_Alignment = 1,
+				}))
+			{
+				LogQualificationError("qualify graphics: dynamic uniform initialization failed.");
+				return 1;
+			}
+			VulkanSet0DynamicUniformFrames set0Frames;
+			if (!set0Frames.Initialize(
+				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount()))
+			{
+				LogQualificationError("qualify graphics: set-0 frame initialization failed.");
+				return 1;
+			}
+
+			const VulkanBeginFrameResult begin = runtime.BeginFrame();
+			if (!begin.IsAcquired() || !set0Frames.BeginFrame(begin.m_FrameSlotIndex))
+			{
+				if (begin.IsAcquired())
+				{
+					GGLAB_UNUSED(runtime.AbortFrame());
+				}
+				LogQualificationError("qualify graphics: frame acquire or set-0 begin failed.");
+				return 1;
+			}
+			const VulkanFrameRecording recording = runtime.BeginFrameRecording();
+			if (!recording.IsValid())
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				GGLAB_UNUSED(runtime.AbortFrame());
+				LogQualificationError("qualify graphics: command recording did not begin.");
+				return 1;
+			}
+
+			VkRenderingAttachmentInfo presentAttachment{};
+			presentAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+			presentAttachment.imageView = recording.m_BackBufferView;
+			presentAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			presentAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			presentAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			presentAttachment.clearValue.color = { { 0.04f, 0.06f, 0.09f, 1.0f } };
+			VkRenderingInfo presentRendering{};
+			presentRendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+			presentRendering.renderArea.extent = recording.m_Extent;
+			presentRendering.layerCount = 1;
+			presentRendering.colorAttachmentCount = 1;
+			presentRendering.pColorAttachments = &presentAttachment;
+			vkCmdBeginRendering(recording.m_CommandBuffer, &presentRendering);
+			vkCmdEndRendering(recording.m_CommandBuffer);
+
+			VulkanTexture* nativeColor = resources.ResolveTexture(colorTexture.Get());
+			VulkanTexture* nativeDepth = resources.ResolveTexture(depthTexture.Get());
+			if (nativeColor == nullptr || nativeDepth == nullptr)
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				GGLAB_UNUSED(runtime.AbortFrame());
+				LogQualificationError("qualify graphics: native render targets are unavailable.");
+				return 1;
+			}
+			const std::array beginBarriers{
+				MakeVulkanImageBarrier(nativeColor->Get(), VK_IMAGE_ASPECT_COLOR_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+					VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+					VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT),
+				MakeVulkanImageBarrier(nativeDepth->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+						VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+						VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+			};
+			VkDependencyInfo beginDependency{};
+			beginDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			beginDependency.imageMemoryBarrierCount = static_cast<uint32_t>(beginBarriers.size());
+			beginDependency.pImageMemoryBarriers = beginBarriers.data();
+			vkCmdPipelineBarrier2(recording.m_CommandBuffer, &beginDependency);
+
+			VulkanGraphicsCommandContext commandContext(
+				&device, &pipelineSystem, &uniformBuffer, &set0Frames);
+			if (!commandContext.BeginEncoding(recording.m_CommandBuffer, begin.m_FrameSlotIndex))
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				GGLAB_UNUSED(runtime.AbortFrame());
+				LogQualificationError("qualify graphics: graphics encoder did not begin.");
+				return 1;
+			}
+			const std::array attachments{
+				RHIRenderingAttachment{.m_View = colorView, .m_LoadOp = RHIContentLoadOp::DontCare },
+			};
+			const RHIRenderingAttachment depthAttachment{
+				.m_View = depthView,
+				.m_LoadOp = RHIContentLoadOp::DontCare,
+			};
+			commandContext.BeginRendering({
+				.m_ColorAttachments = attachments,
+				.m_DepthAttachment = depthAttachment,
+				});
+			commandContext.ClearColorAttachment(0, { 0.01f, 0.015f, 0.025f, 1.0f });
+			commandContext.ClearDepthAttachment(0.0f);
+			const auto makeParameters = [&](uint32_t mode, float depth = 0.0f)
+				{
+					return CoordinateConformanceParameters{
+						.m_TextureIndex = markerDescriptor.m_Index,
+						.m_SamplerIndex = samplerDescriptor.m_Index,
+						.m_Mode = mode,
+						.m_Depth = depth,
+						.m_TargetExtent = {
+							static_cast<float>(targetWidth), static_cast<float>(targetHeight),
+						},
+					};
+				};
+			const RHIVertexBufferBinding vertexBinding{
+				.m_Buffer = vertexBuffer.Get(),
+				.m_Stride = sizeof(CoordinateVertex),
+				.m_SizeInBytes = sizeof(vertices),
+			};
+			commandContext.SetVertexBuffers(
+				0, std::span<const RHIVertexBufferBinding>(&vertexBinding, 1));
+			commandContext.SetPipeline(geometryPipeline);
+			commandContext.SetViewport({ 0.0f, 0.0f, 32.0f, 32.0f });
+			commandContext.SetScissorRect({ 0, 0, 32, 32 });
+			commandContext.SetPushConstants(0, makeParameters(0));
+			commandContext.Draw(6);
+
+			const RHIIndexBufferBinding indexBinding{
+				.m_Buffer = indexBuffer.Get(),
+				.m_SizeInBytes = sizeof(indices),
+				.m_Format = RHIFormat::R32Uint,
+			};
+			commandContext.SetIndexBuffer(indexBinding);
+			commandContext.SetViewport({ 32.0f, 0.0f, 32.0f, 32.0f });
+			commandContext.SetScissorRect({ 32, 0, 64, 32 });
+			commandContext.SetPushConstants(0, makeParameters(1));
+			commandContext.DrawIndexed(6, 1, 0, 6, 0);
+
+			commandContext.SetPipeline(depthPipeline);
+			commandContext.SetViewport({ 0.0f, 32.0f, 32.0f, 32.0f });
+			commandContext.SetScissorRect({ 0, 32, 32, 64 });
+			commandContext.SetPushConstants(0, makeParameters(2, 0.25f));
+			commandContext.DrawFullscreenTriangle();
+			commandContext.SetPushConstants(0, makeParameters(2, 0.75f));
+			commandContext.DrawFullscreenTriangle();
+
+			commandContext.SetPipeline(positionPipeline);
+			commandContext.SetViewport({ 32.0f, 32.0f, 32.0f, 32.0f });
+			commandContext.SetScissorRect({ 40, 40, 56, 56 });
+			commandContext.SetPushConstants(0, makeParameters(3));
+			commandContext.DrawFullscreenTriangle();
+			commandContext.EndRendering();
+			const bool encodingSucceeded = commandContext.FinishEncoding();
+			std::vector<RHITextureHandle> usedTextures(
+				commandContext.GetUsedTextures().begin(), commandContext.GetUsedTextures().end());
+			std::vector<RHIBufferHandle> usedBuffers(
+				commandContext.GetUsedBuffers().begin(), commandContext.GetUsedBuffers().end());
+			if (!encodingSucceeded)
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				GGLAB_UNUSED(runtime.AbortFrame());
+				LogQualificationError("qualify graphics: graphics command validation failed.");
+				return 1;
+			}
+
+			const VkImageMemoryBarrier2 toCommon = MakeVulkanImageBarrier(nativeColor->Get(),
+				VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+				VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+			VkDependencyInfo endDependency{};
+			endDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			endDependency.imageMemoryBarrierCount = 1;
+			endDependency.pImageMemoryBarriers = &toCommon;
+			vkCmdPipelineBarrier2(recording.m_CommandBuffer, &endDependency);
+			if (!runtime.EndFrameRecording())
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				GGLAB_UNUSED(runtime.AbortFrame());
+				LogQualificationError("qualify graphics: command recording did not finalize.");
+				return 1;
+			}
+			const VulkanSubmitPresentResult frame = runtime.EndFrame();
+			if (!frame.m_Submitted || !frame.m_SubmittedFencePoint.IsValid())
+			{
+				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
+				LogQualificationError("qualify graphics: graphics submission failed.");
+				return 1;
+			}
+			const bool uniformFrameEnded =
+				set0Frames.EndFrame(begin.m_FrameSlotIndex, frame.m_SubmittedFencePoint);
+			for (const RHITextureHandle texture : usedTextures)
+			{
+				resources.RecordTextureUse(texture, frame.m_SubmittedFencePoint);
+			}
+			for (const RHIBufferHandle buffer : usedBuffers)
+			{
+				resources.RecordBufferUse(buffer, frame.m_SubmittedFencePoint);
+			}
+			if (!uniformFrameEnded || runtime.WaitIdle() != VK_SUCCESS)
+			{
+				LogQualificationError(
+					"qualify graphics: graphics completion or uniform retirement failed.");
+				return 1;
+			}
+
+			TextureAssetData readback;
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				RHITextureReadbackRequest request =
+					batch.ReadbackTexture(colorTexture.Get(), colorDesc);
+				const RHITransferSubmission submission = batch.Submit(true);
+				if (!request.IsValid() || !submission.m_Completion.IsValid() ||
+					!device.IsFencePointCompleted(submission.m_Completion))
+				{
+					LogQualificationError("qualify graphics: color readback failed.");
+					return 1;
+				}
+				const std::byte* mapped = transferManager.MapTextureReadback(device, request);
+				readback = transferManager.ResolveMappedTextureReadback(request, mapped);
+				transferManager.UnmapTextureReadback(device, request);
+				if (!readback.IsValid())
+				{
+					LogQualificationError("qualify graphics: color readback failed.");
+					return 1;
+				}
+			}
+
+			struct Pixel
+			{
+				uint8_t m_R = 0;
+				uint8_t m_G = 0;
+				uint8_t m_B = 0;
+				uint8_t m_A = 0;
+			};
+			const auto readPixel = [&readback](uint32_t x, uint32_t y) noexcept
+				{
+					const size_t offset = (static_cast<size_t>(y) * targetWidth + x) * 4;
+					return Pixel{
+						std::to_integer<uint8_t>(readback.m_Pixels[offset + 0]),
+						std::to_integer<uint8_t>(readback.m_Pixels[offset + 1]),
+						std::to_integer<uint8_t>(readback.m_Pixels[offset + 2]),
+						std::to_integer<uint8_t>(readback.m_Pixels[offset + 3]),
+					};
+				};
+			const auto nearPixel = [](Pixel actual, Pixel expected, uint8_t tolerance) noexcept
+				{
+					const auto channelNear = [tolerance](uint8_t a, uint8_t b) noexcept
+						{
+							return std::abs(static_cast<int>(a) - static_cast<int>(b)) <= tolerance;
+						};
+					return channelNear(actual.m_R, expected.m_R) &&
+						channelNear(actual.m_G, expected.m_G) &&
+						channelNear(actual.m_B, expected.m_B) &&
+						channelNear(actual.m_A, expected.m_A);
+				};
+			const std::array probePixels{
+				readPixel(7, 19), readPixel(23, 19),
+				readPixel(40, 8), readPixel(56, 8), readPixel(40, 24), readPixel(56, 24),
+				readPixel(16, 48), readPixel(48, 48), readPixel(33, 33),
+			};
+			const bool pixelsPassed =
+				nearPixel(probePixels[0], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[1], { 230, 26, 204, 255 }, 20) &&
+				nearPixel(probePixels[2], { 255, 0, 0, 255 }, 20) &&
+				nearPixel(probePixels[3], { 0, 255, 0, 255 }, 20) &&
+				nearPixel(probePixels[4], { 0, 0, 255, 255 }, 20) &&
+				nearPixel(probePixels[5], { 255, 255, 0, 255 }, 20) &&
+				nearPixel(probePixels[6], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[7], { 193, 193, 62, 255 }, 20) &&
+				nearPixel(probePixels[8], { 3, 4, 6, 255 }, 10);
+			if (!pixelsPassed)
+			{
+				std::string observed;
+				for (const Pixel pixel : probePixels)
+				{
+					observed += std::format(" ({},{},{},{})", pixel.m_R, pixel.m_G,
+						pixel.m_B, pixel.m_A);
+				}
+				LogQualificationError(std::format(
+					"qualify graphics: coordinate probe pixels did not match:{}", observed));
+				return 1;
+			}
+
+			set0Frames.Finalize();
+			uniformBuffer.Finalize();
+			transferManager.Reclaim();
+			device.RetireCompletedWork();
+			LogQualificationInfo(
+				"qualify graphics: opposite winding, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
 			return 0;
 		}
 
@@ -1755,6 +2385,10 @@ namespace gglab
 				return 1;
 			}
 			if (RunVulkanTransferQualification(*runtime.GetDevice(), runtime) != 0)
+			{
+				return 1;
+			}
+			if (RunVulkanGraphicsQualification(*runtime.GetDevice(), runtime) != 0)
 			{
 				return 1;
 			}

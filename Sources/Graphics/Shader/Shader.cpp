@@ -15,6 +15,7 @@ namespace gglab
 			.m_SizeInBytes = m_Artifact.m_Binary.SizeInBytes(),
 			.m_Format = m_Artifact.GetBinaryFormat(),
 			.m_Hash = m_Artifact.m_Hash,
+			.m_EntryPoint = m_Desc.m_Entry,
 		};
 	}
 

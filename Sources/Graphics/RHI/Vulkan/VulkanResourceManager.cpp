@@ -783,6 +783,39 @@ namespace gglab
 		return slot && slot->m_Resource ? &slot->m_RHIDesc : nullptr;
 	}
 
+	bool VulkanResourceManager::ResolveTextureViewBinding(
+		RHITextureViewHandle view, TextureViewBinding& outBinding) const noexcept
+	{
+		outBinding = {};
+		if (!CheckOwnerThread("VulkanResourceManager::ResolveTextureViewBinding"))
+		{
+			return false;
+		}
+		const TextureViewSlot* viewSlot = m_TextureViews.Resolve(view);
+		if (viewSlot == nullptr || !viewSlot->m_Backing ||
+			viewSlot->m_Backing->GetImageView() == VK_NULL_HANDLE)
+		{
+			return false;
+		}
+		const TextureSlot* textureSlot = m_Textures.Resolve(viewSlot->m_Key.m_Texture);
+		if (textureSlot == nullptr || !textureSlot->m_Resource)
+		{
+			return false;
+		}
+		const uint32_t mip = viewSlot->m_Key.m_Desc.m_Subresources.m_BaseMip;
+		outBinding.m_Texture = viewSlot->m_Key.m_Texture;
+		outBinding.m_ViewDesc = viewSlot->m_Key.m_Desc;
+		outBinding.m_TextureDesc = textureSlot->m_RHIDesc;
+		outBinding.m_Image = textureSlot->m_Resource->Get();
+		outBinding.m_ImageView = viewSlot->m_Backing->GetImageView();
+		outBinding.m_Extent = {
+			std::max(textureSlot->m_RHIDesc.m_Extent.m_Width >> mip, 1u),
+			std::max(textureSlot->m_RHIDesc.m_Extent.m_Height >> mip, 1u),
+			std::max(textureSlot->m_RHIDesc.m_Extent.m_Depth >> mip, 1u),
+		};
+		return true;
+	}
+
 	RHITextureViewHandle VulkanResourceManager::CreateTextureView(
 		RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept
 	{

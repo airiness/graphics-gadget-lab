@@ -711,7 +711,13 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp">
@@ -808,6 +814,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
@@ -1907,6 +1916,9 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -2090,10 +2102,16 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h">
@@ -2515,6 +2533,9 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl">

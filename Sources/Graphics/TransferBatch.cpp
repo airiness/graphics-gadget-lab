@@ -233,7 +233,7 @@ namespace gglab
 			return false;
 		}
 
-		// Phase 1: validate the candidate against the complete existing manifest
+		// Validate the candidate against the complete existing manifest
 		// of this texture before mutating anything. An exact-range update must
 		// also stay consistent with every other overlapping publication, so the
 		// manifest can never end up with two terminal states for one subresource.
@@ -264,7 +264,7 @@ namespace gglab
 			}
 		}
 
-		// Phase 2: mutate only after the candidate passed the complete check.
+		// Mutate only after the candidate passed the complete check.
 		if (exactEntryIndex)
 		{
 			m_Publications[*exactEntryIndex].m_PublishedState = publishedState;

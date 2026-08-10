@@ -132,4 +132,41 @@ namespace gglab
 		}
 		return std::nullopt;
 	}
+
+	VkImageMemoryBarrier2 MakeVulkanImageBarrier(VkImage image,
+		const VkImageSubresourceRange& subresources, VkImageLayout oldLayout,
+		VkImageLayout newLayout,
+		VkPipelineStageFlags2 sourceStages, VkAccessFlags2 sourceAccess,
+		VkPipelineStageFlags2 destinationStages, VkAccessFlags2 destinationAccess) noexcept
+	{
+		VkImageMemoryBarrier2 barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		barrier.srcStageMask = sourceStages;
+		barrier.srcAccessMask = sourceAccess;
+		barrier.dstStageMask = destinationStages;
+		barrier.dstAccessMask = destinationAccess;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+		barrier.subresourceRange = subresources;
+		return barrier;
+	}
+
+	VkImageMemoryBarrier2 MakeVulkanImageBarrier(VkImage image,
+		VkImageAspectFlags aspects, VkImageLayout oldLayout, VkImageLayout newLayout,
+		VkPipelineStageFlags2 sourceStages, VkAccessFlags2 sourceAccess,
+		VkPipelineStageFlags2 destinationStages, VkAccessFlags2 destinationAccess) noexcept
+	{
+		const VkImageSubresourceRange subresources{
+			.aspectMask = aspects,
+			.baseMipLevel = 0,
+			.levelCount = 1,
+			.baseArrayLayer = 0,
+			.layerCount = 1,
+		};
+		return MakeVulkanImageBarrier(image, subresources, oldLayout, newLayout,
+			sourceStages, sourceAccess, destinationStages, destinationAccess);
+	}
 }

@@ -12,6 +12,7 @@
 namespace gglab
 {
 	class VulkanDevice;
+	class VulkanPipelineState;
 
 	enum class VulkanBindingLayoutError : uint8_t
 	{
@@ -109,6 +110,9 @@ namespace gglab
 			RHIBindingLayoutHandle layout) noexcept;
 		[[nodiscard]] const VulkanBindingLayout* ResolveBindingLayout(
 			RHIBindingLayoutHandle layout) const noexcept;
+		[[nodiscard]] bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
+			VulkanPipelineState*& outPipelineState, VulkanBindingLayout*& outBindingLayout,
+			RHIGraphicsPipelineDesc& outDesc) const noexcept;
 
 	private:
 		struct BindingLayoutSlot
@@ -117,8 +121,16 @@ namespace gglab
 			std::string m_DebugName;
 		};
 
+		struct PipelineSlot
+		{
+			std::unique_ptr<VulkanPipelineState> m_Pipeline;
+			RHIGraphicsPipelineDesc m_Desc{};
+			std::array<ShaderHash128, 5> m_ShaderHashes{};
+		};
+
 		VulkanDevice* m_Device = nullptr;
 		std::vector<BindingLayoutSlot> m_BindingLayouts;
+		std::vector<PipelineSlot> m_Pipelines;
 		RHIBindingLayoutHandle::GenerationType m_BindingLayoutGeneration = 1;
 		RHIPipelineHandle::GenerationType m_PipelineGeneration = 1;
 		uint64_t m_Revision = 1;

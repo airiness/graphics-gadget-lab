@@ -30,6 +30,16 @@ namespace gglab
 	class VulkanResourceManager
 	{
 	public:
+		struct TextureViewBinding
+		{
+			RHITextureHandle m_Texture{};
+			RHITextureViewDesc m_ViewDesc{};
+			RHITextureDesc m_TextureDesc{};
+			VkImage m_Image = VK_NULL_HANDLE;
+			VkImageView m_ImageView = VK_NULL_HANDLE;
+			RHIExtent3D m_Extent{};
+		};
+
 		struct ImportedTextureDesc
 		{
 			RHIImportedTextureDesc m_RHI;
@@ -166,6 +176,8 @@ namespace gglab
 		const VulkanBuffer* ResolveBuffer(RHIBufferHandle buffer) const noexcept;
 		const RHITextureDesc* ResolveTextureDesc(RHITextureHandle texture) const noexcept;
 		const RHIBufferDesc* ResolveBufferDesc(RHIBufferHandle buffer) const noexcept;
+		[[nodiscard]] bool ResolveTextureViewBinding(
+			RHITextureViewHandle view, TextureViewBinding& outBinding) const noexcept;
 
 		RHITextureViewHandle CreateTextureView(
 			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept;

@@ -54,9 +54,8 @@ namespace gglab
 			return result;
 		}
 		const VulkanDeviceProfileCapabilities& capabilities = *createInfo.m_ProfileCapabilities;
-		// The policy-reduced set is what the logical device actually enables;
-		// the exposed set (GetPortabilityCapabilities) stays empty until a
-		// consuming feature has a complete native lowering.
+		// The policy-reduced set is what the logical device enables and what
+		// object creation may expose after the corresponding lowering exists.
 		const RHIPortabilityCapabilities enabledCapabilities =
 			ApplyVulkanPortabilityPolicy(createInfo.m_PortabilityCapabilities);
 
@@ -160,9 +159,7 @@ namespace gglab
 		device->m_ImageCubeArrayEnabled = createInfo.m_ImageCubeArrayAvailable;
 		device->m_SamplerMirrorClampToEdgeEnabled =
 			createInfo.m_SamplerMirrorClampToEdgeAvailable;
-		// The exposed set stays empty: no conditional capability has a
-		// complete native lowering yet.
-		device->m_PortabilityCapabilities = {};
+		device->m_PortabilityCapabilities = enabledCapabilities;
 		const VkResult createResult =
 			vkCreateDevice(createInfo.m_PhysicalDevice, &deviceCreateInfo, nullptr, &device->m_Device);
 		if (createResult != VK_SUCCESS)

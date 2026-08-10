@@ -2,8 +2,10 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 #include <array>
@@ -72,6 +74,83 @@ namespace gglab
 			default:
 				return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 			}
+		}
+
+		[[nodiscard]] bool IsVulkanShaderBytecode(const ShaderBytecode& bytecode) noexcept
+		{
+			return !bytecode.IsValid() || bytecode.m_Format == ShaderBinaryFormat::SpirV;
+		}
+
+		[[nodiscard]] bool AreVertexInputsEqual(
+			const RHIVertexInputLayoutDesc& left, const RHIVertexInputLayoutDesc& right) noexcept
+		{
+			if (left.m_AttributeCount != right.m_AttributeCount ||
+				left.m_VertexBufferCount != right.m_VertexBufferCount)
+			{
+				return false;
+			}
+			for (uint32_t index = 0; index < left.m_AttributeCount; ++index)
+			{
+				const auto& a = left.m_Attributes[index];
+				const auto& b = right.m_Attributes[index];
+				if (a.m_SemanticIndex != b.m_SemanticIndex || a.m_Location != b.m_Location ||
+					a.m_Format != b.m_Format || a.m_InputSlot != b.m_InputSlot ||
+					a.m_AlignedByteOffset != b.m_AlignedByteOffset)
+				{
+					return false;
+				}
+			}
+			for (uint32_t index = 0; index < left.m_VertexBufferCount; ++index)
+			{
+				const auto& a = left.m_VertexBuffers[index];
+				const auto& b = right.m_VertexBuffers[index];
+				if (a.m_InputSlot != b.m_InputSlot || a.m_StrideInBytes != b.m_StrideInBytes ||
+					a.m_InputRate != b.m_InputRate || a.m_InstanceStepRate != b.m_InstanceStepRate)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool AreGraphicsPipelineDescriptionsEqual(
+			const RHIGraphicsPipelineDesc& left, const RHIGraphicsPipelineDesc& right) noexcept
+		{
+			if (left.m_BindingLayout != right.m_BindingLayout ||
+				left.m_TopologyType != right.m_TopologyType ||
+				left.m_PrimitiveTopology != right.m_PrimitiveTopology ||
+				left.m_RenderTargetCount != right.m_RenderTargetCount ||
+				left.m_DepthStencilFormat != right.m_DepthStencilFormat ||
+				left.m_SampleCount != right.m_SampleCount ||
+				left.m_SampleQuality != right.m_SampleQuality ||
+				left.m_SampleMask != right.m_SampleMask ||
+				left.m_Rasterizer.m_FillMode != right.m_Rasterizer.m_FillMode ||
+				left.m_Rasterizer.m_CullMode != right.m_Rasterizer.m_CullMode ||
+				left.m_Rasterizer.m_FrontCounterClockwise !=
+				right.m_Rasterizer.m_FrontCounterClockwise ||
+				left.m_Rasterizer.m_DepthBias != right.m_Rasterizer.m_DepthBias ||
+				left.m_Rasterizer.m_DepthBiasClamp != right.m_Rasterizer.m_DepthBiasClamp ||
+				left.m_Rasterizer.m_SlopeScaledDepthBias !=
+				right.m_Rasterizer.m_SlopeScaledDepthBias ||
+				left.m_Rasterizer.m_DepthClipEnable != right.m_Rasterizer.m_DepthClipEnable ||
+				left.m_DepthStencil.m_DepthTestEnable != right.m_DepthStencil.m_DepthTestEnable ||
+				left.m_DepthStencil.m_DepthWriteEnable != right.m_DepthStencil.m_DepthWriteEnable ||
+				left.m_DepthStencil.m_DepthCompareOp != right.m_DepthStencil.m_DepthCompareOp ||
+				left.m_DepthStencil.m_StencilEnable != right.m_DepthStencil.m_StencilEnable ||
+				left.m_Blend.m_AlphaToCoverageEnable != right.m_Blend.m_AlphaToCoverageEnable ||
+				!AreVertexInputsEqual(left.m_VertexInput, right.m_VertexInput))
+			{
+				return false;
+			}
+			for (uint32_t index = 0; index < RHIGraphicsPipelineDesc::MaxRenderTargets; ++index)
+			{
+				if (left.m_RenderTargetFormats[index] != right.m_RenderTargetFormats[index] ||
+					left.m_Blend.m_RenderTargets[index] != right.m_Blend.m_RenderTargets[index])
+				{
+					return false;
+				}
+			}
+			return true;
 		}
 	}
 
@@ -275,7 +354,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 	}
 
-	VulkanPipelineSystem::~VulkanPipelineSystem() = default;
+	VulkanPipelineSystem::~VulkanPipelineSystem()
+	{
+		Clear();
+	}
 
 	RHIBindingLayoutHandle VulkanPipelineSystem::CreateBindingLayout(
 		const RHIBindingLayoutDesc& desc) noexcept
@@ -302,10 +384,90 @@ namespace gglab
 	RHIPipelineHandle VulkanPipelineSystem::CreateGraphicsPipeline(
 		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
 	{
-		GGLAB_UNUSED(createInfo);
-		GGLAB_LOG_GRAPHICS_WARN(
-			"Vulkan graphics pipeline creation is not available in the active backend path.");
-		return {};
+		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::CreateGraphicsPipeline") ||
+			!ValidateRHIGraphicsPipelinePortability(createInfo.m_Desc,
+				m_Device->GetEnabledPortabilityCapabilities()).IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"VulkanPipelineSystem::CreateGraphicsPipeline rejected a non-portable description.");
+			return {};
+		}
+		VulkanBindingLayout* bindingLayout = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
+		const bool needsPixelShader = createInfo.m_Desc.m_RenderTargetCount != 0;
+		if (bindingLayout == nullptr || !createInfo.m_VertexShader.IsValid() ||
+			createInfo.m_VertexShader.m_EntryPoint.empty() ||
+			(needsPixelShader && (!createInfo.m_PixelShader.IsValid() ||
+				createInfo.m_PixelShader.m_EntryPoint.empty())) ||
+			!IsVulkanShaderBytecode(createInfo.m_VertexShader) ||
+			!IsVulkanShaderBytecode(createInfo.m_PixelShader) ||
+			!IsVulkanShaderBytecode(createInfo.m_DomainShader) ||
+			!IsVulkanShaderBytecode(createInfo.m_HullShader) ||
+			!IsVulkanShaderBytecode(createInfo.m_GeometryShader) ||
+			createInfo.m_DomainShader.IsValid() || createInfo.m_HullShader.IsValid() ||
+			createInfo.m_GeometryShader.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"VulkanPipelineSystem::CreateGraphicsPipeline received invalid or unsupported inputs.");
+			return {};
+		}
+
+		const std::array shaderHashes{
+			createInfo.m_VertexShader.m_Hash,
+			createInfo.m_PixelShader.m_Hash,
+			createInfo.m_DomainShader.m_Hash,
+			createInfo.m_HullShader.m_Hash,
+			createInfo.m_GeometryShader.m_Hash,
+		};
+		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
+		{
+			const PipelineSlot& slot = m_Pipelines[index];
+			if (slot.m_Pipeline && slot.m_ShaderHashes == shaderHashes &&
+				AreGraphicsPipelineDescriptionsEqual(slot.m_Desc, createInfo.m_Desc))
+			{
+				return RHIPipelineHandle(index, m_PipelineGeneration);
+			}
+		}
+
+		VkShaderModule vertexModule =
+			CreateShaderModule(createInfo.m_VertexShader, "Vulkan.GraphicsPipeline.VS");
+		VkShaderModule pixelModule = needsPixelShader
+			? CreateShaderModule(createInfo.m_PixelShader, "Vulkan.GraphicsPipeline.PS")
+			: VK_NULL_HANDLE;
+		if (vertexModule == VK_NULL_HANDLE || (needsPixelShader && pixelModule == VK_NULL_HANDLE))
+		{
+			DestroyShaderModule(pixelModule);
+			DestroyShaderModule(vertexModule);
+			return {};
+		}
+
+		const std::string vertexEntry = utils::ToString(createInfo.m_VertexShader.m_EntryPoint);
+		const std::string pixelEntry = utils::ToString(createInfo.m_PixelShader.m_EntryPoint);
+		std::array<VulkanShaderStageModule, 2> stages{
+			VulkanShaderStageModule{ VK_SHADER_STAGE_VERTEX_BIT, vertexModule, vertexEntry.c_str() },
+			VulkanShaderStageModule{ VK_SHADER_STAGE_FRAGMENT_BIT, pixelModule, pixelEntry.c_str() },
+		};
+		const uint32_t stageCount = needsPixelShader ? 2u : 1u;
+		auto pipeline = std::make_unique<VulkanPipelineState>();
+		const bool created = pipeline->Create(m_Device, bindingLayout, createInfo.m_Desc,
+			std::span<const VulkanShaderStageModule>(stages.data(), stageCount));
+		DestroyShaderModule(pixelModule);
+		DestroyShaderModule(vertexModule);
+		if (!created)
+		{
+			return {};
+		}
+
+		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_Pipelines.size());
+		PipelineSlot& slot = m_Pipelines.emplace_back();
+		slot.m_Pipeline = std::move(pipeline);
+		slot.m_Desc = createInfo.m_Desc;
+		for (uint32_t attributeIndex = 0;
+			attributeIndex < slot.m_Desc.m_VertexInput.m_AttributeCount; ++attributeIndex)
+		{
+			slot.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName = nullptr;
+		}
+		slot.m_ShaderHashes = shaderHashes;
+		return RHIPipelineHandle(index, m_PipelineGeneration);
 	}
 
 	RHIPipelineHandle VulkanPipelineSystem::CreateComputePipeline(
@@ -324,12 +486,14 @@ namespace gglab
 
 	bool VulkanPipelineSystem::IsAlive(RHIPipelineHandle pipeline) const noexcept
 	{
-		GGLAB_UNUSED(pipeline);
-		return false;
+		return pipeline.IsValid() && pipeline.Generation() == m_PipelineGeneration &&
+			pipeline.Index() < m_Pipelines.size() && m_Pipelines[pipeline.Index()].m_Pipeline &&
+			m_Pipelines[pipeline.Index()].m_Pipeline->Get() != VK_NULL_HANDLE;
 	}
 
 	void VulkanPipelineSystem::Clear() noexcept
 	{
+		m_Pipelines.clear();
 		++m_PipelineGeneration;
 		if (m_PipelineGeneration == RHIPipelineHandle::InvalidGeneration)
 		{
@@ -401,5 +565,22 @@ namespace gglab
 			return nullptr;
 		}
 		return m_BindingLayouts[layout.Index()].m_Layout.get();
+	}
+
+	bool VulkanPipelineSystem::ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
+		VulkanPipelineState*& outPipelineState, VulkanBindingLayout*& outBindingLayout,
+		RHIGraphicsPipelineDesc& outDesc) const noexcept
+	{
+		outPipelineState = nullptr;
+		outBindingLayout = nullptr;
+		if (!IsAlive(pipeline))
+		{
+			return false;
+		}
+		const PipelineSlot& slot = m_Pipelines[pipeline.Index()];
+		outPipelineState = slot.m_Pipeline.get();
+		outBindingLayout = slot.m_Pipeline->GetBindingLayout();
+		outDesc = slot.m_Desc;
+		return outBindingLayout != nullptr;
 	}
 }

@@ -237,6 +237,22 @@ namespace gglab
 		VkResult m_Result = VK_SUCCESS;
 	};
 
+	struct VulkanFrameRecording
+	{
+		VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
+		VkImage m_BackBufferImage = VK_NULL_HANDLE;
+		VkImageView m_BackBufferView = VK_NULL_HANDLE;
+		VkExtent2D m_Extent{};
+		uint32_t m_FrameSlotIndex = 0;
+		uint32_t m_BackBufferIndex = 0;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_CommandBuffer != VK_NULL_HANDLE && m_BackBufferImage != VK_NULL_HANDLE &&
+				m_BackBufferView != VK_NULL_HANDLE && m_Extent.width != 0 && m_Extent.height != 0;
+		}
+	};
+
 	// Minimal swapchain frame lifecycle: acquire, record a known-color clear,
 	// submit, signal the graphics timeline and the per-image rendering
 	// finished semaphore, present. AbortFrame releases an acquired image with
@@ -271,6 +287,16 @@ namespace gglab
 		// image: the caller owns the drawable extent and must recreate the
 		// swapchain with the real extent before retrying.
 		[[nodiscard]] VulkanBeginFrameResult BeginFrame() noexcept;
+		// Opens the active frame's normal primary command buffer and records
+		// the swapchain-image transition into color-attachment layout. The
+		// returned command buffer is borrowed until EndFrameRecording or
+		// AbortFrame. Aborting discards every command recorded through it.
+		[[nodiscard]] VulkanFrameRecording BeginFrameRecording() noexcept;
+		// Records the transition to presentation layout and closes the normal
+		// primary command buffer. It does not submit; EndFrame consumes the
+		// finalized recording.
+		[[nodiscard]] bool EndFrameRecording() noexcept;
+		[[nodiscard]] VulkanSubmitPresentResult EndFrame() noexcept;
 		// Records the known-color clear, submits and presents the active
 		// frame.
 		[[nodiscard]] VulkanSubmitPresentResult EndFrame(
@@ -338,9 +364,6 @@ namespace gglab
 		[[nodiscard]] VkSemaphore GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept;
 
 	private:
-		void RecordNormalFrame(
-			VkCommandBuffer commandBuffer, uint32_t backBufferIndex,
-			const std::array<float, 4>& clearColor) noexcept;
 		void RecordAbortFrame(VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept;
 		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
 			uint32_t frameSlotIndex, uint32_t backBufferIndex,
@@ -359,6 +382,8 @@ namespace gglab
 		bool m_Vsync = false;
 		bool m_Fatal = false;
 		bool m_DeviceLost = false;
+		bool m_NormalRecordingOpen = false;
+		bool m_NormalRecordingReady = false;
 		bool m_Finalized = false;
 		bool m_DescriptorFrameTrackingAttached = false;
 	};

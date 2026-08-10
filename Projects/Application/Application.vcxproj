@@ -340,6 +340,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
@@ -443,7 +444,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -606,8 +609,10 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -710,6 +715,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h" />
@@ -924,6 +930,7 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />

@@ -12,6 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
@@ -695,6 +696,37 @@ namespace gglab
 				"Vulkan barrier lowering maps transfer, attachment, and presentation layouts");
 			context.Check(!ToVulkanImageLayout(RHILayout::Unknown).has_value(),
 				"Vulkan barrier lowering rejects an unknown image layout");
+
+			const VkImage image = reinterpret_cast<VkImage>(static_cast<uintptr_t>(17));
+			const VkImageMemoryBarrier2 imageBarrier = MakeVulkanImageBarrier(image,
+				VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_2_NONE,
+				VK_ACCESS_2_NONE, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+			context.Check(imageBarrier.image == image &&
+				imageBarrier.srcQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED &&
+				imageBarrier.dstQueueFamilyIndex == VK_QUEUE_FAMILY_IGNORED &&
+				imageBarrier.subresourceRange.aspectMask == VK_IMAGE_ASPECT_COLOR_BIT &&
+				imageBarrier.subresourceRange.levelCount == 1 &&
+				imageBarrier.subresourceRange.layerCount == 1,
+				"Vulkan image barriers use explicit synchronization and singular ranges");
+			const VkImageSubresourceRange range{
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 2,
+				.levelCount = 3,
+				.baseArrayLayer = 4,
+				.layerCount = 5,
+			};
+			const VkImageMemoryBarrier2 rangedBarrier = MakeVulkanImageBarrier(image, range,
+				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT,
+				VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+			context.Check(rangedBarrier.subresourceRange.aspectMask == range.aspectMask &&
+				rangedBarrier.subresourceRange.baseMipLevel == range.baseMipLevel &&
+				rangedBarrier.subresourceRange.levelCount == range.levelCount &&
+				rangedBarrier.subresourceRange.baseArrayLayer == range.baseArrayLayer &&
+				rangedBarrier.subresourceRange.layerCount == range.layerCount,
+				"Vulkan image barrier construction preserves explicit subresource ranges");
 		}
 
 		void RunVulkanTextureCopyContractTests(SelfTestContext& context) noexcept
@@ -1839,6 +1871,84 @@ namespace gglab
 			"Adopted core capabilities pass through the device policy");
 	}
 
+	void RunVulkanGraphicsPipelineContractTests(SelfTestContext& context) noexcept
+	{
+		RHIGraphicsPipelineDesc desc{};
+		desc.m_VertexInput.m_VertexBuffers[0] = {
+			.m_InputSlot = 0,
+			.m_StrideInBytes = 20,
+		};
+		desc.m_VertexInput.m_VertexBufferCount = 1;
+		desc.m_VertexInput.m_Attributes[0] = {
+			.m_Location = 0,
+			.m_Format = RHIFormat::R32G32B32Float,
+			.m_InputSlot = 0,
+			.m_AlignedByteOffset = 0,
+		};
+		desc.m_VertexInput.m_Attributes[1] = {
+			.m_Location = 1,
+			.m_Format = RHIFormat::R32G32Float,
+			.m_InputSlot = 0,
+			.m_AlignedByteOffset = 12,
+		};
+		desc.m_VertexInput.m_AttributeCount = 2;
+		desc.m_Rasterizer.m_CullMode = RHICullMode::Back;
+		desc.m_Rasterizer.m_FrontCounterClockwise = false;
+		desc.m_DepthStencil = {
+			.m_DepthTestEnable = true,
+			.m_DepthWriteEnable = true,
+			.m_DepthCompareOp = RHICompareOp::Greater,
+		};
+		desc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+		desc.m_RenderTargetCount = 1;
+		desc.m_DepthStencilFormat = RHIFormat::D32Float;
+
+		const VulkanGraphicsPipelinePlan plan = BuildVulkanGraphicsPipelinePlan(desc);
+		context.Check(plan.IsValid() &&
+			plan.m_Topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST &&
+			plan.m_VertexBindingCount == 1 && plan.m_VertexAttributeCount == 2 &&
+			plan.m_VertexBindings[0].binding == 0 && plan.m_VertexBindings[0].stride == 20 &&
+			plan.m_VertexAttributes[0].location == 0 &&
+			plan.m_VertexAttributes[0].format == VK_FORMAT_R32G32B32_SFLOAT &&
+			plan.m_VertexAttributes[1].location == 1 &&
+			plan.m_VertexAttributes[1].offset == 12 &&
+			plan.m_FrontFace == VK_FRONT_FACE_CLOCKWISE &&
+			plan.m_CullMode == VK_CULL_MODE_BACK_BIT &&
+			plan.m_DepthCompareOp == VK_COMPARE_OP_GREATER &&
+			plan.m_ColorFormats[0] == VK_FORMAT_R8G8B8A8_UNORM &&
+			plan.m_DepthFormat == VK_FORMAT_D32_SFLOAT,
+			"Graphics pipeline lowering preserves vertex, winding, attachment and depth contracts");
+		context.Check(ToVulkanFrontFace(false) == VK_FRONT_FACE_CLOCKWISE &&
+			ToVulkanFrontFace(true) == VK_FRONT_FACE_COUNTER_CLOCKWISE,
+			"Front-face lowering applies the coordinate policy exactly once");
+
+		RHIGraphicsPipelineDesc duplicateLocation = desc;
+		duplicateLocation.m_VertexInput.m_Attributes[1].m_Location = 0;
+		context.Check(BuildVulkanGraphicsPipelinePlan(duplicateLocation).m_Error ==
+			VulkanGraphicsPipelineError::InvalidVertexBinding,
+			"Graphics pipeline lowering rejects duplicate vertex locations");
+		RHIGraphicsPipelineDesc outsideStride = desc;
+		outsideStride.m_VertexInput.m_Attributes[1].m_AlignedByteOffset = 16;
+		context.Check(BuildVulkanGraphicsPipelinePlan(outsideStride).m_Error ==
+			VulkanGraphicsPipelineError::InvalidVertexFormat,
+			"Graphics pipeline lowering rejects attributes that exceed their binding stride");
+		RHIGraphicsPipelineDesc mismatchedTopology = desc;
+		mismatchedTopology.m_TopologyType = RHIPrimitiveTopologyType::Line;
+		context.Check(BuildVulkanGraphicsPipelinePlan(mismatchedTopology).m_Error ==
+			VulkanGraphicsPipelineError::InvalidTopology,
+			"Graphics pipeline lowering rejects mismatched topology families");
+		RHIGraphicsPipelineDesc invalidStencil = desc;
+		invalidStencil.m_DepthStencil.m_StencilEnable = true;
+		context.Check(BuildVulkanGraphicsPipelinePlan(invalidStencil).m_Error ==
+			VulkanGraphicsPipelineError::InvalidDepthStencilFormat,
+			"Graphics pipeline lowering rejects stencil state without a stencil format");
+		RHIGraphicsPipelineDesc invalidSamples = desc;
+		invalidSamples.m_SampleCount = 3;
+		context.Check(BuildVulkanGraphicsPipelinePlan(invalidSamples).m_Error ==
+			VulkanGraphicsPipelineError::InvalidSampleCount,
+			"Graphics pipeline lowering rejects non-power-of-two sample counts");
+	}
+
 	void RunVulkanDescriptorArenaTests(SelfTestContext& context) noexcept
 	{
 		// Arena capacity matches the frozen backend-neutral contract.
@@ -2244,6 +2354,7 @@ namespace gglab
 		RunVulkanCliContractTests(context);
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);
+		RunVulkanGraphicsPipelineContractTests(context);
 		RunVulkanDescriptorArenaTests(context);
 		RunVulkanDescriptorPublicationTests(context);
 		RunVulkanDescriptorGenerationTests(context);

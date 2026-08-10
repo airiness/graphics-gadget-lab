@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
+#include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <format>
@@ -19,27 +20,16 @@ namespace gglab
 			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 		constexpr VkAccessFlags2 kColorWriteAccess = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
-		VkImageMemoryBarrier2 MakeLayoutTransitionBarrier(VkImage image,
+		VkImageMemoryBarrier2 MakePresentImageBarrier(VkImage image,
 			VkImageLayout oldLayout, VkImageLayout newLayout, bool hasWriteSource,
-			bool hasWriteDestination)
+			bool hasWriteDestination) noexcept
 		{
-			VkImageMemoryBarrier2 barrier{};
-			barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-			barrier.srcStageMask = hasWriteSource ? kAllStages : VK_PIPELINE_STAGE_2_NONE;
-			barrier.srcAccessMask = hasWriteSource ? kAllAccess : VK_ACCESS_2_NONE;
-			barrier.dstStageMask = hasWriteDestination ? kColorWriteStage : VK_PIPELINE_STAGE_2_NONE;
-			barrier.dstAccessMask = hasWriteDestination ? kColorWriteAccess : VK_ACCESS_2_NONE;
-			barrier.oldLayout = oldLayout;
-			barrier.newLayout = newLayout;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.image = image;
-			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			barrier.subresourceRange.baseMipLevel = 0;
-			barrier.subresourceRange.levelCount = 1;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-			return barrier;
+			return MakeVulkanImageBarrier(image, VK_IMAGE_ASPECT_COLOR_BIT,
+				oldLayout, newLayout,
+				hasWriteSource ? kAllStages : VK_PIPELINE_STAGE_2_NONE,
+				hasWriteSource ? kAllAccess : VK_ACCESS_2_NONE,
+				hasWriteDestination ? kColorWriteStage : VK_PIPELINE_STAGE_2_NONE,
+				hasWriteDestination ? kColorWriteAccess : VK_ACCESS_2_NONE);
 		}
 	}
 
@@ -497,8 +487,111 @@ namespace gglab
 	VulkanSubmitPresentResult VulkanFrameRuntime::EndFrame(
 		const std::array<float, 4>& clearColor) noexcept
 	{
+		const VulkanFrameRecording recording = BeginFrameRecording();
+		if (!recording.IsValid())
+		{
+			return {};
+		}
+
+		VkRenderingAttachmentInfo colorAttachment{};
+		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		colorAttachment.imageView = recording.m_BackBufferView;
+		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		std::ranges::copy(clearColor, colorAttachment.clearValue.color.float32);
+
+		VkRenderingInfo renderingInfo{};
+		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		renderingInfo.renderArea.extent = recording.m_Extent;
+		renderingInfo.layerCount = 1;
+		renderingInfo.colorAttachmentCount = 1;
+		renderingInfo.pColorAttachments = &colorAttachment;
+		vkCmdBeginRendering(recording.m_CommandBuffer, &renderingInfo);
+		vkCmdEndRendering(recording.m_CommandBuffer);
+		if (!EndFrameRecording())
+		{
+			return {};
+		}
+		return EndFrame();
+	}
+
+	VulkanFrameRecording VulkanFrameRuntime::BeginFrameRecording() noexcept
+	{
+		if (!m_ActiveFrame.has_value() || m_NormalRecordingOpen || m_NormalRecordingReady)
+		{
+			return {};
+		}
+		const VulkanActiveFrame active = *m_ActiveFrame;
+		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
+		const VkImage swapchainImage = m_SwapChain->GetImage(active.m_BackBufferIndex).m_Image;
+		const VkImageView swapchainView = m_SwapChain->GetImageView(active.m_BackBufferIndex);
+		const VkExtent2D extent = m_SwapChain->GetExtent();
+
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		const VkResult beginResult = vkBeginCommandBuffer(slot.m_NormalCommandBuffer, &beginInfo);
+		if (beginResult != VK_SUCCESS)
+		{
+			MarkFatal(beginResult);
+			return {};
+		}
+
+		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(active.m_BackBufferIndex);
+		const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
+			? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+			: VK_IMAGE_LAYOUT_UNDEFINED;
+		const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
+			oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
+		VkDependencyInfo dependencyInfo{};
+		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dependencyInfo.imageMemoryBarrierCount = 1;
+		dependencyInfo.pImageMemoryBarriers = &barrier;
+		vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+
+		m_NormalRecordingOpen = true;
+		return {
+			.m_CommandBuffer = slot.m_NormalCommandBuffer,
+			.m_BackBufferImage = swapchainImage,
+			.m_BackBufferView = swapchainView,
+			.m_Extent = extent,
+			.m_FrameSlotIndex = active.m_FrameSlotIndex,
+			.m_BackBufferIndex = active.m_BackBufferIndex,
+		};
+	}
+
+	bool VulkanFrameRuntime::EndFrameRecording() noexcept
+	{
+		if (!m_ActiveFrame.has_value() || !m_NormalRecordingOpen || m_NormalRecordingReady)
+		{
+			return false;
+		}
+		const VulkanActiveFrame active = *m_ActiveFrame;
+		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
+		const VkImage swapchainImage = m_SwapChain->GetImage(active.m_BackBufferIndex).m_Image;
+		const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, true, false);
+		VkDependencyInfo dependencyInfo{};
+		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dependencyInfo.imageMemoryBarrierCount = 1;
+		dependencyInfo.pImageMemoryBarriers = &barrier;
+		vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+		const VkResult endResult = vkEndCommandBuffer(slot.m_NormalCommandBuffer);
+		m_NormalRecordingOpen = false;
+		if (endResult != VK_SUCCESS)
+		{
+			MarkFatal(endResult);
+			return false;
+		}
+		m_NormalRecordingReady = true;
+		return true;
+	}
+
+	VulkanSubmitPresentResult VulkanFrameRuntime::EndFrame() noexcept
+	{
 		VulkanSubmitPresentResult result{};
-		if (!m_ActiveFrame.has_value())
+		if (!m_ActiveFrame.has_value() || !m_NormalRecordingReady)
 		{
 			// No active frame: the transaction is already complete or was
 			// never started.
@@ -513,9 +606,10 @@ namespace gglab
 			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
 				active.m_FrameSlotIndex);
 			m_ActiveFrame.reset();
+			m_NormalRecordingOpen = false;
+			m_NormalRecordingReady = false;
 			return result;
 		}
-		RecordNormalFrame(slot.m_NormalCommandBuffer, active.m_BackBufferIndex, clearColor);
 		VulkanSubmitPresentResult submitPresent =
 			SubmitAndPresent(active.m_FrameSlotIndex, active.m_BackBufferIndex,
 				slot.m_NormalCommandBuffer);
@@ -529,6 +623,7 @@ namespace gglab
 			submitPresent.m_Fatal = true;
 		}
 		m_ActiveFrame.reset();
+		m_NormalRecordingReady = false;
 		if (submitPresent.m_Presented)
 		{
 			m_LayoutTracker.Set(active.m_BackBufferIndex, VulkanPresentImageLayout::Present);
@@ -546,6 +641,8 @@ namespace gglab
 			return result;
 		}
 		const VulkanActiveFrame active = *m_ActiveFrame;
+		m_NormalRecordingOpen = false;
+		m_NormalRecordingReady = false;
 		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
 		if (!m_StateMachine.TryAbort(active.m_FrameSlotIndex))
 		{
@@ -632,59 +729,6 @@ namespace gglab
 		return m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
 	}
 
-	void VulkanFrameRuntime::RecordNormalFrame(VkCommandBuffer commandBuffer,
-		uint32_t backBufferIndex, const std::array<float, 4>& clearColor) noexcept
-	{
-		const VkImage swapchainImage = m_SwapChain->GetImage(backBufferIndex).m_Image;
-		const VkImageView swapchainView = m_SwapChain->GetImageView(backBufferIndex);
-		const VkExtent2D extent = m_SwapChain->GetExtent();
-
-		VkCommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
-		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(backBufferIndex);
-		const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
-			? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-			: VK_IMAGE_LAYOUT_UNDEFINED;
-		const VkImageMemoryBarrier2 firstBarrier = MakeLayoutTransitionBarrier(swapchainImage,
-			oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers = &firstBarrier;
-		vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
-
-		VkRenderingAttachmentInfo colorAttachment{};
-		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		colorAttachment.imageView = swapchainView;
-		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachment.clearValue.color.float32[0] = clearColor[0];
-		colorAttachment.clearValue.color.float32[1] = clearColor[1];
-		colorAttachment.clearValue.color.float32[2] = clearColor[2];
-		colorAttachment.clearValue.color.float32[3] = clearColor[3];
-
-		VkRenderingInfo renderingInfo{};
-		renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		renderingInfo.renderArea.offset = { 0, 0 };
-		renderingInfo.renderArea.extent = extent;
-		renderingInfo.layerCount = 1;
-		renderingInfo.colorAttachmentCount = 1;
-		renderingInfo.pColorAttachments = &colorAttachment;
-		vkCmdBeginRendering(commandBuffer, &renderingInfo);
-		vkCmdEndRendering(commandBuffer);
-
-		const VkImageMemoryBarrier2 lastBarrier = MakeLayoutTransitionBarrier(swapchainImage,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, true, false);
-		dependencyInfo.pImageMemoryBarriers = &lastBarrier;
-		vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
-
-		vkEndCommandBuffer(commandBuffer);
-	}
-
 	void VulkanFrameRuntime::RecordAbortFrame(
 		VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept
 	{
@@ -704,7 +748,7 @@ namespace gglab
 			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::ColorAttachment
 				? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 				: VK_IMAGE_LAYOUT_UNDEFINED;
-			const VkImageMemoryBarrier2 barrier = MakeLayoutTransitionBarrier(swapchainImage,
+			const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
 				oldLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, tracked == VulkanPresentImageLayout::ColorAttachment,
 				false);
 			VkDependencyInfo dependencyInfo{};
