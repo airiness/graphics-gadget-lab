@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
@@ -6,6 +5,8 @@
 
 #include <cctype>
 #include <numeric>
+
+#include <imgui.h>
 
 namespace gglab
 {

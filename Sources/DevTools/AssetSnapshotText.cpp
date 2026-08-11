@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "Core/Utility/StringUtils.h"
 

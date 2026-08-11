@@ -1,8 +1,14 @@
 #pragma once
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Core/CoreMacros.h"
 
+#include <windows.h>
+
+#include <cstdint>
 #include <deque>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

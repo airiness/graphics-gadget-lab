@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/RenderViewPanel.h"
 #include "Core/Math/Culling.h"
 #include "Core/Math/MathFunctions.h"
@@ -11,6 +10,8 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+
+#include <imgui.h>
 
 namespace gglab
 {

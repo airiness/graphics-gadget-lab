@@ -1,9 +1,10 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "Core/Math/MathFunctions.h"
 #include "DevTools/DevelopGui/Interop/ImGuiMathInterop.h"
 
 #include <algorithm>
+
+#include <imgui.h>
 
 namespace gglab::devtools
 {

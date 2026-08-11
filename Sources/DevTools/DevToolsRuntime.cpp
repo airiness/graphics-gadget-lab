@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

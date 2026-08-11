@@ -1,6 +1,7 @@
 #pragma once
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/Windows/Win32Window.h"
+#include "Core/CoreMacros.h"
 
 namespace gglab
 {

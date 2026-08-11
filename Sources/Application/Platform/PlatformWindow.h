@@ -1,4 +1,7 @@
 #pragma once
+#include "Core/CoreMacros.h"
+
+#include <cstdint>
 
 namespace gglab
 {

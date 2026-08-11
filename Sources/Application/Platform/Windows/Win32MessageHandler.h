@@ -1,5 +1,7 @@
 #pragma once
 
+#include <windows.h>
+
 namespace gglab
 {
 	struct Win32MessageResult

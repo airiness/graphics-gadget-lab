@@ -1,6 +1,5 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/Quaternion.h"
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
+#include "Core/Math/Quaternion.h"
 #include "Scene/Components.h"
 #include "Core/Math/MathFunctions.h"
 #include "Core/Utility/StringUtils.h"
@@ -16,6 +15,8 @@
 
 #include <algorithm>
 #include <vector>
+
+#include <imgui.h>
 
 namespace gglab
 {

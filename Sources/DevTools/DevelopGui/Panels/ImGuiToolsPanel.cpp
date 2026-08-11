@@ -1,6 +1,7 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

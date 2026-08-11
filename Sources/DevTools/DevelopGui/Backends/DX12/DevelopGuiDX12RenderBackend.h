@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
 
 #include <backends/imgui_impl_dx12.h>
