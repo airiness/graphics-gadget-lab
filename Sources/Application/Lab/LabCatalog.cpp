@@ -1,6 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/LabCatalog.h"
 #include "Application/Lab/LabSessionBase.h"
+#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

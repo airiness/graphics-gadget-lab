@@ -4,6 +4,7 @@
 #include "Application/Lab/LabParameter.h"
 #include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"
+#include "Core/CoreMacros.h"
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
