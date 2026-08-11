@@ -8,12 +8,9 @@
 #include "Core/Math/Matrix.h"
 #include "Core/StringId.h"
 #include "Core/TypedIndex.h"
-#include "Core/Utility/TypeUtils.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/RHI/RHIHandles.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIResource.h"
-#include "Graphics/RHI/RHITexture.h"
 
 #include <compare>
 #include <cstddef>
@@ -21,7 +18,6 @@
 #include <filesystem>
 #include <functional>
 #include <limits>
-#include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>

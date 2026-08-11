@@ -1,6 +1,15 @@
-#include "Core/Precompiled.h"
 #include "Graphics/EnvironmentAssetController.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Utility/PathUtils.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
 
 namespace gglab
 {

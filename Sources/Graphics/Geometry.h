@@ -2,7 +2,12 @@
 #include "Graphics/VertexData.h"
 #include "Scene/Components.h"
 
+#include <entt/entity/entity.hpp>
+
+#include <cstdint>
 #include <optional>
+#include <string_view>
+#include <vector>
 
 namespace gglab
 {

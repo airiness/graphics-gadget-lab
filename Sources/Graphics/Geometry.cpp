@@ -1,10 +1,15 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Geometry.h"
+#include "Core/CoreMacros.h"
 #include "Core/Math/MathConstants.h"
-#include "Scene/Components.h"
+#include "Core/World.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Core/World.h"
+
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

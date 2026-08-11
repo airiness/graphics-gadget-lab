@@ -1,5 +1,6 @@
 #include "Graphics/CameraController.h"
 #include "Core/Math/MathFunctions.h"
+#include "Graphics/Camera.h"
 
 #include <algorithm>
 #include <cmath>

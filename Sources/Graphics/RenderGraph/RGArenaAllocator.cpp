@@ -1,6 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
+#include "Core/CoreMacros.h"
 #include "Core/Utility/MathUtils.h"
+
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
+#include <utility>
 
 namespace gglab
 {

@@ -1,8 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <cstddef>
+#include <string_view>
+#include <vector>
 
 namespace gglab
 {
