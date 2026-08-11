@@ -15,6 +15,7 @@
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
@@ -141,30 +142,6 @@ namespace gglab
 		{
 			return filter == RHISamplerFilter::ComparisonMinMagLinearMipPoint ||
 				filter == RHISamplerFilter::ComparisonAnisotropic;
-		}
-
-		[[nodiscard]] VkCompareOp ToVkCompareOp(RHICompareOp op) noexcept
-		{
-			switch (op)
-			{
-			case RHICompareOp::Never:
-				return VK_COMPARE_OP_NEVER;
-			case RHICompareOp::Less:
-				return VK_COMPARE_OP_LESS;
-			case RHICompareOp::Equal:
-				return VK_COMPARE_OP_EQUAL;
-			case RHICompareOp::LessEqual:
-				return VK_COMPARE_OP_LESS_OR_EQUAL;
-			case RHICompareOp::Greater:
-				return VK_COMPARE_OP_GREATER;
-			case RHICompareOp::NotEqual:
-				return VK_COMPARE_OP_NOT_EQUAL;
-			case RHICompareOp::GreaterEqual:
-				return VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case RHICompareOp::Always:
-				return VK_COMPARE_OP_ALWAYS;
-			}
-			return VK_COMPARE_OP_NEVER;
 		}
 
 		// The sampler contract only supports the three fixed border
@@ -1407,7 +1384,7 @@ namespace gglab
 			? static_cast<float>(std::max(desc.m_MaxAnisotropy, 1u))
 			: 1.0f;
 		createInfo.compareEnable = IsComparisonSamplerFilter(desc.m_Filter) ? VK_TRUE : VK_FALSE;
-		createInfo.compareOp = ToVkCompareOp(desc.m_CompareOp);
+		createInfo.compareOp = ToVulkanCompareOp(desc.m_CompareOp);
 		createInfo.minLod = desc.m_MinLOD;
 		createInfo.maxLod = desc.m_MaxLOD;
 		createInfo.borderColor = ToVkBorderColor(desc);

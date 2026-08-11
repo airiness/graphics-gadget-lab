@@ -28,6 +28,24 @@ namespace gglab
 		TriangleStrip,
 	};
 
+	[[nodiscard]] constexpr inline bool IsRHIPrimitiveTopologyCompatible(
+		RHIPrimitiveTopologyType type, RHIPrimitiveTopology topology) noexcept
+	{
+		switch (type)
+		{
+		case RHIPrimitiveTopologyType::Point:
+			return topology == RHIPrimitiveTopology::PointList;
+		case RHIPrimitiveTopologyType::Line:
+			return topology == RHIPrimitiveTopology::LineList ||
+				topology == RHIPrimitiveTopology::LineStrip;
+		case RHIPrimitiveTopologyType::Triangle:
+			return topology == RHIPrimitiveTopology::TriangleList ||
+				topology == RHIPrimitiveTopology::TriangleStrip;
+		default:
+			return false;
+		}
+	}
+
 	enum class RHIVertexInputRate : uint8_t
 	{
 		PerVertex,

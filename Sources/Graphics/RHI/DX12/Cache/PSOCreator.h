@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
+#include "Core/Utility/MathUtils.h"
 
 #include <cstddef>
 #include <cstring>
@@ -28,7 +29,7 @@ namespace gglab
 		{
 		public:
 			explicit StreamWriter(void* storage, size_t capacityBytes) noexcept :
-				m_Begin(AlignUp(reinterpret_cast<std::byte*>(storage), alignof(void*))),
+				m_Begin(utils::AlignUp(reinterpret_cast<std::byte*>(storage), alignof(void*))),
 				m_Current(m_Begin), m_End(reinterpret_cast<std::byte*>(storage) + capacityBytes)
 			{
 			}
@@ -37,7 +38,7 @@ namespace gglab
 			{
 				static_assert(
 					std::is_trivially_copyable_v<SubObjType>, "SubObj must be trivially copyable.");
-				m_Current = AlignUp(m_Current, alignof(void*));
+				m_Current = utils::AlignUp(m_Current, alignof(void*));
 				GGLAB_ASSERT_MSG(
 					m_Current + sizeof(SubObjType) <= m_End, "Stream memory is overflow.");
 				std::memcpy(m_Current, std::addressof(subObj),
@@ -61,14 +62,6 @@ namespace gglab
 				desc.pPipelineStateSubobjectStream = m_Begin;
 				desc.SizeInBytes = static_cast<UINT>(m_Current - m_Begin);
 				return desc;
-			}
-
-		private:
-			static std::byte* AlignUp(std::byte* ptr, size_t alignment) noexcept
-			{
-				auto value = reinterpret_cast<uintptr_t>(ptr);
-				value = (value + (alignment - 1)) & ~(uintptr_t(alignment - 1));
-				return reinterpret_cast<std::byte*>(value);
 			}
 
 		private:

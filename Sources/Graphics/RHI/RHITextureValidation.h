@@ -82,6 +82,8 @@ namespace gglab
 		RHITextureValidationError error) noexcept;
 	[[nodiscard]] std::string_view RHITextureSupportReasonText(
 		RHITextureSupportReason reason) noexcept;
+	[[nodiscard]] RHITextureSupportReason RHITextureSupportReasonForUsage(
+		RHITextureUsage usage) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureDesc(
 		const RHITextureDesc& desc) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureViewDesc(

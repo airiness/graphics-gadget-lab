@@ -1,5 +1,6 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
+#include "Core/Utility/MathUtils.h"
 
 namespace gglab
 {
@@ -53,14 +54,14 @@ namespace gglab
 
 	void* RGArenaAllocator::AllocateBytes(size_t size, size_t alignment) noexcept
 	{
-		GGLAB_ASSERT_MSG((alignment & (alignment - 1)) == 0, "alignment must be power of 2.");
+		GGLAB_ASSERT_MSG(utils::IsPow2(alignment), "alignment must be power of 2.");
 
-		std::byte* aligned = AlignUp(m_Head, alignment);
+		std::byte* aligned = utils::AlignUp(m_Head, alignment);
 		size_t used = static_cast<size_t>(aligned - m_Base) + size;
 		if (used > m_Capacity)
 		{
 			Grow(size + static_cast<size_t>(aligned - m_Base));
-			aligned = AlignUp(m_Head, alignment);
+			aligned = utils::AlignUp(m_Head, alignment);
 		}
 
 		m_Head = aligned + size;
@@ -109,12 +110,5 @@ namespace gglab
 		m_Head = std::exchange(other.m_Head, nullptr);
 		m_Capacity = std::exchange(other.m_Capacity, 0);
 		m_DtorEntries = std::move(other.m_DtorEntries);
-	}
-
-	std::byte* RGArenaAllocator::AlignUp(std::byte* pointer, size_t alignment) noexcept
-	{
-		auto uintPointer = reinterpret_cast<std::uintptr_t>(pointer);
-		auto aligned = (uintPointer + (alignment - 1)) & ~(alignment - 1);
-		return reinterpret_cast<std::byte*>(aligned);
 	}
 }

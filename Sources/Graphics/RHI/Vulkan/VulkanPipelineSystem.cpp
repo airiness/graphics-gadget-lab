@@ -2,6 +2,7 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
@@ -15,67 +16,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] VkShaderStageFlags ToVulkanShaderStages(RHIShaderStage stages) noexcept
-		{
-			VkShaderStageFlags result = 0;
-			if (Test(stages, RHIShaderStage::Vertex))
-			{
-				result |= VK_SHADER_STAGE_VERTEX_BIT;
-			}
-			if (Test(stages, RHIShaderStage::Pixel))
-			{
-				result |= VK_SHADER_STAGE_FRAGMENT_BIT;
-			}
-			if (Test(stages, RHIShaderStage::Compute))
-			{
-				result |= VK_SHADER_STAGE_COMPUTE_BIT;
-			}
-			return result;
-		}
-
-		[[nodiscard]] VulkanShaderRegisterClass ToVulkanRegisterClass(
-			RHIBindingType type) noexcept
-		{
-			switch (type)
-			{
-			case RHIBindingType::ConstantBuffer:
-			case RHIBindingType::PushConstants:
-				return VulkanShaderRegisterClass::ConstantBuffer;
-			case RHIBindingType::ReadOnlyStorageBuffer:
-			case RHIBindingType::SampledTexture:
-				return VulkanShaderRegisterClass::ShaderResource;
-			case RHIBindingType::ReadWriteStorageBuffer:
-			case RHIBindingType::StorageTexture:
-				return VulkanShaderRegisterClass::UnorderedAccess;
-			case RHIBindingType::Sampler:
-				return VulkanShaderRegisterClass::Sampler;
-			default:
-				return VulkanShaderRegisterClass::ConstantBuffer;
-			}
-		}
-
-		[[nodiscard]] VkDescriptorType ToVulkanDescriptorType(RHIBindingType type) noexcept
-		{
-			switch (type)
-			{
-			case RHIBindingType::ConstantBuffer:
-				return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			case RHIBindingType::ReadOnlyStorageBuffer:
-			case RHIBindingType::ReadWriteStorageBuffer:
-				return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			case RHIBindingType::SampledTexture:
-				return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-			case RHIBindingType::StorageTexture:
-				return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-			case RHIBindingType::Sampler:
-				return VK_DESCRIPTOR_TYPE_SAMPLER;
-			case RHIBindingType::PushConstants:
-				return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			default:
-				return VK_DESCRIPTOR_TYPE_MAX_ENUM;
-			}
-		}
-
 		[[nodiscard]] bool IsVulkanShaderBytecode(const ShaderBytecode& bytecode) noexcept
 		{
 			return !bytecode.IsValid() || bytecode.m_Format == ShaderBinaryFormat::SpirV;
@@ -197,7 +137,7 @@ namespace gglab
 			}
 
 			const VulkanShaderBindingResult location = EvaluateVulkanFixedShaderBinding(
-				ToVulkanRegisterClass(slot.m_Type), slot.m_Binding, slot.m_Space);
+				ToVulkanShaderRegisterClass(slot.m_Type), slot.m_Binding, slot.m_Space);
 			if (!location.IsSupported())
 			{
 				plan.m_Error = VulkanBindingLayoutError::UnsupportedRegisterSpace;

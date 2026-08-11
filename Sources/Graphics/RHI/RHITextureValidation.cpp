@@ -144,6 +144,27 @@ namespace gglab
 		return "unknown texture support reason";
 	}
 
+	RHITextureSupportReason RHITextureSupportReasonForUsage(RHITextureUsage usage) noexcept
+	{
+		switch (usage)
+		{
+		case RHITextureUsage::Sampled:
+			return RHITextureSupportReason::ShaderResourceUnsupported;
+		case RHITextureUsage::RenderTarget:
+			return RHITextureSupportReason::RenderTargetUnsupported;
+		case RHITextureUsage::DepthStencil:
+			return RHITextureSupportReason::DepthStencilUnsupported;
+		case RHITextureUsage::UnorderedAccess:
+			return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
+		case RHITextureUsage::CopySource:
+			return RHITextureSupportReason::CopySourceUnsupported;
+		case RHITextureUsage::CopyDest:
+			return RHITextureSupportReason::CopyDestUnsupported;
+		default:
+			return RHITextureSupportReason::FormatCombinationUnsupported;
+		}
+	}
+
 	RHITextureValidationResult ValidateRHITextureDesc(const RHITextureDesc& desc) noexcept
 	{
 		const RHIFormatInfo& formatInfo = GetRHIFormatInfo(desc.m_Format);

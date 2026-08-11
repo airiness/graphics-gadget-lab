@@ -3,6 +3,7 @@
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RHI/RHITexture.h"
 
@@ -66,6 +67,13 @@ namespace gglab
 
 		bool operator==(const RHIIndexBufferBinding&) const noexcept = default;
 	};
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferOffsetAligned(
+		RHIFormat format, uint64_t offset) noexcept
+	{
+		return format == RHIFormat::R32Uint &&
+			offset % GetRHIFormatInfo(format).m_BytesPerBlock == 0;
+	}
 
 	struct RHIDescriptorTableBinding
 	{

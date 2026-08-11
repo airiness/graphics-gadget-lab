@@ -61,6 +61,11 @@ namespace gglab::utils
 				});
 	}
 
+	bool StartsWithIgnoreCase(std::string_view text, std::string_view prefix) noexcept
+	{
+		return text.size() >= prefix.size() && EqualsIgnoreCase(text.substr(0, prefix.size()), prefix);
+	}
+
 	bool ContainsIgnoreCase(std::string_view text, std::string_view substring) noexcept
 	{
 		if (substring.empty())
@@ -74,6 +79,18 @@ namespace gglab::utils
 				return std::tolower(static_cast<unsigned char>(left)) ==
 					std::tolower(static_cast<unsigned char>(right));
 			}) != text.end();
+	}
+
+	std::string BytesToHexString(std::span<const uint8_t> bytes) noexcept
+	{
+		constexpr std::string_view HexDigits = "0123456789abcdef";
+		std::string text(bytes.size() * 2, '\0');
+		for (size_t index = 0; index < bytes.size(); ++index)
+		{
+			text[index * 2] = HexDigits[bytes[index] >> 4];
+			text[index * 2 + 1] = HexDigits[bytes[index] & 0x0f];
+		}
+		return text;
 	}
 
 	std::string_view FindLeaf(std::string_view path) noexcept

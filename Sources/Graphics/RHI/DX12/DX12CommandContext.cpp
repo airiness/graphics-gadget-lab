@@ -614,10 +614,12 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(device);
 
 		DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
-		if (!buffer)
+		if (!buffer || !IsRHIIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset) ||
+			binding.m_Offset > buffer->SizeInBytes() || binding.m_SizeInBytes == 0 ||
+			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_Offset)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
-				"DX12GraphicsCommandContext::SetIndexBuffer received a non-live buffer handle.");
+				"DX12GraphicsCommandContext::SetIndexBuffer received an invalid binding.");
 			return;
 		}
 

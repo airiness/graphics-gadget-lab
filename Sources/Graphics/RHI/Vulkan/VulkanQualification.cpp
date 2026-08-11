@@ -1,5 +1,5 @@
 #include "Core/Precompiled.h"
-#include "Core/Log/Logger.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
@@ -67,22 +67,6 @@ namespace gglab
 			bootstrapOptions.m_SelectionRequest =
 				MakeVulkanSelectionRequest(options.m_AdapterSelector);
 			return bootstrapOptions;
-		}
-
-		void LogQualificationInfo(const std::string& message) noexcept
-		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->info("{}", message);
-			}
-		}
-
-		void LogQualificationError(const std::string& message) noexcept
-		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->error("{}", message);
-			}
 		}
 
 		[[nodiscard]] TextureAssetData MakeQualificationTextureData(
@@ -198,7 +182,7 @@ namespace gglab
 			VulkanBeginFrameResult begin = runtime.BeginFrame();
 			if (begin.m_Status == VulkanAcquireOutcome::OutOfDate)
 			{
-				LogQualificationInfo(std::format(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 					"qualify[{:03d}] acquire OUT_OF_DATE; recreating with the real extent and "
 					"retrying once.",
 					step));
@@ -210,7 +194,7 @@ namespace gglab
 			}
 			if (!begin.IsAcquired())
 			{
-				LogQualificationError(std::format(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 					"qualify[{:03d}] BeginFrame failed (status={}, result={}).", step,
 					static_cast<int>(begin.m_Status), static_cast<int>(begin.m_Result)));
 				return false;
@@ -240,7 +224,7 @@ namespace gglab
 			}
 			if (endResult.m_Fatal)
 			{
-				LogQualificationError(std::format(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 					"qualify[{:03d}] frame transaction failed (result={}).", step,
 					static_cast<int>(endResult.m_Result)));
 				return false;
@@ -255,14 +239,14 @@ namespace gglab
 				{
 					++stats.m_SuboptimalCount;
 				}
-				LogQualificationInfo(std::format(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 					"qualify[{:03d}] recreation pending; recreating at the safe point.", step));
 				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
 				{
 					return false;
 				}
 			}
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify[{:03d}] {:5s} frameSlot={} backBuffer={} imageAvailable=0x{:016x} "
 				"renderingFinished=0x{:016x} timeline={}",
 				step, abort ? "abort" : "normal", begin.m_FrameSlotIndex,
@@ -282,7 +266,7 @@ namespace gglab
 			RECT clientRect{};
 			if (!GetClientRect(hwnd, &clientRect))
 			{
-				LogQualificationError("GetClientRect failed before swapchain recreate.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("GetClientRect failed before swapchain recreate.");
 				return VulkanQualificationRecreateOutcome::Failed;
 			}
 			const uint32_t width =
@@ -293,7 +277,7 @@ namespace gglab
 			{
 				// Suspended window: never create a zero-size swapchain. The
 				// caller stops driving frames until the window is restored.
-				LogQualificationInfo(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 					"qualify[recreate] drawable extent is zero; recreation suspended.");
 				return VulkanQualificationRecreateOutcome::Suspended;
 			}
@@ -301,12 +285,12 @@ namespace gglab
 			std::string error;
 			if (!runtime.RecreateSwapChain(width, height, vsync, error))
 			{
-				LogQualificationError(std::format("Swapchain recreate failed: {}", error));
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format("Swapchain recreate failed: {}", error));
 				return VulkanQualificationRecreateOutcome::Failed;
 			}
 			++stats.m_RecreateCount;
 			const auto& swapChain = runtime.GetSwapChain();
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify[recreate] {}x{} vsync={} presentMode={} format={} images={}",
 				width, height, vsync ? "on" : "off", PresentModeName(swapChain.GetPresentMode()),
 				GetRHIFormatInfo(swapChain.GetFormat()).m_Name, swapChain.GetImageCount()));
@@ -324,7 +308,7 @@ namespace gglab
 				SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 			if (!moved)
 			{
-				LogQualificationError(std::format(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 					"SetWindowPos({}x{}) failed with error {}.", width, height,
 					static_cast<uint32_t>(GetLastError())));
 				return false;
@@ -371,7 +355,7 @@ namespace gglab
 				{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
 			if (!pending.IsValid())
 			{
-				LogQualificationError("qualify resource: deferred texture creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: deferred texture creation failed.");
 				return 1;
 			}
 			const RHITextureViewHandle pendingView =
@@ -380,13 +364,13 @@ namespace gglab
 				resources.GetTextureViewDescriptor(pendingView);
 			if (!pendingView.IsValid() || !pendingDescriptor.IsValid())
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify resource: deferred texture view creation failed.");
 				return 1;
 			}
 			if (!resources.PublishTextureViewDescriptor(pendingView))
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify resource: deferred descriptor publication failed.");
 				return 1;
 			}
@@ -420,7 +404,7 @@ namespace gglab
 				probe.Index() == pending.Index() || probeView.Index() == pendingView.Index() ||
 				probeDescriptor.m_Index == pendingDescriptor.m_Index)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify resource: incomplete retirement gate released a resource, view or "
 					"descriptor slot.");
 				return 1;
@@ -433,7 +417,7 @@ namespace gglab
 				.m_TextureViewSlot = pendingView.Index(),
 				.m_DescriptorIndex = pendingDescriptor.m_Index,
 			};
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify resource: incomplete gate at timeline {} retained resource/view/"
 				"descriptor slots {}/{}/{}.", incompletePoint.m_Value, pending.Index(),
 				pendingView.Index(), pendingDescriptor.m_Index));
@@ -471,7 +455,7 @@ namespace gglab
 				probeView.Index() != pending.m_TextureViewSlot ||
 				probeDescriptor.m_Index != pending.m_DescriptorIndex)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify resource: completed gate did not release the pending resource, "
 					"view and descriptor slots together.");
 				return 1;
@@ -479,7 +463,7 @@ namespace gglab
 			resources.DestroyTextureView(probeView);
 			resources.DestroyTexture(probe);
 			resources.RetireCompletedResources();
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify resource: deferred gate completed; resource/view/descriptor slots "
 				"{}/{}/{} were released and reused together.", pending.m_TextureSlot,
 				pending.m_TextureViewSlot, pending.m_DescriptorIndex));
@@ -528,7 +512,7 @@ namespace gglab
 					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
 				if (!upload.IsValid() || !readback.IsValid() || !structured.IsValid())
 				{
-					LogQualificationError("qualify resource: buffer creation failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: buffer creation failed.");
 					return 1;
 				}
 				const RHIBufferViewHandle structuredView = resources.CreateBufferView(structured,
@@ -545,21 +529,21 @@ namespace gglab
 					resources.GetBufferViewDescriptor(typedSrv).IsValid() ||
 					resources.GetBufferViewDescriptor(typedUav).IsValid())
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify resource: fixed-set structured/typed buffer view contract failed.");
 					return 1;
 				}
 				void* mapped = resources.MapBuffer(upload, { 0, 4096 });
 				if (mapped == nullptr)
 				{
-					LogQualificationError("qualify resource: upload buffer mapping failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: upload buffer mapping failed.");
 					return 1;
 				}
 				std::memset(mapped, 0xAB, 4096);
 				resources.UnmapBuffer(upload, { 0, 4096 });
 				if (resources.MapBuffer(readback, { 0, 4096 }) == nullptr)
 				{
-					LogQualificationError("qualify resource: readback buffer mapping failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: readback buffer mapping failed.");
 					return 1;
 				}
 				resources.UnmapBuffer(readback, {});
@@ -612,7 +596,7 @@ namespace gglab
 					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
 				if (!color.IsValid() || !depth.IsValid() || !typeless.IsValid())
 				{
-					LogQualificationError("qualify resource: texture creation failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: texture creation failed.");
 					return 1;
 				}
 
@@ -654,7 +638,7 @@ namespace gglab
 					!srgb.IsValid() || !sampler.IsValid() || !comparisonSampler.IsValid() ||
 					!anisotropicSampler.IsValid())
 				{
-					LogQualificationError("qualify resource: view or sampler creation failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: view or sampler creation failed.");
 					return 1;
 				}
 
@@ -665,7 +649,7 @@ namespace gglab
 				if (!srvDescriptor.IsValid() ||
 					resources.GetTextureViewDescriptor(dsv).IsValid())
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify resource: descriptor index contract violated.");
 					return 1;
 				}
@@ -704,7 +688,7 @@ namespace gglab
 						{ firstTexture.Index(), secondTexture.Index(), thirdTexture.Index() },
 						textureSlots[0], textureSlots[1], textureSlots[2]))
 					{
-						LogQualificationError(
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 							"qualify resource: texture slots were not reused.");
 						return 1;
 					}
@@ -720,7 +704,7 @@ namespace gglab
 						}
 						if (!found)
 						{
-							LogQualificationError(
+							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 								"qualify resource: view slots were not reused.");
 							return 1;
 						}
@@ -759,7 +743,7 @@ namespace gglab
 						descriptorIndices[1] != descriptorIndices[2];
 					if (!descriptorSetMatches)
 					{
-						LogQualificationError(
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 							"qualify resource: descriptor indices were not reused.");
 						return 1;
 					}
@@ -806,7 +790,7 @@ namespace gglab
 					{ .m_Domain = RHIResourceDebugDomain::Diagnostics });
 				if (!typelessUav.IsValid())
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify resource: typeless UAV texture creation failed.");
 					return 1;
 				}
@@ -825,7 +809,7 @@ namespace gglab
 				if (!srgbSrv.IsValid() || !unormUav.IsValid() ||
 					!resources.GetTextureViewDescriptor(unormUav).IsValid())
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify resource: typeless UAV family creation failed.");
 					return 1;
 				}
@@ -833,11 +817,11 @@ namespace gglab
 				resources.DestroyTextureView(unormUav);
 				resources.DestroyTexture(typelessUav);
 				resources.RetireCompletedResources();
-				LogQualificationInfo(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 					"qualify resource: typeless UAV family (SRGB SRV + UNORM UAV) created.");
 			}
 
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify resource: {} create/destroy cycles retired with slot and "
 				"descriptor reuse.", kIterations));
 			return 0;
@@ -892,7 +876,7 @@ namespace gglab
 						.m_Label = "Qualification.BufferReadback" }));
 				if (!gpuBuffer || !readbackBuffer)
 				{
-					LogQualificationError("qualify transfer: buffer creation failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: buffer creation failed.");
 					return 1;
 				}
 
@@ -906,7 +890,7 @@ namespace gglab
 					uploadSubmission.m_Publications.front().m_PublishedState != commonState ||
 					!device.IsFencePointCompleted(uploadSubmission.m_Completion))
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: buffer upload completion/publication contract failed.");
 					return 1;
 				}
@@ -941,7 +925,7 @@ namespace gglab
 					!readbackSubmission.m_Completion.IsValid() ||
 					readbackSubmission.m_Publications.size() != 2 || !bytesMatch)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: explicit buffer copy/readback contract failed.");
 					return 1;
 				}
@@ -959,7 +943,7 @@ namespace gglab
 				});
 			if (!textureData.IsValid())
 			{
-				LogQualificationError("qualify transfer: texture artifact fixture is invalid.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: texture artifact fixture is invalid.");
 				return 1;
 			}
 			const RHITextureDesc textureDesc{
@@ -975,7 +959,7 @@ namespace gglab
 					.m_Label = "Qualification.TextureArtifact" }));
 			if (!texture)
 			{
-				LogQualificationError("qualify transfer: texture artifact creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: texture artifact creation failed.");
 				return 1;
 			}
 			{
@@ -988,7 +972,7 @@ namespace gglab
 					submission.m_Publications.front().m_Texture != texture.Get() ||
 					submission.m_Publications.front().m_PublishedState != commonState)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: texture artifact publication contract failed.");
 					return 1;
 				}
@@ -1005,7 +989,7 @@ namespace gglab
 					submission.m_Publications.size() != 2 ||
 					resolved.m_Pixels != textureData.m_Pixels)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: texture artifact readback bytes did not match.");
 					return 1;
 				}
@@ -1019,7 +1003,7 @@ namespace gglab
 					BuiltinTextureFactory::BuildBootstrapTextures();
 				if (bootstrapTextures.empty())
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: bootstrap texture factory returned no textures.");
 					return 1;
 				}
@@ -1046,7 +1030,7 @@ namespace gglab
 				{
 					if (!ValidateTextureUploadForDevice(bootstrapTexture.m_Data, device).IsValid())
 					{
-						LogQualificationError(std::format(
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 							"qualify transfer: bootstrap texture '{}' is invalid for the selected device.",
 							bootstrapTexture.m_Name));
 						return 1;
@@ -1064,7 +1048,7 @@ namespace gglab
 						const RHITextureHandle texture = resources.m_Textures.back().Get();
 						if (!texture.IsValid())
 						{
-							LogQualificationError(std::format(
+							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 								"qualify transfer: bootstrap texture '{}' creation failed.",
 								bootstrapTexture.m_Name));
 							return 1;
@@ -1078,7 +1062,7 @@ namespace gglab
 						}
 						if (!view.IsValid() || !device.GetTextureViewDescriptor(view).IsValid())
 						{
-							LogQualificationError(std::format(
+							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 								"qualify transfer: bootstrap texture '{}' SRV creation failed.",
 								bootstrapTexture.m_Name));
 							return 1;
@@ -1086,7 +1070,7 @@ namespace gglab
 						if (!batch.UploadTexture(texture, bootstrapTexture.m_Data.MakeUploadData(),
 							UndefinedRHITextureState(), shaderResourceState))
 						{
-							LogQualificationError(std::format(
+							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 								"qualify transfer: bootstrap texture '{}' upload recording failed.",
 								bootstrapTexture.m_Name));
 							return 1;
@@ -1110,7 +1094,7 @@ namespace gglab
 						});
 				if (!everyTexturePublished)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: bootstrap texture batch publication failed.");
 					return 1;
 				}
@@ -1121,7 +1105,7 @@ namespace gglab
 					});
 				if (!everyDescriptorPublished)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: bootstrap descriptor publication failed.");
 					return 1;
 				}
@@ -1131,11 +1115,11 @@ namespace gglab
 					descriptorDiagnostics.m_RetainedBackingCount < resources.m_Views.size() ||
 					descriptorDiagnostics.m_EstimatedRetainedBytes == 0)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: bootstrap descriptor backing diagnostics are incomplete.");
 					return 1;
 				}
-				LogQualificationInfo(std::format(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 					"qualify transfer: {} bootstrap textures uploaded and published "
 					"(retained backing estimate={} bytes).",
 					resources.m_Textures.size(),
@@ -1150,7 +1134,7 @@ namespace gglab
 					std::vector<std::byte>(16, std::byte{ 0x3C })));
 			if (!iblArtifact)
 			{
-				LogQualificationError("qualify transfer: IBL stage artifact fixture is invalid.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: IBL stage artifact fixture is invalid.");
 				return 1;
 			}
 			const RHITextureDesc iblDesc{
@@ -1173,7 +1157,7 @@ namespace gglab
 					submission.m_Publications.size() != 1 ||
 					submission.m_Publications.front().m_PublishedState != shaderResourceState)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify transfer: IBL artifact upload/publication failed.");
 					return 1;
 				}
@@ -1292,7 +1276,7 @@ namespace gglab
 			{
 				scheduler.ClearGpuCompletionHold();
 				scheduler.Finalize();
-				LogQualificationError("qualify transfer: WaitIdle failed after scheduler upload.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: WaitIdle failed after scheduler upload.");
 				return 1;
 			}
 			scheduler.ClearGpuCompletionHold();
@@ -1320,12 +1304,12 @@ namespace gglab
 			transferManager.Reclaim();
 			if (!schedulerPassed)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify transfer: worker handoff or completion-gated publication failed.");
 				return 1;
 			}
 
-			LogQualificationInfo(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 				"qualify transfer: buffer, texture artifact, bootstrap texture, IBL artifact and owner-thread scheduler paths passed.");
 			return 0;
 		}
@@ -1338,7 +1322,7 @@ namespace gglab
 				descriptors.GetGlobalSetLayout() == VK_NULL_HANDLE ||
 				descriptors.GetGlobalSet() == VK_NULL_HANDLE)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: the exact global descriptor layout is unavailable.");
 				return 1;
 			}
@@ -1358,7 +1342,7 @@ namespace gglab
 				{
 					resources.DestroySampler(submittedSampler);
 				}
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: submitted sampler publication setup failed.");
 				return 1;
 			}
@@ -1366,7 +1350,7 @@ namespace gglab
 			if (!submittedBegin.IsAcquired())
 			{
 				resources.DestroySampler(submittedSampler);
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: submitted sampler frame acquire failed.");
 				return 1;
 			}
@@ -1381,7 +1365,7 @@ namespace gglab
 				pendingSubmittedDiagnostics.m_RetirementRequestedCount == 0 ||
 				!submittedFrame.m_Submitted || runtime.WaitIdle() != VK_SUCCESS)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: submitted sampler retirement was not fence-gated.");
 				return 1;
 			}
@@ -1389,7 +1373,7 @@ namespace gglab
 			if (descriptors.GetSamplerState(submittedSamplerDescriptor.m_Index) !=
 				VulkanDescriptorPublicationState::Free)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: submitted sampler retirement did not complete.");
 				return 1;
 			}
@@ -1407,7 +1391,7 @@ namespace gglab
 				{
 					resources.DestroySampler(abandonedSampler);
 				}
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: abandoned sampler publication setup failed.");
 				return 1;
 			}
@@ -1415,7 +1399,7 @@ namespace gglab
 			if (!abandonedBegin.IsAcquired())
 			{
 				resources.DestroySampler(abandonedSampler);
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: abandoned sampler frame acquire failed.");
 				return 1;
 			}
@@ -1426,7 +1410,7 @@ namespace gglab
 				descriptors.GetSamplerState(abandonedSamplerDescriptor.m_Index) !=
 				VulkanDescriptorPublicationState::Free)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: descriptor-unused abort retained a sampler snapshot.");
 				return 1;
 			}
@@ -1468,7 +1452,7 @@ namespace gglab
 				layout->GetPlan().GetDynamicOffsetSlot(1) != 0 ||
 				layout->GetPlan().GetDynamicOffsetSlot(0) != 1)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify pipeline: set-0 or pipeline-layout creation failed.");
 				return 1;
 			}
@@ -1482,7 +1466,7 @@ namespace gglab
 				.m_Alignment = 1,
 				}))
 			{
-				LogQualificationError("qualify dynamic uniform: buffer initialization failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify dynamic uniform: buffer initialization failed.");
 				return 1;
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
@@ -1491,7 +1475,7 @@ namespace gglab
 			if (!set0Initialized || !set0Frames.BeginFrame(0) ||
 				set0Frames.BeginFrame(0) || uniformBuffer.GetAlignmentInBytes() != uniformAlignment)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify dynamic uniform: set-0 frame-slot gating failed.");
 				return 1;
 			}
@@ -1519,7 +1503,7 @@ namespace gglab
 				!diagnostics || diagnostics->m_OverflowCount == 0 ||
 				set0Frames.GetDescriptorSet(0) == VK_NULL_HANDLE)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify dynamic uniform: immutable allocation, alignment or overflow failed.");
 				return 1;
 			}
@@ -1530,7 +1514,7 @@ namespace gglab
 				!set0Frames.BeginFrame(0) || !set0Frames.EndFrame(0, completedFrame) ||
 				!set0Frames.BeginFrame(0) || !set0Frames.AbortFrame(0))
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify dynamic uniform: completed frame-slot reuse failed.");
 				return 1;
 			}
@@ -1560,7 +1544,7 @@ namespace gglab
 				pipelineSystem.CreateShaderModule(rejectedBytecode) == VK_NULL_HANDLE;
 			if (shaderModule == VK_NULL_HANDLE || !rejectedDxil)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify pipeline: SPIR-V module creation or DXIL rejection failed.");
 				return 1;
 			}
@@ -1570,7 +1554,7 @@ namespace gglab
 			set0Frames.Finalize();
 			uniformBuffer.Finalize();
 			device.RetireCompletedWork();
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify descriptors: global layout, pipeline layout, shader module and dynamic "
 				"uniform storage passed (alignment={}, highWater={}, overflow={}).",
 				uniformAlignment, highWater, overflowCount));
@@ -1649,7 +1633,7 @@ namespace gglab
 			if (layout == nullptr || layout->GetPlan().m_DynamicOffsetCount != 1 ||
 				layout->GetPlan().GetDynamicOffsetSlot(0) != 0)
 			{
-				LogQualificationError("qualify graphics: binding layout creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: binding layout creation failed.");
 				return 1;
 			}
 
@@ -1680,7 +1664,7 @@ namespace gglab
 				pixelArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
 				depthOverrideArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
 			{
-				LogQualificationError("qualify graphics: coordinate shader compilation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: coordinate shader compilation failed.");
 				return 1;
 			}
 			const ShaderBytecode geometryShader{
@@ -1792,7 +1776,7 @@ namespace gglab
 				!positionPipeline.IsValid() || !backCullPipeline.IsValid() ||
 				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid())
 			{
-				LogQualificationError("qualify graphics: native pipeline creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: native pipeline creation failed.");
 				return 1;
 			}
 
@@ -1920,7 +1904,7 @@ namespace gglab
 				!depthWriteProbeDescriptor.IsValid() || !depthOverrideProbeDescriptor.IsValid() ||
 				!markerSampler.IsValid() || !samplerDescriptor.IsValid())
 			{
-				LogQualificationError("qualify graphics: offscreen resource creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: offscreen resource creation failed.");
 				return 1;
 			}
 
@@ -1944,7 +1928,7 @@ namespace gglab
 					!resources.PublishTextureViewDescriptor(depthOverrideProbeSrv) ||
 					!resources.PublishSamplerDescriptor(markerSampler))
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"qualify graphics: marker upload or descriptor publication failed.");
 					return 1;
 				}
@@ -1979,7 +1963,7 @@ namespace gglab
 				}));
 			if (!vertexBuffer || !indexBuffer)
 			{
-				LogQualificationError("qualify graphics: geometry buffer creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: geometry buffer creation failed.");
 				return 1;
 			}
 			void* mappedVertices = device.MapBuffer(vertexBuffer.Get(), {});
@@ -1994,7 +1978,7 @@ namespace gglab
 				{
 					device.UnmapBuffer(indexBuffer.Get(), {});
 				}
-				LogQualificationError("qualify graphics: geometry buffer creation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: geometry buffer creation failed.");
 				return 1;
 			}
 			std::memcpy(mappedVertices, vertices.data(), sizeof(vertices));
@@ -2011,14 +1995,14 @@ namespace gglab
 				.m_Alignment = 1,
 				}))
 			{
-				LogQualificationError("qualify graphics: dynamic uniform initialization failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: dynamic uniform initialization failed.");
 				return 1;
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
 			if (!set0Frames.Initialize(
 				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount()))
 			{
-				LogQualificationError("qualify graphics: set-0 frame initialization failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: set-0 frame initialization failed.");
 				return 1;
 			}
 
@@ -2029,7 +2013,7 @@ namespace gglab
 				{
 					GGLAB_UNUSED(runtime.AbortFrame());
 				}
-				LogQualificationError("qualify graphics: frame acquire or set-0 begin failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: frame acquire or set-0 begin failed.");
 				return 1;
 			}
 			const VulkanFrameRecording recording = runtime.BeginFrameRecording();
@@ -2037,7 +2021,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				LogQualificationError("qualify graphics: command recording did not begin.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: command recording did not begin.");
 				return 1;
 			}
 
@@ -2068,7 +2052,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				LogQualificationError("qualify graphics: native render targets are unavailable.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: native render targets are unavailable.");
 				return 1;
 			}
 			const std::array beginBarriers{
@@ -2111,7 +2095,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				LogQualificationError("qualify graphics: graphics encoder did not begin.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics encoder did not begin.");
 				return 1;
 			}
 			const auto makeParameters = [&](CoordinateConformanceMode mode, float depth = 0.0f,
@@ -2273,7 +2257,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				LogQualificationError("qualify graphics: graphics command validation failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics command validation failed.");
 				return 1;
 			}
 
@@ -2291,14 +2275,14 @@ namespace gglab
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
-				LogQualificationError("qualify graphics: command recording did not finalize.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: command recording did not finalize.");
 				return 1;
 			}
 			const VulkanSubmitPresentResult frame = runtime.EndFrame();
 			if (!frame.m_Submitted || !frame.m_SubmittedFencePoint.IsValid())
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
-				LogQualificationError("qualify graphics: graphics submission failed.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics submission failed.");
 				return 1;
 			}
 			const bool uniformFrameEnded =
@@ -2318,7 +2302,7 @@ namespace gglab
 				!pipelineSystem.IsAlive(depthOverridePipeline);
 			if (!uniformFrameEnded || !pipelineCacheCleared || runtime.WaitIdle() != VK_SUCCESS)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify graphics: completion, pipeline invalidation or uniform retirement failed.");
 				return 1;
 			}
@@ -2332,7 +2316,7 @@ namespace gglab
 				if (!request.IsValid() || !submission.m_Completion.IsValid() ||
 					!device.IsFencePointCompleted(submission.m_Completion))
 				{
-					LogQualificationError("qualify graphics: color readback failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: color readback failed.");
 					return 1;
 				}
 				const std::byte* mapped = transferManager.MapTextureReadback(device, request);
@@ -2340,7 +2324,7 @@ namespace gglab
 				transferManager.UnmapTextureReadback(device, request);
 				if (!readback.IsValid())
 				{
-					LogQualificationError("qualify graphics: color readback failed.");
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: color readback failed.");
 					return 1;
 				}
 			}
@@ -2402,7 +2386,7 @@ namespace gglab
 					observed += std::format(" ({},{},{},{})", pixel.m_R, pixel.m_G,
 						pixel.m_B, pixel.m_A);
 				}
-				LogQualificationError(std::format(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 					"qualify graphics: coordinate probe pixels did not match:{}", observed));
 				return 1;
 			}
@@ -2411,7 +2395,7 @@ namespace gglab
 			uniformBuffer.Finalize();
 			transferManager.Reclaim();
 			device.RetireCompletedWork();
-			LogQualificationInfo(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 				"qualify graphics: winding, back-face culling, depth-only shader stages, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
 			return 0;
 		}
@@ -2435,7 +2419,7 @@ namespace gglab
 					return RunQualificationStep(runtime, hwnd, step++, true, stats);
 				};
 
-			LogQualificationInfo("Vulkan minimal-frame qualification started.");
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan minimal-frame qualification started.");
 
 			// Establish a run of continuous normal presents.
 			for (uint32_t i = 0; i < 4; ++i)
@@ -2549,11 +2533,11 @@ namespace gglab
 				if (minimizedRect.right - minimizedRect.left != 0 ||
 					minimizedRect.bottom - minimizedRect.top != 0)
 				{
-					LogQualificationError(
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"Minimized window did not report a zero drawable extent.");
 					return 1;
 				}
-				LogQualificationInfo(
+				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 					"qualify[minimize] drawable extent is 0x0; BeginFrame skipped.");
 			}
 			ShowWindow(hwnd, SW_RESTORE);
@@ -2571,7 +2555,7 @@ namespace gglab
 
 			if (runtime.WaitIdle() != VK_SUCCESS)
 			{
-				LogQualificationError(
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify WaitIdle failed before the final summary; the runtime may have "
 					"entered the fatal state.");
 				return 1;
@@ -2606,20 +2590,20 @@ namespace gglab
 			}
 
 			const auto& swapChain = runtime.GetSwapChain();
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify summary: normal={} abort={} recreate={} mismatchedFrames={} "
 				"suboptimal={} timeline={}",
 				stats.m_NormalFrames, stats.m_AbortFrames, stats.m_RecreateCount,
 				stats.m_MismatchedFrames, stats.m_SuboptimalCount,
 				runtime.GetTimelineSignalValue()));
-			LogQualificationInfo(std::format(
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify swapchain: format={} extent={}x{} presentMode={} vsync={} images={} "
 				"frameSlots={}",
 				GetRHIFormatInfo(swapChain.GetFormat()).m_Name, swapChain.GetWidth(),
 				swapChain.GetHeight(), PresentModeName(swapChain.GetPresentMode()),
 				runtime.GetVsync() ? "on" : "off", swapChain.GetImageCount(),
 				runtime.GetFrameSlotCount()));
-			LogQualificationInfo("Vulkan minimal-frame qualification finished.");
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan minimal-frame qualification finished.");
 			return 0;
 		}
 #endif
@@ -2641,7 +2625,7 @@ namespace gglab
 			clientRect.right - clientRect.left == 0 ||
 			clientRect.bottom - clientRect.top == 0)
 		{
-			LogQualificationError("Vulkan startup requires a nonzero window drawable extent.");
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan startup requires a nonzero window drawable extent.");
 			return 1;
 		}
 
@@ -2658,11 +2642,11 @@ namespace gglab
 		VulkanBootstrapRuntimeResult result = CreateVulkanBootstrapRuntime(createInfo);
 		if (!result.Succeeded())
 		{
-			LogQualificationError(std::format(
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"Vulkan bootstrap runtime creation failed: {}", result.m_Error));
 			return 1;
 		}
-		LogQualificationInfo(std::format(
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 			"Vulkan qualification on adapter [{}] '{}' (validation={}).",
 			result.m_SelectedSnapshot.m_Identity.m_EnumerationIndex,
 			result.m_SelectedSnapshot.m_Identity.m_DeviceName,
@@ -2673,10 +2657,7 @@ namespace gglab
 		return exitCode;
 #else
 		GGLAB_UNUSED(options);
-		if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-		{
-			logger->error("Vulkan backend was not built (GGLAB_ENABLE_VULKAN=0).");
-		}
+		GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan backend was not built (GGLAB_ENABLE_VULKAN=0).");
 		return 1;
 #endif
 	}

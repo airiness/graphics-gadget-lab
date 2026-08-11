@@ -5,6 +5,7 @@
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "Core/Utility/MathUtils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -12,22 +13,13 @@
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] uint64_t AlignUp(uint64_t value, uint64_t alignment) noexcept
-		{
-			const uint64_t safeAlignment = std::max<uint64_t>(alignment, 1);
-			return (value + safeAlignment - 1) / safeAlignment * safeAlignment;
-		}
-	}
-
 	VulkanDynamicUniformArena::VulkanDynamicUniformArena(
 		const VulkanDynamicUniformArenaConfig& config) noexcept : m_Config(config)
 	{
 		m_Config.m_PageSizeInBytes = std::max(m_Config.m_PageSizeInBytes, 1u);
 		m_Config.m_MaxPageCount = std::max(m_Config.m_MaxPageCount, 1u);
 		m_Config.m_Alignment = std::max(m_Config.m_Alignment, 1u);
-		const uint64_t alignedPageSize = AlignUp(
+		const uint64_t alignedPageSize = utils::AlignUp<uint64_t>(
 			m_Config.m_PageSizeInBytes, m_Config.m_Alignment);
 		m_Config.m_PageSizeInBytes = alignedPageSize <= UINT32_MAX
 			? static_cast<uint32_t>(alignedPageSize)
@@ -43,7 +35,7 @@ namespace gglab
 			return {};
 		}
 		const uint32_t capacity = GetCapacityInBytes();
-		uint64_t offset = AlignUp(m_Cursor, m_Config.m_Alignment);
+		uint64_t offset = utils::AlignUp<uint64_t>(m_Cursor, m_Config.m_Alignment);
 		uint64_t pageIndex = offset / m_Config.m_PageSizeInBytes;
 		const uint64_t pageEnd = (pageIndex + 1) * m_Config.m_PageSizeInBytes;
 		if (offset + sizeInBytes > pageEnd)

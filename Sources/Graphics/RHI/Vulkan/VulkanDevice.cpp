@@ -2,6 +2,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 #include <array>
@@ -16,23 +17,12 @@ namespace gglab
 		constexpr std::string_view MutableDescriptorTypeExtensionName =
 			VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
 
-		[[nodiscard]] std::string FormatUuid(
-			const std::array<uint8_t, VK_UUID_SIZE>& uuid) noexcept
-		{
-			std::string text;
-			text.reserve(VK_UUID_SIZE * 2);
-			for (const uint8_t byte : uuid)
-			{
-				text += std::format("{:02x}", byte);
-			}
-			return text;
-		}
-
 		[[nodiscard]] std::string BuildAdapterCompatibilityIdentity(
 			const VulkanAdapterIdentity& identity) noexcept
 		{
 			return std::format("vulkan:{}:{}:{:08x}:{:08x}", identity.UuidHex(),
-				FormatUuid(identity.m_DriverUuid), identity.m_ApiVersion, identity.m_DriverVersion);
+				utils::BytesToHexString(identity.m_DriverUuid), identity.m_ApiVersion,
+				identity.m_DriverVersion);
 		}
 	}
 

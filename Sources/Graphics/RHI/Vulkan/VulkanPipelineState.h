@@ -52,7 +52,6 @@ namespace gglab
 		}
 	};
 
-	[[nodiscard]] VkFrontFace ToVulkanFrontFace(bool frontCounterClockwise) noexcept;
 	[[nodiscard]] VulkanGraphicsPipelinePlan BuildVulkanGraphicsPipelinePlan(
 		const RHIGraphicsPipelineDesc& desc) noexcept;
 

@@ -714,6 +714,9 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
@@ -2106,6 +2109,9 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">

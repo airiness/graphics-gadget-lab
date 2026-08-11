@@ -2,6 +2,7 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
@@ -9,155 +10,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] VkPrimitiveTopology ToVulkanPrimitiveTopology(
-			RHIPrimitiveTopology topology) noexcept
-		{
-			switch (topology)
-			{
-			case RHIPrimitiveTopology::PointList:
-				return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-			case RHIPrimitiveTopology::LineList:
-				return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-			case RHIPrimitiveTopology::LineStrip:
-				return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-			case RHIPrimitiveTopology::TriangleList:
-				return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-			case RHIPrimitiveTopology::TriangleStrip:
-				return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-			default:
-				return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
-			}
-		}
-
-		[[nodiscard]] bool IsTopologyTypeCompatible(
-			RHIPrimitiveTopologyType type, RHIPrimitiveTopology topology) noexcept
-		{
-			switch (type)
-			{
-			case RHIPrimitiveTopologyType::Point:
-				return topology == RHIPrimitiveTopology::PointList;
-			case RHIPrimitiveTopologyType::Line:
-				return topology == RHIPrimitiveTopology::LineList ||
-					topology == RHIPrimitiveTopology::LineStrip;
-			case RHIPrimitiveTopologyType::Triangle:
-				return topology == RHIPrimitiveTopology::TriangleList ||
-					topology == RHIPrimitiveTopology::TriangleStrip;
-			default:
-				return false;
-			}
-		}
-
-		[[nodiscard]] VkPolygonMode ToVulkanPolygonMode(RHIFillMode mode) noexcept
-		{
-			return mode == RHIFillMode::Wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
-		}
-
-		[[nodiscard]] VkCullModeFlags ToVulkanCullMode(RHICullMode mode) noexcept
-		{
-			switch (mode)
-			{
-			case RHICullMode::Front:
-				return VK_CULL_MODE_FRONT_BIT;
-			case RHICullMode::Back:
-				return VK_CULL_MODE_BACK_BIT;
-			default:
-				return VK_CULL_MODE_NONE;
-			}
-		}
-
-		[[nodiscard]] VkCompareOp ToVulkanCompareOp(RHICompareOp op) noexcept
-		{
-			switch (op)
-			{
-			case RHICompareOp::Never:
-				return VK_COMPARE_OP_NEVER;
-			case RHICompareOp::Less:
-				return VK_COMPARE_OP_LESS;
-			case RHICompareOp::Equal:
-				return VK_COMPARE_OP_EQUAL;
-			case RHICompareOp::LessEqual:
-				return VK_COMPARE_OP_LESS_OR_EQUAL;
-			case RHICompareOp::Greater:
-				return VK_COMPARE_OP_GREATER;
-			case RHICompareOp::NotEqual:
-				return VK_COMPARE_OP_NOT_EQUAL;
-			case RHICompareOp::GreaterEqual:
-				return VK_COMPARE_OP_GREATER_OR_EQUAL;
-			case RHICompareOp::Always:
-			default:
-				return VK_COMPARE_OP_ALWAYS;
-			}
-		}
-
-		[[nodiscard]] VkBlendFactor ToVulkanBlendFactor(RHIBlendFactor factor) noexcept
-		{
-			switch (factor)
-			{
-			case RHIBlendFactor::Zero:
-				return VK_BLEND_FACTOR_ZERO;
-			case RHIBlendFactor::One:
-				return VK_BLEND_FACTOR_ONE;
-			case RHIBlendFactor::SrcColor:
-				return VK_BLEND_FACTOR_SRC_COLOR;
-			case RHIBlendFactor::OneMinusSrcColor:
-				return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-			case RHIBlendFactor::SrcAlpha:
-				return VK_BLEND_FACTOR_SRC_ALPHA;
-			case RHIBlendFactor::OneMinusSrcAlpha:
-				return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			case RHIBlendFactor::DstAlpha:
-				return VK_BLEND_FACTOR_DST_ALPHA;
-			case RHIBlendFactor::OneMinusDstAlpha:
-				return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-			case RHIBlendFactor::DstColor:
-				return VK_BLEND_FACTOR_DST_COLOR;
-			case RHIBlendFactor::OneMinusDstColor:
-				return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-			}
-			return VK_BLEND_FACTOR_ONE;
-		}
-
-		[[nodiscard]] VkBlendOp ToVulkanBlendOp(RHIBlendOp op) noexcept
-		{
-			switch (op)
-			{
-			case RHIBlendOp::Subtract:
-				return VK_BLEND_OP_SUBTRACT;
-			case RHIBlendOp::ReverseSubtract:
-				return VK_BLEND_OP_REVERSE_SUBTRACT;
-			case RHIBlendOp::Min:
-				return VK_BLEND_OP_MIN;
-			case RHIBlendOp::Max:
-				return VK_BLEND_OP_MAX;
-			case RHIBlendOp::Add:
-			default:
-				return VK_BLEND_OP_ADD;
-			}
-		}
-
-		[[nodiscard]] VkColorComponentFlags ToVulkanColorWriteMask(
-			RHIColorWriteMask mask) noexcept
-		{
-			VkColorComponentFlags result = 0;
-			if (Test(mask, RHIColorWriteMask::Red))
-			{
-				result |= VK_COLOR_COMPONENT_R_BIT;
-			}
-			if (Test(mask, RHIColorWriteMask::Green))
-			{
-				result |= VK_COLOR_COMPONENT_G_BIT;
-			}
-			if (Test(mask, RHIColorWriteMask::Blue))
-			{
-				result |= VK_COLOR_COMPONENT_B_BIT;
-			}
-			if (Test(mask, RHIColorWriteMask::Alpha))
-			{
-				result |= VK_COLOR_COMPONENT_A_BIT;
-			}
-			return result;
-		}
-
 		[[nodiscard]] const RHIVertexBufferLayoutDesc* FindVertexBinding(
 			const RHIVertexInputLayoutDesc& input, uint32_t slot) noexcept
 		{
@@ -172,16 +24,11 @@ namespace gglab
 		}
 	}
 
-	VkFrontFace ToVulkanFrontFace(bool frontCounterClockwise) noexcept
-	{
-		return frontCounterClockwise ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
-	}
-
 	VulkanGraphicsPipelinePlan BuildVulkanGraphicsPipelinePlan(
 		const RHIGraphicsPipelineDesc& desc) noexcept
 	{
 		VulkanGraphicsPipelinePlan plan{};
-		if (!IsTopologyTypeCompatible(desc.m_TopologyType, desc.m_PrimitiveTopology))
+		if (!IsRHIPrimitiveTopologyCompatible(desc.m_TopologyType, desc.m_PrimitiveTopology))
 		{
 			plan.m_Error = VulkanGraphicsPipelineError::InvalidTopology;
 			return plan;

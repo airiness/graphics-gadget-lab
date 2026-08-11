@@ -13,6 +13,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
@@ -1922,10 +1923,10 @@ namespace gglab
 		context.Check(ToVulkanFrontFace(false) == VK_FRONT_FACE_CLOCKWISE &&
 			ToVulkanFrontFace(true) == VK_FRONT_FACE_COUNTER_CLOCKWISE,
 			"Front-face lowering applies the coordinate policy exactly once");
-		context.Check(IsVulkanIndexBufferOffsetAligned(RHIFormat::R32Uint, 4) &&
-			!IsVulkanIndexBufferOffsetAligned(RHIFormat::R32Uint, 2) &&
-			!IsVulkanIndexBufferOffsetAligned(RHIFormat::Unknown, 0),
-			"Index buffer offsets honor the Vulkan index-element alignment rule");
+		context.Check(IsRHIIndexBufferOffsetAligned(RHIFormat::R32Uint, 4) &&
+			!IsRHIIndexBufferOffsetAligned(RHIFormat::R32Uint, 2) &&
+			!IsRHIIndexBufferOffsetAligned(RHIFormat::Unknown, 0),
+			"Index buffer offsets honor the RHI index-element alignment rule");
 
 		RHIGraphicsPipelineDesc duplicateLocation = desc;
 		duplicateLocation.m_VertexInput.m_Attributes[1].m_Location = 0;

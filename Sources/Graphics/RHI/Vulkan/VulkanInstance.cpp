@@ -1,7 +1,7 @@
 #include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
-#include "Core/Log/Logger.h"
+#include "Core/Log/LogMacros.h"
 
 #include <array>
 
@@ -9,14 +9,6 @@ namespace gglab
 {
 	namespace
 	{
-		void LogVulkanWarning(const std::string& message) noexcept
-		{
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->warn("{}", message);
-			}
-		}
-
 		VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 			VkDebugUtilsMessageTypeFlagsEXT types, const VkDebugUtilsMessengerCallbackDataEXT* data,
@@ -55,10 +47,7 @@ namespace gglab
 				: severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
 				? spdlog::level::warn
 				: spdlog::level::info;
-			if (auto& logger = Logger::GetLogger(Logger::LoggerType::Graphics))
-			{
-				logger->log(level, "{}", text);
-			}
+			GGLAB_LOG_GRAPHICS_ALWAYS(level, "{}", text);
 			return VK_FALSE;
 		}
 	}
@@ -140,9 +129,9 @@ namespace gglab
 			hasValidationLayer;
 		if (createInfo.m_RequestValidation && (!hasDebugUtils || !hasValidationLayer))
 		{
-			LogVulkanWarning(std::format(
+			GGLAB_LOG_GRAPHICS_WARN_ALWAYS(
 				"Vulkan validation requested but unavailable (debug_utils={}, validation layer={}).",
-				hasDebugUtils, hasValidationLayer));
+				hasDebugUtils, hasValidationLayer);
 		}
 
 		std::vector<const char*> enabledLayers;
@@ -215,9 +204,8 @@ namespace gglab
 					&messengerCreateInfo, nullptr, &instance->m_DebugMessenger);
 				if (messengerResult != VK_SUCCESS)
 				{
-					LogVulkanWarning(std::format(
-						"Failed to create the Vulkan debug messenger: {}.",
-						ToString(messengerResult)));
+					GGLAB_LOG_GRAPHICS_WARN_ALWAYS(
+						"Failed to create the Vulkan debug messenger: {}.", ToString(messengerResult));
 				}
 			}
 		}

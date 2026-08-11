@@ -8,28 +8,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] RHITextureSupportReason TextureSupportReasonForUsage(
-			RHITextureUsage usage) noexcept
-		{
-			switch (usage)
-			{
-			case RHITextureUsage::Sampled:
-				return RHITextureSupportReason::ShaderResourceUnsupported;
-			case RHITextureUsage::RenderTarget:
-				return RHITextureSupportReason::RenderTargetUnsupported;
-			case RHITextureUsage::DepthStencil:
-				return RHITextureSupportReason::DepthStencilUnsupported;
-			case RHITextureUsage::UnorderedAccess:
-				return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
-			case RHITextureUsage::CopySource:
-				return RHITextureSupportReason::CopySourceUnsupported;
-			case RHITextureUsage::CopyDest:
-				return RHITextureSupportReason::CopyDestUnsupported;
-			default:
-				return RHITextureSupportReason::FormatCombinationUnsupported;
-			}
-		}
-
 		inline constexpr std::array<RHIFormat, 2> R8G8B8A8TypelessViewFormats{
 			RHIFormat::R8G8B8A8Unorm,
 			RHIFormat::R8G8B8A8UnormSrgb,
@@ -497,7 +475,7 @@ namespace gglab
 			const VkFormatFeatureFlags2 requiredFeatures = ToVulkanFormatFeatureFlags(usage);
 			if ((availableFeatures & requiredFeatures) != requiredFeatures)
 			{
-				return { .m_Reason = TextureSupportReasonForUsage(usage) };
+				return { .m_Reason = RHITextureSupportReasonForUsage(usage) };
 			}
 		}
 

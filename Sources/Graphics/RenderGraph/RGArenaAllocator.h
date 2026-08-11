@@ -34,8 +34,6 @@ namespace gglab
 		void RunDtors() noexcept;
 		void Exchange(RGArenaAllocator&& other) noexcept;
 
-		static std::byte* AlignUp(std::byte* pointer, size_t alignment) noexcept;
-
 	private:
 		std::byte* m_Base = nullptr;
 		std::byte* m_Head = nullptr;

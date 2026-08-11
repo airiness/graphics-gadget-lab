@@ -2269,6 +2269,14 @@ namespace gglab
 				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported) ==
 				"typed unordered-access store unsupported",
 				"Texture capability failures expose a stable diagnostic reason");
+			context.Check(
+				RHITextureSupportReasonForUsage(RHITextureUsage::Sampled) ==
+				RHITextureSupportReason::ShaderResourceUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::CopyDest) ==
+				RHITextureSupportReason::CopyDestUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::None) ==
+				RHITextureSupportReason::FormatCombinationUnsupported,
+				"Texture usage failures map to backend-neutral support reasons");
 		}
 
 		[[nodiscard]] bool HasDependencyEdge(const RGSnapshot& snapshot, uint32_t fromPass,
@@ -3224,6 +3232,14 @@ namespace gglab
 			customBorderSampler.m_AddressU = RHITextureAddressMode::Border;
 			customBorderSampler.m_BorderColor[0] = 0.5f;
 			RHIGraphicsPipelineDesc pipelineDesc{};
+			context.Check(
+				IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Triangle, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Line, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Patch, RHIPrimitiveTopology::TriangleList),
+				"Primitive topology compatibility is a backend-neutral pipeline contract");
 			pipelineDesc.m_VertexInput.m_VertexBufferCount = 1;
 			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate =
 				RHIVertexInputRate::PerInstance;

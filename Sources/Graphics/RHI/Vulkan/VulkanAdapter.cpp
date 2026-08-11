@@ -3,6 +3,7 @@
 #include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -65,17 +66,6 @@ namespace gglab
 
 		constexpr uint32_t GtaoPreferredIndex = 4;
 		constexpr uint32_t GtaoFallbackIndex = 5;
-
-		[[nodiscard]] std::string FormatUuid(const std::array<uint8_t, VK_UUID_SIZE>& uuid) noexcept
-		{
-			std::string text;
-			text.reserve(VK_UUID_SIZE * 2);
-			for (const uint8_t byte : uuid)
-			{
-				text += std::format("{:02x}", byte);
-			}
-			return text;
-		}
 
 		[[nodiscard]] VkPhysicalDeviceProperties2 QueryDeviceProperties(
 			VkPhysicalDevice physicalDevice, VkPhysicalDeviceIDProperties& idProperties,
@@ -239,7 +229,7 @@ namespace gglab
 
 	std::string VulkanAdapterIdentity::UuidHex() const noexcept
 	{
-		return FormatUuid(m_DeviceUuid);
+		return utils::BytesToHexString(m_DeviceUuid);
 	}
 
 	VulkanAdapterCapabilitySnapshot QueryVulkanAdapterCapabilitySnapshot(VkInstance instance,
