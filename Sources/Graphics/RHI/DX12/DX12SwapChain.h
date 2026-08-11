@@ -1,13 +1,19 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/RHISwapChain.h"
+
+#include <cstdint>
+#include <vector>
+
+#include <dxgi1_6.h>
+#include <windows.h>
 
 namespace gglab
 {
 	class DX12Device;
 	class DX12CommandQueue;
 	class DX12QueueSystem;
-	class DX12CommandList;
 	class DX12Texture;
 	class DX12SwapChain final : public RHISwapChain
 	{

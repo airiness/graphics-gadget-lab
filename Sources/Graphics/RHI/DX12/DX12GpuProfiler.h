@@ -5,8 +5,14 @@
 #include "Graphics/RHI/RHIResource.h"
 
 #include <atomic>
+#include <cstdint>
 #include <limits>
 #include <mutex>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <d3d12.h>
 
 namespace gglab
 {

@@ -1,10 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12GpuProfiler.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
+
+#include <algorithm>
+#include <iterator>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace gglab
 {
