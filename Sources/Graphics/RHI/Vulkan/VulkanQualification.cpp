@@ -1589,15 +1589,28 @@ namespace gglab
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			};
+			enum class CoordinateConformanceMode : uint32_t
+			{
+				Winding = 0,
+				MarkerSampling = 1,
+				DepthVisualization = 2,
+				Position = 3,
+				DepthProbe = 4,
+			};
+			constexpr float DepthOnlyExpectedDepth = 0.25f;
+			constexpr float DepthOnlyVertexDepth = 0.75f;
+			constexpr float ReversedZFarProbeDepth = 0.25f;
+			constexpr float ReversedZNearProbeDepth = 0.75f;
 
 			struct CoordinateConformanceParameters
 			{
 				uint32_t m_TextureIndex = 0;
 				uint32_t m_SamplerIndex = 0;
-				uint32_t m_Mode = 0;
+				CoordinateConformanceMode m_Mode = CoordinateConformanceMode::Winding;
 				float m_Depth = 0.0f;
 				float m_TargetExtent[2] = { 1.0f, 1.0f };
-				float m_Padding[2]{};
+				float m_DepthOverride = 0.0f;
+				float m_Padding = 0.0f;
 			};
 			static_assert(sizeof(CoordinateConformanceParameters) == 32);
 			struct CoordinateVertex
@@ -1658,11 +1671,14 @@ namespace gglab
 				compileShader(ShaderStage::Vertex, L"VSFullscreen");
 			ShaderCompileArtifact pixelArtifact =
 				compileShader(ShaderStage::Pixel, L"PSConformance");
+			ShaderCompileArtifact depthOverrideArtifact =
+				compileShader(ShaderStage::Pixel, L"PSDepthOverride");
 			if (!geometryArtifact.m_Binary.IsValid() || !fullscreenArtifact.m_Binary.IsValid() ||
-				!pixelArtifact.m_Binary.IsValid() ||
+				!pixelArtifact.m_Binary.IsValid() || !depthOverrideArtifact.m_Binary.IsValid() ||
 				geometryArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
 				fullscreenArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
-				pixelArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
+				pixelArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				depthOverrideArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
 			{
 				LogQualificationError("qualify graphics: coordinate shader compilation failed.");
 				return 1;
@@ -1687,6 +1703,13 @@ namespace gglab
 				.m_Format = pixelArtifact.GetBinaryFormat(),
 				.m_Hash = pixelArtifact.m_Hash,
 				.m_EntryPoint = L"PSConformance",
+			};
+			const ShaderBytecode depthOverrideShader{
+				.m_Data = depthOverrideArtifact.m_Binary.Data(),
+				.m_SizeInBytes = depthOverrideArtifact.m_Binary.SizeInBytes(),
+				.m_Format = depthOverrideArtifact.GetBinaryFormat(),
+				.m_Hash = depthOverrideArtifact.m_Hash,
+				.m_EntryPoint = L"PSDepthOverride",
 			};
 
 			RHIGraphicsPipelineDesc geometryDesc{};
@@ -1730,6 +1753,11 @@ namespace gglab
 			};
 			RHIGraphicsPipelineDesc positionDesc = depthDesc;
 			positionDesc.m_DepthStencil = geometryDesc.m_DepthStencil;
+			RHIGraphicsPipelineDesc backCullDesc = geometryDesc;
+			backCullDesc.m_Rasterizer.m_CullMode = RHICullMode::Back;
+			RHIGraphicsPipelineDesc depthOnlyDesc = depthDesc;
+			depthOnlyDesc.m_RenderTargetFormats = {};
+			depthOnlyDesc.m_RenderTargetCount = 0;
 			const RHIPipelineHandle geometryPipeline = pipelineSystem.CreateGraphicsPipeline({
 				.m_Desc = geometryDesc,
 				.m_VertexShader = geometryShader,
@@ -1745,8 +1773,24 @@ namespace gglab
 				.m_VertexShader = fullscreenShader,
 				.m_PixelShader = pixelShader,
 				});
+			const RHIPipelineHandle backCullPipeline = pipelineSystem.CreateGraphicsPipeline({
+				.m_Desc = backCullDesc,
+				.m_VertexShader = geometryShader,
+				.m_PixelShader = pixelShader,
+				});
+			const RHIPipelineHandle depthWithoutPixelPipeline =
+				pipelineSystem.CreateGraphicsPipeline({
+					.m_Desc = depthOnlyDesc,
+					.m_VertexShader = fullscreenShader,
+					});
+			const RHIPipelineHandle depthOverridePipeline = pipelineSystem.CreateGraphicsPipeline({
+				.m_Desc = depthOnlyDesc,
+				.m_VertexShader = fullscreenShader,
+				.m_PixelShader = depthOverrideShader,
+				});
 			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
-				!positionPipeline.IsValid())
+				!positionPipeline.IsValid() || !backCullPipeline.IsValid() ||
+				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid())
 			{
 				LogQualificationError("qualify graphics: native pipeline creation failed.");
 				return 1;
@@ -1764,6 +1808,14 @@ namespace gglab
 				.m_Extent = { targetWidth, targetHeight, 1 },
 				.m_DebugName = "Qualification.GraphicsDepth",
 			};
+			const RHITextureDesc depthWriteProbeDesc{
+				.m_Format = depthFormat,
+				.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled,
+				.m_Extent = { targetWidth, targetHeight, 1 },
+				.m_DebugName = "Qualification.GraphicsDepthWriteProbe",
+			};
+			RHITextureDesc depthOverrideProbeDesc = depthWriteProbeDesc;
+			depthOverrideProbeDesc.m_DebugName = "Qualification.GraphicsDepthOverrideProbe";
 			const RHITextureDesc markerDesc{
 				.m_Format = colorFormat,
 				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
@@ -1782,6 +1834,14 @@ namespace gglab
 				.m_Desc = markerDesc,
 				.m_InitialState = UndefinedRHITextureState(),
 				}));
+			RHITextureOwner depthWriteProbeTexture(&device, device.CreateTexture({
+				.m_Desc = depthWriteProbeDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}));
+			RHITextureOwner depthOverrideProbeTexture(&device, device.CreateTexture({
+				.m_Desc = depthOverrideProbeDesc,
+				.m_InitialState = UndefinedRHITextureState(),
+				}));
 			const RHITextureViewHandle colorView = device.CreateTextureView(colorTexture.Get(), {
 				.m_Type = RHITextureViewType::RenderTarget,
 				.m_Dimension = RHITextureViewDimension::Texture2D,
@@ -1797,12 +1857,36 @@ namespace gglab
 				.m_Dimension = RHITextureViewDimension::Texture2D,
 				.m_Format = colorFormat,
 				});
+			const RHITextureViewHandle depthWriteProbeDsv =
+				device.CreateTextureView(depthWriteProbeTexture.Get(), {
+					.m_Type = RHITextureViewType::DepthStencil,
+					.m_Dimension = RHITextureViewDimension::Texture2D,
+					.m_Format = depthFormat,
+					});
+			const RHITextureViewHandle depthWriteProbeSrv =
+				device.CreateTextureView(depthWriteProbeTexture.Get(), {
+					.m_Type = RHITextureViewType::ShaderResource,
+					.m_Dimension = RHITextureViewDimension::Texture2D,
+					.m_Format = depthFormat,
+					});
+			const RHITextureViewHandle depthOverrideProbeDsv =
+				device.CreateTextureView(depthOverrideProbeTexture.Get(), {
+					.m_Type = RHITextureViewType::DepthStencil,
+					.m_Dimension = RHITextureViewDimension::Texture2D,
+					.m_Format = depthFormat,
+					});
+			const RHITextureViewHandle depthOverrideProbeSrv =
+				device.CreateTextureView(depthOverrideProbeTexture.Get(), {
+					.m_Type = RHITextureViewType::ShaderResource,
+					.m_Dimension = RHITextureViewDimension::Texture2D,
+					.m_Format = depthFormat,
+					});
 			const RHISamplerHandle markerSampler =
 				device.CreateSampler({ .m_Filter = RHISamplerFilter::MinMagMipPoint });
 			struct ViewCleanup
 			{
 				VulkanDevice& m_Device;
-				std::array<RHITextureViewHandle, 3> m_Views;
+				std::array<RHITextureViewHandle, 7> m_Views;
 				RHISamplerHandle m_Sampler;
 				~ViewCleanup()
 				{
@@ -1818,13 +1902,22 @@ namespace gglab
 						m_Device.DestroySampler(m_Sampler);
 					}
 				}
-			} cleanup{ device, { colorView, depthView, markerView }, markerSampler };
+			} cleanup{ device, { colorView, depthView, markerView, depthWriteProbeDsv,
+				depthWriteProbeSrv, depthOverrideProbeDsv, depthOverrideProbeSrv }, markerSampler };
 			const RHIDescriptorHandle markerDescriptor =
 				resources.GetTextureViewDescriptor(markerView);
+			const RHIDescriptorHandle depthWriteProbeDescriptor =
+				resources.GetTextureViewDescriptor(depthWriteProbeSrv);
+			const RHIDescriptorHandle depthOverrideProbeDescriptor =
+				resources.GetTextureViewDescriptor(depthOverrideProbeSrv);
 			const RHIDescriptorHandle samplerDescriptor =
 				resources.GetSamplerDescriptor(markerSampler);
-			if (!colorTexture || !depthTexture || !markerTexture || !colorView.IsValid() ||
-				!depthView.IsValid() || !markerView.IsValid() || !markerDescriptor.IsValid() ||
+			if (!colorTexture || !depthTexture || !markerTexture || !depthWriteProbeTexture ||
+				!depthOverrideProbeTexture || !colorView.IsValid() || !depthView.IsValid() ||
+				!markerView.IsValid() || !depthWriteProbeDsv.IsValid() ||
+				!depthWriteProbeSrv.IsValid() || !depthOverrideProbeDsv.IsValid() ||
+				!depthOverrideProbeSrv.IsValid() || !markerDescriptor.IsValid() ||
+				!depthWriteProbeDescriptor.IsValid() || !depthOverrideProbeDescriptor.IsValid() ||
 				!markerSampler.IsValid() || !samplerDescriptor.IsValid())
 			{
 				LogQualificationError("qualify graphics: offscreen resource creation failed.");
@@ -1847,6 +1940,8 @@ namespace gglab
 				if (!recorded || !submission.m_Completion.IsValid() ||
 					!device.IsFencePointCompleted(submission.m_Completion) ||
 					!resources.PublishTextureViewDescriptor(markerView) ||
+					!resources.PublishTextureViewDescriptor(depthWriteProbeSrv) ||
+					!resources.PublishTextureViewDescriptor(depthOverrideProbeSrv) ||
 					!resources.PublishSamplerDescriptor(markerSampler))
 				{
 					LogQualificationError(
@@ -1964,7 +2059,12 @@ namespace gglab
 
 			VulkanTexture* nativeColor = resources.ResolveTexture(colorTexture.Get());
 			VulkanTexture* nativeDepth = resources.ResolveTexture(depthTexture.Get());
-			if (nativeColor == nullptr || nativeDepth == nullptr)
+			VulkanTexture* nativeDepthWriteProbe =
+				resources.ResolveTexture(depthWriteProbeTexture.Get());
+			VulkanTexture* nativeDepthOverrideProbe =
+				resources.ResolveTexture(depthOverrideProbeTexture.Get());
+			if (nativeColor == nullptr || nativeDepth == nullptr ||
+				nativeDepthWriteProbe == nullptr || nativeDepthOverrideProbe == nullptr)
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
 				GGLAB_UNUSED(runtime.AbortFrame());
@@ -1978,6 +2078,20 @@ namespace gglab
 					VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
 					VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT),
 				MakeVulkanImageBarrier(nativeDepth->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+						VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+						VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+				MakeVulkanImageBarrier(nativeDepthWriteProbe->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
+					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
+					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+						VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+						VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+				MakeVulkanImageBarrier(nativeDepthOverrideProbe->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
 					VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 					VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE,
 					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
@@ -2000,6 +2114,80 @@ namespace gglab
 				LogQualificationError("qualify graphics: graphics encoder did not begin.");
 				return 1;
 			}
+			const auto makeParameters = [&](CoordinateConformanceMode mode, float depth = 0.0f,
+				uint32_t textureIndex = UINT32_MAX, float depthOverride = 0.0f)
+				{
+					return CoordinateConformanceParameters{
+						.m_TextureIndex = textureIndex == UINT32_MAX
+							? markerDescriptor.m_Index
+							: textureIndex,
+						.m_SamplerIndex = samplerDescriptor.m_Index,
+						.m_Mode = mode,
+						.m_Depth = depth,
+						.m_TargetExtent = {
+							static_cast<float>(targetWidth), static_cast<float>(targetHeight),
+						},
+						.m_DepthOverride = depthOverride,
+					};
+				};
+
+			const RHIRenderingAttachment depthWriteProbeAttachment{
+				.m_View = depthWriteProbeDsv,
+				.m_LoadOp = RHIContentLoadOp::DontCare,
+			};
+			commandContext.BeginRendering({ .m_DepthAttachment = depthWriteProbeAttachment });
+			commandContext.ClearDepthAttachment(0.0f);
+			commandContext.SetPipeline(depthWithoutPixelPipeline);
+			commandContext.SetViewport({ 0.0f, 0.0f,
+				static_cast<float>(targetWidth), static_cast<float>(targetHeight) });
+			commandContext.SetScissorRect({ 0, 0,
+				static_cast<int32_t>(targetWidth), static_cast<int32_t>(targetHeight) });
+			commandContext.SetPushConstants(0, makeParameters(
+				CoordinateConformanceMode::Winding, DepthOnlyExpectedDepth));
+			commandContext.DrawFullscreenTriangle();
+			commandContext.EndRendering();
+
+			const RHIRenderingAttachment depthOverrideProbeAttachment{
+				.m_View = depthOverrideProbeDsv,
+				.m_LoadOp = RHIContentLoadOp::DontCare,
+			};
+			commandContext.BeginRendering({ .m_DepthAttachment = depthOverrideProbeAttachment });
+			commandContext.ClearDepthAttachment(0.0f);
+			commandContext.SetPipeline(depthOverridePipeline);
+			commandContext.SetViewport({ 0.0f, 0.0f,
+				static_cast<float>(targetWidth), static_cast<float>(targetHeight) });
+			commandContext.SetScissorRect({ 0, 0,
+				static_cast<int32_t>(targetWidth), static_cast<int32_t>(targetHeight) });
+			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding,
+				DepthOnlyVertexDepth, UINT32_MAX, DepthOnlyExpectedDepth));
+			commandContext.DrawFullscreenTriangle();
+			commandContext.EndRendering();
+
+			const std::array depthProbeBarriers{
+				MakeVulkanImageBarrier(nativeDepthWriteProbe->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+						VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+					VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+					VK_ACCESS_2_SHADER_SAMPLED_READ_BIT),
+				MakeVulkanImageBarrier(nativeDepthOverrideProbe->Get(), VK_IMAGE_ASPECT_DEPTH_BIT,
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+						VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+					VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+					VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+					VK_ACCESS_2_SHADER_SAMPLED_READ_BIT),
+			};
+			VkDependencyInfo depthProbeDependency{};
+			depthProbeDependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			depthProbeDependency.imageMemoryBarrierCount =
+				static_cast<uint32_t>(depthProbeBarriers.size());
+			depthProbeDependency.pImageMemoryBarriers = depthProbeBarriers.data();
+			vkCmdPipelineBarrier2(recording.m_CommandBuffer, &depthProbeDependency);
+
 			const std::array attachments{
 				RHIRenderingAttachment{.m_View = colorView, .m_LoadOp = RHIContentLoadOp::DontCare },
 			};
@@ -2013,18 +2201,6 @@ namespace gglab
 				});
 			commandContext.ClearColorAttachment(0, { 0.01f, 0.015f, 0.025f, 1.0f });
 			commandContext.ClearDepthAttachment(0.0f);
-			const auto makeParameters = [&](uint32_t mode, float depth = 0.0f)
-				{
-					return CoordinateConformanceParameters{
-						.m_TextureIndex = markerDescriptor.m_Index,
-						.m_SamplerIndex = samplerDescriptor.m_Index,
-						.m_Mode = mode,
-						.m_Depth = depth,
-						.m_TargetExtent = {
-							static_cast<float>(targetWidth), static_cast<float>(targetHeight),
-						},
-					};
-				};
 			const RHIVertexBufferBinding vertexBinding{
 				.m_Buffer = vertexBuffer.Get(),
 				.m_Stride = sizeof(CoordinateVertex),
@@ -2035,8 +2211,17 @@ namespace gglab
 			commandContext.SetPipeline(geometryPipeline);
 			commandContext.SetViewport({ 0.0f, 0.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 0, 0, 32, 32 });
-			commandContext.SetPushConstants(0, makeParameters(0));
+			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding));
 			commandContext.Draw(6);
+
+			commandContext.SetPipeline(backCullPipeline);
+			commandContext.SetViewport({ 32.0f, 32.0f, 8.0f, 16.0f });
+			commandContext.SetScissorRect({ 32, 32, 40, 48 });
+			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Winding));
+			commandContext.Draw(3, 1, 3);
+			commandContext.SetViewport({ 32.0f, 48.0f, 8.0f, 16.0f });
+			commandContext.SetScissorRect({ 32, 48, 40, 64 });
+			commandContext.Draw(3);
 
 			const RHIIndexBufferBinding indexBinding{
 				.m_Buffer = indexBuffer.Get(),
@@ -2046,21 +2231,37 @@ namespace gglab
 			commandContext.SetIndexBuffer(indexBinding);
 			commandContext.SetViewport({ 32.0f, 0.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 32, 0, 64, 32 });
-			commandContext.SetPushConstants(0, makeParameters(1));
+			commandContext.SetPushConstants(
+				0, makeParameters(CoordinateConformanceMode::MarkerSampling));
 			commandContext.DrawIndexed(6, 1, 0, 6, 0);
 
 			commandContext.SetPipeline(depthPipeline);
 			commandContext.SetViewport({ 0.0f, 32.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 0, 32, 32, 64 });
-			commandContext.SetPushConstants(0, makeParameters(2, 0.25f));
+			commandContext.SetPushConstants(0, makeParameters(
+				CoordinateConformanceMode::DepthVisualization, ReversedZFarProbeDepth));
 			commandContext.DrawFullscreenTriangle();
-			commandContext.SetPushConstants(0, makeParameters(2, 0.75f));
+			commandContext.SetPushConstants(0, makeParameters(
+				CoordinateConformanceMode::DepthVisualization, ReversedZNearProbeDepth));
 			commandContext.DrawFullscreenTriangle();
 
 			commandContext.SetPipeline(positionPipeline);
+			commandContext.SetViewport({ 0.0f, 56.0f, 8.0f, 8.0f });
+			commandContext.SetScissorRect({ 0, 56, 8, 64 });
+			commandContext.SetPushConstants(
+				0, makeParameters(CoordinateConformanceMode::DepthProbe, 0.0f,
+					depthWriteProbeDescriptor.m_Index, DepthOnlyExpectedDepth));
+			commandContext.DrawFullscreenTriangle();
+			commandContext.SetViewport({ 8.0f, 56.0f, 8.0f, 8.0f });
+			commandContext.SetScissorRect({ 8, 56, 16, 64 });
+			commandContext.SetPushConstants(
+				0, makeParameters(CoordinateConformanceMode::DepthProbe, 0.0f,
+					depthOverrideProbeDescriptor.m_Index, DepthOnlyExpectedDepth));
+			commandContext.DrawFullscreenTriangle();
+
 			commandContext.SetViewport({ 32.0f, 32.0f, 32.0f, 32.0f });
 			commandContext.SetScissorRect({ 40, 40, 56, 56 });
-			commandContext.SetPushConstants(0, makeParameters(3));
+			commandContext.SetPushConstants(0, makeParameters(CoordinateConformanceMode::Position));
 			commandContext.DrawFullscreenTriangle();
 			commandContext.EndRendering();
 			const bool encodingSucceeded = commandContext.FinishEncoding();
@@ -2110,10 +2311,15 @@ namespace gglab
 			{
 				resources.RecordBufferUse(buffer, frame.m_SubmittedFencePoint);
 			}
-			if (!uniformFrameEnded || runtime.WaitIdle() != VK_SUCCESS)
+			pipelineSystem.Clear();
+			const bool pipelineCacheCleared = pipelineSystem.IsAlive(layoutHandle) &&
+				!pipelineSystem.IsAlive(geometryPipeline) &&
+				!pipelineSystem.IsAlive(depthWithoutPixelPipeline) &&
+				!pipelineSystem.IsAlive(depthOverridePipeline);
+			if (!uniformFrameEnded || !pipelineCacheCleared || runtime.WaitIdle() != VK_SUCCESS)
 			{
 				LogQualificationError(
-					"qualify graphics: graphics completion or uniform retirement failed.");
+					"qualify graphics: completion, pipeline invalidation or uniform retirement failed.");
 				return 1;
 			}
 
@@ -2169,19 +2375,25 @@ namespace gglab
 				};
 			const std::array probePixels{
 				readPixel(7, 19), readPixel(23, 19),
+				readPixel(38, 42), readPixel(34, 58),
 				readPixel(40, 8), readPixel(56, 8), readPixel(40, 24), readPixel(56, 24),
-				readPixel(16, 48), readPixel(48, 48), readPixel(33, 33),
+				readPixel(16, 48), readPixel(4, 60), readPixel(12, 60),
+				readPixel(48, 48), readPixel(33, 33),
 			};
 			const bool pixelsPassed =
 				nearPixel(probePixels[0], { 26, 230, 51, 255 }, 20) &&
 				nearPixel(probePixels[1], { 230, 26, 204, 255 }, 20) &&
-				nearPixel(probePixels[2], { 255, 0, 0, 255 }, 20) &&
-				nearPixel(probePixels[3], { 0, 255, 0, 255 }, 20) &&
-				nearPixel(probePixels[4], { 0, 0, 255, 255 }, 20) &&
-				nearPixel(probePixels[5], { 255, 255, 0, 255 }, 20) &&
-				nearPixel(probePixels[6], { 26, 230, 51, 255 }, 20) &&
-				nearPixel(probePixels[7], { 193, 193, 62, 255 }, 20) &&
-				nearPixel(probePixels[8], { 3, 4, 6, 255 }, 10);
+				nearPixel(probePixels[2], { 3, 4, 6, 255 }, 10) &&
+				nearPixel(probePixels[3], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[4], { 255, 0, 0, 255 }, 20) &&
+				nearPixel(probePixels[5], { 0, 255, 0, 255 }, 20) &&
+				nearPixel(probePixels[6], { 0, 0, 255, 255 }, 20) &&
+				nearPixel(probePixels[7], { 255, 255, 0, 255 }, 20) &&
+				nearPixel(probePixels[8], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[9], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[10], { 26, 230, 51, 255 }, 20) &&
+				nearPixel(probePixels[11], { 193, 193, 62, 255 }, 20) &&
+				nearPixel(probePixels[12], { 3, 4, 6, 255 }, 10);
 			if (!pixelsPassed)
 			{
 				std::string observed;
@@ -2200,7 +2412,7 @@ namespace gglab
 			transferManager.Reclaim();
 			device.RetireCompletedWork();
 			LogQualificationInfo(
-				"qualify graphics: opposite winding, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
+				"qualify graphics: winding, back-face culling, depth-only shader stages, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
 			return 0;
 		}
 

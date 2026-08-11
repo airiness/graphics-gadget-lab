@@ -7,6 +7,7 @@
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
+#include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
@@ -1921,6 +1922,10 @@ namespace gglab
 		context.Check(ToVulkanFrontFace(false) == VK_FRONT_FACE_CLOCKWISE &&
 			ToVulkanFrontFace(true) == VK_FRONT_FACE_COUNTER_CLOCKWISE,
 			"Front-face lowering applies the coordinate policy exactly once");
+		context.Check(IsVulkanIndexBufferOffsetAligned(RHIFormat::R32Uint, 4) &&
+			!IsVulkanIndexBufferOffsetAligned(RHIFormat::R32Uint, 2) &&
+			!IsVulkanIndexBufferOffsetAligned(RHIFormat::Unknown, 0),
+			"Index buffer offsets honor the Vulkan index-element alignment rule");
 
 		RHIGraphicsPipelineDesc duplicateLocation = desc;
 		duplicateLocation.m_VertexInput.m_Attributes[1].m_Location = 0;

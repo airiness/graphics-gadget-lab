@@ -393,11 +393,12 @@ namespace gglab
 			return {};
 		}
 		VulkanBindingLayout* bindingLayout = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
-		const bool needsPixelShader = createInfo.m_Desc.m_RenderTargetCount != 0;
+		const bool requiresPixelShader = createInfo.m_Desc.m_RenderTargetCount != 0;
+		const bool hasPixelShader = createInfo.m_PixelShader.IsValid();
 		if (bindingLayout == nullptr || !createInfo.m_VertexShader.IsValid() ||
 			createInfo.m_VertexShader.m_EntryPoint.empty() ||
-			(needsPixelShader && (!createInfo.m_PixelShader.IsValid() ||
-				createInfo.m_PixelShader.m_EntryPoint.empty())) ||
+			(requiresPixelShader && !hasPixelShader) ||
+			(hasPixelShader && createInfo.m_PixelShader.m_EntryPoint.empty()) ||
 			!IsVulkanShaderBytecode(createInfo.m_VertexShader) ||
 			!IsVulkanShaderBytecode(createInfo.m_PixelShader) ||
 			!IsVulkanShaderBytecode(createInfo.m_DomainShader) ||
@@ -430,10 +431,10 @@ namespace gglab
 
 		VkShaderModule vertexModule =
 			CreateShaderModule(createInfo.m_VertexShader, "Vulkan.GraphicsPipeline.VS");
-		VkShaderModule pixelModule = needsPixelShader
+		VkShaderModule pixelModule = hasPixelShader
 			? CreateShaderModule(createInfo.m_PixelShader, "Vulkan.GraphicsPipeline.PS")
 			: VK_NULL_HANDLE;
-		if (vertexModule == VK_NULL_HANDLE || (needsPixelShader && pixelModule == VK_NULL_HANDLE))
+		if (vertexModule == VK_NULL_HANDLE || (hasPixelShader && pixelModule == VK_NULL_HANDLE))
 		{
 			DestroyShaderModule(pixelModule);
 			DestroyShaderModule(vertexModule);
@@ -446,7 +447,7 @@ namespace gglab
 			VulkanShaderStageModule{ VK_SHADER_STAGE_VERTEX_BIT, vertexModule, vertexEntry.c_str() },
 			VulkanShaderStageModule{ VK_SHADER_STAGE_FRAGMENT_BIT, pixelModule, pixelEntry.c_str() },
 		};
-		const uint32_t stageCount = needsPixelShader ? 2u : 1u;
+		const uint32_t stageCount = hasPixelShader ? 2u : 1u;
 		auto pipeline = std::make_unique<VulkanPipelineState>();
 		const bool created = pipeline->Create(m_Device, bindingLayout, createInfo.m_Desc,
 			std::span<const VulkanShaderStageModule>(stages.data(), stageCount));
@@ -493,6 +494,20 @@ namespace gglab
 
 	void VulkanPipelineSystem::Clear() noexcept
 	{
+		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::Clear"))
+		{
+			return;
+		}
+		if (!m_Pipelines.empty())
+		{
+			const VkResult result = vkQueueWaitIdle(m_Device->GetGraphicsQueue());
+			if (result != VK_SUCCESS)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"VulkanPipelineSystem::Clear failed to quiesce the graphics queue with {}.",
+					ToString(result));
+			}
+		}
 		m_Pipelines.clear();
 		++m_PipelineGeneration;
 		if (m_PipelineGeneration == RHIPipelineHandle::InvalidGeneration)

@@ -71,14 +71,26 @@ namespace gglab
 		{
 		};
 
+		enum class CoordinateConformanceMode : uint32_t
+		{
+			Winding = 0,
+			MarkerSampling = 1,
+			DepthVisualization = 2,
+			Position = 3,
+			DepthProbe = 4,
+		};
+		constexpr float ReversedZFarProbeDepth = 0.25f;
+		constexpr float ReversedZNearProbeDepth = 0.75f;
+
 		struct CoordinateConformanceParameters
 		{
 			uint32_t m_TextureIndex = 0;
 			uint32_t m_SamplerIndex = 0;
-			uint32_t m_Mode = 0;
+			CoordinateConformanceMode m_Mode = CoordinateConformanceMode::Winding;
 			float m_Depth = 0.0f;
 			float m_TargetExtent[2] = { 1.0f, 1.0f };
-			float m_Padding[2]{};
+			float m_DepthOverride = 0.0f;
+			float m_Padding = 0.0f;
 		};
 		static_assert(IsPassRootConstantStruct<CoordinateConformanceParameters>);
 		static_assert(sizeof(CoordinateConformanceParameters) == 32);
@@ -244,7 +256,8 @@ namespace gglab
 							"Coordinate conformance descriptors must be shader visible.");
 						const uint32_t halfWidth = data.m_Width / 2;
 						const uint32_t halfHeight = data.m_Height / 2;
-						const auto makeParameters = [&](uint32_t mode, float depth = 0.0f)
+						const auto makeParameters = [&](CoordinateConformanceMode mode,
+							float depth = 0.0f, float depthOverride = 0.0f)
 						{
 							return CoordinateConformanceParameters{
 								.m_TextureIndex = marker.m_Index,
@@ -255,6 +268,7 @@ namespace gglab
 									static_cast<float>(data.m_Width),
 									static_cast<float>(data.m_Height),
 								},
+								.m_DepthOverride = depthOverride,
 							};
 						};
 
@@ -272,8 +286,26 @@ namespace gglab
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(halfHeight) });
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(0));
+							makeParameters(CoordinateConformanceMode::Winding));
 						commandContext->Draw(6);
+
+						const uint32_t lowerHeight = data.m_Height - halfHeight;
+						const uint32_t cullSplit = halfHeight + lowerHeight / 2;
+						commandContext->SetPipeline(GetOrCreateBackCullPipeline());
+						commandContext->SetViewport({ static_cast<float>(halfWidth),
+							static_cast<float>(halfHeight), 8.0f,
+							static_cast<float>(cullSplit - halfHeight) });
+						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth),
+							static_cast<int32_t>(halfHeight), static_cast<int32_t>(halfWidth + 8),
+							static_cast<int32_t>(cullSplit) });
+						commandContext->Draw(3, 1, 3);
+						commandContext->SetViewport({ static_cast<float>(halfWidth),
+							static_cast<float>(cullSplit), 8.0f,
+							static_cast<float>(data.m_Height - cullSplit) });
+						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth),
+							static_cast<int32_t>(cullSplit), static_cast<int32_t>(halfWidth + 8),
+							static_cast<int32_t>(data.m_Height) });
+						commandContext->Draw(3);
 
 						const RHIIndexBufferBinding indexBinding{
 							.m_Buffer = m_IndexBuffer.Get(),
@@ -288,7 +320,7 @@ namespace gglab
 							static_cast<int32_t>(data.m_Width), static_cast<int32_t>(halfHeight) });
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(1));
+							makeParameters(CoordinateConformanceMode::MarkerSampling));
 						commandContext->DrawIndexed(6, 1, 0, 6, 0);
 
 						commandContext->SetPipeline(GetOrCreateDepthPipeline());
@@ -298,11 +330,13 @@ namespace gglab
 							static_cast<int32_t>(halfWidth), static_cast<int32_t>(data.m_Height) });
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(2, 0.25f));
+							makeParameters(CoordinateConformanceMode::DepthVisualization,
+								ReversedZFarProbeDepth));
 						commandContext->DrawFullscreenTriangle();
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(2, 0.75f));
+							makeParameters(CoordinateConformanceMode::DepthVisualization,
+								ReversedZNearProbeDepth));
 						commandContext->DrawFullscreenTriangle();
 
 						commandContext->SetPipeline(GetOrCreatePositionPipeline());
@@ -315,7 +349,7 @@ namespace gglab
 							static_cast<int32_t>(data.m_Height - 8) });
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
-							makeParameters(3));
+							makeParameters(CoordinateConformanceMode::Position));
 						commandContext->DrawFullscreenTriangle();
 						commandContext->EndRendering();
 						m_State->m_ConformanceExecutions.fetch_add(1, std::memory_order_relaxed);
@@ -384,6 +418,8 @@ namespace gglab
 				initializeRecipe(m_GeometryRecipe, geometryVS, conformancePS, InputLayoutID::P3T2,
 					backBufferFormat, DepthFormat, DepthPreset::DepthDisabled);
 				m_GeometryRecipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
+				m_BackCullRecipe = m_GeometryRecipe;
+				m_BackCullRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 				initializeRecipe(m_DepthRecipe, fullscreenVS, conformancePS, InputLayoutID::None,
 					backBufferFormat, DepthFormat, DepthPreset::ReversedZWrite);
 				initializeRecipe(m_PositionRecipe, fullscreenVS, conformancePS, InputLayoutID::None,
@@ -453,6 +489,12 @@ namespace gglab
 					m_DepthSlot, m_DepthRecipe, ConformancePassInfo);
 			}
 
+			RHIPipelineHandle GetOrCreateBackCullPipeline() noexcept
+			{
+				return m_Renderer->GetPipelineCache()->Resolve(
+					m_BackCullSlot, m_BackCullRecipe, ConformancePassInfo);
+			}
+
 			RHIPipelineHandle GetOrCreatePositionPipeline() noexcept
 			{
 				return m_Renderer->GetPipelineCache()->Resolve(
@@ -469,10 +511,12 @@ namespace gglab
 			RHIDescriptorHandle m_SamplerDescriptor{};
 			GraphicsPhysicalPipelineKey m_MarkerRecipe{};
 			GraphicsPhysicalPipelineKey m_GeometryRecipe{};
+			GraphicsPhysicalPipelineKey m_BackCullRecipe{};
 			GraphicsPhysicalPipelineKey m_DepthRecipe{};
 			GraphicsPhysicalPipelineKey m_PositionRecipe{};
 			GraphicsPipelineSlot m_MarkerSlot{};
 			GraphicsPipelineSlot m_GeometrySlot{};
+			GraphicsPipelineSlot m_BackCullSlot{};
 			GraphicsPipelineSlot m_DepthSlot{};
 			GraphicsPipelineSlot m_PositionSlot{};
 			bool m_Initialized = false;
@@ -511,7 +555,7 @@ namespace gglab
 			.m_Status = rendered ? LabDiagnosticCheckStatus::Passed
 				: LabDiagnosticCheckStatus::Pending,
 			.m_Detail = rendered
-				? "Triangle, indexed sampling, reversed-Z and position probes executed."
+				? "Winding, back-face culling, indexed sampling, reversed-Z and position probes executed."
 				: "Waiting for the first complete marker and conformance frame.",
 		});
 	}
@@ -528,7 +572,7 @@ namespace gglab
 			.m_DisplayName = "Coordinate Conformance",
 			.m_Category = "Rendering",
 			.m_Description =
-				"Validates winding, upper-left UVs, indexed drawing, scissor, SV_Position, fullscreen triangles, and reversed-Z depth.",
+				"Validates winding, back-face culling, upper-left UVs, indexed drawing, scissor, SV_Position, fullscreen triangles, and reversed-Z depth.",
 			.m_Kind = LabKind::Pipeline,
 			.m_SchemaVersion = 1,
 		};

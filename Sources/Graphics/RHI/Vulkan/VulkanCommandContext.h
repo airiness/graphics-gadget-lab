@@ -11,6 +11,9 @@
 
 namespace gglab
 {
+	[[nodiscard]] bool IsVulkanIndexBufferOffsetAligned(
+		RHIFormat format, uint64_t offset) noexcept;
+
 	class VulkanBindingLayout;
 	class VulkanDevice;
 	class VulkanPipelineState;

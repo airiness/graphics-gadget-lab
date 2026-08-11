@@ -28,6 +28,11 @@ namespace gglab
 		}
 	}
 
+	bool IsVulkanIndexBufferOffsetAligned(RHIFormat format, uint64_t offset) noexcept
+	{
+		return format == RHIFormat::R32Uint && offset % sizeof(uint32_t) == 0;
+	}
+
 	VulkanGraphicsCommandContext::VulkanGraphicsCommandContext(VulkanDevice* device,
 		VulkanPipelineSystem* pipelineSystem, VulkanDynamicUniformBuffer* uniformBuffer,
 		VulkanSet0DynamicUniformFrames* set0Frames) noexcept :
@@ -508,6 +513,7 @@ namespace gglab
 		const RHIBufferDesc* desc = m_Device->GetResourceManager().ResolveBufferDesc(binding.m_Buffer);
 		if (m_CommandBuffer == VK_NULL_HANDLE || buffer == nullptr || desc == nullptr ||
 			!Test(desc->m_Usage, RHIBufferUsage::Index) || binding.m_Format != RHIFormat::R32Uint ||
+			!IsVulkanIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset) ||
 			binding.m_Offset > desc->m_SizeInBytes || binding.m_SizeInBytes == 0 ||
 			binding.m_SizeInBytes > desc->m_SizeInBytes - binding.m_Offset)
 		{

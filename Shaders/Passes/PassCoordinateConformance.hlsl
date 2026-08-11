@@ -1,6 +1,13 @@
 #include <Common/BindlessResources.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 
+static const uint CoordinateModeWinding = 0;
+static const uint CoordinateModeMarkerSampling = 1;
+static const uint CoordinateModeDepthVisualization = 2;
+static const uint CoordinateModePosition = 3;
+static const uint CoordinateModeDepthProbe = 4;
+static const float CoordinateDepthProbeTolerance = 0.05;
+
 struct CoordinateConformanceParameters
 {
 	uint TextureIndex;
@@ -8,7 +15,8 @@ struct CoordinateConformanceParameters
 	uint Mode;
 	float Depth;
 	float2 TargetExtent;
-	float2 Padding;
+	float DepthOverride;
+	float Padding;
 };
 
 ConstantBuffer<CoordinateConformanceParameters> g_Pass : register(b2);
@@ -53,27 +61,45 @@ float4 PSMarker(CoordinateConformanceVSOutput input) : SV_Target0
 	return texel.x == 0 ? float4(0.0, 0.0, 1.0, 1.0) : float4(1.0, 1.0, 0.0, 1.0);
 }
 
+float PSDepthOverride() : SV_Depth
+{
+	return g_Pass.DepthOverride;
+}
+
 float4 PSConformance(CoordinateConformanceVSOutput input, bool isFrontFace : SV_IsFrontFace) : SV_Target0
 {
-	if (g_Pass.Mode == 0)
+	if (g_Pass.Mode == CoordinateModeWinding)
 	{
 		return isFrontFace
 			? float4(0.1, 0.9, 0.2, 1.0)
 			: float4(0.9, 0.1, 0.8, 1.0);
 	}
-	if (g_Pass.Mode == 1)
+	if (g_Pass.Mode == CoordinateModeMarkerSampling)
 	{
 		Texture2D<float4> marker = GetTexture2DFloat4(g_Pass.TextureIndex);
 		SamplerState markerSampler = GetSamplerState(g_Pass.SamplerIndex);
 		return marker.SampleLevel(markerSampler, input.UV, 0.0);
 	}
-	if (g_Pass.Mode == 2)
+	if (g_Pass.Mode == CoordinateModeDepthVisualization)
 	{
 		return g_Pass.Depth > 0.5
 			? float4(0.1, 0.9, 0.2, 1.0)
 			: float4(0.9, 0.1, 0.15, 1.0);
 	}
-
-	const float2 normalizedPosition = input.PositionCS.xy / max(g_Pass.TargetExtent, float2(1.0, 1.0));
-	return float4(normalizedPosition.x, normalizedPosition.y, 1.0 - normalizedPosition.y, 1.0);
+	if (g_Pass.Mode == CoordinateModeDepthProbe)
+	{
+		Texture2D<float> depthProbe = GetTexture2DFloat(g_Pass.TextureIndex);
+		SamplerState depthSampler = GetSamplerState(g_Pass.SamplerIndex);
+		const float depth = depthProbe.SampleLevel(depthSampler, input.UV, 0.0);
+		return abs(depth - g_Pass.DepthOverride) < CoordinateDepthProbeTolerance
+			? float4(0.1, 0.9, 0.2, 1.0)
+			: float4(0.9, 0.1, 0.15, 1.0);
+	}
+	if (g_Pass.Mode == CoordinateModePosition)
+	{
+		const float2 normalizedPosition =
+			input.PositionCS.xy / max(g_Pass.TargetExtent, float2(1.0, 1.0));
+		return float4(normalizedPosition.x, normalizedPosition.y, 1.0 - normalizedPosition.y, 1.0);
+	}
+	return float4(1.0, 0.0, 1.0, 1.0);
 }
