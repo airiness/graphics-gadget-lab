@@ -1,10 +1,16 @@
 #pragma once
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Core/CoreMacros.h"
+
+#include <cstdint>
+#include <limits>
+
+#include <d3dx12.h>
 
 namespace gglab
 {
 	class DX12Device;
 	class DX12DescriptorAllocatorBase;
+	class DX12FencePoint;
 
 	struct DX12DescriptorRange
 	{

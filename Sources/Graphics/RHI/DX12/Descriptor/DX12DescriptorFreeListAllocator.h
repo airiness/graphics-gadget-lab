@@ -1,6 +1,12 @@
 #pragma once
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorAllocatorBase.h"
 #include "Core/Allocator/FreeListSpanAllocator.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorAllocatorBase.h"
+#include "Graphics/RHI/DX12/DX12FencePoint.h"
+
+#include <cstdint>
+#include <deque>
+#include <mutex>
+#include <vector>
 
 namespace gglab
 {

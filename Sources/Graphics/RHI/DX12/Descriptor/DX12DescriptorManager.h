@@ -1,12 +1,17 @@
 #pragma once
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Core/CoreMacros.h"
+#include "Core/Utility/TypeUtils.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
-#include "Core/Utility/TypeUtils.h"
+
+#include <array>
+#include <cstdint>
+#include <memory>
 
 namespace gglab
 {
 	class DX12Device;
+	class DX12FencePoint;
 	class DX12DescriptorHeap;
 	class DX12DescriptorFreeListAllocator;
 
