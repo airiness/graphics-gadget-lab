@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -6,6 +5,11 @@
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <span>
 
 namespace gglab
 {

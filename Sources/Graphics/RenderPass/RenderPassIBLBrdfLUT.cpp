@@ -1,9 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <cstdint>
+#include <span>
 
 namespace gglab
 {

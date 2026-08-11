@@ -1,6 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
-
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -11,6 +11,9 @@
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <algorithm>
+#include <cstdint>
 
 namespace gglab
 {

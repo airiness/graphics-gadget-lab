@@ -1,10 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLClear.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
+
+#include <span>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

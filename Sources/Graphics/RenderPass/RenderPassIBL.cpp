@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

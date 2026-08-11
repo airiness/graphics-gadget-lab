@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -7,6 +7,10 @@
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
+
+#include <array>
+#include <cstdint>
+#include <span>
 
 namespace gglab
 {
