@@ -1,8 +1,10 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <shared_mutex>
 #include <string>

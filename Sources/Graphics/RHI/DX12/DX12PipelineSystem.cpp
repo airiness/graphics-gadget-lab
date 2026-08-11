@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/DX12/Cache/PSOCreator.h"
@@ -7,6 +8,12 @@
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <utility>
 
 namespace gglab
 {
