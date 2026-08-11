@@ -1,11 +1,15 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
-#include "Graphics/RHI/RHITransferContext.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
+#include "Graphics/RHI/RHITransferContext.h"
 
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <vector>
+
+#include <d3dx12.h>
 
 namespace gglab
 {

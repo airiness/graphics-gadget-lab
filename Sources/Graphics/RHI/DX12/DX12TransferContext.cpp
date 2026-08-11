@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12TransferContext.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
@@ -12,7 +13,15 @@
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
+#include <algorithm>
 #include <cstring>
+#include <format>
+#include <memory>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
