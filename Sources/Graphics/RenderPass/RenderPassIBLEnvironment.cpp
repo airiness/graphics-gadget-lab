@@ -102,7 +102,8 @@ namespace gglab
 				if (hasSource)
 				{
 					data.m_SourceTexture = builder.ImportTexture("IBL.SourceEnvironment",
-						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample);
+						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample,
+						RGContentValidity::Defined);
 					data.m_SourceTexture =
 						builder.Read(data.m_SourceTexture, RGTextureAccess::Sample);
 				}
@@ -153,9 +154,13 @@ namespace gglab
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
 				{
 					const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[face]);
-					commandContext->SetRenderTargets(
-						std::span<const RHITextureViewHandle>(&rtv, 1));
-					commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+					const RHIRenderingAttachment colorAttachment{
+						.m_View = rtv,
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					commandContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 					const IBLEnvironmentPassParameters passParameters{
 						.CubemapFaceIndex = face,
@@ -168,6 +173,7 @@ namespace gglab
 						passParameters);
 
 					commandContext->DrawFullscreenTriangle();
+					commandContext->EndRendering();
 				}
 
 				bakeScheduler->NotifyStageExecuted(IBLBakeStage::Environment, bakeGeneration);

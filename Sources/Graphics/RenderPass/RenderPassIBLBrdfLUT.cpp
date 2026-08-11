@@ -63,9 +63,14 @@ namespace gglab
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
-				commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+				const RHIRenderingAttachment colorAttachment{
+					.m_View = rtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				commandContext->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
-				commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&rtv, 1));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

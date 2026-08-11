@@ -1,6 +1,10 @@
 #pragma once
 #include "Core/Utility/TypeUtils.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
+
 namespace gglab::utils
 {
 	template <UnsignedInteger T> constexpr T AlignUp(T value, T multiple) noexcept
@@ -11,6 +15,13 @@ namespace gglab::utils
 		}
 		const T result = value % multiple;
 		return result ? (value + multiple - result) : value;
+	}
+
+	template <typename T> [[nodiscard]] T* AlignUp(T* value, size_t alignment) noexcept
+		requires std::is_object_v<T>
+	{
+		const uintptr_t address = reinterpret_cast<uintptr_t>(value);
+		return reinterpret_cast<T*>(AlignUp(address, static_cast<uintptr_t>(alignment)));
 	}
 
 	template <UnsignedInteger T> constexpr T AlignDown(T value, T multiple) noexcept

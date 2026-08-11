@@ -305,38 +305,47 @@ namespace gglab
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				std::array<RHITextureViewHandle, 3> renderTargets{ rtv, {}, {} };
+				std::array<RHIRenderingAttachment, 3> renderTargets{
+					RHIRenderingAttachment{ .m_View = rtv }, {}, {}
+				};
 				uint32_t renderTargetCount = 1;
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
-					renderTargets[1] = executeContext.GetViewHandle(data.m_LegacyReferenceRtv);
-					GGLAB_ASSERT_MSG(renderTargets[1].IsValid(),
+					renderTargets[1] = {
+						.m_View = executeContext.GetViewHandle(data.m_LegacyReferenceRtv),
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					GGLAB_ASSERT_MSG(renderTargets[1].m_View.IsValid(),
 						"Forward+ HDR diff requires a legacy reference render target.");
 					renderTargetCount = 2;
 				}
 				if (data.m_GTAOContributionOutputEnabled)
 				{
-					renderTargets[renderTargetCount] =
-						executeContext.GetViewHandle(data.m_GTAOContributionRtv);
-					GGLAB_ASSERT_MSG(renderTargets[renderTargetCount].IsValid(),
+					renderTargets[renderTargetCount] = {
+						.m_View = executeContext.GetViewHandle(data.m_GTAOContributionRtv),
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					GGLAB_ASSERT_MSG(renderTargets[renderTargetCount].m_View.IsValid(),
 						"GTAO contribution preview requires a render-target view.");
 					++renderTargetCount;
 				}
-				graphicsContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(renderTargets.data(), renderTargetCount),
-					dsv);
+				graphicsContext->BeginRendering({
+					.m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(renderTargets.data(), renderTargetCount),
+					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
+				});
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
-					graphicsContext->ClearColor(renderTargets[1], { 0.0f, 0.0f, 0.0f, 1.0f });
+					graphicsContext->ClearColorAttachment(1, { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_GTAOContributionOutputEnabled)
 				{
-					graphicsContext->ClearColor(
-						renderTargets[renderTargetCount - 1], { 0.0f, 0.0f, 0.0f, 1.0f });
+					graphicsContext->ClearColorAttachment(
+						renderTargetCount - 1, { 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_ClearDepth)
 				{
-					graphicsContext->ClearDepthStencil(dsv, data.m_ClearDepthValue);
+					graphicsContext->ClearDepthAttachment(data.m_ClearDepthValue);
 				}
 
 				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);
@@ -422,13 +431,13 @@ namespace gglab
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				// Set material structured buffer
 				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				// View structured buffer
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
@@ -440,7 +449,7 @@ namespace gglab
 				const auto& lightSB = renderer->GetLightStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
-					lightSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+					lightSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				if (data.m_LightingVariant != ForwardPBRLightingVariant::Legacy)
 				{

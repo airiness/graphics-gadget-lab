@@ -9,6 +9,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -16,13 +17,16 @@
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/TransferBatch.h"
 
 #include <type_traits>
 
@@ -129,8 +133,8 @@ namespace gglab
 			{
 				return {};
 			}
-			RHITextureHandle CreateTexture(
-				const RHITextureDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
+			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
+				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
 				return {};
 			}
@@ -220,30 +224,45 @@ namespace gglab
 			void TrackBufferUse(RHIBufferHandle) noexcept override {}
 			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				m_TextureBarrierCount += static_cast<uint32_t>(barriers.size());
 				m_TextureBarriers.insert(m_TextureBarriers.end(), barriers.begin(), barriers.end());
 			}
 			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				m_BufferBarrierCount += static_cast<uint32_t>(barriers.size());
 			}
-			void FlushBarriers() noexcept override { ++m_FlushBarrierCount; }
+			void FlushBarriers() noexcept override
+			{
+				GGLAB_ASSERT(!m_IsRendering);
+				++m_FlushBarrierCount;
+			}
 			void CopyBuffer(
 				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
 				++m_CopyBufferCount;
 			}
 			void BeginGpuProfileScope(std::string_view) noexcept override { ++m_BeginProfileCount; }
 			void EndGpuProfileScope() noexcept override { ++m_EndProfileCount; }
 			void SetPipeline(RHIPipelineHandle) noexcept override {}
 			void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
-			void SetRenderTargets(
-				std::span<const RHITextureViewHandle>, RHITextureViewHandle) noexcept override
+			void BeginRendering(const RHIRenderingInfo&) noexcept override
 			{
+				GGLAB_ASSERT(!m_IsRendering);
+				m_IsRendering = true;
+				++m_BeginRenderingCount;
 			}
-			void ClearColor(RHITextureViewHandle, const std::array<float, 4>&) noexcept override {}
-			void ClearDepthStencil(
-				RHITextureViewHandle, float, std::optional<uint8_t>) noexcept override
+			void EndRendering() noexcept override
+			{
+				GGLAB_ASSERT(m_IsRendering);
+				m_IsRendering = false;
+				++m_EndRenderingCount;
+			}
+			bool IsRendering() const noexcept override { return m_IsRendering; }
+			void ClearColorAttachment(uint32_t, const std::array<float, 4>&) noexcept override {}
+			void ClearDepthAttachment(float, std::optional<uint8_t>) noexcept override
 			{
 			}
 			void SetViewport(const RHIViewport&) noexcept override {}
@@ -268,6 +287,9 @@ namespace gglab
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
 			uint32_t m_CopyBufferCount = 0;
+			uint32_t m_BeginRenderingCount = 0;
+			uint32_t m_EndRenderingCount = 0;
+			bool m_IsRendering = false;
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 		};
 
@@ -308,6 +330,58 @@ namespace gglab
 			uint32_t m_FlushBarrierCount = 0;
 			uint32_t m_TextureBarrierCount = 0;
 			uint32_t m_BufferBarrierCount = 0;
+		};
+
+		class RecordingTransferContext final : public RHITransferContext
+		{
+		public:
+			RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+			RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Copy; }
+			void TrackTextureUse(RHITextureHandle) noexcept override {}
+			void TrackBufferUse(RHIBufferHandle) noexcept override {}
+			void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override
+			{
+				m_TextureBarriers.insert(m_TextureBarriers.end(), barriers.begin(), barriers.end());
+			}
+			void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override
+			{
+				m_BufferBarriers.insert(m_BufferBarriers.end(), barriers.begin(), barriers.end());
+			}
+			void FlushBarriers() noexcept override {}
+			void CopyBuffer(
+				RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override
+			{
+			}
+			void Begin() noexcept override {}
+			RHIFencePoint Submit(bool) noexcept override
+			{
+				++m_SubmitCallCount;
+				return m_FailSubmit ? RHIFencePoint{} : RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 7 };
+			}
+			void Abort() noexcept override { ++m_AbortCallCount; }
+			void ReclaimCompleted() noexcept override {}
+			bool UploadBuffer(
+				const void*, uint64_t, RHIBufferHandle, uint64_t) noexcept override
+			{
+				return !m_FailUploads;
+			}
+			bool UploadTexture(
+				const RHITextureUploadData&, RHITextureHandle) noexcept override
+			{
+				return !m_FailUploads;
+			}
+			RHITextureReadbackRequest ReadbackTexture(
+				RHITextureHandle, const RHITextureDesc&) noexcept override
+			{
+				return {};
+			}
+
+			std::vector<RHITextureBarrier> m_TextureBarriers;
+			std::vector<RHIBufferBarrier> m_BufferBarriers;
+			bool m_FailUploads = false;
+			bool m_FailSubmit = false;
+			uint32_t m_SubmitCallCount = 0;
+			uint32_t m_AbortCallCount = 0;
 		};
 
 		[[nodiscard]] bool NearlyEqual(
@@ -501,9 +575,11 @@ namespace gglab
 						.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest,
 					};
 					data.m_Vertex = builder.ImportBuffer("NapaVoxel.Vertex",
-						RHIBufferHandle{ 41, 1 }, vertexDesc, RGBufferAccess::None);
+						RHIBufferHandle{ 41, 1 }, vertexDesc, RGBufferAccess::None,
+						RGContentValidity::Defined);
 					data.m_Index = builder.ImportBuffer("NapaVoxel.Index",
-						RHIBufferHandle{ 42, 1 }, indexDesc, RGBufferAccess::None);
+						RHIBufferHandle{ 42, 1 }, indexDesc, RGBufferAccess::None,
+						RGContentValidity::Defined);
 					data.m_Vertex = builder.Read(
 						data.m_Vertex, RGBufferAccess::Vertex, RHIStage::VertexShader);
 					data.m_Index = builder.Read(
@@ -546,14 +622,14 @@ namespace gglab
 			{
 				const RGCompiledPass& voxelPass = plan->GetPasses()[1];
 				const auto hasAccess = [&voxelPass](RGResourceType type, uint64_t access) noexcept
-				{
-					return std::ranges::any_of(voxelPass.m_Accesses,
-						[type, access](const RGCompiledAccess& compiledAccess) noexcept
-						{
-							return compiledAccess.m_ResourceType == type &&
-								compiledAccess.m_AccessValue == access;
-						});
-				};
+					{
+						return std::ranges::any_of(voxelPass.m_Accesses,
+							[type, access](const RGCompiledAccess& compiledAccess) noexcept
+							{
+								return compiledAccess.m_ResourceType == type &&
+									compiledAccess.m_AccessValue == access;
+							});
+					};
 				resourceContractMatches =
 					hasAccess(RGResourceType::RGTexture,
 						static_cast<uint64_t>(RGTextureAccess::RenderTarget)) &&
@@ -576,10 +652,10 @@ namespace gglab
 				const RHIResourceState index = ToRHIResourceState(RGBufferAccess::Index);
 				const auto matchesTransition = [](const RGBarrierIntent& barrier,
 					const RHIResourceState& before, const RHIResourceState& after) noexcept
-				{
-					return barrier.m_Kind == RGBarrierKind::Transition &&
-						barrier.m_Before == before && barrier.m_After == after;
-				};
+					{
+						return barrier.m_Kind == RGBarrierKind::Transition &&
+							barrier.m_Before == before && barrier.m_After == after;
+					};
 				barrierContractMatches = voxelPass.m_PreBarriers.size() == 2 &&
 					voxelPass.m_PostBarriers.size() == 2 &&
 					std::ranges::any_of(voxelPass.m_PreBarriers,
@@ -597,6 +673,106 @@ namespace gglab
 			}
 			context.Check(barrierContractMatches,
 				"Napa voxel mesh buffers transition from Common for draw and return to Common");
+		}
+
+		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
+		{
+			constexpr uint32_t FrameSlotCount = 2;
+			constexpr uint32_t SwapChainImageCount = 3;
+			RenderFrameBuilder::BuildResult syntheticFrame{};
+			syntheticFrame.m_FrameSlotIndex = 1;
+			syntheticFrame.m_BackBufferIndex = 2;
+			syntheticFrame.m_FrameSerial = 17;
+			const RenderFrameContext renderContext = syntheticFrame.MakeRenderFrameContext();
+			std::array<uint32_t, FrameSlotCount> frameSlotStorage{};
+			std::array<uint32_t, SwapChainImageCount> swapChainImageStorage{};
+			frameSlotStorage[renderContext.m_FrameSlotIndex] = 11;
+			swapChainImageStorage[renderContext.m_BackBufferIndex] = 29;
+			context.Check(renderContext.m_FrameSlotIndex < FrameSlotCount &&
+				renderContext.m_BackBufferIndex < SwapChainImageCount &&
+				renderContext.m_FrameSlotIndex != renderContext.m_BackBufferIndex &&
+				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
+				"Frame context preserves independent frame-slot and swapchain-image indices");
+
+			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
+			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
+			context.Check(bgraUnorm.m_Family == RHIFormatFamily::B8G8R8A8 &&
+				bgraSrgb.m_Family == RHIFormatFamily::B8G8R8A8 &&
+				AreRHIFormatsInSameFamily(bgraUnorm.m_Format, bgraSrgb.m_Format) &&
+				!AreRHIFormatsInSameFamily(
+					RHIFormat::B8G8R8A8Unorm, RHIFormat::R8G8B8A8Unorm) &&
+				bgraUnorm.m_BytesPerBlock == 4,
+				"Pure RHI format metadata keeps BGRA8 in its own color-view family");
+
+			bool locationsAreExplicit = true;
+			for (uint32_t layoutIndex = 0;
+				layoutIndex < static_cast<uint32_t>(InputLayoutID::Count); ++layoutIndex)
+			{
+				const auto vertexLayout =
+					BuildRHIVertexInputLayoutDesc(static_cast<InputLayoutID>(layoutIndex));
+				locationsAreExplicit &= vertexLayout.m_AttributeCount > 0;
+				for (uint32_t attributeIndex = 0;
+					attributeIndex < vertexLayout.m_AttributeCount; ++attributeIndex)
+				{
+					locationsAreExplicit &=
+						vertexLayout.m_Attributes[attributeIndex].m_Location == attributeIndex;
+				}
+			}
+			context.Check(locationsAreExplicit,
+				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
+
+			RHIRenderingSignature renderingSignature{};
+			renderingSignature.m_ColorFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			renderingSignature.m_ColorAttachmentCount = 1;
+			renderingSignature.m_DepthFormat = RHIFormat::D32Float;
+			renderingSignature.m_SampleCount = 4;
+			RHIGraphicsPipelineDesc pipelineDesc{};
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			pipelineDesc.m_RenderTargetCount = 1;
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
+			pipelineDesc.m_SampleCount = 4;
+			const bool matchingSignature =
+				IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::B8G8R8A8Unorm;
+			const bool rejectsColorMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_RenderTargetFormats[0] = RHIFormat::R8G8B8A8Unorm;
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::Unknown;
+			const bool rejectsDepthMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			pipelineDesc.m_DepthStencilFormat = RHIFormat::D32Float;
+			pipelineDesc.m_SampleCount = 1;
+			const bool rejectsSampleMismatch =
+				!IsGraphicsPipelineCompatible(pipelineDesc, renderingSignature);
+			context.Check(matchingSignature && rejectsColorMismatch && rejectsDepthMismatch &&
+				rejectsSampleMismatch,
+				"Graphics pipeline compatibility covers active color, depth, and sample signature");
+		}
+
+		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept
+		{
+			const bool bgraRoundTrips =
+				ToDXGIFormat(RHIFormat::B8G8R8A8Unorm) == DXGI_FORMAT_B8G8R8A8_UNORM &&
+				ToDXGIFormat(RHIFormat::B8G8R8A8UnormSrgb) ==
+				DXGI_FORMAT_B8G8R8A8_UNORM_SRGB &&
+				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM) == RHIFormat::B8G8R8A8Unorm &&
+				ToRHIFormat(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB) ==
+				RHIFormat::B8G8R8A8UnormSrgb;
+			context.Check(bgraRoundTrips,
+				"DX12 preserves actual BGRA8 swapchain formats through RHI conversion");
+
+			GraphicsPhysicalPipelineKey recipe{};
+			recipe.m_InputLayoutId = InputLayoutID::P3N3T2;
+			const RHIGraphicsPipelineDesc baseDesc = BuildRHIGraphicsPipelineDesc(recipe);
+			RHIGraphicsPipelineDesc changedDesc = baseDesc;
+			++changedDesc.m_VertexInput.m_Attributes[1].m_Location;
+			const DX12GraphicsPipelineShaderInputs shaders{};
+			const auto baseKey =
+				MakeDX12RHIGraphicsPSOKey(baseDesc, RootSignatureID{ 3 }, shaders);
+			const auto changedKey =
+				MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
+			context.Check(baseKey != changedKey,
+				"DX12 normalized graphics keys include explicit RHI vertex locations");
 		}
 
 		void RunProjectionConventionTests(SelfTestContext& context) noexcept
@@ -855,7 +1031,7 @@ namespace gglab
 					RenderGraph::RGBuilder& builder, SampleableDepthPassData& data)
 				{
 					graphDepth = builder.ImportTexture("DisplayView.DepthBuffer", graphDepthHandle,
-						graphDepthDesc, RGTextureAccess::None);
+						graphDepthDesc, CommonRHIResourceState(), RGContentValidity::Undefined);
 					builder.WriteInPlace(graphDepth, RGTextureAccess::DepthStencilWrite);
 					data.m_View =
 						builder.CreateView<RHITextureViewType::DepthStencil>(graphDepth, dsvDesc);
@@ -1032,7 +1208,8 @@ namespace gglab
 					RenderGraph::RGBuilder& builder, DepthAccessChainPassData&)
 				{
 					accessChainDepth = builder.ImportTexture("DepthAccessChain.Depth",
-						graphDepthHandle, graphDepthDesc, RGTextureAccess::None);
+						graphDepthHandle, graphDepthDesc, RGTextureAccess::None,
+						RGContentValidity::Undefined);
 					builder.WriteInPlace(accessChainDepth, RGTextureAccess::DepthStencilWrite);
 				});
 			accessChainGraph.AddPass<DepthAccessChainPassData>("DepthAccessChain.Sample",
@@ -1086,10 +1263,12 @@ namespace gglab
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,
-				.m_Model = ShaderModel::SM_6_7,
+				.m_Target = {
+					.m_Model = ShaderModel::SM_6_7,
+					.m_HlslVersion = L"2021",
+				},
 				.m_Entry = L"CSMain",
 				.m_IncludeDirs = {L"."},
-				.m_HlslVersion = L"2021",
 			};
 			const ShaderDesc normalizedDesc = compiler.NormalizeShaderDesc(desc);
 			const ShaderCompileArtifact artifact = compiler.CompileOrLoadArtifact(normalizedDesc);
@@ -2090,6 +2269,14 @@ namespace gglab
 				RHITextureSupportReason::TypedUnorderedAccessStoreUnsupported) ==
 				"typed unordered-access store unsupported",
 				"Texture capability failures expose a stable diagnostic reason");
+			context.Check(
+				RHITextureSupportReasonForUsage(RHITextureUsage::Sampled) ==
+				RHITextureSupportReason::ShaderResourceUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::CopyDest) ==
+				RHITextureSupportReason::CopyDestUnsupported &&
+				RHITextureSupportReasonForUsage(RHITextureUsage::None) ==
+				RHITextureSupportReason::FormatCombinationUnsupported,
+				"Texture usage failures map to backend-neutral support reasons");
 		}
 
 		[[nodiscard]] bool HasDependencyEdge(const RGSnapshot& snapshot, uint32_t fromPass,
@@ -2626,6 +2813,13 @@ namespace gglab
 				.m_ArraySliceCount = 1,
 				.m_Aspects = RHITextureAspect::Color,
 			};
+			const RHISubresourceRange secondMip = {
+				.m_BaseMip = 1,
+				.m_MipCount = 1,
+				.m_BaseArraySlice = 0,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
 			const RHISubresourceRange thirdMip = {
 				.m_BaseMip = 2,
 				.m_MipCount = 1,
@@ -2637,7 +2831,12 @@ namespace gglab
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
 				{
 					mipTexture = builder.CreateTexture("MipTexture", mipTextureDesc);
+					// Every subresource later consumed in this fixture must be
+					// defined first: mip0 (UAV), mip1 (copy destination) and
+					// mip2 (UAV, later sampled and copied).
 					builder.WriteInPlace(mipTexture, RGTextureAccess::StorageWrite, firstMip);
+					builder.WriteInPlace(mipTexture, RGTextureAccess::CopyDest, secondMip);
+					builder.WriteInPlace(mipTexture, RGTextureAccess::StorageWrite, thirdMip);
 					data.m_Texture = mipTexture;
 				});
 			multiSubresourceGraph.AddPass<TextureStorageAccessPassData>("SampleThirdMip",
@@ -2760,8 +2959,14 @@ namespace gglab
 				[&](RGExecuteContext& executeContext)
 				{
 					++graphicsExecutions;
-					graphicsContextSelected =
-						executeContext.GetGraphicsCommandContext() == &graphicsContext;
+					auto* selectedContext = executeContext.GetGraphicsCommandContext();
+					graphicsContextSelected = selectedContext == &graphicsContext;
+					const RHIRenderingAttachment colorAttachment{
+						.m_View = RHITextureViewHandle{ 31, 1 },
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					selectedContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				});
 			encoderGraph.AddTrivialSideEffectPass("ComputeEncoder", RGPassEncoderType::Compute,
 				[&](RGExecuteContext& executeContext)
@@ -2781,9 +2986,10 @@ namespace gglab
 						.m_Usage = RHIBufferUsage::CopySource | RHIBufferUsage::CopyDest,
 					};
 					data.m_FirstBuffer = builder.ImportBuffer("CopySource", RHIBufferHandle{ 21, 1 },
-						copyBufferDesc, RGBufferAccess::CopySource);
+						copyBufferDesc, RGBufferAccess::CopySource, RGContentValidity::Defined);
 					data.m_SecondBuffer = builder.ImportBuffer("CopyDestination",
-						RHIBufferHandle{ 22, 1 }, copyBufferDesc, RGBufferAccess::CopyDest);
+						RHIBufferHandle{ 22, 1 }, copyBufferDesc, RGBufferAccess::CopyDest,
+						RGContentValidity::Undefined);
 					data.m_FirstBuffer = builder.Read(
 						data.m_FirstBuffer, RGBufferAccess::CopySource, RHIStage::Copy);
 					builder.WriteInPlace(
@@ -2836,8 +3042,11 @@ namespace gglab
 					graphicsContextSelected && directComputeContextSelected &&
 					copyContextSelected && copyResourcesResolved &&
 					graphicsContext.m_CopyBufferCount == 1 &&
+					graphicsContext.m_BeginRenderingCount == 1 &&
+					graphicsContext.m_EndRenderingCount == 1 &&
+					!graphicsContext.IsRendering() &&
 					asyncComputeRemainsUnavailable,
-					"RenderGraph executes each live pass with its declared direct-list encoder");
+					"RenderGraph closes graphics rendering before the next direct-list encoder");
 				context.Check(graphicsContext.m_BeginProfileCount == 2 &&
 					graphicsContext.m_EndProfileCount == 2 &&
 					directComputeContext.m_BeginProfileCount == 1 &&
@@ -2865,9 +3074,10 @@ namespace gglab
 						.m_StrideInBytes = 16,
 					};
 					data.m_Texture = builder.ImportTexture("BatchingTexture",
-						RHITextureHandle{ 1, 1 }, textureDesc, RGTextureAccess::CopyDest);
+						RHITextureHandle{ 1, 1 }, textureDesc, RGTextureAccess::CopyDest,
+						RGContentValidity::Defined);
 					data.m_Buffer = builder.ImportBuffer("BatchingBuffer", RHIBufferHandle{ 1, 1 },
-						bufferDesc, RGBufferAccess::CopyDest);
+						bufferDesc, RGBufferAccess::CopyDest, RGContentValidity::Defined);
 					data.m_Texture = builder.Read(
 						data.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					data.m_Buffer = builder.Read(
@@ -2896,6 +3106,814 @@ namespace gglab
 			}
 		}
 
+		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
+		{
+			const RHIOwnedTextureCreateInfo ownedCreateInfo{};
+			context.Check(ownedCreateInfo.m_InitialState == UndefinedRHITextureState(),
+				"Owned texture create info defaults to Undefined");
+			context.Check(IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureInitial),
+				"Undefined is a valid owned texture initial state");
+			context.Check(IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierBefore),
+				"Undefined is a valid texture barrier source state");
+			context.Check(!IsRHIResourceStateValid(
+				ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureBarrierAfter),
+				"Undefined is rejected as a texture barrier destination state");
+			context.Check(!IsRHIResourceStateValid(
+				RHIResourceState{ .m_Layout = RHILayout::Unknown },
+				RHIResourceStateUsage::TextureInitial),
+				"Owned textures default to initial-only Undefined while Unknown remains invalid");
+			context.Check(IsRHIResourceStateValid(
+				PresentRHITextureState(), RHIResourceStateUsage::TextureBarrierAfter) &&
+				!IsRHIResourceStateValid(
+					PresentRHITextureState(), RHIResourceStateUsage::Buffer),
+				"Present is an exact texture-only special state");
+			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) ==
+				D3D12_BARRIER_LAYOUT_COMMON &&
+				ToD3D12ResourceStates(UndefinedRHITextureState()) == D3D12_RESOURCE_STATE_COMMON,
+				"DX12 lowers logical Undefined texture state to COMMON");
+
+			const RHITextureDesc graphTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+			};
+			RenderGraph initializedGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			initializedGraph.AddPass<TextureStorageAccessPassData>("InitializeTexture",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					data.m_Texture = builder.CreateTexture("UndefinedTexture", graphTextureDesc);
+					builder.WriteInPlace(data.m_Texture, RGTextureAccess::StorageWrite);
+					builder.SideEffect();
+				});
+			const bool initializedCompiled = initializedGraph.Compile();
+			RGSnapshot initializedSnapshot;
+			BuildRenderGraphSnapshot(initializedGraph, initializedSnapshot);
+			context.Check(initializedCompiled && initializedSnapshot.m_Resources.size() == 1 &&
+				initializedSnapshot.m_Resources[0].m_InitialBarrierState == UndefinedRHITextureState(),
+				"RenderGraph-created textures begin in Undefined state and Write defines contents");
+
+			auto hasUndefinedRead = [](const RenderGraph& graph) noexcept
+				{
+					return std::ranges::any_of(graph.GetCompileDiagnostics(),
+						[](const RGCompileDiagnostic& diagnostic) noexcept
+						{
+							return diagnostic.m_Code == RGCompileDiagnosticCode::UndefinedContentRead;
+						});
+				};
+			RenderGraph transientReadGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			transientReadGraph.AddPass<StorageAccessPassData>("ReadUndefinedBuffer",
+				[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+				{
+					data.m_Buffer = builder.CreateBuffer("UndefinedBuffer");
+					data.m_Buffer = builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
+					builder.SideEffect();
+				});
+			context.Check(!transientReadGraph.Compile() && hasUndefinedRead(transientReadGraph),
+				"RenderGraph reports release-visible texture/buffer read-before-write diagnostics");
+
+			RecordingDevice recordingDevice;
+			const RHITextureDesc importedDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled,
+				.m_Extent = { 8, 8, 1 },
+			};
+			auto buildImportedRead = [&](RGContentValidity validity)
+				{
+					auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
+						.m_Device = &recordingDevice,
+						.m_TransientResourcePool =
+							reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+						});
+					graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
+						[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+						{
+							data.m_Texture = builder.ImportTexture("ImportedTexture",
+								RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
+							data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
+							builder.SideEffect();
+						});
+					return graph;
+				};
+			auto undefinedImportGraph = buildImportedRead(RGContentValidity::Undefined);
+			auto definedImportGraph = buildImportedRead(RGContentValidity::Defined);
+			context.Check(!undefinedImportGraph->Compile() && hasUndefinedRead(*undefinedImportGraph) &&
+				definedImportGraph->Compile(),
+				"Imported state and content validity are explicit, independent contracts");
+
+			RHITextureDesc cubeDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled,
+				.m_Extent = { 8, 8, 1 },
+				.m_ArraySize = 6,
+			};
+			const RHITextureViewDesc cubeView{
+				.m_Type = RHITextureViewType::ShaderResource,
+				.m_Dimension = RHITextureViewDimension::TextureCube,
+				.m_Subresources = {.m_ArraySliceCount = 6 },
+			};
+			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).m_Error ==
+				RHITextureValidationError::MissingCubeCompatible,
+				"Cube views require an explicit CubeCompatible resource flag");
+			cubeDesc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
+			context.Check(ValidateRHITextureViewDesc(cubeDesc, cubeView).IsValid(),
+				"CubeCompatible resources accept complete cube views");
+
+			const RHIPortabilityCapabilities vulkanCapabilities{};
+			RHITextureViewDesc minLodView{};
+			minLodView.m_ResourceMinLODClamp = 1.0f;
+			RHISamplerDesc customBorderSampler{};
+			customBorderSampler.m_AddressU = RHITextureAddressMode::Border;
+			customBorderSampler.m_BorderColor[0] = 0.5f;
+			RHIGraphicsPipelineDesc pipelineDesc{};
+			context.Check(
+				IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Triangle, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Line, RHIPrimitiveTopology::TriangleList) &&
+				!IsRHIPrimitiveTopologyCompatible(
+					RHIPrimitiveTopologyType::Patch, RHIPrimitiveTopology::TriangleList),
+				"Primitive topology compatibility is a backend-neutral pipeline contract");
+			const RHIIndexBufferBinding indexBinding{
+				.m_Offset = 16,
+				.m_SizeInBytes = 24,
+				.m_Format = RHIFormat::R32Uint,
+			};
+			RHIIndexBufferBinding misalignedBinding = indexBinding;
+			misalignedBinding.m_Offset = 18;
+			RHIIndexBufferBinding misalignedSizeBinding = indexBinding;
+			misalignedSizeBinding.m_SizeInBytes = 22;
+			RHIIndexBufferBinding unknownFormatBinding = indexBinding;
+			unknownFormatBinding.m_Format = RHIFormat::Unknown;
+			context.Check(
+				IsRHIIndexBufferBindingRangeValid(indexBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(misalignedBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(misalignedSizeBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(unknownFormatBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(indexBinding, 32) &&
+				IsRHIIndexBufferDrawRangeValid(indexBinding, 6, 0) &&
+				IsRHIIndexBufferDrawRangeValid(indexBinding, 2, 4) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 3, 4) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 1, 6) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 1, UINT32_MAX),
+				"Index buffer bindings and indexed draws stay within the declared RHI range");
+			pipelineDesc.m_VertexInput.m_VertexBufferCount = 1;
+			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate =
+				RHIVertexInputRate::PerInstance;
+			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InstanceStepRate = 2;
+			context.Check(
+				ValidateRHITextureViewPortability(minLodView, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::ImageViewMinLodUnsupported &&
+				ValidateRHISamplerPortability(customBorderSampler, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::CustomBorderColorUnsupported &&
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::InstanceDivisorUnsupported,
+				"Vulkan profile rejects unsupported view, sampler, and instance-divisor semantics");
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_FillMode = RHIFillMode::Wireframe;
+			const bool rejectsWireframe =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::WireframeUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_DepthClipEnable = false;
+			const bool rejectsDepthClamp =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::DepthClampUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_Rasterizer.m_DepthBiasClamp = 1.0f;
+			const bool rejectsBiasClamp =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::DepthBiasClampUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_RenderTargetCount = 2;
+			pipelineDesc.m_Blend.m_RenderTargets[1].m_BlendEnable = true;
+			const bool rejectsIndependentBlend =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::IndependentBlendUnsupported;
+			pipelineDesc = {};
+			pipelineDesc.m_SampleQuality = 1;
+			const bool rejectsSampleQuality =
+				ValidateRHIGraphicsPipelinePortability(pipelineDesc, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::SampleQualityUnsupported;
+			context.Check(rejectsWireframe && rejectsDepthClamp && rejectsBiasClamp &&
+				rejectsIndependentBlend && rejectsSampleQuality,
+				"Vulkan profile rejects unsupported rasterizer, blend, and sample-quality semantics");
+
+			RecordingTransferContext transferContext;
+			TransferBatch batch(transferContext);
+			const RHIResourceState shaderReadState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			};
+			const RHITextureHandle uploadedTexture{ 3, 1 };
+			const RHIBufferHandle uploadedBuffer{ 4, 1 };
+			const uint32_t bufferData = 17;
+			const bool transferRecorded = batch.UploadTexture(uploadedTexture, {},
+				UndefinedRHITextureState(), shaderReadState) &&
+				batch.UploadBuffer(uploadedBuffer, 0, &bufferData, sizeof(bufferData)) &&
+				batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData,
+					sizeof(bufferData));
+			const RHITransferSubmission submission = batch.Submit(false);
+			context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
+				transferContext.m_BufferBarriers.size() == 4 &&
+				transferContext.m_TextureBarriers[0].m_Before == UndefinedRHITextureState() &&
+				transferContext.m_TextureBarriers[1].m_After == shaderReadState &&
+				transferContext.m_BufferBarriers.front().m_Before.m_Layout == RHILayout::Common &&
+				transferContext.m_BufferBarriers.front().m_After.m_Layout == RHILayout::CopyDest &&
+				transferContext.m_BufferBarriers.back().m_After.m_Layout == RHILayout::Common &&
+				submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
+				submission.m_Publications[0].m_Type == RHIResourceType::Texture &&
+				submission.m_Publications[0].m_PublishedState == shaderReadState &&
+				submission.m_Publications[1].m_Type == RHIResourceType::Buffer,
+				"Transfer submission publishes one terminal state per resource with its completion fence");
+
+			// --- Subresource-granular texture content validity ---
+			const RHITextureDesc mipTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+				.m_MipLevels = 2,
+			};
+			const RHISubresourceRange colorMip0{
+				.m_MipCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange colorMip1{
+				.m_BaseMip = 1,
+				.m_MipCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Undefined texture written on mip0 accepts reads of mip0");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(!mipReadGraph.Compile() && hasUndefinedRead(mipReadGraph),
+					"Undefined texture written on mip0 rejects reads of mip1");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip0);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip1);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip0AfterMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip0);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Version inheritance preserves previously defined mip0 after mip1 write");
+			}
+			{
+				RenderGraph mipReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId mipTextureId{};
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("WriteMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						mipTextureId = builder.CreateTexture("MipValidityTexture", mipTextureDesc);
+						builder.WriteInPlace(mipTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, colorMip1);
+						builder.SideEffect();
+					});
+				mipReadGraph.AddPass<TextureStorageAccessPassData>("ReadMip1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(
+							mipTextureId, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(mipReadGraph.Compile(),
+					"Undefined texture written on mip1 accepts reads of mip1");
+			}
+
+			// Array slice partial write/read.
+			const RHITextureDesc arrayTextureDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Extent = { 8, 8, 1 },
+				.m_ArraySize = 2,
+			};
+			const RHISubresourceRange slice0Range{
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			const RHISubresourceRange slice1Range{
+				.m_BaseArraySlice = 1,
+				.m_ArraySliceCount = 1,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				RenderGraph sliceReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId sliceTextureId{};
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice0",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, slice0Range);
+						builder.SideEffect();
+					});
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(sliceTextureId, RGTextureAccess::Sample,
+							RHIStage::PixelShader, slice1Range);
+						builder.SideEffect();
+					});
+				context.Check(!sliceReadGraph.Compile() && hasUndefinedRead(sliceReadGraph),
+					"Array slice writes do not define other slices");
+			}
+			{
+				RenderGraph sliceReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId sliceTextureId{};
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("WriteSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						sliceTextureId = builder.CreateTexture("SliceValidityTexture", arrayTextureDesc);
+						builder.WriteInPlace(sliceTextureId, RGTextureAccess::RenderTarget,
+							RHIStage::RenderTarget, slice1Range);
+						builder.SideEffect();
+					});
+				sliceReadGraph.AddPass<TextureStorageAccessPassData>("ReadSlice1",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(sliceTextureId, RGTextureAccess::Sample,
+							RHIStage::PixelShader, slice1Range);
+						builder.SideEffect();
+					});
+				context.Check(sliceReadGraph.Compile(),
+					"Array slice writes define their own slice");
+			}
+
+			// Depth/stencil aspect granularity.
+			const RHITextureDesc depthStencilTextureDesc{
+				.m_Format = RHIFormat::D24UnormS8Uint,
+				.m_Extent = { 8, 8, 1 },
+			};
+			const RHISubresourceRange depthAspectRange{ .m_Aspects = RHITextureAspect::Depth };
+			const RHISubresourceRange stencilAspectRange{ .m_Aspects = RHITextureAspect::Stencil };
+			{
+				RenderGraph aspectReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId aspectTextureId{};
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("WriteDepthAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						aspectTextureId =
+							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadDepthAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectReadGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				context.Check(!aspectReadGraph.Compile() && hasUndefinedRead(aspectReadGraph),
+					"Depth aspect writes do not define the stencil aspect");
+			}
+			{
+				RenderGraph aspectWriteGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				RGTextureId aspectTextureId{};
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteBothAspects",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						aspectTextureId =
+							builder.CreateTexture("AspectValidityTexture", depthStencilTextureDesc);
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, depthAspectRange);
+						builder.SideEffect();
+					});
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("WriteStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.WriteInPlace(aspectTextureId, RGTextureAccess::DepthStencilWrite,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				aspectWriteGraph.AddPass<TextureStorageAccessPassData>("ReadStencilAspect",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData&)
+					{
+						builder.Read(aspectTextureId, RGTextureAccess::DepthStencilRead,
+							RHIStage::DepthStencil, stencilAspectRange);
+						builder.SideEffect();
+					});
+				context.Check(aspectWriteGraph.Compile(),
+					"Stencil aspect writes define the stencil aspect");
+			}
+
+			// Imported Defined texture with partial reads.
+			{
+				RecordingDevice recordingDevice;
+				RenderGraph importedPartialGraph({
+					.m_Device = &recordingDevice,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				importedPartialGraph.AddPass<TextureStorageAccessPassData>("ReadImportedPartial",
+					[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+					{
+						data.m_Texture =
+							builder.ImportTexture("PartialImportedTexture", RHITextureHandle{ 10, 1 },
+								mipTextureDesc, UndefinedRHITextureState(), RGContentValidity::Defined);
+						data.m_Texture = builder.Read(
+							data.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader, colorMip1);
+						builder.SideEffect();
+					});
+				context.Check(importedPartialGraph.Compile(),
+					"Imported Defined textures support partial reads");
+			}
+
+			// Read-before-write remains a declaration contract even when the
+			// reading pass can be culled.
+			{
+				RenderGraph cullableReadGraph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				cullableReadGraph.AddPass<StorageAccessPassData>("CullableUndefinedRead",
+					[](RenderGraph::RGBuilder& builder, StorageAccessPassData& data)
+					{
+						data.m_Buffer = builder.CreateBuffer("CullableBuffer");
+						data.m_Buffer =
+							builder.Read(data.m_Buffer, RGBufferAccess::StructuredRead);
+					});
+				context.Check(!cullableReadGraph.Compile() && hasUndefinedRead(cullableReadGraph),
+					"Cullable passes still report read-before-write declarations");
+			}
+
+			// --- Portability fixed-array boundaries ---
+			RHIGraphicsPipelineDesc maxCountPipeline{};
+			maxCountPipeline.m_VertexInput.m_VertexBufferCount =
+				RHIVertexInputLayoutDesc::MaxVertexBuffers;
+			maxCountPipeline.m_RenderTargetCount = RHIGraphicsPipelineDesc::MaxRenderTargets;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				maxCountPipeline, vulkanCapabilities).IsValid(),
+				"Pipeline portability accepts maximum vertex buffer and render target counts");
+			RHIGraphicsPipelineDesc vertexOverflowPipeline{};
+			vertexOverflowPipeline.m_VertexInput.m_VertexBufferCount =
+				RHIVertexInputLayoutDesc::MaxVertexBuffers + 1;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				vertexOverflowPipeline, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::VertexBufferCountExceedsLimit,
+				"Pipeline portability rejects vertex buffer counts above the input layout limit");
+			RHIGraphicsPipelineDesc targetOverflowPipeline{};
+			targetOverflowPipeline.m_RenderTargetCount =
+				RHIGraphicsPipelineDesc::MaxRenderTargets + 1;
+			context.Check(ValidateRHIGraphicsPipelinePortability(
+				targetOverflowPipeline, vulkanCapabilities).m_Error ==
+				RHIPortabilityValidationError::RenderTargetCountExceedsLimit,
+				"Pipeline portability rejects render target counts above the pipeline limit");
+
+			// --- Portability rejection reason text ---
+			context.Check(
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::ImageViewMinLodUnsupported) ==
+				"image view min LOD clamp is not supported" &&
+				!GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::None).empty() &&
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::ImageViewMinLodUnsupported) !=
+				GetRHIPortabilityValidationErrorText(
+					RHIPortabilityValidationError::None),
+				"Portability rejection reasons expose stable, distinct text");
+
+			// --- TransferBatch poisoned state ---
+			{
+				RecordingTransferContext failingContext;
+				TransferBatch failingBatch(failingContext);
+				const RHITextureHandle failTexture{ 5, 1 };
+				const bool firstUpload = failingBatch.UploadTexture(
+					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				failingContext.m_FailUploads = true;
+				const bool failedUpload = failingBatch.UploadTexture(
+					failTexture, {}, UndefinedRHITextureState(), shaderReadState);
+				context.Check(firstUpload && !failedUpload && failingBatch.IsFailed() &&
+					failingContext.m_TextureBarriers.size() == 3,
+					"UploadTexture failure after recorded barriers poisons the batch");
+				const RHITransferSubmission failedSubmission = failingBatch.Submit(false);
+				context.Check(failingContext.m_SubmitCallCount == 0 &&
+					failingContext.m_AbortCallCount == 1 &&
+					!failedSubmission.m_Completion.IsValid() &&
+					failedSubmission.m_Publications.empty(),
+					"Poisoned batches abort without submitting and return an invalid submission");
+			}
+			{
+				RecordingTransferContext readbackContext;
+				TransferBatch readbackBatch(readbackContext);
+				const RHITextureReadbackRequest request = readbackBatch.ReadbackTexture(
+					RHITextureHandle{ 6, 1 }, RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::CopySource,
+						.m_Extent = { 1, 1, 1 },
+					});
+				const RHITransferSubmission submission = readbackBatch.Submit(false);
+				context.Check(!request.IsValid() && readbackBatch.IsFailed() &&
+					readbackContext.m_TextureBarriers.size() == 1 &&
+					readbackContext.m_AbortCallCount == 1 &&
+					readbackContext.m_SubmitCallCount == 0 &&
+					!submission.m_Completion.IsValid(),
+					"Readback allocation failure poisons and aborts its partially recorded state transition");
+			}
+			{
+				RecordingTransferContext submitFailureContext;
+				TransferBatch submitFailureBatch(submitFailureContext);
+				const uint32_t payload = 23;
+				const bool uploadRecorded = submitFailureBatch.UploadBuffer(
+					RHIBufferHandle{ 8, 1 }, 0, &payload, sizeof(payload));
+				submitFailureContext.m_FailSubmit = true;
+				const RHITransferSubmission submission = submitFailureBatch.Submit(false);
+				context.Check(uploadRecorded && submitFailureBatch.IsFailed() &&
+					submitFailureContext.m_SubmitCallCount == 1 &&
+					!submission.m_Completion.IsValid() && submission.m_Publications.empty(),
+					"Native submission failure discards the publication manifest");
+			}
+			{
+				RecordingTransferContext moveContext;
+				TransferBatch moveSource(moveContext);
+				const RHITextureHandle moveTexture{ 7, 1 };
+				GGLAB_UNUSED(moveSource.UploadTexture(
+					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				moveContext.m_FailUploads = true;
+				GGLAB_UNUSED(moveSource.UploadTexture(
+					moveTexture, {}, UndefinedRHITextureState(), shaderReadState));
+				TransferBatch moveTarget(std::move(moveSource));
+				context.Check(moveTarget.IsFailed(),
+					"Move construction preserves the poisoned state");
+				const RHITransferSubmission moveSubmission = moveTarget.Submit(false);
+				context.Check(moveContext.m_SubmitCallCount == 0 &&
+					moveContext.m_AbortCallCount == 1 && !moveSubmission.m_Completion.IsValid(),
+					"Moved poisoned batches still abort without submitting");
+			}
+
+			// --- TransferBatch overlapping publication validation ---
+			const RHIResourceState copyDestState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
+			};
+			const RHITextureHandle overlapTexture{ 6, 1 };
+			const RHISubresourceRange colorMips{
+				.m_MipCount = 2,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				RecordingTransferContext overlapContext;
+				TransferBatch overlapBatch(overlapContext);
+				const bool sameRangeAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0) &&
+					overlapBatch.PublishTexture(overlapTexture, copyDestState, colorMip0) &&
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0);
+				const bool disjointAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip1);
+				const bool sameStateOverlapAccepted =
+					overlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips);
+				context.Check(sameRangeAccepted && disjointAccepted && sameStateOverlapAccepted &&
+					!overlapBatch.IsFailed(),
+					"Exact, disjoint, and same-state overlapping texture publications are accepted");
+				const RHITransferSubmission overlapSubmission = overlapBatch.Submit(false);
+				context.Check(overlapSubmission.m_Completion.IsValid(),
+					"Non-conflicting publications submit normally");
+			}
+			{
+				RecordingTransferContext conflictContext;
+				TransferBatch conflictBatch(conflictContext);
+				GGLAB_UNUSED(conflictBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool conflictRejected =
+					!conflictBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				context.Check(conflictRejected && conflictBatch.IsFailed(),
+					"Overlapping publications with conflicting terminal states poison the batch");
+			}
+			{
+				RecordingTransferContext wholeContext;
+				TransferBatch wholeBatch(wholeContext);
+				GGLAB_UNUSED(
+					wholeBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeConflictRejected =
+					!wholeBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(wholeConflictRejected && wholeBatch.IsFailed(),
+					"Whole-resource publications overlap every partial range");
+			}
+			{
+				RecordingTransferContext remainingContext;
+				TransferBatch remainingBatch(remainingContext);
+				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
+				GGLAB_UNUSED(remainingBatch.PublishTexture(overlapTexture, shaderReadState, remainingRange));
+				const bool remainingConflictRejected =
+					!remainingBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(remainingConflictRejected && remainingBatch.IsFailed(),
+					"Remaining-count ranges overlap explicit partial ranges");
+			}
+
+			// --- Exact-range updates must stay consistent with overlapping
+			// publications (validate-first, mutate-second) ---
+			const RHIResourceState copySourceState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::CopySource,
+			};
+			const RHISubresourceRange colorMips3{
+				.m_MipCount = 3,
+				.m_Aspects = RHITextureAspect::Color,
+			};
+			{
+				// A narrow exact-range update must be rejected when a broader
+				// overlapping publication keeps a different terminal state.
+				RecordingTransferContext narrowUpdateContext;
+				TransferBatch narrowUpdateBatch(narrowUpdateContext);
+				GGLAB_UNUSED(
+					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					narrowUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				const bool narrowUpdateRejected =
+					!narrowUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(narrowUpdateRejected && narrowUpdateBatch.IsFailed(),
+					"Exact-range updates cannot contradict a broader overlapping publication");
+			}
+			{
+				// A broader exact-range update must be rejected when a narrower
+				// overlapping publication keeps a different terminal state.
+				RecordingTransferContext broadUpdateContext;
+				TransferBatch broadUpdateBatch(broadUpdateContext);
+				GGLAB_UNUSED(
+					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				GGLAB_UNUSED(
+					broadUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool broadUpdateRejected =
+					!broadUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMips);
+				context.Check(broadUpdateRejected && broadUpdateBatch.IsFailed(),
+					"Broader exact-range updates cannot contradict a narrower overlapping publication");
+			}
+			{
+				// A disjoint exact-range update must succeed without poisoning.
+				RecordingTransferContext disjointUpdateContext;
+				TransferBatch disjointUpdateBatch(disjointUpdateContext);
+				GGLAB_UNUSED(
+					disjointUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					disjointUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip1));
+				const bool disjointUpdateSucceeded =
+					disjointUpdateBatch.PublishTexture(overlapTexture, copySourceState, colorMip0);
+				context.Check(disjointUpdateSucceeded && !disjointUpdateBatch.IsFailed(),
+					"Disjoint exact-range updates succeed without poisoning the batch");
+			}
+			{
+				// An exact-range update must succeed when every overlapping
+				// publication agrees with the updated terminal state.
+				RecordingTransferContext agreeingOverlapContext;
+				TransferBatch agreeingOverlapBatch(agreeingOverlapContext);
+				GGLAB_UNUSED(
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips));
+				const bool agreeingOverlapAccepted =
+					agreeingOverlapBatch.PublishTexture(overlapTexture, shaderReadState, colorMips3);
+				context.Check(agreeingOverlapAccepted && !agreeingOverlapBatch.IsFailed(),
+					"Exact-range updates succeed when all overlapping entries agree on the state");
+			}
+			{
+				// A partial exact-range update must be rejected when a
+				// whole-resource publication keeps a different terminal state.
+				RecordingTransferContext partialUpdateContext;
+				TransferBatch partialUpdateBatch(partialUpdateContext);
+				GGLAB_UNUSED(
+					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				GGLAB_UNUSED(
+					partialUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				const bool partialUpdateRejected =
+					!partialUpdateBatch.PublishTexture(overlapTexture, copyDestState, colorMip0);
+				context.Check(partialUpdateRejected && partialUpdateBatch.IsFailed(),
+					"Partial exact-range updates cannot contradict a whole-resource publication");
+			}
+			{
+				// A whole-resource exact-range update must be rejected when a
+				// partial publication keeps a different terminal state.
+				RecordingTransferContext wholeUpdateContext;
+				TransferBatch wholeUpdateBatch(wholeUpdateContext);
+				GGLAB_UNUSED(
+					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(
+					wholeUpdateBatch.PublishTexture(overlapTexture, shaderReadState, std::nullopt));
+				const bool wholeUpdateRejected =
+					!wholeUpdateBatch.PublishTexture(overlapTexture, copyDestState, std::nullopt);
+				context.Check(wholeUpdateRejected && wholeUpdateBatch.IsFailed(),
+					"Whole-resource exact-range updates cannot contradict a partial publication");
+			}
+			{
+				// A Remaining-count exact-range update must be rejected when a
+				// narrower overlapping publication keeps a different terminal state.
+				RecordingTransferContext remainingUpdateContext;
+				TransferBatch remainingUpdateBatch(remainingUpdateContext);
+				const RHISubresourceRange remainingRange{ .m_Aspects = RHITextureAspect::Color };
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
+					overlapTexture, shaderReadState, colorMip0));
+				GGLAB_UNUSED(remainingUpdateBatch.PublishTexture(
+					overlapTexture, shaderReadState, remainingRange));
+				const bool remainingUpdateRejected =
+					!remainingUpdateBatch.PublishTexture(
+						overlapTexture, copyDestState, remainingRange);
+				context.Check(remainingUpdateRejected && remainingUpdateBatch.IsFailed(),
+					"Remaining-count exact-range updates cannot contradict a narrower overlapping publication");
+			}
+		}
+
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
 		{
 		}
@@ -2906,8 +3924,11 @@ namespace gglab
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
+		RunRHIFrameAndGraphicsScopeContractTests(context);
+		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
+		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);

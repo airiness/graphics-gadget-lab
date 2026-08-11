@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+env:
+  VULKAN_SDK_VERSION: 1.3.296.0
+  VULKAN_SDK_SHA256: acb4ae0786fd3e558f8b3c36cc3eba91638984217ba8a6795ec64d2f9ffd8c4b
+  VULKAN_RUNTIME_SHA256: e0429f91cf356fe99e381f7d22e568ac81945669f1be1772d933a0d189230452
+
 concurrency:
   group: build-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -22,7 +27,7 @@ jobs:
   build:
     name: Build / ${{ matrix.configuration }}
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     strategy:
       fail-fast: false
@@ -48,6 +53,81 @@ jobs:
         uses: NuGet/setup-nuget@v3
         with:
           nuget-version: 6.14.3
+
+      - name: Configure Vulkan paths
+        shell: pwsh
+        run: |
+          $sdkRoot = Join-Path $env:RUNNER_TEMP "VulkanSDK\$env:VULKAN_SDK_VERSION"
+          $runtimeRoot = Join-Path $env:RUNNER_TEMP "VulkanRT\$env:VULKAN_SDK_VERSION"
+          "VULKAN_SDK=$sdkRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VULKAN_RUNTIME=$runtimeRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Cache Vulkan environment
+        id: cache-vulkan-environment
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ runner.temp }}\VulkanSDK\${{ env.VULKAN_SDK_VERSION }}
+            ${{ runner.temp }}\VulkanRT\${{ env.VULKAN_SDK_VERSION }}
+          key: ${{ runner.os }}-${{ runner.arch }}-vulkan-${{ env.VULKAN_SDK_VERSION }}-${{ env.VULKAN_SDK_SHA256 }}-${{ env.VULKAN_RUNTIME_SHA256 }}
+
+      - name: Install Vulkan SDK and runtime
+        if: steps.cache-vulkan-environment.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $installerName = "VulkanSDK-$env:VULKAN_SDK_VERSION-Installer.exe"
+          $installerPath = Join-Path $env:RUNNER_TEMP $installerName
+          $installerUri =
+            "https://sdk.lunarg.com/sdk/download/$env:VULKAN_SDK_VERSION/windows/$installerName"
+
+          Invoke-WebRequest -Uri $installerUri -OutFile $installerPath
+
+          $actualSha256 = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash
+          if ($actualSha256 -ine $env:VULKAN_SDK_SHA256) {
+            throw "Vulkan SDK installer SHA-256 mismatch: expected '$env:VULKAN_SDK_SHA256', got '$actualSha256'."
+          }
+
+          & $installerPath --root $env:VULKAN_SDK --accept-licenses --default-answer `
+            --confirm-command install copy_only=1
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $runtimeArchiveName = "VulkanRT-$env:VULKAN_SDK_VERSION-Components.zip"
+          $runtimeArchivePath = Join-Path $env:RUNNER_TEMP $runtimeArchiveName
+          $runtimeArchiveUri =
+            "https://sdk.lunarg.com/sdk/download/$env:VULKAN_SDK_VERSION/windows/$runtimeArchiveName"
+
+          Invoke-WebRequest -Uri $runtimeArchiveUri -OutFile $runtimeArchivePath
+
+          $actualRuntimeSha256 =
+            (Get-FileHash -LiteralPath $runtimeArchivePath -Algorithm SHA256).Hash
+          if ($actualRuntimeSha256 -ine $env:VULKAN_RUNTIME_SHA256) {
+            throw "Vulkan runtime SHA-256 mismatch: expected '$env:VULKAN_RUNTIME_SHA256', got '$actualRuntimeSha256'."
+          }
+
+          Expand-Archive -LiteralPath $runtimeArchivePath -DestinationPath $env:VULKAN_RUNTIME
+
+      - name: Validate Vulkan environment
+        shell: pwsh
+        run: |
+          $runtimeBin = Join-Path $env:VULKAN_RUNTIME `
+            "VulkanRT-$env:VULKAN_SDK_VERSION-Components\x64"
+          $requiredPaths = @(
+            (Join-Path $env:VULKAN_SDK "Include\vulkan\vulkan.h")
+            (Join-Path $env:VULKAN_SDK "Lib\vulkan-1.lib")
+            (Join-Path $env:VULKAN_SDK "Bin\spirv-val.exe")
+            (Join-Path $runtimeBin "vulkan-1.dll")
+          )
+          foreach ($requiredPath in $requiredPaths) {
+            if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
+              throw "Required Vulkan SDK file is missing: '$requiredPath'."
+            }
+          }
+
+          (Join-Path $env:VULKAN_SDK "Bin") | Out-File -FilePath $env:GITHUB_PATH `
+            -Encoding utf8 -Append
+          $runtimeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
@@ -92,6 +172,15 @@ jobs:
 
           msbuild @buildArguments
 
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests
+        shell: pwsh
+        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        run: |
+          & .\GraphicsGadgetLab.exe --self-test all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }

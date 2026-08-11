@@ -110,7 +110,8 @@ namespace gglab
 				{
 					data.m_EnvironmentCubemap =
 						builder.ImportTexture("Skybox.FallbackEnvironmentCubemap",
-							fallbackTextureHandle, fallbackTextureDesc, RGTextureAccess::Sample);
+							fallbackTextureHandle, fallbackTextureDesc, RGTextureAccess::Sample,
+							RGContentValidity::Defined);
 					data.m_EnvironmentCubemap =
 						builder.Read(data.m_EnvironmentCubemap, RGTextureAccess::Sample);
 				}
@@ -153,8 +154,12 @@ namespace gglab
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
 				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
-				commandContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
+				commandContext->BeginRendering({
+					.m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
+					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
+				});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

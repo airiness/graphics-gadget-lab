@@ -20,6 +20,7 @@ namespace gglab
 		R32G32B32A32,
 		R32,
 		D24S8,
+		B8G8R8A8,
 	};
 
 	struct RHIFormatInfo
@@ -92,6 +93,12 @@ namespace gglab
 				RHIFormatInfo{RHIFormat::R16Float, "R16Float", RHIFormatFamily::R16,
 					RHITextureAspect::Color, RHITextureAspect::None, RHIFormat::Unknown, 1, 2, 1, 1,
 					false},
+				RHIFormatInfo{RHIFormat::B8G8R8A8Unorm, "B8G8R8A8Unorm",
+					RHIFormatFamily::B8G8R8A8, RHITextureAspect::Color, RHITextureAspect::None,
+					RHIFormat::Unknown, 1, 4, 1, 1, false},
+				RHIFormatInfo{RHIFormat::B8G8R8A8UnormSrgb, "B8G8R8A8UnormSrgb",
+					RHIFormatFamily::B8G8R8A8, RHITextureAspect::Color, RHITextureAspect::None,
+					RHIFormat::Unknown, 1, 4, 1, 1, false},
 		};
 
 		consteval bool ValidateRHIFormatInfos() noexcept

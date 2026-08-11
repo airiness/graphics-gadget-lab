@@ -6,6 +6,7 @@
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
+#include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Core/Log/Logger.h"
 
 namespace gglab
@@ -33,6 +34,10 @@ namespace gglab
 				.m_Id = "rendering-contracts",
 				.m_Run = &RunRenderingContractSelfTests,
 			},
+			SelfTestSuiteDesc{
+				.m_Id = "vulkan-contracts",
+				.m_Run = &RunVulkanContractSelfTests,
+			},
 		};
 
 		[[nodiscard]] const SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
@@ -43,15 +48,16 @@ namespace gglab
 		}
 	}
 
-	bool IsApplicationSelfTestSuiteRegistered(std::string_view suiteId) noexcept
+	bool IsApplicationSelfTestSelectionValid(std::string_view selection) noexcept
 	{
-		return FindSuite(suiteId) != nullptr;
+		return selection == AllApplicationSelfTestsSelection || FindSuite(selection) != nullptr;
 	}
 
-	bool RunApplicationSelfTestSuite(std::string_view suiteId) noexcept
+	bool RunApplicationSelfTests(std::string_view selection) noexcept
 	{
-		const SelfTestSuiteDesc* suite = FindSuite(suiteId);
-		if (!suite)
+		const bool runAll = selection == AllApplicationSelfTestsSelection;
+		const SelfTestSuiteDesc* suite = runAll ? nullptr : FindSuite(selection);
+		if (!runAll && !suite)
 		{
 			return false;
 		}
@@ -61,6 +67,18 @@ namespace gglab
 			Logger::Initialize();
 		}
 		ConsoleSelfTestReporter reporter;
+		if (runAll)
+		{
+			bool allSucceeded = true;
+			for (const SelfTestSuiteDesc& registeredSuite : RegisteredSuites)
+			{
+				if (!RunSelfTestSuite(registeredSuite, reporter))
+				{
+					allSucceeded = false;
+				}
+			}
+			return allSucceeded;
+		}
 		return RunSelfTestSuite(*suite, reporter);
 	}
 }

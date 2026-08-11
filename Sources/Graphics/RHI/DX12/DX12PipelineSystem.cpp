@@ -6,6 +6,7 @@
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
+#include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
 
 namespace gglab
 {
@@ -79,6 +80,13 @@ namespace gglab
 	RHIPipelineHandle DX12PipelineSystem::CreateGraphicsPipeline(
 		const RHIGraphicsPipelineCreateInfo& createInfo) noexcept
 	{
+		if (!ValidateRHIGraphicsPipelinePortability(
+			createInfo.m_Desc, DX12PortabilityCapabilities).IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DX12PipelineSystem::CreateGraphicsPipeline rejected a non-portable description.");
+			return {};
+		}
 		DX12RootSignature* rootSignature = ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
 		if (!rootSignature || !createInfo.m_VertexShader.IsValid() ||
 			!IsDX12ShaderBytecode(createInfo.m_VertexShader) ||
@@ -166,10 +174,29 @@ namespace gglab
 	}
 
 	bool DX12PipelineSystem::ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
-		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature) const noexcept
+		DX12PipelineState*& outPipelineState, DX12RootSignature*& outRootSignature,
+		RHIGraphicsPipelineDesc& outDesc) const noexcept
 	{
-		return ResolvePipeline(
-			pipeline, PipelineType::Graphics, outPipelineState, outRootSignature);
+		outPipelineState = nullptr;
+		outRootSignature = nullptr;
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration)
+		{
+			return false;
+		}
+		std::shared_lock lock(m_Mutex);
+		if (pipeline.Index() >= m_Pipelines.size())
+		{
+			return false;
+		}
+		const PipelineBinding& binding = m_Pipelines[pipeline.Index()];
+		if (binding.m_Type != PipelineType::Graphics)
+		{
+			return false;
+		}
+		outPipelineState = binding.m_PipelineState;
+		outRootSignature = binding.m_RootSignature;
+		outDesc = binding.m_GraphicsDesc;
+		return outPipelineState != nullptr && outRootSignature != nullptr;
 	}
 
 	bool DX12PipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,

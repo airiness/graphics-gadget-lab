@@ -65,7 +65,7 @@ namespace gglab
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						targets.m_BackBuffer = builder.ImportTexture("LoadingShell.BackBuffer",
 							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-							RGTextureAccess::Present);
+							RGTextureAccess::Present, RGContentValidity::Undefined);
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 						data.m_BackBuffer = targets.m_BackBuffer;
 						data.m_Rtv =
@@ -80,13 +80,19 @@ namespace gglab
 						shadow.m_DirectionalShadowMapPreview =
 							builder.ImportTexture("LoadingShell.ShadowPreview",
 								resourceRegistry->GetTextureHandle(shadowIndex), *shadowDesc,
-								RGTextureAccess::None);
+								RGTextureAccess::None, RGContentValidity::Defined);
 					},
 					[renderer](RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
-						executeContext.GetGraphicsCommandContext()->ClearColor(
-							executeContext.GetViewHandle(data.m_Rtv),
-							renderer->GetBackBufferClearColor());
+						auto* commandContext = executeContext.GetGraphicsCommandContext();
+						const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
+						const RHIRenderingAttachment colorAttachment{
+							.m_View = rtv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+						commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
 					});
 
 				m_IBLPass.AddPass(rg, context, services);

@@ -139,9 +139,13 @@ namespace gglab
 					{
 						const auto rtvIndex = mip * CubemapFaceCount + face;
 						const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[rtvIndex]);
-						commandContext->SetRenderTargets(
-							std::span<const RHITextureViewHandle>(&rtv, 1));
-						commandContext->ClearColor(rtv, { 0.0f, 0.0f, 0.0f, 1.0f });
+						const RHIRenderingAttachment colorAttachment{
+							.m_View = rtv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+						commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 						const IBLPrefilteredSpecularPassParameters passParameters{
 							.CubemapFaceIndex = face,
@@ -159,6 +163,7 @@ namespace gglab
 							passParameters);
 
 						commandContext->DrawFullscreenTriangle();
+						commandContext->EndRendering();
 					}
 				}
 

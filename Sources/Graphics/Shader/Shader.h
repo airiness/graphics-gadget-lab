@@ -30,6 +30,62 @@ namespace gglab
 	};
 	GGLAB_ENUM_FLAGS(ShaderCompileFlags);
 
+	enum class ShaderSpirVTargetEnvironment : uint8_t
+	{
+		None,
+		Vulkan1_3,
+	};
+
+	enum class ShaderCoordinateOptions : uint8_t
+	{
+		None = 0u,
+		InvertY = 1u << 0,
+		UseDxPositionW = 1u << 1,
+	};
+	GGLAB_ENUM_FLAGS(ShaderCoordinateOptions);
+
+	struct ShaderCompileTarget
+	{
+		ShaderBinaryFormat m_BinaryFormat = ShaderBinaryFormat::Dxil;
+		ShaderModel m_Model = ShaderModel::SM_6_7;
+		std::wstring m_HlslVersion = L"2021";
+		ShaderCompileFlags m_Flags = ShaderCompileFlags::None;
+		std::wstring m_OptimizationLevel = L"O3";
+		ShaderSpirVTargetEnvironment m_SpirVTargetEnvironment =
+			ShaderSpirVTargetEnvironment::None;
+		uint32_t m_BindingABIRevision = 0;
+		ShaderCoordinateOptions m_CoordinateOptions = ShaderCoordinateOptions::None;
+		std::wstring m_DxcVersion;
+
+		bool operator==(const ShaderCompileTarget&) const noexcept = default;
+	};
+
+	enum class ShaderCompileValidationError : uint8_t
+	{
+		None,
+		UnsupportedBinaryFormat,
+		EmptySourcePath,
+		SourcePathNotCanonical,
+		EmptyEntryPoint,
+		CompilerIdentityMismatch,
+		UnsupportedSpirVTargetEnvironment,
+		UnsupportedBindingABIRevision,
+		InvalidCoordinateOptions,
+		UnexpectedSpirVTargetState,
+		ReservedExtraArgument,
+	};
+
+	struct ShaderCompileValidationResult
+	{
+		ShaderCompileValidationError m_Error = ShaderCompileValidationError::None;
+		std::wstring m_Message;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Error == ShaderCompileValidationError::None;
+		}
+	};
+
 	struct ShaderDefine
 	{
 		std::wstring m_Name{};
@@ -43,14 +99,11 @@ namespace gglab
 	{
 		std::filesystem::path m_SourcePath{};
 		ShaderStage m_Stage = ShaderStage::Pixel;
-		ShaderModel m_Model = ShaderModel::SM_6_7;
+		ShaderCompileTarget m_Target{};
 		std::wstring m_Entry{};
 		std::vector<std::filesystem::path> m_IncludeDirs;
 		std::vector<ShaderDefine> m_Defines;
-		ShaderCompileFlags m_Flags = ShaderCompileFlags::None;
 		std::vector<std::wstring> m_ExtraArgs;
-		std::wstring m_HlslVersion = L"2021";
-		std::wstring m_OptLevel = L"O3";
 	};
 
 	struct ShaderCompileArtifact
@@ -58,17 +111,23 @@ namespace gglab
 		std::filesystem::path m_BinaryPath{};
 		std::filesystem::path m_MetaPath{};
 		ShaderBinary m_Binary{};
-		ShaderBinaryFormat m_Format = ShaderBinaryFormat::Unknown;
+		ShaderCompileTarget m_Target{ .m_BinaryFormat = ShaderBinaryFormat::Unknown };
 		ShaderHash128 m_Hash{};
 		std::filesystem::file_time_type m_SourceTimeStamp{};
 		bool m_FromCache = false;
+
+		[[nodiscard]] ShaderBinaryFormat GetBinaryFormat() const noexcept
+		{
+			return m_Target.m_BinaryFormat;
+		}
 
 		void Reset() noexcept
 		{
 			m_BinaryPath.clear();
 			m_MetaPath.clear();
 			m_Binary.Reset();
-			m_Format = ShaderBinaryFormat::Unknown;
+			m_Target = {};
+			m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
 			m_Hash = {};
 			m_SourceTimeStamp = {};
 			m_FromCache = false;

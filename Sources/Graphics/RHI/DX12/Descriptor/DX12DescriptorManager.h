@@ -1,6 +1,7 @@
 #pragma once
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
+#include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Core/Utility/TypeUtils.h"
 
 namespace gglab
@@ -16,10 +17,11 @@ namespace gglab
 		{
 			DX12Device* m_DX12Device = nullptr;
 
-			uint32_t m_CbvSrvUavCount = 65536;
+			uint32_t m_CbvSrvUavCount =
+				GGLabDescriptorCapacityContract.m_ResourceDescriptorCount;
 			uint32_t m_RtvCount = 4096;
 			uint32_t m_DsvCount = 1024;
-			uint32_t m_SamplerCount = 2048;
+			uint32_t m_SamplerCount = GGLabDescriptorCapacityContract.m_SamplerDescriptorCount;
 
 			uint32_t m_DevelopGuiSrvCount = 1024;
 		};

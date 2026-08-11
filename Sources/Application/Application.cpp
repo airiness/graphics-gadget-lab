@@ -2,6 +2,7 @@
 #include "Application/Application.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Application/RenderingStartup.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
@@ -97,7 +98,7 @@ namespace gglab
 
 	void Application::Run() noexcept
 	{
-		if (!m_IsInitialized || !m_PlatformHost)
+		if (!m_IsInitialized || !m_PlatformHost || m_ExitAfterInitialize)
 		{
 			return;
 		}
@@ -151,6 +152,20 @@ namespace gglab
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
+		// The backend is resolved before the ShaderManager preload starts.
+		// Explicit Vulkan selection runs the bootstrap qualification
+		// (instance, surface, adapters, profile gate, device, queue) and then
+		// exits; it never falls back to DX12.
+		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
+		if (m_LaunchOptions.m_ListAdapters || activeBackend == RHIBackendType::Vulkan)
+		{
+			m_ExitCode = RunRenderingStartupPath(
+				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
+			m_ExitAfterInitialize = true;
+			m_IsInitialized = true;
+			return;
+		}
+
 		// Time
 		m_Time = std::make_unique<Time>();
 		m_Time->Initialize();
@@ -169,12 +184,13 @@ namespace gglab
 		}
 
 		// ShaderManager
-		m_ShaderManager = std::make_unique<ShaderManager>();
+		m_ShaderManager = std::make_unique<ShaderManager>(activeBackend);
 		InitializeAssets();
 
 		// Renderer
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
+		rendererCreateInfo.m_Backend = activeBackend;
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
@@ -184,7 +200,7 @@ namespace gglab
 
 		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
 			.m_Device = m_Renderer->GetDevice(),
-			.m_FrameSlotCount = m_Renderer->GetSwapChain()->GetBufferCount(),
+			.m_FrameSlotCount = m_Renderer->GetRHIContext()->GetFrameSlotCount(),
 			});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
@@ -357,11 +373,12 @@ namespace gglab
 
 		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
-		const uint32_t backBufferIndex = m_Renderer->GetSwapChain()->GetCurrentBackBufferIndex();
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
-		auto rendererFrame = m_Renderer->BeginFrame(backBufferIndex);
+		auto rendererFrame = m_Renderer->BeginFrame();
+		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
+		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
 
@@ -380,6 +397,7 @@ namespace gglab
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
+			.m_FrameSlotIndex = frameSlotIndex,
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
@@ -389,7 +407,7 @@ namespace gglab
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
-		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(backBufferIndex,
+		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
@@ -486,6 +504,21 @@ namespace gglab
 	{
 		if (!m_IsInitialized)
 		{
+			return;
+		}
+
+		// Bootstrap/qualification mode never created the renderer subsystems.
+		if (m_ExitAfterInitialize)
+		{
+			if (m_TaskSystem)
+			{
+				m_TaskSystem->Shutdown();
+			}
+			if (m_PlatformHost)
+			{
+				m_PlatformHost->Finalize();
+			}
+			m_IsInitialized = false;
 			return;
 		}
 

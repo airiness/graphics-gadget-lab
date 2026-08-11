@@ -49,6 +49,7 @@ namespace gglab
 	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		RHIContextDesc contextDesc{};
+		contextDesc.m_Backend = createInfo.m_Backend;
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
@@ -140,14 +141,13 @@ namespace gglab
 		m_IsInitialized = false;
 	}
 
-	Renderer::Frame Renderer::BeginFrame(uint32_t backBufferIndex) noexcept
+	Renderer::Frame Renderer::BeginFrame() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
 		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
 		RHIFrameContext& rhiFrame = m_RHIContext->BeginFrame();
-		GGLAB_ASSERT(rhiFrame.GetBackBufferIndex() == backBufferIndex);
 
 		m_SceneCB->Tick();
 		m_ViewSB->Tick();
@@ -170,6 +170,7 @@ namespace gglab
 			"Renderer::Render received a frame created by another Renderer.");
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State == Frame::State::Begun,
 			"Renderer::Render requires an active frame begun by Renderer::BeginFrame.");
+		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == frame.m_FrameSlotIndex);
 		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
 		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
 
@@ -323,8 +324,8 @@ namespace gglab
 			desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 3, 0, 1, 0, "ViewSB");
 		AddBindingSlot(desc, RHIBindingType::ReadOnlyStorageBuffer, RHIShaderStage::All, 4, 0, 1, 0,
 			"LightSB");
-		AddBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable, RHIShaderStage::All, 0, 0,
-			0, 0, "BindlessTextures");
+		AddBindingSlot(desc, RHIBindingType::BindlessResourceTable, RHIShaderStage::All, 0, 0, 0, 0,
+			"BindlessResources");
 		AddBindingSlot(desc, RHIBindingType::BindlessSamplerTable, RHIShaderStage::All, 0, 0, 0, 0,
 			"BindlessSamplers");
 		return desc;
@@ -398,49 +399,50 @@ namespace gglab
 		{
 			DynamicConstantBufferAllocator::CreateInfo createInfo{};
 			createInfo.m_Device = GetDevice();
-			createInfo.m_CapacityInBytes =
-				static_cast<uint32_t>(sizeof(SceneGPU)) * GetSwapChain()->GetBufferCount() * 4;
+			createInfo.m_CapacityInBytes = static_cast<uint32_t>(sizeof(SceneGPU)) *
+				m_RHIContext->GetFrameSlotCount() * 4;
 			createInfo.m_DebugName = "Renderer.DynamicConstants";
 			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
 		}
 
-		// Persistent scene tables are replicated per backbuffer. Each frame only
-		// updates the safe physical version selected by its backbuffer index.
+		// Persistent scene tables are replicated per frame slot. Each frame only updates
+		// the safe physical version selected by its reusable slot.
 		{
 			PersistentStructuredBuffer<ObjectGPU>::CreateInfo objectSBCreateInfo{};
 			objectSBCreateInfo.m_Device = GetDevice();
 			objectSBCreateInfo.m_ElementCapacity = MaxObjectCapacity;
-			objectSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
+			objectSBCreateInfo.m_BufferCount = m_RHIContext->GetFrameSlotCount();
 			objectSBCreateInfo.m_DebugName = "Renderer.PersistentObjects";
 			m_ObjectSB =
 				std::make_unique<PersistentStructuredBuffer<ObjectGPU>>(objectSBCreateInfo);
 			m_ObjectTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, ObjectGPU>>(
-				MaxObjectCapacity, GetSwapChain()->GetBufferCount());
+				MaxObjectCapacity, m_RHIContext->GetFrameSlotCount());
 
 			PersistentStructuredBuffer<MaterialGPU>::CreateInfo materialSBCreateInfo{};
 			materialSBCreateInfo.m_Device = GetDevice();
 			materialSBCreateInfo.m_ElementCapacity = MaxMaterialCapacity;
-			materialSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
+			materialSBCreateInfo.m_BufferCount = m_RHIContext->GetFrameSlotCount();
 			materialSBCreateInfo.m_DebugName = "Renderer.PersistentMaterials";
 			m_MaterialSB =
 				std::make_unique<PersistentStructuredBuffer<MaterialGPU>>(materialSBCreateInfo);
 			m_MaterialTable =
 				std::make_unique<PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>>(
-					MaxMaterialCapacity, GetSwapChain()->GetBufferCount());
+					MaxMaterialCapacity, m_RHIContext->GetFrameSlotCount());
 
 			PersistentStructuredBuffer<LightGPU>::CreateInfo lightSBCreateInfo{};
 			lightSBCreateInfo.m_Device = GetDevice();
 			lightSBCreateInfo.m_ElementCapacity = MaxLightCapacity;
-			lightSBCreateInfo.m_BufferCount = GetSwapChain()->GetBufferCount();
+			lightSBCreateInfo.m_BufferCount = m_RHIContext->GetFrameSlotCount();
 			lightSBCreateInfo.m_DebugName = "Renderer.PersistentLights";
 			m_LightSB = std::make_unique<PersistentStructuredBuffer<LightGPU>>(lightSBCreateInfo);
 			m_LightTable = std::make_unique<PersistentStructuredBufferTable<uint64_t, LightGPU>>(
-				MaxLightCapacity, GetSwapChain()->GetBufferCount());
+				MaxLightCapacity, m_RHIContext->GetFrameSlotCount());
 
 			// View data remains a small per-frame dynamic upload allocation.
 			DynamicStructuredBufferAllocator<ViewGPU>::CreateInfo viewSBCreateInfo{};
 			viewSBCreateInfo.m_Device = GetDevice();
-			viewSBCreateInfo.m_ElementCapacity = MaxViewCapacity * GetSwapChain()->GetBufferCount();
+			viewSBCreateInfo.m_ElementCapacity =
+				MaxViewCapacity * m_RHIContext->GetFrameSlotCount();
 			viewSBCreateInfo.m_DebugName = "Renderer.DynamicViews";
 			m_ViewSB =
 				std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);

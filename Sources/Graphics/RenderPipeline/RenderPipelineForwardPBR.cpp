@@ -168,7 +168,7 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
-					backBufferDesc, RGTextureAccess::Present);
+					backBufferDesc, RGTextureAccess::Present, RGContentValidity::Undefined);
 
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};
@@ -227,7 +227,7 @@ namespace gglab
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
-					*shadowMapPreviewDesc, RGTextureAccess::None);
+					*shadowMapPreviewDesc, RGTextureAccess::None, RGContentValidity::Defined);
 			});
 
 		// SwapChain prepare backbuffer
@@ -250,7 +250,13 @@ namespace gglab
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				commandContext->ClearColor(rtv, renderer->GetBackBufferClearColor());
+				const RHIRenderingAttachment colorAttachment{
+					.m_View = rtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				commandContext->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+				commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
 			});
 
 		// IBL Pass

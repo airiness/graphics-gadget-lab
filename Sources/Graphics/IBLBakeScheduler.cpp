@@ -389,9 +389,8 @@ namespace gglab
 	bool IBLBakeScheduler::UploadCachedArtifacts(const IBLDerivedDataLookupResult& result) noexcept
 	{
 		TransferBatch batch = m_TransferManager->BeginBatch();
-		std::vector<RHITextureBarrier> barriers;
-		barriers.reserve(static_cast<size_t>(IBLArtifactStage::Count));
 		bool uploaded = true;
+		uint32_t uploadCount = 0;
 		for (IBLArtifactStage stage : ArtifactStages)
 		{
 			const IBLStageArtifactHandle& artifact = result.Get(stage).m_Artifact;
@@ -402,29 +401,20 @@ namespace gglab
 			const TextureIndex textureIndex = ArtifactTextureIndices[static_cast<size_t>(stage)];
 			const RHITextureHandle texture =
 				m_RenderResourceRegistry->GetIBLBakeTextureHandle(textureIndex);
-			uploaded &= batch.UploadTexture(texture, artifact->m_Texture.MakeUploadData());
-			barriers.push_back({
-				.m_Texture = texture,
-				.m_Before =
-					{
-						.m_Stages = RHIStage::Copy,
-						.m_Access = RHIAccess::CopyDest,
-						.m_Layout = RHILayout::CopyDest,
-					},
-				.m_After =
-					{
-						.m_Stages = RHIStage::All,
-						.m_Access = RHIAccess::Common,
-						.m_Layout = RHILayout::Common,
-					},
-				});
+			const RHIResourceState commonState{
+				.m_Stages = RHIStage::All,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			uploaded &= batch.UploadTexture(texture, artifact->m_Texture.MakeUploadData(),
+				UndefinedRHITextureState(), commonState);
+			++uploadCount;
 		}
-		if (barriers.empty())
+		if (uploadCount == 0)
 		{
 			return false;
 		}
-		batch.TextureBarrier(barriers);
-		m_InFlightFence = batch.Submit(false);
+		m_InFlightFence = batch.Submit(false).m_Completion;
 		return uploaded && m_InFlightFence.IsValid();
 	}
 
@@ -620,7 +610,7 @@ namespace gglab
 			return false;
 		}
 
-		m_InFlightFence = batch.Submit(false);
+		m_InFlightFence = batch.Submit(false).m_Completion;
 		m_CacheReadbackInFlight = m_InFlightFence.IsValid();
 		m_ReadbackWork = m_CacheReadbackInFlight ? std::move(work) : nullptr;
 		m_Status.m_CacheWritePending = m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();

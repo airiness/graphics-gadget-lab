@@ -77,7 +77,7 @@ namespace gglab
 						const auto* desc = renderResRegistry->GetTextureDesc(index);
 						GGLAB_ASSERT_NOT_NULL(desc);
 						return builder.ImportTexture(name, renderResRegistry->GetTextureHandle(index),
-							*desc, RGTextureAccess::None);
+							*desc, RGTextureAccess::None, RGContentValidity::Defined);
 					};
 				previewResources.m_EnvironmentCubemapPreview = importPreview(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
@@ -158,6 +158,6 @@ namespace gglab
 		return builder.ImportTexture(name,
 			bakeTarget ? registry.GetIBLBakeTextureHandle(texIndex)
 			: registry.GetTextureHandle(texIndex),
-			*desc, RGTextureAccess::None);
+			*desc, RGTextureAccess::None, RGContentValidity::Defined);
 	}
 }

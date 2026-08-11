@@ -56,7 +56,7 @@ namespace gglab
 
 	DX12TransferContext::DX12TransferContext(
 		DX12Device* dx12Device, DX12QueueSystem* queueSystem) noexcept :
-		m_Handle(AllocateDX12CommandContextHandle()), m_Device(dx12Device)
+		m_Handle(AllocateRHICommandContextHandle()), m_Device(dx12Device)
 	{
 		GGLAB_ASSERT_MSG(dx12Device != nullptr, "DX12Device pointer can not be null.");
 		GGLAB_ASSERT_MSG(queueSystem != nullptr, "DX12QueueSystem pointer can not be null.");
@@ -93,6 +93,15 @@ namespace gglab
 		nativeBarriers.reserve(barriers.size());
 		for (const RHITextureBarrier& barrier : barriers)
 		{
+			if (!IsRHIResourceStateValid(
+				barrier.m_Before, RHIResourceStateUsage::TextureBarrierBefore) ||
+				!IsRHIResourceStateValid(
+					barrier.m_After, RHIResourceStateUsage::TextureBarrierAfter))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12TransferContext::TextureBarrier rejected an invalid resource state.");
+				continue;
+			}
 			DX12Texture* texture = m_Device->ResolveTexture(barrier.m_Texture);
 			if (!texture)
 			{
@@ -126,6 +135,13 @@ namespace gglab
 		nativeBarriers.reserve(barriers.size());
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
+			if (!IsRHIResourceStateValid(barrier.m_Before, RHIResourceStateUsage::Buffer) ||
+				!IsRHIResourceStateValid(barrier.m_After, RHIResourceStateUsage::Buffer))
+			{
+				GGLAB_LOG_GRAPHICS_WARN(
+					"DX12TransferContext::BufferBarrier rejected an invalid resource state.");
+				continue;
+			}
 			DX12Buffer* buffer = m_Device->ResolveBuffer(barrier.m_Buffer);
 			if (!buffer)
 			{

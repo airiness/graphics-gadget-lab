@@ -479,10 +479,10 @@ namespace gglab
 
 	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-		const auto* swapChain = m_Services.m_Renderer
-			? m_Services.m_Renderer->GetSwapChain()
+		const auto* rhiContext = m_Services.m_Renderer
+			? m_Services.m_Renderer->GetRHIContext()
 			: nullptr;
-		m_GpuTimingWarmupFrames = swapChain ? swapChain->GetBufferCount() : 3;
+		m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
 	}
 
 	void ForwardPlusLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept

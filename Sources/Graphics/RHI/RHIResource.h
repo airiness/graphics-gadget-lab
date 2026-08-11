@@ -25,14 +25,6 @@ namespace gglab
 		GpuToCpu,
 	};
 
-	struct RHIResourceDesc
-	{
-		RHIResourceType m_Type = RHIResourceType::Unknown;
-		RHIResourceState m_InitialState{};
-		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
-		const char* m_DebugName = nullptr;
-	};
-
 	struct RHIExternalResourceDesc
 	{
 		RHIResourceState m_InitialState{};

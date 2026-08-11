@@ -39,7 +39,7 @@ namespace gglab
 			const RHITextureDesc& desc) const noexcept = 0;
 		virtual RHITextureSupportResult QueryTextureViewSupport(const RHITextureDesc& textureDesc,
 			const RHITextureViewDesc& viewDesc) const noexcept = 0;
-		virtual RHITextureHandle CreateTexture(const RHITextureDesc& desc,
+		virtual RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;
 		virtual RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc,
 			const RHIResourceDebugIdentityDesc& debugIdentity = {}) noexcept = 0;

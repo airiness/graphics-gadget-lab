@@ -19,3 +19,6 @@
 [submodule "Externals/Vender/imgui"]
 	path = Externals/Vender/imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "Externals/Vender/VulkanMemoryAllocator"]
+	path = Externals/Vender/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

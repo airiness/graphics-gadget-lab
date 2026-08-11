@@ -89,8 +89,13 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				graphicsContext->SetRenderTargets({}, dsv);
-				graphicsContext->ClearDepthStencil(dsv, data.m_ClearDepth);
+				graphicsContext->BeginRendering({
+					.m_DepthAttachment = RHIRenderingAttachment{
+						.m_View = dsv,
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					},
+				});
+				graphicsContext->ClearDepthAttachment(data.m_ClearDepth);
 
 				if (!data.m_DrawCoverage)
 				{
@@ -146,11 +151,11 @@ namespace gglab
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
 					renderer->GetObjectStructuredBuffer()->GetBufferHandle(
-						contextPtr->m_BackBufferIndex));
+						contextPtr->m_FrameSlotIndex));
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					renderer->GetMaterialStructuredBuffer()->GetBufferHandle(
-						contextPtr->m_BackBufferIndex));
+						contextPtr->m_FrameSlotIndex));
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					renderer->GetViewStructuredBuffer()->GetBufferHandle());

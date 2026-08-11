@@ -17,7 +17,7 @@ namespace gglab
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
-		uint32_t m_BufferCount = 2;
+		uint32_t m_FrameSlotCount = 2;
 		bool m_AllowTearing = true;
 		bool m_Vsync = false;
 	};
@@ -27,6 +27,7 @@ namespace gglab
 	public:
 		virtual ~RHIFrameContext() = default;
 
+		[[nodiscard]] virtual uint32_t GetFrameSlotIndex() const noexcept = 0;
 		[[nodiscard]] virtual uint32_t GetBackBufferIndex() const noexcept = 0;
 		[[nodiscard]] virtual RHITextureHandle GetBackBuffer() const noexcept = 0;
 		[[nodiscard]] virtual RHIGraphicsCommandContext& GetGraphicsContext() noexcept = 0;
@@ -58,7 +59,7 @@ namespace gglab
 		virtual void WaitIdle() noexcept = 0;
 		virtual void RetireCompletedWork() noexcept = 0;
 
-		[[nodiscard]] virtual uint32_t GetCurrentFrameIndex() const noexcept = 0;
+		[[nodiscard]] virtual uint32_t GetFrameSlotCount() const noexcept = 0;
 	};
 
 	[[nodiscard]] std::unique_ptr<RHIContext> CreateRHIContext(const RHIContextDesc& desc) noexcept;

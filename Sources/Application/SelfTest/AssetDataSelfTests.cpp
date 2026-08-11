@@ -998,6 +998,7 @@ namespace gglab
 			RHITextureDesc cubeDesc = textureDesc;
 			cubeDesc.m_Extent = { 4, 4, 1 };
 			cubeDesc.m_ArraySize = 6;
+			cubeDesc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 			RHITextureViewDesc cubeView = typedSrv;
 			cubeView.m_Dimension = RHITextureViewDimension::TextureCube;
 			cubeView.m_Subresources.m_ArraySliceCount = 5;

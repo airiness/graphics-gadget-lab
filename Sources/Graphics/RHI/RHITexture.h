@@ -21,6 +21,13 @@ namespace gglab
 	};
 	GGLAB_ENUM_FLAGS(RHITextureUsage);
 
+	enum class RHITextureCreateFlags : uint8_t
+	{
+		None = 0,
+		CubeCompatible = 1u << 0,
+	};
+	GGLAB_ENUM_FLAGS(RHITextureCreateFlags);
+
 	enum class RHITextureDimension : uint8_t
 	{
 		Texture1D,
@@ -58,12 +65,19 @@ namespace gglab
 		RHITextureDimension m_Dimension = RHITextureDimension::Texture2D;
 		RHIFormat m_Format = RHIFormat::Unknown;
 		RHITextureUsage m_Usage = RHITextureUsage::None;
+		RHITextureCreateFlags m_CreateFlags = RHITextureCreateFlags::None;
 		RHIExtent3D m_Extent{};
 		uint16_t m_ArraySize = 1;
 		uint16_t m_MipLevels = 1;
 		uint16_t m_SampleCount = 1;
 		const char* m_DebugName = nullptr;
 		std::optional<RHIClearValue> m_ClearValue = std::nullopt;
+	};
+
+	struct RHIOwnedTextureCreateInfo
+	{
+		RHITextureDesc m_Desc{};
+		RHIResourceState m_InitialState = UndefinedRHITextureState();
 	};
 
 	[[nodiscard]] constexpr inline RHITextureAspect GetRHITextureAspects(
@@ -156,4 +170,15 @@ namespace gglab
 				m_ReadOnlyDepth, m_ReadOnlyStencil);
 		}
 	};
+
+	[[nodiscard]] constexpr inline RHIPortabilityValidationResult
+		ValidateRHITextureViewPortability(const RHITextureViewDesc& desc,
+			const RHIPortabilityCapabilities& capabilities) noexcept
+	{
+		if (desc.m_ResourceMinLODClamp != 0.0f && !capabilities.m_ImageViewMinLod)
+		{
+			return { .m_Error = RHIPortabilityValidationError::ImageViewMinLodUnsupported };
+		}
+		return {};
+	}
 }

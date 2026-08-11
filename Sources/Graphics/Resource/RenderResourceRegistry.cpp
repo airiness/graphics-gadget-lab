@@ -74,6 +74,7 @@ namespace gglab
 			desc.m_Format = createInfo.m_EnvironmentCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
 				RHITextureUsage::CopySource | RHITextureUsage::CopyDest;
+			desc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -96,6 +97,7 @@ namespace gglab
 			desc.m_Format = createInfo.m_IrradianceCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
 				RHITextureUsage::CopySource | RHITextureUsage::CopyDest;
+			desc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -122,6 +124,7 @@ namespace gglab
 			desc.m_Format = createInfo.m_PrefilteredSpecularCubemapFormat;
 			desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
 				RHITextureUsage::CopySource | RHITextureUsage::CopyDest;
+			desc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 
 			RHITextureViewDesc srvDesc{};
 			srvDesc.m_Type = RHITextureViewType::ShaderResource;
@@ -238,6 +241,7 @@ namespace gglab
 				desc.m_Format = format;
 				desc.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Sampled |
 					RHITextureUsage::CopySource | RHITextureUsage::CopyDest;
+				desc.m_CreateFlags = RHITextureCreateFlags::CubeCompatible;
 
 				RHITextureViewDesc srvDesc{};
 				srvDesc.m_Type = RHITextureViewType::ShaderResource;

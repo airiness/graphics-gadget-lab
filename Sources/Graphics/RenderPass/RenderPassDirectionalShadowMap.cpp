@@ -73,8 +73,13 @@ namespace gglab
 
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
-				graphicsContext->ClearDepthStencil(dsv, 1.0f, 0);
-				graphicsContext->SetRenderTargets({}, dsv);
+				graphicsContext->BeginRendering({
+					.m_DepthAttachment = RHIRenderingAttachment{
+						.m_View = dsv,
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					},
+				});
+				graphicsContext->ClearDepthAttachment(1.0f, 0);
 
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
@@ -124,12 +129,12 @@ namespace gglab
 				const auto& objectSB = renderer->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBufferHandle(contextPtr->m_BackBufferIndex));
+					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				const auto& viewSB = renderer->GetViewStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(

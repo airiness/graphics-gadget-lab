@@ -16,6 +16,8 @@ namespace gglab
 		InvalidMipLevelCount,
 		InvalidSampleCount,
 		InvalidDimension,
+		InvalidCreateFlags,
+		MissingCubeCompatible,
 		InvalidClearValue,
 		IncompatibleViewFormat,
 		IncompatibleViewDimension,
@@ -49,12 +51,20 @@ namespace gglab
 		TypedUnorderedAccessUnsupported,
 		TypedUnorderedAccessStoreUnsupported,
 		MultisamplingUnsupported,
+		CopySourceUnsupported,
+		CopyDestUnsupported,
+		// The format supports every requested single use, but the combined
+		// image-format query (usage, flags, view format list) failed.
+		FormatCombinationUnsupported,
 	};
 
 	struct RHITextureSupportResult
 	{
 		RHITextureValidationError m_ValidationError = RHITextureValidationError::None;
 		RHITextureSupportReason m_Reason = RHITextureSupportReason::None;
+		// Filled when a description is rejected by the portability contract
+		// rather than by backend format support. See GetRHIPortabilityValidationErrorText.
+		RHIPortabilityValidationError m_PortabilityError = RHIPortabilityValidationError::None;
 		bool m_Supported = false;
 
 		[[nodiscard]] constexpr bool IsDescriptionValid() const noexcept
@@ -72,6 +82,8 @@ namespace gglab
 		RHITextureValidationError error) noexcept;
 	[[nodiscard]] std::string_view RHITextureSupportReasonText(
 		RHITextureSupportReason reason) noexcept;
+	[[nodiscard]] RHITextureSupportReason RHITextureSupportReasonForUsage(
+		RHITextureUsage usage) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureDesc(
 		const RHITextureDesc& desc) noexcept;
 	[[nodiscard]] RHITextureValidationResult ValidateRHITextureViewDesc(

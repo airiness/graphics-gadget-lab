@@ -47,12 +47,6 @@ namespace gglab
 			RHIResourceState m_After;
 		};
 
-		constexpr std::array TextureAspectOrder = {
-			RHITextureAspect::Color,
-			RHITextureAspect::Depth,
-			RHITextureAspect::Stencil,
-		};
-
 		uint32_t PlaneCountOf(const RHITextureDesc& desc) noexcept
 		{
 			return GetRHITexturePlaneCount(desc);
@@ -69,52 +63,6 @@ namespace gglab
 			return desc;
 		}
 
-		uint32_t AspectIndexOf(const RHITextureDesc& desc, RHITextureAspect target) noexcept
-		{
-			uint32_t index = 0;
-			const RHITextureAspect aspects = GetRHITextureAspects(desc);
-			for (const auto aspect : TextureAspectOrder)
-			{
-				if (!Test(aspects, aspect))
-				{
-					continue;
-				}
-				if (aspect == target)
-				{
-					return index;
-				}
-				++index;
-			}
-			GGLAB_UNREACHABLE("Texture aspect is not supported by the resource format.");
-		}
-
-		RHITextureAspect AspectFromIndex(const RHITextureDesc& desc, uint32_t targetIndex) noexcept
-		{
-			uint32_t index = 0;
-			const RHITextureAspect aspects = GetRHITextureAspects(desc);
-			for (const auto aspect : TextureAspectOrder)
-			{
-				if (!Test(aspects, aspect))
-				{
-					continue;
-				}
-				if (index == targetIndex)
-				{
-					return aspect;
-				}
-				++index;
-			}
-			GGLAB_UNREACHABLE("Texture aspect index is out of range.");
-		}
-
-		uint32_t SubresourceIndex(const RHITextureDesc& desc, uint32_t mip, uint32_t arraySlice,
-			RHITextureAspect aspect) noexcept
-		{
-			return mip +
-				GetRHITextureMipLevelCount(desc) *
-				(arraySlice + GetRHITextureArraySize(desc) * AspectIndexOf(desc, aspect));
-		}
-
 		TextureSubresource DecodeSubresource(const RHITextureDesc& desc, uint32_t index) noexcept
 		{
 			const uint32_t mipLevels = GetRHITextureMipLevelCount(desc);
@@ -122,30 +70,8 @@ namespace gglab
 			return TextureSubresource{
 				.m_Mip = index % mipLevels,
 				.m_ArraySlice = (index / mipLevels) % arraySize,
-				.m_Aspect = AspectFromIndex(desc, index / (mipLevels * arraySize)),
+				.m_Aspect = GetRHITextureAspectAt(desc, index / (mipLevels * arraySize)),
 			};
-		}
-
-		template <typename Func>
-		void ForEachSubresource(
-			const RHITextureDesc& desc, const RHISubresourceRange& range, Func&& function) noexcept
-		{
-			for (const auto aspect : TextureAspectOrder)
-			{
-				if (!Test(range.m_Aspects, aspect))
-				{
-					continue;
-				}
-				for (uint32_t arraySlice = range.m_BaseArraySlice;
-					arraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount; ++arraySlice)
-				{
-					for (uint32_t mip = range.m_BaseMip; mip < range.m_BaseMip + range.m_MipCount;
-						++mip)
-					{
-						function(TextureSubresource{ mip, arraySlice, aspect });
-					}
-				}
-			}
 		}
 
 		void AppendCoalescedTextureBarriers(RGVirtualResourceIndex resourceIndex,
@@ -184,8 +110,8 @@ namespace gglab
 				std::unordered_set<uint32_t> uniqueSubresources;
 				for (const auto& subresource : group.m_Subresources)
 				{
-					uniqueSubresources.insert(SubresourceIndex(
-						desc, subresource.m_Mip, subresource.m_ArraySlice, subresource.m_Aspect));
+					uniqueSubresources.insert(GetRHITextureSubresourceIndex(desc,
+						subresource.m_Mip, subresource.m_ArraySlice, subresource.m_Aspect));
 				}
 				GGLAB_ASSERT_MSG(uniqueSubresources.size() == group.m_Subresources.size(),
 					"Texture barrier coalescing received duplicate subresources.");
@@ -305,7 +231,7 @@ namespace gglab
 				for (const auto& range : mergedRanges)
 				{
 					uint32_t rangeAspectCount = 0;
-					for (const auto aspect : TextureAspectOrder)
+					for (const RHITextureAspect aspect : RHITextureAspectOrder)
 					{
 						rangeAspectCount += Test(range.m_Aspects, aspect) ? 1u : 0u;
 					}
@@ -372,11 +298,13 @@ namespace gglab
 					auto& stateTracker = textureStates.at(virtualResource);
 					std::vector<TextureBarrierRecord> transitions;
 					std::vector<TextureBarrierRecord> uavBarriers;
-					ForEachSubresource(textureDesc, range,
-						[&](const TextureSubresource& subresource)
+					ForEachRHITextureSubresource(textureDesc, range,
+						[&](uint32_t mip, uint32_t arraySlice, RHITextureAspect aspect)
 						{
-							const uint32_t index = SubresourceIndex(textureDesc, subresource.m_Mip,
-								subresource.m_ArraySlice, subresource.m_Aspect);
+							const TextureSubresource subresource{ mip, arraySlice, aspect };
+							const uint32_t index = GetRHITextureSubresourceIndex(
+								textureDesc, subresource.m_Mip, subresource.m_ArraySlice,
+								subresource.m_Aspect);
 							auto stateIter =
 								stateTracker.m_SubresourceStates
 								.emplace(index,
@@ -412,11 +340,11 @@ namespace gglab
 					AppendCoalescedTextureBarriers(access.m_Resource, textureDesc, uavBarriers,
 						passNode.m_PreBarriers, RGBarrierKind::Uav,
 						RGBarrierReason::OrderedStorageHazard);
-					ForEachSubresource(textureDesc, range,
-						[&](const TextureSubresource& subresource)
+					ForEachRHITextureSubresource(textureDesc, range,
+						[&](uint32_t mip, uint32_t arraySlice, RHITextureAspect aspect)
 						{
-							const uint32_t index = SubresourceIndex(textureDesc, subresource.m_Mip,
-								subresource.m_ArraySlice, subresource.m_Aspect);
+							const uint32_t index = GetRHITextureSubresourceIndex(
+								textureDesc, mip, arraySlice, aspect);
 							auto& trackedState = stateTracker.m_SubresourceStates.at(index);
 							const bool transitioned =
 								NeedsRHIResourceTransition(trackedState.m_State, requiredState);
@@ -506,12 +434,11 @@ namespace gglab
 					normalizedFinalRange =
 						NormalizeTextureSubresourceRange(textureDesc, resource.m_FinalSubresources);
 					const auto& range = *normalizedFinalRange;
-					ForEachSubresource(textureDesc, range,
-						[&](const TextureSubresource& subresource)
+					ForEachRHITextureSubresource(textureDesc, range,
+						[&](uint32_t mip, uint32_t arraySlice, RHITextureAspect aspect)
 						{
 							stateTracker.m_SubresourceStates.try_emplace(
-								SubresourceIndex(textureDesc, subresource.m_Mip,
-									subresource.m_ArraySlice, subresource.m_Aspect),
+								GetRHITextureSubresourceIndex(textureDesc, mip, arraySlice, aspect),
 								TrackedResourceState{
 									.m_State = stateTracker.m_InitialState,
 									.m_LastOrderedUavAccess =

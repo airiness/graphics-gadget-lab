@@ -48,6 +48,8 @@
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -61,6 +63,8 @@
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -140,6 +144,8 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\Application\RenderingStartup.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
@@ -160,6 +166,8 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTest.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.cpp" />
+    <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
@@ -332,6 +340,7 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
@@ -422,6 +431,27 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -435,6 +465,8 @@
     <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\Application\RenderingStartup.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
@@ -443,6 +475,8 @@
     <ClInclude Include="..\..\Sources\Application\SelfTest\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTest.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\SelfTestRunner.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.h" />
+    <ClInclude Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Platform\Windows\Win32MessageHandler.h" />
@@ -538,8 +572,10 @@
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptorCapacityContract.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIContext.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
@@ -558,6 +594,32 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureValidation.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
@@ -603,6 +665,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h" />
@@ -654,6 +717,7 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\NapaVoxelLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
+    <ClInclude Include="..\..\Sources\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\SampleableDepthLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h" />
@@ -868,6 +932,7 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />

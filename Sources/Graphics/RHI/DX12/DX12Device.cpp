@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+#include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Core/HResult.h"
@@ -139,6 +140,12 @@ namespace gglab
 		{
 			return { .m_ValidationError = validation.m_Error };
 		}
+		const RHIPortabilityValidationResult portability =
+			ValidateRHITextureViewPortability(viewDesc, DX12PortabilityCapabilities);
+		if (!portability.IsValid())
+		{
+			return { .m_PortabilityError = portability.m_Error };
+		}
 		const RHITextureSupportResult textureSupport = QueryTextureSupport(textureDesc);
 		if (!textureSupport.IsSupported())
 		{
@@ -172,10 +179,10 @@ namespace gglab
 		return { .m_Supported = true };
 	}
 
-	RHITextureHandle DX12Device::CreateTexture(
-		const RHITextureDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+	RHITextureHandle DX12Device::CreateTexture(const RHIOwnedTextureCreateInfo& createInfo,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
-		return m_ResourceManager.CreateTexture(desc, debugIdentity);
+		return m_ResourceManager.CreateTexture(createInfo, debugIdentity);
 	}
 
 	RHIBufferHandle DX12Device::CreateBuffer(
@@ -224,6 +231,11 @@ namespace gglab
 
 	RHISamplerHandle DX12Device::CreateSampler(const RHISamplerDesc& desc) noexcept
 	{
+		if (!ValidateRHISamplerPortability(desc, DX12PortabilityCapabilities).IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12Device::CreateSampler rejected a non-portable sampler.");
+			return {};
+		}
 		if (!m_DescriptorCache)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
@@ -448,6 +460,12 @@ namespace gglab
 	{
 		return m_DescriptorCache ? m_DescriptorCache->ResolveTextureView(view)
 			: DX12DescriptorView{};
+	}
+
+	bool DX12Device::ResolveTextureViewInfo(RHITextureViewHandle view,
+		DX12DescriptorView& descriptor, RHITextureViewKey& key) const noexcept
+	{
+		return m_DescriptorCache && m_DescriptorCache->ResolveTextureViewInfo(view, descriptor, key);
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(

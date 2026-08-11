@@ -28,6 +28,24 @@ namespace gglab
 		TriangleStrip,
 	};
 
+	[[nodiscard]] constexpr inline bool IsRHIPrimitiveTopologyCompatible(
+		RHIPrimitiveTopologyType type, RHIPrimitiveTopology topology) noexcept
+	{
+		switch (type)
+		{
+		case RHIPrimitiveTopologyType::Point:
+			return topology == RHIPrimitiveTopology::PointList;
+		case RHIPrimitiveTopologyType::Line:
+			return topology == RHIPrimitiveTopology::LineList ||
+				topology == RHIPrimitiveTopology::LineStrip;
+		case RHIPrimitiveTopologyType::Triangle:
+			return topology == RHIPrimitiveTopology::TriangleList ||
+				topology == RHIPrimitiveTopology::TriangleStrip;
+		default:
+			return false;
+		}
+	}
+
 	enum class RHIVertexInputRate : uint8_t
 	{
 		PerVertex,
@@ -38,6 +56,7 @@ namespace gglab
 	{
 		const char* m_SemanticName = nullptr;
 		uint32_t m_SemanticIndex = 0;
+		uint32_t m_Location = 0;
 		RHIFormat m_Format = RHIFormat::Unknown;
 		uint32_t m_InputSlot = 0;
 		uint32_t m_AlignedByteOffset = 0;
@@ -138,6 +157,8 @@ namespace gglab
 		RHIBlendFactor m_DstAlpha = RHIBlendFactor::Zero;
 		RHIBlendOp m_AlphaOp = RHIBlendOp::Add;
 		RHIColorWriteMask m_WriteMask = RHIColorWriteMask::All;
+
+		constexpr bool operator==(const RHIRenderTargetBlendDesc&) const noexcept = default;
 	};
 
 	struct RHIBlendDesc
@@ -179,4 +200,59 @@ namespace gglab
 		RHIBindingLayoutHandle m_BindingLayout{};
 		RHIShaderHandle m_ComputeShader{};
 	};
+
+	[[nodiscard]] constexpr inline RHIPortabilityValidationResult
+		ValidateRHIGraphicsPipelinePortability(const RHIGraphicsPipelineDesc& desc,
+			const RHIPortabilityCapabilities& capabilities) noexcept
+	{
+		if (desc.m_VertexInput.m_VertexBufferCount >
+			RHIVertexInputLayoutDesc::MaxVertexBuffers)
+		{
+			return { .m_Error = RHIPortabilityValidationError::VertexBufferCountExceedsLimit };
+		}
+		if (desc.m_RenderTargetCount > RHIGraphicsPipelineDesc::MaxRenderTargets)
+		{
+			return { .m_Error = RHIPortabilityValidationError::RenderTargetCountExceedsLimit };
+		}
+		for (uint32_t layoutIndex = 0; layoutIndex < desc.m_VertexInput.m_VertexBufferCount;
+			++layoutIndex)
+		{
+			const auto& layout = desc.m_VertexInput.m_VertexBuffers[layoutIndex];
+			if (layout.m_InputRate == RHIVertexInputRate::PerVertex && layout.m_InstanceStepRate != 0)
+			{
+				return { .m_Error = RHIPortabilityValidationError::InvalidVertexInputRate };
+			}
+			if (layout.m_InputRate == RHIVertexInputRate::PerInstance &&
+				layout.m_InstanceStepRate > 1 && !capabilities.m_VertexAttributeDivisor)
+			{
+				return { .m_Error = RHIPortabilityValidationError::InstanceDivisorUnsupported };
+			}
+		}
+		if (desc.m_Rasterizer.m_FillMode == RHIFillMode::Wireframe &&
+			!capabilities.m_FillModeNonSolid)
+		{
+			return { .m_Error = RHIPortabilityValidationError::WireframeUnsupported };
+		}
+		if (!desc.m_Rasterizer.m_DepthClipEnable && !capabilities.m_DepthClamp)
+		{
+			return { .m_Error = RHIPortabilityValidationError::DepthClampUnsupported };
+		}
+		if (desc.m_Rasterizer.m_DepthBiasClamp != 0.0f && !capabilities.m_DepthBiasClamp)
+		{
+			return { .m_Error = RHIPortabilityValidationError::DepthBiasClampUnsupported };
+		}
+		for (uint32_t targetIndex = 1; targetIndex < desc.m_RenderTargetCount; ++targetIndex)
+		{
+			if (desc.m_Blend.m_RenderTargets[targetIndex] != desc.m_Blend.m_RenderTargets[0] &&
+				!capabilities.m_IndependentBlend)
+			{
+				return { .m_Error = RHIPortabilityValidationError::IndependentBlendUnsupported };
+			}
+		}
+		if (desc.m_SampleQuality != 0 && !capabilities.m_SampleQuality)
+		{
+			return { .m_Error = RHIPortabilityValidationError::SampleQualityUnsupported };
+		}
+		return {};
+	}
 }

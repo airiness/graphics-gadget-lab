@@ -194,7 +194,7 @@ namespace gglab
 						resources.m_BackBuffer =
 							builder.ImportTexture("RenderGraphCompute.BackBuffer",
 								swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-								RGTextureAccess::Present);
+								RGTextureAccess::Present, RGContentValidity::Undefined);
 
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
@@ -218,8 +218,14 @@ namespace gglab
 					[state = m_State](RGExecuteContext& executeContext, InitializePassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
-						commandContext->ClearColor(
-							executeContext.GetViewHandle(data.m_WorkRtv), { 0.0f, 0.0f, 0.0f, 1.0f });
+						const auto workRtv = executeContext.GetViewHandle(data.m_WorkRtv);
+						const RHIRenderingAttachment colorAttachment{
+							.m_View = workRtv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+						commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 						state->m_InitializeExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
@@ -382,10 +388,15 @@ namespace gglab
 						GGLAB_ASSERT_MSG(workASrv.IsValid() && workBSrv.IsValid(),
 							"Compute Lab preview SRVs must be shader visible.");
 
-						commandContext->ClearColor(backBufferRtv, { 0.005f, 0.008f, 0.015f, 1.0f });
+						const RHIRenderingAttachment colorAttachment{
+							.m_View = backBufferRtv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+						commandContext->ClearColorAttachment(
+							0, { 0.005f, 0.008f, 0.015f, 1.0f });
 						commandContext->SetPipeline(GetOrCreatePreviewPSO());
-						commandContext->SetRenderTargets(
-							std::span<const RHITextureViewHandle>(&backBufferRtv, 1));
 						commandContext->SetViewport({
 							0.0f,
 							0.0f,

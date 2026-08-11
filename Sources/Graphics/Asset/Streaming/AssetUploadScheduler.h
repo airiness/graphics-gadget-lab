@@ -11,6 +11,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -302,8 +303,9 @@ namespace gglab
 		}
 	};
 
-	// Owns the main-thread streaming boundaries around resource publication and
-	// transfer-queue work. Jobs advance only at explicit publication step boundaries.
+	// Owns the graphics-owner-thread boundaries around resource publication and
+	// transfer work. Workers may enqueue immutable CPU payload handoffs, but jobs
+	// advance and all RHI calls occur only at explicit owner-thread boundaries.
 	class AssetUploadScheduler
 	{
 	public:
@@ -345,6 +347,7 @@ namespace gglab
 		void ClearResourcePublicationFault() noexcept;
 		void ArmGpuCompletionHold(const AssetStreamingIdentity& identity) noexcept;
 		void ClearGpuCompletionHold() noexcept;
+		[[nodiscard]] bool IsOwnerThread() const noexcept;
 
 		[[nodiscard]] AssetUploadStatistics GetStatistics() const;
 
@@ -411,9 +414,10 @@ namespace gglab
 			std::deque<double> m_RecentExecutionMilliseconds;
 		};
 
-		[[nodiscard]] bool IsOwnerThread() const noexcept;
-		void EnqueueWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
-			AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept;
+		void InsertQueuedWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
+			QueuedWork&& queued) noexcept;
+		void DrainWorkerHandoffs() noexcept;
+		[[nodiscard]] bool HasWorkerHandoffs() const noexcept;
 		[[nodiscard]] double ExecuteWork(
 			QueuedWork&& queued, QueueTelemetry& telemetry, std::string_view queueName) noexcept;
 		void InsertResourcePublication(QueuedResourcePublication&& publication) noexcept;
@@ -477,6 +481,8 @@ namespace gglab
 		std::deque<QueuedWork> m_CpuPayloadQueue;
 		std::deque<QueuedResourcePublication> m_ResourcePublicationQueue;
 		std::deque<QueuedWork> m_UploadRecordingQueue;
+		mutable std::mutex m_HandoffMutex;
+		std::deque<QueuedWork> m_CpuPayloadHandoffs;
 		std::unique_ptr<TransferBatch> m_RecordingBatch;
 		std::vector<PendingUpload> m_RecordedUploads;
 		std::deque<PendingUpload> m_PendingUploads;

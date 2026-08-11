@@ -97,8 +97,8 @@ namespace gglab
 				sizeof(HdrDiffParameters), "HdrDiffConstants");
 			AppendBindingSlot(desc, RHIBindingType::ReadWriteStorageBuffer,
 				RHIShaderStage::Compute, 0, 0, "TileMetrics");
-			AppendBindingSlot(desc, RHIBindingType::BindlessSampledTextureTable,
-				RHIShaderStage::Compute, 0, 0, "BindlessTextures");
+			AppendBindingSlot(desc, RHIBindingType::BindlessResourceTable,
+				RHIShaderStage::Compute, 0, 0, "BindlessResources");
 			return desc;
 		}
 
@@ -310,7 +310,7 @@ namespace gglab
 			});
 
 		const auto debugReadback = m_DebugReadback;
-		const uint32_t bufferIndex = context.m_BackBufferIndex;
+		const uint32_t bufferIndex = context.m_FrameSlotIndex;
 		const uint64_t frameSerial = context.m_FrameSerial;
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.HdrDiffReadback", RGPassEncoderType::Copy,
@@ -334,7 +334,7 @@ namespace gglab
 				readbackDesc.m_DebugName = "ForwardPlus.HdrDiffReadback";
 				data.m_Readback = builder.ImportBuffer("ForwardPlus.HdrDiffReadback",
 					debugReadback->GetHdrDiffBuffer(bufferIndex), readbackDesc,
-					RGBufferAccess::CopyDest);
+					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;
 				data.m_FrameSerial = frameSerial;

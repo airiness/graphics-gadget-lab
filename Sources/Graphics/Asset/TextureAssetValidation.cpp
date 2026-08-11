@@ -39,6 +39,7 @@ namespace gglab
 			case RHITextureValidationError::InvalidDimension:
 				return Error(TextureStructureValidationError::InvalidExtent);
 			case RHITextureValidationError::InvalidArraySize:
+			case RHITextureValidationError::MissingCubeCompatible:
 			case RHITextureValidationError::IncompatibleViewDimension:
 			case RHITextureValidationError::InvalidSubresourceRange:
 				return Error(TextureStructureValidationError::InvalidArrayConfiguration);
@@ -55,6 +56,7 @@ namespace gglab
 			case RHITextureValidationError::InvalidUploadSlicePitch:
 				return Error(TextureStructureValidationError::InvalidSlicePitch);
 			case RHITextureValidationError::InvalidUsage:
+			case RHITextureValidationError::InvalidCreateFlags:
 			case RHITextureValidationError::InvalidSampleCount:
 			case RHITextureValidationError::InvalidClearValue:
 			case RHITextureValidationError::UnsupportedUploadFormat:
@@ -351,6 +353,10 @@ namespace gglab
 			.m_Dimension = RHITextureDimension::Texture2D,
 			.m_Format = data.m_ResourceFormat,
 			.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest,
+			.m_CreateFlags = data.m_SrvDimension == RHITextureViewDimension::TextureCube ||
+				data.m_SrvDimension == RHITextureViewDimension::TextureCubeArray
+				? RHITextureCreateFlags::CubeCompatible
+				: RHITextureCreateFlags::None,
 			.m_Extent = data.m_Extent,
 			.m_ArraySize = data.m_ArraySize,
 			.m_MipLevels = data.m_MipLevels,

@@ -14,6 +14,8 @@ namespace gglab
 			RHITextureUsage::Sampled | RHITextureUsage::RenderTarget |
 			RHITextureUsage::DepthStencil | RHITextureUsage::UnorderedAccess |
 			RHITextureUsage::CopySource | RHITextureUsage::CopyDest | RHITextureUsage::Present;
+		constexpr RHITextureCreateFlags KnownTextureCreateFlags =
+			RHITextureCreateFlags::CubeCompatible;
 
 		[[nodiscard]] constexpr RHITextureValidationResult Error(
 			RHITextureValidationError error) noexcept
@@ -82,6 +84,10 @@ namespace gglab
 			return "invalid texture sample count";
 		case RHITextureValidationError::InvalidDimension:
 			return "invalid texture dimension";
+		case RHITextureValidationError::InvalidCreateFlags:
+			return "invalid texture create flags";
+		case RHITextureValidationError::MissingCubeCompatible:
+			return "cube texture view requires CubeCompatible resource creation";
 		case RHITextureValidationError::InvalidClearValue:
 			return "invalid texture clear value";
 		case RHITextureValidationError::IncompatibleViewFormat:
@@ -128,8 +134,35 @@ namespace gglab
 			return "typed unordered-access store unsupported";
 		case RHITextureSupportReason::MultisamplingUnsupported:
 			return "multisampling unsupported";
+		case RHITextureSupportReason::CopySourceUnsupported:
+			return "copy-source format unsupported";
+		case RHITextureSupportReason::CopyDestUnsupported:
+			return "copy-destination format unsupported";
+		case RHITextureSupportReason::FormatCombinationUnsupported:
+			return "format combination unsupported";
 		}
 		return "unknown texture support reason";
+	}
+
+	RHITextureSupportReason RHITextureSupportReasonForUsage(RHITextureUsage usage) noexcept
+	{
+		switch (usage)
+		{
+		case RHITextureUsage::Sampled:
+			return RHITextureSupportReason::ShaderResourceUnsupported;
+		case RHITextureUsage::RenderTarget:
+			return RHITextureSupportReason::RenderTargetUnsupported;
+		case RHITextureUsage::DepthStencil:
+			return RHITextureSupportReason::DepthStencilUnsupported;
+		case RHITextureUsage::UnorderedAccess:
+			return RHITextureSupportReason::TypedUnorderedAccessUnsupported;
+		case RHITextureUsage::CopySource:
+			return RHITextureSupportReason::CopySourceUnsupported;
+		case RHITextureUsage::CopyDest:
+			return RHITextureSupportReason::CopyDestUnsupported;
+		default:
+			return RHITextureSupportReason::FormatCombinationUnsupported;
+		}
 	}
 
 	RHITextureValidationResult ValidateRHITextureDesc(const RHITextureDesc& desc) noexcept
@@ -148,6 +181,18 @@ namespace gglab
 		{
 			return Error(RHITextureValidationError::InvalidUsage);
 		}
+		const uint32_t createFlags = static_cast<uint32_t>(desc.m_CreateFlags);
+		const uint32_t knownCreateFlags = static_cast<uint32_t>(KnownTextureCreateFlags);
+		if ((createFlags & ~knownCreateFlags) != 0)
+		{
+			return Error(RHITextureValidationError::InvalidCreateFlags);
+		}
+		if (Test(desc.m_CreateFlags, RHITextureCreateFlags::CubeCompatible) &&
+			(desc.m_Dimension != RHITextureDimension::Texture2D || desc.m_ArraySize % 6 != 0 ||
+				desc.m_Extent.m_Width != desc.m_Extent.m_Height))
+		{
+			return Error(RHITextureValidationError::InvalidCreateFlags);
+		}
 
 		if (desc.m_Extent.m_Width == 0 || desc.m_Extent.m_Height == 0 || desc.m_Extent.m_Depth == 0)
 		{
@@ -162,6 +207,13 @@ namespace gglab
 			return Error(RHITextureValidationError::InvalidMipLevelCount);
 		}
 		if (desc.m_SampleCount == 0)
+		{
+			return Error(RHITextureValidationError::InvalidSampleCount);
+		}
+		// Only the power-of-two sample counts every backend expresses are
+		// legal; anything else must fail loudly instead of being silently
+		// downgraded by a backend conversion.
+		if (desc.m_SampleCount > 64 || (desc.m_SampleCount & (desc.m_SampleCount - 1)) != 0)
 		{
 			return Error(RHITextureValidationError::InvalidSampleCount);
 		}
@@ -258,6 +310,12 @@ namespace gglab
 		if (!IsDimensionCompatible(textureDesc.m_Dimension, viewDesc.m_Dimension))
 		{
 			return Error(RHITextureValidationError::IncompatibleViewDimension);
+		}
+		if ((viewDesc.m_Dimension == RHITextureViewDimension::TextureCube ||
+			viewDesc.m_Dimension == RHITextureViewDimension::TextureCubeArray) &&
+			!Test(textureDesc.m_CreateFlags, RHITextureCreateFlags::CubeCompatible))
+		{
+			return Error(RHITextureValidationError::MissingCubeCompatible);
 		}
 		if (viewDesc.m_Type == RHITextureViewType::DepthStencil &&
 			textureDesc.m_Dimension == RHITextureDimension::Texture3D)

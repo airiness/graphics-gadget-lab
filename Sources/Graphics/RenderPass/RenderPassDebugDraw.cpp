@@ -120,8 +120,15 @@ namespace gglab
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv =
 					scene ? executeContext.GetViewHandle(data.m_Dsv) : RHITextureViewHandle{};
-				commandContext->SetRenderTargets(
-					std::span<const RHITextureViewHandle>(&rtv, 1), dsv);
+				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
+				commandContext->BeginRendering({
+					.m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1),
+					.m_DepthAttachment = dsv.IsValid()
+						? std::optional<RHIRenderingAttachment>(
+							RHIRenderingAttachment{ .m_View = dsv })
+						: std::nullopt,
+				});
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),

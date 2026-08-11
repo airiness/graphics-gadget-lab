@@ -38,7 +38,7 @@ namespace gglab
 		initInfo.Device = m_DX12Device->Get();
 		initInfo.CommandQueue =
 			dx12Context->GetQueueSystem().GetQueue(DX12QueueType::Graphics).Get();
-		initInfo.NumFramesInFlight = swapChain.GetBufferCount();
+		initInfo.NumFramesInFlight = context.GetFrameSlotCount();
 		initInfo.RTVFormat = ToDXGIFormat(swapChain.GetFormat());
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		initInfo.SrvDescriptorHeap = m_DescriptorManager
@@ -103,7 +103,9 @@ namespace gglab
 			return;
 		}
 
-		commandContext->SetRenderTargets(std::span<const RHITextureViewHandle>(&renderTarget, 1));
+		const RHIRenderingAttachment colorAttachment{ .m_View = renderTarget };
+		commandContext->BeginRendering({ .m_ColorAttachments =
+			std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 
 		auto* heap = m_DescriptorManager
 			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)

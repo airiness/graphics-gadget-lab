@@ -13,31 +13,6 @@
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] bool HasDebugIdentity(const RHIResourceDebugIdentityDesc& identity) noexcept
-		{
-			return identity.m_Domain != RHIResourceDebugDomain::Unknown ||
-				!identity.m_Category.empty() || !identity.m_Label.empty() ||
-				!identity.m_Source.empty() || identity.m_StableId.has_value();
-		}
-
-		[[nodiscard]] RHIResourceDebugIdentityDesc ResolveDebugIdentity(
-			const RHIResourceDebugIdentityDesc& identity, std::string_view legacyName,
-			RHIResourceType resourceType) noexcept
-		{
-			if (HasDebugIdentity(identity))
-			{
-				return identity;
-			}
-			return {
-				.m_Domain = RHIResourceDebugDomain::Unknown,
-				.m_Category = RHIResourceTypeDebugText(resourceType),
-				.m_Label = legacyName.empty() ? std::string_view("Unspecified") : legacyName,
-			};
-		}
-	}
-
 	DX12ResourceManager::~DX12ResourceManager() noexcept = default;
 
 	void DX12ResourceManager::Initialize(DX12Device* device) noexcept
@@ -60,14 +35,15 @@ namespace gglab
 		m_DescriptorCache = nullptr;
 	}
 
-	RHITextureHandle DX12ResourceManager::CreateTexture(
-		const RHITextureDesc& desc, const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
+	RHITextureHandle DX12ResourceManager::CreateTexture(const RHIOwnedTextureCreateInfo& ownedCreateInfo,
+		const RHIResourceDebugIdentityDesc& debugIdentity) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr,
 			"DX12ResourceManager must be initialized before creating textures.");
 		GGLAB_ASSERT_MSG(
 			m_Device->GetMemAllocator() != nullptr, "DX12 memory allocator is not initialized.");
 
+		const RHITextureDesc& desc = ownedCreateInfo.m_Desc;
 		const RHITextureValidationResult validation = ValidateRHITextureDesc(desc);
 		if (!validation.IsValid())
 		{
@@ -77,17 +53,26 @@ namespace gglab
 				RHITextureValidationErrorText(validation.m_Error));
 			return {};
 		}
+		if (!IsRHIResourceStateValid(
+			ownedCreateInfo.m_InitialState, RHIResourceStateUsage::TextureInitial))
+		{
+			++m_Diagnostics.m_CreateFailureCount;
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12ResourceManager::CreateTexture rejected an invalid initial state.");
+			return {};
+		}
 
 		auto texture = std::make_unique<DX12Texture>();
 
-		DX12Resource::CreateInfo createInfo{};
-		createInfo.m_Allocator = m_Device->GetMemAllocator();
-		createInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
-		createInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
-		createInfo.m_ResourceDesc = ToD3D12ResourceDesc(desc);
-		createInfo.m_EnhancedInitialLayout = D3D12_BARRIER_LAYOUT_COMMON;
-		createInfo.m_ClearValue = ToD3D12ClearValue(desc.m_ClearValue);
-		texture->Create(createInfo);
+		DX12Resource::CreateInfo nativeCreateInfo{};
+		nativeCreateInfo.m_Allocator = m_Device->GetMemAllocator();
+		nativeCreateInfo.m_AllocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+		nativeCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
+		nativeCreateInfo.m_ResourceDesc = ToD3D12ResourceDesc(desc);
+		nativeCreateInfo.m_EnhancedInitialLayout =
+			ToD3D12BarrierLayout(ownedCreateInfo.m_InitialState.m_Layout);
+		nativeCreateInfo.m_ClearValue = ToD3D12ClearValue(desc.m_ClearValue);
+		texture->Create(nativeCreateInfo);
 		if (!texture->IsValid())
 		{
 			++m_Diagnostics.m_CreateFailureCount;
@@ -98,9 +83,9 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Texture);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureCreateCount;
 		return AllocateTextureSlot(
 			std::move(texture), RHIResourceOwnership::Owned, resolvedIdentity);
@@ -157,20 +142,21 @@ namespace gglab
 
 		const std::string_view legacyName = desc.m_DebugName ? desc.m_DebugName : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(debugIdentity, legacyName, RHIResourceType::Buffer);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(debugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferCreateCount;
 		return AllocateBufferSlot(std::move(buffer), RHIResourceOwnership::Owned, resolvedIdentity);
 	}
 
 	RHITextureHandle DX12ResourceManager::ImportTexture(const ImportedTextureDesc& desc) noexcept
 	{
-		if (!desc.m_Resource)
+		if (!desc.m_Resource || !IsRHIResourceStateValid(
+			desc.m_RHI.m_External.m_InitialState, RHIResourceStateUsage::TextureInitial))
 		{
 			++m_Diagnostics.m_ImportFailureCount;
 			GGLAB_LOG_GRAPHICS_WARN(
-				"DX12ResourceManager::ImportTexture rejected a null native resource.");
+				"DX12ResourceManager::ImportTexture rejected its resource or initial state.");
 			return {};
 		}
 
@@ -190,9 +176,9 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
+			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Texture);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_TextureImportCount;
 		return AllocateTextureSlot(
 			std::move(texture), RHIResourceOwnership::Borrowed, resolvedIdentity);
@@ -200,11 +186,12 @@ namespace gglab
 
 	RHIBufferHandle DX12ResourceManager::ImportBuffer(const ImportedBufferDesc& desc) noexcept
 	{
-		if (!desc.m_Resource)
+		if (!desc.m_Resource || !IsRHIResourceStateValid(
+			desc.m_RHI.m_External.m_InitialState, RHIResourceStateUsage::Buffer))
 		{
 			++m_Diagnostics.m_ImportFailureCount;
 			GGLAB_LOG_GRAPHICS_WARN(
-				"DX12ResourceManager::ImportBuffer rejected a null native resource.");
+				"DX12ResourceManager::ImportBuffer rejected its resource or initial state.");
 			return {};
 		}
 
@@ -224,9 +211,9 @@ namespace gglab
 			: desc.m_RHI.m_Desc.m_DebugName;
 		const std::string_view legacyName = debugNameText ? debugNameText : "";
 		const auto resolvedIdentity =
-			ResolveDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
+			ResolveRHIResourceDebugIdentity(desc.m_DebugIdentity, legacyName, RHIResourceType::Buffer);
 		m_Diagnostics.m_UnnamedResourceCreateCount +=
-			!HasDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
+			!HasRHIResourceDebugIdentity(desc.m_DebugIdentity) && legacyName.empty() ? 1u : 0u;
 		++m_Diagnostics.m_BufferImportCount;
 		return AllocateBufferSlot(
 			std::move(buffer), RHIResourceOwnership::Borrowed, resolvedIdentity);

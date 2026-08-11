@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/RHITypes.h"
 
 #include <cstdint>
 #include <optional>
@@ -19,8 +20,18 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
-		std::optional<std::string> m_SelfTestSuiteId;
+		std::optional<std::string> m_SelfTestSelection;
 		bool m_StartWithAbsoluteMouse = false;
+
+		// RHI backend selection. Defaults to DX12; an explicit --rhi vulkan
+		// never falls back to DX12.
+		RHIBackendType m_RhiBackend = RHIBackendType::DX12;
+		bool m_RhiBackendSpecified = false;
+		// Lists all Vulkan adapters with their profile evaluation and exits.
+		bool m_ListAdapters = false;
+		// Optional deterministic adapter selector (enumeration index or
+		// identity prefix) for the Vulkan backend.
+		std::optional<std::string> m_AdapterSelector;
 	};
 
 	struct ApplicationLaunchParseResult

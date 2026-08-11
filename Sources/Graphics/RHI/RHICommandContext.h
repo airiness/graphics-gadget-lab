@@ -3,10 +3,12 @@
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHIFence.h"
+#include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RHI/RHITexture.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -17,6 +19,12 @@
 namespace gglab
 {
 	class RHICommandContext;
+
+	[[nodiscard]] inline RHICommandContextHandle AllocateRHICommandContextHandle() noexcept
+	{
+		static std::atomic<RHICommandContextHandle::IndexType> nextIndex = 0;
+		return RHICommandContextHandle(nextIndex.fetch_add(1, std::memory_order_relaxed), 1);
+	}
 
 	struct RHITextureBarrier
 	{
@@ -54,11 +62,50 @@ namespace gglab
 	{
 		RHIBufferHandle m_Buffer{};
 		uint64_t m_Offset = 0;
-		uint32_t m_SizeInBytes = 0;
+		uint32_t m_SizeInBytes = 0; // Logical range beginning at m_Offset.
 		RHIFormat m_Format = RHIFormat::Unknown;
 
 		bool operator==(const RHIIndexBufferBinding&) const noexcept = default;
 	};
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferOffsetAligned(
+		RHIFormat format, uint64_t offset) noexcept
+	{
+		return format == RHIFormat::R32Uint &&
+			offset % GetRHIFormatInfo(format).m_BytesPerBlock == 0;
+	}
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferBindingRangeValid(
+		const RHIIndexBufferBinding& binding, uint64_t bufferSizeInBytes) noexcept
+	{
+		if (!IsRHIIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset))
+		{
+			return false;
+		}
+		const uint64_t indexSizeInBytes = GetRHIFormatInfo(binding.m_Format).m_BytesPerBlock;
+		return binding.m_SizeInBytes != 0 && binding.m_SizeInBytes % indexSizeInBytes == 0 &&
+			binding.m_Offset <= bufferSizeInBytes &&
+			binding.m_SizeInBytes <= bufferSizeInBytes - binding.m_Offset;
+	}
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferDrawRangeValid(
+		const RHIIndexBufferBinding& binding, uint32_t indexCount,
+		uint32_t startIndexLocation) noexcept
+	{
+		if (binding.m_Format != RHIFormat::R32Uint)
+		{
+			return false;
+		}
+		const uint64_t indexSizeInBytes = GetRHIFormatInfo(binding.m_Format).m_BytesPerBlock;
+		if (binding.m_SizeInBytes == 0 || binding.m_SizeInBytes % indexSizeInBytes != 0)
+		{
+			return false;
+		}
+		const uint64_t startInBytes = uint64_t{ startIndexLocation } * indexSizeInBytes;
+		const uint64_t drawSizeInBytes = uint64_t{ indexCount } * indexSizeInBytes;
+		return startInBytes <= binding.m_SizeInBytes &&
+			drawSizeInBytes <= binding.m_SizeInBytes - startInBytes;
+	}
 
 	struct RHIDescriptorTableBinding
 	{
@@ -89,6 +136,53 @@ namespace gglab
 		bool operator==(const RHIScissorRect&) const noexcept = default;
 	};
 
+	enum class RHIContentLoadOp : uint8_t
+	{
+		Load,
+		DontCare,
+	};
+
+	struct RHIRenderingAttachment
+	{
+		RHITextureViewHandle m_View{};
+		RHIContentLoadOp m_LoadOp = RHIContentLoadOp::Load;
+	};
+
+	struct RHIRenderingInfo
+	{
+		std::span<const RHIRenderingAttachment> m_ColorAttachments{};
+		std::optional<RHIRenderingAttachment> m_DepthAttachment = std::nullopt;
+	};
+
+	struct RHIRenderingSignature
+	{
+		std::array<RHIFormat, RHIGraphicsPipelineDesc::MaxRenderTargets> m_ColorFormats{};
+		uint32_t m_ColorAttachmentCount = 0;
+		RHIFormat m_DepthFormat = RHIFormat::Unknown;
+		uint32_t m_SampleCount = 0;
+
+		bool operator==(const RHIRenderingSignature&) const noexcept = default;
+	};
+
+	[[nodiscard]] constexpr inline bool IsGraphicsPipelineCompatible(
+		const RHIGraphicsPipelineDesc& pipeline, const RHIRenderingSignature& rendering) noexcept
+	{
+		if (pipeline.m_RenderTargetCount != rendering.m_ColorAttachmentCount ||
+			pipeline.m_DepthStencilFormat != rendering.m_DepthFormat ||
+			pipeline.m_SampleCount != rendering.m_SampleCount)
+		{
+			return false;
+		}
+		for (uint32_t index = 0; index < rendering.m_ColorAttachmentCount; ++index)
+		{
+			if (pipeline.m_RenderTargetFormats[index] != rendering.m_ColorFormats[index])
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	class RHICommandContext
 	{
 	public:
@@ -116,11 +210,14 @@ namespace gglab
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;
-		virtual void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
-			RHITextureViewHandle depthStencil = {}) noexcept = 0;
-		virtual void ClearColor(
-			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept = 0;
-		virtual void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,
+		// A graphics pass may end rendering explicitly to open multiple rendering scopes;
+		// otherwise RGExecutor closes the final active scope at the pass boundary.
+		virtual void BeginRendering(const RHIRenderingInfo& info) noexcept = 0;
+		virtual void EndRendering() noexcept = 0;
+		[[nodiscard]] virtual bool IsRendering() const noexcept = 0;
+		virtual void ClearColorAttachment(
+			uint32_t colorAttachmentIndex, const std::array<float, 4>& color) noexcept = 0;
+		virtual void ClearDepthAttachment(float depth,
 			std::optional<uint8_t> stencil = std::nullopt) noexcept = 0;
 		virtual void SetViewport(const RHIViewport& viewport) noexcept = 0;
 		virtual void SetScissorRect(const RHIScissorRect& rect) noexcept = 0;

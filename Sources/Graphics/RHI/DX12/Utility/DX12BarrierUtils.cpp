@@ -204,7 +204,9 @@ namespace gglab
 		switch (layout)
 		{
 		case RHILayout::Unknown:
-			return D3D12_BARRIER_LAYOUT_UNDEFINED;
+			GGLAB_UNREACHABLE("RHILayout::Unknown is an invalid barrier layout.");
+		case RHILayout::Undefined:
+			return D3D12_BARRIER_LAYOUT_COMMON;
 		case RHILayout::Common:
 			return D3D12_BARRIER_LAYOUT_COMMON;
 		case RHILayout::ShaderResource:

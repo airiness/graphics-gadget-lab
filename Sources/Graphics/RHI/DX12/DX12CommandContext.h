@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
+#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/RHICommandContext.h"
 
 #include <memory>
@@ -8,15 +9,12 @@
 
 namespace gglab
 {
-	struct DX12DescriptorView;
 	class DX12CommandList;
 	class DX12Device;
 	class DX12PipelineState;
 	class DX12PipelineSystem;
 	class DX12RootSignature;
 	class DX12GpuProfiler;
-
-	[[nodiscard]] RHICommandContextHandle AllocateDX12CommandContextHandle() noexcept;
 
 	class DX12CommandContext
 	{
@@ -42,6 +40,9 @@ namespace gglab
 		void ClearTrackedResourceUses() noexcept;
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept;
 		void TrackTextureUse(RHITextureHandle texture) noexcept;
+		void BeginRenderingScope() noexcept;
+		void EndRenderingScope() noexcept;
+		[[nodiscard]] bool IsRendering() const noexcept { return m_IsRendering; }
 
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept;
@@ -60,6 +61,7 @@ namespace gglab
 		DX12Device* m_Device = nullptr;
 		DX12CommandList* m_CommandList = nullptr;
 		RHIQueueType m_QueueType = RHIQueueType::Graphics;
+		bool m_IsRendering = false;
 		std::vector<RHIBufferHandle> m_UsedBuffers;
 		std::vector<RHITextureHandle> m_UsedTextures;
 	};
@@ -91,7 +93,12 @@ namespace gglab
 		void ClearTrackedResourceUses() noexcept
 		{
 			m_Backend.ClearTrackedResourceUses();
+			m_IndexBufferBinding.reset();
 			m_CurrentRootSignature = nullptr;
+			m_CurrentPipelineDesc.reset();
+			m_ActiveRenderingSignature.reset();
+			m_ActiveColorAttachments.clear();
+			m_ActiveDepthAttachment.reset();
 		}
 
 		void TrackTextureUse(RHITextureHandle texture) noexcept override
@@ -112,11 +119,12 @@ namespace gglab
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
-		void SetRenderTargets(std::span<const RHITextureViewHandle> renderTargets,
-			RHITextureViewHandle depthStencil = {}) noexcept override;
-		void ClearColor(
-			RHITextureViewHandle renderTarget, const std::array<float, 4>& color) noexcept override;
-		void ClearDepthStencil(RHITextureViewHandle depthStencil, float depth,
+		void BeginRendering(const RHIRenderingInfo& info) noexcept override;
+		void EndRendering() noexcept override;
+		bool IsRendering() const noexcept override { return m_Backend.IsRendering(); }
+		void ClearColorAttachment(
+			uint32_t colorAttachmentIndex, const std::array<float, 4>& color) noexcept override;
+		void ClearDepthAttachment(float depth,
 			std::optional<uint8_t> stencil = std::nullopt) noexcept override;
 		void SetViewport(const RHIViewport& viewport) noexcept override;
 		void SetScissorRect(const RHIScissorRect& rect) noexcept override;
@@ -145,10 +153,16 @@ namespace gglab
 
 	private:
 		friend class DX12ComputeCommandContext;
+		[[nodiscard]] bool ValidateActivePipelineCompatibility(std::string_view operation) const noexcept;
 
 		DX12CommandContext m_Backend;
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;
+		std::optional<RHIGraphicsPipelineDesc> m_CurrentPipelineDesc;
+		std::optional<RHIRenderingSignature> m_ActiveRenderingSignature;
+		std::vector<DX12DescriptorView> m_ActiveColorAttachments;
+		std::optional<DX12DescriptorView> m_ActiveDepthAttachment;
+		std::optional<RHIIndexBufferBinding> m_IndexBufferBinding;
 		DX12GpuProfiler* m_GpuProfiler = nullptr;
 	};
 

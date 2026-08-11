@@ -96,7 +96,7 @@ namespace gglab
 			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
-			uint32_t m_CurrentBackBufferIndex = 0;
+			uint32_t m_FrameSlotIndex = 0;
 		};
 
 		struct BuildResult

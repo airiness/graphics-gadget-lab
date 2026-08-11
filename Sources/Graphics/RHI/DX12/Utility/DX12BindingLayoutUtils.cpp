@@ -34,7 +34,7 @@ namespace gglab
 				return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
 			case RHIBindingType::ReadOnlyStorageBuffer:
 			case RHIBindingType::SampledTexture:
-			case RHIBindingType::BindlessSampledTextureTable:
+			case RHIBindingType::BindlessResourceTable:
 			default:
 				return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 			}
@@ -66,7 +66,7 @@ namespace gglab
 
 			if (IsBindlessBindingType(slot.m_Type))
 			{
-				flags |= slot.m_Type == RHIBindingType::BindlessSampledTextureTable
+				flags |= slot.m_Type == RHIBindingType::BindlessResourceTable
 					? D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
 					: D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 				continue;

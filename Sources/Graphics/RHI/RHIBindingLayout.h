@@ -17,13 +17,13 @@ namespace gglab
 		StorageTexture,
 		Sampler,
 		PushConstants,
-		BindlessSampledTextureTable,
+		BindlessResourceTable,
 		BindlessSamplerTable,
 	};
 
 	[[nodiscard]] constexpr bool IsBindlessBindingType(RHIBindingType type) noexcept
 	{
-		return type == RHIBindingType::BindlessSampledTextureTable ||
+		return type == RHIBindingType::BindlessResourceTable ||
 			type == RHIBindingType::BindlessSamplerTable;
 	}
 

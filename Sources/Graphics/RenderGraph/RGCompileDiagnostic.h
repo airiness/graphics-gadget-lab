@@ -16,6 +16,7 @@ namespace gglab
 	enum class RGCompileDiagnosticCode : uint8_t
 	{
 		InvalidDeclaration,
+		UndefinedContentRead,
 		DependencyCycle,
 		InvalidExecutionPlan,
 	};

@@ -22,9 +22,11 @@ namespace gglab
 			uint32_t semanticIndex, RHIFormat format, uint32_t offset) noexcept
 		{
 			GGLAB_ASSERT(desc.m_AttributeCount < RHIVertexInputLayoutDesc::MaxAttributes);
+			const uint32_t location = desc.m_AttributeCount;
 			auto& attribute = desc.m_Attributes[desc.m_AttributeCount++];
 			attribute.m_SemanticName = semanticName;
 			attribute.m_SemanticIndex = semanticIndex;
+			attribute.m_Location = location;
 			attribute.m_Format = format;
 			attribute.m_InputSlot = 0;
 			attribute.m_AlignedByteOffset = offset;

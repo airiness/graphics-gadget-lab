@@ -105,7 +105,7 @@ namespace gglab
 					"ForwardPlusTileDepthRanges");
 			}
 			AppendBindingSlot(
-				desc, RHIBindingType::BindlessSampledTextureTable, 0, 0, "BindlessTextures");
+				desc, RHIBindingType::BindlessResourceTable, 0, 0, "BindlessResources");
 			return desc;
 		}
 	}
@@ -167,12 +167,14 @@ namespace gglab
 		if (m_DebugReadback)
 		{
 			auto* device = renderer->GetDevice();
+			auto* rhiContext = renderer->GetRHIContext();
 			auto* swapChain = renderer->GetSwapChain();
 			GGLAB_ASSERT_NOT_NULL(device);
+			GGLAB_ASSERT_NOT_NULL(rhiContext);
 			GGLAB_ASSERT_NOT_NULL(swapChain);
-			m_DebugReadback->Initialize(*device, swapChain->GetBufferCount());
-			m_DebugReadback->ConsumeCompletedSlot(context.m_BackBufferIndex);
-			m_DebugReadback->PrepareGridBuffer(*device, context.m_BackBufferIndex,
+			m_DebugReadback->Initialize(*device, rhiContext->GetFrameSlotCount());
+			m_DebugReadback->ConsumeCompletedSlot(context.m_FrameSlotIndex);
+			m_DebugReadback->PrepareGridBuffer(*device, context.m_FrameSlotIndex,
 				MakeForwardPlusTileGrid(
 					swapChain->GetBufferWidth(), swapChain->GetBufferHeight()));
 		}
@@ -266,7 +268,7 @@ namespace gglab
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
 					renderer->GetLightStructuredBuffer()->GetBufferHandle(
-						context.m_BackBufferIndex));
+						context.m_FrameSlotIndex));
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::TileHeaders), headers);
 				commandContext->SetReadWriteBuffer(
@@ -302,7 +304,7 @@ namespace gglab
 		}
 
 		const auto debugReadback = m_DebugReadback;
-		const uint32_t bufferIndex = context.m_BackBufferIndex;
+		const uint32_t bufferIndex = context.m_FrameSlotIndex;
 		const uint64_t frameSerial = context.m_FrameSerial;
 		rg.AddPass<ReadbackPassData>(
 			"Lighting.ForwardPlus.Readback", RGPassEncoderType::Copy,
@@ -339,7 +341,8 @@ namespace gglab
 				readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
 				readbackDesc.m_DebugName = "ForwardPlus.DebugReadback";
 				data.m_Readback = builder.ImportBuffer("ForwardPlus.DebugReadback",
-					debugReadback->GetBuffer(bufferIndex), readbackDesc, RGBufferAccess::CopyDest);
+					debugReadback->GetBuffer(bufferIndex), readbackDesc, RGBufferAccess::CopyDest,
+					RGContentValidity::Undefined);
 				builder.WriteInPlace(data.m_Readback, RGBufferAccess::CopyDest, RHIStage::Copy);
 
 				RHIBufferDesc gridReadbackDesc{};
@@ -351,7 +354,7 @@ namespace gglab
 				gridReadbackDesc.m_DebugName = "ForwardPlus.GridReadback";
 				data.m_GridReadback = builder.ImportBuffer("ForwardPlus.GridReadback",
 					debugReadback->GetGridBuffer(bufferIndex), gridReadbackDesc,
-					RGBufferAccess::CopyDest);
+					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 				builder.WriteInPlace(
 					data.m_GridReadback, RGBufferAccess::CopyDest, RHIStage::Copy);
 				data.m_BufferIndex = bufferIndex;

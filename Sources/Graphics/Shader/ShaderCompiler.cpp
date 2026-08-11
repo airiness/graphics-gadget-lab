@@ -6,6 +6,10 @@
 #include "Core/Utility/StringUtils.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Hash/KeyHash.h"
+#include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
+#include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+
+#include <cwctype>
 
 namespace gglab
 {
@@ -17,6 +21,88 @@ namespace gglab
 
 	namespace
 	{
+		[[nodiscard]] constexpr std::string_view ShaderBinaryFormatText(
+			ShaderBinaryFormat format) noexcept
+		{
+			switch (format)
+			{
+			case ShaderBinaryFormat::Dxil:
+				return "dxil";
+			case ShaderBinaryFormat::SpirV:
+				return "spirv";
+			case ShaderBinaryFormat::Unknown:
+				break;
+			}
+			return "unknown";
+		}
+
+		[[nodiscard]] constexpr std::string_view SpirVTargetEnvironmentText(
+			ShaderSpirVTargetEnvironment environment) noexcept
+		{
+			switch (environment)
+			{
+			case ShaderSpirVTargetEnvironment::None:
+				return "none";
+			case ShaderSpirVTargetEnvironment::Vulkan1_3:
+				return "vulkan1.3";
+			}
+			return "unknown";
+		}
+
+		[[nodiscard]] constexpr bool IsVertexProducingStage(ShaderStage stage) noexcept
+		{
+			return stage == ShaderStage::Vertex || stage == ShaderStage::Domain ||
+				stage == ShaderStage::Geometry || stage == ShaderStage::Mesh;
+		}
+
+		[[nodiscard]] bool IsCompilerOwnedExtraArgument(std::wstring_view argument) noexcept
+		{
+			if (argument.empty())
+			{
+				return false;
+			}
+			if (argument.front() == L'@')
+			{
+				return true;
+			}
+
+			std::wstring lower(argument);
+			std::ranges::transform(lower, lower.begin(),
+				[](wchar_t value) noexcept { return static_cast<wchar_t>(::towlower(value)); });
+			const auto isOption = [&lower](std::wstring_view option) noexcept
+				{
+					return lower == option ||
+						(lower.size() > option.size() && lower.starts_with(option) &&
+							lower[option.size()] == L'=');
+				};
+
+			if (lower.starts_with(L"-fvk-") || lower.starts_with(L"/fvk-") ||
+				lower.starts_with(L"-fspv-") || lower.starts_with(L"/fspv-"))
+			{
+				return true;
+			}
+
+			constexpr std::array CompilerOwnedOptions{
+				L"-e", L"/e", L"-t", L"/t", L"-hv", L"/hv", L"-spirv", L"/spirv",
+				L"-zi", L"/zi", L"-qembed_debug", L"/qembed_debug", L"-qstrip_debug",
+				L"/qstrip_debug", L"-qstrip_reflect", L"/qstrip_reflect", L"-fcgl",
+				L"/fcgl", L"-ast-dump", L"/ast-dump", L"-dumpbin", L"/dumpbin",
+			};
+			if (std::ranges::any_of(CompilerOwnedOptions, isOption))
+			{
+				return true;
+			}
+
+			constexpr std::array OptimizationOptions{
+				L"-o0", L"/o0",
+				L"-o1", L"/o1",
+				L"-o2", L"/o2",
+				L"-o3", L"/o3",
+				L"-od", L"/od",
+			};
+			return std::ranges::find(OptimizationOptions, lower) != OptimizationOptions.end();
+		}
+
 		class ShaderIncludeHandler final
 			: public Microsoft::WRL::RuntimeClass<
 			Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDxcIncludeHandler>
@@ -82,10 +168,88 @@ namespace gglab
 		}
 	}
 
+	ShaderCompileValidationResult ValidateShaderDesc(
+		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept
+	{
+		const auto reject = [](ShaderCompileValidationError error, std::wstring message) noexcept
+			{
+				return ShaderCompileValidationResult{
+					.m_Error = error,
+					.m_Message = std::move(message),
+				};
+			};
+
+		if (desc.m_Target.m_BinaryFormat != ShaderBinaryFormat::Dxil &&
+			desc.m_Target.m_BinaryFormat != ShaderBinaryFormat::SpirV)
+		{
+			return reject(ShaderCompileValidationError::UnsupportedBinaryFormat,
+				L"Shader binary format is unsupported.");
+		}
+		if (desc.m_SourcePath.empty())
+		{
+			return reject(
+				ShaderCompileValidationError::EmptySourcePath, L"Shader source path is empty.");
+		}
+		if (utils::Canonical(desc.m_SourcePath) != desc.m_SourcePath)
+		{
+			return reject(ShaderCompileValidationError::SourcePathNotCanonical,
+				L"Shader source path is not canonical; normalize the descriptor before compiling.");
+		}
+		if (desc.m_Entry.empty())
+		{
+			return reject(ShaderCompileValidationError::EmptyEntryPoint,
+				L"Shader entry point is empty; normalize the descriptor before compiling.");
+		}
+		if (activeDxcVersion.empty() || desc.m_Target.m_DxcVersion != activeDxcVersion)
+		{
+			return reject(ShaderCompileValidationError::CompilerIdentityMismatch,
+				L"Shader target DXC identity does not match the active compiler.");
+		}
+
+		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+		{
+			const ShaderCompileTarget expected = ShaderCompiler::MakeVulkanSpirVTarget(desc.m_Stage);
+			if (desc.m_Target.m_SpirVTargetEnvironment != expected.m_SpirVTargetEnvironment)
+			{
+				return reject(ShaderCompileValidationError::UnsupportedSpirVTargetEnvironment,
+					L"SPIR-V target environment does not match the active Vulkan shader contract.");
+			}
+			if (desc.m_Target.m_BindingABIRevision != expected.m_BindingABIRevision)
+			{
+				return reject(ShaderCompileValidationError::UnsupportedBindingABIRevision,
+					L"Shader binding ABI revision does not match the active Vulkan contract.");
+			}
+			if (desc.m_Target.m_CoordinateOptions != expected.m_CoordinateOptions)
+			{
+				return reject(ShaderCompileValidationError::InvalidCoordinateOptions,
+					L"Shader coordinate options do not match the active stage and backend.");
+			}
+		}
+		else if (desc.m_Target.m_SpirVTargetEnvironment != ShaderSpirVTargetEnvironment::None ||
+			desc.m_Target.m_BindingABIRevision != 0 ||
+			desc.m_Target.m_CoordinateOptions != ShaderCoordinateOptions::None)
+		{
+			return reject(ShaderCompileValidationError::UnexpectedSpirVTargetState,
+				L"DXIL shader target contains SPIR-V-only state.");
+		}
+
+		for (const std::wstring& argument : desc.m_ExtraArgs)
+		{
+			if (IsCompilerOwnedExtraArgument(argument))
+			{
+				return reject(ShaderCompileValidationError::ReservedExtraArgument,
+					std::format(L"Shader extra argument '{}' is owned by the normalized target.",
+						argument));
+			}
+		}
+		return {};
+	}
+
 	ShaderCompiler::ShaderCompiler() noexcept : m_Impl(std::make_unique<Impl>())
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
+		m_DxcVersion = QueryDxcVersion();
 
 		SetSourceRootDirectory(GetShaderSourceRoot());
 		const auto defaultRootDir = utils::GetExeOutDir() / L"ShaderCache";
@@ -109,51 +273,65 @@ namespace gglab
 
 	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
 	{
-		GGLAB_ASSERT_MSG(
-			!desc.m_Entry.empty(), "Shader entry is empty, ShaderDesc may not be normalized.");
-		GGLAB_ASSERT_MSG(utils::Canonical(desc.m_SourcePath) == desc.m_SourcePath,
-			"Shader source path is not be canonical, ShaderDesc may not be normalized.");
+		const ShaderCompileValidationResult validation = ValidateShaderDesc(desc, m_DxcVersion);
+		if (!validation.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Shader compile descriptor validation failed: {}",
+				utils::ToString(validation.m_Message));
+			return {};
+		}
 
 		ShaderCompileArtifact artifact{};
 		const auto recipeHash = ComputeRecipeHash(desc);
 		const auto keyHex = ToHex(recipeHash);
-		const auto binaryPath = MakeCacheBinaryPath(keyHex, desc.m_Stage);
+		const auto binaryPath =
+			MakeCacheBinaryPath(keyHex, desc.m_Stage, desc.m_Target.m_BinaryFormat);
 
 		auto meta = binaryPath;
 		meta.replace_extension(L"meta.txt");
 
 		artifact.m_BinaryPath = binaryPath;
 		artifact.m_MetaPath = meta;
-		artifact.m_Format = ShaderBinaryFormat::Dxil;
+		artifact.m_Target = desc.m_Target;
 
 		// Exist
 		std::error_code errorCode;
 		if (std::filesystem::exists(binaryPath, errorCode) &&
 			std::filesystem::exists(meta, errorCode))
 		{
-			if (IsMetaUpToDate(meta))
+			if (IsMetaUpToDate(meta, desc, recipeHash))
 			{
 				ComPtr<IDxcBlobEncoding> blobEncoding;
 				GGLAB_HR(m_Impl->m_Utils->LoadFile(binaryPath.c_str(), nullptr, &blobEncoding));
-				artifact.m_Binary = CopyShaderBinary(blobEncoding.Get());
-				artifact.m_FromCache = true;
-				artifact.m_Hash = ComputeHashFromBinary(artifact.m_Binary);
-				return artifact;
+				ShaderBinary cachedBinary = CopyShaderBinary(blobEncoding.Get());
+				if (IsBinaryFormat(cachedBinary, artifact.GetBinaryFormat()))
+				{
+					artifact.m_Binary = std::move(cachedBinary);
+					artifact.m_FromCache = true;
+					artifact.m_Hash = ComputeHashFromBinary(
+						artifact.m_Binary, artifact.GetBinaryFormat());
+					return artifact;
+				}
 			}
 		}
 
 		// Compile is not exist
 		std::vector<std::filesystem::path> deps;
 		auto binary = CompileShader(desc, deps);
+		if (!IsBinaryFormat(binary, artifact.GetBinaryFormat()))
+		{
+			return {};
+		}
 
 		// Save binary
 		utils::WriteFileBinary(binaryPath, binary.Data(), binary.SizeInBytes());
-		WriteMeta(meta, desc, deps);
+		WriteMeta(meta, desc, deps, recipeHash);
 
 		// result
 		artifact.m_Binary = std::move(binary);
 		artifact.m_FromCache = false;
-		artifact.m_Hash = ComputeHashFromBinary(artifact.m_Binary);
+		artifact.m_Hash = ComputeHashFromBinary(
+			artifact.m_Binary, artifact.GetBinaryFormat());
 		return artifact;
 	}
 
@@ -172,17 +350,39 @@ namespace gglab
 			m_DefaultShaderConfig.m_Defines.end());
 		desc.m_ExtraArgs.insert(desc.m_ExtraArgs.end(), m_DefaultShaderConfig.m_ExtraArgs.begin(),
 			m_DefaultShaderConfig.m_ExtraArgs.end());
-		if (desc.m_HlslVersion.empty())
+		if (desc.m_Target.m_HlslVersion.empty())
 		{
-			desc.m_HlslVersion = m_DefaultShaderConfig.m_HlslVersion;
+			desc.m_Target.m_HlslVersion = m_DefaultShaderConfig.m_Target.m_HlslVersion;
 		}
-		if (desc.m_OptLevel.empty())
+		if (desc.m_Target.m_OptimizationLevel.empty())
 		{
-			desc.m_OptLevel = m_DefaultShaderConfig.m_OptLevel;
+			desc.m_Target.m_OptimizationLevel =
+				m_DefaultShaderConfig.m_Target.m_OptimizationLevel;
 		}
-		if (desc.m_Flags == ShaderCompileFlags::None)
+		if (desc.m_Target.m_Flags == ShaderCompileFlags::None)
 		{
-			desc.m_Flags = m_DefaultShaderConfig.m_Flags;
+			desc.m_Target.m_Flags = m_DefaultShaderConfig.m_Target.m_Flags;
+		}
+		desc.m_Target.m_DxcVersion = m_DxcVersion;
+		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+		{
+			const ShaderCompileTarget vulkanTarget = MakeVulkanSpirVTarget(desc.m_Stage);
+			if (desc.m_Target.m_SpirVTargetEnvironment == ShaderSpirVTargetEnvironment::None)
+			{
+				desc.m_Target.m_SpirVTargetEnvironment =
+					vulkanTarget.m_SpirVTargetEnvironment;
+			}
+			if (desc.m_Target.m_BindingABIRevision == 0)
+			{
+				desc.m_Target.m_BindingABIRevision = vulkanTarget.m_BindingABIRevision;
+			}
+			desc.m_Target.m_CoordinateOptions = vulkanTarget.m_CoordinateOptions;
+		}
+		else
+		{
+			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
+			desc.m_Target.m_BindingABIRevision = 0;
+			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
 		}
 
 		// Source and include paths supplied by shader users are relative to the configured source root.
@@ -237,6 +437,122 @@ namespace gglab
 		return desc;
 	}
 
+	ShaderCompileTarget ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage stage) noexcept
+	{
+		ShaderCompileTarget target{};
+		target.m_BinaryFormat = ShaderBinaryFormat::SpirV;
+		target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::Vulkan1_3;
+		target.m_BindingABIRevision = GGLabVulkanShaderBindingABI.m_Revision;
+		if (IsVertexProducingStage(stage) &&
+			GGLabVulkanCoordinatePolicy.m_InvertVertexProducingStageY)
+		{
+			target.m_CoordinateOptions |= ShaderCoordinateOptions::InvertY;
+		}
+		if (stage == ShaderStage::Pixel && GGLabVulkanCoordinatePolicy.m_UseDxPositionW)
+		{
+			target.m_CoordinateOptions |= ShaderCoordinateOptions::UseDxPositionW;
+		}
+		return target;
+	}
+
+	std::vector<std::wstring> ShaderCompiler::BuildCompileArguments(const ShaderDesc& desc) noexcept
+	{
+		const ShaderCompileTarget& compileTarget = desc.m_Target;
+		std::vector<std::wstring> args;
+		args.reserve(32 + desc.m_IncludeDirs.size() * 2 + desc.m_Defines.size() * 2 +
+			desc.m_ExtraArgs.size());
+
+		args.emplace_back(L"-E");
+		args.push_back(desc.m_Entry.empty() ? DefaultEntry(desc.m_Stage) : desc.m_Entry);
+		args.emplace_back(L"-T");
+		args.push_back(ToTarget(desc.m_Stage, compileTarget.m_Model));
+		args.emplace_back(L"-HV");
+		args.push_back(compileTarget.m_HlslVersion);
+
+		if (compileTarget.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+		{
+			args.emplace_back(L"-spirv");
+			args.emplace_back(L"-fspv-target-env=vulkan1.3");
+			args.emplace_back(L"-fvk-use-dx-layout");
+
+			const auto appendRegisterShift = [&args](std::wstring_view option,
+				VulkanShaderRegisterClass registerClass) noexcept
+				{
+					const VulkanFixedRegisterRange range =
+						GetVulkanFixedRegisterRange(registerClass);
+					args.emplace_back(option);
+					args.push_back(std::to_wstring(range.m_BindingShift));
+					args.push_back(std::to_wstring(
+						GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace));
+				};
+			appendRegisterShift(L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer);
+			appendRegisterShift(L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource);
+			appendRegisterShift(L"-fvk-u-shift", VulkanShaderRegisterClass::UnorderedAccess);
+			appendRegisterShift(L"-fvk-s-shift", VulkanShaderRegisterClass::Sampler);
+
+			args.emplace_back(L"-fvk-bind-resource-heap");
+			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_ResourceHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet));
+			args.emplace_back(L"-fvk-bind-sampler-heap");
+			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_SamplerHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet));
+
+			if (Test(compileTarget.m_CoordinateOptions, ShaderCoordinateOptions::InvertY))
+			{
+				args.emplace_back(L"-fvk-invert-y");
+			}
+			if (Test(compileTarget.m_CoordinateOptions, ShaderCoordinateOptions::UseDxPositionW))
+			{
+				args.emplace_back(L"-fvk-use-dx-position-w");
+			}
+		}
+
+		if (Test(compileTarget.m_Flags, ShaderCompileFlags::Debug))
+		{
+			args.emplace_back(DXC_ARG_DEBUG);
+			if (compileTarget.m_BinaryFormat == ShaderBinaryFormat::SpirV)
+			{
+				args.emplace_back(L"-fspv-debug=vulkan-with-source");
+			}
+			else
+			{
+				args.emplace_back(L"-Qembed_debug");
+			}
+		}
+		else if (compileTarget.m_BinaryFormat == ShaderBinaryFormat::Dxil)
+		{
+			args.emplace_back(L"-Qstrip_debug");
+			args.emplace_back(L"-Qstrip_reflect");
+		}
+
+		if (Test(compileTarget.m_Flags, ShaderCompileFlags::Optimization))
+		{
+			args.push_back(L"-" + compileTarget.m_OptimizationLevel);
+		}
+		else
+		{
+			args.emplace_back(DXC_ARG_SKIP_OPTIMIZATIONS);
+		}
+
+		for (const auto& include : desc.m_IncludeDirs)
+		{
+			args.emplace_back(L"-I");
+			args.push_back(utils::Canonical(include).wstring());
+		}
+		for (const ShaderDefine& define : desc.m_Defines)
+		{
+			std::wstring value = define.m_Name;
+			if (!define.m_Value.empty())
+			{
+				value += L"=" + define.m_Value;
+			}
+			args.emplace_back(L"-D");
+			args.push_back(std::move(value));
+		}
+		args.insert(args.end(), desc.m_ExtraArgs.begin(), desc.m_ExtraArgs.end());
+		return args;
+	}
+
 	ShaderHash128 ShaderCompiler::ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept
 	{
 		const auto keyString = BuildKeyString(mergedDesc);
@@ -251,39 +567,43 @@ namespace gglab
 	}
 
 	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(
-		const std::wstring& keyHex, ShaderStage stage) const noexcept
+		const std::wstring& keyHex, ShaderStage stage, ShaderBinaryFormat format) const noexcept
 	{
-		std::wstring extension;
+		std::wstring stageExtension;
 		switch (stage)
 		{
 		case ShaderStage::Vertex:
-			extension = L".vs.dxil";
+			stageExtension = L".vs";
 			break;
 		case ShaderStage::Pixel:
-			extension = L".ps.dxil";
+			stageExtension = L".ps";
 			break;
 		case ShaderStage::Hull:
-			extension = L".hs.dxil";
+			stageExtension = L".hs";
 			break;
 		case ShaderStage::Domain:
-			extension = L".ds.dxil";
+			stageExtension = L".ds";
 			break;
 		case ShaderStage::Geometry:
-			extension = L".gs.dxil";
+			stageExtension = L".gs";
 			break;
 		case ShaderStage::Mesh:
-			extension = L".ms.dxil";
+			stageExtension = L".ms";
 			break;
 		case ShaderStage::Compute:
-			extension = L".cs.dxil";
+			stageExtension = L".cs";
 			break;
 		default:
-			extension = L".dxil";
 			break;
 		}
+		const std::wstring formatDirectory =
+			format == ShaderBinaryFormat::SpirV ? L"spirv" : L"dxil";
+		const std::wstring binaryExtension =
+			format == ShaderBinaryFormat::SpirV ? L".spv" : L".dxil";
+		const std::wstring extension = stageExtension + binaryExtension;
 
-		auto path =
-			m_CacheRootDir / keyHex.substr(0, 2) / keyHex.substr(2, 2) / (keyHex + extension);
+		auto path = m_CacheRootDir / formatDirectory / keyHex.substr(0, 2) /
+			keyHex.substr(2, 2) / (keyHex + extension);
 		utils::CreateParentDirectoryIfNotExist(path);
 		return path;
 	}
@@ -304,71 +624,12 @@ namespace gglab
 		GGLAB_HR(MakeAndInitialize<ShaderIncludeHandler>(
 			&includeHandler, m_Impl->m_Utils, desc.m_IncludeDirs));
 
+		const std::vector<std::wstring> ownedArgs = BuildCompileArguments(desc);
 		std::vector<const wchar_t*> args;
-		const std::wstring entry = desc.m_Entry.empty() ? L"Main" : desc.m_Entry;
-		const std::wstring target = ToTarget(desc.m_Stage, desc.m_Model);
-
-		args.push_back(L"-E");
-		args.push_back(entry.c_str());
-
-		args.push_back(L"-T");
-		args.push_back(target.c_str());
-
-		args.push_back(L"-HV");
-		args.push_back(desc.m_HlslVersion.c_str());
-
-		if (Test(desc.m_Flags, ShaderCompileFlags::Debug))
+		args.reserve(ownedArgs.size());
+		for (const std::wstring& arg : ownedArgs)
 		{
-			args.insert(args.end(), { DXC_ARG_DEBUG, L"-Qembed_debug" });
-		}
-		else
-		{
-			args.insert(args.end(), { L"-Qstrip_debug", L"-Qstrip_reflect" });
-		}
-
-		if (Test(desc.m_Flags, ShaderCompileFlags::Optimization))
-		{
-			const std::wstring optFlag = L"-" + desc.m_OptLevel;
-			args.push_back(optFlag.c_str());
-		}
-		else
-		{
-			args.push_back(DXC_ARG_SKIP_OPTIMIZATIONS);
-		}
-
-		// -I
-		std::vector<std::wstring> includes;
-		includes.reserve(desc.m_IncludeDirs.size());
-		for (const auto& path : desc.m_IncludeDirs)
-		{
-			includes.push_back(utils::Canonical(path).wstring());
-			args.push_back(L"-I");
-			args.push_back(includes.back().c_str());
-		}
-
-		// -D
-		std::vector<std::wstring> defines;
-		defines.reserve(desc.m_Defines.size());
-		for (const auto& define : desc.m_Defines)
-		{
-			std::wstring arg = define.m_Name;
-			if (!define.m_Value.empty())
-			{
-				arg += L"=" + define.m_Value;
-			}
-			defines.push_back(std::move(arg));
-		}
-
-		for (auto& define : defines)
-		{
-			args.push_back(L"-D");
-			args.push_back(define.c_str());
-		}
-
-		// Extra args
-		for (auto& extra : desc.m_ExtraArgs)
-		{
-			args.push_back(extra.c_str());
+			args.push_back(arg.c_str());
 		}
 
 		// Compile
@@ -400,7 +661,7 @@ namespace gglab
 	}
 
 	void ShaderCompiler::WriteMeta(const std::filesystem::path& meta, const ShaderDesc& desc,
-		const std::vector<std::filesystem::path>& deps) const noexcept
+		const std::vector<std::filesystem::path>& deps, ShaderHash128 recipeHash) const noexcept
 	{
 		const auto created = utils::CreateParentDirectoryIfNotExist(meta);
 
@@ -414,8 +675,17 @@ namespace gglab
 
 		const auto src = utils::Canonical(desc.m_SourcePath).string();
 		const auto entry = utils::ToString(desc.m_Entry);
-		const auto target = utils::ToString(ToTarget(desc.m_Stage, desc.m_Model));
+		const auto target = utils::ToString(ToTarget(desc.m_Stage, desc.m_Target.m_Model));
 
+		out << "schema=2\n";
+		out << "recipe=" << utils::ToString(ToHex(recipeHash)) << "\n";
+		out << "binary_format=" << ShaderBinaryFormatText(desc.m_Target.m_BinaryFormat) << "\n";
+		out << "target_environment=" <<
+			SpirVTargetEnvironmentText(desc.m_Target.m_SpirVTargetEnvironment) << "\n";
+		out << "binding_abi_revision=" << desc.m_Target.m_BindingABIRevision << "\n";
+		out << "coordinate_options=" <<
+			static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions) << "\n";
+		out << "dxc_version=" << utils::ToString(desc.m_Target.m_DxcVersion) << "\n";
 		out << "src=" << src << "\n";
 		out << "entry=" << entry << "\n";
 		out << "target=" << target << "\n";
@@ -462,7 +732,8 @@ namespace gglab
 		}
 	}
 
-	bool ShaderCompiler::IsMetaUpToDate(const std::filesystem::path& meta) const noexcept
+	bool ShaderCompiler::IsMetaUpToDate(const std::filesystem::path& meta,
+		const ShaderDesc& desc, ShaderHash128 recipeHash) const noexcept
 	{
 		std::error_code errorCode;
 		if (!std::filesystem::exists(meta, errorCode))
@@ -476,20 +747,28 @@ namespace gglab
 			return false;
 		}
 
+		std::unordered_map<std::string, std::string> values;
+		size_t dependencyCount = 0;
 		std::string line;
 		while (std::getline(in, line))
 		{
 			if (line.rfind("dep=", 0) != 0)
 			{
+				const size_t separator = line.find('=');
+				if (separator != std::string::npos)
+				{
+					values[line.substr(0, separator)] = line.substr(separator + 1);
+				}
 				continue;
 			}
+			++dependencyCount;
 
 			const auto bar = line.find("|");
 			const auto eq = line.find("mtime=", bar == std::string::npos ? 0 : bar);
 
 			if (bar == std::string::npos || eq == std::string::npos)
 			{
-				continue;
+				return false;
 			}
 
 			const std::string p = line.substr(4, bar - 4);
@@ -506,7 +785,22 @@ namespace gglab
 				return false;
 			}
 		}
-		return true;
+
+		const auto equals = [&values](std::string_view key, std::string_view expected) noexcept
+			{
+				const auto iterator = values.find(std::string(key));
+				return iterator != values.end() && iterator->second == expected;
+			};
+		return dependencyCount > 0 && equals("schema", "2") &&
+			equals("recipe", utils::ToString(ToHex(recipeHash))) &&
+			equals("binary_format", ShaderBinaryFormatText(desc.m_Target.m_BinaryFormat)) &&
+			equals("target_environment",
+				SpirVTargetEnvironmentText(desc.m_Target.m_SpirVTargetEnvironment)) &&
+			equals("binding_abi_revision",
+				std::to_string(desc.m_Target.m_BindingABIRevision)) &&
+			equals("coordinate_options",
+				std::to_string(static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions))) &&
+			equals("dxc_version", utils::ToString(desc.m_Target.m_DxcVersion));
 	}
 
 	std::wstring ShaderCompiler::DefaultEntry(const ShaderStage& stage) noexcept
@@ -589,47 +883,67 @@ namespace gglab
 	std::wstring ShaderCompiler::BuildKeyString(const ShaderDesc& desc) noexcept
 	{
 		const auto src = utils::Canonical(desc.m_SourcePath).wstring();
-		const auto entry = desc.m_Entry.empty() ? std::wstring(L"Main") : desc.m_Entry;
-		const auto target = ToTarget(desc.m_Stage, desc.m_Model);
-
 		std::wstring str;
 		str.reserve(1024);
-
-		str += L"src:" + src + L";";
-		str += L"entry:" + entry + L";";
-		str += L"target:" + target + L";";
-		str += L"hv:" + desc.m_HlslVersion + L";";
-		str += L"optimization:" + desc.m_OptLevel + L";";
-		str += L"flags:" + std::to_wstring(static_cast<uint32_t>(desc.m_Flags)) + L";";
-
-		// defines
-		auto defines = desc.m_Defines;
-		std::sort(defines.begin(), defines.end());
-		str += L"defines:";
-		for (auto& define : defines)
+		const auto append = [&str](std::wstring_view name, std::wstring_view value)
+			{
+				str.append(name);
+				str.push_back(L':');
+				str.append(std::to_wstring(value.size()));
+				str.push_back(L':');
+				str.append(value);
+				str.push_back(L';');
+			};
+		append(L"src", src);
+		append(L"binary_format",
+			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_BinaryFormat)));
+		append(L"target_environment",
+			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_SpirVTargetEnvironment)));
+		append(L"binding_abi_revision",
+			std::to_wstring(desc.m_Target.m_BindingABIRevision));
+		append(L"coordinate_options",
+			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions)));
+		append(L"dxc_version", desc.m_Target.m_DxcVersion);
+		const std::vector<std::wstring> compileArguments = BuildCompileArguments(desc);
+		for (const std::wstring& argument : compileArguments)
 		{
-			str += define.m_Name + L"=" + define.m_Value + L",";
-		}
-
-		// include dirs
-		auto includes = desc.m_IncludeDirs;
-		std::sort(includes.begin(), includes.end());
-		str += L";includes:";
-		for (auto& path : includes)
-		{
-			str += utils::Canonical(path).wstring() + L",";
-		}
-
-		// extra args
-		auto extras = desc.m_ExtraArgs;
-		std::sort(extras.begin(), extras.end());
-		str += L";extra:";
-		for (auto& arg : extras)
-		{
-			str += arg + L",";
+			append(L"arg", argument);
 		}
 
 		return str;
+	}
+
+	std::wstring ShaderCompiler::QueryDxcVersion() const noexcept
+	{
+		ComPtr<IDxcVersionInfo> versionInfo;
+		if (FAILED(m_Impl->m_Compiler.As(&versionInfo)))
+		{
+			return L"unknown";
+		}
+
+		UINT32 major = 0;
+		UINT32 minor = 0;
+		if (FAILED(versionInfo->GetVersion(&major, &minor)))
+		{
+			return L"unknown";
+		}
+
+		ComPtr<IDxcVersionInfo2> versionInfo2;
+		if (FAILED(m_Impl->m_Compiler.As(&versionInfo2)))
+		{
+			return std::format(L"{}.{}", major, minor);
+		}
+
+		UINT32 commitCount = 0;
+		char* commitHash = nullptr;
+		if (FAILED(versionInfo2->GetCommitInfo(&commitCount, &commitHash)))
+		{
+			return std::format(L"{}.{}", major, minor);
+		}
+		const std::wstring commit =
+			commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
+		CoTaskMemFree(commitHash);
+		return std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
 	}
 
 	bool ShaderCompiler::GetContainerHash(
@@ -642,7 +956,6 @@ namespace gglab
 		}
 
 		// magic number for DirectX Container
-		// https://llvm.org/docs/DirectX/DXContainer.html?utm_source=chatgpt.com#file-header
 		static const unsigned char DXBCMagicNumber[] = { 'D', 'X', 'B', 'C' };
 		if (std::memcmp(data, DXBCMagicNumber, 4) != 0)
 		{
@@ -655,7 +968,38 @@ namespace gglab
 		return true;
 	}
 
-	ShaderHash128 ShaderCompiler::ComputeHashFromBinary(const ShaderBinary& binary) noexcept
+	bool ShaderCompiler::IsBinaryFormat(
+		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept
+	{
+		if (!binary.IsValid())
+		{
+			return false;
+		}
+
+		const auto* data = static_cast<const uint8_t*>(binary.Data());
+		const size_t size = binary.SizeInBytes();
+		switch (format)
+		{
+		case ShaderBinaryFormat::Dxil:
+			return size >= 20 && std::memcmp(data, "DXBC", 4) == 0;
+		case ShaderBinaryFormat::SpirV:
+		{
+			if (size < 5 * sizeof(uint32_t) || size % sizeof(uint32_t) != 0)
+			{
+				return false;
+			}
+			uint32_t magic = 0;
+			std::memcpy(&magic, data, sizeof(magic));
+			return magic == 0x07230203u;
+		}
+		case ShaderBinaryFormat::Unknown:
+			break;
+		}
+		return false;
+	}
+
+	ShaderHash128 ShaderCompiler::ComputeHashFromBinary(
+		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept
 	{
 		ShaderHash128 hash{};
 		if (!binary.IsValid())
@@ -667,14 +1011,17 @@ namespace gglab
 		const auto* ptr = static_cast<const uint8_t*>(binary.Data());
 		const auto size = binary.SizeInBytes();
 
-		if (GetContainerHash(ptr, size, hash))
+		if (format == ShaderBinaryFormat::Dxil && GetContainerHash(ptr, size, hash))
 		{
 			return hash;
 		}
 
 		// FNV-1a 64-bit hash
-		GGLAB_LOG_GRAPHICS_WARN(
-			"ShaderCompiler::ComputeHashFromBinary: Failed to get container hash, fallback to FNV-1a hash.");
+		if (format == ShaderBinaryFormat::Dxil)
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"ShaderCompiler::ComputeHashFromBinary: Failed to get DXIL container hash, fallback to FNV-1a hash.");
+		}
 		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
 		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
 		return hash;

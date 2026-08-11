@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 #include <tuple>
 
@@ -28,6 +29,7 @@ namespace gglab
 		size_t m_SizeInBytes = 0;
 		ShaderBinaryFormat m_Format = ShaderBinaryFormat::Unknown;
 		ShaderHash128 m_Hash{};
+		std::wstring_view m_EntryPoint{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{

@@ -35,6 +35,8 @@ namespace gglab
 			RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept;
 		RHISamplerHandle GetOrCreateSampler(const RHISamplerDesc& desc) noexcept;
 		DX12DescriptorView ResolveTextureView(RHITextureViewHandle view) const noexcept;
+		bool ResolveTextureViewInfo(RHITextureViewHandle view, DX12DescriptorView& descriptor,
+			RHITextureViewKey& key) const noexcept;
 		DX12DescriptorView ResolveBufferView(RHIBufferViewHandle view) const noexcept;
 		RHIDescriptorHandle ResolveTextureViewDescriptor(RHITextureViewHandle view) const noexcept;
 		RHIDescriptorHandle ResolveBufferViewDescriptor(RHIBufferViewHandle view) const noexcept;

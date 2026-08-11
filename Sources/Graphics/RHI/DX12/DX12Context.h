@@ -19,9 +19,10 @@ namespace gglab
 	class DX12FrameContext final : public RHIFrameContext
 	{
 	public:
-		DX12FrameContext(DX12Context* context, uint32_t frameIndex) noexcept;
+		DX12FrameContext(DX12Context* context, uint32_t frameSlotIndex) noexcept;
 		~DX12FrameContext() override = default;
 
+		uint32_t GetFrameSlotIndex() const noexcept override { return m_FrameSlotIndex; }
 		uint32_t GetBackBufferIndex() const noexcept override { return m_BackBufferIndex; }
 		RHITextureHandle GetBackBuffer() const noexcept override;
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
@@ -33,7 +34,7 @@ namespace gglab
 		friend class DX12Context;
 
 		DX12Context* m_Context = nullptr;
-		uint32_t m_FrameIndex = 0;
+		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
 		DX12CommandAllocator* m_GraphicsAllocator = nullptr;
 		DX12CommandAllocator* m_ComputeAllocator = nullptr;
@@ -65,7 +66,7 @@ namespace gglab
 		void Resize(uint32_t width, uint32_t height) noexcept override;
 		void WaitIdle() noexcept override;
 		void RetireCompletedWork() noexcept override;
-		uint32_t GetCurrentFrameIndex() const noexcept override;
+		uint32_t GetFrameSlotCount() const noexcept override;
 
 		[[nodiscard]] DX12Device& GetDX12Device() noexcept;
 		[[nodiscard]] const DX12Device& GetDX12Device() const noexcept;
@@ -93,6 +94,7 @@ namespace gglab
 		std::vector<std::unique_ptr<DX12ComputeCommandContext>> m_DirectComputeContexts;
 		std::vector<std::unique_ptr<DX12FrameContext>> m_Frames;
 		DX12FrameContext* m_ActiveFrame = nullptr;
+		uint32_t m_NextFrameSlotIndex = 0;
 		bool m_Initialized = false;
 	};
 }

@@ -254,6 +254,7 @@ namespace gglab
 			const auto& attribute = rhiDesc.m_VertexInput.m_Attributes[i];
 			mix(attribute.m_SemanticName);
 			mix(attribute.m_SemanticIndex);
+			mix(attribute.m_Location);
 			mix(attribute.m_Format);
 			mix(attribute.m_InputSlot);
 			mix(attribute.m_AlignedByteOffset);

@@ -69,6 +69,7 @@ namespace gglab
 		StringID m_NameId;
 		bool m_Imported = false;
 		bool m_Devirtualized = false;
+		RGContentValidity m_InitialContentValidity = RGContentValidity::Undefined;
 
 		RHIResourceState m_InitialBarrierState = CommonRHIResourceState();
 		std::optional<RHIResourceState> m_FinalBarrierState;
@@ -105,6 +106,10 @@ namespace gglab
 		RGResourceNodeIndex m_Previous = InvalidRGResourceNodeIndex;
 		RGPassNodeIndex m_Writer = InvalidRGPassNodeIndex;
 		std::vector<RGPassNodeIndex> m_Readers;
+		// Version-level content validity for buffers. Textures use the
+		// subresource-level m_TextureValidity below.
+		RGContentValidity m_ContentValidity = RGContentValidity::Undefined;
+		RGTextureContentValidity m_TextureValidity{};
 
 		StringID NameId() const noexcept
 		{
@@ -187,15 +192,27 @@ namespace gglab
 			RGResourceId<RESOURCE> Import(const char* name,
 				typename RGResourceTraits<RESOURCE>::Handle handle,
 				const typename RESOURCE::Descriptor& desc,
-				typename RESOURCE::Access initialAccess) noexcept
+				typename RESOURCE::Access initialAccess,
+				RGContentValidity initialContentValidity) noexcept
 			{
-				return m_RG.ImportInternal<RESOURCE>(name, handle, desc, initialAccess);
+				return m_RG.ImportInternal<RESOURCE>(name, handle, desc,
+					ToRHIResourceState(initialAccess), initialContentValidity);
 			}
 
 			RGTextureId ImportTexture(const char* name, RHITextureHandle texture,
-				const RHITextureDesc& desc, RGTextureAccess initialAccess) noexcept
+				const RHITextureDesc& desc, RGTextureAccess initialAccess,
+				RGContentValidity initialContentValidity) noexcept
 			{
-				return Import<RGTextureResource>(name, texture, desc, initialAccess);
+				return Import<RGTextureResource>(
+					name, texture, desc, initialAccess, initialContentValidity);
+			}
+
+			RGTextureId ImportTexture(const char* name, RHITextureHandle texture,
+				const RHITextureDesc& desc, RHIResourceState initialState,
+				RGContentValidity initialContentValidity) noexcept
+			{
+				return m_RG.ImportInternal<RGTextureResource>(
+					name, texture, desc, initialState, initialContentValidity);
 			}
 
 			template <RHITextureViewType T>
@@ -206,9 +223,11 @@ namespace gglab
 			}
 
 			RGBufferId ImportBuffer(const char* name, RHIBufferHandle buffer,
-				const RHIBufferDesc& desc, RGBufferAccess initialAccess) noexcept
+				const RHIBufferDesc& desc, RGBufferAccess initialAccess,
+				RGContentValidity initialContentValidity) noexcept
 			{
-				return Import<RGBufferResource>(name, buffer, desc, initialAccess);
+				return Import<RGBufferResource>(
+					name, buffer, desc, initialAccess, initialContentValidity);
 			}
 
 			template <typename RESOURCE>
@@ -410,7 +429,8 @@ namespace gglab
 		RGResourceId<RESOURCE> ImportInternal(const char* name,
 			typename RGResourceTraits<RESOURCE>::Handle handle,
 			const typename RESOURCE::Descriptor& desc,
-			typename RESOURCE::Access initialAccess) noexcept;
+			RHIResourceState initialState,
+			RGContentValidity initialContentValidity) noexcept;
 
 		template <typename RESOURCE>
 		RGResourceId<RESOURCE> ReadInternal(RGPassNodeIndex passNodeIndex,
@@ -440,6 +460,18 @@ namespace gglab
 			RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
+
+		// Texture subresource-level content validity helpers. A nullopt range
+		// represents the complete texture; ranges are normalized with
+		// NormalizeTextureSubresourceRange before interpretation.
+		static bool IsTextureSubresourceRangeDefined(const RGTextureContentValidity& validity,
+			const RHITextureDesc& desc,
+			const std::optional<RHISubresourceRange>& requested) noexcept;
+		static void MarkTextureSubresourceRangeDefined(RGTextureContentValidity& validity,
+			const RHITextureDesc& desc,
+			const std::optional<RHISubresourceRange>& requested) noexcept;
+		static RGTextureContentValidity MakeImportedTextureValidity(
+			RGContentValidity initialContentValidity) noexcept;
 
 	private:
 		RHIDevice* m_Device = nullptr;
@@ -613,6 +645,10 @@ namespace gglab
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			virtualResource->m_InitialBarrierState = UndefinedRHITextureState();
+		}
 		m_VirtualResources.push_back(virtualResource);
 
 		RGResourceNode resourceNode{
@@ -631,12 +667,32 @@ namespace gglab
 	template <typename RESOURCE>
 	inline RGResourceId<RESOURCE> RenderGraph::ImportInternal(const char* name,
 		typename RGResourceTraits<RESOURCE>::Handle importedHandle,
-		const typename RESOURCE::Descriptor& desc, typename RESOURCE::Access initialAccess) noexcept
+		const typename RESOURCE::Descriptor& desc, RHIResourceState initialState,
+		RGContentValidity initialContentValidity) noexcept
 	{
 		GGLAB_ASSERT_MSG(name && *name, "Import name must be valid.");
 		GGLAB_ASSERT_MSG(importedHandle.IsValid(), "Import RHI resource handle must be valid.");
 		GGLAB_ASSERT_MSG(
 			m_Device->IsAlive(importedHandle), "Import RHI resource handle must be live.");
+		constexpr RHIResourceStateUsage StateUsage = std::is_same_v<RESOURCE, RGTextureResource>
+			? RHIResourceStateUsage::TextureInitial
+			: RHIResourceStateUsage::Buffer;
+		if (!IsRHIResourceStateValid(initialState, StateUsage))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"RenderGraph import '{}' rejected initial state stages={}, access={}, layout={}.",
+				name ? name : "<null>", static_cast<uint64_t>(initialState.m_Stages),
+				static_cast<uint64_t>(initialState.m_Access),
+				static_cast<uint32_t>(initialState.m_Layout));
+		}
+		GGLAB_ASSERT_MSG(IsRHIResourceStateValid(initialState, StateUsage),
+			"Import RHI resource state must be valid for the resource type.");
+		if (!name || !*name || !importedHandle.IsValid() || !m_Device->IsAlive(importedHandle) ||
+			!IsRHIResourceStateValid(initialState, StateUsage))
+		{
+			m_BuildValid = false;
+			return {};
+		}
 
 		RGResourceHandle handle{
 			RGResourceHandle::Handle(static_cast<uint16_t>(m_ResourceSlots.size())), 1 };
@@ -655,7 +711,8 @@ namespace gglab
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true; // import resource alreay devirtualized.
-		virtualResource->m_InitialBarrierState = ToRHIResourceState(initialAccess);
+		virtualResource->m_InitialBarrierState = initialState;
+		virtualResource->m_InitialContentValidity = initialContentValidity;
 		virtualResource->m_Desc = desc;
 		virtualResource->m_ResourceType = RGResourceTraits<RESOURCE>::ResourceType;
 		virtualResource->m_ImportedHandle = importedHandle;
@@ -664,7 +721,12 @@ namespace gglab
 		RGResourceNode resourceNode{
 			.m_ResourceHandle = handle,
 			.m_VirtualResource = virtualResource,
+			.m_ContentValidity = initialContentValidity,
 		};
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			resourceNode.m_TextureValidity = MakeImportedTextureValidity(initialContentValidity);
+		}
 		m_ResourceNodes.push_back(resourceNode);
 
 		// Emplace in name handle unordered map.
@@ -832,6 +894,8 @@ namespace gglab
 			nextResourceNode.m_ResourceHandle = resourceId;
 			nextResourceNode.m_VirtualResource = curResourceNode->m_VirtualResource;
 			nextResourceNode.m_Previous = previousNodeIndex;
+			nextResourceNode.m_ContentValidity = curResourceNode->m_ContentValidity;
+			nextResourceNode.m_TextureValidity = curResourceNode->m_TextureValidity;
 			slot.m_ResourceNodeIndex =
 				RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 			m_ResourceNodes.push_back(nextResourceNode);
@@ -839,6 +903,17 @@ namespace gglab
 			curResourceNode = &m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
 		}
 		curResourceNode->m_Writer = stablePassNodeIndex;
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+				curResourceNode->m_VirtualResource);
+			MarkTextureSubresourceRangeDefined(
+				curResourceNode->m_TextureValidity, texture->m_Desc, subresources);
+		}
+		else
+		{
+			curResourceNode->m_ContentValidity = RGContentValidity::Defined;
+		}
 
 		// Imported resource -> pass side effect
 		if (curResourceNode->m_VirtualResource && curResourceNode->m_VirtualResource->m_Imported)
@@ -904,10 +979,6 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(previousNode.m_Writer != stablePassNodeIndex,
 			"Pass can not read-write a resource it already writes.");
-		GGLAB_ASSERT_MSG(
-			previousNode.m_Writer.IsValid() || previousNode.m_VirtualResource->m_Imported,
-			"ReadWrite requires existing contents. Use Write to initialize a transient resource.");
-
 		previousNode.m_Readers.push_back(stablePassNodeIndex);
 		auto* virtualResource = previousNode.m_VirtualResource;
 
@@ -918,9 +989,20 @@ namespace gglab
 		nextResourceNode.m_VirtualResource = virtualResource;
 		nextResourceNode.m_Previous = previousNodeIndex;
 		nextResourceNode.m_Writer = stablePassNodeIndex;
+		nextResourceNode.m_ContentValidity = RGContentValidity::Defined;
+		nextResourceNode.m_TextureValidity = previousNode.m_TextureValidity;
 		slot.m_ResourceNodeIndex =
 			RGResourceNodeIndex{ static_cast<uint32_t>(m_ResourceNodes.size()) };
 		m_ResourceNodes.push_back(nextResourceNode);
+
+		if constexpr (std::is_same_v<RESOURCE, RGTextureResource>)
+		{
+			const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+				virtualResource);
+			auto& writtenNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
+			MarkTextureSubresourceRangeDefined(
+				writtenNode.m_TextureValidity, texture->m_Desc, subresources);
+		}
 
 		if (virtualResource && virtualResource->m_Imported)
 		{

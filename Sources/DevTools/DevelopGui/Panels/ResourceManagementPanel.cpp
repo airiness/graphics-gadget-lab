@@ -140,7 +140,7 @@ namespace gglab
 				.m_Label = name,
 				.m_StableId = serial,
 			};
-			return device.CreateTexture(desc, debugIdentity);
+			return device.CreateTexture({ .m_Desc = desc }, debugIdentity);
 		}
 
 		RHIBufferHandle CreateTestBuffer(
@@ -544,7 +544,7 @@ namespace gglab
 		{
 			RHITextureDesc invalidTexture{};
 			RHIBufferDesc invalidBuffer{};
-			GGLAB_UNUSED(device.CreateTexture(invalidTexture));
+			GGLAB_UNUSED(device.CreateTexture({ .m_Desc = invalidTexture }));
 			GGLAB_UNUSED(device.CreateBuffer(invalidBuffer));
 		}
 		ImGui::SameLine();

@@ -35,6 +35,14 @@ namespace gglab
 			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
 			~Frame() noexcept;
 			[[nodiscard]] uint64_t GetSerial() const noexcept { return m_FrameSerial; }
+			[[nodiscard]] uint32_t GetFrameSlotIndex() const noexcept
+			{
+				return m_FrameSlotIndex;
+			}
+			[[nodiscard]] uint32_t GetBackBufferIndex() const noexcept
+			{
+				return m_BackBufferIndex;
+			}
 
 		private:
 			enum class State : uint8_t
@@ -46,6 +54,7 @@ namespace gglab
 
 			Frame(Renderer* renderer, RHIFrameContext* rhiFrame, uint64_t frameSerial) noexcept :
 				m_Renderer(renderer), m_RHIFrame(rhiFrame), m_FrameSerial(frameSerial),
+				m_FrameSlotIndex(rhiFrame ? rhiFrame->GetFrameSlotIndex() : 0),
 				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0)
 			{
 			}
@@ -55,6 +64,7 @@ namespace gglab
 			Renderer* m_Renderer = nullptr;
 			State m_State = State::Begun;
 			uint64_t m_FrameSerial = 0;
+			uint32_t m_FrameSlotIndex = std::numeric_limits<uint32_t>::max();
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
@@ -64,6 +74,7 @@ namespace gglab
 
 		struct CreateInfo
 		{
+			RHIBackendType m_Backend = RHIBackendType::Unknown;
 			ShaderManager* m_ShaderManager = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
 			void* m_NativeWindowHandle = nullptr;
@@ -80,7 +91,7 @@ namespace gglab
 		void Finalize() noexcept;
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
-		[[nodiscard]] Frame BeginFrame(uint32_t backBufferIndex) noexcept;
+		[[nodiscard]] Frame BeginFrame() noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		void EndFrame(Frame& frame) noexcept;
