@@ -1,12 +1,15 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIContext.h"
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 namespace gglab
 {
 	class DX12CommandAllocator;
+	class DX12CommandList;
 	class DX12ComputeCommandContext;
 	class DX12DescriptorManager;
 	class DX12Device;
@@ -80,7 +83,7 @@ namespace gglab
 		DX12ComputeCommandContext* AcquireComputeContext(DX12FrameContext& frame) noexcept;
 		DX12ComputeCommandContext& GetDirectComputeContext(DX12FrameContext& frame) noexcept;
 		void BeginGraphicsRecording(DX12FrameContext& frame) noexcept;
-		void BindGlobalDescriptorHeaps(class DX12CommandList& commandList) noexcept;
+		void BindGlobalDescriptorHeaps(DX12CommandList& commandList) noexcept;
 		void FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
 		void Finalize() noexcept;
 
