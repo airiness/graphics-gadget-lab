@@ -1,9 +1,18 @@
-#include "Core/Precompiled.h"
+#include "Graphics/Asset/AssetManager.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/SamplerRegistry.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
+#include "Graphics/SamplerRegistry.h"
+
+#include <format>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

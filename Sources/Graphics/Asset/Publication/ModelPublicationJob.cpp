@@ -1,5 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace gglab
 {

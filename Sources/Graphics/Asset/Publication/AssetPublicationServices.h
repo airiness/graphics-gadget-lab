@@ -5,6 +5,7 @@
 #include "Graphics/GraphicsTypes.h"
 
 #include <compare>
+#include <cstdint>
 #include <span>
 #include <string>
 #include <vector>

@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Publication/ModelPublicationJournal.h"
+#include "Core/CoreMacros.h"
+
+#include <cstddef>
+#include <utility>
 
 namespace gglab
 {

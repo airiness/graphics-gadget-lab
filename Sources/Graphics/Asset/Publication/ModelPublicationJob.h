@@ -2,8 +2,11 @@
 #include "Graphics/Asset/Publication/ModelPublicationJournal.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
