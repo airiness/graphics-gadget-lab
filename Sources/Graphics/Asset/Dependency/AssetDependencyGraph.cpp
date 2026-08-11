@@ -1,5 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
+#include "Core/CoreMacros.h"
+
+#include <algorithm>
+#include <memory>
+#include <ranges>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

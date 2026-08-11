@@ -1,5 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
+#include "Core/CoreMacros.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <ranges>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
