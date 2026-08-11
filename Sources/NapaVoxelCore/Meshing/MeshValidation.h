@@ -102,8 +102,10 @@ namespace napa::voxel
 		Float3 a, Float3 b, Float3 c, float voxelSize) noexcept;
 	// Winding evidence follows material-section order, then triangle order.
 	// Validation trusts its field provenance and does not include it in the
-	// mesh hash. Geometry bounds are inclusive; unique source-cell ownership
-	// remains a producer invariant.
+	// mesh hash. Canonical-position duplicate triangles are invalid, and every
+	// vertex normal must lie in its final outward face hemisphere. Geometry
+	// bounds are inclusive; unique source-cell ownership remains a producer
+	// invariant.
 	[[nodiscard]] ValidationResult ValidateAndHashChunkMesh(const MeshData& mesh,
 		std::span<const MeshTriangleWindingEvidence> windingEvidence,
 		const VoxelWorldConfig& config, ChunkCoord chunk, MeshValidationResult& result);

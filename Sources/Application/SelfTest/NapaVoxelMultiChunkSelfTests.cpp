@@ -423,7 +423,7 @@ namespace gglab
 				meshing.m_Validation.m_IndexCount == 0 &&
 				meshing.m_Validation.m_TriangleCount == 0 &&
 				meshing.m_Validation.m_ValidationHash ==
-				0x9a6da64aacf473a6ull &&
+				0xe0f05d920ff2a6c1ull &&
 				meshing.m_BoundaryValidation ==
 				BoundaryContourValidationResult{
 					.m_ChunkRecordCount = 8,
@@ -564,7 +564,7 @@ namespace gglab
 				meshing.m_Validation ==
 				WorldMeshValidationResult{
 					.m_ValidationHash =
-						0xce1a7aea20fb4807ull,
+						0xd31a1d473131fb32ull,
 					.m_ChunkCount = 8,
 					.m_VertexCount = 1908,
 					.m_SectionCount = 8,
@@ -1075,7 +1075,7 @@ namespace gglab
 			context.Check(
 				ComputeVisibleWorldMeshHash(visible, visibleValidation).Succeeded() &&
 				visibleValidation == initialValidation &&
-				visibleValidation.m_ValidationHash == 0xce1a7aea20fb4807ull,
+				visibleValidation.m_ValidationHash == 0xd31a1d473131fb32ull,
 				"Visible World mesh hashing reads only the published Mesh Set");
 
 			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
@@ -1294,7 +1294,7 @@ namespace gglab
 			context.Check(
 				allChunksEmpty &&
 				validation.m_ChunkCount == EightChunkDomain.size() &&
-				validation.m_ValidationHash == 0x9a6da64aacf473a6ull,
+				validation.m_ValidationHash == 0xe0f05d920ff2a6c1ull,
 				"Visible World mesh hashing includes every Empty Mesh Chunk");
 		}
 

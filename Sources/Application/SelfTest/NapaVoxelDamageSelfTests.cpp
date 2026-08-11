@@ -699,12 +699,12 @@ namespace gglab
 						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
 						{ return record.m_Chunk == ChunkCoord{}; });
 					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
-						validation.m_ValidationHash == 0x258d430301532e18ull &&
-						validation.m_VertexCount == 2952 && validation.m_IndexCount == 2952 &&
-						validation.m_TriangleCount == 984 &&
+						validation.m_ValidationHash == 0xe555db2b5789fadcull &&
+						validation.m_VertexCount == 2946 && validation.m_IndexCount == 2946 &&
+						validation.m_TriangleCount == 982 &&
 						chunk != destroyedVisible.GetChunks().end() &&
-						chunk->m_Validation.m_ValidationHash == 0x3017114a9fe6a1d6ull &&
-						chunk->m_Validation.m_TriangleCount == 128 &&
+						chunk->m_Validation.m_ValidationHash == 0xab1cc81a0772ae9cull &&
+						chunk->m_Validation.m_TriangleCount == 126 &&
 						chunk->m_Validation.m_QuantizedBounds == QuantizedMeshAabb{
 							.m_Min = {},
 							.m_Max = { 131072, 393216, 393216 },
@@ -762,6 +762,55 @@ namespace gglab
 				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
 		}
 
+		void RunPlaytestBreachMeshingRegressionTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config{
+				.m_ChunkCellCount = 16,
+				.m_VoxelSize = 1.0f,
+				.m_SurfaceBandVoxels = 2.0f,
+				.m_LogicalCellBounds = {
+					.m_Min = {},
+					.m_MaxExclusive = { 16, 16, 16 },
+				},
+			};
+			const PrimitiveDesc wall{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = { 8.0, 8.0, 8.0 },
+						.m_HalfExtents = { 3.0, 5.0, 5.0 },
+					},
+				},
+			};
+			std::unique_ptr<VoxelWorld> world;
+			PrimitiveWorldGenerationResult generation{};
+			VoxelMutationResult firstHit{};
+			VoxelMutationResult secondHit{};
+			ChunkMeshRecord breached{};
+			ChunkMeshRecord repeated{};
+			const SphereEditRequest request = MakeStoneEdit({ 5.0, 8.0, 8.0 }, 8.0);
+			const bool meshed = GeneratePrimitiveVoxelWorld(
+				config, std::span{ &wall, 1 }, world, generation).Succeeded() && world &&
+				ApplySphereEdit(*world, request, firstHit).Succeeded() &&
+				firstHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				ApplySphereEdit(*world, request, secondHit).Succeeded() &&
+				secondHit.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+				ReferenceMesher(*world).MeshChunk({}, breached).Succeeded() &&
+				ReferenceMesher(*world).MeshChunk({}, repeated).Succeeded();
+			context.Check(meshed &&
+				breached.m_Validation.m_ValidationHash == 0x4e6bf4c2051e6853ull &&
+				breached.m_Validation.m_VertexCount == 144 &&
+				breached.m_Validation.m_IndexCount == 144 &&
+				breached.m_Validation.m_TriangleCount == 48 &&
+				breached.m_Validation == repeated.m_Validation &&
+				breached.m_WindingEvidence == repeated.m_WindingEvidence,
+				"The P1 Playtest Stone breach emits one deterministic canonical surface");
+		}
+
 		void RunDamageMarkerSnapshotTests(SelfTestContext& context) noexcept
 		{
 			using namespace napa::voxel;
@@ -816,6 +865,7 @@ namespace gglab
 		RunStoneMutationGoldenTests(context);
 		RunStoneFullDomainOracleTests(context);
 		RunDestructionRestoreQuiescenceTests(context);
+		RunPlaytestBreachMeshingRegressionTests(context);
 		RunDamageMarkerSnapshotTests(context);
 	}
 }

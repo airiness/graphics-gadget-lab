@@ -734,7 +734,7 @@ namespace gglab
 					{},
 					emptyResult).Succeeded() &&
 					emptyResult.m_ValidationHash ==
-						0x975c842617a7f737ull &&
+						0x1bae1ab0d4fe41d4ull &&
 					emptyResult.m_VertexCount == 0 &&
 					emptyResult.m_SectionCount == 0 &&
 					emptyResult.m_IndexCount == 0 &&
@@ -754,7 +754,7 @@ namespace gglab
 			context.Check(
 				triangleValid &&
 					triangleResult.m_ValidationHash ==
-						0x21aed4c96ec6a864ull &&
+						0x5e153da2b7e76c81ull &&
 					triangleResult.m_VertexCount == 3 &&
 					triangleResult.m_SectionCount == 1 &&
 					triangleResult.m_IndexCount == 3 &&
@@ -776,7 +776,7 @@ namespace gglab
 					{},
 					multiMaterialResult).Succeeded() &&
 					multiMaterialResult.m_ValidationHash ==
-						0xfac2dfe1f66f2a3aull &&
+						0x2af57e16f6b1ff2dull &&
 					multiMaterialResult.m_VertexCount == 4 &&
 					multiMaterialResult.m_SectionCount == 2 &&
 					multiMaterialResult.m_IndexCount == 6 &&
@@ -1130,6 +1130,35 @@ namespace gglab
 					triangleResult).m_Error ==
 					ValidationError::InvalidMeshNormal,
 				"Mesh vertex normals must have unit length");
+
+			MeshData opposedNormal = triangle;
+			opposedNormal.m_Vertices[0].m_Normal =
+				{ 0.0f, 0.0f, -1.0f };
+			context.Check(
+				ValidatePositiveZWindingMesh(
+					opposedNormal,
+					config,
+					{},
+					triangleResult).m_Error ==
+					ValidationError::InvalidMeshNormal,
+				"Mesh vertex normals must face the final outward triangle hemisphere");
+
+			MeshData duplicateTriangle = triangle;
+			duplicateTriangle.m_Sections[0].m_Indices =
+				{ 0, 1, 2, 2, 0, 1 };
+			const std::array duplicateWinding{
+				positiveZWinding[0],
+				positiveZWinding[0],
+			};
+			context.Check(
+				ValidateAndHashChunkMesh(
+					duplicateTriangle,
+					duplicateWinding,
+					config,
+					{},
+					triangleResult).m_Error ==
+					ValidationError::DuplicateMeshTriangle,
+				"Mesh validation rejects canonical-position duplicate triangles");
 
 			MeshData nonFiniteNormal = triangle;
 			nonFiniteNormal.m_Vertices[0].m_Normal.m_X =
@@ -2066,7 +2095,7 @@ namespace gglab
 					emptyMeshing.m_Validation.m_TriangleCount == 0 &&
 					emptyMeshing
 						.m_Validation.m_ValidationHash ==
-						0x975c842617a7f737ull &&
+						0x1bae1ab0d4fe41d4ull &&
 					emptyMeshing
 						.m_SkippedDegenerateTriangleCount == 0,
 				"An empty primitive set produces the canonical empty chunk mesh");
@@ -2136,7 +2165,7 @@ namespace gglab
 				planeMeshed &&
 					planeMeshing
 						.m_Validation.m_ValidationHash ==
-						0xec35ebe82f6c064bull &&
+						0xea1ffbaade2887a6ull &&
 					planeMeshing.m_Validation.m_VertexCount == 384 &&
 					planeMeshing.m_Validation.m_SectionCount == 1 &&
 					planeMeshing.m_Validation.m_IndexCount == 384 &&
@@ -2322,7 +2351,7 @@ namespace gglab
 							.m_Validation.m_TriangleCount &&
 					sphereMeshing
 						.m_Validation.m_ValidationHash ==
-						0x6b4a8ee0313b31f6ull &&
+						0x977b1b0448b96ddfull &&
 					sphereMeshing.m_Validation.m_VertexCount == 864 &&
 					sphereMeshing.m_Validation.m_IndexCount == 864 &&
 					sphereMeshing.m_Validation.m_TriangleCount == 288 &&
@@ -2377,7 +2406,7 @@ namespace gglab
 				negativeSphereMeshed &&
 					negativeSphereMeshing
 						.m_Validation.m_ValidationHash ==
-						0xbfe56abe9f0e96a5ull &&
+						0x345ff318eabda4fcull &&
 					negativeSphereMeshing
 						.m_Validation.m_VertexCount == 864 &&
 					negativeSphereMeshing
@@ -2479,7 +2508,7 @@ namespace gglab
 				boxMeshed &&
 					boxMeshing
 						.m_Validation.m_ValidationHash ==
-						0xd5eaedea9f7e6af4ull &&
+						0x5754e59bbb1ce2c1ull &&
 					boxMeshing.m_Validation.m_VertexCount == 1080 &&
 					boxMeshing.m_Validation.m_IndexCount == 1080 &&
 					boxMeshing.m_Validation.m_TriangleCount == 360 &&
@@ -2586,7 +2615,7 @@ namespace gglab
 				multiMaterialMeshed &&
 					multiMaterialMeshing
 						.m_Validation.m_ValidationHash ==
-						0x2b062e7394d3c3b9ull &&
+						0x3f1957439cf8e502ull &&
 					multiMaterialMeshing
 						.m_Validation.m_VertexCount == 1104 &&
 					multiMaterialMeshing
