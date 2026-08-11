@@ -3240,6 +3240,29 @@ namespace gglab
 				!IsRHIPrimitiveTopologyCompatible(
 					RHIPrimitiveTopologyType::Patch, RHIPrimitiveTopology::TriangleList),
 				"Primitive topology compatibility is a backend-neutral pipeline contract");
+			const RHIIndexBufferBinding indexBinding{
+				.m_Offset = 16,
+				.m_SizeInBytes = 24,
+				.m_Format = RHIFormat::R32Uint,
+			};
+			RHIIndexBufferBinding misalignedBinding = indexBinding;
+			misalignedBinding.m_Offset = 18;
+			RHIIndexBufferBinding misalignedSizeBinding = indexBinding;
+			misalignedSizeBinding.m_SizeInBytes = 22;
+			RHIIndexBufferBinding unknownFormatBinding = indexBinding;
+			unknownFormatBinding.m_Format = RHIFormat::Unknown;
+			context.Check(
+				IsRHIIndexBufferBindingRangeValid(indexBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(misalignedBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(misalignedSizeBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(unknownFormatBinding, 64) &&
+				!IsRHIIndexBufferBindingRangeValid(indexBinding, 32) &&
+				IsRHIIndexBufferDrawRangeValid(indexBinding, 6, 0) &&
+				IsRHIIndexBufferDrawRangeValid(indexBinding, 2, 4) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 3, 4) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 1, 6) &&
+				!IsRHIIndexBufferDrawRangeValid(indexBinding, 1, UINT32_MAX),
+				"Index buffer bindings and indexed draws stay within the declared RHI range");
 			pipelineDesc.m_VertexInput.m_VertexBufferCount = 1;
 			pipelineDesc.m_VertexInput.m_VertexBuffers[0].m_InputRate =
 				RHIVertexInputRate::PerInstance;

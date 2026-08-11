@@ -62,7 +62,7 @@ namespace gglab
 	{
 		RHIBufferHandle m_Buffer{};
 		uint64_t m_Offset = 0;
-		uint32_t m_SizeInBytes = 0;
+		uint32_t m_SizeInBytes = 0; // Logical range beginning at m_Offset.
 		RHIFormat m_Format = RHIFormat::Unknown;
 
 		bool operator==(const RHIIndexBufferBinding&) const noexcept = default;
@@ -73,6 +73,38 @@ namespace gglab
 	{
 		return format == RHIFormat::R32Uint &&
 			offset % GetRHIFormatInfo(format).m_BytesPerBlock == 0;
+	}
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferBindingRangeValid(
+		const RHIIndexBufferBinding& binding, uint64_t bufferSizeInBytes) noexcept
+	{
+		if (!IsRHIIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset))
+		{
+			return false;
+		}
+		const uint64_t indexSizeInBytes = GetRHIFormatInfo(binding.m_Format).m_BytesPerBlock;
+		return binding.m_SizeInBytes != 0 && binding.m_SizeInBytes % indexSizeInBytes == 0 &&
+			binding.m_Offset <= bufferSizeInBytes &&
+			binding.m_SizeInBytes <= bufferSizeInBytes - binding.m_Offset;
+	}
+
+	[[nodiscard]] constexpr inline bool IsRHIIndexBufferDrawRangeValid(
+		const RHIIndexBufferBinding& binding, uint32_t indexCount,
+		uint32_t startIndexLocation) noexcept
+	{
+		if (binding.m_Format != RHIFormat::R32Uint)
+		{
+			return false;
+		}
+		const uint64_t indexSizeInBytes = GetRHIFormatInfo(binding.m_Format).m_BytesPerBlock;
+		if (binding.m_SizeInBytes == 0 || binding.m_SizeInBytes % indexSizeInBytes != 0)
+		{
+			return false;
+		}
+		const uint64_t startInBytes = uint64_t{ startIndexLocation } * indexSizeInBytes;
+		const uint64_t drawSizeInBytes = uint64_t{ indexCount } * indexSizeInBytes;
+		return startInBytes <= binding.m_SizeInBytes &&
+			drawSizeInBytes <= binding.m_SizeInBytes - startInBytes;
 	}
 
 	struct RHIDescriptorTableBinding

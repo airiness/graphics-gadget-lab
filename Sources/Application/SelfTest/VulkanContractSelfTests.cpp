@@ -1923,11 +1923,6 @@ namespace gglab
 		context.Check(ToVulkanFrontFace(false) == VK_FRONT_FACE_CLOCKWISE &&
 			ToVulkanFrontFace(true) == VK_FRONT_FACE_COUNTER_CLOCKWISE,
 			"Front-face lowering applies the coordinate policy exactly once");
-		context.Check(IsRHIIndexBufferOffsetAligned(RHIFormat::R32Uint, 4) &&
-			!IsRHIIndexBufferOffsetAligned(RHIFormat::R32Uint, 2) &&
-			!IsRHIIndexBufferOffsetAligned(RHIFormat::Unknown, 0),
-			"Index buffer offsets honor the RHI index-element alignment rule");
-
 		RHIGraphicsPipelineDesc duplicateLocation = desc;
 		duplicateLocation.m_VertexInput.m_Attributes[1].m_Location = 0;
 		context.Check(BuildVulkanGraphicsPipelinePlan(duplicateLocation).m_Error ==

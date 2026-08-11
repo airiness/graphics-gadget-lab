@@ -93,6 +93,7 @@ namespace gglab
 		void ClearTrackedResourceUses() noexcept
 		{
 			m_Backend.ClearTrackedResourceUses();
+			m_IndexBufferBinding.reset();
 			m_CurrentRootSignature = nullptr;
 			m_CurrentPipelineDesc.reset();
 			m_ActiveRenderingSignature.reset();
@@ -161,6 +162,7 @@ namespace gglab
 		std::optional<RHIRenderingSignature> m_ActiveRenderingSignature;
 		std::vector<DX12DescriptorView> m_ActiveColorAttachments;
 		std::optional<DX12DescriptorView> m_ActiveDepthAttachment;
+		std::optional<RHIIndexBufferBinding> m_IndexBufferBinding;
 		DX12GpuProfiler* m_GpuProfiler = nullptr;
 	};
 

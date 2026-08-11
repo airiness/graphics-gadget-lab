@@ -610,13 +610,12 @@ namespace gglab
 
 	void DX12GraphicsCommandContext::SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept
 	{
+		m_IndexBufferBinding.reset();
 		DX12Device* device = m_Backend.GetDevice();
 		GGLAB_ASSERT_NOT_NULL(device);
 
 		DX12Buffer* buffer = device->ResolveBuffer(binding.m_Buffer);
-		if (!buffer || !IsRHIIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset) ||
-			binding.m_Offset > buffer->SizeInBytes() || binding.m_SizeInBytes == 0 ||
-			binding.m_SizeInBytes > buffer->SizeInBytes() - binding.m_Offset)
+		if (!buffer || !IsRHIIndexBufferBindingRangeValid(binding, buffer->SizeInBytes()))
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"DX12GraphicsCommandContext::SetIndexBuffer received an invalid binding.");
@@ -628,6 +627,7 @@ namespace gglab
 		view.SizeInBytes = binding.m_SizeInBytes;
 		view.Format = ToDXGIFormat(binding.m_Format);
 		m_Backend.GetCommandList()->SetIndexBuffer(view);
+		m_IndexBufferBinding = binding;
 		m_Backend.TrackBufferUse(binding.m_Buffer);
 	}
 
@@ -635,9 +635,20 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
+		if (indexCount == 0 || instanceCount == 0)
+		{
+			return;
+		}
 		GGLAB_ASSERT_MSG(m_Backend.IsRendering(), "DrawIndexed requires an active rendering scope.");
 		if (!m_Backend.IsRendering())
 		{
+			return;
+		}
+		if (!m_IndexBufferBinding || !IsRHIIndexBufferDrawRangeValid(
+			*m_IndexBufferBinding, indexCount, startIndexLocation))
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"DX12GraphicsCommandContext::DrawIndexed exceeded the bound index buffer range.");
 			return;
 		}
 		const bool compatible = ValidateActivePipelineCompatibility("DrawIndexed");

@@ -9,6 +9,8 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/Shader/ShaderManager.h"
 
+#include <algorithm>
+
 namespace gglab
 {
 	struct CoordinateConformanceLabState
@@ -21,6 +23,7 @@ namespace gglab
 	{
 		constexpr RHIFormat MarkerFormat = RHIFormat::R8G8B8A8Unorm;
 		constexpr RHIFormat DepthFormat = RHIFormat::D32Float;
+		constexpr uint32_t CullingPanelInsetPixels = 16;
 
 		const RenderPassInfo MarkerPassInfo{
 			.m_TypeName = "Lab.CoordinateConformance.Marker",
@@ -256,6 +259,15 @@ namespace gglab
 							"Coordinate conformance descriptors must be shader visible.");
 						const uint32_t halfWidth = data.m_Width / 2;
 						const uint32_t halfHeight = data.m_Height / 2;
+						const uint32_t rightWidth = data.m_Width - halfWidth;
+						const uint32_t lowerHeight = data.m_Height - halfHeight;
+						const uint32_t panelInset =
+							rightWidth > 2 * CullingPanelInsetPixels &&
+							lowerHeight > 2 * CullingPanelInsetPixels ? CullingPanelInsetPixels : 0;
+						const uint32_t panelLeft = halfWidth + panelInset;
+						const uint32_t panelTop = halfHeight + panelInset;
+						const uint32_t panelRight = data.m_Width - panelInset;
+						const uint32_t panelBottom = data.m_Height - panelInset;
 						const auto makeParameters = [&](CoordinateConformanceMode mode,
 							float depth = 0.0f, float depthOverride = 0.0f)
 						{
@@ -288,24 +300,6 @@ namespace gglab
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							makeParameters(CoordinateConformanceMode::Winding));
 						commandContext->Draw(6);
-
-						const uint32_t lowerHeight = data.m_Height - halfHeight;
-						const uint32_t cullSplit = halfHeight + lowerHeight / 2;
-						commandContext->SetPipeline(GetOrCreateBackCullPipeline());
-						commandContext->SetViewport({ static_cast<float>(halfWidth),
-							static_cast<float>(halfHeight), 8.0f,
-							static_cast<float>(cullSplit - halfHeight) });
-						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth),
-							static_cast<int32_t>(halfHeight), static_cast<int32_t>(halfWidth + 8),
-							static_cast<int32_t>(cullSplit) });
-						commandContext->Draw(3, 1, 3);
-						commandContext->SetViewport({ static_cast<float>(halfWidth),
-							static_cast<float>(cullSplit), 8.0f,
-							static_cast<float>(data.m_Height - cullSplit) });
-						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth),
-							static_cast<int32_t>(cullSplit), static_cast<int32_t>(halfWidth + 8),
-							static_cast<int32_t>(data.m_Height) });
-						commandContext->Draw(3);
 
 						const RHIIndexBufferBinding indexBinding{
 							.m_Buffer = m_IndexBuffer.Get(),
@@ -341,16 +335,30 @@ namespace gglab
 
 						commandContext->SetPipeline(GetOrCreatePositionPipeline());
 						commandContext->SetViewport({ static_cast<float>(halfWidth),
-							static_cast<float>(halfHeight), static_cast<float>(data.m_Width - halfWidth),
-							static_cast<float>(data.m_Height - halfHeight) });
-						commandContext->SetScissorRect({ static_cast<int32_t>(halfWidth + 8),
-							static_cast<int32_t>(halfHeight + 8),
-							static_cast<int32_t>(data.m_Width - 8),
-							static_cast<int32_t>(data.m_Height - 8) });
+							static_cast<float>(halfHeight), static_cast<float>(rightWidth),
+							static_cast<float>(lowerHeight) });
+						commandContext->SetScissorRect({ static_cast<int32_t>(panelLeft),
+							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
+							static_cast<int32_t>(panelBottom) });
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
 							makeParameters(CoordinateConformanceMode::Position));
 						commandContext->DrawFullscreenTriangle();
+
+						// Overlay the same two-sided winding pair on the position gradient. With
+						// back-face culling enabled, the surviving triangle remains solid while
+						// the gradient stays visible where its opposite-facing pair was rejected.
+						commandContext->SetPipeline(GetOrCreateBackCullPipeline());
+						commandContext->SetViewport({ static_cast<float>(panelLeft),
+							static_cast<float>(panelTop), static_cast<float>(panelRight - panelLeft),
+							static_cast<float>(panelBottom - panelTop) });
+						commandContext->SetScissorRect({ static_cast<int32_t>(panelLeft),
+							static_cast<int32_t>(panelTop), static_cast<int32_t>(panelRight),
+							static_cast<int32_t>(panelBottom) });
+						commandContext->SetPushConstants(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+							makeParameters(CoordinateConformanceMode::Winding));
+						commandContext->Draw(6);
 						commandContext->EndRendering();
 						m_State->m_ConformanceExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
@@ -555,7 +563,9 @@ namespace gglab
 			.m_Status = rendered ? LabDiagnosticCheckStatus::Passed
 				: LabDiagnosticCheckStatus::Pending,
 			.m_Detail = rendered
-				? "Winding, back-face culling, indexed sampling, reversed-Z and position probes executed."
+				? "Top-left shows both winding colors; bottom-right overlays back-face culling on "
+					"the position gradient so only the front-facing triangle remains. Indexed "
+					"sampling and reversed-Z probes also executed."
 				: "Waiting for the first complete marker and conformance frame.",
 		});
 	}

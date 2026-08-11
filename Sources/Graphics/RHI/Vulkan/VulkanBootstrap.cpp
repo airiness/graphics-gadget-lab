@@ -502,7 +502,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan bootstrap qualification succeeded; cleaning up.");
 		}
-		// Destruction order is enforced by member order: device, surface,
+		// Destruction order is enforced by member order: surface, device,
 		// instance. The frame runtime is never created on this path.
 		return exitCode;
 	}

@@ -100,12 +100,12 @@ namespace gglab
 		std::vector<RHITextureHandle> m_UsedTextures;
 		std::array<std::optional<RHIVertexBufferBinding>,
 			RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
+		std::optional<RHIIndexBufferBinding> m_IndexBufferBinding;
 		RHIPrimitiveTopology m_PrimitiveTopology = RHIPrimitiveTopology::Unknown;
 		VkExtent2D m_RenderExtent{};
 		bool m_IsRendering = false;
 		bool m_ViewportSet = false;
 		bool m_ScissorSet = false;
-		bool m_IndexBufferSet = false;
 		bool m_HasEncodingError = false;
 	};
 }

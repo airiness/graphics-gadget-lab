@@ -62,12 +62,12 @@ namespace gglab
 		m_UsedBuffers.clear();
 		m_UsedTextures.clear();
 		m_VertexBindings.fill(std::nullopt);
+		m_IndexBufferBinding.reset();
 		m_PrimitiveTopology = RHIPrimitiveTopology::Unknown;
 		m_RenderExtent = {};
 		m_IsRendering = false;
 		m_ViewportSet = false;
 		m_ScissorSet = false;
-		m_IndexBufferSet = false;
 		m_HasEncodingError = false;
 		return true;
 	}
@@ -504,19 +504,20 @@ namespace gglab
 
 	void VulkanGraphicsCommandContext::SetIndexBuffer(const RHIIndexBufferBinding& binding) noexcept
 	{
+		m_IndexBufferBinding.reset();
 		VulkanBuffer* buffer = m_Device->GetResourceManager().ResolveBuffer(binding.m_Buffer);
 		const RHIBufferDesc* desc = m_Device->GetResourceManager().ResolveBufferDesc(binding.m_Buffer);
 		if (m_CommandBuffer == VK_NULL_HANDLE || buffer == nullptr || desc == nullptr ||
-			!Test(desc->m_Usage, RHIBufferUsage::Index) || binding.m_Format != RHIFormat::R32Uint ||
-			!IsRHIIndexBufferOffsetAligned(binding.m_Format, binding.m_Offset) ||
-			binding.m_Offset > desc->m_SizeInBytes || binding.m_SizeInBytes == 0 ||
-			binding.m_SizeInBytes > desc->m_SizeInBytes - binding.m_Offset)
+			!Test(desc->m_Usage, RHIBufferUsage::Index) ||
+			!IsRHIIndexBufferBindingRangeValid(binding, desc->m_SizeInBytes))
 		{
 			Reject("SetIndexBuffer", "the index buffer binding is invalid");
 			return;
 		}
+		// Vulkan 1.3 binds from offset to the end of VkBuffer. Preserve the narrower
+		// RHI range so DrawIndexed can enforce it before recording a native draw.
 		vkCmdBindIndexBuffer(m_CommandBuffer, buffer->Get(), binding.m_Offset, VK_INDEX_TYPE_UINT32);
-		m_IndexBufferSet = true;
+		m_IndexBufferBinding = binding;
 		TrackBufferUse(binding.m_Buffer);
 	}
 
@@ -524,8 +525,17 @@ namespace gglab
 		uint32_t startIndexLocation, int32_t baseVertexLocation,
 		uint32_t startInstanceLocation) noexcept
 	{
-		if (indexCount == 0 || instanceCount == 0 || !ValidateDraw("DrawIndexed", true) ||
-			!BindDescriptorSets())
+		if (indexCount == 0 || instanceCount == 0 || !ValidateDraw("DrawIndexed", true))
+		{
+			return;
+		}
+		if (!IsRHIIndexBufferDrawRangeValid(
+			*m_IndexBufferBinding, indexCount, startIndexLocation))
+		{
+			Reject("DrawIndexed", "the draw exceeds the bound index buffer range");
+			return;
+		}
+		if (!BindDescriptorSets())
 		{
 			return;
 		}
@@ -581,7 +591,7 @@ namespace gglab
 		if (!m_IsRendering || m_CurrentPipeline == nullptr || !m_CurrentPipelineDesc ||
 			!m_ActiveRenderingSignature || !m_ViewportSet || !m_ScissorSet ||
 			m_PrimitiveTopology != m_CurrentPipelineDesc->m_PrimitiveTopology ||
-			(indexed && !m_IndexBufferSet))
+			(indexed && !m_IndexBufferBinding))
 		{
 			Reject(operation, "required rendering, pipeline, dynamic state or index state is missing");
 			return false;
