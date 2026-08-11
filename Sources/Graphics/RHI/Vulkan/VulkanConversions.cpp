@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
 
 namespace gglab

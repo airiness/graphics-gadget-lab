@@ -1,9 +1,8 @@
-#include "Core/Precompiled.h"
+#include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Core/Utility/MathUtils.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
-#include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 
 #include <algorithm>
 #include <limits>

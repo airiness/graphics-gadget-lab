@@ -1,5 +1,3 @@
-#include "Core/Precompiled.h"
-
 // VMA_IMPLEMENTATION is defined in exactly one translation unit of the
 // application. It must be defined before
 // any header pulls in vk_mem_alloc.h: the header's include guard would
@@ -11,6 +9,7 @@
 #include <vk_mem_alloc.h>
 
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"

@@ -1,9 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <format>
 
 namespace gglab
 {

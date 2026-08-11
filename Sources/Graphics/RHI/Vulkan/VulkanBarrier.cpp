@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 
 namespace gglab

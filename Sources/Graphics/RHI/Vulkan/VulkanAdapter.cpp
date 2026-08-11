@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"

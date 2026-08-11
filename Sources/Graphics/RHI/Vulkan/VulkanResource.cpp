@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 namespace gglab

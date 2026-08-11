@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 

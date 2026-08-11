@@ -1,4 +1,4 @@
-#include "Core/Precompiled.h"
+#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
@@ -6,7 +6,6 @@
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/TransferManager.h"
-#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"

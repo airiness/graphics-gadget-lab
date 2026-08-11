@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"

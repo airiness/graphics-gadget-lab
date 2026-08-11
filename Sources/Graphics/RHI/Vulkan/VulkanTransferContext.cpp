@@ -1,11 +1,11 @@
-#include "Core/Precompiled.h"
+#include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanResource.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
-#include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <algorithm>
