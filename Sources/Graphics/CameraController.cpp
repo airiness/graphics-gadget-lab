@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/CameraController.h"
-#include "Graphics/Camera.h"
 #include "Core/Math/MathFunctions.h"
+
+#include <algorithm>
+#include <cmath>
 
 namespace gglab
 {

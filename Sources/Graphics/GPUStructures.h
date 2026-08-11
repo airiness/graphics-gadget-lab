@@ -2,8 +2,11 @@
 #include "Core/Math/Color.h"
 #include "Core/Math/Matrix.h"
 #include "Core/Math/Vector.h"
-#include "Core/TypedIndex.h"
+#include "Core/Utility/TypeUtils.h"
 #include "Graphics/GraphicsTypes.h"
+
+#include <cstdint>
+
 // struct member name without m_ for GPU using
 
 namespace gglab

@@ -6,6 +6,7 @@
 #include "Graphics/GraphicsTypes.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>

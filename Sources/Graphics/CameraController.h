@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Math/Vector.h"
 #include "Graphics/Camera.h"
 

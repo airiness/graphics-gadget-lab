@@ -2,6 +2,8 @@
 #include "Core/Math/MathFunctions.h"
 #include "Core/Math/Matrix.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	class Camera
