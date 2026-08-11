@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -7,6 +8,12 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
 #include "Graphics/RHI/DX12/Utility/DX12SamplerUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

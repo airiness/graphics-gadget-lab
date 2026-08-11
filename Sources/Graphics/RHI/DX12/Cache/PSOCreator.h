@@ -1,6 +1,7 @@
 #pragma once
-#include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
+#include "Core/CoreMacros.h"
 #include "Core/Utility/MathUtils.h"
+#include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
 
 #include <cstddef>
 #include <cstring>

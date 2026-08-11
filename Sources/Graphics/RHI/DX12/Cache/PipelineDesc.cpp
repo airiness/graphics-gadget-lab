@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
+
+#include <cstdint>
 
 namespace gglab
 {

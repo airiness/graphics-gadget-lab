@@ -1,7 +1,17 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIBindingLayout.h"
+
+#include <cstdint>
+#include <memory>
+#include <shared_mutex>
+#include <tuple>
+#include <unordered_map>
+#include <vector>
+
+#include <d3dx12.h>
 
 namespace gglab
 {
