@@ -1,10 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 
 #include <algorithm>
 #include <bit>
+#include <cstdint>
 #include <limits>
+#include <string_view>
 
 namespace gglab
 {

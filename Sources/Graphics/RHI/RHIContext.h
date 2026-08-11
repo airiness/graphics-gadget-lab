@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHISwapChain.h"
 
+#include <cstdint>
 #include <memory>
 
 namespace gglab
