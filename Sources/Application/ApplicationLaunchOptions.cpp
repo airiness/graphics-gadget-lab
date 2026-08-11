@@ -144,7 +144,7 @@ namespace gglab
 			}
 			if (argument == "--self-test")
 			{
-				if (result.m_Options.m_SelfTestSuiteId)
+				if (result.m_Options.m_SelfTestSelection)
 				{
 					result.m_Error = "Option '--self-test' may only be specified once.";
 					return result;
@@ -154,12 +154,12 @@ namespace gglab
 					result.m_Error = "Option '--self-test' requires a non-empty suite ID.";
 					return result;
 				}
-				if (!IsApplicationSelfTestSuiteRegistered(arguments[index]))
+				if (!IsApplicationSelfTestSelectionValid(arguments[index]))
 				{
-					result.m_Error = std::format("Unknown self-test suite '{}'.", arguments[index]);
+					result.m_Error = std::format("Unknown self-test selection '{}'.", arguments[index]);
 					return result;
 				}
-				result.m_Options.m_SelfTestSuiteId = std::string(arguments[index]);
+				result.m_Options.m_SelfTestSelection = std::string(arguments[index]);
 				continue;
 			}
 
@@ -177,7 +177,7 @@ namespace gglab
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		}
-		if (result.m_Options.m_SelfTestSuiteId &&
+		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
 				result.m_Options.m_StartWithAbsoluteMouse ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
@@ -225,10 +225,10 @@ namespace gglab
 			"  --adapter <index|prefix>        Select a Vulkan adapter by enumeration\n"
 			"                                  index or device UUID/name prefix.\n"
 			"                                  Requires an explicit --rhi vulkan.\n"
-			"  --self-test <suite-id>          Run a headless self-test suite.\n"
+			"  --self-test <suite-id|all>      Run one or all headless self-test suites.\n"
 			"                                  Available: artifact-cache, asset-data,\n"
 			"                                  publication-accounting, rendering-contracts,\n"
-			"                                  napa-voxel, vulkan-contracts.\n"
+			"                                  napa-voxel, vulkan-contracts, all.\n"
 			"  --help, -h                      Show this help text.\n"
 			"Requires the Vulkan SDK 1.3.296 for --rhi vulkan / --list-adapters builds\n"
 			"(GGLAB_ENABLE_VULKAN=1, the default).\n";

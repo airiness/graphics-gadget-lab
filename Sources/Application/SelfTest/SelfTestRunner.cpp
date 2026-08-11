@@ -48,15 +48,16 @@ namespace gglab
 		}
 	}
 
-	bool IsApplicationSelfTestSuiteRegistered(std::string_view suiteId) noexcept
+	bool IsApplicationSelfTestSelectionValid(std::string_view selection) noexcept
 	{
-		return FindSuite(suiteId) != nullptr;
+		return selection == AllApplicationSelfTestsSelection || FindSuite(selection) != nullptr;
 	}
 
-	bool RunApplicationSelfTestSuite(std::string_view suiteId) noexcept
+	bool RunApplicationSelfTests(std::string_view selection) noexcept
 	{
-		const SelfTestSuiteDesc* suite = FindSuite(suiteId);
-		if (!suite)
+		const bool runAll = selection == AllApplicationSelfTestsSelection;
+		const SelfTestSuiteDesc* suite = runAll ? nullptr : FindSuite(selection);
+		if (!runAll && !suite)
 		{
 			return false;
 		}
@@ -66,6 +67,18 @@ namespace gglab
 			Logger::Initialize();
 		}
 		ConsoleSelfTestReporter reporter;
+		if (runAll)
+		{
+			bool allSucceeded = true;
+			for (const SelfTestSuiteDesc& registeredSuite : RegisteredSuites)
+			{
+				if (!RunSelfTestSuite(registeredSuite, reporter))
+				{
+					allSucceeded = false;
+				}
+			}
+			return allSucceeded;
+		}
 		return RunSelfTestSuite(*suite, reporter);
 	}
 }

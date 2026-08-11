@@ -20,7 +20,7 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
-		std::optional<std::string> m_SelfTestSuiteId;
+		std::optional<std::string> m_SelfTestSelection;
 		bool m_StartWithAbsoluteMouse = false;
 
 		// RHI backend selection. Defaults to DX12; an explicit --rhi vulkan

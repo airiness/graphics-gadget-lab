@@ -28,9 +28,9 @@ int main(int argc, char* argv[])
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
 	}
-	if (launchResult.m_Options.m_SelfTestSuiteId)
+	if (launchResult.m_Options.m_SelfTestSelection)
 	{
-		return gglab::RunApplicationSelfTestSuite(*launchResult.m_Options.m_SelfTestSuiteId)
+		return gglab::RunApplicationSelfTests(*launchResult.m_Options.m_SelfTestSelection)
 			? EXIT_SUCCESS
 			: EXIT_FAILURE;
 	}
