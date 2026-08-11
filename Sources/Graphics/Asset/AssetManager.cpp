@@ -1,17 +1,36 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/AssetManager.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Task/TaskSystem.h"
+#include "Core/Utility/PathUtils.h"
+#include "Core/Utility/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
-#include "Graphics/TransferManager.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDevice.h"
-#include "Core/Utility/PathUtils.h"
-#include "Core/Utility/TypeUtils.h"
+#include "Graphics/TransferManager.h"
+
 #include <algorithm>
+#include <array>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <format>
 #include <limits>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <span>
+#include <string_view>
+#include <system_error>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace gglab
 {

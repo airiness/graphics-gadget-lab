@@ -1,17 +1,32 @@
-#include "Core/Precompiled.h"
-#include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Utility/PathUtils.h"
+#include "Core/Utility/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/TransferManager.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHIDevice.h"
+#include "Graphics/TransferManager.h"
 #include "Graphics/Utility/TextureUtils.h"
-#include "Core/Utility/PathUtils.h"
-#include "Core/Utility/TypeUtils.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

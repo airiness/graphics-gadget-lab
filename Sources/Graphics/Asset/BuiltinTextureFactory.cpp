@@ -1,10 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Utility/CubemapUtils.h"
 #include "Graphics/Utility/TextureUtils.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
