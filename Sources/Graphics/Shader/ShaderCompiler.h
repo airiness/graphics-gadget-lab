@@ -1,6 +1,13 @@
 #pragma once
 #include "Graphics/Shader/Shader.h"
 
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace gglab
 {
 	[[nodiscard]] ShaderCompileValidationResult ValidateShaderDesc(

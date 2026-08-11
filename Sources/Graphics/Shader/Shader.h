@@ -1,6 +1,12 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/EnumFlags.h"
 #include "Graphics/Shader/ShaderTypes.h"
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 namespace gglab
 {
