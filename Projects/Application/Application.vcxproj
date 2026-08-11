@@ -187,6 +187,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
@@ -303,6 +304,8 @@
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
@@ -480,6 +483,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h" />
+    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />

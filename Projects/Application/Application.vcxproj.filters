@@ -219,6 +219,9 @@
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp">
       <Filter>Core\Task</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp">
+      <Filter>Core\Platform\Win</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp">
       <Filter>Core\Async</Filter>
     </ClCompile>
@@ -559,6 +562,12 @@
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp">
+      <Filter>Core\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.cpp">
+      <Filter>Core\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp">
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp">
@@ -1155,6 +1164,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h">
       <Filter>Core\Task</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h">
