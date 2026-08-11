@@ -1,11 +1,24 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/IBLStageArtifactCodec.h"
 #include "Graphics/Shader/ShaderPaths.h"
 
+#include <array>
 #include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <memory>
+#include <mutex>
 #include <set>
+#include <span>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

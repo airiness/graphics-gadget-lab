@@ -1,10 +1,26 @@
-﻿#include "Core/Precompiled.h"
-#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
+﻿#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
+#include "Core/CoreMacros.h"
 #include "Core/Hash/Sha256.h"
-#include "Core/Log/Logger.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Utility/PathUtils.h"
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <limits>
+#include <mutex>
+#include <span>
+#include <string>
+#include <string_view>
+#include <system_error>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

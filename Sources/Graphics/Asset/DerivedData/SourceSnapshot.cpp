@@ -1,6 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
 #include "Core/Hash/Sha256.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <limits>
+#include <string>
 
 namespace gglab
 {

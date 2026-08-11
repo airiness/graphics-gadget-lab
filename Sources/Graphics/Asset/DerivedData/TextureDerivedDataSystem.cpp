@@ -1,10 +1,19 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <condition_variable>
+#include <filesystem>
+#include <memory>
 #include <mutex>
+#include <stop_token>
+#include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

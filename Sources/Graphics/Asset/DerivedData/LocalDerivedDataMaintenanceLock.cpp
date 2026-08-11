@@ -1,6 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
 #include "Core/Hash/Sha256.h"
+
+#include <Windows.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <span>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
 
 namespace gglab
 {
