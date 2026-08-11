@@ -1,6 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Core/HResult.h"
+
+#include <cstdint>
 
 namespace gglab
 {

@@ -1,5 +1,9 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12Resource.h"
+
+#include <cstdint>
+
 namespace gglab
 {
 	class DX12Buffer : public DX12Resource

@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
+
+#include <utility>
 
 namespace gglab
 {

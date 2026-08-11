@@ -1,6 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
+
+#include <cstdint>
 
 namespace gglab
 {

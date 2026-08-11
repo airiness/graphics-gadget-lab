@@ -1,5 +1,8 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIFence.h"
+
+#include <cstdint>
 
 namespace gglab
 {

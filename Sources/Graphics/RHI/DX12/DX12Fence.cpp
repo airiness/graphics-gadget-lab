@@ -1,10 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
 
 #include <atomic>
+#include <cstdint>
 
 namespace gglab
 {
