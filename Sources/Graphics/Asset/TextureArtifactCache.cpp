@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace gglab
 {

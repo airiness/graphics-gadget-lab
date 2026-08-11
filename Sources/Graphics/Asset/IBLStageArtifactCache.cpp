@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/IBLStageArtifactCache.h"
+
+#include <utility>
 
 namespace gglab
 {

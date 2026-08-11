@@ -2,6 +2,8 @@
 #include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
 namespace gglab

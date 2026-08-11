@@ -1,8 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
+#include "Core/CoreMacros.h"
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Utility/TextureUtils.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

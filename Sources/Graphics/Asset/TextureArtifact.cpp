@@ -1,6 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Core/Hash/Sha256.h"
+#include "Core/Log/LogMacros.h"
+
+#include <cstdint>
+#include <utility>
 
 namespace gglab
 {

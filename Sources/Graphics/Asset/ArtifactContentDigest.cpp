@@ -1,5 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 namespace gglab
 {
