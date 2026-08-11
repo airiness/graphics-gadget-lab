@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Backends/DirectXMathInterop.h"
 #include "Core/Math/MathConstants.h"
 #include "Core/Math/MathFunctions.h"

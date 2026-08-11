@@ -1,7 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Core/Utility/StringUtils.h"
 
+#include <Windows.h>
+
+#include <algorithm>
 #include <cctype>
+#include <format>
+#include <ranges>
 
 namespace gglab::utils
 {

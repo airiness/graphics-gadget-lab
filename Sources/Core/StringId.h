@@ -1,14 +1,18 @@
 #pragma once
+#include "Core/CoreMacros.h"
 
-#include <cstdint>
 #include <array>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <limits>
 #include <mutex>
 #include <shared_mutex>
-#include <unordered_map>
 #include <string>
 #include <string_view>
-#include <compare>
+#include <unordered_map>
+#include <utility>
 
 namespace gglab
 {

@@ -1,5 +1,10 @@
 #pragma once
 
+#include <Windows.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <string_view>
 
 namespace gglab::utils

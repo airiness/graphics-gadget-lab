@@ -1,6 +1,8 @@
 #pragma once
 #include "Core/Allocator/AllocatorBase.h"
 
+#include <map>
+
 namespace gglab
 {
 	class FreeListSpanAllocator : public AllocatorBase

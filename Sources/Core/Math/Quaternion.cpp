@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Quaternion.h"
 
 namespace gglab::math

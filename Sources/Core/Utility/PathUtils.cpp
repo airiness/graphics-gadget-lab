@@ -1,6 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/StringUtils.h"
+
+#include <chrono>
+#include <fstream>
 
 namespace gglab::utils
 {

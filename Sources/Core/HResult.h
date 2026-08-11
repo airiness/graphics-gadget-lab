@@ -2,6 +2,8 @@
 #include <Windows.h>
 
 #include <source_location>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {

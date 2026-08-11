@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Core/Allocator/RingSpanAllocator.h"
+#include "Core/Log/LogMacros.h"
+
+#include <algorithm>
 
 namespace gglab
 {

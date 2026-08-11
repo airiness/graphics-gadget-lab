@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Culling.h"
+#include "Core/CoreMacros.h"
 #include "Core/Math/MathFunctions.h"
 
 namespace gglab::math

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Backends/DirectXMathInterop.h"
 #include "Core/Math/BoundingVolumes.h"
 

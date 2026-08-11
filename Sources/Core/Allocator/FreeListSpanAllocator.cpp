@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Core/Allocator/FreeListSpanAllocator.h"
+#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

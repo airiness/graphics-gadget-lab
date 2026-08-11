@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Core/Platform/Win/Win32NamedMutex.h"
+
+#include <Windows.h>
+
+#include <utility>
 
 namespace gglab::win32
 {

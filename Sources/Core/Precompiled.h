@@ -52,7 +52,6 @@
 
 // GameInput
 #include <GameInput.h>
-#pragma comment(lib, "gameinput.lib")
 
 // entt
 #include <entt/entt.hpp>

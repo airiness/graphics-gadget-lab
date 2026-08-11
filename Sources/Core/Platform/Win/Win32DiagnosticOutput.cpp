@@ -1,5 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Core/Platform/Win/Win32DiagnosticOutput.h"
+
+#include <Windows.h>
+
+#include <chrono>
+#include <cstdio>
+#include <ctime>
 
 namespace gglab::win32
 {

@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Core/Profiling/CpuProfiler.h"
+
+#include <algorithm>
+#include <iterator>
 
 namespace gglab
 {

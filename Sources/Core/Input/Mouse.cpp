@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Core/Input/Mouse.h"
+
+#include <tuple>
 
 namespace gglab
 {
