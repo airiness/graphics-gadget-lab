@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
+
+#include <algorithm>
+#include <optional>
+#include <unordered_map>
 
 namespace gglab
 {

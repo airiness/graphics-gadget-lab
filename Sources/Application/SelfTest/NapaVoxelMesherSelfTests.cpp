@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/SelfTest.h"
 
 #include <cstdio>

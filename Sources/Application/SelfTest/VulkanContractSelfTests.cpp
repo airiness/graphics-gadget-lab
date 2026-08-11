@@ -1,6 +1,5 @@
-#include "Core/Precompiled.h"
-#include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/SelfTest/VulkanContractSelfTests.h"
+#include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
@@ -24,6 +23,26 @@
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #endif
+
+#include <windows.h>
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
