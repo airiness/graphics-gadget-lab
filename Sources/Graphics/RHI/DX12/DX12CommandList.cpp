@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
+#include "Core/CoreMacros.h"
+#include "Core/HResult.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
@@ -8,6 +9,11 @@
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12Resource.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
+
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <vector>
 
 namespace gglab
 {

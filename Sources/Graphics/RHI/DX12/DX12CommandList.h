@@ -1,16 +1,21 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Math/Color.h"
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 
 #include <array>
+#include <cstdint>
 #include <cstring>
+#include <optional>
+#include <span>
 #include <type_traits>
+#include <vector>
+
+#include <d3dx12.h>
 
 namespace gglab
 {
-	struct DX12DescriptorView;
-
 	class DX12Device;
 	class DX12Resource;
 	class DX12CommandQueue;
