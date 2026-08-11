@@ -6,8 +6,13 @@
 #include "Graphics/VertexData.h"
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <stop_token>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

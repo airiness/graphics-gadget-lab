@@ -1,14 +1,26 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
+#include "Core/CoreMacros.h"
+#include "Core/HResult.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Utility/PathUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Utility/TextureUtils.h"
-#include "Core/HResult.h"
-#include "Core/Utility/PathUtils.h"
 
 #include <DirectXTex.h>
 #include <DirectXPackedVector.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <format>
+#include <span>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {
