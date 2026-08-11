@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12EnumUtils.h"
 
 namespace gglab

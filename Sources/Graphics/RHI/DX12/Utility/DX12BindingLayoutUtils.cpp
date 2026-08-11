@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
+#include "Core/CoreMacros.h"
+
+#include <cstdint>
 
 namespace gglab
 {

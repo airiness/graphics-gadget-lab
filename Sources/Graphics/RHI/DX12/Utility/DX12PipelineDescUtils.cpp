@@ -1,8 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12EnumUtils.h"
-
 #include "Graphics/Utility/DXGIFormatUtils.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <type_traits>
 
 namespace gglab
 {

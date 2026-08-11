@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIPipeline.h"
 
 #include <array>
+#include <cstdint>
 #include <d3d12.h>
 
 namespace gglab

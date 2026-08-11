@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIBindingLayout.h"
 
 #include <array>
+#include <cstdint>
 #include <d3dx12.h>
 
 namespace gglab

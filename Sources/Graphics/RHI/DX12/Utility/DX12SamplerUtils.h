@@ -1,6 +1,7 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/RHISampler.h"
+
+#include <d3d12.h>
 
 namespace gglab
 {

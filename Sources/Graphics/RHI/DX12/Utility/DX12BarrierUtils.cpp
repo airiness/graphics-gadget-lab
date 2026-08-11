@@ -1,8 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+
+#include <d3dx12.h>
 
 namespace gglab
 {
