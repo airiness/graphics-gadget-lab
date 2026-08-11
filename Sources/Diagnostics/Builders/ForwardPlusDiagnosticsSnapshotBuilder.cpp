@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"

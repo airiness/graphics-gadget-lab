@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
 
 #include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"

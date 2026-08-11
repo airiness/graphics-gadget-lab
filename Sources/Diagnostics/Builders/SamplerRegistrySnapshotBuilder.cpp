@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "Graphics/SamplerRegistry.h"

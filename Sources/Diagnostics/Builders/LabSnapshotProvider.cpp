@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabRuntime.h"

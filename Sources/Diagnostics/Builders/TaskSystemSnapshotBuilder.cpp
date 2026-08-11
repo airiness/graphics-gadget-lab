@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Core/Task/TaskSystem.h"
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
