@@ -423,7 +423,7 @@ namespace gglab
 				meshing.m_Validation.m_IndexCount == 0 &&
 				meshing.m_Validation.m_TriangleCount == 0 &&
 				meshing.m_Validation.m_ValidationHash ==
-				0x9a6da64aacf473a6ull &&
+				0x9d97b7e13bde8d4cull &&
 				meshing.m_BoundaryValidation ==
 				BoundaryContourValidationResult{
 					.m_ChunkRecordCount = 8,
@@ -564,7 +564,7 @@ namespace gglab
 				meshing.m_Validation ==
 				WorldMeshValidationResult{
 					.m_ValidationHash =
-						0xce1a7aea20fb4807ull,
+						0xb27f09eb3887560aull,
 					.m_ChunkCount = 8,
 					.m_VertexCount = 1908,
 					.m_SectionCount = 8,
@@ -889,6 +889,53 @@ namespace gglab
 				"Fully exact-iso boundary triangles emit no interior contour");
 		}
 
+		void RunZeroGradientBoundaryFallbackTests(SelfTestContext& context)
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config{
+				.m_ChunkCellCount = 8,
+				.m_VoxelSize = 1.0f,
+				.m_SurfaceBandVoxels = 2.0f,
+				.m_LogicalCellBounds = {
+					.m_Min = {},
+					.m_MaxExclusive = { 16, 8, 8 },
+				},
+			};
+			std::unique_ptr<VoxelWorld> world;
+			bool initialized = VoxelWorld::Create(config, world).Succeeded() && world;
+			for (std::int32_t z = 0; z <= 8 && initialized; ++z)
+			{
+				for (std::int32_t y = 0; y <= 8 && initialized; y += 2)
+				{
+					for (std::int32_t x = 0; x <= 16; ++x)
+					{
+						bool changed = false;
+						initialized = world->WriteCurrentSample({ x, y, z }, {
+							.m_Density = 255,
+							.m_Material = VoxelMaterial::Stone,
+							}, changed).Succeeded() && changed;
+						if (!initialized)
+						{
+							break;
+						}
+					}
+				}
+			}
+
+			ReferenceWorldMeshingResult first{};
+			ReferenceWorldMeshingResult repeated{};
+			const bool meshed = initialized &&
+				ReferenceMesher(*world).MeshWorld(first).Succeeded() &&
+				ReferenceMesher(*world).MeshWorld(repeated).Succeeded();
+			context.Check(meshed && first.m_Chunks.size() == 2 &&
+				first.m_Validation == repeated.m_Validation &&
+				first.m_BoundaryValidation == repeated.m_BoundaryValidation &&
+				first.m_BoundaryValidation.m_ComparedFacePairCount == 1 &&
+				first.m_BoundaryValidation.m_ComparedSegmentCount > 0,
+				"Zero-gradient topology fallback preserves adjacent Chunk boundary contours");
+		}
+
 		void RunCpuMeshBatchTests(SelfTestContext& context)
 		{
 			using namespace napa::voxel;
@@ -1075,7 +1122,7 @@ namespace gglab
 			context.Check(
 				ComputeVisibleWorldMeshHash(visible, visibleValidation).Succeeded() &&
 				visibleValidation == initialValidation &&
-				visibleValidation.m_ValidationHash == 0xce1a7aea20fb4807ull,
+				visibleValidation.m_ValidationHash == 0xb27f09eb3887560aull,
 				"Visible World mesh hashing reads only the published Mesh Set");
 
 			std::unique_ptr<PendingCpuMeshBatch> sameRevisionPending;
@@ -1294,7 +1341,7 @@ namespace gglab
 			context.Check(
 				allChunksEmpty &&
 				validation.m_ChunkCount == EightChunkDomain.size() &&
-				validation.m_ValidationHash == 0x9a6da64aacf473a6ull,
+				validation.m_ValidationHash == 0x9d97b7e13bde8d4cull,
 				"Visible World mesh hashing includes every Empty Mesh Chunk");
 		}
 
@@ -1356,6 +1403,7 @@ namespace gglab
 		RunCompleteDomainTests(context);
 		RunBoundarySurfaceTests(context);
 		RunExactIsoCornerTests(context);
+		RunZeroGradientBoundaryFallbackTests(context);
 		RunCpuMeshBatchTests(context);
 		RunEmptyCpuMeshBatchTests(context);
 		RunGuardAllocationTests(context);

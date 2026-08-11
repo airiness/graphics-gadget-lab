@@ -400,7 +400,7 @@ namespace gglab
 			const ValidationResult interiorResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &interiorChange, 1 }, dataDirty, meshDirty);
 			context.Check(interiorResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				dataDirty == std::vector<ChunkCoord>{ origin }&&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"An interior Sample change dirties one Data owner and one Mesh owner");
 
@@ -408,16 +408,16 @@ namespace gglab
 			const ValidationResult gradientCornerResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &gradientCornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(gradientCornerResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				dataDirty == std::vector<ChunkCoord>{ origin }&&
 				meshDirty == std::vector<ChunkCoord>{
 					{ 0, 0, -1 }, { 0, -1, 0 }, { -1, 0, 0 }, origin,
-				}, "A Density change one Cell from a Chunk corner includes its Gradient consumers");
+			}, "A Density change one Cell from a Chunk corner includes its Gradient consumers");
 
 			const VoxelSampleChange faceChange = MakeDensityChange({ 8, 2, 2 });
 			const ValidationResult faceResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &faceChange, 1 }, dataDirty, meshDirty);
 			context.Check(faceResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 0, 0 } } &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 0, 0 } }&&
 				meshDirty == std::vector<ChunkCoord>{ origin, { 1, 0, 0 } },
 				"A Chunk-face Sample change dirties both adjacent Mesh owners");
 
@@ -425,10 +425,10 @@ namespace gglab
 			const ValidationResult edgeResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &edgeChange, 1 }, dataDirty, meshDirty);
 			context.Check(edgeResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 0 } } &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 0 } }&&
 				meshDirty == std::vector<ChunkCoord>{
-					origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
-				}, "A Chunk-edge Sample change dirties all four adjacent Mesh owners");
+				origin, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 },
+			}, "A Chunk-edge Sample change dirties all four adjacent Mesh owners");
 
 			const VoxelSampleChange cornerChange = MakeDensityChange({ 8, 8, 8 });
 			const std::vector<ChunkCoord> expectedCornerMesh{
@@ -438,7 +438,7 @@ namespace gglab
 			const ValidationResult cornerResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &cornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(cornerResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 1 } } &&
+				dataDirty == std::vector<ChunkCoord>{ { 1, 1, 1 } }&&
 				meshDirty == expectedCornerMesh,
 				"A Chunk-corner Sample change dirties all eight adjacent Mesh owners");
 
@@ -450,7 +450,7 @@ namespace gglab
 			const ValidationResult negativeResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &negativeCornerChange, 1 }, dataDirty, meshDirty);
 			context.Check(negativeResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				dataDirty == std::vector<ChunkCoord>{ origin }&&
 				meshDirty == expectedNegativeCornerMesh,
 				"Negative Chunk owners use the same exact corner-dirty contract");
 
@@ -470,7 +470,7 @@ namespace gglab
 			const ValidationResult damageResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &damageOnlyChange, 1 }, dataDirty, meshDirty);
 			context.Check(damageResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } } && meshDirty.empty(),
+				dataDirty == std::vector<ChunkCoord>{ { -1, -1, -1 } }&& meshDirty.empty(),
 				"A Damage-only Sample change dirties Data without invalidating Mesh");
 
 			const VoxelSampleChange materialOnlyChange{
@@ -489,7 +489,7 @@ namespace gglab
 			const ValidationResult materialResult = DeriveVoxelMutationDirtyChunks(
 				config, std::span{ &materialOnlyChange, 1 }, dataDirty, meshDirty);
 			context.Check(materialResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin } &&
+				dataDirty == std::vector<ChunkCoord>{ origin }&&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"A Material-only Sample change invalidates both Data and Mesh owners");
 
@@ -512,7 +512,7 @@ namespace gglab
 			const ValidationResult clippedResult = DeriveVoxelMutationDirtyChunks(
 				clippedConfig, clippedChanges, dataDirty, meshDirty);
 			context.Check(clippedResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } }&&
 				meshDirty == std::vector<ChunkCoord>{ origin },
 				"Mesh Dirty cells are clipped exactly to Logical Cell Bounds");
 
@@ -531,7 +531,7 @@ namespace gglab
 			const ValidationResult reversedResult = DeriveVoxelMutationDirtyChunks(
 				config, reversedChanges, reversedDataDirty, reversedMeshDirty);
 			context.Check(repeatedResult.Succeeded() && reversedResult.Succeeded() &&
-				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } } &&
+				dataDirty == std::vector<ChunkCoord>{ origin, { 1, 1, 1 } }&&
 				meshDirty == expectedCornerMesh && dataDirty == reversedDataDirty &&
 				meshDirty == reversedMeshDirty,
 				"Dirty Chunk sets are sorted, unique, and independent of change order");
@@ -829,7 +829,7 @@ namespace gglab
 				editedValidation.m_ValidationHash != initialValidation.m_ValidationHash,
 				"Headless CPU publication atomically advances every Gradient-aware replacement");
 			context.Check(editedValidation == WorldMeshValidationResult{
-				.m_ValidationHash = 0x623a998fd4ecadf9ull,
+				.m_ValidationHash = 0xe42406261ba87065ull,
 				.m_ChunkCount = 8,
 				.m_VertexCount = 4902,
 				.m_SectionCount = 8,
@@ -1071,19 +1071,19 @@ namespace gglab
 		{
 			using namespace napa::voxel;
 			const auto makeStone = [](Double3 center) noexcept
-			{
-				return PrimitiveDesc{
-					.m_StableId = { 1 },
-					.m_Material = VoxelMaterial::Stone,
-					.m_Shape = PrimitiveShape::Sphere,
-					.m_Parameters = {
-						.m_Sphere = {
-							.m_Center = center,
-							.m_Radius = 0.96,
+				{
+					return PrimitiveDesc{
+						.m_StableId = { 1 },
+						.m_Material = VoxelMaterial::Stone,
+						.m_Shape = PrimitiveShape::Sphere,
+						.m_Parameters = {
+							.m_Sphere = {
+								.m_Center = center,
+								.m_Radius = 0.96,
+							},
 						},
-					},
+					};
 				};
-			};
 			const VoxelWorldConfig boundaryConfig{
 				.m_ChunkCellCount = 16,
 				.m_VoxelSize = 0.25f,

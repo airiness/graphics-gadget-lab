@@ -1098,7 +1098,7 @@ namespace gglab
 							.m_StableId = 9001,
 							.m_Generation = 1,
 							},
-						.m_Estimate = { .m_SourceBytes = 16 },
+						.m_Estimate = {.m_SourceBytes = 16 },
 						},
 						[&]()
 						{
@@ -1923,7 +1923,7 @@ namespace gglab
 				},
 				.m_WindowWidth = 64,
 				.m_WindowHeight = 64,
-				.m_RunConfig = { .m_WarmupFrames = 0 },
+				.m_RunConfig = {.m_WarmupFrames = 0 },
 			};
 
 			bool runtimeValid = false;

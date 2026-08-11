@@ -23,7 +23,7 @@ namespace gglab
 			std::uint64_t stableId,
 			napa::voxel::PrimitivePriority priority = {},
 			napa::voxel::VoxelMaterial material =
-				napa::voxel::VoxelMaterial::Stone) noexcept
+			napa::voxel::VoxelMaterial::Stone) noexcept
 		{
 			return {
 				.m_StableId = { stableId },
@@ -100,7 +100,7 @@ namespace gglab
 				double radius,
 				napa::voxel::PrimitivePriority priority = {},
 				napa::voxel::VoxelMaterial material =
-					napa::voxel::VoxelMaterial::Stone) noexcept
+				napa::voxel::VoxelMaterial::Stone) noexcept
 		{
 			napa::voxel::PrimitiveDesc sphere = MakeSphere(
 				stableId,
@@ -155,22 +155,22 @@ namespace gglab
 
 			context.Check(
 				std::is_standard_layout_v<Double3> &&
-					std::is_trivially_copyable_v<Double3> &&
-					std::is_standard_layout_v<SpherePrimitive> &&
-					std::is_trivially_copyable_v<SpherePrimitive> &&
-					std::is_standard_layout_v<
-						AxisAlignedBoxPrimitive> &&
-					std::is_trivially_copyable_v<
-						AxisAlignedBoxPrimitive> &&
-					std::is_standard_layout_v<GroundSlabPrimitive> &&
-					std::is_trivially_copyable_v<GroundSlabPrimitive> &&
-					std::is_standard_layout_v<PrimitiveDesc> &&
-					std::is_trivially_copyable_v<PrimitiveDesc>,
+				std::is_trivially_copyable_v<Double3> &&
+				std::is_standard_layout_v<SpherePrimitive> &&
+				std::is_trivially_copyable_v<SpherePrimitive> &&
+				std::is_standard_layout_v<
+				AxisAlignedBoxPrimitive> &&
+				std::is_trivially_copyable_v<
+				AxisAlignedBoxPrimitive> &&
+				std::is_standard_layout_v<GroundSlabPrimitive> &&
+				std::is_trivially_copyable_v<GroundSlabPrimitive> &&
+				std::is_standard_layout_v<PrimitiveDesc> &&
+				std::is_trivially_copyable_v<PrimitiveDesc>,
 				"Primitive descriptors use portable value layouts");
 			context.Check(
 				std::is_same_v<
-					std::underlying_type_t<PrimitiveShape>,
-					std::uint8_t>,
+				std::underlying_type_t<PrimitiveShape>,
+				std::uint8_t>,
 				"PrimitiveShape uses uint8_t as its underlying type");
 		}
 
@@ -184,8 +184,8 @@ namespace gglab
 			const PrimitiveDesc slab = MakeGroundSlab(3);
 			context.Check(
 				ValidatePrimitive(sphere).Succeeded() &&
-					ValidatePrimitive(box).Succeeded() &&
-					ValidatePrimitive(slab).Succeeded(),
+				ValidatePrimitive(box).Succeeded() &&
+				ValidatePrimitive(slab).Succeeded(),
 				"Supported field primitives pass validation");
 
 			PrimitiveDesc invalid = sphere;
@@ -193,7 +193,7 @@ namespace gglab
 				std::numeric_limits<double>::infinity();
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonFinitePrimitivePosition,
+				ValidationError::NonFinitePrimitivePosition,
 				"Primitive validation rejects non-finite positions");
 
 			invalid = sphere;
@@ -201,14 +201,14 @@ namespace gglab
 				std::numeric_limits<double>::quiet_NaN();
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonFinitePrimitiveSize,
+				ValidationError::NonFinitePrimitiveSize,
 				"Primitive validation rejects non-finite sizes");
 
 			invalid = sphere;
 			invalid.m_Parameters.m_Sphere.m_Radius = 0.0;
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonPositiveSphereRadius,
+				ValidationError::NonPositiveSphereRadius,
 				"Primitive validation rejects a non-positive sphere radius");
 
 			invalid = box;
@@ -216,7 +216,7 @@ namespace gglab
 				std::numeric_limits<double>::infinity();
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonFinitePrimitiveSize,
+				ValidationError::NonFinitePrimitiveSize,
 				"Box validation rejects non-finite extents");
 
 			invalid = box;
@@ -224,7 +224,7 @@ namespace gglab
 				-1.0;
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonPositivePrimitiveExtent,
+				ValidationError::NonPositivePrimitiveExtent,
 				"Primitive validation rejects a non-positive box extent");
 
 			invalid = slab;
@@ -232,7 +232,7 @@ namespace gglab
 				std::numeric_limits<double>::quiet_NaN();
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonFinitePrimitivePosition,
+				ValidationError::NonFinitePrimitivePosition,
 				"Ground slab validation rejects non-finite positions");
 
 			invalid = slab;
@@ -240,28 +240,28 @@ namespace gglab
 				0.0;
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::NonPositivePrimitiveExtent,
+				ValidationError::NonPositivePrimitiveExtent,
 				"Primitive validation rejects a non-positive slab extent");
 
 			invalid = sphere;
 			invalid.m_Material = VoxelMaterial::Empty;
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::EmptyPrimitiveMaterial,
+				ValidationError::EmptyPrimitiveMaterial,
 				"Primitive validation rejects the empty material");
 
 			invalid = sphere;
 			invalid.m_Material = static_cast<VoxelMaterial>(255);
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::InvalidVoxelMaterial,
+				ValidationError::InvalidVoxelMaterial,
 				"Primitive validation rejects an unknown material");
 
 			invalid = sphere;
 			invalid.m_Shape = static_cast<PrimitiveShape>(255);
 			context.Check(
 				ValidatePrimitive(invalid).m_Error ==
-					ValidationError::InvalidPrimitiveShape,
+				ValidationError::InvalidPrimitiveShape,
 				"Primitive validation rejects an unknown shape");
 
 			const std::array validSet{
@@ -271,8 +271,8 @@ namespace gglab
 			};
 			context.Check(
 				ValidatePrimitiveSet(validSet).Succeeded() &&
-					ValidatePrimitiveSet(
-						std::span<const PrimitiveDesc>{}).Succeeded(),
+				ValidatePrimitiveSet(
+					std::span<const PrimitiveDesc>{}).Succeeded(),
 				"Primitive set validation accepts unique and empty sets");
 
 			const std::array duplicateSet{
@@ -281,7 +281,7 @@ namespace gglab
 			};
 			context.Check(
 				ValidatePrimitiveSet(duplicateSet).m_Error ==
-					ValidationError::DuplicatePrimitiveStableId,
+				ValidationError::DuplicatePrimitiveStableId,
 				"Primitive set validation rejects duplicate stable IDs");
 		}
 
@@ -293,23 +293,23 @@ namespace gglab
 			const PrimitiveDesc sphere = MakeSphere(1);
 			context.Check(
 				HasSignedDistance(sphere, { 1.0, 2.0, 3.0 }, -2.0) &&
-					HasSignedDistance(
-						sphere,
-						{ 3.0, 2.0, 3.0 },
-						0.0) &&
-					HasSignedDistance(
-						sphere,
-						{ 4.0, 2.0, 3.0 },
-						1.0),
+				HasSignedDistance(
+					sphere,
+					{ 3.0, 2.0, 3.0 },
+					0.0) &&
+				HasSignedDistance(
+					sphere,
+					{ 4.0, 2.0, 3.0 },
+					1.0),
 				"Sphere SDF classifies center, surface, and outside");
 
 			const PrimitiveDesc box = MakeBox(2);
 			context.Check(
 				HasSignedDistance(box, {}, -1.0) &&
-					HasSignedDistance(box, { 1.0, 0.0, 0.0 }, 0.0) &&
-					HasSignedDistance(box, { 1.0, 2.0, 0.0 }, 0.0) &&
-					HasSignedDistance(box, { 1.0, 2.0, 3.0 }, 0.0) &&
-					HasSignedDistance(box, { 2.0, 2.0, 3.0 }, 1.0),
+				HasSignedDistance(box, { 1.0, 0.0, 0.0 }, 0.0) &&
+				HasSignedDistance(box, { 1.0, 2.0, 0.0 }, 0.0) &&
+				HasSignedDistance(box, { 1.0, 2.0, 3.0 }, 0.0) &&
+				HasSignedDistance(box, { 2.0, 2.0, 3.0 }, 1.0),
 				"Box SDF classifies center, face, edge, corner, and outside");
 
 			const PrimitiveDesc slab = MakeGroundSlab(3);
@@ -318,18 +318,18 @@ namespace gglab
 					slab,
 					{ 0.0, -1.5, 0.0 },
 					0.0) &&
-					HasSignedDistance(
-						slab,
-						{ 0.0, -2.5, 0.0 },
-						0.0) &&
-					HasSignedDistance(
-						slab,
-						{ 4.0, -2.0, 0.0 },
-						0.0) &&
-					HasSignedDistance(
-						slab,
-						{ 0.0, -2.0, 0.0 },
-						-0.5),
+				HasSignedDistance(
+					slab,
+					{ 0.0, -2.5, 0.0 },
+					0.0) &&
+				HasSignedDistance(
+					slab,
+					{ 4.0, -2.0, 0.0 },
+					0.0) &&
+				HasSignedDistance(
+					slab,
+					{ 0.0, -2.0, 0.0 },
+					-0.5),
 				"Ground slab SDF represents a finite closed box");
 
 			double unchanged = 37.0;
@@ -343,7 +343,7 @@ namespace gglab
 					},
 					unchanged).m_Error ==
 					ValidationError::NonFinitePrimitivePosition &&
-					unchanged == 37.0,
+				unchanged == 37.0,
 				"Signed-distance evaluation rejects a non-finite query");
 
 			PrimitiveDesc extreme = sphere;
@@ -359,7 +359,7 @@ namespace gglab
 					},
 					unchanged).m_Error ==
 					ValidationError::NonFiniteSignedDistance &&
-					unchanged == 37.0,
+				unchanged == 37.0,
 				"Signed-distance evaluation rejects non-finite results");
 		}
 
@@ -371,13 +371,13 @@ namespace gglab
 			std::int64_t rounded = 0;
 			context.Check(
 				RoundHalfAwayFromZero(0.5, rounded).Succeeded() &&
-					rounded == 1 &&
-					RoundHalfAwayFromZero(1.5, rounded).Succeeded() &&
-					rounded == 2 &&
-					RoundHalfAwayFromZero(-0.5, rounded).Succeeded() &&
-					rounded == -1 &&
-					RoundHalfAwayFromZero(-1.5, rounded).Succeeded() &&
-					rounded == -2,
+				rounded == 1 &&
+				RoundHalfAwayFromZero(1.5, rounded).Succeeded() &&
+				rounded == 2 &&
+				RoundHalfAwayFromZero(-0.5, rounded).Succeeded() &&
+				rounded == -1 &&
+				RoundHalfAwayFromZero(-1.5, rounded).Succeeded() &&
+				rounded == -2,
 				"Density rounding resolves positive and negative halves away from zero");
 
 			rounded = 37;
@@ -385,13 +385,13 @@ namespace gglab
 				RoundHalfAwayFromZero(
 					std::numeric_limits<double>::infinity(),
 					rounded).m_Error ==
-					ValidationError::NonFiniteQuantizationInput &&
-					rounded == 37 &&
-					RoundHalfAwayFromZero(
-						std::numeric_limits<double>::max(),
-						rounded).m_Error ==
-						ValidationError::ArithmeticOverflow &&
-					rounded == 37,
+				ValidationError::NonFiniteQuantizationInput &&
+				rounded == 37 &&
+				RoundHalfAwayFromZero(
+					std::numeric_limits<double>::max(),
+					rounded).m_Error ==
+				ValidationError::ArithmeticOverflow &&
+				rounded == 37,
 				"Density rounding rejects invalid inputs without changing output");
 
 			std::uint8_t density = 0;
@@ -401,25 +401,25 @@ namespace gglab
 					1.0f,
 					2.0f,
 					density).Succeeded() &&
-					density == IsoValue &&
-					QuantizeSignedDistance(
-						-1.0 / 127.0,
-						1.0f,
-						2.0f,
-						density).Succeeded() &&
-					density == IsoValue + 1 &&
-					QuantizeSignedDistance(
-						1000.0,
-						1.0f,
-						2.0f,
-						density).Succeeded() &&
-					density == 0 &&
-					QuantizeSignedDistance(
-						-1000.0,
-						1.0f,
-						2.0f,
-						density).Succeeded() &&
-					density == 255,
+				density == IsoValue &&
+				QuantizeSignedDistance(
+					-1.0 / 127.0,
+					1.0f,
+					2.0f,
+					density).Succeeded() &&
+				density == IsoValue + 1 &&
+				QuantizeSignedDistance(
+					1000.0,
+					1.0f,
+					2.0f,
+					density).Succeeded() &&
+				density == 0 &&
+				QuantizeSignedDistance(
+					-1000.0,
+					1.0f,
+					2.0f,
+					density).Succeeded() &&
+				density == 255,
 				"SDF quantization fixes the iso point, half rounding, and clamping");
 
 			density = 91;
@@ -429,8 +429,8 @@ namespace gglab
 					1.0f,
 					2.0f,
 					density).m_Error ==
-					ValidationError::NonFiniteQuantizationInput &&
-					density == 91,
+				ValidationError::NonFiniteQuantizationInput &&
+				density == 91,
 				"SDF quantization leaves output unchanged on failure");
 
 			DensityQuantizationContext quantizationContext;
@@ -439,18 +439,18 @@ namespace gglab
 					0.0,
 					quantizationContext,
 					density).m_Error ==
-					ValidationError::
-						UnpreparedDensityQuantizationContext &&
-					density == 91 &&
-					PrepareDensityQuantizationContext(
-						1.0f,
-						2.0f,
-						quantizationContext).Succeeded() &&
-					QuantizeSignedDistance(
-						0.0,
-						quantizationContext,
-						density).Succeeded() &&
-					density == IsoValue,
+				ValidationError::
+				UnpreparedDensityQuantizationContext &&
+				density == 91 &&
+				PrepareDensityQuantizationContext(
+					1.0f,
+					2.0f,
+					quantizationContext).Succeeded() &&
+				QuantizeSignedDistance(
+					0.0,
+					quantizationContext,
+					density).Succeeded() &&
+				density == IsoValue,
 				"Prepared quantization contexts validate world parameters once");
 		}
 
@@ -487,12 +487,12 @@ namespace gglab
 					priorityTie,
 					priorityWorld,
 					generation).Succeeded() &&
-					priorityWorld &&
-					ReadCurrentSample(
-						*priorityWorld,
-						centerSample,
-						sample) &&
-					sample.m_Material == VoxelMaterial::Soil,
+				priorityWorld &&
+				ReadCurrentSample(
+					*priorityWorld,
+					centerSample,
+					sample) &&
+				sample.m_Material == VoxelMaterial::Soil,
 				"Exact SDF ties prefer the higher primitive priority");
 
 			const std::array stableIdTie{
@@ -516,12 +516,12 @@ namespace gglab
 					stableIdTie,
 					stableIdWorld,
 					generation).Succeeded() &&
-					stableIdWorld &&
-					ReadCurrentSample(
-						*stableIdWorld,
-						centerSample,
-						sample) &&
-					sample.m_Material == VoxelMaterial::Stone,
+				stableIdWorld &&
+				ReadCurrentSample(
+					*stableIdWorld,
+					centerSample,
+					sample) &&
+				sample.m_Material == VoxelMaterial::Stone,
 				"Equal-priority SDF ties prefer the lower stable ID");
 
 			const std::array distinctDistances{
@@ -545,12 +545,12 @@ namespace gglab
 					distinctDistances,
 					distanceWorld,
 					generation).Succeeded() &&
-					distanceWorld &&
-					ReadCurrentSample(
-						*distanceWorld,
-						centerSample,
-						sample) &&
-					sample.m_Material == VoxelMaterial::Stone,
+				distanceWorld &&
+				ReadCurrentSample(
+					*distanceWorld,
+					centerSample,
+					sample) &&
+				sample.m_Material == VoxelMaterial::Stone,
 				"Primitive union does not apply an epsilon to distinct SDF values");
 		}
 
@@ -573,9 +573,9 @@ namespace gglab
 				MakeGroundSlab(20),
 			};
 			primitives[2].m_Parameters.m_GroundSlab.m_Center =
-				{ 11.0, 3.0, 8.0 };
+			{ 11.0, 3.0, 8.0 };
 			primitives[2].m_Parameters.m_GroundSlab.m_HalfExtents =
-				{ 2.0, 0.5, 2.0 };
+			{ 2.0, 0.5, 2.0 };
 
 			std::unique_ptr<VoxelWorld> forwardWorld;
 			PrimitiveWorldGenerationResult forwardResult{};
@@ -592,14 +592,14 @@ namespace gglab
 			PrimitiveWorldGenerationResult reverseResult{};
 			context.Check(
 				generatedForward &&
-					GeneratePrimitiveVoxelWorld(
-						config,
-						primitives,
-						reverseWorld,
-						reverseResult).Succeeded() &&
-					reverseWorld &&
-					forwardResult.m_InitialVoxelHash ==
-						reverseResult.m_InitialVoxelHash,
+				GeneratePrimitiveVoxelWorld(
+					config,
+					primitives,
+					reverseWorld,
+					reverseResult).Succeeded() &&
+				reverseWorld &&
+				forwardResult.m_InitialVoxelHash ==
+				reverseResult.m_InitialVoxelHash,
 				"Primitive input order does not affect the initial voxel hash");
 
 			bool repeatedHashMatches = generatedForward;
@@ -617,7 +617,7 @@ namespace gglab
 						repeatedResult).Succeeded() &&
 					repeatedWorld &&
 					repeatedResult.m_InitialVoxelHash ==
-						forwardResult.m_InitialVoxelHash;
+					forwardResult.m_InitialVoxelHash;
 			}
 			context.Check(
 				repeatedHashMatches,
@@ -639,19 +639,19 @@ namespace gglab
 					boundaryPrimitive,
 					boundaryWorld,
 					boundaryResult).Succeeded() &&
-					boundaryWorld &&
-					ReadCurrentSample(
-						*boundaryWorld,
-						{ 7, 8, 8 },
-						left) &&
-					ReadCurrentSample(
-						*boundaryWorld,
-						{ 8, 8, 8 },
-						right) &&
-					left == right &&
-					left.m_Density >= IsoValue &&
-					boundaryWorld->FindChunk({ 0, 1, 1 }) != nullptr &&
-					boundaryWorld->FindChunk({ 1, 1, 1 }) != nullptr,
+				boundaryWorld &&
+				ReadCurrentSample(
+					*boundaryWorld,
+					{ 7, 8, 8 },
+					left) &&
+				ReadCurrentSample(
+					*boundaryWorld,
+					{ 8, 8, 8 },
+					right) &&
+				left == right &&
+				left.m_Density >= IsoValue &&
+				boundaryWorld->FindChunk({ 0, 1, 1 }) != nullptr &&
+				boundaryWorld->FindChunk({ 1, 1, 1 }) != nullptr,
 				"Primitive generation preserves sample bytes across a chunk boundary");
 		}
 
@@ -677,32 +677,32 @@ namespace gglab
 				VoxelWorld::Create(
 					config,
 					defaultWorld).Succeeded() &&
-					defaultWorld &&
-					ComputeLogicalVoxelWorldHash(
-						*defaultWorld,
-						defaultHash).Succeeded() &&
-					GeneratePrimitiveVoxelWorld(
-						config,
-						std::span<const PrimitiveDesc>{},
-						emptyPrimitiveWorld,
-						emptyPrimitiveResult).Succeeded() &&
-					emptyPrimitiveWorld &&
-					emptyPrimitiveWorld->IsOriginalStateSealed() &&
-					emptyPrimitiveWorld->GetWorldVoxelRevision() == 1 &&
-					emptyPrimitiveWorld->GetResidentChunkCount() == 0 &&
-					emptyPrimitiveResult.m_InitialVoxelHash ==
-						defaultHash &&
-					emptyPrimitiveWorld->ReadOriginalSample(
-						{ 4, 4, 4 },
-						emptyOriginal).Succeeded() &&
-					emptyPrimitiveWorld->ReadCurrentSample(
-						{ 4, 4, 4 },
-						emptyCurrent).Succeeded() &&
-					emptyOriginal == DefaultVoxelSample &&
-					emptyCurrent == DefaultVoxelSample &&
-					RestoreAll(*emptyPrimitiveWorld, emptyRestore).Succeeded() &&
-					!emptyRestore.Changed() &&
-					emptyPrimitiveWorld->GetWorldVoxelRevision() == 1,
+				defaultWorld &&
+				ComputeLogicalVoxelWorldHash(
+					*defaultWorld,
+					defaultHash).Succeeded() &&
+				GeneratePrimitiveVoxelWorld(
+					config,
+					std::span<const PrimitiveDesc>{},
+					emptyPrimitiveWorld,
+					emptyPrimitiveResult).Succeeded() &&
+				emptyPrimitiveWorld&&
+				emptyPrimitiveWorld->IsOriginalStateSealed() &&
+				emptyPrimitiveWorld->GetWorldVoxelRevision() == 1 &&
+				emptyPrimitiveWorld->GetResidentChunkCount() == 0 &&
+				emptyPrimitiveResult.m_InitialVoxelHash ==
+				defaultHash &&
+				emptyPrimitiveWorld->ReadOriginalSample(
+					{ 4, 4, 4 },
+					emptyOriginal).Succeeded() &&
+				emptyPrimitiveWorld->ReadCurrentSample(
+					{ 4, 4, 4 },
+					emptyCurrent).Succeeded() &&
+				emptyOriginal == DefaultVoxelSample &&
+				emptyCurrent == DefaultVoxelSample &&
+				RestoreAll(*emptyPrimitiveWorld, emptyRestore).Succeeded() &&
+				!emptyRestore.Changed() &&
+				emptyPrimitiveWorld->GetWorldVoxelRevision() == 1,
 				"An empty primitive set generates a sealed sparse empty baseline");
 
 			std::unique_ptr<VoxelWorld> unchangedWorld;
@@ -710,7 +710,7 @@ namespace gglab
 				VoxelWorld::Create(
 					config,
 					unchangedWorld).Succeeded() &&
-					unchangedWorld,
+				unchangedWorld,
 				"Primitive generation failure fixture creates a world");
 			VoxelWorld* const unchangedAddress =
 				unchangedWorld.get();
@@ -729,10 +729,10 @@ namespace gglab
 					unsafePrimitive,
 					unchangedWorld,
 					unchangedResult).m_Error ==
-					ValidationError::EmptySafetyMarginViolation &&
-					unchangedWorld.get() == unchangedAddress &&
-					unchangedResult.m_InitialVoxelHash ==
-						0x123456789abcdef0ull,
+				ValidationError::EmptySafetyMarginViolation &&
+				unchangedWorld.get() == unchangedAddress &&
+				unchangedResult.m_InitialVoxelHash ==
+				0x123456789abcdef0ull,
 				"Safety-margin failure does not publish a partial world");
 
 			const std::array validPrimitive{
@@ -755,45 +755,45 @@ namespace gglab
 				: nullptr;
 			context.Check(
 				generated &&
-					generatedWorld->IsOriginalStateSealed() &&
-					generatedWorld->GetWorldVoxelRevision() == 1 &&
-					generatedChunk != nullptr &&
-					generatedChunk->GetVoxelRevision() == 1,
+				generatedWorld->IsOriginalStateSealed() &&
+				generatedWorld->GetWorldVoxelRevision() == 1 &&
+				generatedChunk != nullptr &&
+				generatedChunk->GetVoxelRevision() == 1,
 				"Primitive generation publishes a sealed revision-one baseline");
 
 			bool changed = true;
 			context.Check(
 				generated &&
-					generatedWorld->WriteOriginalAndCurrentSample(
-						{ 4, 4, 4 },
-						DefaultVoxelSample,
-						changed).m_Error ==
-						ValidationError::OriginalStateSealed &&
-					changed,
+				generatedWorld->WriteOriginalAndCurrentSample(
+					{ 4, 4, 4 },
+					DefaultVoxelSample,
+					changed).m_Error ==
+				ValidationError::OriginalStateSealed &&
+				changed,
 				"Sealed primitive worlds reject later Original writes");
 
 			std::uint64_t restoredHash = 0;
 			VoxelMutationResult restore{};
 			context.Check(
 				generated &&
-					generatedWorld->WriteCurrentSample(
-						{ 4, 4, 4 },
-						DefaultVoxelSample,
-						changed).Succeeded() &&
-					changed &&
-					RestoreAll(*generatedWorld, restore).Succeeded() &&
-					restore.Changed() &&
-					ComputeLogicalVoxelWorldHash(
-						*generatedWorld,
-						restoredHash).Succeeded() &&
-					restoredHash ==
-						generatedResult.m_InitialVoxelHash,
+				generatedWorld->WriteCurrentSample(
+					{ 4, 4, 4 },
+					DefaultVoxelSample,
+					changed).Succeeded() &&
+				changed &&
+				RestoreAll(*generatedWorld, restore).Succeeded() &&
+				restore.Changed() &&
+				ComputeLogicalVoxelWorldHash(
+					*generatedWorld,
+					restoredHash).Succeeded() &&
+				restoredHash ==
+				generatedResult.m_InitialVoxelHash,
 				"Restore returns edited Current data to the generated baseline");
 
 			context.Check(
 				generated &&
-					generatedResult.m_InitialVoxelHash ==
-						0x1c13954365d53eafull,
+				generatedResult.m_InitialVoxelHash ==
+				0x1c13954365d53eafull,
 				"A single-chunk primitive world matches its golden hash");
 
 			const VoxelWorldConfig boundaryConfig =
@@ -812,9 +812,9 @@ namespace gglab
 					boundaryPrimitive,
 					boundaryWorld,
 					boundaryResult).Succeeded() &&
-					boundaryWorld &&
-					boundaryResult.m_InitialVoxelHash ==
-						0xd1d37ab06b383ad6ull,
+				boundaryWorld &&
+				boundaryResult.m_InitialVoxelHash ==
+				0xd1d37ab06b383ad6ull,
 				"A chunk-boundary primitive world matches its golden hash");
 		}
 	}

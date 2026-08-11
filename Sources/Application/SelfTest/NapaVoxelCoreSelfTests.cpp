@@ -28,7 +28,7 @@ namespace gglab
 			static_cast<unsigned>(contract.m_RestoreContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 27, "Core API version is 27");
+		context.Check(contract.m_CoreApiVersion == 29, "Core API version is 29");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");
@@ -36,8 +36,8 @@ namespace gglab
 			contract.m_MeshHashSchemaVersion == 1,
 			"Mesh hash schema version is 1");
 		context.Check(
-			contract.m_ReferenceMesherVersion == 4,
-			"Reference mesher version is 4");
+			contract.m_ReferenceMesherVersion == 6,
+			"Reference mesher version is 6");
 		context.Check(contract.m_EditContractVersion == 3,
 			"Sphere edit contract version is 3");
 		context.Check(contract.m_MutationContractVersion == 4,

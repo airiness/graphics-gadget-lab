@@ -87,6 +87,7 @@ namespace napa::voxel
 		MismatchedDataOnlyPublication = 78,
 		DataOnlyPublicationAllocationFailure = 79,
 		MismatchedSurfaceStateRevision = 80,
+		DuplicateMeshTriangle = 81,
 	};
 
 	struct ValidationResult

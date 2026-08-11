@@ -699,16 +699,16 @@ namespace gglab
 						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
 						{ return record.m_Chunk == ChunkCoord{}; });
 					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
-						validation.m_ValidationHash == 0x258d430301532e18ull &&
-						validation.m_VertexCount == 2952 && validation.m_IndexCount == 2952 &&
-						validation.m_TriangleCount == 984 &&
+						validation.m_ValidationHash == 0x1b29e7c3f53ef189ull &&
+						validation.m_VertexCount == 2946 && validation.m_IndexCount == 2946 &&
+						validation.m_TriangleCount == 982 &&
 						chunk != destroyedVisible.GetChunks().end() &&
-						chunk->m_Validation.m_ValidationHash == 0x3017114a9fe6a1d6ull &&
-						chunk->m_Validation.m_TriangleCount == 128 &&
+						chunk->m_Validation.m_ValidationHash == 0x44e0f7f6fc8d181full &&
+						chunk->m_Validation.m_TriangleCount == 126 &&
 						chunk->m_Validation.m_QuantizedBounds == QuantizedMeshAabb{
 							.m_Min = {},
 							.m_Max = { 131072, 393216, 393216 },
-						};
+					};
 					repeatedCyclesMatched = firstCycleDestroyedGolden;
 				}
 
@@ -760,6 +760,79 @@ namespace gglab
 				"The first Stone Wall destruction cycle matches its exact hole Mesh Golden");
 			context.Check(repeatedCyclesMatched,
 				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
+		}
+
+		void RunPlaytestBreachMeshingRegressionTests(SelfTestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config{
+				.m_ChunkCellCount = 16,
+				.m_VoxelSize = 1.0f,
+				.m_SurfaceBandVoxels = 2.0f,
+				.m_LogicalCellBounds = {
+					.m_Min = {},
+					.m_MaxExclusive = { 16, 16, 16 },
+				},
+			};
+			const PrimitiveDesc wall{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = { 8.0, 8.0, 8.0 },
+						.m_HalfExtents = { 3.0, 5.0, 5.0 },
+					},
+				},
+			};
+			const auto meshBreach = [&config, &wall](Double3 center,
+				ChunkMeshRecord& breached, ChunkMeshRecord& repeated)
+				{
+					std::unique_ptr<VoxelWorld> world;
+					PrimitiveWorldGenerationResult generation{};
+					VoxelMutationResult firstHit{};
+					VoxelMutationResult secondHit{};
+					const SphereEditRequest request = MakeStoneEdit(center, 4.0);
+					return GeneratePrimitiveVoxelWorld(
+						config, std::span{ &wall, 1 }, world, generation).Succeeded() && world &&
+						ApplySphereEdit(*world, request, firstHit).Succeeded() &&
+						firstHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+						ApplySphereEdit(*world, request, secondHit).Succeeded() &&
+						secondHit.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+						ReferenceMesher(*world).MeshChunk({}, breached).Succeeded() &&
+						ReferenceMesher(*world).MeshChunk({}, repeated).Succeeded() &&
+						breached.m_Validation == repeated.m_Validation &&
+						breached.m_WindingEvidence == repeated.m_WindingEvidence;
+				};
+
+			ChunkMeshRecord centerBreached{};
+			ChunkMeshRecord centerRepeated{};
+			const bool centerMeshed =
+				meshBreach({ 5.0, 8.0, 8.0 }, centerBreached, centerRepeated);
+			context.Check(centerMeshed &&
+				centerBreached.m_Validation.m_ValidationHash == 0x6c0a4107ba561328ull &&
+				centerBreached.m_Validation.m_VertexCount == 4542 &&
+				centerBreached.m_Validation.m_IndexCount == 4542 &&
+				centerBreached.m_Validation.m_TriangleCount == 1514,
+				"The P1 Playtest Stone breach emits one deterministic canonical surface");
+
+			constexpr std::array<double, 7> FaceCoordinates{
+				3.5, 4.0, 5.25, 8.0, 10.75, 12.0, 12.5,
+			};
+			bool faceMatrixMeshed = true;
+			for (const double z : FaceCoordinates)
+			{
+				for (const double y : FaceCoordinates)
+				{
+					ChunkMeshRecord breached{};
+					ChunkMeshRecord repeated{};
+					faceMatrixMeshed = faceMatrixMeshed &&
+						meshBreach({ 5.0, y, z }, breached, repeated);
+				}
+			}
+			context.Check(faceMatrixMeshed,
+				"P1 radius-four breaches mesh deterministically across the playable Stone face");
 		}
 
 		void RunDamageMarkerSnapshotTests(SelfTestContext& context) noexcept
@@ -816,6 +889,7 @@ namespace gglab
 		RunStoneMutationGoldenTests(context);
 		RunStoneFullDomainOracleTests(context);
 		RunDestructionRestoreQuiescenceTests(context);
+		RunPlaytestBreachMeshingRegressionTests(context);
 		RunDamageMarkerSnapshotTests(context);
 	}
 }

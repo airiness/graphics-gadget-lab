@@ -7,10 +7,12 @@
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace napa::voxel
@@ -21,6 +23,39 @@ namespace napa::voxel
 		{
 			QuantizedMeshPosition m_Position{};
 			QuantizedMeshNormal m_Normal{};
+		};
+
+		struct CanonicalTriangleKey
+		{
+			std::array<QuantizedMeshPosition, 3> m_Positions{};
+		};
+
+		struct QuantizedMeshPositionZYXLess
+		{
+			[[nodiscard]] bool operator()(QuantizedMeshPosition lhs,
+				QuantizedMeshPosition rhs) const noexcept
+			{
+				if (lhs.m_Z != rhs.m_Z)
+				{
+					return lhs.m_Z < rhs.m_Z;
+				}
+				if (lhs.m_Y != rhs.m_Y)
+				{
+					return lhs.m_Y < rhs.m_Y;
+				}
+				return lhs.m_X < rhs.m_X;
+			}
+		};
+
+		struct CanonicalTriangleKeyLess
+		{
+			[[nodiscard]] bool operator()(const CanonicalTriangleKey& lhs,
+				const CanonicalTriangleKey& rhs) const noexcept
+			{
+				return std::lexicographical_compare(lhs.m_Positions.begin(), lhs.m_Positions.end(),
+					rhs.m_Positions.begin(), rhs.m_Positions.end(),
+					QuantizedMeshPositionZYXLess{});
+			}
 		};
 
 		[[nodiscard]] bool IsFinite(Float3 value) noexcept
@@ -131,6 +166,24 @@ namespace napa::voxel
 				crossY * static_cast<double>(outwardDirection.m_Y) +
 				crossZ * static_cast<double>(outwardDirection.m_Z) >
 				0.0;
+		}
+
+		[[nodiscard]] bool HasOutwardFacingNormal(
+			Float3 a, Float3 b, Float3 c, Float3 normal) noexcept
+		{
+			const double abX = static_cast<double>(b.m_X) - static_cast<double>(a.m_X);
+			const double abY = static_cast<double>(b.m_Y) - static_cast<double>(a.m_Y);
+			const double abZ = static_cast<double>(b.m_Z) - static_cast<double>(a.m_Z);
+			const double acX = static_cast<double>(c.m_X) - static_cast<double>(a.m_X);
+			const double acY = static_cast<double>(c.m_Y) - static_cast<double>(a.m_Y);
+			const double acZ = static_cast<double>(c.m_Z) - static_cast<double>(a.m_Z);
+
+			const double crossX = abY * acZ - abZ * acY;
+			const double crossY = abZ * acX - abX * acZ;
+			const double crossZ = abX * acY - abY * acX;
+			return crossX * static_cast<double>(normal.m_X) +
+				crossY * static_cast<double>(normal.m_Y) +
+				crossZ * static_cast<double>(normal.m_Z) > 0.0;
 		}
 
 		void WriteQuantizedPosition(
@@ -428,6 +481,7 @@ namespace napa::voxel
 		std::uint64_t totalIndexCount = 0;
 		std::uint64_t triangleCount = 0;
 		std::size_t windingEvidenceIndex = 0;
+		std::set<CanonicalTriangleKey, CanonicalTriangleKeyLess> canonicalTriangles;
 		std::uint8_t previousMaterial = 0;
 		bool hasPreviousMaterial = false;
 		for (const MeshSection& section : mesh.m_Sections)
@@ -485,6 +539,15 @@ namespace napa::voxel
 				{
 					return { ValidationError::DegenerateMeshTriangle };
 				}
+				CanonicalTriangleKey triangleKey{
+					.m_Positions = { positionA, positionB, positionC },
+				};
+				std::sort(triangleKey.m_Positions.begin(), triangleKey.m_Positions.end(),
+					QuantizedMeshPositionZYXLess{});
+				if (!canonicalTriangles.insert(triangleKey).second)
+				{
+					return { ValidationError::DuplicateMeshTriangle };
+				}
 
 				const MeshVertex& vertexA = mesh.m_Vertices[indexA];
 				const MeshVertex& vertexB = mesh.m_Vertices[indexB];
@@ -527,6 +590,15 @@ namespace napa::voxel
 					outwardDirection))
 				{
 					return { ValidationError::InvalidMeshWinding };
+				}
+				if (!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,
+						vertexC.m_Position, vertexA.m_Normal) ||
+					!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,
+						vertexC.m_Position, vertexB.m_Normal) ||
+					!HasOutwardFacingNormal(vertexA.m_Position, vertexB.m_Position,
+						vertexC.m_Position, vertexC.m_Normal))
+				{
+					return { ValidationError::InvalidMeshNormal };
 				}
 			}
 		}
