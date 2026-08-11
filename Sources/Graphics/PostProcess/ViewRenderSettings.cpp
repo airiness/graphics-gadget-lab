@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Pipeline/GTAO.h"
+
+#include <algorithm>
 
 namespace gglab
 {

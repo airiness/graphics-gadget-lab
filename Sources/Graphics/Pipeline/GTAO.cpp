@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Pipeline/GTAO.h"
+
+#include <array>
+#include <cmath>
+#include <cstdint>
 
 namespace gglab
 {

@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+#include "Core/CoreMacros.h"
 
 #include <array>
+#include <cstddef>
 
 namespace gglab
 {

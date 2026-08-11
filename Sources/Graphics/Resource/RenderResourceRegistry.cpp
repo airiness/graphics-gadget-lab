@@ -1,11 +1,18 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Utility/TextureUtils.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <format>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace gglab
 {

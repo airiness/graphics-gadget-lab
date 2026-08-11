@@ -1,5 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <span>
+#include <vector>
 
 namespace gglab
 {

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Utility/CubemapUtils.h"
 
 namespace gglab

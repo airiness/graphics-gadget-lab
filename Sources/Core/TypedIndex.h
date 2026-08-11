@@ -1,8 +1,10 @@
 #pragma once
-#include <cstdint>
-#include <limits>
-#include <functional>
+#include "Core/CoreMacros.h"
+
 #include <compare>
+#include <cstdint>
+#include <functional>
+#include <limits>
 #include <type_traits>
 
 namespace gglab

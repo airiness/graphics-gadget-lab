@@ -1,6 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Buffer/DynamicBufferAllocator.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
+#include <string_view>
 
 namespace gglab
 {

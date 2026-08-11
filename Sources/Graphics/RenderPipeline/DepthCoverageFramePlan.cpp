@@ -1,5 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+
+#include <format>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace gglab
 {

@@ -1,7 +1,18 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
-
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <array>
+#include <atomic>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace gglab
 {
