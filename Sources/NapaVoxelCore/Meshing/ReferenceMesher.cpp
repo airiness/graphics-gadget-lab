@@ -195,16 +195,16 @@ namespace napa::voxel
 			};
 		}
 
-		[[nodiscard]] ValidationResult ComputeOutwardNormal(
-			DensityGradient gradient, Float3& normal) noexcept
+		[[nodiscard]] ValidationResult NormalizeOutwardDirection(
+			DensityGradient direction, Float3& normal) noexcept
 		{
-			if (!IsFinite(gradient))
+			if (!IsFinite(direction))
 			{
 				return { ValidationError::NonFiniteDensityGradient };
 			}
 
-			const double lengthSquared = gradient.m_X * gradient.m_X + gradient.m_Y * gradient.m_Y +
-				gradient.m_Z * gradient.m_Z;
+			const double lengthSquared = direction.m_X * direction.m_X +
+				direction.m_Y * direction.m_Y + direction.m_Z * direction.m_Z;
 			if (!std::isfinite(lengthSquared))
 			{
 				return { ValidationError::NonFiniteDensityGradient };
@@ -216,9 +216,9 @@ namespace napa::voxel
 
 			const double inverseLength = 1.0 / std::sqrt(lengthSquared);
 			const Float3 prepared{
-				static_cast<float>(-gradient.m_X * inverseLength),
-				static_cast<float>(-gradient.m_Y * inverseLength),
-				static_cast<float>(-gradient.m_Z * inverseLength),
+				static_cast<float>(direction.m_X * inverseLength),
+				static_cast<float>(direction.m_Y * inverseLength),
+				static_cast<float>(direction.m_Z * inverseLength),
 			};
 			if (!IsFinite(prepared))
 			{
@@ -227,6 +227,40 @@ namespace napa::voxel
 
 			normal = prepared;
 			return {};
+		}
+
+		[[nodiscard]] ValidationResult ComputeOutwardNormal(
+			DensityGradient gradient, Float3& normal) noexcept
+		{
+			return NormalizeOutwardDirection({
+				-gradient.m_X,
+				-gradient.m_Y,
+				-gradient.m_Z,
+			}, normal);
+		}
+
+		[[nodiscard]] ValidationResult ComputeReferenceEdgeOutwardNormal(
+			const ReferenceEdgeEndpoint& first, const ReferenceEdgeEndpoint& second,
+			DensityGradient gradient, Float3& normal) noexcept
+		{
+			const ValidationResult gradientResult = ComputeOutwardNormal(gradient, normal);
+			if (gradientResult.m_Error != ValidationError::DegenerateDensityGradient)
+			{
+				return gradientResult;
+			}
+
+			// Discontinuous edits can cancel interpolated central differences exactly.
+			// The crossing classification still supplies one canonical, nonzero outward
+			// direction that is identical for triangle and Chunk-boundary consumers.
+			const ReferenceEdgeEndpoint& solid =
+				first.m_Sample.m_Density >= IsoValue ? first : second;
+			const ReferenceEdgeEndpoint& empty =
+				first.m_Sample.m_Density >= IsoValue ? second : first;
+			return NormalizeOutwardDirection({
+				static_cast<double>(empty.m_Coordinate.m_X) - solid.m_Coordinate.m_X,
+				static_cast<double>(empty.m_Coordinate.m_Y) - solid.m_Coordinate.m_Y,
+				static_cast<double>(empty.m_Coordinate.m_Z) - solid.m_Coordinate.m_Z,
+			}, normal);
 		}
 
 		[[nodiscard]] ValidationResult InterpolatePreparedEdgeCandidate(
@@ -281,9 +315,17 @@ namespace napa::voxel
 					ValidationError::NonFiniteDensityGradient,
 				};
 			}
+			Float3 normal{};
+			const ValidationResult normalResult = ComputeReferenceEdgeOutwardNormal(
+				first, second, densityGradient, normal);
+			if (normalResult.Failed())
+			{
+				return normalResult;
+			}
 
 			vertex = {
 				.m_Position = position,
+				.m_Normal = normal,
 				.m_DensityGradient = densityGradient,
 				.m_EndpointA = first.m_Coordinate,
 				.m_EndpointB = second.m_Coordinate,
@@ -380,14 +422,8 @@ namespace napa::voxel
 		}
 
 		[[nodiscard]] ValidationResult QuantizeBoundaryNormal(
-			DensityGradient gradient, QuantizedMeshNormal& normal) noexcept
+			Float3 outwardNormal, QuantizedMeshNormal& normal) noexcept
 		{
-			Float3 outwardNormal{};
-			const ValidationResult normalResult = ComputeOutwardNormal(gradient, outwardNormal);
-			if (normalResult.Failed())
-			{
-				return normalResult;
-			}
 			return QuantizeMeshNormal(outwardNormal, normal);
 		}
 
@@ -467,7 +503,7 @@ namespace napa::voxel
 			for (std::size_t index = 0; index < normals.size(); ++index)
 			{
 				const ValidationResult normalResult = QuantizeBoundaryNormal(
-					crossingVertices[index].m_DensityGradient, normals[index]);
+					crossingVertices[index].m_Normal, normals[index]);
 				if (normalResult.Failed())
 				{
 					return normalResult;
@@ -1325,13 +1361,6 @@ namespace napa::voxel
 			return interpolationResult;
 		}
 
-		Float3 normal{};
-		const ValidationResult normalResult =
-			ComputeOutwardNormal(prepared.m_DensityGradient, normal);
-		if (normalResult.Failed())
-		{
-			return normalResult;
-		}
 		QuantizedMeshPosition quantizedPosition{};
 		const ValidationResult quantizationResult =
 			QuantizeMeshPosition(prepared.m_Position, quantizationContext, quantizedPosition);
@@ -1345,7 +1374,6 @@ namespace napa::voxel
 				ValidationError::MeshGeometryOutsideTargetCellDomain,
 			};
 		}
-		prepared.m_Normal = normal;
 		vertex = prepared;
 		return {};
 	}
@@ -1536,16 +1564,6 @@ namespace napa::voxel
 			if (areaResult.Failed())
 			{
 				return areaResult;
-			}
-
-			for (ReferenceEdgeVertex& vertex : candidate.m_Vertices)
-			{
-				const ValidationResult normalResult =
-					ComputeOutwardNormal(vertex.m_DensityGradient, vertex.m_Normal);
-				if (normalResult.Failed())
-				{
-					return normalResult;
-				}
 			}
 
 			const ValidationResult windingResult =
