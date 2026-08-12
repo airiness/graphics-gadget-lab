@@ -459,6 +459,7 @@
     <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSurface.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -626,6 +627,7 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSurface.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -708,6 +710,7 @@
     <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.h" />
     <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />

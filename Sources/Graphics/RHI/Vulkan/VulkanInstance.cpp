@@ -109,14 +109,14 @@ namespace gglab
 		constexpr std::string_view DebugUtilsExtensionName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 		constexpr std::string_view ValidationLayerName = "VK_LAYER_KHRONOS_validation";
 
-		std::vector<const char*> enabledExtensions;
-		enabledExtensions.reserve(createInfo.m_RequiredInstanceExtensions.size() + 1);
+		std::vector<std::string> requiredExtensionStorage;
+		requiredExtensionStorage.reserve(createInfo.m_RequiredInstanceExtensions.size());
 		std::vector<std::string_view> missingRequiredExtensions;
 		for (const std::string_view required : createInfo.m_RequiredInstanceExtensions)
 		{
 			if (ContainsExtension(extensions, required))
 			{
-				enabledExtensions.push_back(required.data());
+				requiredExtensionStorage.emplace_back(required);
 			}
 			else
 			{
@@ -151,6 +151,12 @@ namespace gglab
 				hasDebugUtils, hasValidationLayer);
 		}
 
+		std::vector<const char*> enabledExtensions;
+		enabledExtensions.reserve(requiredExtensionStorage.size() + 1);
+		for (const std::string& required : requiredExtensionStorage)
+		{
+			enabledExtensions.push_back(required.c_str());
+		}
 		std::vector<const char*> enabledLayers;
 		if (hasDebugUtils)
 		{

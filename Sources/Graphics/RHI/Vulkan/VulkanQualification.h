@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 
+#include <filesystem>
 #include <optional>
 #include <string>
 
@@ -13,6 +14,8 @@ namespace gglab
 		bool m_RequestValidation = false;
 		bool m_ListAdapters = false;
 		std::optional<std::string> m_AdapterSelector;
+		std::filesystem::path m_ShaderSourceRoot;
+		std::filesystem::path m_ShaderCacheRoot;
 	};
 
 	// Runs the deterministic Vulkan bootstrap, adapter inspection and

@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <shared_mutex>
 #include <string>
@@ -48,7 +49,8 @@ namespace gglab
 	class ShaderManager
 	{
 	public:
-		explicit ShaderManager(RHIBackendType activeBackend) noexcept;
+		ShaderManager(RHIBackendType activeBackend, std::filesystem::path shaderSourceRoot,
+			std::filesystem::path shaderCacheRoot) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager();
 

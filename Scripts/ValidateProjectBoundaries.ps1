@@ -78,9 +78,10 @@ $knownViolations = @(
 )
 
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
-$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|bcrypt\.h'
-$platformLeafIncludeRegex = '#include\s*"Core/Platform/Win/'
+$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|GetExeOutDir|bcrypt\.h'
+$platformLeafIncludeRegex = '#include\s*"(Core/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h)'
 $platformNamespaceRegex = '\bwin32::'
+$platformTypeRegex = '\bVulkanWin32Surface(Factory)?\b'
 
 function Test-IsExempt {
     param([string]$RelativePath)
@@ -167,7 +168,8 @@ foreach ($file in $files) {
     if (-not (Test-IsExempt $file.Path)) {
         $platformLeaked = $content -match $platformLeakRegex -or
             $content -match $platformLeafIncludeRegex -or
-            $content -match $platformNamespaceRegex
+            $content -match $platformNamespaceRegex -or
+            $content -match $platformTypeRegex
         if ($platformLeaked) {
             $platformFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "platform" })
         }

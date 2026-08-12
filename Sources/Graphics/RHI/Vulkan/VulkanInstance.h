@@ -21,8 +21,9 @@ namespace gglab
 			// Enables the Khronos validation layer and debug messenger when
 			// VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils are available.
 			bool m_RequestValidation = false;
-			// Instance extensions the caller's platform/surface requires;
-			// every listed name must be available or creation fails.
+			// Instance extensions the caller's platform/surface requires. Views need only
+			// remain valid for Create(); names are copied into null-terminated storage.
+			// Every listed name must be available or creation fails.
 			std::span<const std::string_view> m_RequiredInstanceExtensions{};
 		};
 

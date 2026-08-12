@@ -11,8 +11,6 @@
 
 namespace gglab
 {
-	class VulkanWin32Surface;
-
 	// Stable physical device identity. Device and driver UUIDs are the
 	// persistent identifiers used by the adapter selector.
 	struct VulkanAdapterIdentity

@@ -1,4 +1,4 @@
-#include "Core/Utility/StringUtils.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 
 #include <Windows.h>
 

@@ -56,6 +56,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			std::filesystem::path m_CacheDirectory;
+			std::filesystem::path m_ShaderSourceRoot;
 			IBLStageArtifactCacheConfig m_ArtifactCache{};
 			IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 			std::string m_AdapterScopeIdentity;
@@ -89,6 +90,7 @@ namespace gglab
 
 		IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 		std::string m_AdapterScopeIdentity;
+		std::filesystem::path m_ShaderSourceRoot;
 		mutable std::mutex m_ArtifactMutex;
 		IBLStageArtifactCache m_ArtifactCache;
 		LocalDerivedDataStore m_Store;

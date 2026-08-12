@@ -1,6 +1,7 @@
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/ApplicationLaunchOptions.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
@@ -20,6 +21,7 @@
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #endif
@@ -789,8 +791,10 @@ namespace gglab
 			}
 
 			ScopedTestDirectory scopedDirectory(tempRoot);
-			ShaderCompiler compiler;
-			compiler.SetCacheRootDirectory(scopedDirectory.GetPath());
+			const std::filesystem::path shaderSourceRoot =
+				ResolveShaderSourceRoot(utils::GetExeOutDir());
+			const std::filesystem::path shaderCacheRoot = scopedDirectory.GetPath();
+			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const SpirVValidatorInfo validator = FindSpirVValidator();
 			context.Check(validator.MatchesValidationBaseline(),
 				"Vulkan SDK and SPIR-V Tools match the configured validation baseline");
@@ -849,10 +853,12 @@ namespace gglab
 				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
 			};
-			ShaderManager dxilManager(RHIBackendType::DX12);
+			ShaderManager dxilManager(
+				RHIBackendType::DX12, shaderSourceRoot, shaderCacheRoot);
 			const ShaderID dxilManagerShader = dxilManager.LoadShader(managerDesc);
 			managerDesc.m_Target = {};
-			ShaderManager spirVManager(RHIBackendType::Vulkan);
+			ShaderManager spirVManager(
+				RHIBackendType::Vulkan, shaderSourceRoot, shaderCacheRoot);
 			const ShaderID spirVManagerShader = spirVManager.LoadShader(managerDesc);
 			context.Check(dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
 				spirVManager.GetActiveBackend() == RHIBackendType::Vulkan &&

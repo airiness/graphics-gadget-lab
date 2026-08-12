@@ -13,9 +13,9 @@
 #include "Application/LoadingProgress.h"
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
-#include "Core/Utility/PathUtils.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
@@ -27,6 +27,7 @@
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
@@ -38,6 +39,7 @@
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 
+#include <filesystem>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -190,7 +192,11 @@ namespace gglab
 		}
 
 		// ShaderManager
-		m_ShaderManager = std::make_unique<ShaderManager>(activeBackend);
+		const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+		const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
+		const std::filesystem::path shaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot);
+		m_ShaderManager = std::make_unique<ShaderManager>(
+			activeBackend, shaderSourceRoot, shaderCacheRoot);
 		InitializeAssets();
 
 		// Renderer
@@ -199,6 +205,9 @@ namespace gglab
 		rendererCreateInfo.m_Backend = activeBackend;
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
+		rendererCreateInfo.m_IblDerivedDataCacheDirectory =
+			runtimeRoot / "DerivedDataCache" / "IBL";
+		rendererCreateInfo.m_ShaderSourceRoot = shaderSourceRoot;
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
@@ -216,7 +225,7 @@ namespace gglab
 		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
-			utils::GetExeOutDir() / "DerivedDataCache" / "Texture";
+			runtimeRoot / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
 		m_EnvironmentAssetController =

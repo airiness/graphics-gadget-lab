@@ -192,7 +192,7 @@ namespace gglab
 		{
 			std::unique_ptr<VulkanInstance> m_Instance;
 			std::unique_ptr<VulkanDevice> m_Device;
-			std::unique_ptr<VulkanWin32Surface> m_Surface;
+			std::unique_ptr<VulkanSurface> m_Surface;
 			VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		};
 
@@ -206,6 +206,11 @@ namespace gglab
 		{
 			outReport = {};
 			outObjects = {};
+			if (options.m_SurfaceFactory == nullptr)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan bootstrap requires a surface factory.");
+				return 1;
+			}
 
 			if (sizeof(void*) != 8)
 			{
@@ -216,7 +221,7 @@ namespace gglab
 			VulkanInstance::CreateInfo instanceCreateInfo{};
 			instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
 			instanceCreateInfo.m_RequiredInstanceExtensions =
-				VulkanWin32Surface::RequiredInstanceExtensionNames();
+				options.m_SurfaceFactory->RequiredInstanceExtensionNames();
 			VulkanInstance::Result instanceResult = VulkanInstance::Create(instanceCreateInfo);
 			if (!instanceResult.Succeeded())
 			{
@@ -230,17 +235,16 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format("Vulkan instance created (validation={}).",
 				outReport.m_HasDebugMessenger ? "enabled" : "disabled"));
 
-			VulkanWin32Surface::Result surfaceResult =
-				VulkanWin32Surface::Create(instance->Get(), options.m_NativeInstanceHandle,
-					options.m_NativeWindowHandle);
+			VulkanSurfaceFactoryBase::Result surfaceResult =
+				options.m_SurfaceFactory->Create(instance->Get());
 			if (!surfaceResult.Succeeded())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					std::format("Vulkan surface creation failed: {}", surfaceResult.m_Error));
 				return 1;
 			}
-			std::unique_ptr<VulkanWin32Surface> surface = std::move(surfaceResult.m_Surface);
-			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan Win32 surface created.");
+			std::unique_ptr<VulkanSurface> surface = std::move(surfaceResult.m_Surface);
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan surface created.");
 
 			uint32_t physicalDeviceCount = 0;
 			VkResult enumerateResult =
@@ -537,7 +541,7 @@ namespace gglab
 
 		VulkanFrameRuntimeCreateInfo frameInfo{};
 		frameInfo.m_Instance = objects.m_Instance.get();
-		frameInfo.m_Surface = objects.m_Surface.get();
+		frameInfo.m_Surface = objects.m_Surface->Get();
 		frameInfo.m_PhysicalDevice = objects.m_PhysicalDevice;
 		frameInfo.m_Device = objects.m_Device.get();
 		frameInfo.m_Snapshot = &result.m_SelectedSnapshot;

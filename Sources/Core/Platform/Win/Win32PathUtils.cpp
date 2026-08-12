@@ -1,4 +1,4 @@
-#include "Core/Utility/PathUtils.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 
 #include <Windows.h>
 

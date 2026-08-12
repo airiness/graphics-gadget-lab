@@ -1,6 +1,5 @@
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/IBLStageArtifactCodec.h"
-#include "Graphics/Shader/ShaderPaths.h"
 
 #include <array>
 #include <bit>
@@ -126,6 +125,7 @@ namespace gglab
 	IBLDerivedDataSystem::IBLDerivedDataSystem(const CreateInfo& createInfo) noexcept :
 		m_Compatibility(createInfo.m_Compatibility),
 		m_AdapterScopeIdentity(createInfo.m_AdapterScopeIdentity),
+		m_ShaderSourceRoot(createInfo.m_ShaderSourceRoot),
 		m_ArtifactCache(createInfo.m_ArtifactCache), m_Store(createInfo.m_CacheDirectory)
 	{
 	}
@@ -321,7 +321,7 @@ namespace gglab
 		}
 		Sha256Builder builder;
 		bool succeeded = builder.IsValid();
-		const std::filesystem::path shaderRoot = GetShaderSourceRoot();
+		const std::filesystem::path& shaderRoot = m_ShaderSourceRoot;
 		std::set<std::filesystem::path> visited;
 		for (std::string_view shaderPath : BakeShaderPaths[static_cast<size_t>(stage)])
 		{

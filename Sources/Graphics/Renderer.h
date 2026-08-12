@@ -12,6 +12,7 @@
 #include "Graphics/RenderScene.h"
 
 #include <array>
+#include <filesystem>
 
 namespace gglab
 {
@@ -77,6 +78,8 @@ namespace gglab
 			RHIBackendType m_Backend = RHIBackendType::Unknown;
 			ShaderManager* m_ShaderManager = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
+			std::filesystem::path m_IblDerivedDataCacheDirectory;
+			std::filesystem::path m_ShaderSourceRoot;
 			void* m_NativeWindowHandle = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;

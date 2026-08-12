@@ -6,7 +6,6 @@
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
-#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 
 #include <vulkan/vulkan.h>
 
@@ -179,7 +178,7 @@ namespace gglab
 		// All borrowed: the caller owns the bootstrap-created objects and
 		// destroys them after the frame runtime.
 		VulkanInstance* m_Instance = nullptr;
-		VulkanWin32Surface* m_Surface = nullptr;
+		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		VulkanDevice* m_Device = nullptr;
 		const VulkanAdapterCapabilitySnapshot* m_Snapshot = nullptr;

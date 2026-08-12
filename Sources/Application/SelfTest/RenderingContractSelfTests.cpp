@@ -1,5 +1,6 @@
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
@@ -25,8 +26,10 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferBatch.h"
 
+#include <filesystem>
 #include <type_traits>
 
 namespace gglab
@@ -1258,7 +1261,9 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
-			ShaderCompiler compiler;
+			const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+			ShaderCompiler compiler(
+				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,

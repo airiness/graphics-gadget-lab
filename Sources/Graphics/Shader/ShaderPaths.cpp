@@ -3,8 +3,15 @@
 
 namespace gglab
 {
-	std::filesystem::path GetShaderSourceRoot() noexcept
+	std::filesystem::path ResolveShaderSourceRoot(
+		const std::filesystem::path& runtimeRoot) noexcept
 	{
-		return utils::Canonical(utils::GetExeOutDir() / ShaderSourceRelativeDirectory);
+		return utils::Canonical(runtimeRoot / ShaderSourceRelativeDirectory);
+	}
+
+	std::filesystem::path ResolveShaderCacheRoot(
+		const std::filesystem::path& runtimeRoot) noexcept
+	{
+		return utils::Canonical(runtimeRoot / ShaderCacheRelativeDirectory);
 	}
 }

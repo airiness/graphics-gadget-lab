@@ -1,7 +1,6 @@
 #include "Graphics/Renderer.h"
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -100,7 +99,8 @@ namespace gglab
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
 		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
 		iblBakeSchedulerCreateInfo.m_DerivedDataCacheDirectory =
-			utils::GetExeOutDir() / "DerivedDataCache" / "IBL";
+			createInfo.m_IblDerivedDataCacheDirectory;
+		iblBakeSchedulerCreateInfo.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot;
 		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();

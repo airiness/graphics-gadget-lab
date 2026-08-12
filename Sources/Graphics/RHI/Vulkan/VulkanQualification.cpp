@@ -13,6 +13,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
+#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #endif
 
@@ -57,11 +58,11 @@ namespace gglab
 		}
 
 		[[nodiscard]] VulkanBootstrapOptions MakeVulkanBootstrapOptions(
-			const VulkanQualificationOptions& options) noexcept
+			const VulkanQualificationOptions& options,
+			const VulkanSurfaceFactoryBase& surfaceFactory) noexcept
 		{
 			VulkanBootstrapOptions bootstrapOptions{};
-			bootstrapOptions.m_NativeInstanceHandle = options.m_HInstance;
-			bootstrapOptions.m_NativeWindowHandle = options.m_Hwnd;
+			bootstrapOptions.m_SurfaceFactory = &surfaceFactory;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
 				MakeVulkanSelectionRequest(options.m_AdapterSelector);
@@ -1314,7 +1315,9 @@ namespace gglab
 		}
 
 		[[nodiscard]] int RunVulkanDescriptorPipelineQualification(
-			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+			VulkanDevice& device, VulkanFrameRuntime& runtime,
+			const std::filesystem::path& shaderSourceRoot,
+			const std::filesystem::path& shaderCacheRoot) noexcept
 		{
 			VulkanDescriptorManager& descriptors = device.GetDescriptorManager();
 			if (!descriptors.IsLayoutSupported() ||
@@ -1518,7 +1521,7 @@ namespace gglab
 				return 1;
 			}
 
-			ShaderCompiler compiler;
+			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			ShaderDesc shaderDesc{
 				.m_SourcePath = L"Passes/PassFinalColor.hlsl",
 				.m_Stage = ShaderStage::Vertex,
@@ -1561,7 +1564,9 @@ namespace gglab
 		}
 
 		[[nodiscard]] int RunVulkanGraphicsQualification(
-			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+			VulkanDevice& device, VulkanFrameRuntime& runtime,
+			const std::filesystem::path& shaderSourceRoot,
+			const std::filesystem::path& shaderCacheRoot) noexcept
 		{
 			constexpr uint32_t targetWidth = 64;
 			constexpr uint32_t targetHeight = 64;
@@ -1636,7 +1641,7 @@ namespace gglab
 				return 1;
 			}
 
-			ShaderCompiler compiler;
+			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const auto compileShader = [&compiler](ShaderStage stage, const wchar_t* entry)
 				{
 					ShaderDesc desc{
@@ -2405,7 +2410,9 @@ namespace gglab
 		// switching. Every step keeps the partial application command buffer
 		// unsubmitted; AbortFrame uses the dedicated minimal command buffer.
 		[[nodiscard]] int RunVulkanQualificationFrames(
-			VulkanFrameRuntime& runtime, HWND hwnd) noexcept
+			VulkanFrameRuntime& runtime, HWND hwnd,
+			const std::filesystem::path& shaderSourceRoot,
+			const std::filesystem::path& shaderCacheRoot) noexcept
 		{
 			QualificationFrameStats stats;
 			uint32_t step = 0;
@@ -2559,7 +2566,8 @@ namespace gglab
 					"entered the fatal state.");
 				return 1;
 			}
-			if (RunVulkanDescriptorPipelineQualification(*runtime.GetDevice(), runtime) != 0)
+			if (RunVulkanDescriptorPipelineQualification(*runtime.GetDevice(), runtime,
+				shaderSourceRoot, shaderCacheRoot) != 0)
 			{
 				return 1;
 			}
@@ -2583,7 +2591,8 @@ namespace gglab
 			{
 				return 1;
 			}
-			if (RunVulkanGraphicsQualification(*runtime.GetDevice(), runtime) != 0)
+			if (RunVulkanGraphicsQualification(*runtime.GetDevice(), runtime,
+				shaderSourceRoot, shaderCacheRoot) != 0)
 			{
 				return 1;
 			}
@@ -2611,12 +2620,14 @@ namespace gglab
 	int RunVulkanQualification(const VulkanQualificationOptions& options) noexcept
 	{
 #if GGLAB_ENABLE_VULKAN
+		VulkanWin32SurfaceFactory surfaceFactory(options.m_HInstance, options.m_Hwnd);
 		if (options.m_ListAdapters)
 		{
 			// Inspection-only: enumerate, evaluate and log every adapter,
 			// then exit without creating a frame runtime.
 			VulkanBootstrapReport report;
-			return RunVulkanBootstrap(MakeVulkanBootstrapOptions(options), report);
+			return RunVulkanBootstrap(
+				MakeVulkanBootstrapOptions(options, surfaceFactory), report);
 		}
 
 		RECT clientRect{};
@@ -2629,7 +2640,7 @@ namespace gglab
 		}
 
 		VulkanBootstrapRuntimeCreateInfo createInfo{};
-		createInfo.m_BootstrapOptions = MakeVulkanBootstrapOptions(options);
+		createInfo.m_BootstrapOptions = MakeVulkanBootstrapOptions(options, surfaceFactory);
 		createInfo.m_FrameSlotCount = 2;
 		createInfo.m_RequestedFormat = RHIFormat::R8G8B8A8Unorm;
 		createInfo.m_Vsync = false;
@@ -2651,8 +2662,8 @@ namespace gglab
 			result.m_SelectedSnapshot.m_Identity.m_DeviceName,
 			result.m_HasDebugMessenger ? "enabled" : "disabled"));
 
-		const int exitCode =
-			RunVulkanQualificationFrames(*result.m_FrameRuntime, options.m_Hwnd);
+		const int exitCode = RunVulkanQualificationFrames(*result.m_FrameRuntime, options.m_Hwnd,
+			options.m_ShaderSourceRoot, options.m_ShaderCacheRoot);
 		return exitCode;
 #else
 		GGLAB_UNUSED(options);

@@ -74,10 +74,12 @@ namespace gglab
 		}
 	}
 
-	ShaderManager::ShaderManager(RHIBackendType activeBackend) noexcept :
+	ShaderManager::ShaderManager(RHIBackendType activeBackend,
+		std::filesystem::path shaderSourceRoot, std::filesystem::path shaderCacheRoot) noexcept :
 		m_ActiveBackend(activeBackend)
 	{
-		m_Compiler = std::make_unique<ShaderCompiler>();
+		m_Compiler = std::make_unique<ShaderCompiler>(
+			std::move(shaderSourceRoot), std::move(shaderCacheRoot));
 
 		m_DefaultShaderConfig.m_Target.m_Flags |=
 			IsHostDebuggerAttached() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
@@ -162,6 +164,8 @@ namespace gglab
 
 		ShaderDesc defaultConfig;
 		RHIBackendType activeBackend = RHIBackendType::Unknown;
+		const std::filesystem::path shaderSourceRoot = m_Compiler->GetSourceRootDirectory();
+		const std::filesystem::path shaderCacheRoot = m_Compiler->GetCacheRootDirectory();
 		{
 			std::shared_lock lock(m_Mutex);
 			defaultConfig = m_DefaultShaderConfig;
@@ -187,9 +191,10 @@ namespace gglab
 				.m_Name = "Shader.Preload",
 				.m_Priority = priority,
 			},
-			[defaultConfig = std::move(defaultConfig), activeBackend, job](std::stop_token stopToken) noexcept
+			[defaultConfig = std::move(defaultConfig), activeBackend, shaderSourceRoot,
+				shaderCacheRoot, job](std::stop_token stopToken) noexcept
 			{
-				ShaderCompiler compiler;
+				ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 				compiler.SetDefaultShaderConfig(defaultConfig);
 				for (uint32_t index = 0; index < job->m_Descs.size(); ++index)
 				{

@@ -5,6 +5,7 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
+#include "Graphics/RHI/Vulkan/VulkanSurface.h"
 
 #include <vulkan/vulkan.h>
 
@@ -16,8 +17,6 @@
 
 namespace gglab
 {
-	class VulkanWin32Surface;
-
 	enum class VulkanAdapterSelectionKind : uint8_t
 	{
 		Default,
@@ -62,10 +61,9 @@ namespace gglab
 
 	struct VulkanBootstrapOptions
 	{
-		// Opaque native handles; the Windows host passes the process instance
-		// and the window handle values.
-		void* m_NativeInstanceHandle = nullptr;
-		void* m_NativeWindowHandle = nullptr;
+		// Borrowed for the duration of RunVulkanBootstrap or
+		// CreateVulkanBootstrapRuntime.
+		const VulkanSurfaceFactoryBase* m_SurfaceFactory = nullptr;
 		bool m_RequestValidation = false;
 		VulkanAdapterSelectionRequest m_SelectionRequest{};
 	};
@@ -79,7 +77,7 @@ namespace gglab
 		bool m_HasDebugMessenger = false;
 	};
 
-	// Creates the instance, optional debug messenger, Win32 surface, queries
+	// Creates the instance, optional debug messenger and host surface, queries
 	// every physical device, evaluates the frozen profile, selects an adapter
 	// and creates its logical device, then reports and cleans up. Returns a
 	// process exit code: 0 on success, non-zero on any explicit failure.
@@ -96,7 +94,7 @@ namespace gglab
 		VulkanAdapterCapabilitySnapshot m_SelectedSnapshot;
 		std::unique_ptr<VulkanInstance> m_Instance;
 		std::unique_ptr<VulkanDevice> m_Device;
-		std::unique_ptr<VulkanWin32Surface> m_Surface;
+		std::unique_ptr<VulkanSurface> m_Surface;
 		std::unique_ptr<VulkanFrameRuntime> m_FrameRuntime;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		bool m_HasDebugMessenger = false;
