@@ -215,6 +215,8 @@ namespace gglab
 
 			VulkanInstance::CreateInfo instanceCreateInfo{};
 			instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
+			instanceCreateInfo.m_RequiredInstanceExtensions =
+				VulkanWin32Surface::RequiredInstanceExtensionNames();
 			VulkanInstance::Result instanceResult = VulkanInstance::Create(instanceCreateInfo);
 			if (!instanceResult.Succeeded())
 			{

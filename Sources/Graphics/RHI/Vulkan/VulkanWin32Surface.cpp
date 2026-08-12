@@ -1,10 +1,27 @@
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
+#include <windows.h>
+
+#include <vulkan/vulkan_win32.h>
+
 #include <format>
 
 namespace gglab
 {
+	namespace
+	{
+		constexpr std::string_view RequiredInstanceExtensions[] = {
+			VK_KHR_SURFACE_EXTENSION_NAME,
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+		};
+	}
+
+	std::span<const std::string_view> VulkanWin32Surface::RequiredInstanceExtensionNames() noexcept
+	{
+		return RequiredInstanceExtensions;
+	}
+
 	VulkanWin32Surface::~VulkanWin32Surface()
 	{
 		Destroy();

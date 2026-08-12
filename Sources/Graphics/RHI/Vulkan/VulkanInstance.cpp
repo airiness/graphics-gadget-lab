@@ -106,21 +106,37 @@ namespace gglab
 			}
 		}
 
-		// VK_KHR_win32_surface; kept as a literal so the portable instance
-		// contract does not depend on the Win32 surface header.
-		constexpr std::string_view Win32SurfaceExtensionName = "VK_KHR_win32_surface";
-		constexpr std::string_view SurfaceExtensionName = VK_KHR_SURFACE_EXTENSION_NAME;
 		constexpr std::string_view DebugUtilsExtensionName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 		constexpr std::string_view ValidationLayerName = "VK_LAYER_KHRONOS_validation";
 
-		const bool hasWin32Surface = ContainsExtension(extensions, Win32SurfaceExtensionName);
-		const bool hasSurface = ContainsExtension(extensions, SurfaceExtensionName);
-		if (!hasWin32Surface || !hasSurface)
+		std::vector<const char*> enabledExtensions;
+		enabledExtensions.reserve(createInfo.m_RequiredInstanceExtensions.size() + 1);
+		std::vector<std::string_view> missingRequiredExtensions;
+		for (const std::string_view required : createInfo.m_RequiredInstanceExtensions)
+		{
+			if (ContainsExtension(extensions, required))
+			{
+				enabledExtensions.push_back(required.data());
+			}
+			else
+			{
+				missingRequiredExtensions.push_back(required);
+			}
+		}
+		if (!missingRequiredExtensions.empty())
 		{
 			result.m_Result = VK_ERROR_EXTENSION_NOT_PRESENT;
-			result.m_Error = std::format(
-				"Required Vulkan instance extensions are unavailable: {} {}.",
-				Win32SurfaceExtensionName, SurfaceExtensionName);
+			std::string missing;
+			for (const std::string_view name : missingRequiredExtensions)
+			{
+				if (!missing.empty())
+				{
+					missing += " ";
+				}
+				missing += name;
+			}
+			result.m_Error =
+				std::format("Required Vulkan instance extensions are unavailable: {}.", missing);
 			return result;
 		}
 
@@ -136,10 +152,6 @@ namespace gglab
 		}
 
 		std::vector<const char*> enabledLayers;
-		std::vector<const char*> enabledExtensions{
-			SurfaceExtensionName.data(),
-			Win32SurfaceExtensionName.data(),
-		};
 		if (hasDebugUtils)
 		{
 			// Debug utils is enabled unconditionally so GGLab debug names

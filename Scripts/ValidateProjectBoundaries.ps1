@@ -72,18 +72,21 @@ $knownViolations = @(
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.h";                     Kind = "platform";  Reason = "Windows.h/HWND; same family as VulkanQualification.cpp; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderCompiler.cpp";                            Kind = "platform";  Reason = "HRESULT/DXC COM integration; planned: move to shader toolchain project ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" },
-    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; planned: narrow platform lock leaf" },
+    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; root identity carries Windows named-mutex name semantics; planned: narrow platform lock leaf" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
 )
 
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
-$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64'
+$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|bcrypt\.h'
 $platformLeafIncludeRegex = '#include\s*"Core/Platform/Win/'
 $platformNamespaceRegex = '\bwin32::'
 
-function Test-Allowed {
+function Test-IsExempt {
     param([string]$RelativePath)
 
+    # Application-owned regions and permanent platform leaves are exempt from
+    # scanning. Transitional debt is NOT exempt: it must be scanned, matched
+    # when the violation is still present, and reported stale when resolved.
     foreach ($region in $applicationOwnedRegions) {
         if ($RelativePath.StartsWith($region + "/")) {
             return $true
@@ -99,8 +102,14 @@ function Test-Allowed {
             return $true
         }
     }
+    return $false
+}
+
+function Test-IsTransitionalDebt {
+    param([string]$File)
+
     foreach ($debt in $transitionalDebt) {
-        if ($RelativePath -eq $debt.File) {
+        if ($debt.File -eq $File) {
             return $true
         }
     }
@@ -151,10 +160,10 @@ foreach ($file in $files) {
         }
     }
 
-    # Platform leakage (skip Application-owned regions and allowlisted leaves).
-    # Covers raw Win32 tokens, direct includes of platform leaves, and the
-    # win32 namespace leaking into portable files.
-    if (-not (Test-Allowed $file.Path)) {
+    # Platform leakage (skip exempt regions; transitional debt is scanned and
+    # matched below). Covers raw Win32 tokens, direct includes of platform
+    # leaves, and the win32 namespace leaking into portable files.
+    if (-not (Test-IsExempt $file.Path)) {
         $platformLeaked = $content -match $platformLeakRegex -or
             $content -match $platformLeafIncludeRegex -or
             $content -match $platformNamespaceRegex
@@ -164,12 +173,16 @@ foreach ($file in $files) {
     }
 }
 
-# Classify actual findings against the ledger.
+# Classify actual findings against the ledger and the transitional debt list.
 $unexpected = @()
 $knownFound = @()
+$debtFound = @()
 foreach ($finding in ($ownershipFindings + $platformFindings)) {
     if (Test-IsKnown $finding.File $finding.Kind) {
         $knownFound += $finding
+    }
+    elseif ($finding.Kind -eq "platform" -and (Test-IsTransitionalDebt $finding.File)) {
+        $debtFound += $finding
     }
     else {
         $unexpected += $finding
@@ -177,6 +190,8 @@ foreach ($finding in ($ownershipFindings + $platformFindings)) {
 }
 
 # Stale ledger entries: known entry whose violation is no longer present.
+# Transitional debt participates in the same lifecycle: a debt entry whose
+# violation disappeared (or whose file is gone) is stale and fails.
 $stale = @()
 foreach ($entry in $knownViolations) {
     $matched = $false
@@ -195,6 +210,23 @@ foreach ($entry in $knownViolations) {
         }
     }
 }
+foreach ($debt in $transitionalDebt) {
+    $matched = $false
+    foreach ($finding in $debtFound) {
+        if ($finding.File -eq $debt.File) {
+            $matched = $true
+            break
+        }
+    }
+    if (-not $matched) {
+        $fileExists = Test-Path (Join-Path $sourcesDir $debt.File)
+        $stale += [pscustomobject]@{
+            File   = $debt.File
+            Kind   = "debt"
+            Reason = if ($fileExists) { "transitional debt resolved" } else { "file no longer exists" }
+        }
+    }
+}
 
 # Report.
 Write-Host "=== Runtime Project Boundary Validation ==="
@@ -206,6 +238,16 @@ Write-Host "KNOWN violations (ledger, enumerated): $($knownFound.Count)"
 foreach ($finding in $knownFound) {
     $entry = $knownViolations | Where-Object { $_.File -eq $finding.File -and $_.Kind -eq $finding.Kind } | Select-Object -First 1
     Write-Host ("  [{0}] {1}" -f $finding.Kind, $finding.File)
+    if ($ShowAll -and $entry) {
+        Write-Host ("        -> {0}" -f $entry.Reason)
+    }
+}
+Write-Host ""
+
+Write-Host "TRANSITIONAL DEBT (scanned, matched): $($debtFound.Count)"
+foreach ($finding in $debtFound) {
+    $entry = $transitionalDebt | Where-Object { $_.File -eq $finding.File } | Select-Object -First 1
+    Write-Host ("  [platform] {0}" -f $finding.File)
     if ($ShowAll -and $entry) {
         Write-Host ("        -> {0}" -f $entry.Reason)
     }

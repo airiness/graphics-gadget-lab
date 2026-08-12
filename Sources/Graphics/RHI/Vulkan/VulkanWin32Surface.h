@@ -1,13 +1,12 @@
 ﻿#pragma once
 #include "Core/CoreMacros.h"
 
-#include <windows.h>
-
 #include <vulkan/vulkan.h>
-#include <vulkan/vulkan_win32.h>
 
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -35,6 +34,10 @@ namespace gglab
 		// implementation interprets them as the process instance and window.
 		[[nodiscard]] static Result Create(
 			VkInstance instance, void* nativeInstanceHandle, void* nativeWindowHandle) noexcept;
+
+		// Instance extensions this surface implementation requires, provided
+		// by the WSI/platform side.
+		[[nodiscard]] static std::span<const std::string_view> RequiredInstanceExtensionNames() noexcept;
 
 		[[nodiscard]] VkSurfaceKHR Get() const noexcept { return m_Surface; }
 
