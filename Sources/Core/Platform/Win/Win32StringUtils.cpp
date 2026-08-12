@@ -36,4 +36,26 @@ namespace gglab::utils
 		}
 		return string;
 	}
+
+	std::wstring ToInvariantLowercase(std::wstring_view value) noexcept
+	{
+		if (value.empty())
+		{
+			return {};
+		}
+		const int requiredCharacters = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE,
+			value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr, 0);
+		if (requiredCharacters <= 0)
+		{
+			return {};
+		}
+		std::wstring result(static_cast<size_t>(requiredCharacters), L'\0');
+		if (::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(),
+			static_cast<int>(value.size()), result.data(), requiredCharacters, nullptr,
+			nullptr, 0) == 0)
+		{
+			return {};
+		}
+		return result;
+	}
 }

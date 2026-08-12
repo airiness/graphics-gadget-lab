@@ -1,7 +1,6 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
 #include "Core/Hash/Sha256.h"
-
-#include <Windows.h>
+#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -17,42 +16,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] std::wstring InvariantLowercase(std::wstring_view value) noexcept
-		{
-			if (value.empty())
-				return {};
-			const int requiredCharacters = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE,
-				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr, 0);
-			if (requiredCharacters <= 0)
-				return {};
-			std::wstring result(static_cast<size_t>(requiredCharacters), L'\0');
-			if (::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(),
-				static_cast<int>(value.size()), result.data(), requiredCharacters, nullptr,
-				nullptr, 0) == 0)
-			{
-				return {};
-			}
-			return result;
-		}
-
-		[[nodiscard]] std::string WideToUtf8(std::wstring_view value) noexcept
-		{
-			if (value.empty())
-				return {};
-			const int requiredBytes = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-			if (requiredBytes <= 0)
-				return {};
-			std::string result(static_cast<size_t>(requiredBytes), '\0');
-			if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
-				static_cast<int>(value.size()), result.data(), requiredBytes, nullptr,
-				nullptr) == 0)
-			{
-				return {};
-			}
-			return result;
-		}
-
 		[[nodiscard]] std::wstring DigestText(const Sha256Hash& digest)
 		{
 			constexpr wchar_t HexDigits[] = L"0123456789abcdef";
@@ -92,8 +55,8 @@ namespace gglab
 		{
 			normalized.pop_back();
 		}
-		normalized = InvariantLowercase(normalized);
-		const std::string canonicalUtf8 = WideToUtf8(normalized);
+		normalized = utils::ToInvariantLowercase(normalized);
+		const std::string canonicalUtf8 = utils::ToString(normalized);
 		if (canonicalUtf8.empty())
 			return {};
 		const Sha256Hash digest =
