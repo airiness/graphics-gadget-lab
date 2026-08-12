@@ -42,17 +42,22 @@ $applicationOwnedRegions = @(
 )
 
 # Platform / backend leaf allowlists.
-$prefixAllow = @(
+# Permanent leaves are reviewed and need no removal condition.
+$platformLeafPrefixes = @(
     "Core/Platform/Win", # Windows implementation leaves
     "Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
 )
-$exactAllow = @(
-    "Core/Hash/Sha256.cpp",                     # BCrypt implementation leaf
-    "Core/HResult.h",                           # transitional: Windows/DX12 helper ownership in flight
-    "Core/HResult.cpp",                         # transitional: Windows/DX12 helper ownership in flight
-    "Graphics/Asset/Loading/TextureLoader.cpp", # DirectXTex (Windows third-party) consumer
+$platformLeafFiles = @(
     "Graphics/RHI/Vulkan/VulkanWin32Surface.h", # Win32 WSI leaf
-    "Graphics/RHI/Vulkan/VulkanWin32Surface.cpp" # Win32 WSI leaf
+    "Graphics/RHI/Vulkan/VulkanWin32Surface.cpp", # Win32 WSI leaf
+    "Graphics/Asset/Loading/TextureLoader.cpp"  # DirectXTex (Windows third-party) consumer
+)
+
+# Transitional debt: allowed only with an explicit removal condition.
+$transitionalDebt = @(
+    [pscustomobject]@{ File = "Core/Hash/Sha256.cpp"; Reason = "BCrypt implementation; planned: move to Core/Platform/Win" },
+    [pscustomobject]@{ File = "Core/HResult.h";       Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" },
+    [pscustomobject]@{ File = "Core/HResult.cpp";     Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" }
 )
 
 # Known violations ledger. Each entry: File, Kind (ownership/platform), Reason
@@ -69,11 +74,15 @@ $knownViolations = @(
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.cpp";                   Kind = "platform";  Reason = "Win32 window-control behavior; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.h";                     Kind = "platform";  Reason = "Windows.h/HWND; same family as VulkanQualification.cpp; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderCompiler.cpp";                            Kind = "platform";  Reason = "HRESULT/DXC COM integration; planned: move to shader toolchain project ownership" },
-    [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" }
+    [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" },
+    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; planned: narrow platform lock leaf" },
+    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
 )
 
-$ownershipIncludeRegex = '#include\s*"(Application|DevTools)/'
-$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink'
+$ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
+$platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64'
+$platformLeafIncludeRegex = '#include\s*"Core/Platform/Win/'
+$platformNamespaceRegex = '\bwin32::'
 
 function Test-Allowed {
     param([string]$RelativePath)
@@ -83,13 +92,18 @@ function Test-Allowed {
             return $true
         }
     }
-    foreach ($prefix in $prefixAllow) {
+    foreach ($prefix in $platformLeafPrefixes) {
         if ($RelativePath.StartsWith($prefix + "/")) {
             return $true
         }
     }
-    foreach ($exact in $exactAllow) {
-        if ($RelativePath -eq $exact) {
+    foreach ($leaf in $platformLeafFiles) {
+        if ($RelativePath -eq $leaf) {
+            return $true
+        }
+    }
+    foreach ($debt in $transitionalDebt) {
+        if ($RelativePath -eq $debt.File) {
             return $true
         }
     }
@@ -141,8 +155,13 @@ foreach ($file in $files) {
     }
 
     # Platform leakage (skip Application-owned regions and allowlisted leaves).
+    # Covers raw Win32 tokens, direct includes of platform leaves, and the
+    # win32 namespace leaking into portable files.
     if (-not (Test-Allowed $file.Path)) {
-        if ($content -match $platformLeakRegex) {
+        $platformLeaked = $content -match $platformLeakRegex -or
+            $content -match $platformLeafIncludeRegex -or
+            $content -match $platformNamespaceRegex
+        if ($platformLeaked) {
             $platformFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "platform" })
         }
     }
@@ -208,8 +227,13 @@ foreach ($entry in $stale) {
 }
 Write-Host ""
 
-if ($unexpected.Count -gt 0) {
-    Write-Host "RESULT: FAIL - unexpected boundary violations found."
+if ($unexpected.Count -gt 0 -or $stale.Count -gt 0) {
+    if ($unexpected.Count -gt 0) {
+        Write-Host "RESULT: FAIL - unexpected boundary violations found."
+    }
+    else {
+        Write-Host "RESULT: FAIL - stale ledger entries must be removed or updated."
+    }
     exit 1
 }
 

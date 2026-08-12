@@ -187,6 +187,15 @@ jobs:
             throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
           }
 
+      - name: Validate runtime project boundaries
+        shell: pwsh
+        run: |
+          ./Scripts/ValidateProjectBoundaries.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Build
         shell: pwsh
         run: |

@@ -567,6 +567,9 @@
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.cpp">
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.cpp">
+      <Filter>Core\Platform\Win</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp">
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
@@ -1731,6 +1734,12 @@
       <Filter>Core\Math\Backends</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h">
+      <Filter>Core\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.h">
+      <Filter>Core\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.h">
       <Filter>Core\Platform\Win</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h">
