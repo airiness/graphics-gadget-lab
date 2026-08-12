@@ -4,6 +4,7 @@
 #include "Core/HResult.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 #include "Core/StringId.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/StringUtils.h"

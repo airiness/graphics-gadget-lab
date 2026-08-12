@@ -2,7 +2,6 @@
 #include "Core/Hash/Sha256.h"
 #include "Core/Platform/Win/Win32NamedMutex.h"
 #include "Core/Platform/Win/Win32StringUtils.h"
-#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
 #include <cstddef>

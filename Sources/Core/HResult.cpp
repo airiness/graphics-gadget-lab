@@ -1,5 +1,6 @@
 #include "Core/HResult.h"
 #include "Core/Platform/Win/Win32DiagnosticOutput.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 #include "Core/Utility/StringUtils.h"
 
 #include <comdef.h>
