@@ -56,7 +56,8 @@
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;$(GGLabRepositoryRoot)Externals\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -70,13 +71,66 @@
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;$(GGLabRepositoryRoot)Externals\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="GGLabRuntimeAnchor.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Time.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
+    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
+    <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
+    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h" />
+    <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
+    <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
+    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\BoundingVolumes.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Color.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Culling.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
+    <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
+    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h" />
+    <ClInclude Include="..\..\Sources\Core\StringId.h" />
+    <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h" />
+    <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h" />
+    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h" />
+    <ClInclude Include="..\..\Sources\Core\Time.h" />
+    <ClInclude Include="..\..\Sources\Core\TypedIndex.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\World.h" />
+    <ClInclude Include="..\..\Sources\Scene\Components.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

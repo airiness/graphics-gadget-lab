@@ -216,14 +216,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp">
-      <Filter>Core\Task</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp">
       <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp">
-      <Filter>Core\Async</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -480,17 +474,8 @@
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Time.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Camera.cpp">
       <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
-      <Filter>Core\Log</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp">
       <Filter>Graphics\RenderGraph</Filter>
@@ -509,12 +494,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePool.cpp">
       <Filter>Graphics\Resource</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
-      <Filter>Core\Allocator</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp">
-      <Filter>Core\Allocator</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
@@ -579,12 +558,6 @@
     <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp">
       <Filter>Graphics\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -602,21 +575,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp">
       <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp">
-      <Filter>Core\Math\Backends</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp">
-      <Filter>Core\Math\Backends</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp">
-      <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp">
       <Filter>Graphics\Asset\Publication</Filter>
@@ -659,18 +617,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp">
       <Filter>Graphics\Asset\Interop</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp">
-      <Filter>Core\Math</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Graphics\Utility</Filter>
@@ -1169,18 +1115,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h">
-      <Filter>Core\Async</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -1385,9 +1319,6 @@
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\CoreMacros.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Geometry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1396,9 +1327,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h">
       <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Scene\Components.h">
-      <Filter>Scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetManager.h">
       <Filter>Graphics\Asset</Filter>
@@ -1439,24 +1367,6 @@
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\BoundingVolumes.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Color.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Culling.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Matrix.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
@@ -1468,9 +1378,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h">
       <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h">
-      <Filter>Core\Hash</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
@@ -1553,15 +1460,6 @@
     <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetViews.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Transform.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Vector.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h">
       <Filter>Core\Platform\Win</Filter>
     </ClInclude>
@@ -1570,12 +1468,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h">
       <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Time.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Camera.h">
       <Filter>Graphics</Filter>
@@ -1588,12 +1480,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h">
       <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Log\Logger.h">
-      <Filter>Core\Log</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h">
-      <Filter>Core\Log</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h">
       <Filter>Graphics</Filter>
@@ -1621,9 +1507,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h">
       <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\StringId.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -1661,29 +1544,11 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\VertexData.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePool.h">
       <Filter>Graphics\Resource</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h">
-      <Filter>Core\Hash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\TypedIndex.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Graphics\RHI\DX12\Cache</Filter>
@@ -1733,9 +1598,6 @@
     <ClInclude Include="..\..\Sources\Core\HResult.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h">
-      <Filter>Core\Math\Backends</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h">
       <Filter>Core\Platform\Win</Filter>
     </ClInclude>
@@ -1759,12 +1621,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderTypes.h">
       <Filter>Graphics\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h">
-      <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h">
       <Filter>Graphics\RenderPass</Filter>
@@ -1805,9 +1661,6 @@
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\TransferManager.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1825,9 +1678,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\ScreenSpace\ScreenSpaceTypes.h">
       <Filter>Graphics\ScreenSpace</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\World.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderScene.h">
       <Filter>Graphics</Filter>
@@ -2218,9 +2068,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h">
       <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h">
-      <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h">
       <Filter>Graphics</Filter>

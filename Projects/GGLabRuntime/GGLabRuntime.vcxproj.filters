@@ -1,13 +1,195 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="GGLabRuntime">
-      <UniqueIdentifier>{65C7EF8F-BF26-4889-9FA2-1CE5D403E65B}</UniqueIdentifier>
+    <Filter Include="Core">
+      <UniqueIdentifier>{235ECABE-538D-436C-9C60-8ED1B57962F0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Allocator">
+      <UniqueIdentifier>{08767CCB-EAF8-469F-BA36-8FD4BBC9B0E7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Async">
+      <UniqueIdentifier>{90DC7873-158E-4318-A252-E3446B1898E7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Hash">
+      <UniqueIdentifier>{9090EAAB-4CEC-4042-9910-1F06CA27A683}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Log">
+      <UniqueIdentifier>{462F539C-9904-442B-8FC7-6AD9033CCAC9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Math">
+      <UniqueIdentifier>{D04AFB62-74C0-47FB-B735-0682D8D313E8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Math\Backends">
+      <UniqueIdentifier>{54CCA5DC-F666-4FFA-97CB-7AF1FF7E3769}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Profiling">
+      <UniqueIdentifier>{BD2758F9-9B65-434D-8349-AF43D8EEA644}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Task">
+      <UniqueIdentifier>{F41C8D9B-E97F-4509-ADAE-2C9CFFE03339}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core\Utility">
+      <UniqueIdentifier>{1068A3E8-4E38-4251-A7FB-4C200598E27F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scene">
+      <UniqueIdentifier>{269EEC4F-15C7-4767-89F3-9CD58964A417}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GGLabRuntimeAnchor.cpp">
-      <Filter>GGLabRuntime</Filter>
+    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp">
+      <Filter>Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp">
+      <Filter>Core\Async</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
+      <Filter>Core\Log</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp">
+      <Filter>Core\Math\Backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp">
+      <Filter>Core\Math\Backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp">
+      <Filter>Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp">
+      <Filter>Core\Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp">
+      <Filter>Core\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Time.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp">
+      <Filter>Core\Utility</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h">
+      <Filter>Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h">
+      <Filter>Core\Async</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\CoreMacros.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\EnumFlags.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h">
+      <Filter>Core\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h">
+      <Filter>Core\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Log\Logger.h">
+      <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h">
+      <Filter>Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h">
+      <Filter>Core\Math\Backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\BoundingVolumes.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Color.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Culling.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Matrix.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Transform.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Math\Vector.h">
+      <Filter>Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h">
+      <Filter>Core\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\StringId.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h">
+      <Filter>Core\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Time.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\TypedIndex.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h">
+      <Filter>Core\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Core\World.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Scene\Components.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

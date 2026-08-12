@@ -66,9 +66,6 @@ $transitionalDebt = @(
 # explicit plan; entries whose violation disappears are reported as stale and
 # should be removed from the ledger.
 $knownViolations = @(
-    [pscustomobject]@{ File = "Graphics/RenderPass/RenderPassDevelopGui.cpp";                  Kind = "ownership"; Reason = "DevTools include; planned: DevelopGui render extension seam" },
-    [pscustomobject]@{ File = "Diagnostics/Snapshots/LabSnapshot.h";                           Kind = "ownership"; Reason = "Application/Lab types; Lab snapshot stays Application-owned" },
-    [pscustomobject]@{ File = "Diagnostics/Builders/LabSnapshotProvider.cpp";                  Kind = "ownership"; Reason = "Application/Lab types; Lab snapshot provider stays Application-owned" },
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.cpp";                   Kind = "platform";  Reason = "Win32 window-control behavior; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.h";                     Kind = "platform";  Reason = "Windows.h/HWND; same family as VulkanQualification.cpp; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderCompiler.cpp";                            Kind = "platform";  Reason = "HRESULT/DXC COM integration; planned: move to shader toolchain project ownership" },
@@ -133,14 +130,14 @@ function Test-IsKnown {
     return $false
 }
 
-# Collect candidate files with repository-relative paths.
-$files = @()
+# Collect portable-platform candidates with Sources-relative paths.
+$candidateFiles = @()
 foreach ($dir in $candidateDirs) {
     $dirPath = Join-Path $sourcesDir $dir
     if (-not (Test-Path $dirPath)) {
         throw "Candidate directory not found: $dirPath"
     }
-    $files += Get-ChildItem -Path $dirPath -Recurse -File |
+    $candidateFiles += Get-ChildItem -Path $dirPath -Recurse -File |
         Where-Object { $_.Extension -in @(".h", ".cpp") } |
         ForEach-Object {
             [pscustomobject]@{
@@ -150,19 +147,53 @@ foreach ($dir in $candidateDirs) {
         }
 }
 
+# Collect the authoritative runtime ownership set from the project. Project-local
+# build anchors and vendored sources use repository-relative paths; Sources items
+# use Sources-relative paths so they share the boundary ledger namespace.
+$runtimeProjectPath = Join-Path $root "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+if (-not (Test-Path $runtimeProjectPath)) {
+    throw "Runtime project not found: $runtimeProjectPath"
+}
+$runtimeProject = [xml](Get-Content -LiteralPath $runtimeProjectPath -Raw -ErrorAction Stop)
+$namespace = New-Object System.Xml.XmlNamespaceManager($runtimeProject.NameTable)
+$namespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$runtimeProjectDir = Split-Path -Parent $runtimeProjectPath
+$runtimeOwnedFiles = @(
+    $runtimeProject.SelectNodes("//msb:ClCompile | //msb:ClInclude", $namespace) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_.Include) } |
+        ForEach-Object {
+            $fullPath = [System.IO.Path]::GetFullPath((Join-Path $runtimeProjectDir $_.Include))
+            if (-not (Test-Path $fullPath)) {
+                throw "Runtime project item not found: $($_.Include)"
+            }
+            $path = if ($fullPath.StartsWith($sourcesDir + [System.IO.Path]::DirectorySeparatorChar)) {
+                $fullPath.Substring($sourcesDir.Length + 1)
+            }
+            else {
+                $fullPath.Substring($root.Length + 1)
+            }
+            [pscustomobject]@{
+                Path     = $path.Replace('\', '/')
+                FullPath = $fullPath
+            }
+        } |
+        Sort-Object FullPath -Unique
+)
+
 $ownershipFindings = New-Object System.Collections.Generic.List[object]
 $platformFindings = New-Object System.Collections.Generic.List[object]
 
-foreach ($file in $files) {
+foreach ($file in $runtimeOwnedFiles) {
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
 
-    # Ownership boundary (skip Application-owned regions; allowlists are platform policy).
-    if (-not ($file.Path.StartsWith("Core/Input/"))) {
-        if ($content -match $ownershipIncludeRegex) {
-            $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
-        }
+    if ($file.Path.StartsWith("Application/") -or $file.Path.StartsWith("DevTools/") -or
+        $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex) {
+        $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }
+}
 
+foreach ($file in $candidateFiles) {
+    $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
     # Platform leakage (skip exempt regions; transitional debt is scanned and
     # matched below). Covers raw Win32 tokens, direct includes of platform
     # leaves, and the win32 namespace leaking into portable files.
@@ -235,7 +266,8 @@ foreach ($debt in $transitionalDebt) {
 # Report.
 Write-Host "=== Runtime Project Boundary Validation ==="
 Write-Host "Root: $root"
-Write-Host "Scanned: $($files.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
+Write-Host "Ownership: $($runtimeOwnedFiles.Count) GGLabRuntime project items"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
 Write-Host ""
 
 Write-Host "KNOWN violations (ledger, enumerated): $($knownFound.Count)"
