@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Application/Demo/DemoLabHost.h"
+#include "Core/CoreMacros.h"
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"

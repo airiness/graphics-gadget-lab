@@ -1,6 +1,5 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/Quaternion.h"
 #include "Application/Demo/DemoPlayground.h"
+#include "Core/Math/Quaternion.h"
 #include "Core/Time.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Mouse.h"

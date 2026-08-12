@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoBase.h"
 #include "Application/Demo/DemoLabHost.h"
