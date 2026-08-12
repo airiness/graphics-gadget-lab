@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"

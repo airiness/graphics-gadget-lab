@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelMeshAdapter.h"
 
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
