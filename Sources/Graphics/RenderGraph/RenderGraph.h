@@ -1,4 +1,8 @@
 #pragma once
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/StringId.h"
+#include "Graphics/GraphicsTypes.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
@@ -6,8 +10,6 @@
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Core/StringId.h"
 
 #include <memory>
 

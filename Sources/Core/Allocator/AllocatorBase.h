@@ -1,7 +1,9 @@
 #pragma once
 //#include "Core/Utility/MathUtils.h"
+#include "Core/CoreMacros.h"
 
 #include <cstdint>
+#include <limits>
 
 namespace gglab
 {

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRaycast.h"
 
 #include "Application/Lab/NapaVoxel/NapaVoxelMeshAdapter.h"

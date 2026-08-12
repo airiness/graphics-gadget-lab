@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
 #include "Application/Lab/LabRuntime.h"

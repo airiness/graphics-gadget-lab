@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -12,6 +12,9 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
+
+#include <cstdint>
+#include <span>
 
 namespace gglab
 {

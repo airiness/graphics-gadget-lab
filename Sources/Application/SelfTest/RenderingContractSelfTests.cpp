@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
 #include "DevTools/DevToolsRuntime.h"

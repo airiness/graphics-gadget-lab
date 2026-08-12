@@ -1,4 +1,6 @@
 #pragma once
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 
 #include <algorithm>
 #include <cstring>

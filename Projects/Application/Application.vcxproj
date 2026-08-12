@@ -66,7 +66,12 @@
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
     <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Label="UserMacros">
+    <GGLAB_USE_PCH Condition="'$(GGLAB_USE_PCH)'==''">1</GGLAB_USE_PCH>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GGLAB_USE_PCH)'=='0'">
+    <IntDir>$(SolutionDir)Build\Intermediate\$(Platform)\$(Configuration)\NoPCH\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>GraphicsGadgetLab</TargetName>
   </PropertyGroup>
@@ -77,16 +82,16 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PrecompiledHeaderFile>Core/Precompiled.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;gameinput.lib;d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -95,52 +100,68 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PrecompiledHeaderFile>Core/Precompiled.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;gameinput.lib;d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'!='0'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'=='0'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>Application/ApplicationPch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles Condition="'$(GGLAB_USE_PCH)'!='0'">Application/ApplicationPch.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\imgui_demo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\imgui_tables.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
@@ -169,6 +190,7 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
@@ -285,6 +307,8 @@
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
@@ -385,12 +409,13 @@
     <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Main.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    <ClCompile Include="..\..\Sources\Application\ApplicationPch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp" />
@@ -461,6 +486,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h" />
+    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
@@ -842,7 +868,7 @@
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
-    <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
+    <ClInclude Include="..\..\Sources\Application\ApplicationPch.h" />
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h" />

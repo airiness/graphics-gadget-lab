@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Core/CoreMacros.h"
+
+#include <cstdint>
 
 namespace gglab
 {

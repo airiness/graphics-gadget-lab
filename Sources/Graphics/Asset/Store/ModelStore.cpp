@@ -1,5 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Store/ModelStore.h"
+#include "Core/CoreMacros.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

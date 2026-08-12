@@ -1,7 +1,6 @@
-#include "Core/Precompiled.h"
+#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Math/Transform.h"
-#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Scene/Components.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"

@@ -1,5 +1,11 @@
 #pragma once
 #include "Graphics/RHI/DX12/Cache/PSOKey.h"
+
+#include <cstdint>
+#include <limits>
+
+#include <d3dx12.h>
+
 namespace gglab
 {
 	// Graphics PSO desc

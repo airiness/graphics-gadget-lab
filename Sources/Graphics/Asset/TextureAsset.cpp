@@ -1,7 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/TextureAsset.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
 #include "Core/Hash/KeyHash.h"
+#include "Core/Log/LogMacros.h"
+#include "Graphics/Asset/TextureAssetValidation.h"
+
+#include <cstddef>
+#include <cstdint>
 
 namespace gglab
 {

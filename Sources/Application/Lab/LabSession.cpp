@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/LabSessionBase.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"

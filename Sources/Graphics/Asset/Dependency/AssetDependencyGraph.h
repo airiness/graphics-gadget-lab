@@ -3,6 +3,7 @@
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/GraphicsTypes.h"
 
+#include <cstdint>
 #include <span>
 #include <unordered_map>
 #include <vector>

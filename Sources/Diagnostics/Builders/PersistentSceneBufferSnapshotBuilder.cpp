@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"

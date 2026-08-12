@@ -1,7 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
+
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <utility>
 
 namespace gglab
 {

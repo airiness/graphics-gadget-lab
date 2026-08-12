@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+
+#include <utility>
 
 namespace gglab
 {

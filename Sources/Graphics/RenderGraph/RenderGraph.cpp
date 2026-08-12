@@ -1,8 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
+
+#include <cstdint>
+#include <optional>
+#include <utility>
 
 namespace gglab
 {

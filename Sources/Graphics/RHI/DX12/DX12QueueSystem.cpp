@@ -1,11 +1,15 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
+
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

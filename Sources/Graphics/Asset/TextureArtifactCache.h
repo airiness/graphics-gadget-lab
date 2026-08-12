@@ -3,6 +3,7 @@
 #include "Graphics/Asset/ArtifactCacheCore.h"
 #include "Graphics/Asset/TextureArtifact.h"
 
+#include <cstdint>
 #include <mutex>
 
 namespace gglab

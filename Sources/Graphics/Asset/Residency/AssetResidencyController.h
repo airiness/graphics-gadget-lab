@@ -1,6 +1,8 @@
 #pragma once
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	class AssetResidencyController final

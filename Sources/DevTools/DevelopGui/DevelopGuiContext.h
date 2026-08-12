@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderQueue.h"

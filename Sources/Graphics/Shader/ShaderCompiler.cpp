@@ -1,15 +1,33 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Shader/ShaderCompiler.h"
-#include "Graphics/Shader/ShaderPaths.h"
-#include "Core/HResult.h"
-#include "Core/StringId.h"
-#include "Core/Utility/StringUtils.h"
-#include "Core/Utility/PathUtils.h"
+#include "Core/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
+#include "Core/HResult.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Platform/Win/ComTypes.h"
+#include "Core/StringId.h"
+#include "Core/Utility/PathUtils.h"
+#include "Core/Utility/StringUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Graphics/Shader/ShaderPaths.h"
 
+#include <dxcapi.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdlib>
+#include <cstring>
 #include <cwctype>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

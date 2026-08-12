@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Demo/StartDemo.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"

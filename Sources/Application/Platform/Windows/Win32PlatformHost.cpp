@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+
+#include <Shlwapi.h>
 
 namespace gglab
 {

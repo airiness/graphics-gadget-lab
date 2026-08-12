@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Core/CoreMacros.h"
+#include "Core/HResult.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -10,7 +12,20 @@
 #include "Graphics/RHI/DX12/Utility/DX12PortabilityUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Core/HResult.h"
+
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <string>
+#include <string_view>
+
+#include <windows.h>
+#include <shlobj.h>
+
+#if defined(BUILD_DEBUG)
+#include <dxgidebug.h>
+#include <pix3.h>
+#endif
 
 namespace gglab
 {

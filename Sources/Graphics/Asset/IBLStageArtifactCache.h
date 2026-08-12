@@ -4,6 +4,8 @@
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	struct IBLStageArtifactCacheConfig

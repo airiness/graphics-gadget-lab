@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Matrix.h"
 
 namespace gglab::math

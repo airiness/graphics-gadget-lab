@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/LabCommandQueue.h"
 
 namespace gglab

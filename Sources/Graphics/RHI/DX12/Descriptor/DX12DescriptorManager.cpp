@@ -1,9 +1,11 @@
-#include "Core/Precompiled.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
+#include "Core/CoreMacros.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+
+#include <memory>
 
 namespace gglab
 {

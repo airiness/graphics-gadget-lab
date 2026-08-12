@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
@@ -6,6 +5,8 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Renderer.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

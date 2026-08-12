@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 
 namespace gglab

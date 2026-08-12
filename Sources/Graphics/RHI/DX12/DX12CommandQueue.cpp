@@ -1,9 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
+
+#include <memory>
+#include <span>
+#include <vector>
 
 namespace gglab
 {

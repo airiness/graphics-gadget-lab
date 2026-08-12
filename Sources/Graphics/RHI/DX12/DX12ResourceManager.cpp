@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Utility/StringUtils.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
@@ -7,9 +9,14 @@
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/RHITextureValidation.h"
-#include "Core/Utility/StringUtils.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

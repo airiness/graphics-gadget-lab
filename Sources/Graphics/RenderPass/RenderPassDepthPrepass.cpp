@@ -1,9 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
+
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
 
 namespace gglab
 {

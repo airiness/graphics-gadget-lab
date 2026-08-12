@@ -2,6 +2,14 @@
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <utility>
+#include <vector>
+
+#include <d3d12.h>
+
 namespace gglab
 {
 	class DX12Device;

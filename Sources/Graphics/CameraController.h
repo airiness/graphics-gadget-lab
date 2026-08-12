@@ -1,9 +1,11 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Math/Vector.h"
-#include "Graphics/Camera.h"
 
 namespace gglab
 {
+	class Camera;
+
 	struct CameraInput
 	{
 		bool m_Front = false;

@@ -1,5 +1,9 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
+
+#include <d3d12.h>
+
 namespace gglab
 {
 	class DX12Device;

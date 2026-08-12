@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

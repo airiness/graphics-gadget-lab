@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"

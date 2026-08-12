@@ -1,8 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <algorithm>
+#include <mutex>
+#include <shared_mutex>
+#include <vector>
 
 namespace gglab
 {

@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 
 #include <vulkan/vulkan.h>

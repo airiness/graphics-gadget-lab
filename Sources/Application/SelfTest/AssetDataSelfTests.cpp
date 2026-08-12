@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"

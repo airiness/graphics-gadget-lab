@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/LabRuntime.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Time.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"

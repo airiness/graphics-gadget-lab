@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
@@ -10,6 +9,8 @@
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

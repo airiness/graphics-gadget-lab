@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextRHI.h"
@@ -10,6 +9,8 @@
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

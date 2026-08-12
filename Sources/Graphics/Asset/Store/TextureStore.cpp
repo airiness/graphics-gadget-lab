@@ -1,5 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Store/TextureStore.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

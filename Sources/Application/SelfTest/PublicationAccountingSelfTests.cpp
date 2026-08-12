@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
 

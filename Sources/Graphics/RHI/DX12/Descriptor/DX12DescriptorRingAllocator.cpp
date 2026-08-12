@@ -1,6 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorRingAllocator.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
+
+#include <mutex>
 
 namespace gglab
 {

@@ -1,6 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/RHIContext.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
+
+#include <memory>
 
 namespace gglab
 {

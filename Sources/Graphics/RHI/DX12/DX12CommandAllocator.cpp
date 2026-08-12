@@ -1,7 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
+
+#include <memory>
+#include <mutex>
+#include <utility>
 
 namespace gglab
 {

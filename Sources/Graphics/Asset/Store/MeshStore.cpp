@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Store/MeshStore.h"
+#include "Core/CoreMacros.h"
+
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

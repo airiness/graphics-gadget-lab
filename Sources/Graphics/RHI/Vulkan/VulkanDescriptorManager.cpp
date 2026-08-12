@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"

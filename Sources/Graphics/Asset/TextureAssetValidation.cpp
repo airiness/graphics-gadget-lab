@@ -1,10 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
 #include <bit>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <string_view>
 #include <vector>
 
 namespace gglab

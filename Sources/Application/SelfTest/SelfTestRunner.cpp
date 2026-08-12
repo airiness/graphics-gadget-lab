@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"

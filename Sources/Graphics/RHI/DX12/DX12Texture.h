@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12Resource.h"
 

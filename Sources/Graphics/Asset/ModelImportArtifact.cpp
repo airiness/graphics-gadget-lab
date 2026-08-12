@@ -1,9 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 #include "Core/Hash/Sha256.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 
 #include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <span>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

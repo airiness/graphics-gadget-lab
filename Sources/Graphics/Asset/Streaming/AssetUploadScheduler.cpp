@@ -1,10 +1,24 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferBatch.h"
 #include "Graphics/TransferManager.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <deque>
+#include <exception>
+#include <format>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <ranges>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

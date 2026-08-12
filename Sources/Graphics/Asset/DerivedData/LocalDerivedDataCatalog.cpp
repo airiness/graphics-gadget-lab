@@ -1,7 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
 
 #include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <mutex>
+#include <system_error>
+#include <unordered_map>
+#include <utility>
 
 namespace gglab
 {

@@ -1,11 +1,15 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <span>
 
 namespace gglab
 {

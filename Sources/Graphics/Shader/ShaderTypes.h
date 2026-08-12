@@ -2,8 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 namespace gglab
 {

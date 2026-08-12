@@ -1,9 +1,9 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/Matrix.h"
 #include "Graphics/RenderWorldExtractor.h"
-#include "Scene/Components.h"
+#include "Core/CoreMacros.h"
+#include "Core/Math/Matrix.h"
 #include "Core/World.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Scene/Components.h"
 
 namespace gglab
 {

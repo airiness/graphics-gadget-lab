@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassForwardPBRBase.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderScene.h"
@@ -17,6 +17,14 @@
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
+
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
+#include <tuple>
 
 namespace gglab
 {

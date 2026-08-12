@@ -1,10 +1,11 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

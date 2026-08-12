@@ -1,16 +1,22 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderScene.h"
-#include "Graphics/TransferManager.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Math/MathFunctions.h"
+#include "Core/Math/Transform.h"
+#include "Core/World.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Core/World.h"
-#include "Scene/Components.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Transform.h"
 #include "Graphics/RenderView.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/TransferManager.h"
+#include "Scene/Components.h"
+
+#include <cstring>
+#include <limits>
+#include <span>
+#include <unordered_map>
+#include <vector>
 
 namespace gglab
 {

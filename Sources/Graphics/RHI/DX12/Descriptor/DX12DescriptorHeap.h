@@ -1,5 +1,10 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
+
+#include <cstdint>
+
+#include <d3dx12.h>
 
 namespace gglab
 {

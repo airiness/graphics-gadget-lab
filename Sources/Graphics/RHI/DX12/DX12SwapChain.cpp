@@ -1,11 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
+#include "Core/CoreMacros.h"
+#include "Core/HResult.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Core/HResult.h"
+
+#include <utility>
 
 namespace gglab
 {

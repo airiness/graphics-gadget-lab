@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
+
+#include <cstdint>
 
 namespace gglab
 {

@@ -1,6 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/TextureAsset.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 namespace gglab
 {

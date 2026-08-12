@@ -4,6 +4,9 @@
 #include "Graphics/RHI/DX12/Utility/DX12InputLayoutUtils.h"
 #include "Graphics/RHI/RHIPipeline.h"
 
+#include <cstdint>
+#include <tuple>
+
 namespace gglab
 {
 	struct DX12GraphicsPipelineShaderInputs

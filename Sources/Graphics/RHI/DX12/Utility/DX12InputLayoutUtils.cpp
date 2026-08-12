@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12InputLayoutUtils.h"
-
+#include "Core/CoreMacros.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+
+#include <cstdint>
 
 namespace gglab
 {

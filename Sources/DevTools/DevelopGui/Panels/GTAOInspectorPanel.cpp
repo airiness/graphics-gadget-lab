@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -11,6 +10,8 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/RHITextureValidation.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/LabParameter.h"
+#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

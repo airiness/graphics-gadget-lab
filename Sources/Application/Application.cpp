@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Application.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
@@ -12,6 +11,8 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Utility/PathUtils.h"
@@ -36,6 +37,11 @@
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
+
+#include <span>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

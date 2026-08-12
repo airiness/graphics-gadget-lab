@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
@@ -9,7 +10,13 @@
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/Asset/TextureAsset.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <optional>
+#include <string_view>
+#include <unordered_set>
+#include <vector>
 
 namespace gglab
 {

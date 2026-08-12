@@ -1,6 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassGTAO.h"
-
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
@@ -11,6 +11,11 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <cstdint>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

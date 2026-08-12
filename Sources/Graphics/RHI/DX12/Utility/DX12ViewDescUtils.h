@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHITexture.h"
 
+#include <cstdint>
 #include <d3d12.h>
 
 namespace gglab

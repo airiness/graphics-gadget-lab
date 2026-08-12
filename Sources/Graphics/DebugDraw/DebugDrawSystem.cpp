@@ -1,8 +1,21 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/MathFunctions.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Math/MathFunctions.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

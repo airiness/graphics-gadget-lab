@@ -3,6 +3,7 @@
 #include "Graphics/GraphicsTypes.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab

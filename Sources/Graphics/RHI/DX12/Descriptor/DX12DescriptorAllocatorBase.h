@@ -1,10 +1,12 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
-#include "Graphics/RHI/DX12/DX12FencePoint.h"
-#include "Core/Allocator/AllocatorBase.h"
+
+#include <cstdint>
 
 namespace gglab
 {
+	class DX12FencePoint;
 	class DX12DescriptorHeap;
 	class DX12DescriptorAllocatorBase
 	{

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"

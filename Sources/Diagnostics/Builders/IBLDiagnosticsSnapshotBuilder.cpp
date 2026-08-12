@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Graphics/EnvironmentLightingSystem.h"

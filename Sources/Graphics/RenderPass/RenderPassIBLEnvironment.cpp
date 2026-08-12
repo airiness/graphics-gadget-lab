@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -9,6 +9,10 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
+
+#include <array>
+#include <cstdint>
+#include <span>
 
 namespace gglab
 {

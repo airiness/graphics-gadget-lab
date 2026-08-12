@@ -6,6 +6,7 @@
 #include "Graphics/Shader/Shader.h"
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <shared_mutex>
 #include <string>

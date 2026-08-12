@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"

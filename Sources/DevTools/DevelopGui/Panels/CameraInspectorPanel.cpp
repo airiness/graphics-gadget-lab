@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -9,6 +8,8 @@
 #include "Core/Math/MathFunctions.h"
 
 #include <array>
+
+#include <imgui.h>
 
 namespace gglab
 {

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <string_view>
 
 namespace gglab::utils
@@ -13,6 +16,5 @@ namespace gglab::utils
 	bool WriteFileBinary(const std::filesystem::path& file, const void* data, size_t size) noexcept;
 	bool LinkDirectory(
 		const std::filesystem::path& srcDir, const std::filesystem::path& dstDir) noexcept;
-	std::filesystem::path GetModuleDirectory(HMODULE hModule) noexcept;
 	std::filesystem::path GetExeOutDir() noexcept;
 }

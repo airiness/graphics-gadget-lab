@@ -1,5 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Core/Async/ProgressChannel.h"
+
+#include <algorithm>
+#include <cmath>
+#include <utility>
 
 namespace gglab
 {

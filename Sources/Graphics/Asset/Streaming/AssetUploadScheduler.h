@@ -7,6 +7,7 @@
 
 #include <array>
 #include <chrono>
+#include <compare>
 #include <cstdint>
 #include <deque>
 #include <functional>

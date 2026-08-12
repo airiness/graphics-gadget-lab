@@ -1,4 +1,6 @@
 #pragma once
+#include <windows.h>
+
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
@@ -7,8 +9,6 @@
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 
 #include <vulkan/vulkan.h>
-
-#include <windows.h>
 
 #include <cstdint>
 #include <memory>

@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Application/Demo/DemoManager.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"
 

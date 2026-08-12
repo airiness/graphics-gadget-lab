@@ -1,9 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/TransferManager.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITransferContext.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <memory>
+#include <utility>
 
 namespace gglab
 {

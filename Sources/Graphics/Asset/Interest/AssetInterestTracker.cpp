@@ -1,7 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
+#include "Core/CoreMacros.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <unordered_set>
 
 namespace gglab
 {

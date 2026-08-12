@@ -1,16 +1,19 @@
 #pragma once
 #include "Core/CoreMacros.h"
+#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/RHI/RHIResourceDebug.h"
 #include "Graphics/RHI/RHITexture.h"
-#include "Core/Platform/Win/ComTypes.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <d3d12.h>
 
 namespace gglab
 {

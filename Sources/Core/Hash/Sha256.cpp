@@ -1,7 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Core/Hash/Sha256.h"
 
+#include <Windows.h>
+
+#include <algorithm>
 #include <bcrypt.h>
+#include <limits>
+#include <type_traits>
 
 #pragma comment(lib, "bcrypt.lib")
 

@@ -1,6 +1,10 @@
-#include "Core/Precompiled.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <algorithm>
+#include <ranges>
+#include <vector>
 
 namespace gglab
 {

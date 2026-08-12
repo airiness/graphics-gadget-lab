@@ -1,7 +1,13 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGBarrierPlanner.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

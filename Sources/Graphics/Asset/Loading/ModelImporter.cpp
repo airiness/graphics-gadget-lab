@@ -1,8 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
-#include "Graphics/Asset/Interop/AssimpMathInterop.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/TypeUtils.h"
+#include "Graphics/Asset/Interop/AssimpMathInterop.h"
 
 #include <assimp/GltfMaterial.h>
 #include <assimp/Importer.hpp>
@@ -11,7 +12,19 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <format>
 #include <limits>
+#include <memory>
+#include <ranges>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

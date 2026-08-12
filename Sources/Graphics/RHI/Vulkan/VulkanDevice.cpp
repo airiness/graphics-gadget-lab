@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "Core/Utility/StringUtils.h"

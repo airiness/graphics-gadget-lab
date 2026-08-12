@@ -1,6 +1,11 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Resource/TransientResourcePool.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <optional>
+#include <string_view>
+#include <vector>
 
 namespace gglab
 {

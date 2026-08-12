@@ -1,6 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Application/Platform/Windows/Win32Window.h"
 #include "Application/Platform/Windows/Win32MessageHandler.h"
+
+#include <algorithm>
+#include <utility>
 
 namespace gglab
 {

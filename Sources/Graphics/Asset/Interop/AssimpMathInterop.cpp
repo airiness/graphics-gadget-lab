@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
 
 namespace gglab::math::interop

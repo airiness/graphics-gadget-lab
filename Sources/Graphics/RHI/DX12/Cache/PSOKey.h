@@ -3,6 +3,11 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader/ShaderTypes.h"
 
+#include <cstdint>
+#include <tuple>
+
+#include <d3d12.h>
+
 namespace gglab
 {
 	struct PipelineFormats

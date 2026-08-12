@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Application/Demo/DemoLoadingShell.h"
+#include "Core/CoreMacros.h"
 #include "Application/Demo/DemoLoadingShellRenderPipeline.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"

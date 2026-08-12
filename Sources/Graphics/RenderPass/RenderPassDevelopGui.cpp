@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassDevelopGui.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"

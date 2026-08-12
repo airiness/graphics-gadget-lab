@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"

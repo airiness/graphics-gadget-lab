@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorAllocatorBase.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 
 namespace gglab

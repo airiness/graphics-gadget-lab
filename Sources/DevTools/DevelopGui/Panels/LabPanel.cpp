@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabRuntime.h"
@@ -6,6 +5,8 @@
 #include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

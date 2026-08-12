@@ -1,5 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/TransferBatch.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+
+#include <algorithm>
+#include <limits>
+#include <optional>
+#include <span>
+#include <utility>
 
 namespace gglab
 {

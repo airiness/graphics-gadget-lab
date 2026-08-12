@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Graphics/RHI/RHIDevice.h"
+
+#include <unordered_set>
 
 namespace gglab
 {

@@ -1,6 +1,14 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <format>
+#include <limits>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

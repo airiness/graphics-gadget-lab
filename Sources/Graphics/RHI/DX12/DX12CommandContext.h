@@ -1,11 +1,17 @@
 #pragma once
 #include "Core/CoreMacros.h"
-#include "Core/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/RHICommandContext.h"
 
+#include <array>
+#include <cstdint>
 #include <memory>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <vector>
+
+#include <d3d12.h>
 
 namespace gglab
 {

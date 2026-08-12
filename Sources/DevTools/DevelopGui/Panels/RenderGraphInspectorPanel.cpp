@@ -1,7 +1,6 @@
-#include "Core/Precompiled.h"
+#include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "Core/Utility/StringUtils.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
-#include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
@@ -9,6 +8,8 @@
 #include "Graphics/RHI/RHIFormat.h"
 #include <algorithm>
 #include <cmath>
+
+#include <imgui.h>
 
 namespace gglab
 {

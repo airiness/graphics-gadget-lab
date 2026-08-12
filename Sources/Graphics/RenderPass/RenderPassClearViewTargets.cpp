@@ -1,7 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+
+#include <span>
 
 namespace gglab
 {

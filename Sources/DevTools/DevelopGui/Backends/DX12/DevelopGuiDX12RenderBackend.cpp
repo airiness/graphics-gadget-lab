@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
@@ -12,6 +12,8 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

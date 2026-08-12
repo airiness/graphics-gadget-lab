@@ -1,10 +1,19 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Task/TaskSystem.h"
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
-#include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/Asset/TextureArtifact.h"
+
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <stop_token>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

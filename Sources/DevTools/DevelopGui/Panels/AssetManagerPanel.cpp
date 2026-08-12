@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
 #include "Core/Utility/StringUtils.h"
 #include "DevTools/AssetSnapshotText.h"
@@ -14,6 +13,8 @@
 #include <algorithm>
 #include <chrono>
 #include <limits>
+
+#include <imgui.h>
 
 namespace gglab
 {

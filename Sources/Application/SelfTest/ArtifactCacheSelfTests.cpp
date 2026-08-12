@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Graphics/Asset/ArtifactCacheCore.h"
 

@@ -9,6 +9,7 @@
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <unordered_map>
 #include <variant>

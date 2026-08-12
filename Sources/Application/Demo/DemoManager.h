@@ -1,5 +1,6 @@
 #pragma once
 #include "Application/Demo/DemoBase.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIFence.h"
 
 namespace gglab

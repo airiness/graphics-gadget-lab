@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
+
+#include <cstdint>
+#include <imgui.h>
 
 namespace gglab::devtools
 {

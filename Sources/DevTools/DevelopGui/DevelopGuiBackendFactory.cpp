@@ -1,6 +1,6 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "Application/Platform/Windows/Win32Window.h"
+#include "Core/Log/LogMacros.h"
 #include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
 #include "DevTools/DevelopGui/Backends/Windows/DevelopGuiWin32PlatformBackend.h"
 #include "Graphics/RHI/DX12/DX12Context.h"

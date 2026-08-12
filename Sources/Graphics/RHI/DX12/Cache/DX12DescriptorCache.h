@@ -1,19 +1,22 @@
 #pragma once
+#include "Core/CoreMacros.h"
+#include "Core/Hash/KeyHash.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
 #include "Graphics/RHI/RHISampler.h"
-#include "Core/Hash/KeyHash.h"
 
+#include <shared_mutex>
 #include <span>
+#include <unordered_map>
+#include <vector>
 
 namespace gglab
 {
 	class DX12Device;
 	class DX12Buffer;
 	class DX12Texture;
-	class DX12DescriptorManager;
 
 	class DX12DescriptorCache
 	{

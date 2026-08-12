@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -10,6 +11,10 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <algorithm>
+#include <memory>
+#include <span>
 
 namespace gglab
 {

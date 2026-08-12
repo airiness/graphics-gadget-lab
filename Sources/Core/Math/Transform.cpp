@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Math/Transform.h"
 
 namespace gglab::math

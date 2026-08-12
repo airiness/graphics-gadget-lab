@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Core/Time.h"
 
 namespace gglab

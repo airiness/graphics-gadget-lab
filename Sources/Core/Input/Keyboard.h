@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Input/InputBase.h"
 
 namespace gglab

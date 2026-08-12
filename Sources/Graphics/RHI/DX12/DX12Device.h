@@ -1,13 +1,18 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
-#include "Core/Utility/TypeUtils.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/DX12/DX12HResult.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
 #include <D3D12MemAlloc.h>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
+
+#include <d3d12.h>
+#include <dxgi1_6.h>
 
 namespace gglab
 {

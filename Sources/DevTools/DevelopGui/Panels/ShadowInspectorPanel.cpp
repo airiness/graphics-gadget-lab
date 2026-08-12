@@ -1,4 +1,4 @@
-#include "Core/Precompiled.h"
+#include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Core/Math/Matrix.h"
 #include "Core/Math/Quaternion.h"
 #include "Scene/Components.h"
@@ -8,13 +8,14 @@
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
-#include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderView.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

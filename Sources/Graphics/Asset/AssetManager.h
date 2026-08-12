@@ -1,4 +1,5 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
@@ -16,7 +17,14 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 
+#include <cstdint>
+#include <filesystem>
+#include <memory>
 #include <optional>
+#include <span>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace gglab
 {

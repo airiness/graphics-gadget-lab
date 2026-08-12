@@ -1,8 +1,12 @@
-#include "Core/Precompiled.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <numbers>
+#include <utility>
 
 namespace gglab
 {

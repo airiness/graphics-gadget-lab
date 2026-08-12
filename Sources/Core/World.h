@@ -1,4 +1,7 @@
 #pragma once
+#include "Core/CoreMacros.h"
+
+#include <entt/entity/registry.hpp>
 
 namespace gglab
 {

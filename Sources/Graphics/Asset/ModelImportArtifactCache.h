@@ -3,6 +3,8 @@
 #include "Graphics/Asset/ArtifactCacheCore.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	struct ModelImportArtifactCacheConfig

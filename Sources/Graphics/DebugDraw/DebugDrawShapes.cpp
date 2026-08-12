@@ -1,7 +1,13 @@
-#include "Core/Precompiled.h"
+#include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Core/Math/MathConstants.h"
 #include "Core/Math/MathFunctions.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <span>
+#include <vector>
 
 namespace gglab
 {

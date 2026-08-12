@@ -1,6 +1,11 @@
 #pragma once
 #include "Core/Platform/Win/ComTypes.h"
 
+#include <Windows.h>
+#include <GameInput.h>
+
+#include <cstdint>
+
 namespace gglab
 {
 	class InputBase

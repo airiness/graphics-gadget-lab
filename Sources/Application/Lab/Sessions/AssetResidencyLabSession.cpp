@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Core/Task/TaskSystem.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"

@@ -1,7 +1,16 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/DerivedData/IBLStageArtifactCodec.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/TextureArtifact.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <format>
+#include <limits>
+#include <span>
+#include <utility>
+#include <vector>
 
 namespace gglab
 {

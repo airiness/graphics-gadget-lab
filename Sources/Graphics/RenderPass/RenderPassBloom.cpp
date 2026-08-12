@@ -1,10 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassBloom.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/PostProcess/PostProcessResolution.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <format>
+#include <span>
+#include <string>
 
 namespace gglab
 {

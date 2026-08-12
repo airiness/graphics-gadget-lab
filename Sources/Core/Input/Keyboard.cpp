@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Core/Input/Keyboard.h"
+
+#include <cstring>
 
 namespace gglab
 {

@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Core/Task/TaskSystem.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"

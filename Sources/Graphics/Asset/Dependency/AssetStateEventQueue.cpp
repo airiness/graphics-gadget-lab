@@ -1,5 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
+#include "Core/CoreMacros.h"
+
+#include <optional>
+#include <thread>
+#include <vector>
 
 namespace gglab
 {

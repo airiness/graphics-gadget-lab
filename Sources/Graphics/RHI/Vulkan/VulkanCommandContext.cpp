@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"

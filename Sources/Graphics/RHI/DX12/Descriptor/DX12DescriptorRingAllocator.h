@@ -3,6 +3,9 @@
 #include "Core/Allocator/RingSpanAllocator.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 
+#include <deque>
+#include <mutex>
+
 namespace gglab
 {
 	class DX12DescriptorAllocator;

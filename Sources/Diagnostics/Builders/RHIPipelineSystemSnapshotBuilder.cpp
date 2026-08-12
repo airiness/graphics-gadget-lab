@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"

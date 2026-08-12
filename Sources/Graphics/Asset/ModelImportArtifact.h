@@ -6,8 +6,12 @@
 #include "Graphics/Asset/TextureArtifact.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <span>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

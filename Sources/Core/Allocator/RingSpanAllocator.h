@@ -1,6 +1,8 @@
 #pragma once
 #include "Core/Allocator/AllocatorBase.h"
 
+#include <deque>
+
 namespace gglab
 {
 	class RingSpanAllocator : public AllocatorBase

@@ -1,4 +1,8 @@
 #pragma once
+#include "Core/CoreMacros.h"
+
+#include <chrono>
+#include <cstdint>
 
 namespace gglab
 {

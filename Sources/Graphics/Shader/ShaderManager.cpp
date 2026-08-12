@@ -1,8 +1,25 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderCompiler.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Utility/StringUtils.h"
+#include "Graphics/Shader/ShaderCompiler.h"
+
+#include <filesystem>
+#include <format>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#if defined(_WIN32)
+#include <Windows.h>
+#endif
 
 namespace gglab
 {
@@ -24,6 +41,15 @@ namespace gglab
 
 	namespace
 	{
+		[[nodiscard]] bool IsHostDebuggerAttached() noexcept
+		{
+#if defined(_WIN32)
+			return IsDebuggerPresent() != FALSE;
+#else
+			return false;
+#endif
+		}
+
 		[[nodiscard]] constexpr std::string_view ShaderStageAbbreviation(ShaderStage stage) noexcept
 		{
 			switch (stage)
@@ -53,7 +79,7 @@ namespace gglab
 		m_Compiler = std::make_unique<ShaderCompiler>();
 
 		m_DefaultShaderConfig.m_Target.m_Flags |=
-			IsDebuggerPresent() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
+			IsHostDebuggerAttached() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
 		ApplyActiveBackendTarget(m_DefaultShaderConfig, m_ActiveBackend);
 		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
 		m_DefaultShaderConfig.m_Defines = {};

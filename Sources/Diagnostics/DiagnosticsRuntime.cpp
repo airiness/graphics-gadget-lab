@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 
 #include <chrono>

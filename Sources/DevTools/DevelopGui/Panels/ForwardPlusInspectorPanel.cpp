@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/Panels/ForwardPlusInspectorPanel.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -7,6 +6,8 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

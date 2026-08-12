@@ -1,8 +1,7 @@
-#include "Core/Precompiled.h"
+#include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
-#include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
@@ -15,6 +14,8 @@
 #include "Graphics/Renderer.h"
 
 #include <chrono>
+
+#include <imgui.h>
 
 namespace gglab
 {

@@ -1,11 +1,17 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderFrameBuilder.h"
+#include "Core/CoreMacros.h"
+#include "Core/Math/Culling.h"
+#include "Core/Profiling/CpuProfiler.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"
-#include "Core/Math/Culling.h"
-#include "Core/Profiling/CpuProfiler.h"
+
+#include <array>
+#include <optional>
+#include <span>
+#include <string_view>
+#include <utility>
 
 namespace gglab
 {

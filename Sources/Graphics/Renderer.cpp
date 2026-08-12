@@ -1,5 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/Renderer.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
+#include "Core/Utility/PathUtils.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -8,7 +10,10 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/TransferManager.h"
-#include "Core/Utility/PathUtils.h"
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
 
 namespace gglab
 {

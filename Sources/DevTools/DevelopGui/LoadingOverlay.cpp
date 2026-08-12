@@ -1,7 +1,9 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/LoadingOverlay.h"
 #include "Application/LoadingProgress.h"
 
+#include <algorithm>
+#include <cmath>
+#include <format>
 #include <imgui.h>
 
 namespace gglab

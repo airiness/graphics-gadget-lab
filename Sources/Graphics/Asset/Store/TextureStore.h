@@ -3,7 +3,10 @@
 #include "Core/Hash/KeyHash.h"
 #include "Graphics/Asset/TextureAsset.h"
 
+#include <cstddef>
+#include <filesystem>
 #include <memory>
+#include <tuple>
 #include <unordered_map>
 
 namespace gglab

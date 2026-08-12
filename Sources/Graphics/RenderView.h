@@ -7,6 +7,8 @@
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/ShadowSettings.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	class Camera;

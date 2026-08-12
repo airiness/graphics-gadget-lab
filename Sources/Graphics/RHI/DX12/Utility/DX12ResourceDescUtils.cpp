@@ -1,6 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+
+#include <optional>
 
 namespace gglab
 {

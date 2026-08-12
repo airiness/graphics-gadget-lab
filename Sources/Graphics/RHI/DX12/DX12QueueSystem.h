@@ -4,6 +4,7 @@
 #include "Graphics/RHI/RHIFence.h"
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <vector>
 

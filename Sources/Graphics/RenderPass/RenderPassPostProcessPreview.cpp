@@ -1,5 +1,5 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "Core/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -7,6 +7,11 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+
+#include <cmath>
+#include <cstdint>
+#include <optional>
+#include <span>
 
 namespace gglab
 {

@@ -2,6 +2,9 @@
 #include "Core/Math/Vector.h"
 #include "Graphics/ShadowSettings.h"
 
+#include <cstdint>
+#include <optional>
+
 namespace gglab
 {
 	class World;

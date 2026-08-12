@@ -1,6 +1,7 @@
-#include "Core/Precompiled.h"
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+
+#include <format>
 
 namespace gglab
 {

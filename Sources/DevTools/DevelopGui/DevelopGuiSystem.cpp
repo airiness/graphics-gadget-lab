@@ -1,10 +1,12 @@
-#include "Core/Precompiled.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
+#include "Core/Log/LogMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
+
+#include <imgui.h>
 
 namespace gglab
 {

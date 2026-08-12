@@ -1,7 +1,14 @@
 #pragma once
+#include "Core/CoreMacros.h"
 #include "Graphics/RHI/DX12/Cache/PSOKey.h"
 #include "Graphics/RHI/DX12/Cache/PSOCreator.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <shared_mutex>
+#include <unordered_map>
 
 namespace gglab
 {

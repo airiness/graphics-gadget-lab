@@ -1,6 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Core/Input/InputBase.h"
 #include "Core/HResult.h"
+#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

@@ -1,5 +1,6 @@
-#include "Core/Precompiled.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "Core/CoreMacros.h"
+#include "Core/Log/LogMacros.h"
 #include "Core/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
@@ -7,6 +8,17 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <memory>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace gglab
 {
