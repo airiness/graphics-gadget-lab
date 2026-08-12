@@ -1658,12 +1658,24 @@ namespace gglab
 		void RunVulkanQualificationPathContractTests(SelfTestContext& context) noexcept
 		{
 			VulkanQualificationOptions options{};
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification rejects missing host-supplied runtime paths");
 			context.Check(!options.HasRequiredRuntimePaths(),
-				"Vulkan qualification rejects missing host-supplied runtime paths");
+				"Vulkan qualification reports missing host-supplied runtime paths");
+
+			options.m_ListAdapters = true;
+			context.Check(options.IsConfigurationValid(),
+				"Vulkan adapter inspection does not require shader runtime paths");
+			options.m_ListAdapters = false;
+
 			options.m_ShaderSourceRoot = "Shaders";
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification requires the shader cache root independently");
 			context.Check(!options.HasRequiredRuntimePaths(),
 				"Vulkan qualification requires the shader cache root independently");
 			options.m_ShaderCacheRoot = "ShaderCache";
+			context.Check(options.IsConfigurationValid(),
+				"Vulkan frame qualification accepts both required host-supplied runtime paths");
 			context.Check(options.HasRequiredRuntimePaths(),
 				"Vulkan qualification accepts both required host-supplied runtime paths");
 		}

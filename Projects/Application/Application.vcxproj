@@ -70,7 +70,7 @@
     <GGLAB_USE_PCH Condition="'$(GGLAB_USE_PCH)'==''">1</GGLAB_USE_PCH>
   </PropertyGroup>
   <PropertyGroup Condition="'$(GGLAB_USE_PCH)'=='0'">
-    <IntDir>$(SolutionDir)Build\Intermediate\$(Platform)\$(Configuration)\NoPCH\</IntDir>
+    <IntDir>$(SolutionDir)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\NoPCH\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>GraphicsGadgetLab</TargetName>

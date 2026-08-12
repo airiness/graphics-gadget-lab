@@ -2620,10 +2620,10 @@ namespace gglab
 	int RunVulkanQualification(const VulkanQualificationOptions& options) noexcept
 	{
 #if GGLAB_ENABLE_VULKAN
-		if (!options.HasRequiredRuntimePaths())
+		if (!options.IsConfigurationValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"Vulkan qualification requires non-empty shader source and cache roots.");
+				"Vulkan frame qualification requires non-empty shader source and cache roots.");
 			return 1;
 		}
 

@@ -21,6 +21,11 @@ namespace gglab
 		{
 			return !m_ShaderSourceRoot.empty() && !m_ShaderCacheRoot.empty();
 		}
+
+		[[nodiscard]] bool IsConfigurationValid() const noexcept
+		{
+			return m_ListAdapters || HasRequiredRuntimePaths();
+		}
 	};
 
 	// Runs the deterministic Vulkan bootstrap, adapter inspection and

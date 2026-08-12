@@ -196,6 +196,29 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build GGLabRuntime standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $runtimeBuildArguments = @(
+            "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-runtime-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @runtimeBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Build
         shell: pwsh
         run: |
@@ -236,6 +259,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: msbuild-binlog-${{ matrix.log_name }}
-          path: Build/Logs/gglab-${{ matrix.log_name }}.binlog
+          path: |
+            Build/Logs/gglab-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7
