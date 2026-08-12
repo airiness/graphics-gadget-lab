@@ -261,8 +261,8 @@
     <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
-      <Filter>Core</Filter>
+    <ClCompile Include="..\..\Sources\Application\ApplicationPch.cpp">
+      <Filter>Application</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Main.cpp">
       <Filter>Application</Filter>
@@ -1328,8 +1328,8 @@
     <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h">
       <Filter>Graphics\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Core\Precompiled.h">
-      <Filter>Core</Filter>
+    <ClInclude Include="..\..\Sources\Application\ApplicationPch.h">
+      <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
       <Filter>Externals\D3D12MemAlloc</Filter>

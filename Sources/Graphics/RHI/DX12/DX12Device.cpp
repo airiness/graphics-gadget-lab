@@ -20,6 +20,7 @@
 #include <string_view>
 
 #include <windows.h>
+#include <shlobj.h>
 
 #if defined(BUILD_DEBUG)
 #include <dxgidebug.h>

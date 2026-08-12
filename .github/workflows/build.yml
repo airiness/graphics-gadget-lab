@@ -169,7 +169,7 @@ jobs:
         shell: pwsh
         run: |
           $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\Core\Precompiled.cpp").Path
+            (Resolve-Path -LiteralPath "Sources\Application\ApplicationPch.cpp").Path
           $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
           $unexpectedIncludes = @(
             Get-ChildItem -LiteralPath Sources -Recurse -File |
@@ -177,7 +177,7 @@ jobs:
                 $_.Extension -in $sourceExtensions -and
                 $_.FullName -ne $pchCreatorSource
               } |
-              Select-String -Pattern '^\s*#\s*include\s*[<"]Core/Precompiled\.h[>"]'
+              Select-String -Pattern '^\s*#\s*include\s*[<"]Application/ApplicationPch\.h[>"]'
           )
 
           if ($unexpectedIncludes.Count -ne 0) {

@@ -118,8 +118,8 @@
     <ClCompile>
       <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'!='0'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'=='0'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>Core/Precompiled.h</PrecompiledHeaderFile>
-      <ForcedIncludeFiles Condition="'$(GGLAB_USE_PCH)'!='0'">Core/Precompiled.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <PrecompiledHeaderFile>Application/ApplicationPch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles Condition="'$(GGLAB_USE_PCH)'!='0'">Application/ApplicationPch.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -413,7 +413,7 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Main.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Precompiled.cpp">
+    <ClCompile Include="..\..\Sources\Application\ApplicationPch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
     </ClCompile>
@@ -868,7 +868,7 @@
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
-    <ClInclude Include="..\..\Sources\Core\Precompiled.h" />
+    <ClInclude Include="..\..\Sources\Application\ApplicationPch.h" />
     <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h" />
