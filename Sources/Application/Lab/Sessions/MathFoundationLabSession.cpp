@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Culling.h"

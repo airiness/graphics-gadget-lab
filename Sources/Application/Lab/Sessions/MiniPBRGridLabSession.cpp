@@ -1,7 +1,6 @@
-#include "Core/Precompiled.h"
+#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Quaternion.h"
-#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"

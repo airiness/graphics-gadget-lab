@@ -1,6 +1,5 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
+#include "Core/Math/Quaternion.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"

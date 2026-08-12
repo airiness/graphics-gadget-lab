@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 
 #include "Diagnostics/Snapshots/LabSnapshot.h"

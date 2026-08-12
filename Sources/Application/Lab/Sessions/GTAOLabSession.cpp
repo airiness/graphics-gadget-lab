@@ -1,6 +1,5 @@
-#include "Core/Precompiled.h"
-#include "Core/Math/Quaternion.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "Core/Math/Quaternion.h"
 
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Camera.h"
