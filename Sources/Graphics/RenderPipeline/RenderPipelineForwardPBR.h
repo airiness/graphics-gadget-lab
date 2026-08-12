@@ -2,7 +2,6 @@
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
-#include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
@@ -77,7 +76,6 @@ namespace gglab
 		RenderPassIBL m_IBLPass;
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
-		RenderPassDevelopGui m_DevelopGuiPass;
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
 	};
 }

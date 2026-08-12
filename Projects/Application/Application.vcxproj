@@ -359,7 +359,6 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp" />
     <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawShapes.cpp" />
@@ -725,7 +724,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />

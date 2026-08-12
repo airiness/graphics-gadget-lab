@@ -5,11 +5,30 @@
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
+#include "Graphics/RenderContexts.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderPass/IBLGraphResources.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
 #include <imgui.h>
 
 namespace gglab
 {
+	namespace
+	{
+		struct DevelopGuiPassData
+		{
+			RGTextureId m_BackBuffer{};
+			RGTextureId m_BrdfLut{};
+			RGTextureId m_EnvironmentCubemapPreview{};
+			RGTextureId m_IrradianceCubemapPreview{};
+			RGTextureId m_PrefilteredSpecularCubemapPreview{};
+			RGTextureId m_DirectionalShadowMapPreview{};
+			RGTextureViewId m_Rtv{};
+		};
+	}
+
 	DevelopGuiSystem::DevelopGuiSystem() noexcept = default;
 
 	DevelopGuiSystem::~DevelopGuiSystem()
@@ -129,6 +148,80 @@ namespace gglab
 		ImGui::Render();
 		m_State = State::Active;
 		m_RenderBackend->RenderDrawData(commandContext, renderTarget);
+	}
+
+	void DevelopGuiSystem::AddOverlayPasses(RenderGraph& renderGraph,
+		const RenderFrameContext& frameContext, const RenderServices&) noexcept
+	{
+		if (!IsFrameOpen())
+		{
+			return;
+		}
+		const RenderViewID displayViewId = frameContext.GetDisplayViewId();
+
+		renderGraph.AddPass<DevelopGuiPassData>("UI.DevelopGui",
+			[displayViewId](RenderGraph::RGBuilder& builder, DevelopGuiPassData& data)
+			{
+				builder.SideEffect();
+
+				auto& blackboard = builder.GetBlackboard();
+				auto& targetsTable =
+					blackboard.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName);
+				auto& viewTargets = targetsTable.GetViewTargets(displayViewId);
+				builder.ReadWriteInPlace(viewTargets.m_BackBuffer, RGTextureAccess::RenderTarget);
+				data.m_BackBuffer = viewTargets.m_BackBuffer;
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
+
+				if (const auto* iblRes = blackboard.TryGet<RGIBLResources>(IBLResourcesName);
+					iblRes && iblRes->m_BrdfLut.IsValid())
+				{
+					data.m_BrdfLut = builder.Read(iblRes->m_BrdfLut, RGTextureAccess::Sample);
+				}
+
+				if (const auto* iblPreviewRes =
+					blackboard.TryGet<RGIBLPreviewResources>(IBLPreviewResourcesName))
+				{
+					if (iblPreviewRes->m_EnvironmentCubemapPreview.IsValid())
+					{
+						data.m_EnvironmentCubemapPreview = builder.Read(
+							iblPreviewRes->m_EnvironmentCubemapPreview, RGTextureAccess::Sample);
+					}
+					if (iblPreviewRes->m_IrradianceCubemapPreview.IsValid())
+					{
+						data.m_IrradianceCubemapPreview = builder.Read(
+							iblPreviewRes->m_IrradianceCubemapPreview, RGTextureAccess::Sample);
+					}
+					if (iblPreviewRes->m_PrefilteredSpecularCubemapPreview.IsValid())
+					{
+						data.m_PrefilteredSpecularCubemapPreview = builder.Read(
+							iblPreviewRes->m_PrefilteredSpecularCubemapPreview,
+							RGTextureAccess::Sample);
+					}
+				}
+
+				if (const auto* shadowRes = blackboard.TryGet<RGShadowResources>(ShadowResourcesName);
+					shadowRes && shadowRes->m_DirectionalShadowMapPreview.IsValid())
+				{
+					data.m_DirectionalShadowMapPreview = builder.Read(
+						shadowRes->m_DirectionalShadowMapPreview, RGTextureAccess::Sample);
+				}
+			},
+			[this](RGExecuteContext& executeContext, DevelopGuiPassData& data)
+			{
+				GGLAB_UNUSED(data.m_BrdfLut);
+				GGLAB_UNUSED(data.m_EnvironmentCubemapPreview);
+				GGLAB_UNUSED(data.m_IrradianceCubemapPreview);
+				GGLAB_UNUSED(data.m_PrefilteredSpecularCubemapPreview);
+				GGLAB_UNUSED(data.m_DirectionalShadowMapPreview);
+
+				if (!IsFrameOpen())
+				{
+					return;
+				}
+
+				RenderDrawData(executeContext.GetGraphicsCommandContext(),
+					executeContext.GetViewHandle(data.m_Rtv));
+			});
 	}
 
 	void DevelopGuiSystem::EndFrame() noexcept

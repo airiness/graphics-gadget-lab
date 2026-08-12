@@ -131,6 +131,7 @@
     <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
     <ClInclude Include="..\..\Sources\Core\World.h" />
     <ClInclude Include="..\..\Sources\Scene\Components.h" />
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

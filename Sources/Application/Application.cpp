@@ -211,7 +211,14 @@ namespace gglab
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
-		m_Renderer->Initialize(rendererCreateInfo);
+		if (!m_Renderer->Initialize(rendererCreateInfo))
+		{
+			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
+			m_ExitCode = 1;
+			m_ExitAfterInitialize = true;
+			m_IsInitialized = true;
+			return;
+		}
 
 		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
 			.m_Device = m_Renderer->GetDevice(),
@@ -430,7 +437,7 @@ namespace gglab
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get(),
-			.m_DevelopGuiSystem = m_DevelopGuiSystem.get(),
+			.m_OverlayExtension = m_DevelopGuiSystem.get(),
 		};
 
 		// Build RenderGraph
@@ -522,7 +529,7 @@ namespace gglab
 			return;
 		}
 
-		// Bootstrap/qualification mode never created the renderer subsystems.
+		// Early-exit startup paths never completed the renderer subsystems.
 		if (m_ExitAfterInitialize)
 		{
 			if (m_TaskSystem)

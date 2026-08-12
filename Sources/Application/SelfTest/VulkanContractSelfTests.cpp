@@ -16,6 +16,7 @@
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
@@ -1654,6 +1655,19 @@ namespace gglab
 		}
 #endif
 
+		void RunVulkanQualificationPathContractTests(SelfTestContext& context) noexcept
+		{
+			VulkanQualificationOptions options{};
+			context.Check(!options.HasRequiredRuntimePaths(),
+				"Vulkan qualification rejects missing host-supplied runtime paths");
+			options.m_ShaderSourceRoot = "Shaders";
+			context.Check(!options.HasRequiredRuntimePaths(),
+				"Vulkan qualification requires the shader cache root independently");
+			options.m_ShaderCacheRoot = "ShaderCache";
+			context.Check(options.HasRequiredRuntimePaths(),
+				"Vulkan qualification accepts both required host-supplied runtime paths");
+		}
+
 		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
@@ -2377,6 +2391,7 @@ namespace gglab
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunShaderArtifactContractTests(context);
+		RunVulkanQualificationPathContractTests(context);
 		RunVulkanCliContractTests(context);
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);

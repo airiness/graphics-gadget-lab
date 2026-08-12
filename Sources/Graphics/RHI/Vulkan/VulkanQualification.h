@@ -16,6 +16,11 @@ namespace gglab
 		std::optional<std::string> m_AdapterSelector;
 		std::filesystem::path m_ShaderSourceRoot;
 		std::filesystem::path m_ShaderCacheRoot;
+
+		[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
+		{
+			return !m_ShaderSourceRoot.empty() && !m_ShaderCacheRoot.empty();
+		}
 	};
 
 	// Runs the deterministic Vulkan bootstrap, adapter inspection and

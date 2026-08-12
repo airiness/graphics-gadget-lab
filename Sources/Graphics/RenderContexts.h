@@ -17,7 +17,7 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;
-	class DevelopGuiSystem;
+	class RenderPipelineOverlayExtensionBase;
 
 	struct RenderFrameContext
 	{
@@ -97,7 +97,7 @@ namespace gglab
 		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
-		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
+		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 
 		bool IsValid() const noexcept { return m_Renderer && m_AssetManager && m_ShaderManager; }
 	};

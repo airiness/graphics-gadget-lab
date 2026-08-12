@@ -83,6 +83,11 @@ namespace gglab
 			void* m_NativeWindowHandle = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+
+			[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
+			{
+				return !m_IblDerivedDataCacheDirectory.empty() && !m_ShaderSourceRoot.empty();
+			}
 		};
 
 	public:
@@ -90,7 +95,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
 		~Renderer();
 
-		void Initialize(const CreateInfo& createInfo) noexcept;
+		[[nodiscard]] bool Initialize(const CreateInfo& createInfo) noexcept;
 		void Finalize() noexcept;
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 

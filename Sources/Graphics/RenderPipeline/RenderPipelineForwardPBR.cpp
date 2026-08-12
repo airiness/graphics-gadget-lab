@@ -4,6 +4,7 @@
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -340,8 +341,10 @@ namespace gglab
 		// Always-visible debug geometry is composed after all back-buffer previews.
 		m_DebugDrawOverlayPass.AddPass(rg, context, services);
 
-		// DevelopGui
-		m_DevelopGuiPass.AddPass(rg, context, services);
+		if (services.m_OverlayExtension)
+		{
+			services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
+		}
 
 		// Return persistent IBL resources to Common only after every consumer and
 		// preview pass has declared its final access for this frame.

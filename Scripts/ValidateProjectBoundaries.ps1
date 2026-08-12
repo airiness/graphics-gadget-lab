@@ -12,10 +12,8 @@ param(
 # Current known violations are enumerated as an explicit ledger; any
 # violation outside the ledger fails the validation.
 #
-# Candidate scanning remains directory-driven while the runtime library owns
-# only its project-local build anchor. Once repository sources move into the
-# target, ownership scanning can derive from project items; portable-platform
-# scanning remains classification-driven.
+# Ownership scanning derives from actual GGLabRuntime project items;
+# portable-platform scanning remains classification-driven.
 
 $ErrorActionPreference = "Stop"
 
@@ -76,6 +74,7 @@ $knownViolations = @(
 )
 
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
+$ownershipSymbolRegex = '\bDevelopGuiSystem\b'
 $platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|GetExeOutDir|bcrypt\.h'
 $platformLeafIncludeRegex = '#include\s*"(Core/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h)'
 $platformNamespaceRegex = '\bwin32::'
@@ -187,7 +186,8 @@ foreach ($file in $runtimeOwnedFiles) {
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
 
     if ($file.Path.StartsWith("Application/") -or $file.Path.StartsWith("DevTools/") -or
-        $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex) {
+        $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex -or
+        $content -match $ownershipSymbolRegex) {
         $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }
 }

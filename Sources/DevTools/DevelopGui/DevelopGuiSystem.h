@@ -3,6 +3,7 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITexture.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 
 #include <imgui.h>
 
@@ -15,7 +16,7 @@ namespace gglab
 	class RHIGraphicsCommandContext;
 	struct DevelopGuiContext;
 
-	class DevelopGuiSystem
+	class DevelopGuiSystem final : public RenderPipelineOverlayExtensionBase
 	{
 	public:
 		enum class State : uint8_t
@@ -34,7 +35,7 @@ namespace gglab
 	public:
 		DevelopGuiSystem() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DevelopGuiSystem);
-		~DevelopGuiSystem();
+		~DevelopGuiSystem() override;
 
 		[[nodiscard]] bool Initialize(const CreateInfo& createInfo) noexcept;
 		void Finalize() noexcept;
@@ -43,6 +44,8 @@ namespace gglab
 		void Draw(DevelopGuiContext& context) noexcept;
 		void RenderDrawData(
 			RHIGraphicsCommandContext* commandContext, RHITextureViewHandle renderTarget) noexcept;
+		void AddOverlayPasses(RenderGraph& renderGraph, const RenderFrameContext& frameContext,
+			const RenderServices& services) noexcept override;
 		void EndFrame() noexcept;
 
 		[[nodiscard]] State GetState() const noexcept { return m_State; }

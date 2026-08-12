@@ -852,9 +852,6 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -1894,9 +1891,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h">
-      <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h">
       <Filter>Graphics\RenderPass</Filter>

@@ -2,11 +2,11 @@
 #include "Core/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
@@ -96,7 +96,10 @@ namespace gglab
 					});
 
 				m_IBLPass.AddPass(rg, context, services);
-				m_DevelopGuiPass.AddPass(rg, context, services);
+				if (services.m_OverlayExtension)
+				{
+					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
+				}
 				m_IBLPass.AddFinishPass(rg);
 
 				rg.AddPass<LoadingShellFinishPassData>("LoadingShell.Finish",
@@ -120,7 +123,6 @@ namespace gglab
 
 		private:
 			RenderPassIBL m_IBLPass;
-			RenderPassDevelopGui m_DevelopGuiPass;
 		};
 	}
 

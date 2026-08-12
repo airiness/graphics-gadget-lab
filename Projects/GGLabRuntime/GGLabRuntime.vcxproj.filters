@@ -34,6 +34,12 @@
     <Filter Include="Scene">
       <UniqueIdentifier>{269EEC4F-15C7-4767-89F3-9CD58964A417}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics">
+      <UniqueIdentifier>{6A6DF654-86A2-4127-996E-B81DE82B08F0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RenderPipeline">
+      <UniqueIdentifier>{3B04F7DE-4C2C-482E-8DDD-9778D9DA12B1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp">
@@ -190,6 +196,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Scene\Components.h">
       <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h">
+      <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

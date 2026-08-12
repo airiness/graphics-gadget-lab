@@ -9,6 +9,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -24,6 +25,7 @@
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderPaths.h"
@@ -77,6 +79,10 @@ namespace gglab
 			RGBufferId m_ScenePhaseBuffer;
 		};
 
+		struct OverlayExtensionFixturePassData
+		{
+		};
+
 		class RecordingOpaqueSceneExtension final : public RenderPipelineSceneExtensionBase
 		{
 		public:
@@ -107,6 +113,30 @@ namespace gglab
 			RGBufferId& m_ScenePhaseBuffer;
 			uint32_t& m_AddPassCount;
 			uint32_t& m_DestructionCount;
+		};
+
+		class RecordingOverlayExtension final : public RenderPipelineOverlayExtensionBase
+		{
+		public:
+			explicit RecordingOverlayExtension(uint32_t& addPassCount) noexcept :
+				m_AddPassCount(addPassCount)
+			{
+			}
+
+			void AddOverlayPasses(RenderGraph& renderGraph,
+				const RenderFrameContext&, const RenderServices&) noexcept override
+			{
+				++m_AddPassCount;
+				renderGraph.AddPass<OverlayExtensionFixturePassData>(
+					"RenderingContract.OverlayExtension",
+					[](RenderGraph::RGBuilder& builder, OverlayExtensionFixturePassData&)
+					{
+						builder.SideEffect();
+					});
+			}
+
+		private:
+			uint32_t& m_AddPassCount;
 		};
 
 		class RecordingDevice final : public RHIDevice
@@ -522,6 +552,51 @@ namespace gglab
 			RenderPipelineForwardPBR defaultPipeline;
 			context.Check(defaultPipeline.GetName() == "ForwardPBR",
 				"ForwardPBR remains source-compatible without an optional extension");
+		}
+
+		void RunOverlayExtensionContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(std::is_abstract_v<RenderPipelineOverlayExtensionBase>);
+			static_assert(std::has_virtual_destructor_v<RenderPipelineOverlayExtensionBase>);
+			static_assert(std::is_same_v<decltype(RenderServices::m_OverlayExtension),
+				RenderPipelineOverlayExtensionBase*>);
+
+			uint32_t addPassCount = 0;
+			RecordingOverlayExtension extension(addPassCount);
+			const RenderServices services{ .m_OverlayExtension = &extension };
+			const RenderScene renderScene{};
+			const RenderFrameContext frameContext{ .m_RenderScene = renderScene };
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			services.m_OverlayExtension->AddOverlayPasses(graph, frameContext, services);
+
+			const bool compiled = graph.Compile();
+			context.Check(compiled && addPassCount == 1,
+				"Overlay extensions add their RenderGraph passes through the runtime-owned hook");
+			if (compiled)
+			{
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				context.Check(snapshot.m_Passes.size() == 1 &&
+					snapshot.m_Passes.front().m_Name == "RenderingContract.OverlayExtension" &&
+					!snapshot.m_Passes.front().m_Culled,
+					"Application-owned overlay passes remain live without a concrete DevTools service");
+			}
+		}
+
+		void RunRuntimePathConfigurationContractTests(SelfTestContext& context) noexcept
+		{
+			Renderer::CreateInfo createInfo{};
+			context.Check(!createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration rejects missing host-supplied runtime paths");
+			createInfo.m_IblDerivedDataCacheDirectory = "DerivedDataCache/IBL";
+			context.Check(!createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration requires the shader source root independently");
+			createInfo.m_ShaderSourceRoot = "Shaders";
+			context.Check(createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration accepts both required host-supplied runtime paths");
 		}
 
 		void RunNapaVoxelRenderGraphContractTests(SelfTestContext& context) noexcept
@@ -3927,6 +4002,8 @@ namespace gglab
 	{
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
+		RunOverlayExtensionContractTests(context);
+		RunRuntimePathConfigurationContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);

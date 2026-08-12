@@ -50,8 +50,15 @@ namespace gglab
 			!m_HasActiveFrame, "Renderer destroyed while a Renderer::Frame is still active.");
 	}
 
-	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
+	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
+		if (!createInfo.HasRequiredRuntimePaths())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer initialization requires non-empty IBL cache and shader source roots.");
+			return false;
+		}
+
 		RHIContextDesc contextDesc{};
 		contextDesc.m_Backend = createInfo.m_Backend;
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
@@ -107,6 +114,7 @@ namespace gglab
 		InitializeGpuBuffers();
 
 		m_IsInitialized = true;
+		return true;
 	}
 
 	void Renderer::Finalize() noexcept
