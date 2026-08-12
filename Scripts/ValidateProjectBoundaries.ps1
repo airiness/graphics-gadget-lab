@@ -12,9 +12,10 @@ param(
 # Current known violations are enumerated as an explicit ledger; any
 # violation outside the ledger fails the validation.
 #
-# Candidate scanning is directory-driven (Core/Scene/Graphics/Diagnostics)
-# until the runtime library project exists; scanning then switches to
-# project-ownership driven.
+# Candidate scanning remains directory-driven while the runtime library owns
+# only its project-local build anchor. Once repository sources move into the
+# target, ownership scanning can derive from project items; portable-platform
+# scanning remains classification-driven.
 
 $ErrorActionPreference = "Stop"
 

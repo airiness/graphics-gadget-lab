@@ -929,6 +929,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
+      <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
       <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>
     </ProjectReference>
