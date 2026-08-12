@@ -1,5 +1,7 @@
 #include "Core/Hash/Sha256.h"
 
+#include <Windows.h>
+
 #include <algorithm>
 #include <bcrypt.h>
 #include <limits>

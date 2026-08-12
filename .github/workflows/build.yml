@@ -25,16 +25,26 @@ concurrency:
 
 jobs:
   build:
-    name: Build / ${{ matrix.configuration }}
+    name: Build / ${{ matrix.display_name }}
     runs-on: windows-2022
     timeout-minutes: 45
 
     strategy:
       fail-fast: false
       matrix:
-        configuration:
-          - Debug
-          - Release
+        include:
+          - display_name: Debug
+            configuration: Debug
+            pch: enabled
+            log_name: Debug
+          - display_name: Release
+            configuration: Release
+            pch: enabled
+            log_name: Release
+          - display_name: Debug (no PCH)
+            configuration: Debug
+            pch: disabled
+            log_name: Debug-no-PCH
 
     steps:
       - name: Checkout repository
@@ -154,6 +164,29 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Validate no-PCH source boundary
+        if: matrix.pch == 'disabled'
+        shell: pwsh
+        run: |
+          $pchCreatorSource =
+            (Resolve-Path -LiteralPath "Sources\Core\Precompiled.cpp").Path
+          $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
+          $unexpectedIncludes = @(
+            Get-ChildItem -LiteralPath Sources -Recurse -File |
+              Where-Object {
+                $_.Extension -in $sourceExtensions -and
+                $_.FullName -ne $pchCreatorSource
+              } |
+              Select-String -Pattern '^\s*#\s*include\s*[<"]Core/Precompiled\.h[>"]'
+          )
+
+          if ($unexpectedIncludes.Count -ne 0) {
+            $locations = $unexpectedIncludes | ForEach-Object {
+              "$($_.Path):$($_.LineNumber)"
+            }
+            throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
+          }
+
       - name: Build
         shell: pwsh
         run: |
@@ -167,8 +200,12 @@ jobs:
             "/p:Platform=x64"
             "/verbosity:minimal"
             "/nologo"
-            "/bl:Build\Logs\gglab-${{ matrix.configuration }}.binlog"
+            "/bl:Build\Logs\gglab-${{ matrix.log_name }}.binlog"
           )
+
+          if ("${{ matrix.pch }}" -eq "disabled") {
+            $buildArguments += "/p:GGLAB_USE_PCH=0"
+          }
 
           msbuild @buildArguments
 
@@ -189,7 +226,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: msbuild-binlog-${{ matrix.configuration }}
-          path: Build/Logs/gglab-${{ matrix.configuration }}.binlog
+          name: msbuild-binlog-${{ matrix.log_name }}
+          path: Build/Logs/gglab-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7

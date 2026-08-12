@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 
+#include <string>
 #include <utility>
 
 namespace gglab::win32

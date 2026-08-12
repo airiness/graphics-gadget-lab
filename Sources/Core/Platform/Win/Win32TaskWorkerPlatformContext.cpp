@@ -3,6 +3,7 @@
 #include "Core/Log/LogMacros.h"
 
 #include <Windows.h>
+#include <objbase.h>
 
 #include <format>
 #include <string>
