@@ -11,13 +11,17 @@ namespace gglab
 	}
 
 	VulkanWin32Surface::Result VulkanWin32Surface::Create(
-		VkInstance instance, HINSTANCE hInstance, HWND hwnd) noexcept
+		VkInstance instance, void* nativeInstanceHandle, void* nativeWindowHandle) noexcept
 	{
+		const HINSTANCE hInstance = static_cast<HINSTANCE>(nativeInstanceHandle);
+		const HWND hwnd = static_cast<HWND>(nativeWindowHandle);
+
 		Result result{};
 		if (instance == VK_NULL_HANDLE || hInstance == nullptr || hwnd == nullptr)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
-			result.m_Error = "VulkanWin32Surface requires a valid instance, HINSTANCE, and HWND.";
+			result.m_Error =
+				"VulkanWin32Surface requires a valid instance and native window handles.";
 			return result;
 		}
 

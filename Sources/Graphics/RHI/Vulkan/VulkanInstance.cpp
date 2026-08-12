@@ -106,7 +106,9 @@ namespace gglab
 			}
 		}
 
-		constexpr std::string_view Win32SurfaceExtensionName = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
+		// VK_KHR_win32_surface; kept as a literal so the portable instance
+		// contract does not depend on the Win32 surface header.
+		constexpr std::string_view Win32SurfaceExtensionName = "VK_KHR_win32_surface";
 		constexpr std::string_view SurfaceExtensionName = VK_KHR_SURFACE_EXTENSION_NAME;
 		constexpr std::string_view DebugUtilsExtensionName = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 		constexpr std::string_view ValidationLayerName = "VK_LAYER_KHRONOS_validation";

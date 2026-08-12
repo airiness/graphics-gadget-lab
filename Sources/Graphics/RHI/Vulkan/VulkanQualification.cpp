@@ -60,8 +60,8 @@ namespace gglab
 			const VulkanQualificationOptions& options) noexcept
 		{
 			VulkanBootstrapOptions bootstrapOptions{};
-			bootstrapOptions.m_HInstance = options.m_HInstance;
-			bootstrapOptions.m_Hwnd = options.m_Hwnd;
+			bootstrapOptions.m_NativeInstanceHandle = options.m_HInstance;
+			bootstrapOptions.m_NativeWindowHandle = options.m_Hwnd;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
 				MakeVulkanSelectionRequest(options.m_AdapterSelector);

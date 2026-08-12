@@ -229,7 +229,8 @@ namespace gglab
 				outReport.m_HasDebugMessenger ? "enabled" : "disabled"));
 
 			VulkanWin32Surface::Result surfaceResult =
-				VulkanWin32Surface::Create(instance->Get(), options.m_HInstance, options.m_Hwnd);
+				VulkanWin32Surface::Create(instance->Get(), options.m_NativeInstanceHandle,
+					options.m_NativeWindowHandle);
 			if (!surfaceResult.Succeeded())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(

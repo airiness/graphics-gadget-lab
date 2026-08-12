@@ -31,8 +31,10 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanWin32Surface);
 		~VulkanWin32Surface();
 
+		// The native handles are opaque at the contract level; the Win32
+		// implementation interprets them as the process instance and window.
 		[[nodiscard]] static Result Create(
-			VkInstance instance, HINSTANCE hInstance, HWND hwnd) noexcept;
+			VkInstance instance, void* nativeInstanceHandle, void* nativeWindowHandle) noexcept;
 
 		[[nodiscard]] VkSurfaceKHR Get() const noexcept { return m_Surface; }
 

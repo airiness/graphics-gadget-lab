@@ -1,12 +1,10 @@
 #pragma once
-#include <windows.h>
 
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
-#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 
 #include <vulkan/vulkan.h>
 
@@ -18,6 +16,8 @@
 
 namespace gglab
 {
+	class VulkanWin32Surface;
+
 	enum class VulkanAdapterSelectionKind : uint8_t
 	{
 		Default,
@@ -62,8 +62,10 @@ namespace gglab
 
 	struct VulkanBootstrapOptions
 	{
-		HINSTANCE m_HInstance = nullptr;
-		HWND m_Hwnd = nullptr;
+		// Opaque native handles; the Windows host passes the process instance
+		// and the window handle values.
+		void* m_NativeInstanceHandle = nullptr;
+		void* m_NativeWindowHandle = nullptr;
 		bool m_RequestValidation = false;
 		VulkanAdapterSelectionRequest m_SelectionRequest{};
 	};
