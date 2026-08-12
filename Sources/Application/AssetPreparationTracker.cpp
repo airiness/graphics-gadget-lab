@@ -1,7 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Application/AssetPreparationTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
+
+#include <algorithm>
+#include <utility>
 
 namespace gglab
 {

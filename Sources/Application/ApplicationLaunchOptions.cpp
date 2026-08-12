@@ -1,7 +1,8 @@
-#include "Core/Precompiled.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Core/Utility/StringUtils.h"
+
+#include <format>
 
 namespace gglab
 {

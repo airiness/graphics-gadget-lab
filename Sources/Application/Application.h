@@ -1,5 +1,11 @@
 #pragma once
 #include "Application/ApplicationLaunchOptions.h"
+#include "Core/CoreMacros.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
 
 namespace gglab
 {

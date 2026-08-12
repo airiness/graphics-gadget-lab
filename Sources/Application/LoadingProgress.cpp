@@ -1,6 +1,9 @@
-#include "Core/Precompiled.h"
 #include "Application/LoadingProgress.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
+
+#include <algorithm>
+#include <format>
+#include <utility>
 
 namespace gglab
 {

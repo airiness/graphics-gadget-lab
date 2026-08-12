@@ -1,4 +1,3 @@
-#include "Core/Precompiled.h"
 #include "Application/RenderingStartup.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 

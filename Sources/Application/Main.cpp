@@ -1,11 +1,15 @@
-#include "Core/Precompiled.h"
 #include "Application/Application.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 int main(int argc, char* argv[])
 {
