@@ -212,7 +212,7 @@ namespace gglab
 		case RHILayout::Unknown:
 			GGLAB_UNREACHABLE("RHILayout::Unknown is an invalid barrier layout.");
 		case RHILayout::Undefined:
-			return D3D12_BARRIER_LAYOUT_COMMON;
+			return D3D12_BARRIER_LAYOUT_UNDEFINED;
 		case RHILayout::Common:
 			return D3D12_BARRIER_LAYOUT_COMMON;
 		case RHILayout::ShaderResource:
@@ -236,16 +236,27 @@ namespace gglab
 		GGLAB_UNREACHABLE("Unhandled RHILayout.");
 	}
 
+	D3D12_BARRIER_LAYOUT ToD3D12TextureInitialLayout(RHILayout layout) noexcept
+	{
+		// Owned textures are created in the reusable COMMON layout. Logical Undefined is lowered
+		// to UNDEFINED only when a first-use barrier discards the previous pooled contents.
+		return layout == RHILayout::Undefined ? D3D12_BARRIER_LAYOUT_COMMON
+			: ToD3D12BarrierLayout(layout);
+	}
+
 	D3D12_TEXTURE_BARRIER BuildD3D12TextureBarrier(const RHITextureBarrier& barrier,
 		ID3D12Resource* resource, const D3D12_RESOURCE_DESC& resourceDesc) noexcept
 	{
+		const D3D12_TEXTURE_BARRIER_FLAGS flags = barrier.m_Before == UndefinedRHITextureState()
+			? D3D12_TEXTURE_BARRIER_FLAG_DISCARD
+			: D3D12_TEXTURE_BARRIER_FLAG_NONE;
 		return CD3DX12_TEXTURE_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
 			ToD3D12BarrierSync(barrier.m_After.m_Stages),
 			ToD3D12BarrierAccess(barrier.m_Before.m_Access),
 			ToD3D12BarrierAccess(barrier.m_After.m_Access),
 			ToD3D12BarrierLayout(barrier.m_Before.m_Layout),
 			ToD3D12BarrierLayout(barrier.m_After.m_Layout), resource,
-			BuildD3D12BarrierSubresourceRange(barrier.m_Subresources, resourceDesc));
+			BuildD3D12BarrierSubresourceRange(barrier.m_Subresources, resourceDesc), flags);
 	}
 
 	D3D12_BUFFER_BARRIER BuildD3D12BufferBarrier(

@@ -3241,9 +3241,34 @@ namespace gglab
 					PresentRHITextureState(), RHIResourceStateUsage::Buffer),
 				"Present is an exact texture-only special state");
 			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) ==
+				D3D12_BARRIER_LAYOUT_UNDEFINED &&
+				ToD3D12TextureInitialLayout(RHILayout::Undefined) ==
 				D3D12_BARRIER_LAYOUT_COMMON &&
 				ToD3D12ResourceStates(UndefinedRHITextureState()) == D3D12_RESOURCE_STATE_COMMON,
-				"DX12 lowers logical Undefined texture state to COMMON");
+				"DX12 preserves Undefined for discard barriers while owned textures start in COMMON");
+
+			D3D12_RESOURCE_DESC discardResourceDesc{};
+			discardResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			discardResourceDesc.Width = 8;
+			discardResourceDesc.Height = 8;
+			discardResourceDesc.DepthOrArraySize = 1;
+			discardResourceDesc.MipLevels = 1;
+			discardResourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			discardResourceDesc.SampleDesc = { 1, 0 };
+			const RHIResourceState storageWriteState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::UnorderedAccess,
+			};
+			const D3D12_TEXTURE_BARRIER discardBarrier = BuildD3D12TextureBarrier({
+				.m_Texture = RHITextureHandle{ 1, 1 },
+				.m_Before = UndefinedRHITextureState(),
+				.m_After = storageWriteState,
+				}, reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 }), discardResourceDesc);
+			context.Check(discardBarrier.LayoutBefore == D3D12_BARRIER_LAYOUT_UNDEFINED &&
+				discardBarrier.LayoutAfter == D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS &&
+				discardBarrier.Flags == D3D12_TEXTURE_BARRIER_FLAG_DISCARD,
+				"DX12 first-use barriers discard stale pooled texture layouts and contents");
 
 			const RHITextureDesc graphTextureDesc{
 				.m_Format = RHIFormat::R8G8B8A8Unorm,
