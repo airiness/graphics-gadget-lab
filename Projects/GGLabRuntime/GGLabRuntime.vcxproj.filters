@@ -1533,4 +1533,158 @@
       <Filter>Graphics</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Diagnostics">
+      <UniqueIdentifier>{90518E80-C2D2-41C8-A04A-8A80F18F3862}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics\Builders">
+      <UniqueIdentifier>{1819CA43-BE74-4125-87DC-049279F46D9B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Diagnostics\Snapshots">
+      <UniqueIdentifier>{056E4A80-A4D4-41F7-BE98-97C90AEF8702}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Externals\D3D12MemAlloc">
+      <UniqueIdentifier>{7847d186-1580-4b5a-b232-ed9305fc091c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
+      <Filter>Externals\D3D12MemAlloc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
+      <Filter>Externals\D3D12MemAlloc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotCommon.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotContext.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotProvider.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotStore.h">
+      <Filter>Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

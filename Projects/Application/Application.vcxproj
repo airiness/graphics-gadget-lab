@@ -123,11 +123,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <ForcedIncludeFiles />
-    </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -192,14 +187,6 @@
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\AssetSnapshotText.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
@@ -228,12 +215,7 @@
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
@@ -288,7 +270,6 @@
     <ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
@@ -323,30 +304,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotCommon.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotContext.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotProvider.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotStore.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
@@ -375,7 +332,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPlatformBackend.h" />
@@ -383,11 +339,8 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
@@ -446,9 +399,6 @@
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationPch.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
