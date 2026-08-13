@@ -1584,7 +1584,7 @@ namespace gglab
 				.m_HasReloadSource =
 					mesh->m_SourceModelId.IsValid() &&
 					mesh->m_SourceMeshIndex != std::numeric_limits<uint32_t>::max(),
-				.m_HasActiveInterest = HasResidencyProtectingInterest(key),
+				.m_HasResidencyProtectingInterest = HasResidencyProtectingInterest(key),
 				.m_HasPublicationRetain = HasPublicationRetain(key, mesh->m_ContentGeneration),
 				.m_HasPinnedDependentModel = HasPinnedDependentModel(
 					AssetKind::Mesh, meshId.Value(), mesh->m_ContentGeneration),
@@ -1615,7 +1615,7 @@ namespace gglab
 				.m_EstimatedBytes = EstimateTextureResidentBytes(*texture),
 				.m_IsReserved = IsReservedTextureId(textureId),
 				.m_HasReloadSource = !texture->m_Source.m_CanonicalPath.empty(),
-				.m_HasActiveInterest = HasResidencyProtectingInterest(key),
+				.m_HasResidencyProtectingInterest = HasResidencyProtectingInterest(key),
 				.m_HasPublicationRetain = HasPublicationRetain(key, texture->m_ContentGeneration),
 				.m_HasPinnedDependentModel = HasPinnedDependentModel(
 					AssetKind::Texture, textureId.Value(), texture->m_ContentGeneration),
