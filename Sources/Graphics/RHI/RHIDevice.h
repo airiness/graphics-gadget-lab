@@ -47,6 +47,9 @@ namespace gglab
 			RHITextureHandle texture, const RHITextureViewDesc& desc) noexcept = 0;
 		virtual RHIBufferViewHandle CreateBufferView(
 			RHIBufferHandle buffer, const RHIBufferViewDesc& desc) noexcept = 0;
+		// Each successful call acquires one sampler ownership reference. Implementations may
+		// return the same cached handle for equivalent descriptions; every acquired reference
+		// must be balanced by DestroySampler, and the handle remains alive until the final release.
 		virtual RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept = 0;
 
 		virtual void DestroyTexture(RHITextureHandle texture) noexcept = 0;

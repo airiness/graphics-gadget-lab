@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -149,11 +150,18 @@ namespace gglab
 	RHISamplerHandle DX12DescriptorCache::GetOrCreateSampler(const RHISamplerDesc& desc) noexcept
 	{
 		{
-			std::shared_lock lock(m_Mutex);
+			std::unique_lock lock(m_Mutex);
 			if (auto iterator = m_RHISamplerCache.find(desc); iterator != m_RHISamplerCache.end())
 			{
-				if (m_RHISamplers.Resolve(iterator->second))
+				if (SamplerSlot* slot = m_RHISamplers.Resolve(iterator->second))
 				{
+					GGLAB_ASSERT_MSG(slot->m_OwnerCount < std::numeric_limits<uint32_t>::max(),
+						"DX12DescriptorCache: sampler ownership count overflow.");
+					if (slot->m_OwnerCount == std::numeric_limits<uint32_t>::max())
+					{
+						return {};
+					}
+					++slot->m_OwnerCount;
 					return iterator->second;
 				}
 			}
@@ -168,9 +176,16 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		if (auto iterator = m_RHISamplerCache.find(desc); iterator != m_RHISamplerCache.end())
 		{
-			if (m_RHISamplers.Resolve(iterator->second))
+			if (SamplerSlot* slot = m_RHISamplers.Resolve(iterator->second))
 			{
 				descriptor.Free();
+				GGLAB_ASSERT_MSG(slot->m_OwnerCount < std::numeric_limits<uint32_t>::max(),
+					"DX12DescriptorCache: sampler ownership count overflow.");
+				if (slot->m_OwnerCount == std::numeric_limits<uint32_t>::max())
+				{
+					return {};
+				}
+				++slot->m_OwnerCount;
 				return iterator->second;
 			}
 		}
@@ -180,6 +195,7 @@ namespace gglab
 		slot.m_Key = desc;
 		slot.m_RetirementPoints.clear();
 		slot.m_Descriptor = std::move(descriptor);
+		slot.m_OwnerCount = 1;
 		m_RHISamplerCache[desc] = sampler;
 		return sampler;
 	}
@@ -631,6 +647,12 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(slot->m_OwnerCount > 0,
+			"DX12DescriptorCache: sampler ownership count underflow.");
+		if (slot->m_OwnerCount == 0 || --slot->m_OwnerCount > 0)
+		{
+			return;
+		}
 
 		m_RHISamplerCache.erase(slot->m_Key);
 		if (m_RHISamplers.BeginRetirement(sampler) == RHIHandleValidationResult::Valid)
@@ -642,6 +664,7 @@ namespace gglab
 			}
 			retiredSlot.m_Key = {};
 			retiredSlot.m_RetirementPoints.clear();
+			retiredSlot.m_OwnerCount = 0;
 			m_RHISamplers.Retire(sampler.Index());
 		}
 	}

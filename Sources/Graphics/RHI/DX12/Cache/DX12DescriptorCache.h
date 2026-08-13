@@ -83,7 +83,16 @@ namespace gglab
 
 		using TextureViewSlot = ViewSlot<RHITextureViewHandle, RHITextureViewKey>;
 		using BufferViewSlot = ViewSlot<RHIBufferViewHandle, RHIBufferViewKey>;
-		using SamplerSlot = ViewSlot<RHISamplerHandle, RHISamplerDesc>;
+
+		struct SamplerSlot
+		{
+			RHISamplerHandle::GenerationType m_Generation = 1;
+			RHIHandleSlotState m_State = RHIHandleSlotState::Free;
+			RHISamplerDesc m_Key{};
+			std::vector<RHIFencePoint> m_RetirementPoints;
+			DX12DescriptorHandle m_Descriptor;
+			uint32_t m_OwnerCount = 0;
+		};
 
 		RHIHandleTable<RHITextureViewHandle, TextureViewSlot> m_RHITextureViews;
 		RHIHandleTable<RHIBufferViewHandle, BufferViewSlot> m_RHIBufferViews;

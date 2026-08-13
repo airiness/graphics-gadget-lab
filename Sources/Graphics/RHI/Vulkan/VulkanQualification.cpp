@@ -623,6 +623,7 @@ namespace gglab
 				samplerDesc.m_AddressU = RHITextureAddressMode::Border;
 				samplerDesc.m_BorderColor[3] = 1.0f;
 				const RHISamplerHandle sampler = resources.CreateSampler(samplerDesc);
+				const RHISamplerHandle samplerAlias = resources.CreateSampler(samplerDesc);
 				RHISamplerDesc comparisonSamplerDesc{};
 				comparisonSamplerDesc.m_Filter =
 					RHISamplerFilter::ComparisonMinMagLinearMipPoint;
@@ -635,7 +636,8 @@ namespace gglab
 				const RHISamplerHandle anisotropicSampler =
 					resources.CreateSampler(anisotropicSamplerDesc);
 				if (!srv.IsValid() || !dsv.IsValid() || !unorm.IsValid() ||
-					!srgb.IsValid() || !sampler.IsValid() || !comparisonSampler.IsValid() ||
+					!srgb.IsValid() || !sampler.IsValid() || samplerAlias != sampler ||
+					!comparisonSampler.IsValid() ||
 					!anisotropicSampler.IsValid())
 				{
 					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify resource: view or sampler creation failed.");
@@ -760,6 +762,14 @@ namespace gglab
 				resources.DestroyBufferView(typedSrv);
 				resources.DestroyBufferView(typedUav);
 				resources.DestroySampler(sampler);
+				if (!resources.IsSamplerAlive(samplerAlias) ||
+					!resources.GetSamplerDescriptor(samplerAlias).IsValid())
+				{
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+						"qualify resource: cached sampler did not retain shared ownership.");
+					return 1;
+				}
+				resources.DestroySampler(samplerAlias);
 				resources.DestroySampler(comparisonSampler);
 				resources.DestroySampler(anisotropicSampler);
 				resources.DestroyTexture(color);
