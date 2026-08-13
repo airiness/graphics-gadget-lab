@@ -575,6 +575,7 @@
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
+    <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h" />

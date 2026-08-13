@@ -327,7 +327,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
-    <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPlatformBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRenderBackend.h" />
