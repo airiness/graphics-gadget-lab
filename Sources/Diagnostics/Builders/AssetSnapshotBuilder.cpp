@@ -120,7 +120,7 @@ namespace gglab
 				const AssetKey key = MakeAssetKey(kind, stableId);
 				return lifecycle.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
 					lifecycle.m_ResidencyState == AssetResidencyState::Resident &&
-					!assetManager.HasActiveInterest(key) &&
+					!assetManager.HasResidencyProtectingInterest(key) &&
 					!assetManager.HasPublicationRetain(key, lifecycle.m_ContentGeneration);
 			};
 		const auto recordResidency =

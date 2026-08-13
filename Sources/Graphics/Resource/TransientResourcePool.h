@@ -24,6 +24,12 @@ namespace gglab
 
 	GGLAB_DEFINE_TYPED_INDEX(TransientResourcePoolSlot, uint32_t);
 
+	enum class TransientTextureReuseMode : uint8_t
+	{
+		DiscardOnAcquire,
+		PreserveCommon,
+	};
+
 	struct TransientTextureKey
 	{
 		RHITextureDimension m_Dimension = RHITextureDimension::Texture2D;
@@ -99,8 +105,8 @@ namespace gglab
 	{
 		TransientTextureAllocation() noexcept = default;
 		TransientTextureAllocation(RHITextureHandle texture, TransientResourcePoolSlot poolSlot,
-			const TransientTextureKey& key) noexcept :
-			m_Texture(texture), m_PoolSlot(poolSlot), m_Key(key)
+			const TransientTextureKey& key, TransientTextureReuseMode reuseMode) noexcept :
+			m_Texture(texture), m_PoolSlot(poolSlot), m_Key(key), m_ReuseMode(reuseMode)
 		{
 		}
 
@@ -118,6 +124,7 @@ namespace gglab
 				m_Texture = rhs.m_Texture;
 				m_PoolSlot = rhs.m_PoolSlot;
 				m_Key = rhs.m_Key;
+				m_ReuseMode = rhs.m_ReuseMode;
 				rhs.Reset();
 			}
 			return *this;
@@ -126,6 +133,7 @@ namespace gglab
 		RHITextureHandle m_Texture{};
 		TransientResourcePoolSlot m_PoolSlot{};
 		TransientTextureKey m_Key{};
+		TransientTextureReuseMode m_ReuseMode = TransientTextureReuseMode::DiscardOnAcquire;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
@@ -137,6 +145,7 @@ namespace gglab
 			m_Texture.Reset();
 			m_PoolSlot.Reset();
 			m_Key = {};
+			m_ReuseMode = TransientTextureReuseMode::DiscardOnAcquire;
 		}
 	};
 
@@ -204,6 +213,8 @@ namespace gglab
 		{
 			RHITextureHandle m_Texture;
 			TransientTextureKey m_Key{};
+			TransientTextureReuseMode m_ReuseMode =
+				TransientTextureReuseMode::DiscardOnAcquire;
 			std::string m_LogicalName;
 			uint64_t m_AcquireSerial = 0;
 		};
@@ -231,7 +242,9 @@ namespace gglab
 		[[nodiscard]] TransientTextureAllocation AcquireTexture(const RHITextureDesc& desc,
 			std::string_view logicalName = {},
 			RHIResourceDebugBindingMode bindingMode =
-			RHIResourceDebugBindingMode::Exclusive) noexcept;
+			RHIResourceDebugBindingMode::Exclusive,
+			TransientTextureReuseMode reuseMode =
+			TransientTextureReuseMode::DiscardOnAcquire) noexcept;
 		[[nodiscard]] TransientBufferAllocation AcquireBuffer(const RHIBufferDesc& desc,
 			std::string_view logicalName = {},
 			RHIResourceDebugBindingMode bindingMode =
@@ -261,7 +274,7 @@ namespace gglab
 		void DestroyBuffer(TransientResourcePoolSlot poolSlot) noexcept;
 
 		[[nodiscard]] TransientTextureAllocation CreateTexture(
-			const RHITextureDesc& textureDesc) noexcept;
+			const RHITextureDesc& textureDesc, TransientTextureReuseMode reuseMode) noexcept;
 		[[nodiscard]] TransientBufferAllocation CreateBuffer(
 			const RHIBufferDesc& bufferDesc) noexcept;
 		void UpdateTextureDebugIdentity(TransientResourcePoolSlot poolSlot,

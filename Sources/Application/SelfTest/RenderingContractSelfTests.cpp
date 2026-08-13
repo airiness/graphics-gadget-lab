@@ -16,6 +16,7 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderQueue.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
@@ -168,7 +169,7 @@ namespace gglab
 			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
 				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return {};
+				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
 			RHIBufferHandle CreateBuffer(
 				const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
@@ -245,6 +246,9 @@ namespace gglab
 				return {};
 			}
 			void RetireCompletedWork() noexcept override {}
+
+		private:
+			uint32_t m_NextTextureIndex = 1;
 		};
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
@@ -3241,9 +3245,34 @@ namespace gglab
 					PresentRHITextureState(), RHIResourceStateUsage::Buffer),
 				"Present is an exact texture-only special state");
 			context.Check(ToD3D12BarrierLayout(RHILayout::Undefined) ==
+				D3D12_BARRIER_LAYOUT_UNDEFINED &&
+				ToD3D12TextureInitialLayout(RHILayout::Undefined) ==
 				D3D12_BARRIER_LAYOUT_COMMON &&
 				ToD3D12ResourceStates(UndefinedRHITextureState()) == D3D12_RESOURCE_STATE_COMMON,
-				"DX12 lowers logical Undefined texture state to COMMON");
+				"DX12 preserves Undefined for discard barriers while owned textures start in COMMON");
+
+			D3D12_RESOURCE_DESC discardResourceDesc{};
+			discardResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			discardResourceDesc.Width = 8;
+			discardResourceDesc.Height = 8;
+			discardResourceDesc.DepthOrArraySize = 1;
+			discardResourceDesc.MipLevels = 1;
+			discardResourceDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			discardResourceDesc.SampleDesc = { 1, 0 };
+			const RHIResourceState storageWriteState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::UnorderedAccess,
+			};
+			const D3D12_TEXTURE_BARRIER discardBarrier = BuildD3D12TextureBarrier({
+				.m_Texture = RHITextureHandle{ 1, 1 },
+				.m_Before = UndefinedRHITextureState(),
+				.m_After = storageWriteState,
+				}, reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 }), discardResourceDesc);
+			context.Check(discardBarrier.LayoutBefore == D3D12_BARRIER_LAYOUT_UNDEFINED &&
+				discardBarrier.LayoutAfter == D3D12_BARRIER_LAYOUT_UNORDERED_ACCESS &&
+				discardBarrier.Flags == D3D12_TEXTURE_BARRIER_FLAG_DISCARD,
+				"DX12 first-use barriers discard stale pooled texture layouts and contents");
 
 			const RHITextureDesc graphTextureDesc{
 				.m_Format = RHIFormat::R8G8B8A8Unorm,
@@ -3266,6 +3295,35 @@ namespace gglab
 			context.Check(initializedCompiled && initializedSnapshot.m_Resources.size() == 1 &&
 				initializedSnapshot.m_Resources[0].m_InitialBarrierState == UndefinedRHITextureState(),
 				"RenderGraph-created textures begin in Undefined state and Write defines contents");
+			const auto* initializedPlan = initializedGraph.GetExecutionPlan();
+			const RHIResourceState initializedWriteState =
+				ToRHIResourceState(RGTextureAccess::StorageWrite);
+			context.Check(initializedCompiled && initializedPlan &&
+				initializedPlan->GetPasses().size() == 1 &&
+				initializedPlan->GetPasses()[0].m_PreBarriers.size() == 1 &&
+				initializedPlan->GetPasses()[0].m_PreBarriers[0].m_Before ==
+				UndefinedRHITextureState() &&
+				initializedPlan->GetPasses()[0].m_PreBarriers[0].m_After ==
+				initializedWriteState && initializedPlan->GetPasses()[0].m_PostBarriers.empty(),
+				"Discardable graph textures keep their terminal layout for the next Undefined acquire");
+
+			RecordingDevice reuseDevice;
+			TransientResourcePool reusePool(&reuseDevice);
+			auto discardAllocation = reusePool.AcquireTexture(graphTextureDesc, "Discardable");
+			const TransientResourcePoolSlot discardSlot = discardAllocation.m_PoolSlot;
+			reusePool.RetireTexture(std::move(discardAllocation), {});
+			reusePool.Tick();
+			auto commonAllocation = reusePool.AcquireTexture(graphTextureDesc, "PreserveCommon",
+				RHIResourceDebugBindingMode::Aliased,
+				TransientTextureReuseMode::PreserveCommon);
+			const TransientResourcePoolSlot commonSlot = commonAllocation.m_PoolSlot;
+			reusePool.RetireTexture(std::move(commonAllocation), {});
+			reusePool.Tick();
+			auto reusedDiscardAllocation =
+				reusePool.AcquireTexture(graphTextureDesc, "DiscardableAgain");
+			context.Check(discardSlot.IsValid() && commonSlot.IsValid() &&
+				discardSlot != commonSlot && reusedDiscardAllocation.m_PoolSlot == discardSlot,
+				"Transient texture reuse keeps discardable and Common-preserving contracts isolated");
 
 			auto hasUndefinedRead = [](const RenderGraph& graph) noexcept
 				{

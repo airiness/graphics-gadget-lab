@@ -78,7 +78,7 @@ namespace gglab
 		nativeCreateInfo.m_AllocDesc.Flags = D3D12MA::ALLOCATION_FLAG_NONE;
 		nativeCreateInfo.m_ResourceDesc = ToD3D12ResourceDesc(desc);
 		nativeCreateInfo.m_EnhancedInitialLayout =
-			ToD3D12BarrierLayout(ownedCreateInfo.m_InitialState.m_Layout);
+			ToD3D12TextureInitialLayout(ownedCreateInfo.m_InitialState.m_Layout);
 		nativeCreateInfo.m_ClearValue = ToD3D12ClearValue(desc.m_ClearValue);
 		texture->Create(nativeCreateInfo);
 		if (!texture->IsValid())

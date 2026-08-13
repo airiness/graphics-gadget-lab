@@ -264,7 +264,7 @@ namespace gglab
 			entry.m_Stamp.m_ResidencyState == AssetResidencyState::Resident &&
 			entry.m_Stamp.m_ResidencyPolicy == AssetResidencyPolicy::Cacheable &&
 			entry.m_EstimatedBytes != 0 && entry.m_HasReloadSource && !entry.m_IsReserved &&
-			!entry.m_HasActiveInterest && !entry.m_HasPublicationRetain &&
+			!entry.m_HasResidencyProtectingInterest && !entry.m_HasPublicationRetain &&
 			!entry.m_HasPinnedDependentModel && unusedFrames >= config.m_MinUnusedFrames;
 	}
 }

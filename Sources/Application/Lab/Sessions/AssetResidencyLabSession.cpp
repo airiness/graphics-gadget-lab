@@ -521,12 +521,31 @@ namespace gglab
 			const AssetSnapshot::Mesh* mesh = FindMeshSnapshot(snapshot, m_State->m_MeshId);
 			const AssetSnapshot::Texture* texture =
 				FindTextureSnapshot(snapshot, m_State->m_TextureId);
+			const AssetOwnershipStatistics ownership = assetManager.GetOwnershipStatistics();
+			const auto hasDependencyInterest = [&ownership](AssetKind kind, uint64_t stableId,
+				uint64_t generation) noexcept
+				{
+					return std::ranges::any_of(ownership.m_ActiveInterests,
+						[kind, stableId, generation](const AssetInterestActivity& interest) noexcept
+						{
+							return interest.m_Kind == kind && interest.m_StableId == stableId &&
+								interest.m_Generation == generation;
+						});
+				};
 			if (!model || !mesh || !texture || !model->m_IsEvictionCandidate ||
 				!mesh->m_IsEvictionCandidate || !texture->m_IsEvictionCandidate ||
 				!model->m_HasDependencyState || snapshot.m_DependencyValidationMismatchCount != 0)
 			{
 				Fail(
 					"Unowned cacheable resident assets were not classified as eviction candidates.");
+				return;
+			}
+			if (!hasDependencyInterest(
+				AssetKind::Mesh, m_State->m_MeshId.Value(), m_State->m_MeshGeneration) ||
+				!hasDependencyInterest(AssetKind::Texture, m_State->m_TextureId.Value(),
+					m_State->m_TextureGeneration))
+			{
+				Fail("Cached model dependencies were released before model runtime retirement.");
 				return;
 			}
 			AssetResidencyConfig config = assetManager.GetResidencyConfig();

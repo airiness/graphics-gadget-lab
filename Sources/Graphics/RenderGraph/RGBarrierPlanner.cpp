@@ -436,10 +436,17 @@ namespace gglab
 
 			if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
 			{
+				// Discardable graph textures begin their next allocation in Undefined, so forcing
+				// them back to Common only creates a redundant layout transition at release. An
+				// explicit export still owns its requested final state.
+				if (!resource.m_Imported && !resource.m_FinalState)
+				{
+					continue;
+				}
 				const RHITextureDesc textureDesc = CompiledTextureDesc(resource);
 				auto& stateTracker = textureStates.at(virtualResource);
 				std::optional<RHISubresourceRange> normalizedFinalRange;
-				if (resource.m_Imported && resource.m_FinalState)
+				if (resource.m_FinalState)
 				{
 					normalizedFinalRange =
 						NormalizeTextureSubresourceRange(textureDesc, resource.m_FinalSubresources);
@@ -464,8 +471,9 @@ namespace gglab
 				{
 					const TextureSubresource subresource =
 						DecodeSubresource(textureDesc, subresourceIndex);
-					RHIResourceState requiredFinalState =
-						resource.m_Imported ? resource.m_InitialState : CommonRHIResourceState();
+					RHIResourceState requiredFinalState = resource.m_Imported
+						? resource.m_InitialState
+						: trackedState.m_State;
 
 					if (normalizedFinalRange)
 					{

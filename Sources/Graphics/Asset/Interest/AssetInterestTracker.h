@@ -88,6 +88,25 @@ namespace gglab
 		[[nodiscard]] bool HasPublicationRetain(AssetContentVersion contentVersion) const noexcept;
 
 		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
+		template <typename OwnerPredicate>
+		[[nodiscard]] bool HasActiveInterestMatchingOwner(
+			AssetKey key, OwnerPredicate&& predicate) const noexcept
+		{
+			const auto interest = m_Interests.find(key);
+			if (interest == m_Interests.end())
+			{
+				return false;
+			}
+			for (uint64_t leaseToken : interest->second.m_LeaseTokens)
+			{
+				const auto lease = m_Leases.find(leaseToken);
+				if (lease != m_Leases.end() && std::invoke(predicate, lease->second.m_Owner))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
 		[[nodiscard]] TaskPriority GetEffectivePriority(
 			AssetKey key, TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] AssetInterestTrackerStatistics GetStatistics() const;

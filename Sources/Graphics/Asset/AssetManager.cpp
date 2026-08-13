@@ -580,6 +580,24 @@ namespace gglab
 			m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
 		}
 		m_PendingResidencyEvictions.clear();
+
+		// Runtime retention is bypassed during terminal shutdown, so explicitly
+		// perform the model-retirement teardown before discarding pending requests.
+		std::unordered_set<ModelID> dependencyModels;
+		dependencyModels.reserve(
+			m_ModelDependencyOwners.size() + m_ModelDependencyLeaseTokens.size());
+		for (const ModelID modelId : m_ModelDependencyOwners | std::views::keys)
+		{
+			dependencyModels.insert(modelId);
+		}
+		for (const ModelID modelId : m_ModelDependencyLeaseTokens | std::views::keys)
+		{
+			dependencyModels.insert(modelId);
+		}
+		for (const ModelID modelId : dependencyModels)
+		{
+			ReleaseModelDependencyInterests(modelId);
+		}
 		m_PendingRuntimeRetirements.clear();
 
 		// Completion events retire the operation serial only after their restored
@@ -740,6 +758,15 @@ namespace gglab
 		if (change->m_IsActive)
 		{
 			HandleInterestChange(*change);
+			// An inactive cached model still owns dependency content, but that internal
+			// lease must not keep reload work alive after the last residency owner leaves.
+			if ((change->m_ContentVersion.m_Key.m_Kind == AssetKind::Mesh ||
+				change->m_ContentVersion.m_Key.m_Kind == AssetKind::Texture) &&
+				!HasResidencyProtectingInterest(change->m_ContentVersion.m_Key))
+			{
+				CancelAssetIfUnreferenced(change->m_ContentVersion.m_Key,
+					change->m_ContentVersion.m_ContentGeneration, false);
+			}
 			return;
 		}
 
@@ -750,8 +777,6 @@ namespace gglab
 			{
 				QueueRuntimeRetirement(change->m_ContentVersion);
 			}
-			ReleaseModelDependencyInterests(
-				ModelID{ static_cast<uint32_t>(change->m_ContentVersion.m_Key.m_StableId) });
 		}
 		CancelAssetIfUnreferenced(
 			change->m_ContentVersion.m_Key, change->m_ContentVersion.m_ContentGeneration);
@@ -775,8 +800,7 @@ namespace gglab
 		}
 		ApplyInterestPriority(change.m_ContentVersion.m_Key,
 			change.m_ContentVersion.m_ContentGeneration, change.m_EffectivePriority);
-		if (change.EffectivePriorityChanged() &&
-			change.m_ContentVersion.m_Key.m_Kind == AssetKind::Model)
+		if (change.m_ContentVersion.m_Key.m_Kind == AssetKind::Model)
 		{
 			UpdateModelDependencyPriorities(
 				ModelID{ static_cast<uint32_t>(change.m_ContentVersion.m_Key.m_StableId) },
@@ -827,6 +851,28 @@ namespace gglab
 	bool AssetManager::HasActiveInterest(AssetKey key) const noexcept
 	{
 		return m_AssetInterestTracker.HasActiveInterest(key);
+	}
+
+	bool AssetManager::HasResidencyProtectingInterest(AssetKey key) const noexcept
+	{
+		// Model dependency leases retain runtime entries until their parent model is
+		// retired. Ignore owners of inactive cached models for GPU residency policy.
+		return m_AssetInterestTracker.HasActiveInterestMatchingOwner(key,
+			[this](AssetOwnerId owner) noexcept
+			{
+				for (const auto& [modelId, dependencyOwner] : m_ModelDependencyOwners)
+				{
+					if (dependencyOwner == owner)
+					{
+						const Model* model = GetModel(modelId);
+						return model && (HasActiveInterest(MakeAssetKey(modelId)) ||
+							HasPublicationRetain(
+								MakeAssetKey(modelId), model->m_ContentGeneration) ||
+							model->m_ResidencyPolicy == AssetResidencyPolicy::Pinned);
+					}
+				}
+				return true;
+			});
 	}
 
 	bool AssetManager::HasPinnedDependentModel(
@@ -1189,7 +1235,8 @@ namespace gglab
 		}
 	}
 
-	void AssetManager::CancelAssetIfUnreferenced(AssetKey key, uint64_t generation) noexcept
+	void AssetManager::CancelAssetIfUnreferenced(
+		AssetKey key, uint64_t generation, bool queueRuntimeRetirement) noexcept
 	{
 		if (HasPublicationRetain(key, generation))
 		{
@@ -1208,7 +1255,10 @@ namespace gglab
 			{
 				return;
 			}
-			QueueRuntimeRetirement(MakeAssetContentVersion(textureId, generation));
+			if (queueRuntimeRetirement)
+			{
+				QueueRuntimeRetirement(MakeAssetContentVersion(textureId, generation));
+			}
 			if (texture->m_State == AssetState::Ready || IsTerminalAssetState(texture->m_State))
 			{
 				return;
@@ -1230,7 +1280,8 @@ namespace gglab
 		}
 		else
 		{
-			CancelMeshIfUnreferenced(MeshID{ static_cast<uint32_t>(key.m_StableId) }, generation);
+			CancelMeshIfUnreferenced(MeshID{ static_cast<uint32_t>(key.m_StableId) }, generation,
+				queueRuntimeRetirement);
 		}
 	}
 
@@ -1284,18 +1335,22 @@ namespace gglab
 				std::format("Model {} has no active owners", modelId.Value()));
 	}
 
-	void AssetManager::CancelMeshIfUnreferenced(MeshID meshId, uint64_t generation) noexcept
+	void AssetManager::CancelMeshIfUnreferenced(
+		MeshID meshId, uint64_t generation, bool queueRuntimeRetirement) noexcept
 	{
 		Mesh* mesh = EditMesh(meshId);
 		if (!mesh || mesh->m_ContentGeneration != generation || IsTerminalAssetState(mesh->m_State))
 		{
-			if (mesh && mesh->m_ContentGeneration == generation)
+			if (queueRuntimeRetirement && mesh && mesh->m_ContentGeneration == generation)
 			{
 				QueueRuntimeRetirement(MakeAssetContentVersion(meshId, generation));
 			}
 			return;
 		}
-		QueueRuntimeRetirement(MakeAssetContentVersion(meshId, generation));
+		if (queueRuntimeRetirement)
+		{
+			QueueRuntimeRetirement(MakeAssetContentVersion(meshId, generation));
+		}
 		if (mesh->m_State == AssetState::Ready)
 		{
 			return;
@@ -1529,7 +1584,7 @@ namespace gglab
 				.m_HasReloadSource =
 					mesh->m_SourceModelId.IsValid() &&
 					mesh->m_SourceMeshIndex != std::numeric_limits<uint32_t>::max(),
-				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasResidencyProtectingInterest = HasResidencyProtectingInterest(key),
 				.m_HasPublicationRetain = HasPublicationRetain(key, mesh->m_ContentGeneration),
 				.m_HasPinnedDependentModel = HasPinnedDependentModel(
 					AssetKind::Mesh, meshId.Value(), mesh->m_ContentGeneration),
@@ -1560,7 +1615,7 @@ namespace gglab
 				.m_EstimatedBytes = EstimateTextureResidentBytes(*texture),
 				.m_IsReserved = IsReservedTextureId(textureId),
 				.m_HasReloadSource = !texture->m_Source.m_CanonicalPath.empty(),
-				.m_HasActiveInterest = HasActiveInterest(key),
+				.m_HasResidencyProtectingInterest = HasResidencyProtectingInterest(key),
 				.m_HasPublicationRetain = HasPublicationRetain(key, texture->m_ContentGeneration),
 				.m_HasPinnedDependentModel = HasPinnedDependentModel(
 					AssetKind::Texture, textureId.Value(), texture->m_ContentGeneration),
@@ -1593,7 +1648,7 @@ namespace gglab
 			const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
 			const AssetKey key = contentVersion.m_Key;
 			const bool protectedByInterest =
-				HasActiveInterest(key) ||
+				HasResidencyProtectingInterest(key) ||
 				HasPublicationRetain(key, contentVersion.m_ContentGeneration);
 			bool finalized = false;
 			bool cancelled = protectedByInterest;
@@ -1747,10 +1802,51 @@ namespace gglab
 		{
 			return;
 		}
+		const bool dependenciesRetained = m_ModelDependencyLeaseTokens.contains(modelId);
 		RefreshModelDependencyInterests(modelId, generation);
+		if (dependenciesRetained)
+		{
+			RequestModelDependencyResidency(*model, GetEffectivePriority(MakeAssetKey(modelId)));
+		}
 		if (m_AssetDependencyGraph.FindModel(MakeAssetContentVersion(modelId, generation)))
 		{
 			m_PendingModels.insert(modelId);
+		}
+	}
+
+	void AssetManager::RequestModelDependencyResidency(
+		const Model& model, TaskPriority priority) noexcept
+	{
+		std::unordered_set<MeshID> meshIds;
+		std::unordered_set<TextureID> textureIds;
+		for (const ModelMesh& instance : model.m_MeshInstance)
+		{
+			meshIds.insert(instance.m_MeshId);
+			if (const Material* material = GetMaterial(instance.m_MaterialId))
+			{
+				for (TextureID textureId : GetMaterialTextureIds(*material))
+				{
+					if (textureId.IsValid() && !IsReservedTextureId(textureId))
+					{
+						textureIds.insert(textureId);
+					}
+				}
+			}
+		}
+		for (MeshID meshId : meshIds)
+		{
+			if (const Mesh* mesh = GetMesh(meshId))
+			{
+				RequestMeshResidency(meshId, mesh->m_ContentGeneration, priority);
+			}
+		}
+		for (TextureID textureId : textureIds)
+		{
+			if (const Texture* texture = m_TextureAssets->GetTexture(textureId))
+			{
+				GGLAB_UNUSED(RequestTextureResidency(
+					textureId, texture->m_ContentGeneration, priority));
+			}
 		}
 	}
 

@@ -64,7 +64,7 @@ namespace gglab
 		uint64_t m_EstimatedBytes = 0;
 		bool m_IsReserved = false;
 		bool m_HasReloadSource = false;
-		bool m_HasActiveInterest = false;
+		bool m_HasResidencyProtectingInterest = false;
 		bool m_HasPublicationRetain = false;
 		bool m_HasPinnedDependentModel = false;
 

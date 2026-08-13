@@ -3,6 +3,8 @@
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -37,7 +39,8 @@ namespace gglab
 
 		const auto& record = m_Textures[allocation.m_PoolSlot.Value()];
 		GGLAB_ASSERT_MSG(
-			record.m_Texture == allocation.m_Texture && record.m_Key == allocation.m_Key,
+			record.m_Texture == allocation.m_Texture && record.m_Key == allocation.m_Key &&
+			record.m_ReuseMode == allocation.m_ReuseMode,
 			"Texture allocation does not match its transient pool slot.");
 
 		m_PendingRetirements.push_back({
@@ -95,21 +98,30 @@ namespace gglab
 	}
 
 	TransientTextureAllocation TransientResourcePool::AcquireTexture(const RHITextureDesc& desc,
-		std::string_view logicalName, RHIResourceDebugBindingMode bindingMode) noexcept
+		std::string_view logicalName, RHIResourceDebugBindingMode bindingMode,
+		TransientTextureReuseMode reuseMode) noexcept
 	{
 		TransientTextureAllocation allocation;
 		const auto key = MakeTextureKey(desc);
-		if (auto iter = m_FreeTextures.find(key);
-			iter != m_FreeTextures.end() && !iter->second.empty())
+		if (auto iter = m_FreeTextures.find(key); iter != m_FreeTextures.end())
 		{
-			const auto poolSlot = iter->second.back();
-			iter->second.pop_back();
-			const auto& record = m_Textures[poolSlot.Value()];
-			allocation = { record.m_Texture, poolSlot, record.m_Key };
+			auto freeSlot = std::ranges::find_if(iter->second.rbegin(), iter->second.rend(),
+				[this, reuseMode](TransientResourcePoolSlot poolSlot)
+				{
+					return poolSlot.Value() < m_Textures.size() &&
+						m_Textures[poolSlot.Value()].m_ReuseMode == reuseMode;
+				});
+			if (freeSlot != iter->second.rend())
+			{
+				const auto poolSlot = *freeSlot;
+				iter->second.erase(std::next(freeSlot).base());
+				const auto& record = m_Textures[poolSlot.Value()];
+				allocation = { record.m_Texture, poolSlot, record.m_Key, record.m_ReuseMode };
+			}
 		}
-		else
+		if (!allocation.IsValid())
 		{
-			allocation = CreateTexture(desc);
+			allocation = CreateTexture(desc, reuseMode);
 		}
 
 		if (allocation.IsValid())
@@ -171,7 +183,7 @@ namespace gglab
 	}
 
 	TransientTextureAllocation TransientResourcePool::CreateTexture(
-		const RHITextureDesc& desc) noexcept
+		const RHITextureDesc& desc, TransientTextureReuseMode reuseMode) noexcept
 	{
 		const TransientResourcePoolSlot poolSlot{ static_cast<uint32_t>(m_Textures.size()) };
 		RHITextureDesc textureDesc = desc;
@@ -197,9 +209,10 @@ namespace gglab
 		m_Textures.push_back(TextureRecord{
 			.m_Texture = texture,
 			.m_Key = key,
+			.m_ReuseMode = reuseMode,
 			});
 
-		return { texture, poolSlot, key };
+		return { texture, poolSlot, key, reuseMode };
 	}
 
 	TransientBufferAllocation TransientResourcePool::CreateBuffer(
@@ -376,6 +389,7 @@ namespace gglab
 		}
 
 		return record.m_Texture == allocation.m_Texture && record.m_Key == allocation.m_Key &&
+			record.m_ReuseMode == allocation.m_ReuseMode &&
 			allocation.m_Key == MakeTextureKey(desc);
 	}
 
