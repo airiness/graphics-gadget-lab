@@ -24,15 +24,6 @@
     <Filter Include="Core">
       <UniqueIdentifier>{bb74519f-06d0-430b-9631-02634c26ac92}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Diagnostics">
-      <UniqueIdentifier>{90518E80-C2D2-41C8-A04A-8A80F18F3862}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Diagnostics\Builders">
-      <UniqueIdentifier>{1819CA43-BE74-4125-87DC-049279F46D9B}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Diagnostics\Snapshots">
-      <UniqueIdentifier>{056E4A80-A4D4-41F7-BE98-97C90AEF8702}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Externals">
       <UniqueIdentifier>{6c9be8e9-f3c0-480e-b08c-55933a3aeb4c}</UniqueIdentifier>
     </Filter>
@@ -464,9 +455,6 @@
     <ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp">
       <Filter>Core\Hash</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -741,12 +729,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h">
       <Filter>DevTools\DevelopGui</Filter>

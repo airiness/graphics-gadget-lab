@@ -13,6 +13,7 @@ param(
 # violation outside the ledger fails the validation.
 #
 # Ownership scanning derives from actual GGLabRuntime project items;
+# all Diagnostics source/header files are required to be runtime-owned;
 # portable-platform scanning remains classification-driven.
 
 $ErrorActionPreference = "Stop"
@@ -181,6 +182,10 @@ $runtimeOwnedFiles = @(
 
 $ownershipFindings = New-Object System.Collections.Generic.List[object]
 $platformFindings = New-Object System.Collections.Generic.List[object]
+$runtimeOwnedPathSet = New-Object System.Collections.Generic.HashSet[string]
+foreach ($file in $runtimeOwnedFiles) {
+    [void]$runtimeOwnedPathSet.Add($file.Path)
+}
 
 foreach ($file in $runtimeOwnedFiles) {
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
@@ -188,6 +193,12 @@ foreach ($file in $runtimeOwnedFiles) {
     if ($file.Path.StartsWith("Application/") -or $file.Path.StartsWith("DevTools/") -or
         $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex -or
         $content -match $ownershipSymbolRegex) {
+        $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
+    }
+}
+
+foreach ($file in $candidateFiles) {
+    if ($file.Path.StartsWith("Diagnostics/") -and -not $runtimeOwnedPathSet.Contains($file.Path)) {
         $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }
 }

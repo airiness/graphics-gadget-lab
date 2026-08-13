@@ -1,8 +1,6 @@
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Application/Lab/LabInterfaces.h"
-#include "Application/Lab/LabRuntime.h"
+#include "Core/CoreMacros.h"
 #include "Diagnostics/SnapshotStore.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab
 {
@@ -15,8 +13,7 @@ namespace gglab
 	{
 		GGLAB_UNUSED(context);
 		auto& snapshot = store.GetOrCreate<LabSnapshot>();
-		const LabRuntime* runtime =
-			m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr;
-		snapshot = runtime ? runtime->GetLabSnapshot() : LabSnapshot{};
+		const LabSnapshotSourceBase* source = m_SourceResolver ? m_SourceResolver() : nullptr;
+		snapshot = source ? source->GetLabSnapshot() : LabSnapshot{};
 	}
 }

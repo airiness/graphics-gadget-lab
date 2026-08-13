@@ -1,19 +1,19 @@
 #pragma once
-#include "Application/Lab/LabTypes.h"
+#include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/EnumText/EnumText.h"
 
 namespace gglab::devtools
 {
-	template <> struct EnumTextTraits<LabRunState>
+	template <> struct EnumTextTraits<LabSnapshotRunState>
 	{
 		static constexpr std::array Entries = {
-			EnumTextEntry{LabRunState::Uninitialized, "Uninitialized"},
-			EnumTextEntry{LabRunState::Loading, "Loading"},
-			EnumTextEntry{LabRunState::WarmingUp, "Warming Up"},
-			EnumTextEntry{LabRunState::Ready, "Ready"},
-			EnumTextEntry{LabRunState::Capturing, "Capturing"},
-			EnumTextEntry{LabRunState::Completed, "Completed"},
-			EnumTextEntry{LabRunState::Failed, "Failed"},
+			EnumTextEntry{LabSnapshotRunState::Uninitialized, "Uninitialized"},
+			EnumTextEntry{LabSnapshotRunState::Loading, "Loading"},
+			EnumTextEntry{LabSnapshotRunState::WarmingUp, "Warming Up"},
+			EnumTextEntry{LabSnapshotRunState::Ready, "Ready"},
+			EnumTextEntry{LabSnapshotRunState::Capturing, "Capturing"},
+			EnumTextEntry{LabSnapshotRunState::Completed, "Completed"},
+			EnumTextEntry{LabSnapshotRunState::Failed, "Failed"},
 		};
 	};
 }

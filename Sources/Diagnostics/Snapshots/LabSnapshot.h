@@ -1,12 +1,99 @@
 #pragma once
-#include "Application/Lab/LabParameter.h"
-#include "Application/Lab/LabRunConfig.h"
-#include "Application/Lab/LabTypes.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Vector.h"
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/RenderScene.h"
 
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
+
 namespace gglab
 {
+	struct LabIdSnapshot
+	{
+		bool IsValid() const noexcept { return !m_Name.empty(); }
+		bool operator==(const LabIdSnapshot&) const noexcept = default;
+
+		std::string m_Name;
+	};
+
+	struct LabParameterIdSnapshot
+	{
+		bool IsValid() const noexcept { return !m_Name.empty(); }
+		bool operator==(const LabParameterIdSnapshot&) const noexcept = default;
+
+		std::string m_Name;
+	};
+
+	enum class LabSnapshotRunState : uint8_t
+	{
+		Uninitialized,
+		Loading,
+		WarmingUp,
+		Ready,
+		Capturing,
+		Completed,
+		Failed,
+	};
+
+	struct LabDescriptorSnapshot
+	{
+		LabIdSnapshot m_Id;
+		std::string m_DisplayName;
+		std::string m_Category;
+		std::string m_Description;
+		uint32_t m_SchemaVersion = 1;
+	};
+
+	using LabSnapshotValue = std::variant<bool, int32_t, uint32_t, float, Vector3, Color>;
+
+	enum class LabSnapshotParameterType : uint8_t
+	{
+		Bool,
+		Int,
+		UInt,
+		Float,
+		Enum,
+		Vector3,
+		Color,
+	};
+
+	enum class LabSnapshotParameterEditPolicy : uint8_t
+	{
+		Continuous,
+		CommitOnEditEnd,
+	};
+
+	struct LabEnumItemSnapshot
+	{
+		int32_t m_Value = 0;
+		std::string m_Name;
+	};
+
+	struct LabParameterDescSnapshot
+	{
+		LabParameterIdSnapshot m_Id;
+		std::string m_Name;
+		std::string m_Group;
+		LabSnapshotParameterType m_Type = LabSnapshotParameterType::Bool;
+		LabSnapshotParameterEditPolicy m_EditPolicy = LabSnapshotParameterEditPolicy::Continuous;
+		LabSnapshotValue m_DefaultValue = false;
+		std::optional<LabSnapshotValue> m_MinValue;
+		std::optional<LabSnapshotValue> m_MaxValue;
+		std::vector<LabEnumItemSnapshot> m_EnumItems;
+	};
+
+	struct LabRunConfigSnapshot
+	{
+		uint64_t m_RandomSeed = 0;
+		uint32_t m_WarmupFrames = 8;
+		bool m_UseFixedDeltaTime = false;
+		float m_FixedDeltaTime = 1.0f / 60.0f;
+	};
+
 	enum class LabDiagnosticCheckStatus : uint8_t
 	{
 		Pending,
@@ -36,8 +123,8 @@ namespace gglab
 
 	struct LabParameterSnapshot
 	{
-		LabParameterDesc m_Desc;
-		LabValue m_Value = false;
+		LabParameterDescSnapshot m_Desc;
+		LabSnapshotValue m_Value = false;
 	};
 
 	struct LabFrameFeedbackSnapshot
@@ -51,16 +138,16 @@ namespace gglab
 
 	struct LabSnapshot
 	{
-		std::vector<LabDescriptor> m_AvailableLabs;
-		LabId m_ActiveLabId;
+		std::vector<LabDescriptorSnapshot> m_AvailableLabs;
+		LabIdSnapshot m_ActiveLabId;
 		std::string m_ActiveLabName;
-		LabId m_PendingLabId;
+		LabIdSnapshot m_PendingLabId;
 		std::string m_PendingLabName;
 		std::string m_Category;
 		std::string m_Description;
 		uint32_t m_SchemaVersion = 0;
-		LabRunState m_State = LabRunState::Uninitialized;
-		LabRunConfig m_RunConfig{};
+		LabSnapshotRunState m_State = LabSnapshotRunState::Uninitialized;
+		LabRunConfigSnapshot m_RunConfig{};
 		LabFrameFeedbackSnapshot m_LastFrame;
 		uint64_t m_FrameInSession = 0;
 		uint32_t m_WarmupFramesRemaining = 0;
@@ -75,6 +162,13 @@ namespace gglab
 		bool m_HasPendingCommands = false;
 		bool m_HasPendingSession = false;
 		bool m_IsHostActive = false;
+	};
+
+	class LabSnapshotSourceBase
+	{
+	public:
+		virtual ~LabSnapshotSourceBase() = default;
+		virtual LabSnapshot GetLabSnapshot() const noexcept = 0;
 	};
 
 	template <> struct SnapshotTraits<LabSnapshot>

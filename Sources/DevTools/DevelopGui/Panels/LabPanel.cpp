@@ -12,12 +12,24 @@ namespace gglab
 {
 	namespace
 	{
-		const LabId CullingLabId("gglab.lab.culling");
+		constexpr std::string_view CullingLabId = "gglab.lab.culling";
 
 		template <typename T>
-		const T* GetOptionalValue(const std::optional<LabValue>& value) noexcept
+		const T* GetOptionalValue(const std::optional<LabSnapshotValue>& value) noexcept
 		{
 			return value ? std::get_if<T>(&*value) : nullptr;
+		}
+
+		LabRunConfig ToLabRunConfig(const LabRunConfigSnapshot& snapshot) noexcept
+		{
+			LabRunConfig config{
+				.m_RandomSeed = snapshot.m_RandomSeed,
+				.m_WarmupFrames = snapshot.m_WarmupFrames,
+				.m_UseFixedDeltaTime = snapshot.m_UseFixedDeltaTime,
+				.m_FixedDeltaTime = snapshot.m_FixedDeltaTime,
+			};
+			config.Sanitize();
+			return config;
 		}
 
 		void DrawCullingLabStatistics(const DevelopGuiContext& context) noexcept
@@ -162,13 +174,13 @@ namespace gglab
 			snapshot.m_ActiveLabName.empty() ? "None" : snapshot.m_ActiveLabName.c_str();
 		if (ImGui::BeginCombo("##ActiveLab", activeName))
 		{
-			for (const LabDescriptor& descriptor : snapshot.m_AvailableLabs)
+			for (const LabDescriptorSnapshot& descriptor : snapshot.m_AvailableLabs)
 			{
 				const bool selected = descriptor.m_Id == snapshot.m_ActiveLabId;
 				ImGui::PushID(descriptor.m_Id.m_Name.c_str());
 				if (ImGui::Selectable(descriptor.m_DisplayName.c_str(), selected))
 				{
-					runtime->RequestSwitchLab(descriptor.m_Id);
+					runtime->RequestSwitchLab(LabId(descriptor.m_Id.m_Name));
 					commandQueued = true;
 				}
 				if (selected)
@@ -204,7 +216,7 @@ namespace gglab
 				"Retiring sessions: %u (waiting for GPU fences)", snapshot.m_RetiringSessionCount);
 		}
 		ImGui::Text("Session frame: %llu", snapshot.m_FrameInSession);
-		if (snapshot.m_State == LabRunState::WarmingUp)
+		if (snapshot.m_State == LabSnapshotRunState::WarmingUp)
 		{
 			ImGui::Text("Warm-up remaining: %u", snapshot.m_WarmupFramesRemaining);
 		}
@@ -225,7 +237,7 @@ namespace gglab
 			ImGui::TextWrapped("%s", snapshot.m_Description.c_str());
 		}
 
-		if (snapshot.m_ActiveLabId == CullingLabId)
+		if (snapshot.m_ActiveLabId.m_Name == CullingLabId)
 		{
 			ImGui::SeparatorText("Culling Statistics");
 			DrawCullingLabStatistics(context);
@@ -258,7 +270,7 @@ namespace gglab
 		}
 		if (m_RunConfigDraft && ImGui::CollapsingHeader("Run Configuration"))
 		{
-			LabRunConfig& config = *m_RunConfigDraft;
+			LabRunConfigSnapshot& config = *m_RunConfigDraft;
 			ImGui::InputScalar("Random Seed", ImGuiDataType_U64, &config.m_RandomSeed);
 			ImGui::DragScalar("Warm-up Frames", ImGuiDataType_U32, &config.m_WarmupFrames, 1.0f);
 			ImGui::Checkbox("Use Fixed Delta Time", &config.m_UseFixedDeltaTime);
@@ -268,8 +280,7 @@ namespace gglab
 			ImGui::EndDisabled();
 			if (ImGui::Button("Restart with Run Config"))
 			{
-				config.Sanitize();
-				runtime->RequestRunConfig(config);
+				runtime->RequestRunConfig(ToLabRunConfig(config));
 				commandQueued = true;
 			}
 		}
@@ -301,31 +312,32 @@ namespace gglab
 		}
 	}
 
-	bool LabPanel::DrawParameter(
-		const LabId& activeLabId, const LabParameterSnapshot& parameter) noexcept
+	bool LabPanel::DrawParameter(const LabIdSnapshot& activeLabId,
+		const LabParameterSnapshot& parameter) noexcept
 	{
-		const LabParameterDesc& desc = parameter.m_Desc;
-		const bool deferred = desc.m_EditPolicy == LabParameterEditPolicy::CommitOnEditEnd;
+		const LabParameterDescSnapshot& desc = parameter.m_Desc;
+		const bool deferred =
+			desc.m_EditPolicy == LabSnapshotParameterEditPolicy::CommitOnEditEnd;
 		auto draft = std::ranges::find_if(m_DeferredParameterEdits,
 			[&activeLabId, &desc](const DeferredParameterEdit& edit) noexcept
 			{
 				return edit.m_LabId == activeLabId && edit.m_ParameterId == desc.m_Id;
 			});
-		LabValue value = draft != m_DeferredParameterEdits.end()
+		LabSnapshotValue value = draft != m_DeferredParameterEdits.end()
 			? draft->m_Value
 			: parameter.m_Value;
 		bool changed = false;
 
 		switch (desc.m_Type)
 		{
-		case LabParameterType::Bool:
+		case LabSnapshotParameterType::Bool:
 		{
 			bool current = std::get<bool>(value);
 			changed = ImGui::Checkbox(desc.m_Name.c_str(), &current);
 			value = current;
 			break;
 		}
-		case LabParameterType::Int:
+		case LabSnapshotParameterType::Int:
 		{
 			int32_t current = std::get<int32_t>(value);
 			const int32_t* minValue = GetOptionalValue<int32_t>(desc.m_MinValue);
@@ -335,7 +347,7 @@ namespace gglab
 			value = current;
 			break;
 		}
-		case LabParameterType::UInt:
+		case LabSnapshotParameterType::UInt:
 		{
 			uint32_t current = std::get<uint32_t>(value);
 			const uint32_t* minValue = GetOptionalValue<uint32_t>(desc.m_MinValue);
@@ -345,7 +357,7 @@ namespace gglab
 			value = current;
 			break;
 		}
-		case LabParameterType::Float:
+		case LabSnapshotParameterType::Float:
 		{
 			float current = std::get<float>(value);
 			const float* minValue = GetOptionalValue<float>(desc.m_MinValue);
@@ -355,16 +367,16 @@ namespace gglab
 			value = current;
 			break;
 		}
-		case LabParameterType::Enum:
+		case LabSnapshotParameterType::Enum:
 		{
 			int32_t current = std::get<int32_t>(value);
 			const auto selected = std::ranges::find_if(desc.m_EnumItems,
-				[current](const LabEnumItem& item) { return item.m_Value == current; });
+				[current](const LabEnumItemSnapshot& item) { return item.m_Value == current; });
 			const char* preview =
 				selected != desc.m_EnumItems.end() ? selected->m_Name.c_str() : "Unknown";
 			if (ImGui::BeginCombo(desc.m_Name.c_str(), preview))
 			{
-				for (const LabEnumItem& item : desc.m_EnumItems)
+				for (const LabEnumItemSnapshot& item : desc.m_EnumItems)
 				{
 					const bool isSelected = item.m_Value == current;
 					if (ImGui::Selectable(item.m_Name.c_str(), isSelected))
@@ -382,7 +394,7 @@ namespace gglab
 			value = current;
 			break;
 		}
-		case LabParameterType::Vector3:
+		case LabSnapshotParameterType::Vector3:
 		{
 			Vector3 current = std::get<Vector3>(value);
 			const Vector3* minValue = GetOptionalValue<Vector3>(desc.m_MinValue);
@@ -392,7 +404,7 @@ namespace gglab
 			value = current;
 			break;
 		}
-		case LabParameterType::Color:
+		case LabSnapshotParameterType::Color:
 		{
 			Color current = std::get<Color>(value);
 			changed = ImGui::ColorEdit4(desc.m_Name.c_str(), &current.m_R);
@@ -424,7 +436,8 @@ namespace gglab
 				if (LabRuntime* runtime =
 					m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr)
 				{
-					runtime->RequestSetParameter(desc.m_Id, draft->m_Value);
+					runtime->RequestSetParameter(
+						LabParameterId(desc.m_Id.m_Name), draft->m_Value);
 					m_DeferredParameterEdits.erase(draft);
 					return true;
 				}
@@ -437,7 +450,7 @@ namespace gglab
 			if (LabRuntime* runtime =
 				m_RuntimeLocator ? m_RuntimeLocator->GetLabRuntimeIfCreated() : nullptr)
 			{
-				runtime->RequestSetParameter(desc.m_Id, value);
+				runtime->RequestSetParameter(LabParameterId(desc.m_Id.m_Name), value);
 			}
 		}
 		return changed;

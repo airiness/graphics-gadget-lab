@@ -215,7 +215,6 @@
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
@@ -389,8 +388,6 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />

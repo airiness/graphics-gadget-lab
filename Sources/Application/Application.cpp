@@ -318,7 +318,11 @@ namespace gglab
 		{
 			m_DevelopGuiSystem->GetDevToolsRuntime().SetTaskSystem(m_TaskSystem.get());
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
-				std::make_unique<LabSnapshotProvider>(m_LabRuntimeLocator.get()),
+				std::make_unique<LabSnapshotProvider>(
+					[runtimeLocator = m_LabRuntimeLocator.get()]() noexcept -> const LabSnapshotSourceBase*
+					{
+						return runtimeLocator ? runtimeLocator->GetLabRuntimeIfCreated() : nullptr;
+					}),
 				SnapshotUpdatePolicy::EveryFrame);
 			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
 				std::make_unique<DemoPanel>(m_DemoManager.get()));

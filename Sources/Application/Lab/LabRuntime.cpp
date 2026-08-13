@@ -6,6 +6,85 @@
 
 namespace gglab
 {
+	namespace
+	{
+		LabIdSnapshot MakeLabIdSnapshot(const LabId& id)
+		{
+			return { .m_Name = id.m_Name };
+		}
+
+		LabParameterIdSnapshot MakeLabParameterIdSnapshot(const LabParameterId& id)
+		{
+			return { .m_Name = id.m_Name };
+		}
+
+		LabSnapshotRunState ToSnapshotRunState(LabRunState state) noexcept
+		{
+			switch (state)
+			{
+			case LabRunState::Uninitialized: return LabSnapshotRunState::Uninitialized;
+			case LabRunState::Loading: return LabSnapshotRunState::Loading;
+			case LabRunState::WarmingUp: return LabSnapshotRunState::WarmingUp;
+			case LabRunState::Ready: return LabSnapshotRunState::Ready;
+			case LabRunState::Capturing: return LabSnapshotRunState::Capturing;
+			case LabRunState::Completed: return LabSnapshotRunState::Completed;
+			case LabRunState::Failed: return LabSnapshotRunState::Failed;
+			}
+			return LabSnapshotRunState::Failed;
+		}
+
+		LabSnapshotParameterType ToSnapshotParameterType(LabParameterType type) noexcept
+		{
+			switch (type)
+			{
+			case LabParameterType::Bool: return LabSnapshotParameterType::Bool;
+			case LabParameterType::Int: return LabSnapshotParameterType::Int;
+			case LabParameterType::UInt: return LabSnapshotParameterType::UInt;
+			case LabParameterType::Float: return LabSnapshotParameterType::Float;
+			case LabParameterType::Enum: return LabSnapshotParameterType::Enum;
+			case LabParameterType::Vector3: return LabSnapshotParameterType::Vector3;
+			case LabParameterType::Color: return LabSnapshotParameterType::Color;
+			}
+			return LabSnapshotParameterType::Bool;
+		}
+
+		LabDescriptorSnapshot MakeDescriptorSnapshot(const LabDescriptor& descriptor)
+		{
+			return {
+				.m_Id = MakeLabIdSnapshot(descriptor.m_Id),
+				.m_DisplayName = descriptor.m_DisplayName,
+				.m_Category = descriptor.m_Category,
+				.m_Description = descriptor.m_Description,
+				.m_SchemaVersion = descriptor.m_SchemaVersion,
+			};
+		}
+
+		LabParameterDescSnapshot MakeParameterDescSnapshot(const LabParameterDesc& desc)
+		{
+			LabParameterDescSnapshot snapshot{
+				.m_Id = MakeLabParameterIdSnapshot(desc.m_Id),
+				.m_Name = desc.m_Name,
+				.m_Group = desc.m_Group,
+				.m_Type = ToSnapshotParameterType(desc.m_Type),
+				.m_EditPolicy = desc.m_EditPolicy == LabParameterEditPolicy::CommitOnEditEnd
+					? LabSnapshotParameterEditPolicy::CommitOnEditEnd
+					: LabSnapshotParameterEditPolicy::Continuous,
+				.m_DefaultValue = desc.m_DefaultValue,
+				.m_MinValue = desc.m_MinValue,
+				.m_MaxValue = desc.m_MaxValue,
+			};
+			snapshot.m_EnumItems.reserve(desc.m_EnumItems.size());
+			for (const LabEnumItem& item : desc.m_EnumItems)
+			{
+				snapshot.m_EnumItems.push_back({
+					.m_Value = item.m_Value,
+					.m_Name = item.m_Name,
+					});
+			}
+			return snapshot;
+		}
+	}
+
 	LabRuntime::LabRuntime(const LabSessionCreateInfo& createInfo) noexcept :
 		m_CreateInfo(createInfo)
 	{
@@ -253,9 +332,14 @@ namespace gglab
 	LabSnapshot LabRuntime::GetLabSnapshot() const noexcept
 	{
 		LabSnapshot snapshot{};
-		snapshot.m_State = m_State;
+		snapshot.m_State = ToSnapshotRunState(m_State);
 		snapshot.m_FrameInSession = m_FrameInSession;
-		snapshot.m_RunConfig = m_CreateInfo.m_RunConfig;
+		snapshot.m_RunConfig = {
+			.m_RandomSeed = m_CreateInfo.m_RunConfig.m_RandomSeed,
+			.m_WarmupFrames = m_CreateInfo.m_RunConfig.m_WarmupFrames,
+			.m_UseFixedDeltaTime = m_CreateInfo.m_RunConfig.m_UseFixedDeltaTime,
+			.m_FixedDeltaTime = m_CreateInfo.m_RunConfig.m_FixedDeltaTime,
+		};
 		snapshot.m_WarmupFramesRemaining = m_WarmupFramesRemaining;
 		snapshot.m_EffectiveDeltaTime = m_EffectiveDeltaTime;
 		snapshot.m_LastFrame = {
@@ -274,7 +358,7 @@ namespace gglab
 		{
 			const LabDescriptor& pendingDescriptor = m_PendingSession->GetDescriptor();
 			const LoadingProgress progress = m_PendingSession->GetPreparationProgress();
-			snapshot.m_PendingLabId = pendingDescriptor.m_Id;
+			snapshot.m_PendingLabId = MakeLabIdSnapshot(pendingDescriptor.m_Id);
 			snapshot.m_PendingLabName = pendingDescriptor.m_DisplayName;
 			snapshot.m_LoadingFraction = progress.m_Fraction;
 			snapshot.m_LoadingStage = progress.m_Stage;
@@ -286,7 +370,7 @@ namespace gglab
 		{
 			if (const LabDescriptor* descriptor = m_Catalog.GetDescriptor(index))
 			{
-				snapshot.m_AvailableLabs.push_back(*descriptor);
+				snapshot.m_AvailableLabs.push_back(MakeDescriptorSnapshot(*descriptor));
 			}
 		}
 
@@ -296,7 +380,7 @@ namespace gglab
 		}
 
 		const LabDescriptor& descriptor = m_ActiveSession->GetDescriptor();
-		snapshot.m_ActiveLabId = descriptor.m_Id;
+		snapshot.m_ActiveLabId = MakeLabIdSnapshot(descriptor.m_Id);
 		snapshot.m_ActiveLabName = descriptor.m_DisplayName;
 		snapshot.m_Category = descriptor.m_Category;
 		snapshot.m_Description = descriptor.m_Description;
@@ -307,7 +391,7 @@ namespace gglab
 		for (const LabParameter& parameter : parameters)
 		{
 			snapshot.m_Parameters.push_back({
-				.m_Desc = parameter.m_Desc,
+				.m_Desc = MakeParameterDescSnapshot(parameter.m_Desc),
 				.m_Value = parameter.m_Value,
 				});
 		}
