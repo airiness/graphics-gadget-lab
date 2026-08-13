@@ -10,7 +10,7 @@ param(
 #   Compile ownership - source files must have one compilation owner, and all
 #                       runtime-candidate .cpp files must have an owner.
 #   Ownership boundary - runtime candidates must not include Application/*,
-#                        DevTools/*, or Application-owned regions.
+#                        DevTools/*, or the legacy Application-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
@@ -39,12 +39,6 @@ $sourcesDir = Join-Path $root "Sources"
 # Candidate runtime directories (portable runtime candidates; backend leaves included).
 $candidateDirs = @("Core", "Scene", "Graphics", "Diagnostics")
 
-# Application-owned regions that physically live inside candidate directories.
-# Ownership wins over directory name.
-$applicationOwnedRegions = @(
-    "Core/Input" # GameInput implementation, Application-owned
-)
-
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
 $platformLeafPrefixes = @(
@@ -59,7 +53,6 @@ $platformLeafFiles = @(
 
 # Transitional debt: allowed only with an explicit removal condition.
 $transitionalDebt = @(
-    [pscustomobject]@{ File = "Core/Hash/Sha256.cpp"; Reason = "BCrypt implementation; planned: move to Core/Platform/Win" },
     [pscustomobject]@{ File = "Core/HResult.h";       Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" },
     [pscustomobject]@{ File = "Core/HResult.cpp";     Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" }
 )
@@ -88,14 +81,9 @@ $platformTypeRegex = '\bVulkanWin32Surface(Factory)?\b'
 function Test-IsExempt {
     param([string]$RelativePath)
 
-    # Application-owned regions and permanent platform leaves are exempt from
-    # scanning. Transitional debt is NOT exempt: it must be scanned, matched
-    # when the violation is still present, and reported stale when resolved.
-    foreach ($region in $applicationOwnedRegions) {
-        if ($RelativePath.StartsWith($region + "/")) {
-            return $true
-        }
-    }
+    # Permanent platform leaves are exempt from scanning. Transitional debt is
+    # NOT exempt: it must be scanned, matched when the violation is still
+    # present, and reported stale when resolved.
     foreach ($prefix in $platformLeafPrefixes) {
         if ($RelativePath.StartsWith($prefix + "/")) {
             return $true
@@ -283,13 +271,6 @@ foreach ($file in ($candidateFiles | Where-Object { $_.Path.EndsWith(".cpp") }))
             Reason = "runtime-candidate source has no compilation owner"
         })
     }
-    if ($file.Path.StartsWith("Core/Input/") -and -not $ownedByApplication) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "compile-ownership"
-            Target = $file.Path
-            Reason = "current input implementation must remain Application-owned"
-        })
-    }
 }
 
 $ownershipFindings = New-Object System.Collections.Generic.List[object]
@@ -303,7 +284,7 @@ foreach ($file in $runtimeOwnedFiles) {
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
 
     if ($file.Path.StartsWith("Application/") -or $file.Path.StartsWith("DevTools/") -or
-        $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex -or
+        $content -match $ownershipIncludeRegex -or
         $content -match $ownershipSymbolRegex) {
         $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }

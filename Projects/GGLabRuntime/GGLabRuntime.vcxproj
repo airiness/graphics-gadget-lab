@@ -83,6 +83,7 @@
     <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
+    <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
@@ -93,6 +94,10 @@
     <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp" />
     <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp" />
     <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
@@ -278,6 +283,7 @@
     <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h" />
     <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
+    <ClInclude Include="..\..\Sources\Core\HResult.h" />
     <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
@@ -291,6 +297,11 @@
     <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
     <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.h" />
     <ClInclude Include="..\..\Sources\Core\StringId.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h" />
     <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h" />

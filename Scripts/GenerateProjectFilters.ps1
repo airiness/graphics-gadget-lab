@@ -319,9 +319,7 @@ $projectSpecifications = @(
         ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
-            [pscustomobject]@{ Root = "Sources\Application"; FilterPrefix = "Application" }
-            [pscustomobject]@{ Root = "Sources\DevTools"; FilterPrefix = "DevTools" }
-            [pscustomobject]@{ Root = "Sources\Core"; FilterPrefix = "Core" }
+            [pscustomobject]@{ Root = "Sources\Application"; FilterPrefix = "" }
             [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
             [pscustomobject]@{ Root = "Projects\Application\packages.config"; FilterPrefix = "" }
