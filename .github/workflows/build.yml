@@ -169,7 +169,7 @@ jobs:
         shell: pwsh
         run: |
           $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\Application\ApplicationPch.cpp").Path
+            (Resolve-Path -LiteralPath "Sources\Application\Application\ApplicationPch.cpp").Path
           $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
           $unexpectedIncludes = @(
             Get-ChildItem -LiteralPath Sources -Recurse -File |
