@@ -248,6 +248,15 @@ namespace gglab
 			BuildD3D12BarrierSubresourceRange(barrier.m_Subresources, resourceDesc));
 	}
 
+	D3D12_BUFFER_BARRIER BuildD3D12BufferBarrier(
+		const RHIBufferBarrier& barrier, ID3D12Resource* resource) noexcept
+	{
+		return CD3DX12_BUFFER_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
+			ToD3D12BarrierSync(barrier.m_After.m_Stages),
+			ToD3D12BarrierAccess(barrier.m_Before.m_Access),
+			ToD3D12BarrierAccess(barrier.m_After.m_Access), resource);
+	}
+
 	D3D12_RESOURCE_STATES ToD3D12ResourceStates(RHIAccess access) noexcept
 	{
 		if (access == RHIAccess::None || access == RHIAccess::Common)

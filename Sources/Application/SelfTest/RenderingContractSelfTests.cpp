@@ -403,14 +403,24 @@ namespace gglab
 				return !m_FailUploads;
 			}
 			RHITextureReadbackRequest ReadbackTexture(
-				RHITextureHandle, const RHITextureDesc&) noexcept override
+				RHITextureHandle, const RHITextureDesc& desc) noexcept override
 			{
-				return {};
+				if (m_FailReadbacks)
+				{
+					return {};
+				}
+				RHITextureReadbackRequest request{};
+				request.m_Buffer = RHIBufferOwner(nullptr, RHIBufferHandle{ 9, 1 });
+				request.m_BufferSizeInBytes = 4;
+				request.m_TextureDesc = desc;
+				request.m_Subresources.push_back({});
+				return request;
 			}
 
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 			std::vector<RHIBufferBarrier> m_BufferBarriers;
 			bool m_FailUploads = false;
+			bool m_FailReadbacks = true;
 			bool m_FailSubmit = false;
 			uint32_t m_SubmitCallCount = 0;
 			uint32_t m_AbortCallCount = 0;
@@ -850,6 +860,28 @@ namespace gglab
 				MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
 			context.Check(baseKey != changedKey,
 				"DX12 normalized graphics keys include explicit RHI vertex locations");
+
+			const RHIBufferBarrier copyBarrier{
+				.m_Before = {
+					.m_Stages = RHIStage::Copy,
+					.m_Access = RHIAccess::CopySource,
+					.m_Layout = RHILayout::CopySource,
+				},
+				.m_After = {
+					.m_Stages = RHIStage::Copy,
+					.m_Access = RHIAccess::CopyDest,
+					.m_Layout = RHILayout::CopyDest,
+				},
+			};
+			auto* nativeResource = reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 });
+			const D3D12_BUFFER_BARRIER nativeBarrier =
+				BuildD3D12BufferBarrier(copyBarrier, nativeResource);
+			context.Check(nativeBarrier.SyncBefore == D3D12_BARRIER_SYNC_COPY &&
+				nativeBarrier.SyncAfter == D3D12_BARRIER_SYNC_COPY &&
+				nativeBarrier.AccessBefore == D3D12_BARRIER_ACCESS_COPY_SOURCE &&
+				nativeBarrier.AccessAfter == D3D12_BARRIER_ACCESS_COPY_DEST &&
+				nativeBarrier.pResource == nativeResource,
+				"DX12 lowers buffer transitions to the exact Enhanced Barrier contract");
 		}
 
 		void RunProjectionConventionTests(SelfTestContext& context) noexcept
@@ -3790,6 +3822,31 @@ namespace gglab
 					readbackContext.m_SubmitCallCount == 0 &&
 					!submission.m_Completion.IsValid(),
 					"Readback allocation failure poisons and aborts its partially recorded state transition");
+			}
+			{
+				RecordingTransferContext readbackContext;
+				readbackContext.m_FailReadbacks = false;
+				TransferBatch readbackBatch(readbackContext);
+				const RHITextureHandle readbackTexture{ 6, 1 };
+				const RHITextureReadbackRequest request = readbackBatch.ReadbackTexture(
+					readbackTexture, RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::CopySource,
+						.m_Extent = { 1, 1, 1 },
+					});
+				const RHITransferSubmission submission = readbackBatch.Submit(false);
+				const RHIResourceState commonState = CommonRHIResourceState();
+				context.Check(request.IsValid() && readbackContext.m_TextureBarriers.size() == 2 &&
+					readbackContext.m_TextureBarriers[0].m_Before == commonState &&
+					readbackContext.m_TextureBarriers[0].m_After.m_Layout == RHILayout::CopySource &&
+					readbackContext.m_TextureBarriers[1].m_Before.m_Layout == RHILayout::CopySource &&
+					readbackContext.m_TextureBarriers[1].m_After == commonState &&
+					submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
+					submission.m_Publications[0].m_Texture == readbackTexture &&
+					submission.m_Publications[0].m_PublishedState == commonState &&
+					submission.m_Publications[1].m_Buffer == request.m_Buffer.Get() &&
+					submission.m_Publications[1].m_PublishedState.m_Access == RHIAccess::CopyDest,
+					"Texture readback returns its source to Common and publishes both terminal states");
 			}
 			{
 				RecordingTransferContext submitFailureContext;

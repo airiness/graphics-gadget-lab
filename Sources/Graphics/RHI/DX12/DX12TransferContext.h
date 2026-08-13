@@ -38,7 +38,7 @@ namespace gglab
 		void TrackBufferUse(RHIBufferHandle buffer) noexcept override { RecordBufferUse(buffer); }
 		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
 		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
-		void FlushBarriers() noexcept override {}
+		void FlushBarriers() noexcept override;
 
 		void Begin() noexcept override;
 		RHIFencePoint Submit(bool wait = false) noexcept override;

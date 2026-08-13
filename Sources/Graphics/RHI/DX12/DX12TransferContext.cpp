@@ -98,8 +98,7 @@ namespace gglab
 			return;
 		}
 
-		std::vector<CD3DX12_RESOURCE_BARRIER> nativeBarriers;
-		nativeBarriers.reserve(barriers.size());
+		bool barrierRecorded = false;
 		for (const RHITextureBarrier& barrier : barriers)
 		{
 			if (!IsRHIResourceStateValid(
@@ -119,15 +118,15 @@ namespace gglab
 				continue;
 			}
 
-			nativeBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(texture->Get(),
-				ToD3D12ResourceStates(barrier.m_Before), ToD3D12ResourceStates(barrier.m_After)));
+			m_CommandList->AddTextureBarrier(
+				BuildD3D12TextureBarrier(barrier, texture->Get(), texture->GetDesc()));
 			RecordTextureUse(barrier.m_Texture);
+			barrierRecorded = true;
 		}
 
-		if (!nativeBarriers.empty())
+		if (barrierRecorded)
 		{
-			m_CommandList->Get()->ResourceBarrier(
-				static_cast<UINT>(nativeBarriers.size()), nativeBarriers.data());
+			FlushBarriers();
 		}
 	}
 
@@ -140,8 +139,7 @@ namespace gglab
 			return;
 		}
 
-		std::vector<CD3DX12_RESOURCE_BARRIER> nativeBarriers;
-		nativeBarriers.reserve(barriers.size());
+		bool barrierRecorded = false;
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
 			if (!IsRHIResourceStateValid(barrier.m_Before, RHIResourceStateUsage::Buffer) ||
@@ -159,15 +157,24 @@ namespace gglab
 				continue;
 			}
 
-			nativeBarriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(buffer->Get(),
-				ToD3D12ResourceStates(barrier.m_Before), ToD3D12ResourceStates(barrier.m_After)));
+			m_CommandList->AddBufferBarrier(BuildD3D12BufferBarrier(barrier, buffer->Get()));
 			RecordBufferUse(barrier.m_Buffer);
+			barrierRecorded = true;
 		}
 
-		if (!nativeBarriers.empty())
+		if (barrierRecorded)
 		{
-			m_CommandList->Get()->ResourceBarrier(
-				static_cast<UINT>(nativeBarriers.size()), nativeBarriers.data());
+			FlushBarriers();
+		}
+	}
+
+	void DX12TransferContext::FlushBarriers() noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_ExecutingInfo, "FlushBarriers must be called between Begin() and End().");
+		if (m_ExecutingInfo)
+		{
+			m_CommandList->FlushBarriers();
 		}
 	}
 
