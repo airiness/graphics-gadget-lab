@@ -34,6 +34,7 @@ function Get-RepoRoot {
 }
 
 $root = Get-RepoRoot $RootDir
+$repositorySourcesDir = Join-Path $root "Sources"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 
 # Candidate runtime directories (portable runtime candidates; backend leaves included).
@@ -232,6 +233,61 @@ foreach ($path in $applicationProjectReferences) {
 }
 
 $projectContractFindings = New-Object System.Collections.Generic.List[object]
+$requiredRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
+$forbiddenRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources'
+$runtimeIncludeDirectoryNodes = @(
+    $runtimeProject.SelectNodes("//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalIncludeDirectories", $namespace)
+)
+if ($runtimeIncludeDirectoryNodes.Count -eq 0) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "include-visibility"
+        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+        Reason = "missing GGLabRuntime include-directory definitions"
+    })
+}
+foreach ($includeNode in $runtimeIncludeDirectoryNodes) {
+    $includeRoots = @(
+        ([string]$includeNode.InnerText).Split(';') |
+            ForEach-Object { $_.Trim().TrimEnd('\') } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    $condition = [string]$includeNode.ParentNode.ParentNode.Condition
+    $target = if ([string]::IsNullOrWhiteSpace($condition)) {
+        "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+    }
+    else {
+        "Projects/GGLabRuntime/GGLabRuntime.vcxproj ($condition)"
+    }
+    if ($includeRoots -notcontains $requiredRuntimeIncludeRoot) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "include-visibility"
+            Target = $target
+            Reason = "missing narrow Sources/GGLabRuntime include root"
+        })
+    }
+    if ($includeRoots -contains $forbiddenRuntimeIncludeRoot) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "include-visibility"
+            Target = $target
+            Reason = "repository-wide Sources include root is forbidden"
+        })
+    }
+}
+foreach ($file in $runtimeOwnedFiles) {
+    $isFirstPartySource = $file.FullPath.StartsWith(
+        $repositorySourcesDir + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase)
+    $isUnderRuntimeRoot = $file.FullPath.StartsWith(
+        $runtimeSourcesDir + [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase)
+    if ($isFirstPartySource -and -not $isUnderRuntimeRoot) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "source-ownership"
+            Target = $file.FullPath.Substring($root.Length + 1).Replace('\', '/')
+            Reason = "GGLabRuntime project item is outside Sources/GGLabRuntime"
+        })
+    }
+}
 if (-not $applicationProjectReferenceSet.Contains($runtimeProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
