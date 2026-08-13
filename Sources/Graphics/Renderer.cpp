@@ -1,7 +1,6 @@
 #include "Graphics/Renderer.h"
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -51,8 +50,15 @@ namespace gglab
 			!m_HasActiveFrame, "Renderer destroyed while a Renderer::Frame is still active.");
 	}
 
-	void Renderer::Initialize(const CreateInfo& createInfo) noexcept
+	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
+		if (!createInfo.HasRequiredRuntimePaths())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer initialization requires non-empty IBL cache and shader source roots.");
+			return false;
+		}
+
 		RHIContextDesc contextDesc{};
 		contextDesc.m_Backend = createInfo.m_Backend;
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
@@ -100,13 +106,15 @@ namespace gglab
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
 		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
 		iblBakeSchedulerCreateInfo.m_DerivedDataCacheDirectory =
-			utils::GetExeOutDir() / "DerivedDataCache" / "IBL";
+			createInfo.m_IblDerivedDataCacheDirectory;
+		iblBakeSchedulerCreateInfo.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot;
 		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
 
 		m_IsInitialized = true;
+		return true;
 	}
 
 	void Renderer::Finalize() noexcept

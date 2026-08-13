@@ -40,8 +40,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXMeshImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
@@ -55,8 +53,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXMeshImport.props" />
-    <Import Project="..\..\PropertySheets\DirectXTexImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\SpdlogImport.props" />
@@ -70,7 +66,7 @@
     <GGLAB_USE_PCH Condition="'$(GGLAB_USE_PCH)'==''">1</GGLAB_USE_PCH>
   </PropertyGroup>
   <PropertyGroup Condition="'$(GGLAB_USE_PCH)'=='0'">
-    <IntDir>$(SolutionDir)Build\Intermediate\$(Platform)\$(Configuration)\NoPCH\</IntDir>
+    <IntDir>$(GGLabRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\NoPCH\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>GraphicsGadgetLab</TargetName>
@@ -84,9 +80,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -102,9 +98,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(SolutionDir)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -123,11 +119,6 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <ForcedIncludeFiles />
-    </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -166,7 +157,6 @@
     <ClCompile Include="..\..\Sources\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\RenderingStartup.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
@@ -189,27 +179,13 @@
     <ClCompile Include="..\..\Sources\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\SelfTest\VulkanContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Platform\Windows\Win32Window.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\AssetManager.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\ModelImporter.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\AssetSnapshotText.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp" />
@@ -218,25 +194,6 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Camera.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\CameraController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\CameraRig.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp" />
@@ -252,89 +209,14 @@
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevToolsRuntime.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIResource.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\RHITextureValidation.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\RHIContext.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.cpp" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\Core\HResult.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.cpp" />
     <ClCompile Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXBoundsBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Backends\DirectXMathBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Color.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Culling.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\MeshStore.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\TextureStore.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Store\ModelStore.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Matrix.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Quaternion.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Transform.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Math\Vector.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Utility\MathUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Utility\PathUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Utility\CubemapUtils.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.cpp" />
     <ClCompile Include="..\..\Sources\Application\Demo\DemoLoadingShell.cpp" />
@@ -371,128 +253,25 @@
     <ClCompile Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\DebugDraw\DebugDrawShapes.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\ForwardPlus.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\GTAO.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\PipelineCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderFrameBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderQueue.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderScene.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderView.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderWorldExtractor.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputBase.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Geometry.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\MaterialGpuEncoder.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\InputManager.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Keyboard.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Log\Logger.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <ForcedIncludeFiles />
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Main.cpp" />
     <ClCompile Include="..\..\Sources\Core\Input\Mouse.cpp" />
     <ClCompile Include="..\..\Sources\Application\ApplicationPch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Graphics\Renderer.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Allocator\RingSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\SamplerRegistry.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\EnvironmentLightingSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\EnvironmentAssetController.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\IBLBakeScheduler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.cpp" />
     <ClCompile Include="..\..\Sources\Core\Hash\Sha256.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAsset.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifact.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Shader\Shader.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderCompiler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderManager.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\Shader\ShaderPaths.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Utility\StringUtils.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Time.cpp" />
-    <ClCompile Include="..\..\Sources\Core\Profiling\CpuProfiler.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\TransferBatch.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\TransferManager.cpp" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
-    <ClInclude Include="..\..\Sources\Core\Allocator\AllocatorBase.h" />
-    <ClInclude Include="..\..\Sources\Core\Task\TaskSystem.h" />
-    <ClInclude Include="..\..\Sources\Core\Task\TaskWorkerPlatformContext.h" />
-    <ClInclude Include="..\..\Sources\Core\Task\TaskTypes.h" />
-    <ClInclude Include="..\..\Sources\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\Application\Application.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\RenderingStartup.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanQualification.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
@@ -520,30 +299,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\AssetSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\AssetSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TaskSystemSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\DiagnosticsRuntime.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotCommon.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotContext.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotProvider.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\SnapshotStore.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
@@ -552,30 +307,6 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\Buffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicBufferAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicConstantBufferAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\DynamicStructuredBufferAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBuffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Buffer\PersistentStructuredBufferTable.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBL.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLClear.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassClearViewTargets.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassSkybox.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Resource\RenderResourceRegistry.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBlackboard.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Camera.h" />
-    <ClInclude Include="..\..\Sources\Graphics\CameraController.h" />
-    <ClInclude Include="..\..\Sources\Graphics\CameraRig.h" />
-    <ClInclude Include="..\..\Sources\Scene\Components.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITransferContext.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12TransferContext.h" />
-    <ClInclude Include="..\..\Sources\Core\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoManager.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoTypes.h" />
@@ -596,119 +327,23 @@
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevToolsRuntime.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBuffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIBindingLayout.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICoordinatePolicy.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHICommandContext.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptor.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDescriptorCapacityContract.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIDevice.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIContext.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFence.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISwapChain.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandleTable.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIHandles.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipeline.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIPipelineSystem.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResource.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIResourceDebug.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISubresourceUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHISampler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHIFormat.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITexture.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureValidation.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITextureViewDescUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\RHITypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanUtility.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanInstance.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanWin32Surface.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanAdapter.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDevice.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanSwapChain.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTimelineFence.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFrameRuntime.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanBarrier.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanCommandContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanConversions.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineSystem.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanPipelineState.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResource.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanResourceManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTextureCopy.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\Vulkan\VulkanTransferContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiPlatformBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiRenderBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\DevelopGuiSystem.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Buffer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandContext.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandList.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12CommandQueue.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Device.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12HResult.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12QueueSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Context.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12GpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Fence.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12FencePoint.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineState.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12PipelineSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12PSOCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Resource.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12ResourceManager.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
-    <ClCompile Include="..\..\Sources\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
     <ClCompile Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12RootSignature.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12SwapChain.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\DX12Texture.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12EnumUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12QueueUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Utility\TextureUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Utility\CubemapUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Utility\DXGIFormatUtils.h" />
-    <ClInclude Include="..\..\Sources\Core\EnumFlags.h" />
-    <ClInclude Include="..\..\Sources\Core\Hash\KeyHash.h" />
-    <ClInclude Include="..\..\Sources\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\Core\HResult.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Backends\DirectXMathInterop.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32DiagnosticOutput.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32NamedMutex.h" />
-    <ClInclude Include="..\..\Sources\Core\Utility\MathUtils.h" />
-    <ClInclude Include="..\..\Sources\Core\Utility\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32PathUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32ProcessUtils.h" />
+    <ClInclude Include="..\..\Sources\Core\Platform\Win\Win32StringUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShell.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLoadingShellRenderPipeline.h" />
@@ -749,188 +384,25 @@
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Demo\DemoLabRuntimeLocator.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Builders\LabSnapshotProvider.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\DevTools\DevelopGui\Panels\LabPanel.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderContexts.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDevelopGui.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDebugDraw.h" />
-    <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDraw.h" />
-    <ClInclude Include="..\..\Sources\Graphics\DebugDraw\DebugDrawSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassDepthPrepass.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPlusValidationGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\GTAOGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassGTAO.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ForwardPBRShaderSet.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardOpaque.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassForwardTransparent.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLPreview.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBloom.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassFinalColor.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\SceneDepthGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\DepthCoverage.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\ForwardPlus.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\ForwardPlusDebugReadback.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\GTAO.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelineCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\PipelinePresets.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Pipeline\RHIPipelineRecipeAdapter.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PipelineDesc.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOCreator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\PSOKey.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\DepthCoverageFramePlan.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\PostProcessPipeline.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessColor.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessDebug.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessOutput.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\PostProcessResolution.h" />
-    <ClInclude Include="..\..\Sources\Graphics\PostProcess\ViewRenderSettings.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderFrameBuilder.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Profiling\GpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderQueue.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderScene.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderView.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderWorldExtractor.h" />
-    <ClInclude Include="..\..\Sources\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\IBLGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Resource\TransientResourcePool.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\ShadowGraphResources.h" />
-    <ClInclude Include="..\..\Sources\Graphics\ShadowSettings.h" />
-    <ClInclude Include="..\..\Sources\Graphics\GPUStructures.h" />
-    <ClInclude Include="..\..\Sources\Graphics\GraphicsTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadProgress.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Geometry.h" />
-    <ClInclude Include="..\..\Sources\Graphics\MaterialGpuEncoder.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetManager.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Streaming\AssetUploadScheduler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\ModelImporter.h" />
     <ClInclude Include="..\..\Sources\Core\Input\InputManager.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassBase.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderPass\RenderPassInfo.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Keyboard.h" />
-    <ClInclude Include="..\..\Sources\Core\Log\Logger.h" />
-    <ClInclude Include="..\..\Sources\Core\Log\LogMacros.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\BoundingVolumes.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Color.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Culling.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\MathConstants.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\MathFunctions.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Matrix.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentity.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetIdentityConversions.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\AssetContentFingerprint.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactContentDigest.h" />
-    <ClInclude Include="..\..\Sources\Core\Hash\Sha256.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\DerivedDataKey.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\SourceSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Interest\AssetInterestTracker.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\AssetLoadCoordinator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyController.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Residency\AssetResidencyTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MaterialStore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\MeshStore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\TextureStore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Store\ModelStore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetPublicationServices.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\AssetResourcePublication.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJob.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Publication\ModelPublicationJournal.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\BuiltinTextureFactory.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Interop\AssimpMathInterop.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ReservedTexture.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetViews.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Quaternion.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Transform.h" />
-    <ClInclude Include="..\..\Sources\Core\Math\Vector.h" />
     <ClInclude Include="..\..\Sources\Core\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\Core\Input\Mouse.h" />
     <ClInclude Include="..\..\Sources\Application\ApplicationPch.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Renderer.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RenderGraph.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGBarrierPlanner.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompileDiagnostic.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGCompiler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutionPlan.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGExecutor.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
-    <ClInclude Include="..\..\Sources\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGArenaAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGPass.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResource.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceHandle.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RenderGraph\RGResourceUtils.h" />
-    <ClInclude Include="..\..\Sources\Core\Allocator\RingSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\Graphics\SamplerRegistry.h" />
-    <ClInclude Include="..\..\Sources\Graphics\SamplerTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\EnvironmentLightingSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\EnvironmentAssetController.h" />
-    <ClInclude Include="..\..\Sources\Graphics\IBLBakeScheduler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\IBLBakeTypes.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ArtifactCacheCore.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifact.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\IBLStageArtifactCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAsset.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetValidation.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifact.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureArtifactCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifact.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\ModelImportArtifactCache.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\Loading\TextureLoader.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Asset\TextureAssetSystem.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Shader\Shader.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderCompiler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderManager.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderPaths.h" />
-    <ClInclude Include="..\..\Sources\Graphics\Shader\ShaderTypes.h" />
-    <ClInclude Include="..\..\Sources\Core\StringId.h" />
-    <ClInclude Include="..\..\Sources\Core\Time.h" />
-    <ClInclude Include="..\..\Sources\Core\Profiling\CpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\Graphics\TransferBatch.h" />
-    <ClInclude Include="..\..\Sources\Graphics\TransferManager.h" />
-    <ClInclude Include="..\..\Sources\Core\TypedIndex.h" />
-    <ClInclude Include="..\..\Sources\Core\Utility\StringUtils.h" />
-    <ClInclude Include="..\..\Sources\Core\Utility\TypeUtils.h" />
-    <ClInclude Include="..\..\Sources\Graphics\VertexData.h" />
-    <ClInclude Include="..\..\Sources\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h" />
-    <ClInclude Include="..\..\Sources\Core\World.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
+      <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
       <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj">
-      <Project>{6857f086-f6fe-4150-9ed7-7446f1c1c220}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
-      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

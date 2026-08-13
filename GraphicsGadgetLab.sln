@@ -5,13 +5,13 @@ VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Application", "Projects\Application\Application.vcxproj", "{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntime", "Projects\GGLabRuntime\GGLabRuntime.vcxproj", "{F382CFE9-9912-487D-B999-E649C340125D}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NapaVoxelCore", "Projects\NapaVoxelCore\NapaVoxelCore.vcxproj", "{37C8824E-AAAB-46F3-86B1-B03C02FE468B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj", "{371B9FA9-4C90-4AC6-A123-ACED756D6C77}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXMesh", "Externals\Vender\DirectXMesh\DirectXMesh\DirectXMesh_Desktop_2022_Win10.vcxproj", "{6857F086-F6FE-4150-9ED7-7446F1C1C220}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,6 +23,10 @@ Global
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Debug|x64.Build.0 = Debug|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Release|x64.ActiveCfg = Release|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Release|x64.Build.0 = Release|x64
+		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.ActiveCfg = Debug|x64
+		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.Build.0 = Debug|x64
+		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.ActiveCfg = Release|x64
+		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.Build.0 = Release|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Debug|x64.ActiveCfg = Debug|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Debug|x64.Build.0 = Debug|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Release|x64.ActiveCfg = Release|x64
@@ -31,17 +35,12 @@ Global
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.Build.0 = Debug|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.ActiveCfg = Release|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.Build.0 = Release|x64
-		{6857F086-F6FE-4150-9ED7-7446F1C1C220}.Debug|x64.ActiveCfg = Debug|x64
-		{6857F086-F6FE-4150-9ED7-7446F1C1C220}.Debug|x64.Build.0 = Debug|x64
-		{6857F086-F6FE-4150-9ED7-7446F1C1C220}.Release|x64.ActiveCfg = Release|x64
-		{6857F086-F6FE-4150-9ED7-7446F1C1C220}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-		{6857F086-F6FE-4150-9ED7-7446F1C1C220} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F4074E7C-3F11-4C46-A3EE-126AB523A5F5}

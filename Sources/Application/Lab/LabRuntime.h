@@ -4,10 +4,11 @@
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabSessionBase.h"
 #include "Core/CoreMacros.h"
+#include "Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab
 {
-	class LabRuntime final : public ILabControl, public ILabSnapshotSource
+	class LabRuntime final : public ILabControl, public LabSnapshotSourceBase
 	{
 	public:
 		explicit LabRuntime(const LabSessionCreateInfo& createInfo) noexcept;

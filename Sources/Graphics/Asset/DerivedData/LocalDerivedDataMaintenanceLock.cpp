@@ -1,7 +1,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
 #include "Core/Hash/Sha256.h"
-
-#include <Windows.h>
+#include "Core/Platform/Win/Win32NamedMutex.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -17,42 +17,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] std::wstring InvariantLowercase(std::wstring_view value) noexcept
-		{
-			if (value.empty())
-				return {};
-			const int requiredCharacters = ::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE,
-				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr, 0);
-			if (requiredCharacters <= 0)
-				return {};
-			std::wstring result(static_cast<size_t>(requiredCharacters), L'\0');
-			if (::LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_LOWERCASE, value.data(),
-				static_cast<int>(value.size()), result.data(), requiredCharacters, nullptr,
-				nullptr, 0) == 0)
-			{
-				return {};
-			}
-			return result;
-		}
-
-		[[nodiscard]] std::string WideToUtf8(std::wstring_view value) noexcept
-		{
-			if (value.empty())
-				return {};
-			const int requiredBytes = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-				value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-			if (requiredBytes <= 0)
-				return {};
-			std::string result(static_cast<size_t>(requiredBytes), '\0');
-			if (::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
-				static_cast<int>(value.size()), result.data(), requiredBytes, nullptr,
-				nullptr) == 0)
-			{
-				return {};
-			}
-			return result;
-		}
-
 		[[nodiscard]] std::wstring DigestText(const Sha256Hash& digest)
 		{
 			constexpr wchar_t HexDigits[] = L"0123456789abcdef";
@@ -68,11 +32,31 @@ namespace gglab
 		}
 	}
 
+	struct LocalDerivedDataMaintenanceLockGuard::Impl
+	{
+		explicit Impl(win32::NamedMutexGuard&& guard) : m_Guard(std::move(guard))
+		{
+		}
+
+		win32::NamedMutexGuard m_Guard;
+	};
+
+	struct LocalDerivedDataMaintenanceLock::Impl
+	{
+		explicit Impl(std::wstring_view mutexName) : m_Mutex(mutexName)
+		{
+		}
+
+		win32::NamedMutex m_Mutex;
+	};
+
 	LocalDerivedDataRootIdentity ResolveLocalDerivedDataRootIdentity(
 		const std::filesystem::path& rootDirectory) noexcept
 	{
 		if (rootDirectory.empty())
+		{
 			return {};
+		}
 		std::error_code errorCode;
 		std::filesystem::path canonicalRoot =
 			std::filesystem::weakly_canonical(rootDirectory, errorCode);
@@ -82,7 +66,9 @@ namespace gglab
 			canonicalRoot = std::filesystem::absolute(rootDirectory, errorCode);
 		}
 		if (errorCode || canonicalRoot.empty())
+		{
 			return {};
+		}
 		canonicalRoot = canonicalRoot.lexically_normal().make_preferred();
 
 		std::wstring normalized = canonicalRoot.native();
@@ -92,14 +78,18 @@ namespace gglab
 		{
 			normalized.pop_back();
 		}
-		normalized = InvariantLowercase(normalized);
-		const std::string canonicalUtf8 = WideToUtf8(normalized);
+		normalized = utils::ToInvariantLowercase(normalized);
+		const std::string canonicalUtf8 = utils::ToString(normalized);
 		if (canonicalUtf8.empty())
+		{
 			return {};
+		}
 		const Sha256Hash digest =
 			ComputeSha256(std::as_bytes(std::span{ canonicalUtf8.data(), canonicalUtf8.size() }));
 		if (!digest.IsValid())
+		{
 			return {};
+		}
 		return {
 			.m_CanonicalRoot = std::move(canonicalRoot),
 			.m_CanonicalUtf8 = canonicalUtf8,
@@ -107,9 +97,47 @@ namespace gglab
 		};
 	}
 
+	LocalDerivedDataMaintenanceLockGuard::LocalDerivedDataMaintenanceLockGuard() noexcept = default;
+
+	LocalDerivedDataMaintenanceLockGuard::LocalDerivedDataMaintenanceLockGuard(
+		LocalDerivedDataMaintenanceLockGuard&& other) noexcept = default;
+
+	LocalDerivedDataMaintenanceLockGuard& LocalDerivedDataMaintenanceLockGuard::operator=(
+		LocalDerivedDataMaintenanceLockGuard&& other) noexcept = default;
+
+	LocalDerivedDataMaintenanceLockGuard::~LocalDerivedDataMaintenanceLockGuard() = default;
+
+	bool LocalDerivedDataMaintenanceLockGuard::IsAcquired() const noexcept
+	{
+		return m_Impl != nullptr && m_Impl->m_Guard.IsAcquired();
+	}
+
+	bool LocalDerivedDataMaintenanceLockGuard::WasAbandoned() const noexcept
+	{
+		return m_Impl != nullptr && m_Impl->m_Guard.WasAbandoned();
+	}
+
 	LocalDerivedDataMaintenanceLock::LocalDerivedDataMaintenanceLock(
 		const LocalDerivedDataRootIdentity& identity) noexcept :
-		m_Mutex(identity.m_MutexName)
+		m_Impl(identity.IsValid() ? std::make_unique<Impl>(identity.m_MutexName) : nullptr)
 	{
+	}
+
+	LocalDerivedDataMaintenanceLock::~LocalDerivedDataMaintenanceLock() = default;
+
+	bool LocalDerivedDataMaintenanceLock::IsValid() const noexcept
+	{
+		return m_Impl != nullptr && m_Impl->m_Mutex.IsValid();
+	}
+
+	LocalDerivedDataMaintenanceLockGuard LocalDerivedDataMaintenanceLock::Acquire() const noexcept
+	{
+		LocalDerivedDataMaintenanceLockGuard result;
+		if (m_Impl != nullptr && m_Impl->m_Mutex.IsValid())
+		{
+			result.m_Impl = std::make_unique<LocalDerivedDataMaintenanceLockGuard::Impl>(
+				m_Impl->m_Mutex.Acquire());
+		}
+		return result;
 	}
 }

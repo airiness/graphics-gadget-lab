@@ -123,8 +123,9 @@ namespace gglab
 		if (!mapInserted)
 		{
 			m_SamplerEntries.erase(entryIterator);
-			// CreateSampler may return the cached RHI handle that is already owned by
-			// the existing registry entry. Do not destroy that shared handle here.
+			// Release the ownership reference acquired above. The existing registry entry
+			// retains its own reference even when the RHI cache returned the same handle.
+			m_Device->DestroySampler(sampler);
 			return mapIterator->second;
 		}
 

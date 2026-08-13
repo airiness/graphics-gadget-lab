@@ -1,6 +1,7 @@
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "Core/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 #include "Core/Utility/StringUtils.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"

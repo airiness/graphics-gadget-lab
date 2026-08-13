@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <format>
+#include <limits>
 
 namespace gglab
 {
@@ -1072,8 +1073,15 @@ namespace gglab
 		const auto cached = m_SamplerCache.find(desc);
 		if (cached != m_SamplerCache.end())
 		{
-			if (m_Samplers.Resolve(cached->second) != nullptr)
+			if (SamplerSlot* slot = m_Samplers.Resolve(cached->second))
 			{
+				GGLAB_ASSERT_MSG(slot->m_OwnerCount < std::numeric_limits<uint32_t>::max(),
+					"VulkanResourceManager: sampler ownership count overflow.");
+				if (slot->m_OwnerCount == std::numeric_limits<uint32_t>::max())
+				{
+					return {};
+				}
+				++slot->m_OwnerCount;
 				return cached->second;
 			}
 			m_SamplerCache.erase(cached);
@@ -1132,6 +1140,7 @@ namespace gglab
 		slot.m_Desc = desc;
 		slot.m_DescriptorIndex = descriptorIndex;
 		slot.m_Backing = std::move(backing);
+		slot.m_OwnerCount = 1;
 		m_SamplerCache.emplace(desc, handle);
 		return handle;
 	}
@@ -1205,6 +1214,15 @@ namespace gglab
 		{
 			return;
 		}
+		if (SamplerSlot* slot = m_Samplers.Resolve(sampler))
+		{
+			GGLAB_ASSERT_MSG(slot->m_OwnerCount > 0,
+				"VulkanResourceManager: sampler ownership count underflow.");
+			if (slot->m_OwnerCount == 0 || --slot->m_OwnerCount > 0)
+			{
+				return;
+			}
+		}
 		DestroyViewHandle(m_Samplers, sampler, "VulkanResourceManager::DestroySampler",
 			[this, sampler](SamplerSlot& slot) noexcept
 			{
@@ -1218,6 +1236,7 @@ namespace gglab
 							"Failed to retire a Vulkan sampler descriptor.");
 					}
 				}
+				slot.m_OwnerCount = 0;
 			});
 	}
 

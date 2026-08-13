@@ -123,6 +123,7 @@ namespace gglab
 			TransferManager* m_TransferManager = nullptr;
 			GpuProfiler* m_GpuProfiler = nullptr;
 			std::filesystem::path m_DerivedDataCacheDirectory;
+			std::filesystem::path m_ShaderSourceRoot;
 			IBLStageArtifactCacheConfig m_ArtifactCache{};
 		};
 

@@ -2,6 +2,7 @@
 #include "Core/CoreMacros.h"
 #include "Core/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
+#include "Core/Platform/Win/Win32ProcessUtils.h"
 #include "Core/Utility/PathUtils.h"
 
 #include <algorithm>
@@ -200,7 +201,7 @@ namespace gglab
 				return;
 			std::vector<std::filesystem::path> trashPaths;
 			{
-				win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+				LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
 				if (maintenance.IsAcquired())
 				{
 					CleanupOrphanTemporaryFilesLocked();
@@ -243,7 +244,7 @@ namespace gglab
 			return result;
 		}
 		std::scoped_lock lock(m_Mutex);
-		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
 		if (!maintenance.IsAcquired())
 		{
 			m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
@@ -298,7 +299,7 @@ namespace gglab
 		header.AddBytes(std::as_bytes(std::span{ artifactType.data(), artifactType.size() }));
 
 		std::scoped_lock lock(m_Mutex);
-		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
 		if (!maintenance.IsAcquired())
 		{
 			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
@@ -311,7 +312,7 @@ namespace gglab
 			return false;
 		}
 		const std::filesystem::path temporary =
-			path.string() + std::format(".tmp.{}.{}.{}", GetCurrentProcessId(),
+			path.string() + std::format(".tmp.{}.{}.{}", win32::GetCurrentProcessId(),
 				reinterpret_cast<uintptr_t>(this), m_TemporarySerial.fetch_add(1));
 		std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
 		if (stream)
@@ -418,7 +419,7 @@ namespace gglab
 			return;
 		}
 		std::scoped_lock lock(m_Mutex);
-		win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
 		if (!maintenance.IsAcquired())
 			return;
 		const std::filesystem::path path = EntryPath(key);
@@ -447,7 +448,7 @@ namespace gglab
 		bool cleared = false;
 		{
 			std::scoped_lock lock(m_Mutex);
-			win32::NamedMutexGuard maintenance = AcquireMaintenanceLock();
+			LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
 			if (!maintenance.IsAcquired())
 				return false;
 			trashPaths = CollectTrashPathsLocked();
@@ -526,9 +527,9 @@ namespace gglab
 		return m_RootDirectory / text.substr(0, 2) / (text + ".ddc");
 	}
 
-	win32::NamedMutexGuard LocalDerivedDataStore::AcquireMaintenanceLock() noexcept
+	LocalDerivedDataMaintenanceLockGuard LocalDerivedDataStore::AcquireMaintenanceLock() noexcept
 	{
-		win32::NamedMutexGuard maintenance = m_MaintenanceLock.Acquire();
+		LocalDerivedDataMaintenanceLockGuard maintenance = m_MaintenanceLock.Acquire();
 		if (!maintenance.WasAbandoned())
 			return maintenance;
 		GGLAB_LOG_GRAPHICS_WARN("Recovered an abandoned local DDC maintenance lock for '{}'.",
@@ -581,7 +582,7 @@ namespace gglab
 	{
 		return m_RootDirectory.parent_path() /
 			std::format(L"{}.trash.{}.{}.{}", m_RootDirectory.filename().wstring(),
-				::GetCurrentProcessId(), ::GetTickCount64(),
+				win32::GetCurrentProcessId(), win32::GetTickCount64(),
 				m_TrashSerial.fetch_add(1, std::memory_order_relaxed));
 	}
 

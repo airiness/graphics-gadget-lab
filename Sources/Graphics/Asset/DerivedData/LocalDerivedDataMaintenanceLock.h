@@ -1,8 +1,8 @@
 #pragma once
 #include "Core/CoreMacros.h"
-#include "Core/Platform/Win/Win32NamedMutex.h"
 
 #include <filesystem>
+#include <memory>
 #include <string>
 
 namespace gglab
@@ -24,18 +24,36 @@ namespace gglab
 	[[nodiscard]] LocalDerivedDataRootIdentity ResolveLocalDerivedDataRootIdentity(
 		const std::filesystem::path& rootDirectory) noexcept;
 
+	class LocalDerivedDataMaintenanceLockGuard final
+	{
+	public:
+		LocalDerivedDataMaintenanceLockGuard() noexcept;
+		LocalDerivedDataMaintenanceLockGuard(LocalDerivedDataMaintenanceLockGuard&& other) noexcept;
+		LocalDerivedDataMaintenanceLockGuard& operator=(LocalDerivedDataMaintenanceLockGuard&& other) noexcept;
+		GGLAB_DELETE_COPYABLE(LocalDerivedDataMaintenanceLockGuard);
+		~LocalDerivedDataMaintenanceLockGuard();
+
+		[[nodiscard]] bool IsAcquired() const noexcept;
+		[[nodiscard]] bool WasAbandoned() const noexcept;
+
+	private:
+		friend class LocalDerivedDataMaintenanceLock;
+		struct Impl;
+		std::unique_ptr<Impl> m_Impl;
+	};
+
 	class LocalDerivedDataMaintenanceLock final
 	{
 	public:
-		explicit LocalDerivedDataMaintenanceLock(
-			const LocalDerivedDataRootIdentity& identity) noexcept;
+		explicit LocalDerivedDataMaintenanceLock(const LocalDerivedDataRootIdentity& identity) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(LocalDerivedDataMaintenanceLock);
-		~LocalDerivedDataMaintenanceLock() = default;
+		~LocalDerivedDataMaintenanceLock();
 
-		[[nodiscard]] bool IsValid() const noexcept { return m_Mutex.IsValid(); }
-		[[nodiscard]] win32::NamedMutexGuard Acquire() const noexcept { return m_Mutex.Acquire(); }
+		[[nodiscard]] bool IsValid() const noexcept;
+		[[nodiscard]] LocalDerivedDataMaintenanceLockGuard Acquire() const noexcept;
 
 	private:
-		win32::NamedMutex m_Mutex;
+		struct Impl;
+		std::unique_ptr<Impl> m_Impl;
 	};
 }

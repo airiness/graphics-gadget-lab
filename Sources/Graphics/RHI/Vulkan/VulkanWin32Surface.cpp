@@ -5,19 +5,34 @@
 
 namespace gglab
 {
-	VulkanWin32Surface::~VulkanWin32Surface()
+	namespace
 	{
-		Destroy();
+		constexpr std::string_view RequiredInstanceExtensions[] = {
+			VK_KHR_SURFACE_EXTENSION_NAME,
+			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+		};
 	}
 
-	VulkanWin32Surface::Result VulkanWin32Surface::Create(
-		VkInstance instance, HINSTANCE hInstance, HWND hwnd) noexcept
+	VulkanWin32SurfaceFactory::VulkanWin32SurfaceFactory(
+		HINSTANCE instance, HWND window) noexcept :
+		m_Instance(instance), m_Window(window)
+	{
+	}
+
+	std::span<const std::string_view>
+		VulkanWin32SurfaceFactory::RequiredInstanceExtensionNames() const noexcept
+	{
+		return RequiredInstanceExtensions;
+	}
+
+	VulkanSurfaceFactoryBase::Result VulkanWin32SurfaceFactory::Create(
+		VkInstance instance) const noexcept
 	{
 		Result result{};
-		if (instance == VK_NULL_HANDLE || hInstance == nullptr || hwnd == nullptr)
+		if (instance == VK_NULL_HANDLE || m_Instance == nullptr || m_Window == nullptr)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
-			result.m_Error = "VulkanWin32Surface requires a valid instance, HINSTANCE, and HWND.";
+			result.m_Error = "Vulkan Win32 surface creation requires valid instance and window handles.";
 			return result;
 		}
 
@@ -31,15 +46,13 @@ namespace gglab
 			return result;
 		}
 
-		auto surface = std::make_unique<VulkanWin32Surface>();
-		surface->m_Instance = instance;
-
 		VkWin32SurfaceCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		createInfo.hinstance = hInstance;
-		createInfo.hwnd = hwnd;
+		createInfo.hinstance = m_Instance;
+		createInfo.hwnd = m_Window;
 
-		const VkResult createResult = createSurface(instance, &createInfo, nullptr, &surface->m_Surface);
+		VkSurfaceKHR surface = VK_NULL_HANDLE;
+		const VkResult createResult = createSurface(instance, &createInfo, nullptr, &surface);
 		if (createResult != VK_SUCCESS)
 		{
 			result.m_Result = createResult;
@@ -48,22 +61,7 @@ namespace gglab
 			return result;
 		}
 
-		result.m_Surface = std::move(surface);
+		result.m_Surface = std::make_unique<VulkanSurface>(instance, surface);
 		return result;
-	}
-
-	void VulkanWin32Surface::Destroy() noexcept
-	{
-		if (m_Surface != VK_NULL_HANDLE)
-		{
-			const auto destroySurface = reinterpret_cast<PFN_vkDestroySurfaceKHR>(
-				vkGetInstanceProcAddr(m_Instance, "vkDestroySurfaceKHR"));
-			if (destroySurface)
-			{
-				destroySurface(m_Instance, m_Surface, nullptr);
-			}
-			m_Surface = VK_NULL_HANDLE;
-		}
-		m_Instance = VK_NULL_HANDLE;
 	}
 }

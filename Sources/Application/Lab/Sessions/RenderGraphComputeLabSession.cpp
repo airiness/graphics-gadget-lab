@@ -3,9 +3,9 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/RenderPassDevelopGui.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
@@ -425,7 +425,10 @@ namespace gglab
 						m_State->m_PreviewExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
-				m_DevelopGuiPass.AddPass(rg, context, services);
+				if (services.m_OverlayExtension)
+				{
+					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
+				}
 
 				rg.AddPass<FinishPassData>("Lab.RenderGraphCompute.Finish",
 					[displayViewId](RenderGraph::RGBuilder& builder, FinishPassData&)
@@ -512,7 +515,6 @@ namespace gglab
 
 			std::shared_ptr<RenderGraphComputeLabState> m_State;
 			Renderer* m_Renderer = nullptr;
-			RenderPassDevelopGui m_DevelopGuiPass;
 			ComputePipelineRecipe m_ComputeWriteRecipe{};
 			ComputePipelineRecipe m_ComputeReadWriteRecipe{};
 			GraphicsPhysicalPipelineKey m_PreviewRecipe{};

@@ -6,6 +6,7 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 #include "Core/Utility/StringUtils.h"
 
 #include <algorithm>

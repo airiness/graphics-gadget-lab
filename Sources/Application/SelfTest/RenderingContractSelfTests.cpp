@@ -1,5 +1,6 @@
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
@@ -8,6 +9,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -23,10 +25,13 @@
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferBatch.h"
 
+#include <filesystem>
 #include <type_traits>
 
 namespace gglab
@@ -74,6 +79,10 @@ namespace gglab
 			RGBufferId m_ScenePhaseBuffer;
 		};
 
+		struct OverlayExtensionFixturePassData
+		{
+		};
+
 		class RecordingOpaqueSceneExtension final : public RenderPipelineSceneExtensionBase
 		{
 		public:
@@ -104,6 +113,30 @@ namespace gglab
 			RGBufferId& m_ScenePhaseBuffer;
 			uint32_t& m_AddPassCount;
 			uint32_t& m_DestructionCount;
+		};
+
+		class RecordingOverlayExtension final : public RenderPipelineOverlayExtensionBase
+		{
+		public:
+			explicit RecordingOverlayExtension(uint32_t& addPassCount) noexcept :
+				m_AddPassCount(addPassCount)
+			{
+			}
+
+			void AddOverlayPasses(RenderGraph& renderGraph,
+				const RenderFrameContext&, const RenderServices&) noexcept override
+			{
+				++m_AddPassCount;
+				renderGraph.AddPass<OverlayExtensionFixturePassData>(
+					"RenderingContract.OverlayExtension",
+					[](RenderGraph::RGBuilder& builder, OverlayExtensionFixturePassData&)
+					{
+						builder.SideEffect();
+					});
+			}
+
+		private:
+			uint32_t& m_AddPassCount;
 		};
 
 		class RecordingDevice final : public RHIDevice
@@ -370,14 +403,24 @@ namespace gglab
 				return !m_FailUploads;
 			}
 			RHITextureReadbackRequest ReadbackTexture(
-				RHITextureHandle, const RHITextureDesc&) noexcept override
+				RHITextureHandle, const RHITextureDesc& desc) noexcept override
 			{
-				return {};
+				if (m_FailReadbacks)
+				{
+					return {};
+				}
+				RHITextureReadbackRequest request{};
+				request.m_Buffer = RHIBufferOwner(nullptr, RHIBufferHandle{ 9, 1 });
+				request.m_BufferSizeInBytes = 4;
+				request.m_TextureDesc = desc;
+				request.m_Subresources.push_back({});
+				return request;
 			}
 
 			std::vector<RHITextureBarrier> m_TextureBarriers;
 			std::vector<RHIBufferBarrier> m_BufferBarriers;
 			bool m_FailUploads = false;
+			bool m_FailReadbacks = true;
 			bool m_FailSubmit = false;
 			uint32_t m_SubmitCallCount = 0;
 			uint32_t m_AbortCallCount = 0;
@@ -519,6 +562,51 @@ namespace gglab
 			RenderPipelineForwardPBR defaultPipeline;
 			context.Check(defaultPipeline.GetName() == "ForwardPBR",
 				"ForwardPBR remains source-compatible without an optional extension");
+		}
+
+		void RunOverlayExtensionContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(std::is_abstract_v<RenderPipelineOverlayExtensionBase>);
+			static_assert(std::has_virtual_destructor_v<RenderPipelineOverlayExtensionBase>);
+			static_assert(std::is_same_v<decltype(RenderServices::m_OverlayExtension),
+				RenderPipelineOverlayExtensionBase*>);
+
+			uint32_t addPassCount = 0;
+			RecordingOverlayExtension extension(addPassCount);
+			const RenderServices services{ .m_OverlayExtension = &extension };
+			const RenderScene renderScene{};
+			const RenderFrameContext frameContext{ .m_RenderScene = renderScene };
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			services.m_OverlayExtension->AddOverlayPasses(graph, frameContext, services);
+
+			const bool compiled = graph.Compile();
+			context.Check(compiled && addPassCount == 1,
+				"Overlay extensions add their RenderGraph passes through the runtime-owned hook");
+			if (compiled)
+			{
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				context.Check(snapshot.m_Passes.size() == 1 &&
+					snapshot.m_Passes.front().m_Name == "RenderingContract.OverlayExtension" &&
+					!snapshot.m_Passes.front().m_Culled,
+					"Application-owned overlay passes remain live without a concrete DevTools service");
+			}
+		}
+
+		void RunRuntimePathConfigurationContractTests(SelfTestContext& context) noexcept
+		{
+			Renderer::CreateInfo createInfo{};
+			context.Check(!createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration rejects missing host-supplied runtime paths");
+			createInfo.m_IblDerivedDataCacheDirectory = "DerivedDataCache/IBL";
+			context.Check(!createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration requires the shader source root independently");
+			createInfo.m_ShaderSourceRoot = "Shaders";
+			context.Check(createInfo.HasRequiredRuntimePaths(),
+				"Renderer configuration accepts both required host-supplied runtime paths");
 		}
 
 		void RunNapaVoxelRenderGraphContractTests(SelfTestContext& context) noexcept
@@ -772,6 +860,28 @@ namespace gglab
 				MakeDX12RHIGraphicsPSOKey(changedDesc, RootSignatureID{ 3 }, shaders);
 			context.Check(baseKey != changedKey,
 				"DX12 normalized graphics keys include explicit RHI vertex locations");
+
+			const RHIBufferBarrier copyBarrier{
+				.m_Before = {
+					.m_Stages = RHIStage::Copy,
+					.m_Access = RHIAccess::CopySource,
+					.m_Layout = RHILayout::CopySource,
+				},
+				.m_After = {
+					.m_Stages = RHIStage::Copy,
+					.m_Access = RHIAccess::CopyDest,
+					.m_Layout = RHILayout::CopyDest,
+				},
+			};
+			auto* nativeResource = reinterpret_cast<ID3D12Resource*>(uintptr_t{ 0x1234 });
+			const D3D12_BUFFER_BARRIER nativeBarrier =
+				BuildD3D12BufferBarrier(copyBarrier, nativeResource);
+			context.Check(nativeBarrier.SyncBefore == D3D12_BARRIER_SYNC_COPY &&
+				nativeBarrier.SyncAfter == D3D12_BARRIER_SYNC_COPY &&
+				nativeBarrier.AccessBefore == D3D12_BARRIER_ACCESS_COPY_SOURCE &&
+				nativeBarrier.AccessAfter == D3D12_BARRIER_ACCESS_COPY_DEST &&
+				nativeBarrier.pResource == nativeResource,
+				"DX12 lowers buffer transitions to the exact Enhanced Barrier contract");
 		}
 
 		void RunProjectionConventionTests(SelfTestContext& context) noexcept
@@ -1258,7 +1368,9 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
-			ShaderCompiler compiler;
+			const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+			ShaderCompiler compiler(
+				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,
@@ -3712,6 +3824,31 @@ namespace gglab
 					"Readback allocation failure poisons and aborts its partially recorded state transition");
 			}
 			{
+				RecordingTransferContext readbackContext;
+				readbackContext.m_FailReadbacks = false;
+				TransferBatch readbackBatch(readbackContext);
+				const RHITextureHandle readbackTexture{ 6, 1 };
+				const RHITextureReadbackRequest request = readbackBatch.ReadbackTexture(
+					readbackTexture, RHITextureDesc{
+						.m_Format = RHIFormat::R8G8B8A8Unorm,
+						.m_Usage = RHITextureUsage::CopySource,
+						.m_Extent = { 1, 1, 1 },
+					});
+				const RHITransferSubmission submission = readbackBatch.Submit(false);
+				const RHIResourceState commonState = CommonRHIResourceState();
+				context.Check(request.IsValid() && readbackContext.m_TextureBarriers.size() == 2 &&
+					readbackContext.m_TextureBarriers[0].m_Before == commonState &&
+					readbackContext.m_TextureBarriers[0].m_After.m_Layout == RHILayout::CopySource &&
+					readbackContext.m_TextureBarriers[1].m_Before.m_Layout == RHILayout::CopySource &&
+					readbackContext.m_TextureBarriers[1].m_After == commonState &&
+					submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
+					submission.m_Publications[0].m_Texture == readbackTexture &&
+					submission.m_Publications[0].m_PublishedState == commonState &&
+					submission.m_Publications[1].m_Buffer == request.m_Buffer.Get() &&
+					submission.m_Publications[1].m_PublishedState.m_Access == RHIAccess::CopyDest,
+					"Texture readback returns its source to Common and publishes both terminal states");
+			}
+			{
 				RecordingTransferContext submitFailureContext;
 				TransferBatch submitFailureBatch(submitFailureContext);
 				const uint32_t payload = 23;
@@ -3922,6 +4059,8 @@ namespace gglab
 	{
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
+		RunOverlayExtensionContractTests(context);
+		RunRuntimePathConfigurationContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);

@@ -4,12 +4,12 @@
 #include "Core/HResult.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Platform/Win/ComTypes.h"
+#include "Core/Platform/Win/Win32StringUtils.h"
 #include "Core/StringId.h"
 #include "Core/Utility/PathUtils.h"
 #include "Core/Utility/StringUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
-#include "Graphics/Shader/ShaderPaths.h"
 
 #include <dxcapi.h>
 
@@ -263,15 +263,16 @@ namespace gglab
 		return {};
 	}
 
-	ShaderCompiler::ShaderCompiler() noexcept : m_Impl(std::make_unique<Impl>())
+	ShaderCompiler::ShaderCompiler(
+		std::filesystem::path sourceRoot, std::filesystem::path cacheRoot) noexcept :
+		m_Impl(std::make_unique<Impl>())
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
 		m_DxcVersion = QueryDxcVersion();
 
-		SetSourceRootDirectory(GetShaderSourceRoot());
-		const auto defaultRootDir = utils::GetExeOutDir() / L"ShaderCache";
-		SetCacheRootDirectory(defaultRootDir);
+		SetSourceRootDirectory(std::move(sourceRoot));
+		SetCacheRootDirectory(std::move(cacheRoot));
 	}
 
 	ShaderCompiler::~ShaderCompiler() = default;

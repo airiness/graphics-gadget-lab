@@ -5,20 +5,20 @@
   <PropertyGroup />
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Debug'">
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Externals\lib\assimp\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(GGLabRepositoryRoot)Externals\lib\assimp\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>assimp-vc143-mtd.lib;zlibstaticd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(SolutionDir)Externals\bin\assimp\x64\Debug\assimp-vc143-mtd.dll" "$(OutDir)"</Command>
+      <Command>xcopy /y /d "$(GGLabRepositoryRoot)Externals\bin\assimp\x64\Debug\assimp-vc143-mtd.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)Externals\lib\assimp\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(GGLabRepositoryRoot)Externals\lib\assimp\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>assimp-vc143-mt.lib;zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(SolutionDir)Externals\bin\assimp\x64\Release\assimp-vc143-mt.dll" "$(OutDir)"</Command>
+      <Command>xcopy /y /d "$(GGLabRepositoryRoot)Externals\bin\assimp\x64\Release\assimp-vc143-mt.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup />

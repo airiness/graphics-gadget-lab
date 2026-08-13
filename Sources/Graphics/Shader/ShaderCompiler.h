@@ -16,7 +16,7 @@ namespace gglab
 	class ShaderCompiler
 	{
 	public:
-		ShaderCompiler() noexcept;
+		ShaderCompiler(std::filesystem::path sourceRoot, std::filesystem::path cacheRoot) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderCompiler);
 		~ShaderCompiler();
 

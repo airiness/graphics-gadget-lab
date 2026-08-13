@@ -80,6 +80,7 @@ namespace gglab
 		m_TransferManager(createInfo.m_TransferManager), m_GpuProfiler(createInfo.m_GpuProfiler),
 		m_DerivedDataSystem({
 			.m_CacheDirectory = createInfo.m_DerivedDataCacheDirectory,
+			.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot,
 			.m_ArtifactCache = createInfo.m_ArtifactCache,
 			.m_Compatibility = IBLArtifactCompatibility::AdapterScoped,
 			.m_AdapterScopeIdentity = std::string(

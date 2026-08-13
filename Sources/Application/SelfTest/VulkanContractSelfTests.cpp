@@ -1,6 +1,7 @@
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/ApplicationLaunchOptions.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
@@ -15,11 +16,13 @@
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #endif
@@ -789,8 +792,10 @@ namespace gglab
 			}
 
 			ScopedTestDirectory scopedDirectory(tempRoot);
-			ShaderCompiler compiler;
-			compiler.SetCacheRootDirectory(scopedDirectory.GetPath());
+			const std::filesystem::path shaderSourceRoot =
+				ResolveShaderSourceRoot(utils::GetExeOutDir());
+			const std::filesystem::path shaderCacheRoot = scopedDirectory.GetPath();
+			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const SpirVValidatorInfo validator = FindSpirVValidator();
 			context.Check(validator.MatchesValidationBaseline(),
 				"Vulkan SDK and SPIR-V Tools match the configured validation baseline");
@@ -849,10 +854,12 @@ namespace gglab
 				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
 			};
-			ShaderManager dxilManager(RHIBackendType::DX12);
+			ShaderManager dxilManager(
+				RHIBackendType::DX12, shaderSourceRoot, shaderCacheRoot);
 			const ShaderID dxilManagerShader = dxilManager.LoadShader(managerDesc);
 			managerDesc.m_Target = {};
-			ShaderManager spirVManager(RHIBackendType::Vulkan);
+			ShaderManager spirVManager(
+				RHIBackendType::Vulkan, shaderSourceRoot, shaderCacheRoot);
 			const ShaderID spirVManagerShader = spirVManager.LoadShader(managerDesc);
 			context.Check(dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
 				spirVManager.GetActiveBackend() == RHIBackendType::Vulkan &&
@@ -1648,6 +1655,43 @@ namespace gglab
 		}
 #endif
 
+		void RunVulkanQualificationConfigurationContractTests(SelfTestContext& context) noexcept
+		{
+			VulkanQualificationOptions options{};
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan qualification rejects incomplete host configuration");
+			context.Check(!options.HasRequiredRuntimePaths(),
+				"Vulkan qualification reports missing host-supplied runtime paths");
+			context.Check(!options.HasRequiredNativeSurfaceHandles(),
+				"Vulkan qualification reports missing host-supplied native surface handles");
+
+			options.m_ListAdapters = true;
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan adapter inspection rejects missing native surface handles");
+			options.m_HInstance = reinterpret_cast<HINSTANCE>(1);
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan adapter inspection requires the window handle independently");
+			options.m_Hwnd = reinterpret_cast<HWND>(1);
+			context.Check(options.HasRequiredNativeSurfaceHandles(),
+				"Vulkan qualification accepts both required native surface handles");
+			context.Check(options.IsConfigurationValid(),
+				"Vulkan adapter inspection accepts native surface handles without shader paths");
+			options.m_ListAdapters = false;
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification rejects missing host-supplied runtime paths");
+
+			options.m_ShaderSourceRoot = "Shaders";
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification requires the shader cache root independently");
+			context.Check(!options.HasRequiredRuntimePaths(),
+				"Vulkan qualification requires the shader cache root independently");
+			options.m_ShaderCacheRoot = "ShaderCache";
+			context.Check(options.IsConfigurationValid(),
+				"Vulkan frame qualification accepts both required host-supplied runtime paths");
+			context.Check(options.HasRequiredRuntimePaths(),
+				"Vulkan qualification accepts both required host-supplied runtime paths");
+		}
+
 		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
@@ -2371,6 +2415,7 @@ namespace gglab
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunShaderArtifactContractTests(context);
+		RunVulkanQualificationConfigurationContractTests(context);
 		RunVulkanCliContractTests(context);
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);

@@ -187,7 +187,65 @@ jobs:
             throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
           }
 
-      - name: Build
+      - name: Validate runtime project boundaries
+        shell: pwsh
+        run: |
+          ./Scripts/ValidateProjectBoundaries.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabRuntime standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $runtimeBuildArguments = @(
+            "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-runtime-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @runtimeBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build Application standalone
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $applicationBuildArguments = @(
+            "Projects\Application\Application.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-application-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          if ("${{ matrix.pch }}" -eq "disabled") {
+            $applicationBuildArguments += "/p:GGLAB_USE_PCH=0"
+          }
+
+          msbuild @applicationBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build solution
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force Build\Logs | Out-Null
@@ -227,6 +285,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: msbuild-binlog-${{ matrix.log_name }}
-          path: Build/Logs/gglab-${{ matrix.log_name }}.binlog
+          path: |
+            Build/Logs/gglab-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-application-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7

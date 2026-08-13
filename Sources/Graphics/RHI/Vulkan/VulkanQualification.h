@@ -1,6 +1,7 @@
 #pragma once
 #include <windows.h>
 
+#include <filesystem>
 #include <optional>
 #include <string>
 
@@ -13,6 +14,23 @@ namespace gglab
 		bool m_RequestValidation = false;
 		bool m_ListAdapters = false;
 		std::optional<std::string> m_AdapterSelector;
+		std::filesystem::path m_ShaderSourceRoot;
+		std::filesystem::path m_ShaderCacheRoot;
+
+		[[nodiscard]] bool HasRequiredNativeSurfaceHandles() const noexcept
+		{
+			return m_HInstance != nullptr && m_Hwnd != nullptr;
+		}
+
+		[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
+		{
+			return !m_ShaderSourceRoot.empty() && !m_ShaderCacheRoot.empty();
+		}
+
+		[[nodiscard]] bool IsConfigurationValid() const noexcept
+		{
+			return HasRequiredNativeSurfaceHandles() && (m_ListAdapters || HasRequiredRuntimePaths());
+		}
 	};
 
 	// Runs the deterministic Vulkan bootstrap, adapter inspection and

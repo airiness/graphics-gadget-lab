@@ -190,7 +190,16 @@ namespace gglab
 			Fail();
 			return {};
 		}
-		if (!PublishTexture(srcTexture, copySourceState) ||
+
+		// ReadbackTexture is a high-level Common-to-Common operation. Leaving the source in
+		// CopySource would require a caller-selected terminal state that this API does not expose.
+		const RHITextureBarrier toCommon{
+			.m_Texture = srcTexture,
+			.m_Before = copySourceState,
+			.m_After = CommonState,
+		};
+		m_TransferContext->TextureBarrier(std::span{ &toCommon, 1 });
+		if (!PublishTexture(srcTexture, CommonState) ||
 			!PublishBuffer(request.m_Buffer.Get(), CopyDestState))
 		{
 			Fail();

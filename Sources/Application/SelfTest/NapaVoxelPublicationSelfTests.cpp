@@ -7,6 +7,7 @@
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
+#include "Core/Platform/Win/Win32PathUtils.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -16,6 +17,7 @@
 #include "Graphics/RHI/RHITransferContext.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -27,6 +29,7 @@
 #include "NapaVoxelCore/World/VoxelRestore.h"
 
 #include <array>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <thread>
@@ -1898,7 +1901,9 @@ namespace gglab
 				.m_SamplerRegistry = &samplerRegistry,
 				});
 			Renderer renderer;
-			ShaderManager shaderManager(device.GetBackendType());
+			const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+			ShaderManager shaderManager(device.GetBackendType(),
+				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			InputManager inputManager;
 			Time time;
 			NapaVoxelLabSwitchTestState state{

@@ -208,11 +208,7 @@ namespace gglab
 				continue;
 			}
 
-			m_CommandList->AddBufferBarrier(
-				CD3DX12_BUFFER_BARRIER(ToD3D12BarrierSync(barrier.m_Before.m_Stages),
-					ToD3D12BarrierSync(barrier.m_After.m_Stages),
-					ToD3D12BarrierAccess(barrier.m_Before.m_Access),
-					ToD3D12BarrierAccess(barrier.m_After.m_Access), buffer->Get()));
+			m_CommandList->AddBufferBarrier(BuildD3D12BufferBarrier(barrier, buffer->Get()));
 			TrackBufferUse(barrier.m_Buffer);
 		}
 	}

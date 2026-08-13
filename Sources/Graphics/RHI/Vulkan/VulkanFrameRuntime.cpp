@@ -267,7 +267,7 @@ namespace gglab
 		const VulkanFrameRuntimeCreateInfo& createInfo) noexcept
 	{
 		Result result{};
-		if (createInfo.m_Device == nullptr || createInfo.m_Surface == nullptr
+		if (createInfo.m_Device == nullptr || createInfo.m_Surface == VK_NULL_HANDLE
 			|| createInfo.m_Instance == nullptr || createInfo.m_Snapshot == nullptr
 			|| createInfo.m_Width == 0 || createInfo.m_Height == 0)
 		{
@@ -349,7 +349,7 @@ namespace gglab
 		VulkanSwapChainCreateInfo swapChainInfo{};
 		swapChainInfo.m_PhysicalDevice = createInfo.m_PhysicalDevice;
 		swapChainInfo.m_Device = createInfo.m_Device->Get();
-		swapChainInfo.m_Surface = createInfo.m_Surface->Get();
+		swapChainInfo.m_Surface = createInfo.m_Surface;
 		swapChainInfo.m_RequestedFormat = createInfo.m_RequestedFormat;
 		swapChainInfo.m_Vsync = createInfo.m_Vsync;
 		swapChainInfo.m_Width = createInfo.m_Width;

@@ -47,8 +47,8 @@ namespace gglab
 		void Run() noexcept;
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
-		// Process exit code. Non-zero when the Vulkan bootstrap/qualification
-		// path fails or when the selected backend is unavailable.
+		// Process exit code. Non-zero when startup validation, backend bootstrap,
+		// or qualification fails.
 		int GetExitCode() const noexcept { return m_ExitCode; }
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }

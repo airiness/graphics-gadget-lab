@@ -108,6 +108,7 @@ namespace gglab
 			std::vector<RHIFencePoint> m_RetirementPoints;
 			std::optional<uint32_t> m_DescriptorIndex;
 			std::shared_ptr<VulkanDescriptorBacking> m_Backing;
+			uint32_t m_OwnerCount = 0;
 		};
 
 		template <typename HandleT, typename ResourceT> struct ResourceSlot

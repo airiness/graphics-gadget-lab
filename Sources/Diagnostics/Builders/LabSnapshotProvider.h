@@ -1,15 +1,19 @@
 #pragma once
 #include "Diagnostics/SnapshotProvider.h"
+#include "Diagnostics/Snapshots/LabSnapshot.h"
+
+#include <functional>
+#include <utility>
 
 namespace gglab
 {
-	class LabRuntimeLocatorBase;
-
 	class LabSnapshotProvider final : public SnapshotProviderBase
 	{
 	public:
-		explicit LabSnapshotProvider(const LabRuntimeLocatorBase* runtimeLocator) noexcept :
-			m_RuntimeLocator(runtimeLocator)
+		using SourceResolver = std::function<const LabSnapshotSourceBase*()>;
+
+		explicit LabSnapshotProvider(SourceResolver sourceResolver) noexcept :
+			m_SourceResolver(std::move(sourceResolver))
 		{
 		}
 
@@ -18,6 +22,6 @@ namespace gglab
 		void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override;
 
 	private:
-		const LabRuntimeLocatorBase* m_RuntimeLocator = nullptr;
+		SourceResolver m_SourceResolver;
 	};
 }

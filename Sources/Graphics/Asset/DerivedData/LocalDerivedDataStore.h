@@ -92,7 +92,7 @@ namespace gglab
 
 	private:
 		[[nodiscard]] std::filesystem::path EntryPath(const DerivedDataKey& key) const;
-		[[nodiscard]] win32::NamedMutexGuard AcquireMaintenanceLock() noexcept;
+		[[nodiscard]] LocalDerivedDataMaintenanceLockGuard AcquireMaintenanceLock() noexcept;
 		void CleanupOrphanTemporaryFilesLocked() noexcept;
 		[[nodiscard]] std::vector<std::filesystem::path> CollectTrashPathsLocked() const noexcept;
 		[[nodiscard]] std::filesystem::path MakeTrashPath() noexcept;
