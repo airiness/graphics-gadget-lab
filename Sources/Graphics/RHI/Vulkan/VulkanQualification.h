@@ -17,6 +17,11 @@ namespace gglab
 		std::filesystem::path m_ShaderSourceRoot;
 		std::filesystem::path m_ShaderCacheRoot;
 
+		[[nodiscard]] bool HasRequiredNativeSurfaceHandles() const noexcept
+		{
+			return m_HInstance != nullptr && m_Hwnd != nullptr;
+		}
+
 		[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
 		{
 			return !m_ShaderSourceRoot.empty() && !m_ShaderCacheRoot.empty();
@@ -24,7 +29,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsConfigurationValid() const noexcept
 		{
-			return m_ListAdapters || HasRequiredRuntimePaths();
+			return HasRequiredNativeSurfaceHandles() && (m_ListAdapters || HasRequiredRuntimePaths());
 		}
 	};
 

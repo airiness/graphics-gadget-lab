@@ -1655,18 +1655,30 @@ namespace gglab
 		}
 #endif
 
-		void RunVulkanQualificationPathContractTests(SelfTestContext& context) noexcept
+		void RunVulkanQualificationConfigurationContractTests(SelfTestContext& context) noexcept
 		{
 			VulkanQualificationOptions options{};
 			context.Check(!options.IsConfigurationValid(),
-				"Vulkan frame qualification rejects missing host-supplied runtime paths");
+				"Vulkan qualification rejects incomplete host configuration");
 			context.Check(!options.HasRequiredRuntimePaths(),
 				"Vulkan qualification reports missing host-supplied runtime paths");
+			context.Check(!options.HasRequiredNativeSurfaceHandles(),
+				"Vulkan qualification reports missing host-supplied native surface handles");
 
 			options.m_ListAdapters = true;
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan adapter inspection rejects missing native surface handles");
+			options.m_HInstance = reinterpret_cast<HINSTANCE>(1);
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan adapter inspection requires the window handle independently");
+			options.m_Hwnd = reinterpret_cast<HWND>(1);
+			context.Check(options.HasRequiredNativeSurfaceHandles(),
+				"Vulkan qualification accepts both required native surface handles");
 			context.Check(options.IsConfigurationValid(),
-				"Vulkan adapter inspection does not require shader runtime paths");
+				"Vulkan adapter inspection accepts native surface handles without shader paths");
 			options.m_ListAdapters = false;
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification rejects missing host-supplied runtime paths");
 
 			options.m_ShaderSourceRoot = "Shaders";
 			context.Check(!options.IsConfigurationValid(),
@@ -2403,7 +2415,7 @@ namespace gglab
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunShaderArtifactContractTests(context);
-		RunVulkanQualificationPathContractTests(context);
+		RunVulkanQualificationConfigurationContractTests(context);
 		RunVulkanCliContractTests(context);
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);

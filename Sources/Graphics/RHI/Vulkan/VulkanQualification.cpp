@@ -2632,8 +2632,16 @@ namespace gglab
 #if GGLAB_ENABLE_VULKAN
 		if (!options.IsConfigurationValid())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"Vulkan frame qualification requires non-empty shader source and cache roots.");
+			if (!options.HasRequiredNativeSurfaceHandles())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"Vulkan qualification requires non-null HINSTANCE and HWND surface handles.");
+			}
+			else
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"Vulkan frame qualification requires non-empty shader source and cache roots.");
+			}
 			return 1;
 		}
 
