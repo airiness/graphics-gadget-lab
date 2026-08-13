@@ -5,6 +5,10 @@ param(
 
 # Runtime project boundary validation.
 # Enforces the source dependency direction contract for the runtime library:
+#   Project graph - Application must reference GGLabRuntime; GGLabRuntime must
+#                   not reference Application.
+#   Compile ownership - source files must have one compilation owner, and all
+#                       runtime-candidate .cpp files must have an owner.
 #   Ownership boundary - runtime candidates must not include Application/*,
 #                        DevTools/*, or Application-owned regions.
 #   Platform leakage - portable runtime files must not depend on unapproved
@@ -180,6 +184,114 @@ $runtimeOwnedFiles = @(
         Sort-Object FullPath -Unique
 )
 
+$applicationProjectPath = Join-Path $root "Projects/Application/Application.vcxproj"
+if (-not (Test-Path $applicationProjectPath)) {
+    throw "Application project not found: $applicationProjectPath"
+}
+$applicationProject = [xml](Get-Content -LiteralPath $applicationProjectPath -Raw -ErrorAction Stop)
+$applicationNamespace = New-Object System.Xml.XmlNamespaceManager($applicationProject.NameTable)
+$applicationNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$applicationProjectDir = Split-Path -Parent $applicationProjectPath
+
+function Get-ProjectItemPaths {
+    param(
+        [xml]$Project,
+        [System.Xml.XmlNamespaceManager]$Namespace,
+        [string]$ProjectDir,
+        [string]$XPath,
+        [string]$ItemKind
+    )
+
+    return @(
+        $Project.SelectNodes($XPath, $Namespace) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_.Include) } |
+            ForEach-Object {
+                $fullPath = [System.IO.Path]::GetFullPath((Join-Path $ProjectDir $_.Include))
+                if (-not (Test-Path $fullPath)) {
+                    throw "$ItemKind not found: $($_.Include)"
+                }
+                $fullPath
+            } |
+            Sort-Object -Unique
+    )
+}
+
+$runtimeCompileFiles = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
+    "//msb:ClCompile" "Runtime compile item"
+$applicationCompileFiles = Get-ProjectItemPaths $applicationProject $applicationNamespace `
+    $applicationProjectDir "//msb:ClCompile" "Application compile item"
+$runtimeProjectReferences = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
+    "//msb:ProjectReference" "Runtime project reference"
+$applicationProjectReferences = Get-ProjectItemPaths $applicationProject $applicationNamespace `
+    $applicationProjectDir "//msb:ProjectReference" "Application project reference"
+
+$runtimeCompilePathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$applicationCompilePathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$runtimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$applicationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($path in $runtimeCompileFiles) {
+    [void]$runtimeCompilePathSet.Add($path)
+}
+foreach ($path in $applicationCompileFiles) {
+    [void]$applicationCompilePathSet.Add($path)
+}
+foreach ($path in $runtimeProjectReferences) {
+    [void]$runtimeProjectReferenceSet.Add($path)
+}
+foreach ($path in $applicationProjectReferences) {
+    [void]$applicationProjectReferenceSet.Add($path)
+}
+
+$projectContractFindings = New-Object System.Collections.Generic.List[object]
+if (-not $applicationProjectReferenceSet.Contains($runtimeProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/Application/Application.vcxproj"
+        Reason = "missing ProjectReference to GGLabRuntime"
+    })
+}
+if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+        Reason = "must not reference Application"
+    })
+}
+
+foreach ($path in $runtimeCompileFiles) {
+    if ($applicationCompilePathSet.Contains($path)) {
+        $relativePath = $path.Substring($root.Length + 1).Replace('\', '/')
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "compile-ownership"
+            Target = $relativePath
+            Reason = "compiled by both Application and GGLabRuntime"
+        })
+    }
+}
+
+foreach ($file in ($candidateFiles | Where-Object { $_.Path.EndsWith(".cpp") })) {
+    $ownedByRuntime = $runtimeCompilePathSet.Contains($file.FullPath)
+    $ownedByApplication = $applicationCompilePathSet.Contains($file.FullPath)
+    if (-not $ownedByRuntime -and -not $ownedByApplication) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "compile-ownership"
+            Target = $file.Path
+            Reason = "runtime-candidate source has no compilation owner"
+        })
+    }
+    if ($file.Path.StartsWith("Core/Input/") -and -not $ownedByApplication) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "compile-ownership"
+            Target = $file.Path
+            Reason = "current input implementation must remain Application-owned"
+        })
+    }
+}
+
 $ownershipFindings = New-Object System.Collections.Generic.List[object]
 $platformFindings = New-Object System.Collections.Generic.List[object]
 $runtimeOwnedPathSet = New-Object System.Collections.Generic.HashSet[string]
@@ -279,6 +391,13 @@ Write-Host "=== Runtime Project Boundary Validation ==="
 Write-Host "Root: $root"
 Write-Host "Ownership: $($runtimeOwnedFiles.Count) GGLabRuntime project items"
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
+Write-Host "Compile owners: $($runtimeCompileFiles.Count) GGLabRuntime, $($applicationCompileFiles.Count) Application"
+Write-Host ""
+
+Write-Host "PROJECT CONTRACT violations: $($projectContractFindings.Count)"
+foreach ($finding in $projectContractFindings) {
+    Write-Host ("  [{0}] {1} ({2})" -f $finding.Rule, $finding.Target, $finding.Reason)
+}
 Write-Host ""
 
 Write-Host "KNOWN violations (ledger, enumerated): $($knownFound.Count)"
@@ -313,8 +432,11 @@ foreach ($entry in $stale) {
 }
 Write-Host ""
 
-if ($unexpected.Count -gt 0 -or $stale.Count -gt 0) {
-    if ($unexpected.Count -gt 0) {
+if ($projectContractFindings.Count -gt 0 -or $unexpected.Count -gt 0 -or $stale.Count -gt 0) {
+    if ($projectContractFindings.Count -gt 0) {
+        Write-Host "RESULT: FAIL - project graph or compile ownership violations found."
+    }
+    elseif ($unexpected.Count -gt 0) {
         Write-Host "RESULT: FAIL - unexpected boundary violations found."
     }
     else {
