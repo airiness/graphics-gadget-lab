@@ -234,7 +234,8 @@ namespace gglab
 			const std::filesystem::path& canonicalPath, ModelID modelId) noexcept;
 		bool RefreshModelState(ModelID modelId) noexcept;
 		void CancelModelIfUnreferenced(ModelID modelId, uint64_t generation) noexcept;
-		void CancelMeshIfUnreferenced(MeshID meshId, uint64_t generation) noexcept;
+		void CancelMeshIfUnreferenced(
+			MeshID meshId, uint64_t generation, bool queueRuntimeRetirement = true) noexcept;
 		void RefreshModelDependencyInterests(ModelID modelId, uint64_t generation) noexcept;
 		void ReleaseModelDependencyInterests(ModelID modelId) noexcept;
 		void UpdateModelDependencyPriorities(ModelID modelId, TaskPriority priority) noexcept;
@@ -266,7 +267,8 @@ namespace gglab
 		void HandleInterestChange(const AssetInterestChange& change) noexcept;
 		void ApplyInterestPriority(
 			AssetKey key, uint64_t generation, TaskPriority priority) noexcept;
-		void CancelAssetIfUnreferenced(AssetKey key, uint64_t generation) noexcept;
+		void CancelAssetIfUnreferenced(
+			AssetKey key, uint64_t generation, bool queueRuntimeRetirement = true) noexcept;
 		void QueueRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
 		void CancelRuntimeRetirement(AssetContentVersion contentVersion) noexcept;
 		void FinalizeRuntimeRetirements() noexcept;
@@ -274,6 +276,7 @@ namespace gglab
 		[[nodiscard]] TaskPriority GetEffectivePriority(
 			AssetKey key, TaskPriority fallback = TaskPriority::Normal) const noexcept;
 		[[nodiscard]] bool HasActiveInterest(AssetKey key) const noexcept;
+		[[nodiscard]] bool HasResidencyProtectingInterest(AssetKey key) const noexcept;
 		[[nodiscard]] bool HasPinnedDependentModel(
 			AssetKind kind, uint64_t stableId, uint64_t generation) const noexcept;
 		void FinalizeResidencyEvictions() noexcept;
@@ -287,6 +290,8 @@ namespace gglab
 			const AssetResidencyAction& action, uint64_t projectedResidentBytes) noexcept;
 		void ApplyResidencyPlan(const AssetResidencyPlan& plan) noexcept;
 		void RequestModelResidency(ModelID modelId, uint64_t generation) noexcept;
+		void RequestModelDependencyResidency(
+			const Model& model, TaskPriority priority) noexcept;
 		[[nodiscard]] TaskHandle RequestTextureResidency(
 			TextureID textureId, uint64_t generation, TaskPriority priority) noexcept;
 		void RequestMeshResidency(
