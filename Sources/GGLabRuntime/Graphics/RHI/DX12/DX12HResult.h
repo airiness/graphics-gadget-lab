@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/HResult.h"
+#include "Core/Platform/Win/HResult.h"
 
 #include <d3d12.h>
 

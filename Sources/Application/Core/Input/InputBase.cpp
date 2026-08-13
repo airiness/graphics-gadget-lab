@@ -1,5 +1,5 @@
 #include "Core/Input/InputBase.h"
-#include "Core/HResult.h"
+#include "Core/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"
 
 namespace gglab

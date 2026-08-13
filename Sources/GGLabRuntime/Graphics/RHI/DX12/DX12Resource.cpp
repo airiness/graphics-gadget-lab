@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12Resource.h"
 #include "Core/CoreMacros.h"
-#include "Core/HResult.h"
+#include "Core/Platform/Win/HResult.h"
 
 #include <utility>
 

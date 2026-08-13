@@ -1,6 +1,6 @@
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Core/CoreMacros.h"
-#include "Core/HResult.h"
+#include "Core/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Utility/PathUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"

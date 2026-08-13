@@ -10,7 +10,7 @@ param(
 #   Compile ownership - source files must have one compilation owner, and all
 #                       runtime-candidate .cpp files must have an owner.
 #   Ownership boundary - runtime candidates must not include Application/*,
-#                        DevTools/*, or the legacy Application-owned Core/Input/*.
+#                        DevTools/*, or the Application-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
@@ -34,7 +34,7 @@ function Get-RepoRoot {
 }
 
 $root = Get-RepoRoot $RootDir
-$sourcesDir = Join-Path $root "Sources"
+$runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 
 # Candidate runtime directories (portable runtime candidates; backend leaves included).
 $candidateDirs = @("Core", "Scene", "Graphics", "Diagnostics")
@@ -52,10 +52,7 @@ $platformLeafFiles = @(
 )
 
 # Transitional debt: allowed only with an explicit removal condition.
-$transitionalDebt = @(
-    [pscustomobject]@{ File = "Core/HResult.h";       Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" },
-    [pscustomobject]@{ File = "Core/HResult.cpp";     Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" }
-)
+$transitionalDebt = @()
 
 # Known violations ledger. Each entry: File, Kind (ownership/platform), Reason
 # (planned owner / removal condition). New entries may only be added with an
@@ -122,10 +119,10 @@ function Test-IsKnown {
     return $false
 }
 
-# Collect portable-platform candidates with Sources-relative paths.
+# Collect portable-platform candidates with Runtime-owner-root-relative paths.
 $candidateFiles = @()
 foreach ($dir in $candidateDirs) {
-    $dirPath = Join-Path $sourcesDir $dir
+    $dirPath = Join-Path $runtimeSourcesDir $dir
     if (-not (Test-Path $dirPath)) {
         throw "Candidate directory not found: $dirPath"
     }
@@ -133,15 +130,15 @@ foreach ($dir in $candidateDirs) {
         Where-Object { $_.Extension -in @(".h", ".cpp") } |
         ForEach-Object {
             [pscustomobject]@{
-                Path     = $_.FullName.Substring($sourcesDir.Length + 1).Replace('\', '/')
+                Path     = $_.FullName.Substring($runtimeSourcesDir.Length + 1).Replace('\', '/')
                 FullPath = $_.FullName
             }
         }
 }
 
 # Collect the authoritative runtime ownership set from the project. Project-local
-# build anchors and vendored sources use repository-relative paths; Sources items
-# use Sources-relative paths so they share the boundary ledger namespace.
+# build anchors and vendored sources use repository-relative paths; owner-root
+# items use owner-root-relative paths so they share the boundary ledger namespace.
 $runtimeProjectPath = Join-Path $root "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
 if (-not (Test-Path $runtimeProjectPath)) {
     throw "Runtime project not found: $runtimeProjectPath"
@@ -158,8 +155,8 @@ $runtimeOwnedFiles = @(
             if (-not (Test-Path $fullPath)) {
                 throw "Runtime project item not found: $($_.Include)"
             }
-            $path = if ($fullPath.StartsWith($sourcesDir + [System.IO.Path]::DirectorySeparatorChar)) {
-                $fullPath.Substring($sourcesDir.Length + 1)
+            $path = if ($fullPath.StartsWith($runtimeSourcesDir + [System.IO.Path]::DirectorySeparatorChar)) {
+                $fullPath.Substring($runtimeSourcesDir.Length + 1)
             }
             else {
                 $fullPath.Substring($root.Length + 1)
@@ -341,7 +338,7 @@ foreach ($entry in $knownViolations) {
         }
     }
     if (-not $matched) {
-        $fileExists = Test-Path (Join-Path $sourcesDir $entry.File)
+        $fileExists = Test-Path (Join-Path $runtimeSourcesDir $entry.File)
         $stale += [pscustomobject]@{
             File   = $entry.File
             Kind   = $entry.Kind
@@ -358,7 +355,7 @@ foreach ($debt in $transitionalDebt) {
         }
     }
     if (-not $matched) {
-        $fileExists = Test-Path (Join-Path $sourcesDir $debt.File)
+        $fileExists = Test-Path (Join-Path $runtimeSourcesDir $debt.File)
         $stale += [pscustomobject]@{
             File   = $debt.File
             Kind   = "debt"

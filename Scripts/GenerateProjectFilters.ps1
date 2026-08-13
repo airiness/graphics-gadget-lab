@@ -332,10 +332,7 @@ $projectSpecifications = @(
         ItemTypes = @("ClCompile", "ClInclude")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
-            [pscustomobject]@{ Root = "Sources\Core"; FilterPrefix = "Core" }
-            [pscustomobject]@{ Root = "Sources\Scene"; FilterPrefix = "Scene" }
-            [pscustomobject]@{ Root = "Sources\Graphics"; FilterPrefix = "Graphics" }
-            [pscustomobject]@{ Root = "Sources\Diagnostics"; FilterPrefix = "Diagnostics" }
+            [pscustomobject]@{ Root = "Sources\GGLabRuntime"; FilterPrefix = "" }
             [pscustomobject]@{
                 Root = "Externals\Vender\D3D12MemoryAllocator"
                 FilterPrefix = "ThirdParty\D3D12MemoryAllocator"

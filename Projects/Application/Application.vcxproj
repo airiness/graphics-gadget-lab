@@ -82,7 +82,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -100,7 +100,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
