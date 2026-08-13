@@ -742,7 +742,8 @@ namespace gglab
 			{
 				const bool bakeResource = &entries == &m_IBLBakeTextureEntries;
 				auto allocation = m_TransientResourcePool->AcquireTexture(desc,
-					TextureLogicalName(index, bakeResource), RHIResourceDebugBindingMode::Aliased);
+					TextureLogicalName(index, bakeResource), RHIResourceDebugBindingMode::Aliased,
+					TransientTextureReuseMode::PreserveCommon);
 				GGLAB_ASSERT_MSG(
 					allocation.IsValid(), "RenderResourceRegistry: Acquire texture failed.");
 				if (!allocation.IsValid())
