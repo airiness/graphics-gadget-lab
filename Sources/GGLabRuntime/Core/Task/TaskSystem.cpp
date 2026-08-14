@@ -65,7 +65,7 @@ namespace gglab
 	{
 		if (!work)
 		{
-			GGLAB_LOG_WARN("TaskSystem rejected a task without work.");
+			GGLAB_LOG_RUNTIME_WARN("TaskSystem rejected a task without work.");
 			return {};
 		}
 
@@ -74,7 +74,7 @@ namespace gglab
 			std::scoped_lock lock(m_Mutex);
 			if (!m_AcceptingTasks)
 			{
-				GGLAB_LOG_WARN("TaskSystem rejected task '{}' after shutdown began.", desc.m_Name);
+				GGLAB_LOG_RUNTIME_WARN("TaskSystem rejected task '{}' after shutdown began.", desc.m_Name);
 				return {};
 			}
 
@@ -192,14 +192,14 @@ namespace gglab
 				catch (const std::exception& exception)
 				{
 					GGLAB_UNUSED(exception);
-					GGLAB_LOG_ERROR("TaskSystem completion '{}' threw an exception: {}",
+					GGLAB_LOG_RUNTIME_ERROR("TaskSystem completion '{}' threw an exception: {}",
 						completion.m_Info.m_Name, exception.what());
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;
 				}
 				catch (...)
 				{
-					GGLAB_LOG_ERROR("TaskSystem completion '{}' threw an unknown exception.",
+					GGLAB_LOG_RUNTIME_ERROR("TaskSystem completion '{}' threw an unknown exception.",
 						completion.m_Info.m_Name);
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;

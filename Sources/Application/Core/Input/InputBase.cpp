@@ -1,6 +1,6 @@
 #include "Core/Input/InputBase.h"
+#include "Application/ApplicationLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
-#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

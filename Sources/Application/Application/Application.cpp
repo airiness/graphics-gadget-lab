@@ -1,4 +1,5 @@
 #include "Application/Application.h"
+#include "Application/ApplicationLog.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/RenderingStartup.h"
@@ -12,7 +13,6 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
@@ -136,7 +136,7 @@ namespace gglab
 		}
 
 		// Logger
-		Logger::Initialize();
+		InitializeLogging();
 		m_TaskSystem = std::make_unique<TaskSystem>();
 
 		if (!m_PlatformHost)

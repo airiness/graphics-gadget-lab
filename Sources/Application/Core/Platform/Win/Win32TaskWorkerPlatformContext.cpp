@@ -1,6 +1,6 @@
 #include "Core/Task/TaskWorkerPlatformContext.h"
+#include "Application/ApplicationLog.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
 
 #include <Windows.h>
 #include <objbase.h>

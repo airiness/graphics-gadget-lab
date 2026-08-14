@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
+#include "Application/ApplicationLog.h"
 #include "Core/Task/TaskSystem.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"

@@ -33,7 +33,7 @@ namespace gglab
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Textures.size())
 		{
-			GGLAB_LOG_WARN("TransientResourcePool::RetireTexture received an invalid allocation.");
+			GGLAB_LOG_GRAPHICS_WARN("TransientResourcePool::RetireTexture received an invalid allocation.");
 			return;
 		}
 
@@ -56,7 +56,7 @@ namespace gglab
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Buffers.size())
 		{
-			GGLAB_LOG_WARN("TransientResourcePool::RetireBuffer received an invalid allocation.");
+			GGLAB_LOG_GRAPHICS_WARN("TransientResourcePool::RetireBuffer received an invalid allocation.");
 			return;
 		}
 
@@ -169,7 +169,7 @@ namespace gglab
 	{
 		if (!allocation.IsValid() || allocation.m_PoolSlot.Value() >= m_Textures.size())
 		{
-			GGLAB_LOG_WARN(
+			GGLAB_LOG_GRAPHICS_WARN(
 				"TransientResourcePool::SetTextureLogicalName received an invalid allocation.");
 			return;
 		}

@@ -42,7 +42,6 @@
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -55,7 +54,6 @@
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -263,6 +261,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.h" />

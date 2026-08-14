@@ -1,8 +1,8 @@
 #include "Core/Input/InputManager.h"
+#include "Application/ApplicationLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
-#include "Core/Log/LogMacros.h"
 
 namespace gglab
 {

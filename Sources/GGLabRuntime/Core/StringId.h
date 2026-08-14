@@ -71,7 +71,7 @@ namespace gglab
 			// TODO: need log here?
 			/*if (auto iter = m_Dictionary.find(hash); iter != m_Dictionary.end())
 			{
-				GGLAB_LOG_INFO("Hash collision: {}<->{}.", iter->second.c_str(), stringView.data());
+				GGLAB_LOG_RUNTIME_INFO("Hash collision: {}<->{}.", iter->second.c_str(), stringView.data());
 			}*/
 			m_Dictionary.emplace(hash, std::string(stringView));
 		}

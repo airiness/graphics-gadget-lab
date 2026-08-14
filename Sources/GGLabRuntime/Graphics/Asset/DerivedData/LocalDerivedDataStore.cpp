@@ -5,6 +5,8 @@
 #include "GGLabFoundation/Platform/Win/Win32ProcessUtils.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 
+#include <Windows.h>
+
 #include <algorithm>
 #include <array>
 #include <cstddef>

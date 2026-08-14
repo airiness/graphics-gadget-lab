@@ -20,14 +20,14 @@ namespace gglab
 	{
 		if (count == 0)
 		{
-			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. count is 0, nothing allocated.");
+			GGLAB_LOG_RUNTIME_WARN("RingSpanAllocator: AllocateAligned failed. count is 0, nothing allocated.");
 			return {};
 		}
 
 		alignment = std::max(alignment, CountType{ 1 });
 		if (count > m_FreeCount)
 		{
-			GGLAB_LOG_WARN("RingSpanAllocator: AllocateAligned failed. request={}, free={}", count,
+			GGLAB_LOG_RUNTIME_WARN("RingSpanAllocator: AllocateAligned failed. request={}, free={}", count,
 				m_FreeCount);
 			return {};
 		}
@@ -102,7 +102,7 @@ namespace gglab
 			}
 		}
 
-		GGLAB_LOG_WARN(
+		GGLAB_LOG_RUNTIME_WARN(
 			"RingSpanAllocator::AllocateAligned failed: no contiguous space. request={}, alignment={}, free={}.",
 			count, alignment, m_FreeCount);
 		return {};

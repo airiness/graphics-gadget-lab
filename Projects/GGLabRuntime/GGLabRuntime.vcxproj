@@ -58,7 +58,7 @@
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -73,7 +73,7 @@
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -83,7 +83,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Color.cpp" />
@@ -273,7 +272,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathInterop.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\BoundingVolumes.h" />

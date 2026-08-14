@@ -5,6 +5,7 @@
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Logging/Log.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
@@ -19,6 +20,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
@@ -26,6 +29,7 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace gglab::foundation::detail
 {
@@ -40,7 +44,7 @@ namespace gglab::foundation::tests
 		Read = 1 << 0,
 		Write = 1 << 1,
 	};
-	GGLAB_ENUM_FLAGS(TestFlags)
+	GGLAB_ENUM_FLAGS(TestFlags);
 
 	enum class TestValue : std::uint8_t
 	{
@@ -226,6 +230,81 @@ namespace gglab::foundation::tests
 			utils::CreateParentDirectoryIfNotExist(testRoot / "other" / "file.bin");
 	}
 
+	struct CapturedLog final
+	{
+		std::string m_Tag;
+		LogLevel m_Level = LogLevel::Info;
+		std::string m_Message;
+	};
+
+	class CapturingLogSink final : public LogSink
+	{
+	public:
+		void Write(LogTag tag, LogLevel level, std::string_view message) noexcept override
+		{
+			std::scoped_lock lock(m_Mutex);
+			m_Records.push_back(CapturedLog{
+				.m_Tag = std::string(tag.Name()),
+				.m_Level = level,
+				.m_Message = std::string(message),
+			});
+		}
+
+		void Flush() noexcept override
+		{
+			std::scoped_lock lock(m_Mutex);
+			m_WasFlushed = true;
+		}
+
+		[[nodiscard]] std::vector<CapturedLog> Records() const
+		{
+			std::scoped_lock lock(m_Mutex);
+			return m_Records;
+		}
+
+		[[nodiscard]] bool WasFlushed() const noexcept
+		{
+			std::scoped_lock lock(m_Mutex);
+			return m_WasFlushed;
+		}
+
+	private:
+		mutable std::mutex m_Mutex;
+		std::vector<CapturedLog> m_Records;
+		bool m_WasFlushed = false;
+	};
+
+	[[nodiscard]] bool RunLoggingTests() noexcept
+	{
+		InitializeLogging();
+		if (!IsLoggingInitialized())
+		{
+			return false;
+		}
+
+		const std::shared_ptr<LogSink> previousSink = GetLogSink();
+		const auto capture = std::make_shared<CapturingLogSink>();
+		SetLogSink(capture);
+		constexpr LogTag TestTag{ "FOUNDATION_TEST" };
+		Log(TestTag, LogLevel::Info, "formatted {}", 42);
+		std::thread writer(
+			[&]
+			{
+				Log(TestTag, LogLevel::Warning, "plain message");
+			});
+		writer.join();
+		FlushLogs();
+		SetLogSink(previousSink);
+
+		const std::vector<CapturedLog> records = capture->Records();
+		return capture->WasFlushed() && records.size() == 2 &&
+			records[0].m_Tag == "FOUNDATION_TEST" && records[0].m_Level == LogLevel::Info &&
+			records[0].m_Message == "formatted 42" &&
+			records[1].m_Tag == "FOUNDATION_TEST" &&
+			records[1].m_Level == LogLevel::Warning &&
+			records[1].m_Message == "plain message";
+	}
+
 	[[nodiscard]] bool RunWindowsLeafTests() noexcept
 	{
 		constexpr std::string_view Utf8 = "Graphics Gadget Lab \xe5\x9f\xba\xe7\xa1\x80";
@@ -287,6 +366,7 @@ int main()
 		gglab::foundation::tests::RunSha256Tests() &&
 		gglab::foundation::tests::RunStringTests() &&
 		gglab::foundation::tests::RunPathTests() &&
+		gglab::foundation::tests::RunLoggingTests() &&
 		gglab::foundation::tests::RunWindowsLeafTests()
 		? 0
 		: 1;

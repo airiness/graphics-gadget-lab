@@ -13,14 +13,14 @@ namespace gglab
 	{
 		if (count == 0)
 		{
-			GGLAB_LOG_WARN("FreeListSpanAllocator: Allocate(). count is 0, nothing allocated.");
+			GGLAB_LOG_RUNTIME_WARN("FreeListSpanAllocator: Allocate(). count is 0, nothing allocated.");
 			return IndexSpan();
 		}
 
 		const auto countMapIt = m_CountMap.lower_bound(count);
 		if (countMapIt == m_CountMap.end())
 		{
-			GGLAB_LOG_WARN(
+			GGLAB_LOG_RUNTIME_WARN(
 				"FreeListSpanAllocator: Allocate(). Don't have enough count. needed:{}, total:{}, free:{}",
 				count, m_Capacity, m_FreeCount);
 			return IndexSpan();

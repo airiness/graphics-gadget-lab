@@ -159,9 +159,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.cpp">
       <Filter>Core\Async</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.cpp">
-      <Filter>Core\Log</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp">
       <Filter>Core\Math\Backends</Filter>
     </ClCompile>
@@ -775,9 +772,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.h">
-      <Filter>Core\Log</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h">
       <Filter>Core\Log</Filter>

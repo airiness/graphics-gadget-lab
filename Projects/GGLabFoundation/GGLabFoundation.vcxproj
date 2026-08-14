@@ -34,9 +34,11 @@
   <ImportGroup Label="Shared" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -77,6 +79,7 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32NamedMutex.cpp" />
@@ -93,6 +96,7 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\HResult.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.h" />
