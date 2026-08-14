@@ -1,4 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- STL/CRT-only dependency budget: deliberately does not import Common.props because
+     it carries external include roots and Windows platform defaults. The local minimal
+     policy below (stdcpp20, no PCH, no sheets) is intentional; revisit workspace build
+     baseline layering when more standalone tool/test targets exist. -->
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">

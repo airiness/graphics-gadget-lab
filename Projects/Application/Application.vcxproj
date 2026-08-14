@@ -155,9 +155,11 @@
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetUploadSchedulerSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDataOnlyPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDamageSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
@@ -262,7 +264,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetUploadSchedulerSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDataOnlyPublicationSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.h" />

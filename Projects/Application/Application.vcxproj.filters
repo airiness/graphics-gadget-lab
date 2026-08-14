@@ -237,6 +237,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetUploadSchedulerSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -247,6 +250,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDamageSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDataOnlyPublicationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelEditSelfTests.cpp">
@@ -581,10 +587,16 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetUploadSchedulerSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDataOnlyPublicationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.h">
