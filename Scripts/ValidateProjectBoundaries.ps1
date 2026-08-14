@@ -3,22 +3,24 @@ param(
     [switch]$ShowAll
 )
 
-# Runtime project boundary validation.
-# Enforces the source dependency direction contract for the runtime library:
-#   Project graph - Application must reference GGLabRuntime; GGLabRuntime must
-#                   not reference Application.
-#   Compile ownership - source files must have one compilation owner, and all
-#                       runtime-candidate .cpp files must have an owner.
+# Project ownership and runtime boundary validation.
+# Enforces the first-party source ownership and dependency direction contracts:
+#   Project graph - Application must reference GGLabRuntime and NapaVoxelCore;
+#                   Runtime must not reference Application, and NapaVoxelCore
+#                   must remain independent of first-party host projects.
+#   Source ownership - every first-party source item must live below its owning
+#                      project's source root, and every physical source file must
+#                      belong to exactly one owning project.
 #   Ownership boundary - runtime candidates must not include Application/*,
-#                        DevTools/*, or Application-owned regions.
+#                        DevTools/*, or the Application-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
 # violation outside the ledger fails the validation.
 #
-# Ownership scanning derives from actual GGLabRuntime project items;
-# all Diagnostics source/header files are required to be runtime-owned;
-# portable-platform scanning remains classification-driven.
+# Physical/project ownership scanning covers all first-party source roots.
+# Runtime dependency and platform scanning derives from actual GGLabRuntime
+# project items and remains classification-driven.
 
 $ErrorActionPreference = "Stop"
 
@@ -34,16 +36,31 @@ function Get-RepoRoot {
 }
 
 $root = Get-RepoRoot $RootDir
-$sourcesDir = Join-Path $root "Sources"
+$repositorySourcesDir = Join-Path $root "Sources"
+$applicationSourcesDir = Join-Path $root "Sources/Application"
+$runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
+$napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
+
+function Test-IsPathUnderRoot {
+    param(
+        [string]$Path,
+        [string]$Directory
+    )
+
+    return $Path.StartsWith(
+        $Directory.TrimEnd([System.IO.Path]::DirectorySeparatorChar) +
+            [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function ConvertTo-RepoRelativePath {
+    param([string]$Path)
+
+    return $Path.Substring($root.Length + 1).Replace('\', '/')
+}
 
 # Candidate runtime directories (portable runtime candidates; backend leaves included).
 $candidateDirs = @("Core", "Scene", "Graphics", "Diagnostics")
-
-# Application-owned regions that physically live inside candidate directories.
-# Ownership wins over directory name.
-$applicationOwnedRegions = @(
-    "Core/Input" # GameInput implementation, Application-owned
-)
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
@@ -58,11 +75,7 @@ $platformLeafFiles = @(
 )
 
 # Transitional debt: allowed only with an explicit removal condition.
-$transitionalDebt = @(
-    [pscustomobject]@{ File = "Core/Hash/Sha256.cpp"; Reason = "BCrypt implementation; planned: move to Core/Platform/Win" },
-    [pscustomobject]@{ File = "Core/HResult.h";       Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" },
-    [pscustomobject]@{ File = "Core/HResult.cpp";     Reason = "Windows/DX12 helper ownership in flight; planned: DX12/Windows leaf" }
-)
+$transitionalDebt = @()
 
 # Known violations ledger. Each entry: File, Kind (ownership/platform), Reason
 # (planned owner / removal condition). New entries may only be added with an
@@ -88,14 +101,9 @@ $platformTypeRegex = '\bVulkanWin32Surface(Factory)?\b'
 function Test-IsExempt {
     param([string]$RelativePath)
 
-    # Application-owned regions and permanent platform leaves are exempt from
-    # scanning. Transitional debt is NOT exempt: it must be scanned, matched
-    # when the violation is still present, and reported stale when resolved.
-    foreach ($region in $applicationOwnedRegions) {
-        if ($RelativePath.StartsWith($region + "/")) {
-            return $true
-        }
-    }
+    # Permanent platform leaves are exempt from scanning. Transitional debt is
+    # NOT exempt: it must be scanned, matched when the violation is still
+    # present, and reported stale when resolved.
     foreach ($prefix in $platformLeafPrefixes) {
         if ($RelativePath.StartsWith($prefix + "/")) {
             return $true
@@ -134,10 +142,10 @@ function Test-IsKnown {
     return $false
 }
 
-# Collect portable-platform candidates with Sources-relative paths.
+# Collect portable-platform candidates with Runtime-owner-root-relative paths.
 $candidateFiles = @()
 foreach ($dir in $candidateDirs) {
-    $dirPath = Join-Path $sourcesDir $dir
+    $dirPath = Join-Path $runtimeSourcesDir $dir
     if (-not (Test-Path $dirPath)) {
         throw "Candidate directory not found: $dirPath"
     }
@@ -145,15 +153,15 @@ foreach ($dir in $candidateDirs) {
         Where-Object { $_.Extension -in @(".h", ".cpp") } |
         ForEach-Object {
             [pscustomobject]@{
-                Path     = $_.FullName.Substring($sourcesDir.Length + 1).Replace('\', '/')
+                Path     = $_.FullName.Substring($runtimeSourcesDir.Length + 1).Replace('\', '/')
                 FullPath = $_.FullName
             }
         }
 }
 
 # Collect the authoritative runtime ownership set from the project. Project-local
-# build anchors and vendored sources use repository-relative paths; Sources items
-# use Sources-relative paths so they share the boundary ledger namespace.
+# build anchors and vendored sources use repository-relative paths; owner-root
+# items use owner-root-relative paths so they share the boundary ledger namespace.
 $runtimeProjectPath = Join-Path $root "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
 if (-not (Test-Path $runtimeProjectPath)) {
     throw "Runtime project not found: $runtimeProjectPath"
@@ -170,8 +178,8 @@ $runtimeOwnedFiles = @(
             if (-not (Test-Path $fullPath)) {
                 throw "Runtime project item not found: $($_.Include)"
             }
-            $path = if ($fullPath.StartsWith($sourcesDir + [System.IO.Path]::DirectorySeparatorChar)) {
-                $fullPath.Substring($sourcesDir.Length + 1)
+            $path = if ($fullPath.StartsWith($runtimeSourcesDir + [System.IO.Path]::DirectorySeparatorChar)) {
+                $fullPath.Substring($runtimeSourcesDir.Length + 1)
             }
             else {
                 $fullPath.Substring($root.Length + 1)
@@ -192,6 +200,15 @@ $applicationProject = [xml](Get-Content -LiteralPath $applicationProjectPath -Ra
 $applicationNamespace = New-Object System.Xml.XmlNamespaceManager($applicationProject.NameTable)
 $applicationNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
 $applicationProjectDir = Split-Path -Parent $applicationProjectPath
+
+$napaProjectPath = Join-Path $root "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj"
+if (-not (Test-Path $napaProjectPath)) {
+    throw "NapaVoxelCore project not found: $napaProjectPath"
+}
+$napaProject = [xml](Get-Content -LiteralPath $napaProjectPath -Raw -ErrorAction Stop)
+$napaNamespace = New-Object System.Xml.XmlNamespaceManager($napaProject.NameTable)
+$napaNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$napaProjectDir = Split-Path -Parent $napaProjectPath
 
 function Get-ProjectItemPaths {
     param(
@@ -220,38 +237,189 @@ $runtimeCompileFiles = Get-ProjectItemPaths $runtimeProject $namespace $runtimeP
     "//msb:ClCompile" "Runtime compile item"
 $applicationCompileFiles = Get-ProjectItemPaths $applicationProject $applicationNamespace `
     $applicationProjectDir "//msb:ClCompile" "Application compile item"
+$napaCompileFiles = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
+    "//msb:ClCompile" "NapaVoxelCore compile item"
+$runtimeSourceItems = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
+    "//msb:ClCompile | //msb:ClInclude" "Runtime source item"
+$applicationSourceItems = Get-ProjectItemPaths $applicationProject $applicationNamespace `
+    $applicationProjectDir "//msb:ClCompile | //msb:ClInclude" "Application source item"
+$napaSourceItems = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
+    "//msb:ClCompile | //msb:ClInclude" "NapaVoxelCore source item"
 $runtimeProjectReferences = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ProjectReference" "Runtime project reference"
 $applicationProjectReferences = Get-ProjectItemPaths $applicationProject $applicationNamespace `
     $applicationProjectDir "//msb:ProjectReference" "Application project reference"
+$napaProjectReferences = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
+    "//msb:ProjectReference" "NapaVoxelCore project reference"
 
-$runtimeCompilePathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
-    ([System.StringComparer]::OrdinalIgnoreCase)
-$applicationCompilePathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
-    ([System.StringComparer]::OrdinalIgnoreCase)
 $runtimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $applicationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
-foreach ($path in $runtimeCompileFiles) {
-    [void]$runtimeCompilePathSet.Add($path)
-}
-foreach ($path in $applicationCompileFiles) {
-    [void]$applicationCompilePathSet.Add($path)
-}
+$napaProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
 foreach ($path in $runtimeProjectReferences) {
     [void]$runtimeProjectReferenceSet.Add($path)
 }
 foreach ($path in $applicationProjectReferences) {
     [void]$applicationProjectReferenceSet.Add($path)
 }
+foreach ($path in $napaProjectReferences) {
+    [void]$napaProjectReferenceSet.Add($path)
+}
 
 $projectContractFindings = New-Object System.Collections.Generic.List[object]
+$requiredRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
+$forbiddenRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources'
+$runtimeIncludeDirectoryNodes = @(
+    $runtimeProject.SelectNodes("//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalIncludeDirectories", $namespace)
+)
+if ($runtimeIncludeDirectoryNodes.Count -eq 0) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "include-visibility"
+        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+        Reason = "missing GGLabRuntime include-directory definitions"
+    })
+}
+foreach ($includeNode in $runtimeIncludeDirectoryNodes) {
+    $includeRoots = @(
+        ([string]$includeNode.InnerText).Split(';') |
+            ForEach-Object { $_.Trim().TrimEnd('\') } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+    $condition = [string]$includeNode.ParentNode.ParentNode.Condition
+    $target = if ([string]::IsNullOrWhiteSpace($condition)) {
+        "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+    }
+    else {
+        "Projects/GGLabRuntime/GGLabRuntime.vcxproj ($condition)"
+    }
+    if ($includeRoots -notcontains $requiredRuntimeIncludeRoot) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "include-visibility"
+            Target = $target
+            Reason = "missing narrow Sources/GGLabRuntime include root"
+        })
+    }
+    if ($includeRoots -contains $forbiddenRuntimeIncludeRoot) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "include-visibility"
+            Target = $target
+            Reason = "repository-wide Sources include root is forbidden"
+        })
+    }
+}
+$firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
+$ownershipSpecifications = @(
+    [pscustomobject]@{
+        Name       = "Application"
+        SourceRoot = $applicationSourcesDir
+        ItemPaths  = $applicationSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "GGLabRuntime"
+        SourceRoot = $runtimeSourcesDir
+        ItemPaths  = $runtimeSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "NapaVoxelCore"
+        SourceRoot = $napaSourcesDir
+        ItemPaths  = $napaSourceItems
+    }
+)
+
+$firstPartyMemberships = @{}
+foreach ($specification in $ownershipSpecifications) {
+    if (-not (Test-Path -LiteralPath $specification.SourceRoot -PathType Container)) {
+        throw "$($specification.Name) source root not found: $($specification.SourceRoot)"
+    }
+
+    $projectItemPathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+        ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($itemPath in $specification.ItemPaths) {
+        [void]$projectItemPathSet.Add($itemPath)
+
+        if (-not (Test-IsPathUnderRoot $itemPath $repositorySourcesDir)) {
+            continue
+        }
+
+        if (-not (Test-IsPathUnderRoot $itemPath $specification.SourceRoot)) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "source-ownership"
+                Target = ConvertTo-RepoRelativePath $itemPath
+                Reason = "$($specification.Name) project item is outside " +
+                    (ConvertTo-RepoRelativePath $specification.SourceRoot)
+            })
+        }
+
+        if (-not $firstPartyMemberships.ContainsKey($itemPath)) {
+            $firstPartyMemberships[$itemPath] = New-Object 'System.Collections.Generic.List[string]'
+        }
+        [void]$firstPartyMemberships[$itemPath].Add($specification.Name)
+    }
+
+    $physicalOwnerFiles = @(
+        Get-ChildItem -LiteralPath $specification.SourceRoot -Recurse -File |
+            Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
+    )
+    foreach ($file in $physicalOwnerFiles) {
+        if (-not $projectItemPathSet.Contains($file.FullName)) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "source-membership"
+                Target = ConvertTo-RepoRelativePath $file.FullName
+                Reason = "$($specification.Name)-owned source is missing from its project"
+            })
+        }
+    }
+}
+
+$firstPartySourceFiles = @(
+    Get-ChildItem -LiteralPath $repositorySourcesDir -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
+)
+foreach ($file in $firstPartySourceFiles) {
+    $matchingOwners = @(
+        $ownershipSpecifications |
+            Where-Object { Test-IsPathUnderRoot $file.FullName $_.SourceRoot }
+    )
+    if ($matchingOwners.Count -eq 0) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "source-ownership"
+            Target = ConvertTo-RepoRelativePath $file.FullName
+            Reason = "source is outside every recognized project owner root"
+        })
+    }
+    elseif ($matchingOwners.Count -gt 1) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "source-ownership"
+            Target = ConvertTo-RepoRelativePath $file.FullName
+            Reason = "source matches multiple project owner roots"
+        })
+    }
+
+    if ($firstPartyMemberships.ContainsKey($file.FullName) -and
+        $firstPartyMemberships[$file.FullName].Count -gt 1) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "source-membership"
+            Target = ConvertTo-RepoRelativePath $file.FullName
+            Reason = "source is listed by multiple projects: " +
+                ($firstPartyMemberships[$file.FullName] -join ", ")
+        })
+    }
+}
+
 if (-not $applicationProjectReferenceSet.Contains($runtimeProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
         Target = "Projects/Application/Application.vcxproj"
         Reason = "missing ProjectReference to GGLabRuntime"
+    })
+}
+if (-not $applicationProjectReferenceSet.Contains($napaProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/Application/Application.vcxproj"
+        Reason = "missing ProjectReference to NapaVoxelCore"
     })
 }
 if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {
@@ -261,33 +429,12 @@ if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {
         Reason = "must not reference Application"
     })
 }
-
-foreach ($path in $runtimeCompileFiles) {
-    if ($applicationCompilePathSet.Contains($path)) {
-        $relativePath = $path.Substring($root.Length + 1).Replace('\', '/')
+foreach ($forbiddenReference in @($applicationProjectPath, $runtimeProjectPath)) {
+    if ($napaProjectReferenceSet.Contains($forbiddenReference)) {
         $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "compile-ownership"
-            Target = $relativePath
-            Reason = "compiled by both Application and GGLabRuntime"
-        })
-    }
-}
-
-foreach ($file in ($candidateFiles | Where-Object { $_.Path.EndsWith(".cpp") })) {
-    $ownedByRuntime = $runtimeCompilePathSet.Contains($file.FullPath)
-    $ownedByApplication = $applicationCompilePathSet.Contains($file.FullPath)
-    if (-not $ownedByRuntime -and -not $ownedByApplication) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "compile-ownership"
-            Target = $file.Path
-            Reason = "runtime-candidate source has no compilation owner"
-        })
-    }
-    if ($file.Path.StartsWith("Core/Input/") -and -not $ownedByApplication) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "compile-ownership"
-            Target = $file.Path
-            Reason = "current input implementation must remain Application-owned"
+            Rule   = "project-graph"
+            Target = "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj"
+            Reason = "host-independent NapaVoxelCore must not reference first-party host projects"
         })
     }
 }
@@ -303,7 +450,7 @@ foreach ($file in $runtimeOwnedFiles) {
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
 
     if ($file.Path.StartsWith("Application/") -or $file.Path.StartsWith("DevTools/") -or
-        $file.Path.StartsWith("Core/Input/") -or $content -match $ownershipIncludeRegex -or
+        $content -match $ownershipIncludeRegex -or
         $content -match $ownershipSymbolRegex) {
         $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }
@@ -360,7 +507,7 @@ foreach ($entry in $knownViolations) {
         }
     }
     if (-not $matched) {
-        $fileExists = Test-Path (Join-Path $sourcesDir $entry.File)
+        $fileExists = Test-Path (Join-Path $runtimeSourcesDir $entry.File)
         $stale += [pscustomobject]@{
             File   = $entry.File
             Kind   = $entry.Kind
@@ -377,7 +524,7 @@ foreach ($debt in $transitionalDebt) {
         }
     }
     if (-not $matched) {
-        $fileExists = Test-Path (Join-Path $sourcesDir $debt.File)
+        $fileExists = Test-Path (Join-Path $runtimeSourcesDir $debt.File)
         $stale += [pscustomobject]@{
             File   = $debt.File
             Kind   = "debt"
@@ -387,11 +534,14 @@ foreach ($debt in $transitionalDebt) {
 }
 
 # Report.
-Write-Host "=== Runtime Project Boundary Validation ==="
+Write-Host "=== Project Ownership and Runtime Boundary Validation ==="
 Write-Host "Root: $root"
-Write-Host "Ownership: $($runtimeOwnedFiles.Count) GGLabRuntime project items"
+Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party source files"
+Write-Host ("Project items: {0} Application, {1} GGLabRuntime, {2} NapaVoxelCore" -f `
+        $applicationSourceItems.Count, $runtimeSourceItems.Count, $napaSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
-Write-Host "Compile owners: $($runtimeCompileFiles.Count) GGLabRuntime, $($applicationCompileFiles.Count) Application"
+Write-Host ("Compile items: {0} Application, {1} GGLabRuntime, {2} NapaVoxelCore" -f `
+        $applicationCompileFiles.Count, $runtimeCompileFiles.Count, $napaCompileFiles.Count)
 Write-Host ""
 
 Write-Host "PROJECT CONTRACT violations: $($projectContractFindings.Count)"
@@ -434,7 +584,7 @@ Write-Host ""
 
 if ($projectContractFindings.Count -gt 0 -or $unexpected.Count -gt 0 -or $stale.Count -gt 0) {
     if ($projectContractFindings.Count -gt 0) {
-        Write-Host "RESULT: FAIL - project graph or compile ownership violations found."
+        Write-Host "RESULT: FAIL - project graph or source ownership violations found."
     }
     elseif ($unexpected.Count -gt 0) {
         Write-Host "RESULT: FAIL - unexpected boundary violations found."

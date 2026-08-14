@@ -169,7 +169,7 @@ jobs:
         shell: pwsh
         run: |
           $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\Application\ApplicationPch.cpp").Path
+            (Resolve-Path -LiteralPath "Sources\Application\Application\ApplicationPch.cpp").Path
           $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
           $unexpectedIncludes = @(
             Get-ChildItem -LiteralPath Sources -Recurse -File |
@@ -187,7 +187,16 @@ jobs:
             throw "Source-level PCH includes are not allowed: $($locations -join ', ')"
           }
 
-      - name: Validate runtime project boundaries
+      - name: Validate generated project filters
+        shell: pwsh
+        run: |
+          ./Scripts/GenerateProjectFilters.ps1 -Check
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Validate project ownership and runtime boundaries
         shell: pwsh
         run: |
           ./Scripts/ValidateProjectBoundaries.ps1
