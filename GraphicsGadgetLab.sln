@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35913.81
@@ -6,6 +6,8 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Application", "Projects\Application\Application.vcxproj", "{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundation", "Projects\GGLabFoundation\GGLabFoundation.vcxproj", "{5C275408-928E-43C7-A2B5-7099FEA072D4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabTestCore", "Projects\GGLabTestCore\GGLabTestCore.vcxproj", "{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntime", "Projects\GGLabRuntime\GGLabRuntime.vcxproj", "{F382CFE9-9912-487D-B999-E649C340125D}"
 EndProject
@@ -33,6 +35,10 @@ Global
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Debug|x64.Build.0 = Debug|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Release|x64.ActiveCfg = Release|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Release|x64.Build.0 = Release|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Debug|x64.ActiveCfg = Debug|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Debug|x64.Build.0 = Debug|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Release|x64.ActiveCfg = Release|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Release|x64.Build.0 = Release|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.ActiveCfg = Debug|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.Build.0 = Debug|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.ActiveCfg = Release|x64

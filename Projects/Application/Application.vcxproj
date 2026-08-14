@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
@@ -79,8 +79,7 @@
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -97,8 +96,7 @@
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -173,7 +171,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelStorageSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTest.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp" />
@@ -269,7 +266,6 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTest.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.h" />
@@ -387,6 +383,9 @@
     <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
       <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">
+      <Project>{d4e1b7c2-5a3f-4b6d-9e0a-8c7d2f1b6a49}</Project>
     </ProjectReference>
     <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
       <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>

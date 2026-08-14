@@ -1,4 +1,4 @@
-#include "Application/SelfTest/SelfTest.h"
+#include "GGLabTestCore/SelfTest.h"
 
 #include <cstdio>
 

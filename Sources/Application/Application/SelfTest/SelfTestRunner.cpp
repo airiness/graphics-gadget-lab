@@ -5,7 +5,7 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
 #include "Application/SelfTest/PublicationAccountingSelfTests.h"
 #include "Application/SelfTest/RenderingContractSelfTests.h"
-#include "Application/SelfTest/SelfTest.h"
+#include "GGLabTestCore/SelfTest.h"
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 
 #include <algorithm>

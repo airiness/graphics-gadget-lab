@@ -285,9 +285,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTest.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -594,9 +591,6 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTest.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h">

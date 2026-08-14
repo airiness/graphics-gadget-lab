@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/SelfTest/SelfTest.h"
+#include "GGLabTestCore/SelfTest.h"
 
 namespace gglab
 {
