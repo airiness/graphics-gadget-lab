@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cassert>
 #include <cstdlib>
 
@@ -11,7 +12,6 @@
 #define GGLAB_PROFILE_CONCAT_IMPL(left, right) left##right
 #define GGLAB_PROFILE_CONCAT(left, right) GGLAB_PROFILE_CONCAT_IMPL(left, right)
 
-// Define unreachable and abort application
 #define GGLAB_UNREACHABLE(message) \
 	do { \
 		GGLAB_ASSERT_MSG(false, message); \
@@ -23,7 +23,7 @@
 	className& operator=(const className&) noexcept = delete;
 
 #define GGLAB_DELETE_MOVABLE(className) \
-	className(className&&) noexcept = delete;\
+	className(className&&) noexcept = delete; \
 	className& operator=(className&&) noexcept = delete;
 
 #define GGLAB_DELETE_COPYABLE_MOVABLE(className) \
@@ -45,5 +45,3 @@
 #define GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(className) \
 	GGLAB_DELETE_COPYABLE(className) \
 	GGLAB_DEFAULT_MOVABLE(className)
-
-#define GGLAB_INFINITE 0xFFFFFFFF

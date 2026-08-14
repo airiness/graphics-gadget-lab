@@ -11,7 +11,7 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Platform/Win/Win32PathUtils.h"
 #include "Core/Time.h"

@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/CoreMacros.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 

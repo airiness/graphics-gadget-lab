@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/ArtifactCacheCore.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 

@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
 

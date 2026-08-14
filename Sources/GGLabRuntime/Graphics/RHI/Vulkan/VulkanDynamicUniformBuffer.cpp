@@ -5,7 +5,7 @@
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
-#include "Core/Utility/MathUtils.h"
+#include "GGLabFoundation/Base/MathUtils.h"
 
 #include <algorithm>
 #include <cstring>

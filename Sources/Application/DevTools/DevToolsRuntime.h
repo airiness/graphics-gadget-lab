@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"

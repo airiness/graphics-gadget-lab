@@ -6,7 +6,7 @@
 #include "Graphics/ShadowSettings.h"
 #include "Graphics/RHI/RHIDescriptor.h"
 #include "Graphics/RHI/RHITexture.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 
 namespace gglab
 {

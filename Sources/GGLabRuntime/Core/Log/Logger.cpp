@@ -1,5 +1,5 @@
 #include "Core/Log/Logger.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 

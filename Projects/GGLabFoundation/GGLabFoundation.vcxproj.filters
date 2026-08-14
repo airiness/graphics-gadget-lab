@@ -4,10 +4,36 @@
     <Filter Include="Private">
       <UniqueIdentifier>{1F557CE7-74F6-B8D4-2D1E-CEF694A538D8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{65A5F962-2DEC-EF5E-BD7F-EABA2276C46E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation">
+      <UniqueIdentifier>{8BCA3B12-6986-EE71-6B90-8F264A8DA77A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation\Base">
+      <UniqueIdentifier>{ABF284BA-022B-9A0C-E333-8ED942902097}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp">
       <Filter>Private</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h">
+      <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h">
+      <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\MathUtils.h">
+      <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypedIndex.h">
+      <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h">
+      <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

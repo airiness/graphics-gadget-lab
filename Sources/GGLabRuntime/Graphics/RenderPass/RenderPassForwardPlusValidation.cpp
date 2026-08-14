@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"

@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/CoreMacros.h"
-#include "Core/EnumFlags.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Base/EnumFlags.h"
 #include "Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>

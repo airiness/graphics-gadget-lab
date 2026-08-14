@@ -1,6 +1,6 @@
 #pragma once
 #include "Application/ApplicationLaunchOptions.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <cstdint>
 #include <memory>

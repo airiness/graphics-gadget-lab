@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIResource.h"
 #include "Graphics/RHI/RHITypes.h"

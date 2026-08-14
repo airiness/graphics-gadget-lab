@@ -1,5 +1,5 @@
 #include "Graphics/Shader/Shader.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <utility>
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Task/TaskTypes.h"
 #include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"

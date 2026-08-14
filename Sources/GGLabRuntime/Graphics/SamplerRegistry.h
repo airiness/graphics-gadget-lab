@@ -3,7 +3,7 @@
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/SamplerTypes.h"
 #include "Core/Hash/KeyHash.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 
 #include <vector>
 

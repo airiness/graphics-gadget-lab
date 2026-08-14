@@ -1,7 +1,9 @@
 #pragma once
-#include "Core/CoreMacros.h"
+
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <compare>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -9,7 +11,7 @@
 
 namespace gglab
 {
-	template <typename Tag, typename Rep = uint32_t> class TypedIndex
+	template <typename Tag, typename Rep = std::uint32_t> class TypedIndex
 	{
 	public:
 		using ValueType = Rep;
@@ -74,39 +76,34 @@ namespace gglab
 		Rep m_Next = 0;
 	};
 
-	// TypedIndex define helper macro.
-#define GGLAB_DEFINE_TYPED_INDEX(name, repType)				\
-	struct name##Tag {};									\
-	using name = ::gglab::TypedIndex<name##Tag, repType>;	\
+#define GGLAB_DEFINE_TYPED_INDEX(name, repType)             \
+	struct name##Tag {};                                      \
+	using name = ::gglab::TypedIndex<name##Tag, repType>;     \
 	inline constexpr name Invalid##name = name::Invalid();
 
-	// Nested TypedIndex define helper macro.
-#define GGLAB_DEFINE_NESTED_TYPED_INDEX(name, repType)		\
-	struct name##Tag {};									\
-	using name = ::gglab::TypedIndex<name##Tag, repType>;	\
+#define GGLAB_DEFINE_NESTED_TYPED_INDEX(name, repType)      \
+	struct name##Tag {};                                      \
+	using name = ::gglab::TypedIndex<name##Tag, repType>;     \
 	inline static constexpr name Invalid##name = name::Invalid();
 
-	// TypedIndex with counter define helper macro.
-#define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)	\
-	struct name##Tag {};										\
-	using name = ::gglab::TypedIndex<name##Tag, repType>;		\
-	inline constexpr name Invalid##name = name::Invalid();		\
+#define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)    \
+	struct name##Tag {};                                          \
+	using name = ::gglab::TypedIndex<name##Tag, repType>;         \
+	inline constexpr name Invalid##name = name::Invalid();        \
 	using name##Counter = ::gglab::IndexCounter<name>;
 
-	// Nested TypedIndex with counter define helper macro.
-#define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)	\
-	struct name##Tag {};                                            \
-	using name = ::gglab::TypedIndex<name##Tag, repType>;           \
-	inline static constexpr name Invalid##name = name::Invalid();   \
+#define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)   \
+	struct name##Tag {};                                               \
+	using name = ::gglab::TypedIndex<name##Tag, repType>;              \
+	inline static constexpr name Invalid##name = name::Invalid();      \
 	using name##Counter = ::gglab::IndexCounter<name>;
-
 }
 
 namespace std
 {
 	template <typename Tag, typename Rep> struct hash<gglab::TypedIndex<Tag, Rep>>
 	{
-		size_t operator()(gglab::TypedIndex<Tag, Rep> id) const noexcept
+		std::size_t operator()(gglab::TypedIndex<Tag, Rep> id) const noexcept
 		{
 			return std::hash<Rep>{}(id.Value());
 		}

@@ -1,6 +1,6 @@
 #pragma once
 #include "Application/Platform/Windows/Win32MessageHandler.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/Platform/Windows/Win32Window.h"
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 

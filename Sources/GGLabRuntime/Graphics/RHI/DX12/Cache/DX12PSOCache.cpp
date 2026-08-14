@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
 #include "Graphics/RHI/DX12/Utility/DX12InputLayoutUtils.h"
 

@@ -76,6 +76,13 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\MathUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypedIndex.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/TypedIndex.h"
+#include "GGLabFoundation/Base/TypedIndex.h"
 
 namespace gglab
 {

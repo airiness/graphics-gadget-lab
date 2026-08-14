@@ -58,7 +58,7 @@
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -73,7 +73,7 @@
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\spdlog\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -100,7 +100,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\StringUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
@@ -279,8 +278,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\CoreMacros.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\Sha256.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\HResult.h" />
@@ -307,11 +304,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskWorkerPlatformContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\TypedIndex.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\StringUtils.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\TypeUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
@@ -621,6 +615,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>

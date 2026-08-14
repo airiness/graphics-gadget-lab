@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/CoreMacros.h"
-#include "Core/Utility/MathUtils.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Base/MathUtils.h"
 #include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
 
 #include <cstddef>

@@ -385,10 +385,20 @@ function Test-ProjectIncludeVisibility {
 }
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
+$applicationIncludeRoot = '$(GGLabRepositoryRoot)Sources\Application'
+$repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
 $foundationPublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public'
 $foundationPrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private'
 Test-ProjectIncludeVisibility $runtimeProject $namespace `
-    "Projects/GGLabRuntime/GGLabRuntime.vcxproj" @($runtimeIncludeRoot) @($runtimeIncludeRoot)
+    "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
+    @($runtimeIncludeRoot, $foundationPublicIncludeRoot) `
+    @($runtimeIncludeRoot, $foundationPublicIncludeRoot)
+Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
+    "Projects/Application/Application.vcxproj" `
+    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
+        $repositorySourcesIncludeRoot) `
+    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
+        $repositorySourcesIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
     "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
     @($foundationPublicIncludeRoot, $foundationPrivateIncludeRoot) `
@@ -522,6 +532,20 @@ if (-not $applicationProjectReferenceSet.Contains($napaProjectPath)) {
         Rule   = "project-graph"
         Target = "Projects/Application/Application.vcxproj"
         Reason = "missing ProjectReference to NapaVoxelCore"
+    })
+}
+if (-not $applicationProjectReferenceSet.Contains($foundationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/Application/Application.vcxproj"
+        Reason = "missing direct ProjectReference to GGLabFoundation"
+    })
+}
+if (-not $runtimeProjectReferenceSet.Contains($foundationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+        Reason = "missing ProjectReference to GGLabFoundation"
     })
 }
 if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {

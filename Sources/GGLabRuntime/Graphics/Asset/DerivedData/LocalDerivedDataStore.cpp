@@ -1,5 +1,5 @@
 ﻿#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Platform/Win/Win32ProcessUtils.h"

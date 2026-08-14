@@ -1,8 +1,8 @@
 #pragma once
-#include "Core/CoreMacros.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <cstdint>
+#include <limits>
 
 namespace gglab
 {
@@ -25,7 +25,7 @@ namespace gglab
 		RHIFencePoint ToRHI() const noexcept;
 
 		bool IsCompleted() const noexcept;
-		void Wait(uint32_t timeout = GGLAB_INFINITE) const noexcept;
+		void Wait(uint32_t timeout = std::numeric_limits<uint32_t>::max()) const noexcept;
 		void Reset() noexcept;
 
 	private:

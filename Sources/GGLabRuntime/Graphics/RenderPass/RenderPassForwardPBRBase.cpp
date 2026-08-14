@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassForwardPBRBase.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderScene.h"

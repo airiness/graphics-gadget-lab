@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/StringId.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"

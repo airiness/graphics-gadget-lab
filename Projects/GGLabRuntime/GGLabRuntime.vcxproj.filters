@@ -219,9 +219,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.cpp">
       <Filter>Core\Utility</Filter>
     </ClCompile>
@@ -803,12 +800,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h">
       <Filter>Core\Async</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\CoreMacros.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\EnumFlags.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
     </ClInclude>
@@ -887,19 +878,10 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\TypedIndex.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\StringUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\TypeUtils.h">
       <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h">

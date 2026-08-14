@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"

@@ -1,5 +1,5 @@
 #include "Graphics/Asset/BuiltinTextureFactory.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Utility/CubemapUtils.h"
 #include "Graphics/Utility/TextureUtils.h"

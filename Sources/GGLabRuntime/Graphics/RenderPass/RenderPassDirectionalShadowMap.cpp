@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

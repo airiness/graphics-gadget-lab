@@ -1,5 +1,5 @@
 #include "Graphics/Asset/AssetManager.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
 #include "Graphics/Asset/TextureAssetSystem.h"

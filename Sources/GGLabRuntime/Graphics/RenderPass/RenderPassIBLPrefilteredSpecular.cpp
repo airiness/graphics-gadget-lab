@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"

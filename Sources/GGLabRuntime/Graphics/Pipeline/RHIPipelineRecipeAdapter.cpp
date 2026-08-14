@@ -1,5 +1,5 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <cstdint>
 

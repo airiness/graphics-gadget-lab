@@ -1,5 +1,5 @@
 #include "Graphics/Shader/ShaderCompiler.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
 #include "Core/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"

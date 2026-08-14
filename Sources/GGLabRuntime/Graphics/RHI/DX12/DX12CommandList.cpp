@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Platform/Win/HResult.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"

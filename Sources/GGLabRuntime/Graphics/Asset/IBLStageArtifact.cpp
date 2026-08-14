@@ -1,5 +1,5 @@
 #include "Graphics/Asset/IBLStageArtifact.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Hash/Sha256.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Utility/TextureUtils.h"
