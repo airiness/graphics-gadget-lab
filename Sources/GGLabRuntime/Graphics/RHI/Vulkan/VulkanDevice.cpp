@@ -2,7 +2,7 @@
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
 #include <array>

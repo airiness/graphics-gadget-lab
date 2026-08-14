@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 
 #include <Windows.h>
 #include <GameInput.h>

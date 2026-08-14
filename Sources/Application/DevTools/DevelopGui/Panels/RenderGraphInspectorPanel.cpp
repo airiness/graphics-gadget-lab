@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
@@ -108,14 +108,14 @@ namespace gglab
 
 		static bool PassMatchesFilter(const RGSnapshotPassInfo& pass, const char* filter) noexcept
 		{
-			if (utils::ContainsIgnoreCase(pass.m_Name, filter ? filter : ""))
+			if (utils::ContainsAsciiIgnoreCase(pass.m_Name, filter ? filter : ""))
 			{
 				return true;
 			}
 
 			for (const auto& access : pass.m_Accesses)
 			{
-				if (utils::ContainsIgnoreCase(access.m_ResourceName, filter ? filter : ""))
+				if (utils::ContainsAsciiIgnoreCase(access.m_ResourceName, filter ? filter : ""))
 				{
 					return true;
 				}
@@ -127,7 +127,7 @@ namespace gglab
 		static bool ResourceMatchesFilter(
 			const RGSnapshotResourceInfo& resource, const char* filter) noexcept
 		{
-			return utils::ContainsIgnoreCase(resource.m_Name, filter ? filter : "");
+			return utils::ContainsAsciiIgnoreCase(resource.m_Name, filter ? filter : "");
 		}
 
 		static bool PassAccessesResource(

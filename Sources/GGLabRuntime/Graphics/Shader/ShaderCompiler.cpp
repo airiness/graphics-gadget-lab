@@ -1,13 +1,12 @@
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
-#include "Core/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Platform/Win/ComTypes.h"
-#include "Core/Platform/Win/Win32StringUtils.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Core/StringId.h"
-#include "Core/Utility/PathUtils.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 
@@ -15,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <cwctype>
@@ -22,6 +22,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -343,7 +344,8 @@ namespace gglab
 		}
 
 		// Save binary
-		utils::WriteFileBinary(binaryPath, binary.Data(), binary.SizeInBytes());
+		(void)utils::WriteFileBinary(binaryPath,
+			std::span(static_cast<const std::byte*>(binary.Data()), binary.SizeInBytes()));
 		WriteMeta(meta, desc, deps, recipeHash);
 
 		// result
@@ -623,7 +625,7 @@ namespace gglab
 
 		auto path = m_CacheRootDir / formatDirectory / keyHex.substr(0, 2) /
 			keyHex.substr(2, 2) / (keyHex + extension);
-		utils::CreateParentDirectoryIfNotExist(path);
+		(void)utils::CreateParentDirectoryIfNotExist(path);
 		return path;
 	}
 

@@ -7,7 +7,7 @@
 
 namespace gglab::win32
 {
-	enum class NamedMutexAcquireDisposition : uint8_t
+	enum class NamedMutexAcquireDisposition : std::uint8_t
 	{
 		Failed,
 		TimedOut,
@@ -56,7 +56,8 @@ namespace gglab::win32
 
 		[[nodiscard]] bool IsValid() const noexcept { return m_Handle != nullptr; }
 		[[nodiscard]] NamedMutexGuard Acquire(
-			uint32_t timeoutMilliseconds = std::numeric_limits<uint32_t>::max()) const noexcept;
+			std::uint32_t timeoutMilliseconds =
+				std::numeric_limits<std::uint32_t>::max()) const noexcept;
 
 	private:
 		void* m_Handle = nullptr;

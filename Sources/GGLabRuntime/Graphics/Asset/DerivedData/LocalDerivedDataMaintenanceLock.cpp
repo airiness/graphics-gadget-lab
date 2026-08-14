@@ -1,7 +1,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Core/Platform/Win/Win32NamedMutex.h"
-#include "Core/Platform/Win/Win32StringUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32NamedMutex.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <algorithm>
 #include <cstddef>

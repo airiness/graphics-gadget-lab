@@ -1,5 +1,5 @@
 #include "DevTools/AssetSnapshotText.h"
-#include "Core/Utility/StringUtils.h"
+#include "Core/StringIdFormatting.h"
 
 namespace gglab::devtools
 {

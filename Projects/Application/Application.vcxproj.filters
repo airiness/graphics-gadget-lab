@@ -315,9 +315,6 @@
     <ClCompile Include="..\..\Sources\Application\Core\Input\Mouse.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp">
       <Filter>Core\Platform\Win</Filter>
     </ClCompile>
@@ -628,9 +625,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Core\Input\Mouse.h">
       <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.h">
-      <Filter>Core\Platform\Win</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\AssetSnapshotText.h">
       <Filter>DevTools</Filter>

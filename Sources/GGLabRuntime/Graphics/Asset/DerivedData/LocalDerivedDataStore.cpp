@@ -2,8 +2,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Platform/Win/Win32ProcessUtils.h"
-#include "Core/Utility/PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32ProcessUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 
 #include <algorithm>
 #include <array>

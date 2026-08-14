@@ -7,6 +7,18 @@
     <Filter Include="Private\Hash">
       <UniqueIdentifier>{39054E57-3AC5-91DD-A1F2-8DD98361E346}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\IO">
+      <UniqueIdentifier>{22E99987-9783-8F12-CC37-DC3E2C6F9DC0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Platform">
+      <UniqueIdentifier>{4E9BF0C0-8143-81D9-559B-2A1ECB46CCDE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Platform\Win">
+      <UniqueIdentifier>{62C17CB6-BC93-D378-4329-92A927852E09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\String">
+      <UniqueIdentifier>{B2685EC4-A042-948C-9E6E-7580BA00B9E1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public">
       <UniqueIdentifier>{65A5F962-2DEC-EF5E-BD7F-EABA2276C46E}</UniqueIdentifier>
     </Filter>
@@ -19,6 +31,18 @@
     <Filter Include="Public\GGLabFoundation\Hash">
       <UniqueIdentifier>{E15E9DC3-AF72-6EBB-52A4-E252E9FC5C86}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabFoundation\IO">
+      <UniqueIdentifier>{B6EC4746-9B5B-C662-FE35-6F55FB1326B1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation\Platform">
+      <UniqueIdentifier>{301E0201-6ECE-33E6-A73E-BFDDD53F12F3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation\Platform\Win">
+      <UniqueIdentifier>{01D2E39D-8A7D-4456-2FC7-3304A6E284E5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation\String">
+      <UniqueIdentifier>{A57FF96A-7E17-B5D0-0EDD-87F8A1CBA6A4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp">
@@ -26,6 +50,30 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp">
       <Filter>Private\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp">
+      <Filter>Private\IO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32DiagnosticOutput.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32NamedMutex.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32PathUtils.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32ProcessUtils.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32StringUtils.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\String\StringUtils.cpp">
+      <Filter>Private\String</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -46,6 +94,33 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h">
       <Filter>Public\GGLabFoundation\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h">
+      <Filter>Public\GGLabFoundation\IO</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\HResult.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32NamedMutex.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32PathUtils.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32ProcessUtils.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32StringUtils.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\String\StringUtils.h">
+      <Filter>Public\GGLabFoundation\String</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

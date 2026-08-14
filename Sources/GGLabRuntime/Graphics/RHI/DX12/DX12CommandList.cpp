@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"

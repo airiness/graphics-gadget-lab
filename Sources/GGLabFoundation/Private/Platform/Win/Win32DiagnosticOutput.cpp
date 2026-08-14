@@ -1,4 +1,4 @@
-#include "Core/Platform/Win/Win32DiagnosticOutput.h"
+#include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
 
 #include <Windows.h>
 
@@ -14,16 +14,15 @@ namespace gglab::win32
 		const auto now = system_clock::now();
 		const std::time_t time = system_clock::to_time_t(now);
 		std::tm localTime{};
-		::localtime_s(&localTime, &time);
+		if (::localtime_s(&localTime, &time) != 0)
+		{
+			return {};
+		}
 
 		char buffer[64]{};
 		std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d",
-			localTime.tm_year + 1900,
-			localTime.tm_mon + 1,
-			localTime.tm_mday,
-			localTime.tm_hour,
-			localTime.tm_min,
-			localTime.tm_sec);
+			localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday,
+			localTime.tm_hour, localTime.tm_min, localTime.tm_sec);
 		return buffer;
 	}
 

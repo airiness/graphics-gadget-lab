@@ -13,7 +13,7 @@
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Core/Time.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Profiling/CpuProfiler.h"
@@ -192,7 +192,7 @@ namespace gglab
 		}
 
 		// ShaderManager
-		const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+		const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 		const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 		const std::filesystem::path shaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot);
 		m_ShaderManager = std::make_unique<ShaderManager>(

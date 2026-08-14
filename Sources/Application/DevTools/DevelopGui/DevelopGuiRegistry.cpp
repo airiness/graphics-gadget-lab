@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <imgui.h>
 

@@ -1,4 +1,5 @@
 #pragma once
+
 #include <wrl.h>
 
 namespace gglab

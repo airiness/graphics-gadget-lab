@@ -1,5 +1,5 @@
 #include "Application/RenderingStartup.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Graphics/Shader/ShaderPaths.h"
 
@@ -18,7 +18,7 @@ namespace gglab
 #endif
 		qualificationOptions.m_ListAdapters = options.m_ListAdapters;
 		qualificationOptions.m_AdapterSelector = options.m_AdapterSelector;
-		const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+		const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 		qualificationOptions.m_ShaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 		qualificationOptions.m_ShaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot);
 		return RunVulkanQualification(qualificationOptions);

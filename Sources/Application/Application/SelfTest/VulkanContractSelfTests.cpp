@@ -1,7 +1,7 @@
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/ApplicationLaunchOptions.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
@@ -793,7 +793,7 @@ namespace gglab
 
 			ScopedTestDirectory scopedDirectory(tempRoot);
 			const std::filesystem::path shaderSourceRoot =
-				ResolveShaderSourceRoot(utils::GetExeOutDir());
+				ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 			const std::filesystem::path shaderCacheRoot = scopedDirectory.GetPath();
 			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const SpirVValidatorInfo validator = FindSpirVValidator();

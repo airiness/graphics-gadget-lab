@@ -4,12 +4,28 @@
 #include "GGLabFoundation/Base/TypedIndex.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
+#include "GGLabFoundation/Platform/Win/Win32NamedMutex.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32ProcessUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <span>
+#include <string>
 #include <string_view>
+#include <system_error>
+#include <thread>
 #include <type_traits>
+#include <utility>
 
 namespace gglab::foundation::detail
 {
@@ -144,13 +160,134 @@ namespace gglab::foundation::tests
 		return !encoded.IsValid() && !encoded.AddBytes({}) &&
 			!encoded.Finish().IsValid() && Sha256DigestToHex({}).empty();
 	}
+
+	[[nodiscard]] bool RunStringTests() noexcept
+	{
+		constexpr std::array<std::uint8_t, 4> Bytes{ 0x00u, 0x12u, 0xabu, 0xffu };
+		return utils::EqualsAsciiIgnoreCase("GGLab", "gglab") &&
+			!utils::EqualsAsciiIgnoreCase("GGLab", "gglabs") &&
+			utils::StartsWithAsciiIgnoreCase("GraphicsGadgetLab", "GRAPHICS") &&
+			utils::ContainsAsciiIgnoreCase("GraphicsGadgetLab", "GADGET") &&
+			utils::ContainsAsciiIgnoreCase("GraphicsGadgetLab", "") &&
+			!utils::ContainsAsciiIgnoreCase("GraphicsGadgetLab", "runtime") &&
+			utils::BytesToHexString(Bytes) == "0012abff" &&
+			utils::FindLeaf("Foundation/Platform/Win/") == "Win" &&
+			utils::FindLeaf("Foundation") == "Foundation" && utils::FindLeaf("/").empty() &&
+			std::string_view(utils::BoolToString(true)) == "Yes" &&
+			std::string_view(utils::BoolToString(false)) == "No";
+	}
+
+	class ScopedTestDirectory final
+	{
+	public:
+		explicit ScopedTestDirectory(std::filesystem::path path) : m_Path(std::move(path)) {}
+		GGLAB_DELETE_COPYABLE_MOVABLE(ScopedTestDirectory);
+		~ScopedTestDirectory()
+		{
+			std::error_code errorCode;
+			std::filesystem::remove_all(m_Path, errorCode);
+		}
+
+	private:
+		std::filesystem::path m_Path;
+	};
+
+	[[nodiscard]] bool RunPathTests() noexcept
+	{
+		std::error_code errorCode;
+		const std::filesystem::path temporaryRoot =
+			std::filesystem::temp_directory_path(errorCode);
+		if (errorCode || temporaryRoot.empty())
+		{
+			return false;
+		}
+
+		const std::filesystem::path testRoot = temporaryRoot /
+			("gglab.foundation-path-test." + std::to_string(win32::GetCurrentProcessId()) + "." +
+				std::to_string(win32::GetTickCount64()));
+		ScopedTestDirectory cleanup(testRoot);
+		constexpr std::array<std::byte, 4> Payload{
+			std::byte{ 0x00 }, std::byte{ 0x12 }, std::byte{ 0xab }, std::byte{ 0xff }
+		};
+		const std::filesystem::path file = testRoot / "nested" / "fixture.BIN";
+		if (!utils::WriteFileBinary(file, Payload) ||
+			!utils::ExtensionEqualsAsciiIgnoreCase(file, ".bin") ||
+			utils::LastWriteTimeTicks(file) == 0 || utils::Canonical(file).empty())
+		{
+			return false;
+		}
+
+		std::array<std::byte, Payload.size()> actual{};
+		std::ifstream input(file, std::ios::binary);
+		input.read(reinterpret_cast<char*>(actual.data()),
+			static_cast<std::streamsize>(actual.size()));
+		return input && actual == Payload &&
+			utils::CreateDirectoryIfNotExist(file.parent_path()) &&
+			utils::CreateParentDirectoryIfNotExist(testRoot / "other" / "file.bin");
+	}
+
+	[[nodiscard]] bool RunWindowsLeafTests() noexcept
+	{
+		constexpr std::string_view Utf8 = "Graphics Gadget Lab \xe5\x9f\xba\xe7\xa1\x80";
+		const std::wstring wide = utils::ToWideString(Utf8);
+		const std::string invalidUtf8(1, static_cast<char>(0xff));
+		const std::wstring invalidUtf16(1, static_cast<wchar_t>(0xd800));
+		if (wide.empty() || utils::ToString(wide) != Utf8 ||
+			!utils::ToWideString(invalidUtf8).empty() ||
+			!utils::ToString(invalidUtf16).empty() ||
+			utils::ToInvariantLowercase(L"GGLab-123") != L"gglab-123" ||
+			win32::GetCurrentProcessId() == 0 || win32::GetExecutableDirectory().empty() ||
+			win32::FormatLocalTime().empty() ||
+			!utils::StartsWithAsciiIgnoreCase(FormatHResult(E_FAIL), "0x80004005"))
+		{
+			return false;
+		}
+
+		Ensure(S_OK);
+		ComPtr<IUnknown> emptyComPointer;
+		if (emptyComPointer.Get() != nullptr || &win32::WriteDiagnosticOutput == nullptr)
+		{
+			return false;
+		}
+
+		const std::wstring mutexName = L"Local\\gglab.foundation-test." +
+			std::to_wstring(win32::GetCurrentProcessId()) + L"." +
+			std::to_wstring(win32::GetTickCount64());
+		win32::NamedMutex owner(mutexName);
+		win32::NamedMutex contender(mutexName);
+		win32::NamedMutexGuard ownerGuard = owner.Acquire(0);
+		if (!owner.IsValid() || !contender.IsValid() || !ownerGuard.IsAcquired())
+		{
+			return false;
+		}
+
+		std::atomic disposition{ win32::NamedMutexAcquireDisposition::Failed };
+		std::thread thread(
+			[&]
+			{
+				const win32::NamedMutexGuard guard = contender.Acquire(0);
+				disposition.store(guard.GetDisposition(), std::memory_order_relaxed);
+			});
+		thread.join();
+		if (disposition.load(std::memory_order_relaxed) !=
+			win32::NamedMutexAcquireDisposition::TimedOut)
+		{
+			return false;
+		}
+
+		ownerGuard = {};
+		return contender.Acquire(0).IsAcquired();
+	}
 }
 
 int main()
 {
 	const bool linked = gglab::foundation::detail::FoundationLinkAnchor();
 	return linked && gglab::foundation::tests::RunPrimitiveTests() &&
-		gglab::foundation::tests::RunSha256Tests()
+		gglab::foundation::tests::RunSha256Tests() &&
+		gglab::foundation::tests::RunStringTests() &&
+		gglab::foundation::tests::RunPathTests() &&
+		gglab::foundation::tests::RunWindowsLeafTests()
 		? 0
 		: 1;
 }

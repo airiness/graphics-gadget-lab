@@ -1,7 +1,7 @@
 #include "Graphics/Asset/Loading/ModelImporter.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
 

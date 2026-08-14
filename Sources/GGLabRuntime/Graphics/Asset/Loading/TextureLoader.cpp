@@ -1,8 +1,8 @@
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Utility/TextureUtils.h"
 
@@ -318,8 +318,8 @@ namespace gglab
 			return {};
 		}
 
-		const bool isDds = utils::ExtensionEqualsIgnoreCase(texPath, ".dds");
-		const bool isHdr = utils::ExtensionEqualsIgnoreCase(texPath, ".hdr");
+		const bool isDds = utils::ExtensionEqualsAsciiIgnoreCase(texPath, ".dds");
+		const bool isHdr = utils::ExtensionEqualsAsciiIgnoreCase(texPath, ".hdr");
 
 		DirectX::TexMetadata metadata;
 		DirectX::ScratchImage scratchImage;

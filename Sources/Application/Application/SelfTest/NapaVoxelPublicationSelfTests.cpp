@@ -7,7 +7,7 @@
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Core/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -1901,7 +1901,7 @@ namespace gglab
 				.m_SamplerRegistry = &samplerRegistry,
 				});
 			Renderer renderer;
-			const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			ShaderManager shaderManager(device.GetBackendType(),
 				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			InputManager inputManager;

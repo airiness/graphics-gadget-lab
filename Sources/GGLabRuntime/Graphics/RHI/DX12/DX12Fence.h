@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/RHIFence.h"
 

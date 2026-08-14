@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 
 #include <cstdint>
 

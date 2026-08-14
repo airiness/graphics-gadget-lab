@@ -1,5 +1,6 @@
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
+#include "Core/StringIdFormatting.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"

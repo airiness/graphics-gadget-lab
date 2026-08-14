@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/Panels/DebugDrawPanel.h"
-#include "Core/Utility/StringUtils.h"
+#include "Core/StringIdFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 

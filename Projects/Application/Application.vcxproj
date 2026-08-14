@@ -211,7 +211,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabRuntimeLocator.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.cpp" />
@@ -331,7 +330,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
-    <ClInclude Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h" />
