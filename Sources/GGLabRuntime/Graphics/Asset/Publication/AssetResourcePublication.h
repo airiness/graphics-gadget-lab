@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 
 #include <algorithm>
 #include <cstdint>

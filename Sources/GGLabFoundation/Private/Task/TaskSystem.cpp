@@ -1,6 +1,5 @@
-#include "Core/Task/TaskSystem.h"
-#include "Core/Task/TaskWorkerPlatformContext.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
+#include "GGLabFoundation/Logging/Log.h"
 
 #include <algorithm>
 #include <chrono>
@@ -26,6 +25,8 @@ namespace gglab
 
 	namespace
 	{
+		constexpr LogTag TaskLogTag{ "FOUNDATION_TASK" };
+
 		[[nodiscard]] size_t PriorityIndex(TaskPriority priority) noexcept
 		{
 			const size_t index = static_cast<size_t>(priority);
@@ -38,11 +39,18 @@ namespace gglab
 		}
 	}
 
+#if defined(BUILD_DEBUG)
+#define GGLAB_LOG_FOUNDATION_TASK(level, ...) Log(TaskLogTag, level, __VA_ARGS__)
+#else
+#define GGLAB_LOG_FOUNDATION_TASK(level, ...)
+#endif
+
 	TaskSystem::TaskSystem() noexcept : TaskSystem(CreateInfo{})
 	{
 	}
 
 	TaskSystem::TaskSystem(const CreateInfo& createInfo) noexcept :
+		m_WorkerLifecycle(createInfo.m_WorkerLifecycle),
 		m_OwnerThreadId(std::this_thread::get_id()),
 		m_RecentTaskCapacity(createInfo.m_RecentTaskCapacity)
 	{
@@ -65,7 +73,8 @@ namespace gglab
 	{
 		if (!work)
 		{
-			GGLAB_LOG_RUNTIME_WARN("TaskSystem rejected a task without work.");
+			GGLAB_LOG_FOUNDATION_TASK(
+				LogLevel::Warning, "TaskSystem rejected a task without work.");
 			return {};
 		}
 
@@ -74,7 +83,8 @@ namespace gglab
 			std::scoped_lock lock(m_Mutex);
 			if (!m_AcceptingTasks)
 			{
-				GGLAB_LOG_RUNTIME_WARN("TaskSystem rejected task '{}' after shutdown began.", desc.m_Name);
+				GGLAB_LOG_FOUNDATION_TASK(LogLevel::Warning,
+					"TaskSystem rejected task '{}' after shutdown began.", desc.m_Name);
 				return {};
 			}
 
@@ -192,14 +202,16 @@ namespace gglab
 				catch (const std::exception& exception)
 				{
 					GGLAB_UNUSED(exception);
-					GGLAB_LOG_RUNTIME_ERROR("TaskSystem completion '{}' threw an exception: {}",
+					GGLAB_LOG_FOUNDATION_TASK(LogLevel::Error,
+						"TaskSystem completion '{}' threw an exception: {}",
 						completion.m_Info.m_Name, exception.what());
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;
 				}
 				catch (...)
 				{
-					GGLAB_LOG_RUNTIME_ERROR("TaskSystem completion '{}' threw an unknown exception.",
+					GGLAB_LOG_FOUNDATION_TASK(LogLevel::Error,
+						"TaskSystem completion '{}' threw an unknown exception.",
 						completion.m_Info.m_Name);
 					std::scoped_lock lock(m_Mutex);
 					++m_CompletionCallbackFailureCount;
@@ -347,7 +359,27 @@ namespace gglab
 
 	void TaskSystem::WorkerMain(std::stop_token systemStopToken, uint32_t workerIndex) noexcept
 	{
-		TaskWorkerPlatformContext platformContext(workerIndex);
+		std::unique_ptr<TaskWorkerContext> workerContext;
+		if (m_WorkerLifecycle)
+		{
+			try
+			{
+				workerContext = m_WorkerLifecycle->CreateContext(workerIndex);
+			}
+			catch (const std::exception& exception)
+			{
+				GGLAB_UNUSED(exception);
+				GGLAB_LOG_FOUNDATION_TASK(LogLevel::Error,
+					"TaskSystem worker {} lifecycle setup threw an exception: {}", workerIndex,
+					exception.what());
+			}
+			catch (...)
+			{
+				GGLAB_LOG_FOUNDATION_TASK(LogLevel::Error,
+					"TaskSystem worker {} lifecycle setup threw an unknown exception.",
+					workerIndex);
+			}
+		}
 
 		while (!systemStopToken.stop_requested())
 		{
@@ -462,4 +494,6 @@ namespace gglab
 		m_Completions.clear();
 		m_Tasks.clear();
 	}
+
+#undef GGLAB_LOG_FOUNDATION_TASK
 }

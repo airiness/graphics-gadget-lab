@@ -76,6 +76,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
@@ -86,9 +87,12 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32ProcessUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32StringUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32TaskWorkerLifecycle.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\String\StringUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Task\TaskSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\MathUtils.h" />
@@ -104,7 +108,11 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32PathUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32ProcessUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32StringUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32TaskWorkerLifecycle.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\String\StringUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskSystem.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskWorkerLifecycle.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

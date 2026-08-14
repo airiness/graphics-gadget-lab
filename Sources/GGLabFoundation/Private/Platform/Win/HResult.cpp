@@ -26,7 +26,7 @@ namespace gglab
 	{
 		std::array<wchar_t, 1024> buffer{};
 		const DWORD length = ::FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
-				FORMAT_MESSAGE_IGNORE_INSERTS,
+			FORMAT_MESSAGE_IGNORE_INSERTS,
 			nullptr, static_cast<DWORD>(result), 0, buffer.data(),
 			static_cast<DWORD>(buffer.size()), nullptr);
 		std::wstring_view messageView(buffer.data(), length);

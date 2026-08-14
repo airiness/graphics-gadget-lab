@@ -1,4 +1,4 @@
-#include "Core/Async/ProgressChannel.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
 
 #include <algorithm>
 #include <cmath>

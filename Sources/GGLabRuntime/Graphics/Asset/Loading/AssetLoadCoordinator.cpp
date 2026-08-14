@@ -1,7 +1,7 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Task/TaskSystem.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"

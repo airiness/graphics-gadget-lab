@@ -82,7 +82,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathBackend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Color.cpp" />
@@ -93,7 +92,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
@@ -270,7 +268,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathInterop.h" />
@@ -286,9 +283,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringId.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskWorkerPlatformContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />

@@ -31,12 +31,6 @@
     <Filter Include="Core\Input">
       <UniqueIdentifier>{6B56486C-D7A2-940D-93A5-5585769375EB}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Platform">
-      <UniqueIdentifier>{06A02E08-2D83-3CD1-3E80-965FF11509F0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Platform\Win">
-      <UniqueIdentifier>{713A2ADC-1A0B-6D78-3792-1B350C74DA38}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DevTools">
       <UniqueIdentifier>{15DE7C87-C782-D23F-5F82-62216DEEA1A5}</UniqueIdentifier>
     </Filter>
@@ -314,9 +308,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\Mouse.cpp">
       <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp">
-      <Filter>Core\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp">
       <Filter>DevTools</Filter>

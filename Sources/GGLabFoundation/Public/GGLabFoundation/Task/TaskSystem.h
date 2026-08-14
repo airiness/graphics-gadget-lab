@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
+#include "GGLabFoundation/Task/TaskWorkerLifecycle.h"
 
 #include <array>
 #include <condition_variable>
@@ -21,6 +22,9 @@ namespace gglab
 			// Zero selects min(hardware_concurrency - 1, 8), with at least one worker.
 			uint32_t m_WorkerCount = 0;
 			uint32_t m_RecentTaskCapacity = 64;
+			// Null selects the portable no-op lifecycle. A host may explicitly provide
+			// per-worker platform setup without coupling scheduling to that policy.
+			std::shared_ptr<const TaskWorkerLifecycle> m_WorkerLifecycle;
 		};
 
 		TaskSystem() noexcept;
@@ -60,6 +64,7 @@ namespace gglab
 		std::unordered_map<uint64_t, std::shared_ptr<TaskRecord>> m_Tasks;
 		std::deque<CompletionRecord> m_Completions;
 		std::deque<TaskCompletionInfo> m_RecentTasks;
+		std::shared_ptr<const TaskWorkerLifecycle> m_WorkerLifecycle;
 		std::vector<std::jthread> m_Workers;
 		std::thread::id m_OwnerThreadId;
 

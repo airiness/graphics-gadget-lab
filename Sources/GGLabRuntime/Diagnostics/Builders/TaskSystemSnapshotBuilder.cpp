@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
-#include "Core/Task/TaskSystem.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
 
 namespace gglab

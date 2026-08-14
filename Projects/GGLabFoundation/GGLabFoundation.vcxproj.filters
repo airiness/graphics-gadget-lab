@@ -4,6 +4,9 @@
     <Filter Include="Private">
       <UniqueIdentifier>{1F557CE7-74F6-B8D4-2D1E-CEF694A538D8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Async">
+      <UniqueIdentifier>{3D60E476-86B0-0CA2-0178-8738D5AFA326}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Hash">
       <UniqueIdentifier>{39054E57-3AC5-91DD-A1F2-8DD98361E346}</UniqueIdentifier>
     </Filter>
@@ -22,11 +25,17 @@
     <Filter Include="Private\String">
       <UniqueIdentifier>{B2685EC4-A042-948C-9E6E-7580BA00B9E1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Task">
+      <UniqueIdentifier>{0DBF053A-EBFC-5751-D0B6-37F82685363F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public">
       <UniqueIdentifier>{65A5F962-2DEC-EF5E-BD7F-EABA2276C46E}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabFoundation">
       <UniqueIdentifier>{8BCA3B12-6986-EE71-6B90-8F264A8DA77A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabFoundation\Async">
+      <UniqueIdentifier>{9E0EA894-185E-9160-EE99-2C6BC58EE463}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabFoundation\Base">
       <UniqueIdentifier>{ABF284BA-022B-9A0C-E333-8ED942902097}</UniqueIdentifier>
@@ -49,8 +58,14 @@
     <Filter Include="Public\GGLabFoundation\String">
       <UniqueIdentifier>{A57FF96A-7E17-B5D0-0EDD-87F8A1CBA6A4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabFoundation\Task">
+      <UniqueIdentifier>{AC8C2EEC-E6ED-69C1-3A43-34495F9CF626}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp">
+      <Filter>Private\Async</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp">
       <Filter>Private</Filter>
     </ClCompile>
@@ -81,11 +96,20 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32StringUtils.cpp">
       <Filter>Private\Platform\Win</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32TaskWorkerLifecycle.cpp">
+      <Filter>Private\Platform\Win</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\String\StringUtils.cpp">
       <Filter>Private\String</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Task\TaskSystem.cpp">
+      <Filter>Private\Task</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h">
+      <Filter>Public\GGLabFoundation\Async</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h">
       <Filter>Public\GGLabFoundation\Base</Filter>
     </ClInclude>
@@ -131,8 +155,20 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32StringUtils.h">
       <Filter>Public\GGLabFoundation\Platform\Win</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32TaskWorkerLifecycle.h">
+      <Filter>Public\GGLabFoundation\Platform\Win</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\String\StringUtils.h">
       <Filter>Public\GGLabFoundation\String</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskSystem.h">
+      <Filter>Public\GGLabFoundation\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskTypes.h">
+      <Filter>Public\GGLabFoundation\Task</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskWorkerLifecycle.h">
+      <Filter>Public\GGLabFoundation\Task</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

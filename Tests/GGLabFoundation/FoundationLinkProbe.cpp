@@ -3,6 +3,7 @@
 #include "GGLabFoundation/Base/MathUtils.h"
 #include "GGLabFoundation/Base/TypedIndex.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Logging/Log.h"
@@ -13,16 +14,20 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32ProcessUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabFoundation/String/StringUtils.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <mutex>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -179,6 +184,224 @@ namespace gglab::foundation::tests
 			utils::FindLeaf("Foundation") == "Foundation" && utils::FindLeaf("/").empty() &&
 			std::string_view(utils::BoolToString(true)) == "Yes" &&
 			std::string_view(utils::BoolToString(false)) == "No";
+	}
+
+	template <typename Predicate>
+	[[nodiscard]] bool WaitUntil(Predicate&& predicate,
+		std::chrono::milliseconds timeout = std::chrono::seconds(2)) noexcept
+	{
+		const auto deadline = std::chrono::steady_clock::now() + timeout;
+		while (!predicate())
+		{
+			if (std::chrono::steady_clock::now() >= deadline)
+			{
+				return false;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return true;
+	}
+
+	[[nodiscard]] bool RunProgressTests() noexcept
+	{
+		auto channel = std::make_shared<ProgressChannel>();
+		ProgressReporter reporter(channel);
+		reporter.Report(0.4f, "first", "detail", 2, 5);
+		reporter.Report(0.2f, "second");
+		reporter.Subrange(0.5f, 0.75f).Report(0.5f, "subrange", {}, 1, 2);
+
+		ProgressSnapshot snapshot = channel->GetSnapshot();
+		if (!snapshot.HasProgress() || snapshot.m_Fraction != 0.625f ||
+			snapshot.m_Stage != "subrange" || snapshot.m_CompletedUnits != 1 ||
+			snapshot.m_TotalUnits != 2 || snapshot.m_Revision != 3)
+		{
+			return false;
+		}
+
+		std::vector<std::thread> reporters;
+		for (uint32_t index = 0; index < 8; ++index)
+		{
+			reporters.emplace_back([channel, index]
+				{ channel->Report(static_cast<float>(index + 1) / 8.0f, "parallel"); });
+		}
+		for (std::thread& thread : reporters)
+		{
+			thread.join();
+		}
+		snapshot = channel->GetSnapshot();
+		return snapshot.m_Fraction == 1.0f && snapshot.m_Revision == 11;
+	}
+
+	struct RecordingLifecycleState final
+	{
+		std::atomic_uint32_t m_Created = 0;
+		std::atomic_uint32_t m_Destroyed = 0;
+		std::atomic_bool m_DestroyedOnCreatingThread = true;
+	};
+
+	class RecordingWorkerContext final : public TaskWorkerContext
+	{
+	public:
+		explicit RecordingWorkerContext(std::shared_ptr<RecordingLifecycleState> state) noexcept :
+			m_State(std::move(state)), m_CreatingThread(std::this_thread::get_id())
+		{
+			++m_State->m_Created;
+		}
+
+		~RecordingWorkerContext() override
+		{
+			if (std::this_thread::get_id() != m_CreatingThread)
+			{
+				m_State->m_DestroyedOnCreatingThread = false;
+			}
+			++m_State->m_Destroyed;
+		}
+
+	private:
+		std::shared_ptr<RecordingLifecycleState> m_State;
+		std::thread::id m_CreatingThread;
+	};
+
+	class RecordingWorkerLifecycle final : public TaskWorkerLifecycle
+	{
+	public:
+		explicit RecordingWorkerLifecycle(std::shared_ptr<RecordingLifecycleState> state) noexcept :
+			m_State(std::move(state))
+		{
+		}
+
+		[[nodiscard]] std::unique_ptr<TaskWorkerContext> CreateContext(
+			uint32_t workerIndex) const override
+		{
+			GGLAB_UNUSED(workerIndex);
+			return std::make_unique<RecordingWorkerContext>(m_State);
+		}
+
+	private:
+		std::shared_ptr<RecordingLifecycleState> m_State;
+	};
+
+	[[nodiscard]] bool RunTaskTests() noexcept
+	{
+		const std::thread::id ownerThread = std::this_thread::get_id();
+		std::thread::id workThread;
+		std::thread::id completionThread;
+		TaskStatus successStatus = TaskStatus::Invalid;
+		{
+			// No lifecycle policy exercises the portable, independently linkable default path.
+			TaskSystem taskSystem({ .m_WorkerCount = 1 });
+			const TaskHandle handle = taskSystem.Submit(
+				{ .m_Name = "Foundation/default lifecycle" },
+				[&](std::stop_token)
+				{
+					workThread = std::this_thread::get_id();
+					return TaskResult::Success();
+				},
+				[&](const TaskCompletionInfo& info)
+				{
+					completionThread = std::this_thread::get_id();
+					successStatus = info.m_Status;
+				});
+			if (!handle || !WaitUntil([&]
+				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 1; }) ||
+				taskSystem.PumpCompletions() != 1 || successStatus != TaskStatus::Succeeded ||
+				workThread == ownerThread || completionThread != ownerThread)
+			{
+				return false;
+			}
+		}
+
+		const auto lifecycleState = std::make_shared<RecordingLifecycleState>();
+		const auto lifecycle = std::make_shared<RecordingWorkerLifecycle>(lifecycleState);
+		std::atomic_bool blockerStarted = false;
+		std::atomic_bool releaseBlocker = false;
+		std::atomic_bool backgroundExecuted = false;
+		std::vector<std::string> executionOrder;
+		std::mutex executionMutex;
+		TaskStatus cancelledStatus = TaskStatus::Invalid;
+		{
+			TaskSystem taskSystem({
+				.m_WorkerCount = 1,
+				.m_WorkerLifecycle = lifecycle,
+				});
+			if (!WaitUntil([&] { return lifecycleState->m_Created.load() == 1; }))
+			{
+				return false;
+			}
+
+			const TaskHandle blocker = taskSystem.Submit({ .m_Name = "Foundation/blocker" },
+				[&](std::stop_token stopToken)
+				{
+					blockerStarted = true;
+					while (!releaseBlocker.load() && !stopToken.stop_requested())
+					{
+						std::this_thread::yield();
+					}
+					return TaskResult::Success();
+				});
+			if (!blocker || !WaitUntil([&] { return blockerStarted.load(); }))
+			{
+				return false;
+			}
+
+			const TaskHandle background = taskSystem.Submit(
+				{ .m_Name = "Foundation/background", .m_Priority = TaskPriority::Background },
+				[&](std::stop_token)
+				{
+					backgroundExecuted = true;
+					return TaskResult::Success();
+				},
+				[&](const TaskCompletionInfo& info) { cancelledStatus = info.m_Status; });
+			const TaskHandle critical = taskSystem.Submit(
+				{ .m_Name = "Foundation/critical", .m_Priority = TaskPriority::Critical },
+				[&](std::stop_token)
+				{
+					std::scoped_lock lock(executionMutex);
+					executionOrder.emplace_back("critical");
+					return TaskResult::Success();
+				});
+			if (!critical || !taskSystem.Cancel(background))
+			{
+				return false;
+			}
+			releaseBlocker = true;
+			if (!WaitUntil([&]
+				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 3; }))
+			{
+				return false;
+			}
+			taskSystem.PumpCompletions();
+			taskSystem.Shutdown();
+		}
+		if (lifecycleState->m_Destroyed.load() != 1 ||
+			!lifecycleState->m_DestroyedOnCreatingThread.load() || backgroundExecuted.load() ||
+			cancelledStatus != TaskStatus::Cancelled || executionOrder != std::vector<std::string>{ "critical" })
+		{
+			return false;
+		}
+
+		std::atomic_bool shutdownTaskStarted = false;
+		TaskStatus shutdownStatus = TaskStatus::Invalid;
+		TaskSystem shutdownSystem({ .m_WorkerCount = 1 });
+		const TaskHandle shutdownTask = shutdownSystem.Submit(
+			{ .m_Name = "Foundation/shutdown" },
+			[&](std::stop_token stopToken)
+			{
+				shutdownTaskStarted = true;
+				while (!stopToken.stop_requested())
+				{
+					std::this_thread::yield();
+				}
+				return TaskResult::Success();
+			},
+			[&](const TaskCompletionInfo& info) { shutdownStatus = info.m_Status; });
+		if (!shutdownTask || !WaitUntil([&] { return shutdownTaskStarted.load(); }))
+		{
+			return false;
+		}
+		shutdownSystem.Shutdown();
+		return shutdownSystem.PumpCompletions() == 1 &&
+			shutdownStatus == TaskStatus::Cancelled && !shutdownSystem.IsAcceptingTasks();
 	}
 
 	class ScopedTestDirectory final
@@ -355,7 +578,17 @@ namespace gglab::foundation::tests
 		}
 
 		ownerGuard = {};
-		return contender.Acquire(0).IsAcquired();
+		if (!contender.Acquire(0).IsAcquired())
+		{
+			return false;
+		}
+
+		TaskSystem windowsTaskSystem({
+			.m_WorkerCount = 1,
+			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
+			});
+		windowsTaskSystem.Shutdown();
+		return true;
 	}
 }
 
@@ -365,6 +598,8 @@ int main()
 	return linked && gglab::foundation::tests::RunPrimitiveTests() &&
 		gglab::foundation::tests::RunSha256Tests() &&
 		gglab::foundation::tests::RunStringTests() &&
+		gglab::foundation::tests::RunProgressTests() &&
+		gglab::foundation::tests::RunTaskTests() &&
 		gglab::foundation::tests::RunPathTests() &&
 		gglab::foundation::tests::RunLoggingTests() &&
 		gglab::foundation::tests::RunWindowsLeafTests()

@@ -57,7 +57,7 @@ namespace gglab::utils
 		return errorCode
 			? 0
 			: std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch())
-				  .count();
+			.count();
 	}
 
 	bool WriteFileBinary(

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Async/ProgressChannel.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
 
 #include <array>
 #include <compare>

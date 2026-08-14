@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Store/TextureStore.h"

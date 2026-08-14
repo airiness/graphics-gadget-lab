@@ -7,9 +7,6 @@
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{43994716-9911-0D68-A7C4-AECBC39E1151}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Async">
-      <UniqueIdentifier>{0243D9D9-09B7-9556-2D48-0E39EDE17E78}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Hash">
       <UniqueIdentifier>{C5669FEA-0496-AE09-D0C0-39FB2FE18527}</UniqueIdentifier>
     </Filter>
@@ -24,9 +21,6 @@
     </Filter>
     <Filter Include="Core\Profiling">
       <UniqueIdentifier>{E3785D7E-78C8-6F43-3AB3-7526EA233732}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Task">
-      <UniqueIdentifier>{9706B28C-5013-2E86-351A-F4D37772F3B6}</UniqueIdentifier>
     </Filter>
     <Filter Include="Diagnostics">
       <UniqueIdentifier>{F6A745A9-98F8-EDCE-A637-F1F393156953}</UniqueIdentifier>
@@ -156,9 +150,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.cpp">
-      <Filter>Core\Async</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp">
       <Filter>Core\Math\Backends</Filter>
     </ClCompile>
@@ -188,9 +179,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp">
       <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.cpp">
-      <Filter>Core\Task</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp">
       <Filter>Core</Filter>
@@ -767,9 +755,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h">
       <Filter>Core\Allocator</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h">
-      <Filter>Core\Async</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
     </ClInclude>
@@ -814,15 +799,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h">
       <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskTypes.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskWorkerPlatformContext.h">
-      <Filter>Core\Task</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h">
       <Filter>Core</Filter>

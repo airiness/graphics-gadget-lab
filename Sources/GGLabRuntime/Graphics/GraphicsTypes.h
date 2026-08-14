@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Async/ProgressChannel.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Base/EnumFlags.h"
 #include "Core/Hash/KeyHash.h"

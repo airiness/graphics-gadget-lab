@@ -177,7 +177,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />

@@ -14,8 +14,9 @@
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
-#include "Core/Task/TaskSystem.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
@@ -137,7 +138,9 @@ namespace gglab
 
 		// Logger
 		InitializeLogging();
-		m_TaskSystem = std::make_unique<TaskSystem>();
+		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
+			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
+			});
 
 		if (!m_PlatformHost)
 		{
