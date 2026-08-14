@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/SnapshotStore.h"
 
 namespace gglab

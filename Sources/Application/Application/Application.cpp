@@ -1,4 +1,5 @@
 #include "Application/Application.h"
+#include "Application/ApplicationLog.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/RenderingStartup.h"
@@ -11,11 +12,11 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
-#include "Core/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
-#include "Core/Task/TaskSystem.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
@@ -136,8 +137,10 @@ namespace gglab
 		}
 
 		// Logger
-		Logger::Initialize();
-		m_TaskSystem = std::make_unique<TaskSystem>();
+		InitializeLogging();
+		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
+			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
+			});
 
 		if (!m_PlatformHost)
 		{
@@ -192,7 +195,7 @@ namespace gglab
 		}
 
 		// ShaderManager
-		const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+		const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 		const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 		const std::filesystem::path shaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot);
 		m_ShaderManager = std::make_unique<ShaderManager>(

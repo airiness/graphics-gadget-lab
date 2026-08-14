@@ -1,5 +1,5 @@
 #include "Graphics/Asset/Store/MeshStore.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <memory>
 #include <utility>

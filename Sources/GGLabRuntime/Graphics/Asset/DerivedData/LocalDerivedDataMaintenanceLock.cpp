@@ -1,7 +1,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
-#include "Core/Hash/Sha256.h"
-#include "Core/Platform/Win/Win32NamedMutex.h"
-#include "Core/Platform/Win/Win32StringUtils.h"
+#include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabFoundation/Platform/Win/Win32NamedMutex.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -17,7 +17,7 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] std::wstring DigestText(const Sha256Hash& digest)
+		[[nodiscard]] std::wstring DigestText(const Sha256Digest& digest)
 		{
 			constexpr wchar_t HexDigits[] = L"0123456789abcdef";
 			std::wstring text;
@@ -84,7 +84,7 @@ namespace gglab
 		{
 			return {};
 		}
-		const Sha256Hash digest =
+		const Sha256Digest digest =
 			ComputeSha256(std::as_bytes(std::span{ canonicalUtf8.data(), canonicalUtf8.size() }));
 		if (!digest.IsValid())
 		{

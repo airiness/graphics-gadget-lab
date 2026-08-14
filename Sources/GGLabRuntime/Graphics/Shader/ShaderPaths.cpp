@@ -1,5 +1,5 @@
 #include "Graphics/Shader/ShaderPaths.h"
-#include "Core/Utility/PathUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 
 namespace gglab
 {

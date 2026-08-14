@@ -1,7 +1,7 @@
 #include "Application/SelfTest/VulkanContractSelfTests.h"
 #include "Application/SelfTest/SpirVDecorationReader.h"
 #include "Application/ApplicationLaunchOptions.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
@@ -793,7 +793,7 @@ namespace gglab
 
 			ScopedTestDirectory scopedDirectory(tempRoot);
 			const std::filesystem::path shaderSourceRoot =
-				ResolveShaderSourceRoot(utils::GetExeOutDir());
+				ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 			const std::filesystem::path shaderCacheRoot = scopedDirectory.GetPath();
 			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 			const SpirVValidatorInfo validator = FindSpirVValidator();
@@ -983,12 +983,13 @@ namespace gglab
 			std::ifstream metadataInput(spirVArtifact.m_MetaPath, std::ios::binary);
 			const std::string metadata((std::istreambuf_iterator<char>(metadataInput)),
 				std::istreambuf_iterator<char>());
-			context.Check(metadata.find("schema=2") != std::string::npos &&
+			context.Check(metadata.find("schema=3") != std::string::npos &&
+				metadata.find("recipe_hash_schema=1") != std::string::npos &&
 				metadata.find("binary_format=spirv") != std::string::npos &&
 				metadata.find("target_environment=vulkan1.3") != std::string::npos &&
 				metadata.find("binding_abi_revision=1") != std::string::npos &&
 				metadata.find("dxc_version=") != std::string::npos,
-				"Shader artifact metadata records target format, environment, ABI, and DXC identity");
+				"Shader metadata records recipe schema, target, ABI, and DXC identity");
 			const bool metadataChanged = ReplaceMetadataValue(
 				spirVArtifact.m_MetaPath, "binding_abi_revision", "999");
 			const ShaderCompileArtifact rejectedCacheArtifact =

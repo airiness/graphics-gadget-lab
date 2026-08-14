@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Application/Lab/NapaVoxel/NapaVoxelMeshAdapter.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIResource.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
 
 #include <d3d12.h>
 

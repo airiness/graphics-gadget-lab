@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Hash/KeyHash.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/RHI/RHIDescriptor.h"

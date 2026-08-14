@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 
 #include <array>
 #include <format>

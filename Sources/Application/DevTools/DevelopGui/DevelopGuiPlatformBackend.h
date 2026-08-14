@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 namespace gglab
 {

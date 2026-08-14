@@ -1,5 +1,5 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <limits>
 #include <type_traits>

@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Async/ProgressChannel.h"
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
 #include "Graphics/RHI/RHIFence.h"

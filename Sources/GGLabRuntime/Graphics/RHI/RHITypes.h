@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/EnumFlags.h"
+#include "GGLabFoundation/Base/EnumFlags.h"
 
 #include <cstdint>
 #include <string_view>

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Math/Color.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"

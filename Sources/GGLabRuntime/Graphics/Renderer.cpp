@@ -1,5 +1,5 @@
 #include "Graphics/Renderer.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"

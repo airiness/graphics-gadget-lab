@@ -1,7 +1,8 @@
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
@@ -108,14 +109,14 @@ namespace gglab
 
 		static bool PassMatchesFilter(const RGSnapshotPassInfo& pass, const char* filter) noexcept
 		{
-			if (utils::ContainsIgnoreCase(pass.m_Name, filter ? filter : ""))
+			if (utils::ContainsAsciiIgnoreCase(pass.m_Name, filter ? filter : ""))
 			{
 				return true;
 			}
 
 			for (const auto& access : pass.m_Accesses)
 			{
-				if (utils::ContainsIgnoreCase(access.m_ResourceName, filter ? filter : ""))
+				if (utils::ContainsAsciiIgnoreCase(access.m_ResourceName, filter ? filter : ""))
 				{
 					return true;
 				}
@@ -127,7 +128,7 @@ namespace gglab
 		static bool ResourceMatchesFilter(
 			const RGSnapshotResourceInfo& resource, const char* filter) noexcept
 		{
-			return utils::ContainsIgnoreCase(resource.m_Name, filter ? filter : "");
+			return utils::ContainsAsciiIgnoreCase(resource.m_Name, filter ? filter : "");
 		}
 
 		static bool PassAccessesResource(
@@ -198,8 +199,8 @@ namespace gglab
 			ImGui::Separator();
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
 			ImGui::Text("Encoder: %s", devtools::EnumText(pass.m_EncoderType).data());
-			ImGui::Text("Culled: %s", utils::BoolToString(pass.m_Culled));
-			ImGui::Text("SideEffect: %s", utils::BoolToString(pass.m_SideEffect));
+			ImGui::Text("Culled: %s", develop_gui::BoolToYesNo(pass.m_Culled));
+			ImGui::Text("SideEffect: %s", develop_gui::BoolToYesNo(pass.m_SideEffect));
 			ImGui::Text("Accesses: %u", static_cast<uint32_t>(pass.m_Accesses.size()));
 			ImGui::Text("Barriers: %u pre / %u post",
 				static_cast<uint32_t>(pass.m_PreBarriers.size()),
@@ -216,8 +217,8 @@ namespace gglab
 			ImGui::TextWrapped("%s", resource.m_Name.c_str());
 			ImGui::Separator();
 			ImGui::Text("Type: %s", devtools::EnumText(resource.m_ResourceType).data());
-			ImGui::Text("Imported: %s", utils::BoolToString(resource.m_Imported));
-			ImGui::Text("Devirtualized: %s", utils::BoolToString(resource.m_Devirtualized));
+			ImGui::Text("Imported: %s", develop_gui::BoolToYesNo(resource.m_Imported));
+			ImGui::Text("Devirtualized: %s", develop_gui::BoolToYesNo(resource.m_Devirtualized));
 			ImGui::Text("First User: %s", PassIndexToString(resource.m_FirstUserPassIndex).c_str());
 			ImGui::Text("Last User: %s", PassIndexToString(resource.m_LastUserPassIndex).c_str());
 			ImGui::TextWrapped("Usage: %s", usage.c_str());
@@ -771,8 +772,8 @@ namespace gglab
 			ImGui::Text("Pass #%u: %s", pass.m_Index, pass.m_Name.c_str());
 			ImGui::Text("Execution Order: %s", PassIndexToString(pass.m_ExecutionOrder).c_str());
 			ImGui::Text("Encoder: %s", devtools::EnumText(pass.m_EncoderType).data());
-			ImGui::Text("Culled: %s, SideEffect: %s", utils::BoolToString(pass.m_Culled),
-				utils::BoolToString(pass.m_SideEffect));
+			ImGui::Text("Culled: %s, SideEffect: %s", develop_gui::BoolToYesNo(pass.m_Culled),
+				develop_gui::BoolToYesNo(pass.m_SideEffect));
 			const std::string dependencies = PassListToString(pass.m_DependencyPassIndices);
 			const std::string dependents = PassListToString(pass.m_DependentPassIndices);
 			ImGui::TextWrapped("Depends On: %s", dependencies.c_str());
@@ -865,8 +866,8 @@ namespace gglab
 			ImGui::Text("Resource #%u: %s", resource.m_Index, resource.m_Name.c_str());
 			ImGui::Text("Type: %s", devtools::EnumText(resource.m_ResourceType).data());
 			ImGui::Text("Imported: %s, Devirtualized: %s, RefCount: %d",
-				utils::BoolToString(resource.m_Imported),
-				utils::BoolToString(resource.m_Devirtualized), resource.m_RefCount);
+				develop_gui::BoolToYesNo(resource.m_Imported),
+				develop_gui::BoolToYesNo(resource.m_Devirtualized), resource.m_RefCount);
 			ImGui::Text("First User: %s, Last User: %s, Pool Slot: %s",
 				PassIndexToString(resource.m_FirstUserPassIndex).c_str(),
 				PassIndexToString(resource.m_LastUserPassIndex).c_str(), poolSlot.c_str());
@@ -945,9 +946,9 @@ namespace gglab
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(devtools::EnumText(pass.m_EncoderType).data());
 					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(utils::BoolToString(pass.m_Culled));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(pass.m_Culled));
 					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(utils::BoolToString(pass.m_SideEffect));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(pass.m_SideEffect));
 					ImGui::TableSetColumnIndex(6);
 					ImGui::Text("%u", static_cast<uint32_t>(pass.m_DependencyPassIndices.size()));
 					ImGui::TableSetColumnIndex(7);
@@ -1015,9 +1016,9 @@ namespace gglab
 					ImGui::TableSetColumnIndex(2);
 					ImGui::TextUnformatted(devtools::EnumText(resource.m_ResourceType).data());
 					ImGui::TableSetColumnIndex(3);
-					ImGui::TextUnformatted(utils::BoolToString(resource.m_Imported));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(resource.m_Imported));
 					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(utils::BoolToString(resource.m_Devirtualized));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(resource.m_Devirtualized));
 					ImGui::TableSetColumnIndex(5);
 					ImGui::Text("%d", resource.m_RefCount);
 					ImGui::TableSetColumnIndex(6);

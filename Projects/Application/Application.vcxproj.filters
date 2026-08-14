@@ -28,17 +28,8 @@
     <Filter Include="Core">
       <UniqueIdentifier>{A09D7BFC-1F79-4817-0ED1-F7C00792454D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Hash">
-      <UniqueIdentifier>{8A65BE32-6CF4-7887-CB70-E1C3DF9395F2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Input">
       <UniqueIdentifier>{6B56486C-D7A2-940D-93A5-5585769375EB}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Platform">
-      <UniqueIdentifier>{06A02E08-2D83-3CD1-3E80-965FF11509F0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Platform\Win">
-      <UniqueIdentifier>{713A2ADC-1A0B-6D78-3792-1B350C74DA38}</UniqueIdentifier>
     </Filter>
     <Filter Include="DevTools">
       <UniqueIdentifier>{15DE7C87-C782-D23F-5F82-62216DEEA1A5}</UniqueIdentifier>
@@ -306,9 +297,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Hash\Sha256.cpp">
-      <Filter>Core\Hash</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\InputBase.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
@@ -320,12 +308,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\Mouse.cpp">
       <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp">
-      <Filter>Core\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp">
       <Filter>DevTools</Filter>
@@ -441,6 +423,9 @@
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h">
       <Filter>Application</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationPch.h">
@@ -635,9 +620,6 @@
     <ClInclude Include="..\..\Sources\Application\Core\Input\Mouse.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\AssetSnapshotText.h">
       <Filter>DevTools</Filter>
     </ClInclude>
@@ -651,6 +633,9 @@
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiContext.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiFormatting.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiMathWidgets.h">

@@ -1,7 +1,7 @@
 #pragma once
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <windows.h>
 

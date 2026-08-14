@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassBloom.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/PostProcess/PostProcessResolution.h"
 #include "Graphics/Renderer.h"

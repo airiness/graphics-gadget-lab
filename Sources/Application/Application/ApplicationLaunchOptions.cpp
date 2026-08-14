@@ -1,6 +1,6 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/SelfTest/SelfTestRunner.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <format>
 
@@ -10,19 +10,19 @@ namespace gglab
 	{
 		std::optional<ApplicationStartupDemo> ParseDemo(std::string_view value) noexcept
 		{
-			if (utils::EqualsIgnoreCase(value, "start") ||
-				utils::EqualsIgnoreCase(value, "demo.start"))
+			if (utils::EqualsAsciiIgnoreCase(value, "start") ||
+				utils::EqualsAsciiIgnoreCase(value, "demo.start"))
 			{
 				return ApplicationStartupDemo::Start;
 			}
-			if (utils::EqualsIgnoreCase(value, "playground") ||
-				utils::EqualsIgnoreCase(value, "demo.playground"))
+			if (utils::EqualsAsciiIgnoreCase(value, "playground") ||
+				utils::EqualsAsciiIgnoreCase(value, "demo.playground"))
 			{
 				return ApplicationStartupDemo::Playground;
 			}
-			if (utils::EqualsIgnoreCase(value, "lab") ||
-				utils::EqualsIgnoreCase(value, "labhost") ||
-				utils::EqualsIgnoreCase(value, "demo.labhost"))
+			if (utils::EqualsAsciiIgnoreCase(value, "lab") ||
+				utils::EqualsAsciiIgnoreCase(value, "labhost") ||
+				utils::EqualsAsciiIgnoreCase(value, "demo.labhost"))
 			{
 				return ApplicationStartupDemo::LabHost;
 			}
@@ -60,11 +60,11 @@ namespace gglab
 					result.m_Error = "Option '--rhi' requires a backend name ('dx12' or 'vulkan').";
 					return result;
 				}
-				if (utils::EqualsIgnoreCase(arguments[index], "dx12"))
+				if (utils::EqualsAsciiIgnoreCase(arguments[index], "dx12"))
 				{
 					result.m_Options.m_RhiBackend = RHIBackendType::DX12;
 				}
-				else if (utils::EqualsIgnoreCase(arguments[index], "vulkan"))
+				else if (utils::EqualsAsciiIgnoreCase(arguments[index], "vulkan"))
 				{
 					result.m_Options.m_RhiBackend = RHIBackendType::Vulkan;
 				}

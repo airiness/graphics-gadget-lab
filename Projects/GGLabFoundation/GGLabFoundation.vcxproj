@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{5C275408-928E-43C7-A2B5-7099FEA072D4}</ProjectGuid>
+    <RootNamespace>GGLabFoundation</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <GGLabRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</GGLabRepositoryRoot>
+    <OutDir>$(GGLabRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(GGLabRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>GGLabFoundation</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_FOUNDATION_PRIVATE_ACCESS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_FOUNDATION_PRIVATE_ACCESS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32DiagnosticOutput.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32NamedMutex.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32PathUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32ProcessUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32StringUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32TaskWorkerLifecycle.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\String\StringUtils.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Task\TaskSystem.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\MathUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypedIndex.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\HResult.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32NamedMutex.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32PathUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32ProcessUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32StringUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32TaskWorkerLifecycle.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\String\StringUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskSystem.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Task\TaskWorkerLifecycle.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

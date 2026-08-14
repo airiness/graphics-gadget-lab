@@ -1,6 +1,6 @@
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
-#include "Core/CoreMacros.h"
-#include "Core/Utility/MathUtils.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Base/MathUtils.h"
 
 #include <cstddef>
 #include <cstdlib>

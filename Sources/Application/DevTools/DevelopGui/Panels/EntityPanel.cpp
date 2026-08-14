@@ -2,7 +2,7 @@
 #include "Core/Math/Quaternion.h"
 #include "Scene/Components.h"
 #include "Core/Math/MathFunctions.h"
-#include "Core/Utility/StringUtils.h"
+#include "Core/StringIdFormatting.h"
 #include "Core/World.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"

@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/CoreMacros.h"
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Residency/AssetResidencyTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"

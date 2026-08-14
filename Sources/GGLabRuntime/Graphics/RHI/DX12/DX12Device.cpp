@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
-#include "Core/CoreMacros.h"
-#include "Core/Platform/Win/HResult.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"

@@ -1,5 +1,5 @@
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferBatch.h"

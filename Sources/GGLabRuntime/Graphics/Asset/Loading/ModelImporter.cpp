@@ -1,8 +1,8 @@
 #include "Graphics/Asset/Loading/ModelImporter.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
 
 #include <assimp/GltfMaterial.h>

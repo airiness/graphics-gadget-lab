@@ -1,6 +1,6 @@
 #pragma once
 #include "Core/Hash/KeyHash.h"
-#include "Core/TypedIndex.h"
+#include "GGLabFoundation/Base/TypedIndex.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIResourceDebug.h"

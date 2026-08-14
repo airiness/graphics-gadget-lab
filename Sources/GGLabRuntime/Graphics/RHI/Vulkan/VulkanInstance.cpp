@@ -40,12 +40,12 @@ namespace gglab
 
 			// Messages keep their severity: validation errors/warnings are
 			// investigation items, loader and info messages stay informational.
-			const spdlog::level::level_enum level =
+			const LogLevel level =
 				severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
-				? spdlog::level::err
+				? LogLevel::Error
 				: severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-				? spdlog::level::warn
-				: spdlog::level::info;
+				? LogLevel::Warning
+				: LogLevel::Info;
 			GGLAB_LOG_GRAPHICS_ALWAYS(level, "{}", text);
 			return VK_FALSE;
 		}

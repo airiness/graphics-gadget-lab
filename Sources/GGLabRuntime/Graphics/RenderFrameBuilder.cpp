@@ -1,5 +1,5 @@
 #include "Graphics/RenderFrameBuilder.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Math/Culling.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Graphics/Asset/AssetManager.h"

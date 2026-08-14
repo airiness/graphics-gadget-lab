@@ -1,5 +1,5 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutor.h"

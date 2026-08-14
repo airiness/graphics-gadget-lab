@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/DX12GpuProfiler.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"

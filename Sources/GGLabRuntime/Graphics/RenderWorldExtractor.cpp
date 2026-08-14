@@ -1,5 +1,5 @@
 #include "Graphics/RenderWorldExtractor.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Math/Matrix.h"
 #include "Core/World.h"
 #include "Graphics/GraphicsTypes.h"

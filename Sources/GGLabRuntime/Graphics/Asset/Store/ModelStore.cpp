@@ -1,5 +1,5 @@
 #include "Graphics/Asset/Store/ModelStore.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
 #include <filesystem>

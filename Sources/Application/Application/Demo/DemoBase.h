@@ -1,7 +1,7 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
 #include "Application/LoadingProgress.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <optional>
 #include <string_view>

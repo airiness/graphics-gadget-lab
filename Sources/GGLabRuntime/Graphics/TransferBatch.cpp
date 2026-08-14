@@ -1,5 +1,5 @@
 #include "Graphics/TransferBatch.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 
 #include <algorithm>

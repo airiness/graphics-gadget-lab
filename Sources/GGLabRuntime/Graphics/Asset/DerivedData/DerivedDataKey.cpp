@@ -60,13 +60,13 @@ namespace gglab
 			});
 		DerivedDataKeyBuilder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.texture");
-		succeeded &= builder.AddU32(TextureArtifactSchemaVersion);
-		succeeded &= builder.AddU32(TextureProducerCompatibilityVersion);
-		succeeded &= builder.AddU32(TextureDecoderVersion);
+		succeeded &= builder.AddU32LE(TextureArtifactSchemaVersion);
+		succeeded &= builder.AddU32LE(TextureProducerCompatibilityVersion);
+		succeeded &= builder.AddU32LE(TextureDecoderVersion);
 		succeeded &= builder.AddSourceDigest(sourceDigest);
 		succeeded &= builder.AddStringUtf8(sourceExtension);
-		succeeded &= builder.AddU32(static_cast<uint32_t>(importSettings.m_Semantic));
-		succeeded &= builder.AddU32(static_cast<uint32_t>(importSettings.m_MipPolicy));
+		succeeded &= builder.AddU32LE(static_cast<uint32_t>(importSettings.m_Semantic));
+		succeeded &= builder.AddU32LE(static_cast<uint32_t>(importSettings.m_MipPolicy));
 		return succeeded ? builder.Finish() : DerivedDataKey{};
 	}
 

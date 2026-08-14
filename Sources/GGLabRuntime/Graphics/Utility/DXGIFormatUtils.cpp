@@ -1,5 +1,5 @@
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <array>
 #include <cstddef>

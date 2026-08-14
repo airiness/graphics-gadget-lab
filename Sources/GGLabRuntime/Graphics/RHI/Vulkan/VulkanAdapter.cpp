@@ -1,8 +1,9 @@
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
 #include <cstring>

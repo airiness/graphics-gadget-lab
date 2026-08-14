@@ -1,10 +1,10 @@
 #pragma once
-#include "Core/CoreMacros.h"
-#include "Core/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 #include "Graphics/RHI/RHIFence.h"
 
 #include <cstdint>
+#include <limits>
 
 #include <d3d12.h>
 #include <Windows.h>
@@ -24,7 +24,8 @@ namespace gglab
 		RHIFenceHandle GetRHIHandle() const noexcept { return m_RHIHandle; }
 		bool IsCompleted(uint64_t fenceValue) const noexcept;
 		DX12FencePoint Signal(DX12CommandQueue* dx12CommandQueue) noexcept;
-		void WaitCompletion(uint64_t fenceValue, uint32_t timeout = GGLAB_INFINITE) const noexcept;
+		void WaitCompletion(uint64_t fenceValue,
+			uint32_t timeout = std::numeric_limits<uint32_t>::max()) const noexcept;
 
 		ID3D12Fence* Get() const noexcept { return m_D3D12Fence.Get(); }
 

@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
+#include "Application/ApplicationLog.h"
 #include "Core/Math/BoundingVolumes.h"
 #include "Core/Math/Quaternion.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"

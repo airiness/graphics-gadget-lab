@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"

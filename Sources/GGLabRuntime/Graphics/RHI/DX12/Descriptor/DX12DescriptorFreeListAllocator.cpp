@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+	<PropertyGroup>
+		<GGLabFoundationPublicHeaderRoot>$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public\GGLabFoundation\</GGLabFoundationPublicHeaderRoot>
+		<GGLabFoundationHeaderProbeRoot>$(IntDir)HeaderSelfContainment\</GGLabFoundationHeaderProbeRoot>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.h" />
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.hh" />
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.hpp" />
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.hxx" />
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.inl" />
+		<GGLabFoundationPublicHeader Include="$(GGLabFoundationPublicHeaderRoot)**\*.ixx" />
+	</ItemGroup>
+
+	<Target Name="PrepareGGLabFoundationHeaderSelfContainment"
+			BeforeTargets="PrepareForBuild"
+			Condition="'$(DesignTimeBuild)' != 'true'">
+
+		<ItemGroup>
+			<_GGLabFoundationHeaderProbe Include="@(GGLabFoundationPublicHeader)">
+				<ProbeDirectory>$(GGLabFoundationHeaderProbeRoot)%(RecursiveDir)</ProbeDirectory>
+				<ProbeSource>$(GGLabFoundationHeaderProbeRoot)%(RecursiveDir)%(Filename)%(Extension).cpp</ProbeSource>
+				<LogicalInclude>GGLabFoundation/%(RecursiveDir)%(Filename)%(Extension)</LogicalInclude>
+			</_GGLabFoundationHeaderProbe>
+		</ItemGroup>
+
+		<MakeDir Directories="@(_GGLabFoundationHeaderProbe->'%(ProbeDirectory)')" />
+
+		<WriteLinesToFile
+			File="%(_GGLabFoundationHeaderProbe.ProbeSource)"
+			Lines="#include &quot;%(_GGLabFoundationHeaderProbe.LogicalInclude)&quot;"
+			Overwrite="true"
+			WriteOnlyWhenDifferent="true"
+			Encoding="UTF-8" />
+
+		<ItemGroup>
+			<ClCompile Include="@(_GGLabFoundationHeaderProbe->'%(ProbeSource)')">
+				<PrecompiledHeader>NotUsing</PrecompiledHeader>
+			</ClCompile>
+		</ItemGroup>
+
+	</Target>
+
+</Project>

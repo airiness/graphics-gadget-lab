@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"

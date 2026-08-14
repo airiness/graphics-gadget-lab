@@ -1,5 +1,5 @@
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
 #include <cstdint>

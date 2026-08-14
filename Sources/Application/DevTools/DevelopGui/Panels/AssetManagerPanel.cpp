@@ -1,7 +1,8 @@
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
-#include "Core/Utility/StringUtils.h"
+#include "Core/StringIdFormatting.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiFormatting.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/RHIText.h"
@@ -215,7 +216,7 @@ namespace gglab
 					ImGui::TableSetColumnIndex(8);
 					ImGui::Text("%llu", model.m_UseCount);
 					ImGui::TableSetColumnIndex(9);
-					ImGui::TextUnformatted(utils::BoolToString(model.m_IsEvictionCandidate));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(model.m_IsEvictionCandidate));
 					ImGui::TableSetColumnIndex(10);
 					if (model.m_HasDependencyState)
 					{
@@ -235,7 +236,7 @@ namespace gglab
 					ImGui::TableSetColumnIndex(13);
 					ImGui::Text("%u", model.m_MeshInstanceCount);
 					ImGui::TableSetColumnIndex(14);
-					ImGui::TextUnformatted(utils::BoolToString(model.m_IsImportArtifactCached));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(model.m_IsImportArtifactCached));
 					ImGui::TableSetColumnIndex(15);
 					const std::string artifactDigest =
 						ArtifactContentDigestText(model.m_ImportArtifactContentDigest);
@@ -458,18 +459,18 @@ namespace gglab
 					ImGui::TableSetColumnIndex(8);
 					ImGui::Text("%llu", texture.m_UseCount);
 					ImGui::TableSetColumnIndex(9);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsEvictionCandidate));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(texture.m_IsEvictionCandidate));
 					ImGui::TableSetColumnIndex(10);
 					const std::string semantic = devtools::EnumText(texture.m_Semantic);
 					ImGui::TextUnformatted(semantic.c_str());
 					ImGui::TableSetColumnIndex(11);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsCpuArtifactCached));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(texture.m_IsCpuArtifactCached));
 					ImGui::TableSetColumnIndex(12);
 					const std::string artifactId =
 						ArtifactContentDigestText(texture.m_ArtifactContentDigest);
 					ImGui::TextUnformatted(artifactId.empty() ? "-" : artifactId.c_str());
 					ImGui::TableSetColumnIndex(13);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsDerivedDataCached));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(texture.m_IsDerivedDataCached));
 					ImGui::TableSetColumnIndex(14);
 					const std::string derivedDataKey = DerivedDataKeyText(texture.m_DerivedDataKey);
 					ImGui::TextUnformatted(derivedDataKey.empty() ? "-" : derivedDataKey.c_str());
@@ -477,9 +478,9 @@ namespace gglab
 					const std::string sourceDigest = SourceDigestText(texture.m_SourceDigest);
 					ImGui::TextUnformatted(sourceDigest.empty() ? "-" : sourceDigest.c_str());
 					ImGui::TableSetColumnIndex(16);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsUploaded));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(texture.m_IsUploaded));
 					ImGui::TableSetColumnIndex(17);
-					ImGui::TextUnformatted(utils::BoolToString(texture.m_IsReserved));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(texture.m_IsReserved));
 					ImGui::TableSetColumnIndex(18);
 					const std::string textureHandle = devtools::RHIHandleText(texture.m_Texture);
 					ImGui::TextUnformatted(textureHandle.c_str());
@@ -544,13 +545,13 @@ namespace gglab
 					ImGui::TableSetColumnIndex(8);
 					ImGui::Text("%llu", mesh.m_UseCount);
 					ImGui::TableSetColumnIndex(9);
-					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsEvictionCandidate));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(mesh.m_IsEvictionCandidate));
 					ImGui::TableSetColumnIndex(10);
 					ImGui::Text("%u", mesh.m_VertexCount);
 					ImGui::TableSetColumnIndex(11);
 					ImGui::Text("%u", mesh.m_IndexCount);
 					ImGui::TableSetColumnIndex(12);
-					ImGui::TextUnformatted(utils::BoolToString(mesh.m_IsUploaded));
+					ImGui::TextUnformatted(develop_gui::BoolToYesNo(mesh.m_IsUploaded));
 					ImGui::PopID();
 				}
 

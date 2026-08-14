@@ -1,5 +1,5 @@
 #include "Application/SelfTest/AssetDataSelfTests.h"
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
@@ -191,13 +191,13 @@ namespace gglab
 
 		void RunSha256Tests(SelfTestContext& context) noexcept
 		{
-			const Sha256Hash emptyHash = ComputeSha256({});
+			const Sha256Digest emptyHash = ComputeSha256({});
 			context.Check(MatchesHex(emptyHash.m_Value,
 				"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
 				"SHA-256 empty input matches the standard vector");
 
 			constexpr std::string_view Input = "abc";
-			const Sha256Hash abcHash = ComputeSha256(std::as_bytes(std::span{ Input }));
+			const Sha256Digest abcHash = ComputeSha256(std::as_bytes(std::span{ Input }));
 			context.Check(MatchesHex(abcHash.m_Value,
 				"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
 				"SHA-256 text input matches the standard vector");
@@ -250,7 +250,7 @@ namespace gglab
 				"Texture artifact factory rejects non-canonical subresource order");
 
 			std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
-			const Sha256Hash payloadHash = ComputeSha256(payload);
+			const Sha256Digest payloadHash = ComputeSha256(payload);
 			context.Check(
 				payload.size() == 116 &&
 				MatchesHex(payloadHash.m_Value,

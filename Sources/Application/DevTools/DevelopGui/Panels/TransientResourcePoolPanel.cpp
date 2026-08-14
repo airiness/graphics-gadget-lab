@@ -2,7 +2,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/RHIText.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 #include "Graphics/Renderer.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
@@ -105,7 +105,7 @@ namespace gglab
 					texture.m_PoolSlot.Value(), SlotStateText(texture.m_State),
 					texture.m_LogicalName, texture.m_DebugName, texture.m_Key.m_Extent.m_Width,
 					texture.m_Key.m_Extent.m_Height, texture.m_Key.m_Extent.m_Depth);
-				if (!utils::ContainsIgnoreCase(searchable, state.m_Filter))
+				if (!utils::ContainsAsciiIgnoreCase(searchable, state.m_Filter))
 				{
 					continue;
 				}
@@ -182,7 +182,7 @@ namespace gglab
 				const std::string searchable = std::format("{} {} {} {} {}",
 					buffer.m_PoolSlot.Value(), SlotStateText(buffer.m_State), buffer.m_LogicalName,
 					buffer.m_DebugName, buffer.m_Key.m_SizeInBytes);
-				if (!utils::ContainsIgnoreCase(searchable, state.m_Filter))
+				if (!utils::ContainsAsciiIgnoreCase(searchable, state.m_Filter))
 				{
 					continue;
 				}

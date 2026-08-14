@@ -1,5 +1,5 @@
 #include "Graphics/Asset/Publication/ModelPublicationJournal.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <cstddef>
 #include <utility>

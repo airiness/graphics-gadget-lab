@@ -1,5 +1,5 @@
 #include "Graphics/RenderGraph/RGCompiler.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGBarrierPlanner.h"
 

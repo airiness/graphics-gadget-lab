@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 
 namespace gglab
 {

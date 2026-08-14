@@ -1,8 +1,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Task/TaskSystem.h"
-#include "Core/Platform/Win/Win32StringUtils.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/Shader/ShaderCompiler.h"
 
 #include <filesystem>

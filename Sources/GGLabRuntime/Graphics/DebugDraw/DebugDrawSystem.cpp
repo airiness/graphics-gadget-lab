@@ -1,5 +1,5 @@
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Math/MathFunctions.h"
 #include "Graphics/RHI/RHIBuffer.h"

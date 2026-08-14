@@ -1,7 +1,7 @@
 #include "Graphics/EnvironmentAssetController.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/PathUtils.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -46,7 +46,7 @@ namespace gglab
 		{
 			const auto& entry = *iterator;
 			if (!entry.is_regular_file(errorCode) || errorCode ||
-				!utils::ExtensionEqualsIgnoreCase(entry.path(), ".hdr"))
+				!utils::ExtensionEqualsAsciiIgnoreCase(entry.path(), ".hdr"))
 			{
 				continue;
 			}

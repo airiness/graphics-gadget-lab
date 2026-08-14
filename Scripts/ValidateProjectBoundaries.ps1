@@ -3,14 +3,25 @@ param(
     [switch]$ShowAll
 )
 
-# Project ownership and runtime boundary validation.
+# Project ownership and first-party boundary validation.
 # Enforces the first-party source ownership and dependency direction contracts:
 #   Project graph - Application must reference GGLabRuntime and NapaVoxelCore;
-#                   Runtime must not reference Application, and NapaVoxelCore
-#                   must remain independent of first-party host projects.
+#                   Foundation must remain Tier-0; its tests may reference only
+#                   Foundation; NapaVoxelCore remains an independent sibling.
 #   Source ownership - every first-party source item must live below its owning
 #                      project's source root, and every physical source file must
 #                      belong to exactly one owning project.
+#   Include visibility - Foundation sees only its Public/Private roots, while its
+#                        tests see only the Foundation Public root.
+#   Include identity - public logical include paths must be unique across owners.
+#   Foundation boundary - Foundation must not include any upper first-party domain.
+#   Foundation private access - every private header is compiler-gated to the
+#                               Foundation project even when a broad consumer
+#                               include root can physically resolve its path.
+#   Public header closure - every Foundation Public header must compile in its
+#                           own translation unit without aggregate include help.
+#   Foundation consumers - ShaderCompiler foundational dependencies must come
+#                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
 #                        DevTools/*, or the Application-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
@@ -37,7 +48,12 @@ function Get-RepoRoot {
 
 $root = Get-RepoRoot $RootDir
 $repositorySourcesDir = Join-Path $root "Sources"
+$repositoryTestsDir = Join-Path $root "Tests"
 $applicationSourcesDir = Join-Path $root "Sources/Application"
+$foundationSourcesDir = Join-Path $root "Sources/GGLabFoundation"
+$foundationPublicDir = Join-Path $foundationSourcesDir "Public"
+$foundationPrivateDir = Join-Path $foundationSourcesDir "Private"
+$foundationTestsDir = Join-Path $root "Tests/GGLabFoundation"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 $napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
 
@@ -86,7 +102,6 @@ $knownViolations = @(
     [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.h";                     Kind = "platform";  Reason = "Windows.h/HWND; same family as VulkanQualification.cpp; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderCompiler.cpp";                            Kind = "platform";  Reason = "HRESULT/DXC COM integration; planned: move to shader toolchain project ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" },
-    [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanPipelineSystem.cpp";                   Kind = "platform";  Reason = "Win32 wide-string entry conversion; planned: UTF-8 entry point contract in shader runtime" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; root identity carries Windows named-mutex name semantics; planned: narrow platform lock leaf" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
 )
@@ -201,6 +216,27 @@ $applicationNamespace = New-Object System.Xml.XmlNamespaceManager($applicationPr
 $applicationNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
 $applicationProjectDir = Split-Path -Parent $applicationProjectPath
 
+$foundationProjectPath = Join-Path $root "Projects/GGLabFoundation/GGLabFoundation.vcxproj"
+if (-not (Test-Path $foundationProjectPath)) {
+    throw "GGLabFoundation project not found: $foundationProjectPath"
+}
+$foundationProject = [xml](Get-Content -LiteralPath $foundationProjectPath -Raw -ErrorAction Stop)
+$foundationNamespace = New-Object System.Xml.XmlNamespaceManager($foundationProject.NameTable)
+$foundationNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$foundationProjectDir = Split-Path -Parent $foundationProjectPath
+
+$foundationTestsProjectPath = Join-Path $root `
+    "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj"
+if (-not (Test-Path $foundationTestsProjectPath)) {
+    throw "GGLabFoundationTests project not found: $foundationTestsProjectPath"
+}
+$foundationTestsProject = [xml](
+    Get-Content -LiteralPath $foundationTestsProjectPath -Raw -ErrorAction Stop)
+$foundationTestsNamespace = New-Object `
+    System.Xml.XmlNamespaceManager($foundationTestsProject.NameTable)
+$foundationTestsNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$foundationTestsProjectDir = Split-Path -Parent $foundationTestsProjectPath
+
 $napaProjectPath = Join-Path $root "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj"
 if (-not (Test-Path $napaProjectPath)) {
     throw "NapaVoxelCore project not found: $napaProjectPath"
@@ -237,24 +273,43 @@ $runtimeCompileFiles = Get-ProjectItemPaths $runtimeProject $namespace $runtimeP
     "//msb:ClCompile" "Runtime compile item"
 $applicationCompileFiles = Get-ProjectItemPaths $applicationProject $applicationNamespace `
     $applicationProjectDir "//msb:ClCompile" "Application compile item"
+$foundationCompileFiles = Get-ProjectItemPaths $foundationProject $foundationNamespace `
+    $foundationProjectDir "//msb:ClCompile" "GGLabFoundation compile item"
+$foundationTestsCompileFiles = Get-ProjectItemPaths `
+    $foundationTestsProject $foundationTestsNamespace $foundationTestsProjectDir `
+    "//msb:ClCompile" "GGLabFoundationTests compile item"
 $napaCompileFiles = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
     "//msb:ClCompile" "NapaVoxelCore compile item"
 $runtimeSourceItems = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ClCompile | //msb:ClInclude" "Runtime source item"
 $applicationSourceItems = Get-ProjectItemPaths $applicationProject $applicationNamespace `
     $applicationProjectDir "//msb:ClCompile | //msb:ClInclude" "Application source item"
+$foundationSourceItems = Get-ProjectItemPaths $foundationProject $foundationNamespace `
+    $foundationProjectDir "//msb:ClCompile | //msb:ClInclude" "GGLabFoundation source item"
+$foundationTestsSourceItems = Get-ProjectItemPaths `
+    $foundationTestsProject $foundationTestsNamespace $foundationTestsProjectDir `
+    "//msb:ClCompile | //msb:ClInclude" "GGLabFoundationTests source item"
 $napaSourceItems = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
     "//msb:ClCompile | //msb:ClInclude" "NapaVoxelCore source item"
 $runtimeProjectReferences = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ProjectReference" "Runtime project reference"
 $applicationProjectReferences = Get-ProjectItemPaths $applicationProject $applicationNamespace `
     $applicationProjectDir "//msb:ProjectReference" "Application project reference"
+$foundationProjectReferences = Get-ProjectItemPaths $foundationProject $foundationNamespace `
+    $foundationProjectDir "//msb:ProjectReference" "GGLabFoundation project reference"
+$foundationTestsProjectReferences = Get-ProjectItemPaths `
+    $foundationTestsProject $foundationTestsNamespace $foundationTestsProjectDir `
+    "//msb:ProjectReference" "GGLabFoundationTests project reference"
 $napaProjectReferences = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjectDir `
     "//msb:ProjectReference" "NapaVoxelCore project reference"
 
 $runtimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $applicationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$foundationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$foundationTestsProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $napaProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
@@ -264,57 +319,169 @@ foreach ($path in $runtimeProjectReferences) {
 foreach ($path in $applicationProjectReferences) {
     [void]$applicationProjectReferenceSet.Add($path)
 }
+foreach ($path in $foundationProjectReferences) {
+    [void]$foundationProjectReferenceSet.Add($path)
+}
+foreach ($path in $foundationTestsProjectReferences) {
+    [void]$foundationTestsProjectReferenceSet.Add($path)
+}
 foreach ($path in $napaProjectReferences) {
     [void]$napaProjectReferenceSet.Add($path)
 }
 
 $projectContractFindings = New-Object System.Collections.Generic.List[object]
-$requiredRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
-$forbiddenRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources'
-$runtimeIncludeDirectoryNodes = @(
-    $runtimeProject.SelectNodes("//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalIncludeDirectories", $namespace)
-)
-if ($runtimeIncludeDirectoryNodes.Count -eq 0) {
-    $projectContractFindings.Add([pscustomobject]@{
-        Rule   = "include-visibility"
-        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
-        Reason = "missing GGLabRuntime include-directory definitions"
-    })
-}
-foreach ($includeNode in $runtimeIncludeDirectoryNodes) {
-    $includeRoots = @(
-        ([string]$includeNode.InnerText).Split(';') |
-            ForEach-Object { $_.Trim().TrimEnd('\') } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+function Test-ProjectIncludeVisibility {
+    param(
+        [xml]$Project,
+        [System.Xml.XmlNamespaceManager]$Namespace,
+        [string]$ProjectPath,
+        [array]$RequiredFirstPartyRoots,
+        [array]$AllowedFirstPartyRoots
     )
-    $condition = [string]$includeNode.ParentNode.ParentNode.Condition
-    $target = if ([string]::IsNullOrWhiteSpace($condition)) {
-        "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
-    }
-    else {
-        "Projects/GGLabRuntime/GGLabRuntime.vcxproj ($condition)"
-    }
-    if ($includeRoots -notcontains $requiredRuntimeIncludeRoot) {
+
+    $includeDirectoryNodes = @(
+        $Project.SelectNodes(
+            "//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalIncludeDirectories",
+            $Namespace)
+    )
+    if ($includeDirectoryNodes.Count -eq 0) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "include-visibility"
-            Target = $target
-            Reason = "missing narrow Sources/GGLabRuntime include root"
+            Target = $ProjectPath
+            Reason = "missing include-directory definitions"
         })
     }
-    if ($includeRoots -contains $forbiddenRuntimeIncludeRoot) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "include-visibility"
-            Target = $target
-            Reason = "repository-wide Sources include root is forbidden"
-        })
+
+    foreach ($includeNode in $includeDirectoryNodes) {
+        $includeRoots = @(
+            ([string]$includeNode.InnerText).Split(';') |
+                ForEach-Object { $_.Trim().TrimEnd('\') } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+        $condition = [string]$includeNode.ParentNode.ParentNode.Condition
+        $target = if ([string]::IsNullOrWhiteSpace($condition)) {
+            $ProjectPath
+        }
+        else {
+            "$ProjectPath ($condition)"
+        }
+
+        foreach ($requiredRoot in $RequiredFirstPartyRoots) {
+            if ($includeRoots -notcontains $requiredRoot) {
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "include-visibility"
+                    Target = $target
+                    Reason = "missing required first-party include root: $requiredRoot"
+                })
+            }
+        }
+
+        foreach ($includeRoot in $includeRoots) {
+            if ($includeRoot.StartsWith('$(GGLabRepositoryRoot)Sources',
+                    [System.StringComparison]::OrdinalIgnoreCase) -and
+                $AllowedFirstPartyRoots -notcontains $includeRoot) {
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "include-visibility"
+                    Target = $target
+                    Reason = "unexpected first-party include root: $includeRoot"
+                })
+            }
+        }
     }
 }
+
+$runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
+$applicationIncludeRoot = '$(GGLabRepositoryRoot)Sources\Application'
+# Allowed, but deliberately not required: the current NapaVoxelCore/... layout
+# still needs this broad root. Foundation Private access is compiler-gated below.
+$repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
+$foundationPublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public'
+$foundationPrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private'
+Test-ProjectIncludeVisibility $runtimeProject $namespace `
+    "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
+    @($runtimeIncludeRoot, $foundationPublicIncludeRoot) `
+    @($runtimeIncludeRoot, $foundationPublicIncludeRoot)
+Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
+    "Projects/Application/Application.vcxproj" `
+    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot) `
+    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
+        $repositorySourcesIncludeRoot)
+Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
+    "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
+    @($foundationPublicIncludeRoot, $foundationPrivateIncludeRoot) `
+    @($foundationPublicIncludeRoot, $foundationPrivateIncludeRoot)
+Test-ProjectIncludeVisibility $foundationTestsProject $foundationTestsNamespace `
+    "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj" `
+    @($foundationPublicIncludeRoot) @($foundationPublicIncludeRoot)
+
+$foundationPrivateAccessMacro = "GGLAB_FOUNDATION_PRIVATE_ACCESS"
+function Test-ProjectPrivateAccessDefinition {
+    param(
+        [xml]$Project,
+        [System.Xml.XmlNamespaceManager]$Namespace,
+        [string]$ProjectPath,
+        [bool]$Required
+    )
+
+    $definitionNodes = @($Project.SelectNodes(
+        "//msb:ItemDefinitionGroup/msb:ClCompile/msb:PreprocessorDefinitions", $Namespace))
+    if ($Required -and $definitionNodes.Count -eq 0) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = $ProjectPath
+            Reason = "Foundation project has no compile definitions for private access"
+        })
+    }
+    foreach ($definitionNode in $definitionNodes) {
+        $definitions = @(([string]$definitionNode.InnerText).Split(';') |
+            ForEach-Object { $_.Trim() })
+        $hasPrivateAccess = $definitions -contains $foundationPrivateAccessMacro
+        if ($Required -and -not $hasPrivateAccess) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "foundation-private-access"
+                Target = $ProjectPath
+                Reason = "Foundation compile definitions must grant private-header access"
+            })
+        }
+        elseif (-not $Required -and $hasPrivateAccess) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "foundation-private-access"
+                Target = $ProjectPath
+                Reason = "only GGLabFoundation may define $foundationPrivateAccessMacro"
+            })
+        }
+    }
+}
+
+Test-ProjectPrivateAccessDefinition $foundationProject $foundationNamespace `
+    "Projects/GGLabFoundation/GGLabFoundation.vcxproj" $true
+Test-ProjectPrivateAccessDefinition $foundationTestsProject $foundationTestsNamespace `
+    "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $runtimeProject $namespace `
+    "Projects/GGLabRuntime/GGLabRuntime.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $applicationProject $applicationNamespace `
+    "Projects/Application/Application.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $napaProject $napaNamespace `
+    "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj" $false
+
 $firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
+$publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $ownershipSpecifications = @(
     [pscustomobject]@{
         Name       = "Application"
         SourceRoot = $applicationSourcesDir
         ItemPaths  = $applicationSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "GGLabFoundation"
+        SourceRoot = $foundationSourcesDir
+        ItemPaths  = $foundationSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "GGLabFoundationTests"
+        SourceRoot = $foundationTestsDir
+        ItemPaths  = $foundationTestsSourceItems
     }
     [pscustomobject]@{
         Name       = "GGLabRuntime"
@@ -339,7 +506,9 @@ foreach ($specification in $ownershipSpecifications) {
     foreach ($itemPath in $specification.ItemPaths) {
         [void]$projectItemPathSet.Add($itemPath)
 
-        if (-not (Test-IsPathUnderRoot $itemPath $repositorySourcesDir)) {
+        $isFirstPartySource = (Test-IsPathUnderRoot $itemPath $repositorySourcesDir) -or
+            (Test-IsPathUnderRoot $itemPath $repositoryTestsDir)
+        if (-not $isFirstPartySource) {
             continue
         }
 
@@ -375,6 +544,8 @@ foreach ($specification in $ownershipSpecifications) {
 
 $firstPartySourceFiles = @(
     Get-ChildItem -LiteralPath $repositorySourcesDir -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
+    Get-ChildItem -LiteralPath $repositoryTestsDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
 )
 foreach ($file in $firstPartySourceFiles) {
@@ -422,6 +593,20 @@ if (-not $applicationProjectReferenceSet.Contains($napaProjectPath)) {
         Reason = "missing ProjectReference to NapaVoxelCore"
     })
 }
+if (-not $applicationProjectReferenceSet.Contains($foundationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/Application/Application.vcxproj"
+        Reason = "missing direct ProjectReference to GGLabFoundation"
+    })
+}
+if (-not $runtimeProjectReferenceSet.Contains($foundationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
+        Reason = "missing ProjectReference to GGLabFoundation"
+    })
+}
 if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
@@ -429,13 +614,169 @@ if ($runtimeProjectReferenceSet.Contains($applicationProjectPath)) {
         Reason = "must not reference Application"
     })
 }
-foreach ($forbiddenReference in @($applicationProjectPath, $runtimeProjectPath)) {
+if ($foundationProjectReferenceSet.Count -ne 0) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/GGLabFoundation/GGLabFoundation.vcxproj"
+        Reason = "Tier-0 Foundation must not reference another first-party project"
+    })
+}
+if (-not $foundationTestsProjectReferenceSet.Contains($foundationProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj"
+        Reason = "missing ProjectReference to GGLabFoundation"
+    })
+}
+foreach ($reference in $foundationTestsProjectReferenceSet) {
+    if ($reference -ne $foundationProjectPath) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj"
+            Reason = "link probe may reference only GGLabFoundation"
+        })
+    }
+}
+foreach ($forbiddenReference in @($applicationProjectPath, $runtimeProjectPath, $foundationProjectPath)) {
     if ($napaProjectReferenceSet.Contains($forbiddenReference)) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-graph"
             Target = "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj"
             Reason = "host-independent NapaVoxelCore must not reference first-party host projects"
         })
+    }
+}
+
+$foundationForbiddenIncludeRegex = `
+    '#include\s*[<"](?:\.\.|Sources[\\/]|Application[\\/]|DevTools[\\/]|Core[\\/]|' +
+    'GGLabRuntime[\\/]|Scene[\\/]|Graphics[\\/]|Diagnostics[\\/]|Shader[\\/]|' +
+    'ShaderToolchain[\\/]|Tools[\\/]|NapaVoxelCore[\\/])'
+foreach ($itemPath in $foundationSourceItems) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $foundationForbiddenIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "Foundation source includes an upper first-party domain"
+        })
+    }
+}
+
+$foundationPrivateHeaders = @(Get-ChildItem -LiteralPath $foundationPrivateDir -Recurse -File |
+    Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions })
+foreach ($privateHeader in $foundationPrivateHeaders) {
+    $content = Get-Content -LiteralPath $privateHeader.FullName -Raw -ErrorAction Stop
+    if ($content -notmatch
+        '#if\s+!defined\s*\(\s*GGLAB_FOUNDATION_PRIVATE_ACCESS\s*\)') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = ConvertTo-RepoRelativePath $privateHeader.FullName
+            Reason = "private header lacks the Foundation-only compile access guard"
+        })
+    }
+}
+
+$nonFoundationSourceItems = @($applicationSourceItems + $runtimeSourceItems +
+    $foundationTestsSourceItems + $napaSourceItems)
+foreach ($itemPath in $nonFoundationSourceItems) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bGGLAB_FOUNDATION_PRIVATE_ACCESS\b' -or
+        $content -match '#include\s*[<"]GGLabFoundation[\\/]Private[\\/]') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "non-Foundation source attempts to consume Foundation Private content"
+        })
+    }
+}
+
+$shaderCompilerProbePaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.cpp")
+)
+foreach ($shaderCompilerPath in $shaderCompilerProbePaths) {
+    if (-not (Test-Path -LiteralPath $shaderCompilerPath -PathType Leaf)) {
+        throw "ShaderCompiler consumer probe source not found: $shaderCompilerPath"
+    }
+    $shaderCompilerContent = Get-Content -LiteralPath $shaderCompilerPath -Raw -ErrorAction Stop
+    if ($shaderCompilerContent -match '#include\s*"Core[\\/]') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-consumer"
+            Target = ConvertTo-RepoRelativePath $shaderCompilerPath
+            Reason = "ShaderCompiler foundational dependencies must not come from GGLabRuntime/Core"
+        })
+    }
+}
+
+$logicalIncludeSpecifications = @(
+    [pscustomobject]@{
+        Name        = "Application"
+        ScanRoot    = $applicationSourcesDir
+        LogicalRoot = $applicationSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabFoundation"
+        ScanRoot    = $foundationPublicDir
+        LogicalRoot = $foundationPublicDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabRuntime"
+        ScanRoot    = $runtimeSourcesDir
+        LogicalRoot = $runtimeSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "NapaVoxelCore"
+        ScanRoot    = $napaSourcesDir
+        LogicalRoot = $repositorySourcesDir
+    }
+)
+$logicalIncludes = @{}
+foreach ($specification in $logicalIncludeSpecifications) {
+    $headers = if (Test-Path -LiteralPath $specification.ScanRoot -PathType Container) {
+        Get-ChildItem -LiteralPath $specification.ScanRoot -Recurse -File |
+            Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }
+    }
+    else {
+        @()
+    }
+    foreach ($header in $headers) {
+        $logicalPath = $header.FullName.Substring($specification.LogicalRoot.Length + 1).
+            Replace('\', '/')
+        if ($specification.Name -eq "GGLabFoundation" -and
+            -not $logicalPath.StartsWith("GGLabFoundation/",
+                [System.StringComparison]::Ordinal)) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "logical-include"
+                Target = ConvertTo-RepoRelativePath $header.FullName
+                Reason = "Foundation public include path lacks the GGLabFoundation/ prefix"
+            })
+        }
+
+        $logicalKey = $logicalPath.ToLowerInvariant()
+        if ($logicalIncludes.ContainsKey($logicalKey)) {
+            $existing = $logicalIncludes[$logicalKey]
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "logical-include"
+                Target = $logicalPath
+                Reason = "public include collision between $($existing.Owner) and " +
+                    $specification.Name
+            })
+        }
+        else {
+            $logicalIncludes[$logicalKey] = [pscustomobject]@{
+                Owner    = $specification.Name
+                FullPath = $header.FullName
+            }
+        }
     }
 }
 
@@ -537,11 +878,15 @@ foreach ($debt in $transitionalDebt) {
 Write-Host "=== Project Ownership and Runtime Boundary Validation ==="
 Write-Host "Root: $root"
 Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party source files"
-Write-Host ("Project items: {0} Application, {1} GGLabRuntime, {2} NapaVoxelCore" -f `
-        $applicationSourceItems.Count, $runtimeSourceItems.Count, $napaSourceItems.Count)
+Write-Host (("Project items: {0} Application, {1} Foundation, {2} FoundationTests, " +
+    "{3} GGLabRuntime, {4} NapaVoxelCore") -f $applicationSourceItems.Count,
+        $foundationSourceItems.Count, $foundationTestsSourceItems.Count,
+        $runtimeSourceItems.Count, $napaSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
-Write-Host ("Compile items: {0} Application, {1} GGLabRuntime, {2} NapaVoxelCore" -f `
-        $applicationCompileFiles.Count, $runtimeCompileFiles.Count, $napaCompileFiles.Count)
+Write-Host (("Compile items: {0} Application, {1} Foundation, {2} FoundationTests, " +
+    "{3} GGLabRuntime, {4} NapaVoxelCore") -f $applicationCompileFiles.Count,
+        $foundationCompileFiles.Count, $foundationTestsCompileFiles.Count,
+        $runtimeCompileFiles.Count, $napaCompileFiles.Count)
 Write-Host ""
 
 Write-Host "PROJECT CONTRACT violations: $($projectContractFindings.Count)"

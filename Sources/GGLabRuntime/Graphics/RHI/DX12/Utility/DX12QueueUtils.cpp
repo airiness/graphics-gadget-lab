@@ -1,5 +1,5 @@
 #include "Graphics/RHI/DX12/Utility/DX12QueueUtils.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 namespace gglab
 {

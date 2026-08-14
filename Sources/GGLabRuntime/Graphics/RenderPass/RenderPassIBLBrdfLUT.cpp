@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

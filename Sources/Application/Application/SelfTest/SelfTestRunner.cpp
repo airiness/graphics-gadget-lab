@@ -1,4 +1,5 @@
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "GGLabFoundation/Logging/Log.h"
 #include "Application/SelfTest/ArtifactCacheSelfTests.h"
 #include "Application/SelfTest/AssetDataSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
@@ -6,7 +7,9 @@
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Application/SelfTest/SelfTest.h"
 #include "Application/SelfTest/VulkanContractSelfTests.h"
-#include "Core/Log/Logger.h"
+
+#include <algorithm>
+#include <array>
 
 namespace gglab
 {
@@ -61,10 +64,7 @@ namespace gglab
 			return false;
 		}
 
-		if (!Logger::GetLogger(Logger::LoggerType::Application))
-		{
-			Logger::Initialize();
-		}
+		InitializeLogging();
 		ConsoleSelfTestReporter reporter;
 		if (runAll)
 		{

@@ -1,5 +1,5 @@
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"

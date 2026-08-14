@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/SamplerRegistry.h"

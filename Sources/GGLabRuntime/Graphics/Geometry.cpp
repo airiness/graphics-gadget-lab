@@ -1,5 +1,5 @@
 #include "Graphics/Geometry.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Math/MathConstants.h"
 #include "Core/World.h"
 #include "Graphics/Asset/AssetManager.h"

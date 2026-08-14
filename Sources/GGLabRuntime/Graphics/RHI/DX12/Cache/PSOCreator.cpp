@@ -15,7 +15,7 @@ namespace gglab
 	{
 		if (!desc.Validate())
 		{
-			GGLAB_LOG_ERROR("Invalid GraphicsPipelineDesc");
+			GGLAB_LOG_GRAPHICS_ERROR("Invalid GraphicsPipelineDesc");
 			return nullptr;
 		}
 
@@ -32,7 +32,7 @@ namespace gglab
 	{
 		if (!desc.Validate())
 		{
-			GGLAB_LOG_ERROR("Invalid ComputePipelineDesc");
+			GGLAB_LOG_GRAPHICS_ERROR("Invalid ComputePipelineDesc");
 			return nullptr;
 		}
 

@@ -2,7 +2,7 @@
 #include "Core/Math/Color.h"
 #include "Core/Math/Matrix.h"
 #include "Core/Math/Vector.h"
-#include "Core/Utility/TypeUtils.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/GraphicsTypes.h"
 
 #include <cstdint>

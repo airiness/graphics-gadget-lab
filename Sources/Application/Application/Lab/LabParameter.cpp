@@ -1,5 +1,7 @@
 #include "Application/Lab/LabParameter.h"
-#include "Core/Log/LogMacros.h"
+#include "Application/ApplicationLog.h"
+
+#include <algorithm>
 
 namespace gglab
 {

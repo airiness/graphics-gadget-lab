@@ -42,7 +42,6 @@
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -55,7 +54,6 @@
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
-    <Import Project="..\..\PropertySheets\SpdlogImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
@@ -82,7 +80,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -100,7 +98,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -179,7 +177,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32TaskWorkerPlatformContext.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />
@@ -211,7 +208,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabRuntimeLocator.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.cpp" />
@@ -257,7 +253,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Hash\Sha256.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
@@ -265,6 +260,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.h" />
@@ -312,6 +308,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiPanelCatalog.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiProjectionUtils.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiFormatting.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiStateStore.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
@@ -332,7 +329,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
-    <ClInclude Include="..\..\Sources\Application\Core\Platform\Win\Win32PathUtils.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h" />
@@ -385,6 +381,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
       <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>

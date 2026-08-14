@@ -7,9 +7,6 @@
     <Filter Include="Core\Allocator">
       <UniqueIdentifier>{43994716-9911-0D68-A7C4-AECBC39E1151}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Async">
-      <UniqueIdentifier>{0243D9D9-09B7-9556-2D48-0E39EDE17E78}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Hash">
       <UniqueIdentifier>{C5669FEA-0496-AE09-D0C0-39FB2FE18527}</UniqueIdentifier>
     </Filter>
@@ -22,20 +19,8 @@
     <Filter Include="Core\Math\Backends">
       <UniqueIdentifier>{775C4FF7-FB3C-00F9-0E44-E3559673E7E3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Platform">
-      <UniqueIdentifier>{7CCC3556-F534-82F0-9E27-7B81A49AB19B}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Platform\Win">
-      <UniqueIdentifier>{0C14CA03-C0D2-F204-90C7-7B7A89B719CF}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Profiling">
       <UniqueIdentifier>{E3785D7E-78C8-6F43-3AB3-7526EA233732}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Task">
-      <UniqueIdentifier>{9706B28C-5013-2E86-351A-F4D37772F3B6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Utility">
-      <UniqueIdentifier>{1AD262A7-D039-5807-833E-5F521780440A}</UniqueIdentifier>
     </Filter>
     <Filter Include="Diagnostics">
       <UniqueIdentifier>{F6A745A9-98F8-EDCE-A637-F1F393156953}</UniqueIdentifier>
@@ -165,12 +150,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp">
       <Filter>Core\Allocator</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.cpp">
-      <Filter>Core\Async</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.cpp">
-      <Filter>Core\Log</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp">
       <Filter>Core\Math\Backends</Filter>
     </ClCompile>
@@ -195,38 +174,14 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.cpp">
       <Filter>Core\Math</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\HResult.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32DiagnosticOutput.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32NamedMutex.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32ProcessUtils.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32StringUtils.cpp">
-      <Filter>Core\Platform\Win</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp">
       <Filter>Core\Profiling</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.cpp">
-      <Filter>Core\Task</Filter>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp">
       <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.cpp">
-      <Filter>Core\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Utility\StringUtils.cpp">
-      <Filter>Core\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -800,23 +755,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h">
       <Filter>Core\Allocator</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h">
-      <Filter>Core\Async</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\CoreMacros.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\EnumFlags.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\Sha256.h">
-      <Filter>Core\Hash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.h">
-      <Filter>Core\Log</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h">
       <Filter>Core\Log</Filter>
@@ -851,56 +791,17 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.h">
       <Filter>Core\Math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\ComTypes.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\HResult.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32DiagnosticOutput.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32NamedMutex.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32ProcessUtils.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\Win32StringUtils.h">
-      <Filter>Core\Platform\Win</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.h">
       <Filter>Core\Profiling</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringId.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskSystem.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskTypes.h">
-      <Filter>Core\Task</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Task\TaskWorkerPlatformContext.h">
-      <Filter>Core\Task</Filter>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h">
+      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h">
       <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\TypedIndex.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\MathUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\PathUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\StringUtils.h">
-      <Filter>Core\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Utility\TypeUtils.h">
-      <Filter>Core\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h">
       <Filter>Core</Filter>

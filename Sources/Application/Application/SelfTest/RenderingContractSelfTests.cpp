@@ -1,6 +1,6 @@
 #include "Application/SelfTest/RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
-#include "Core/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
@@ -1372,7 +1372,7 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
-			const std::filesystem::path runtimeRoot = utils::GetExeOutDir();
+			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			ShaderCompiler compiler(
 				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
 			ShaderDesc desc{

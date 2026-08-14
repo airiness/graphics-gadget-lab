@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Async/ProgressChannel.h"
+#include "GGLabFoundation/Async/ProgressChannel.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/SamplerTypes.h"
 #include "Graphics/Asset/TextureAsset.h"

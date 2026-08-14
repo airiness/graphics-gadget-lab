@@ -1,5 +1,5 @@
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Shader/ShaderManager.h"

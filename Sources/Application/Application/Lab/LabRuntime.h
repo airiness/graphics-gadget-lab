@@ -3,7 +3,7 @@
 #include "Application/Lab/LabCommandQueue.h"
 #include "Application/Lab/LabInterfaces.h"
 #include "Application/Lab/LabSessionBase.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab

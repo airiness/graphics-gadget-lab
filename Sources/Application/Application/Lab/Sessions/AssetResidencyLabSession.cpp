@@ -1,5 +1,6 @@
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
-#include "Core/Task/TaskSystem.h"
+#include "Application/ApplicationLog.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"

@@ -1,5 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"

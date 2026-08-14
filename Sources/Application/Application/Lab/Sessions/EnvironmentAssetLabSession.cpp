@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
+#include "Application/ApplicationLog.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"

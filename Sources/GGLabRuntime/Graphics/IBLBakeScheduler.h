@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Task/TaskTypes.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeTypes.h"

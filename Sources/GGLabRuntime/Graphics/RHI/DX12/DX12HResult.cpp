@@ -1,7 +1,6 @@
 #include "Graphics/RHI/DX12/DX12HResult.h"
-#include "Core/Platform/Win/Win32DiagnosticOutput.h"
-#include "Core/Platform/Win/Win32StringUtils.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <cstdlib>
 #include <sstream>
@@ -13,6 +12,12 @@ namespace gglab
 {
 	namespace
 	{
+		[[nodiscard]] bool IsDeviceRemovedHResult(HRESULT result) noexcept
+		{
+			return result == DXGI_ERROR_DEVICE_REMOVED || result == DXGI_ERROR_DEVICE_HUNG ||
+				result == DXGI_ERROR_DEVICE_RESET;
+		}
+
 		void AppendAdapterInfo(std::ostringstream& os, ID3D12Device* device)
 		{
 			if (!device)

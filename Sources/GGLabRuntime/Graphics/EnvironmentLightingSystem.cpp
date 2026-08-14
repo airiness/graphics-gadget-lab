@@ -1,5 +1,5 @@
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Core/CoreMacros.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 #include <algorithm>

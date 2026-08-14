@@ -1,7 +1,7 @@
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 #include "Core/Log/LogMacros.h"
-#include "Core/Utility/StringUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
 #include <array>
@@ -39,11 +39,11 @@ namespace gglab
 			{
 				return false;
 			}
-			if (utils::StartsWithIgnoreCase(snapshot.m_Identity.m_DeviceName, prefix))
+			if (utils::StartsWithAsciiIgnoreCase(snapshot.m_Identity.m_DeviceName, prefix))
 			{
 				return true;
 			}
-			return utils::StartsWithIgnoreCase(snapshot.m_Identity.UuidHex(), prefix);
+			return utils::StartsWithAsciiIgnoreCase(snapshot.m_Identity.UuidHex(), prefix);
 		}
 
 		void LogAdapterSummary(const VulkanAdapterCapabilitySnapshot& snapshot) noexcept
