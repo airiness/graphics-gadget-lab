@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{6217F100
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundationTests", "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj", "{B276486A-987A-424E-9878-91057B05DAAD}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntimeTests", "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj", "{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj", "{371B9FA9-4C90-4AC6-A123-ACED756D6C77}"
@@ -51,6 +53,10 @@ Global
 		{B276486A-987A-424E-9878-91057B05DAAD}.Debug|x64.Build.0 = Debug|x64
 		{B276486A-987A-424E-9878-91057B05DAAD}.Release|x64.ActiveCfg = Release|x64
 		{B276486A-987A-424E-9878-91057B05DAAD}.Release|x64.Build.0 = Release|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Debug|x64.ActiveCfg = Debug|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Debug|x64.Build.0 = Debug|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.ActiveCfg = Release|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.Build.0 = Release|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.ActiveCfg = Debug|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.Build.0 = Debug|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.ActiveCfg = Release|x64
@@ -61,6 +67,7 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B276486A-987A-424E-9878-91057B05DAAD} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution

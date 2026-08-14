@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ArtifactCacheSelfTests.h"
+#include "ArtifactCacheSelfTests.h"
 #include "Graphics/Asset/ArtifactCacheCore.h"
 
 namespace gglab

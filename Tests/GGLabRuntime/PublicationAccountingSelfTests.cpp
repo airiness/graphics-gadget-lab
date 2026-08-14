@@ -1,4 +1,4 @@
-#include "Application/SelfTest/PublicationAccountingSelfTests.h"
+#include "PublicationAccountingSelfTests.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
 
 namespace gglab

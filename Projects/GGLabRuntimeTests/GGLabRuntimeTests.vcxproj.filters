@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\Tests\GGLabRuntime\ArtifactCacheSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\GGLabRuntimeTestsMain.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Tests\GGLabRuntime\ArtifactCacheSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\AssetDataSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.h" />
+  </ItemGroup>
+</Project>

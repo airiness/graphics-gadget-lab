@@ -1,4 +1,4 @@
-#include "Application/SelfTest/AssetUploadSchedulerSelfTests.h"
+#include "AssetUploadSchedulerSelfTests.h"
 
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/RHI/RHIBuffer.h"

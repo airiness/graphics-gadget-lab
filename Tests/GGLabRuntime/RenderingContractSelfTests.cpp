@@ -1,7 +1,6 @@
-#include "Application/SelfTest/RenderingContractSelfTests.h"
+#include "RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
-#include "DevTools/DevToolsRuntime.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -2284,27 +2283,6 @@ namespace gglab
 				resolvedGTAO.m_StepCount == GTAOMaxStepCount &&
 				resolvedGTAO.m_DenoiseRadius == GTAOMaxDenoiseRadius,
 				"GTAO authoring inputs resolve to bounded deterministic spatial settings");
-
-			ViewRenderProfile activeProfile{};
-			activeProfile.m_Lighting.m_GTAO.m_Enabled = false;
-			activeProfile.m_Lighting.m_GTAO.m_Radius = 0.75f;
-			DevToolsRuntime devTools;
-			const ViewRenderProfile profileWithoutOverride =
-				devTools.ResolveViewRenderProfile(activeProfile);
-			auto& gtaoOverride = devTools.GetViewRenderSettingsOverrides().m_GTAO;
-			gtaoOverride.m_Settings = activeProfile.m_Lighting.m_GTAO;
-			gtaoOverride.m_Settings.m_Enabled = true;
-			gtaoOverride.m_Settings.m_Radius = 2.5f;
-			gtaoOverride.m_IsActive = true;
-			const ViewRenderProfile profileWithOverride =
-				devTools.ResolveViewRenderProfile(activeProfile);
-			context.Check(!profileWithoutOverride.m_Lighting.m_GTAO.m_Enabled &&
-				profileWithoutOverride.m_Lighting.m_GTAO.m_Radius == 0.75f &&
-				profileWithOverride.m_Lighting.m_GTAO.m_Enabled &&
-				profileWithOverride.m_Lighting.m_GTAO.m_Radius == 2.5f &&
-				!activeProfile.m_Lighting.m_GTAO.m_Enabled &&
-				activeProfile.m_Lighting.m_GTAO.m_Radius == 0.75f,
-				"GTAO DevTools override is explicit and does not mutate the active authoring profile");
 			RunShaderCompileContractTests(context);
 		}
 

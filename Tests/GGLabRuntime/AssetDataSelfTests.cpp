@@ -1,4 +1,4 @@
-#include "Application/SelfTest/AssetDataSelfTests.h"
+#include "AssetDataSelfTests.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"

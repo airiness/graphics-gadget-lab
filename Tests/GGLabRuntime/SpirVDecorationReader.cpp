@@ -1,4 +1,4 @@
-#include "Application/SelfTest/SpirVDecorationReader.h"
+#include "SpirVDecorationReader.h"
 
 #include <algorithm>
 #include <optional>

@@ -1,4 +1,3 @@
-#include "Application/SelfTest/AssetUploadSchedulerSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 #include "Application/SelfTest/NapaVoxelDataOnlyPublicationSelfTests.h"
 
@@ -1936,7 +1935,6 @@ namespace gglab
 		RunInitialPublicationFailureTests(context);
 		RunInitialPublicationCancellationTests(context);
 		RunInitialPublicationIdentityTests(context);
-		RunAssetUploadSchedulerSelfTests(context);
 		RunPublicationSessionCancellationIntegrationTest(context);
 		RunInteractivePublicationIntegrationTest(context);
 		RunReplacementBatchContractTests(context);
