@@ -1,5 +1,6 @@
 #pragma once
 #include "Core/Math/Matrix.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 
 #include <algorithm>
 #include <cmath>
@@ -14,8 +15,8 @@ namespace gglab
 		Standard = 1,
 	};
 
-	static_assert(std::to_underlying(DepthConvention::Reversed) == 0);
-	static_assert(std::to_underlying(DepthConvention::Standard) == 1);
+	static_assert(utils::ToUnderlying(DepthConvention::Reversed) == 0);
+	static_assert(utils::ToUnderlying(DepthConvention::Standard) == 1);
 
 	namespace screen_space
 	{
