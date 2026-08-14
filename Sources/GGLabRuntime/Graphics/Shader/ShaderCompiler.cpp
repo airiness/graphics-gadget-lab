@@ -1,12 +1,11 @@
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Hash/KeyHash.h"
-#include "GGLabFoundation/Platform/Win/HResult.h"
-#include "Core/Log/LogMacros.h"
-#include "GGLabFoundation/Platform/Win/ComTypes.h"
-#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
-#include "Core/StringId.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Logging/Log.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
+#include "GGLabFoundation/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 
@@ -40,6 +39,31 @@ namespace gglab
 
 	namespace
 	{
+		inline constexpr std::uint32_t ShaderRecipeHashSchema = 1;
+		inline constexpr std::uint32_t ShaderCacheMetadataSchema = 3;
+		inline constexpr LogTag ShaderCompilerLogTag{ "SHADER_COMPILER" };
+
+		[[nodiscard]] constexpr std::uint64_t ReadBigEndianU64(
+			const Sha256Digest& digest, std::size_t offset) noexcept
+		{
+			std::uint64_t value = 0;
+			for (std::size_t byteIndex = 0; byteIndex < sizeof(value); ++byteIndex)
+			{
+				value = (value << 8u) |
+					std::to_integer<std::uint64_t>(digest.m_Value[offset + byteIndex]);
+			}
+			return value;
+		}
+
+		[[nodiscard]] constexpr ShaderHash128 TruncateSha256(
+			const Sha256Digest& digest) noexcept
+		{
+			return {
+				.m_LowBits = ReadBigEndianU64(digest, sizeof(std::uint64_t)),
+				.m_HighBits = ReadBigEndianU64(digest, 0),
+			};
+		}
+
 		[[nodiscard]] constexpr std::string_view ShaderBinaryFormatText(
 			ShaderBinaryFormat format) noexcept
 		{
@@ -187,6 +211,13 @@ namespace gglab
 		}
 	}
 
+#if defined(BUILD_DEBUG)
+#define GGLAB_LOG_SHADER_COMPILER(level, ...) \
+	::gglab::Log(ShaderCompilerLogTag, level, __VA_ARGS__)
+#else
+#define GGLAB_LOG_SHADER_COMPILER(level, ...)
+#endif
+
 	ShaderCompileValidationResult ValidateShaderDesc(
 		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept
 	{
@@ -296,7 +327,8 @@ namespace gglab
 		const ShaderCompileValidationResult validation = ValidateShaderDesc(desc, m_DxcVersion);
 		if (!validation.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("Shader compile descriptor validation failed: {}",
+			GGLAB_LOG_SHADER_COMPILER(LogLevel::Error,
+				"Shader compile descriptor validation failed: {}",
 				utils::ToString(validation.m_Message));
 			return {};
 		}
@@ -576,15 +608,30 @@ namespace gglab
 
 	ShaderHash128 ShaderCompiler::ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept
 	{
-		const auto keyString = BuildKeyString(mergedDesc);
-		const auto* bytes = reinterpret_cast<const uint8_t*>(keyString.data());
+		Sha256Builder builder;
+		bool succeeded = builder.AddStringUtf8("gglab.shader.recipe") &&
+			builder.AddU32LE(ShaderRecipeHashSchema) &&
+			builder.AddStringUtf8(
+				utils::ToString(utils::Canonical(mergedDesc.m_SourcePath).generic_wstring())) &&
+			builder.AddU32LE(static_cast<std::uint32_t>(
+				mergedDesc.m_Target.m_BinaryFormat)) &&
+			builder.AddU32LE(static_cast<std::uint32_t>(
+				mergedDesc.m_Target.m_SpirVTargetEnvironment)) &&
+			builder.AddU32LE(mergedDesc.m_Target.m_BindingABIRevision) &&
+			builder.AddU32LE(static_cast<std::uint32_t>(
+				mergedDesc.m_Target.m_CoordinateOptions)) &&
+			builder.AddStringUtf8(utils::ToString(mergedDesc.m_Target.m_DxcVersion));
 
-		const auto keySize = keyString.size() * sizeof(wchar_t);
-		ShaderHash128 hash{};
-		hash.m_LowBits = Crc64(keyString);
-		hash.m_HighBits = FNV1a64::HashBytes64(bytes, keySize);
+		const std::vector<std::wstring> compileArguments = BuildCompileArguments(mergedDesc);
+		succeeded = succeeded &&
+			builder.AddU64LE(static_cast<std::uint64_t>(compileArguments.size()));
+		for (const std::wstring& argument : compileArguments)
+		{
+			succeeded = succeeded && builder.AddStringUtf8(utils::ToString(argument));
+		}
 
-		return hash;
+		GGLAB_ASSERT_MSG(succeeded, "Failed to encode the shader recipe hash input.");
+		return TruncateSha256(builder.Finish());
 	}
 
 	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(
@@ -666,7 +713,7 @@ namespace gglab
 			result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&log), nullptr);
 			if (log && log->GetStringLength())
 			{
-				GGLAB_LOG_GRAPHICS_ERROR(
+				GGLAB_LOG_SHADER_COMPILER(LogLevel::Error,
 					"DXC error:\n{}", static_cast<const char*>(log->GetBufferPointer()));
 			}
 			GGLAB_HR(status);
@@ -698,7 +745,8 @@ namespace gglab
 		const auto entry = utils::ToString(desc.m_Entry);
 		const auto target = utils::ToString(ToTarget(desc.m_Stage, desc.m_Target.m_Model));
 
-		out << "schema=2\n";
+		out << "schema=" << ShaderCacheMetadataSchema << "\n";
+		out << "recipe_hash_schema=" << ShaderRecipeHashSchema << "\n";
 		out << "recipe=" << utils::ToString(ToHex(recipeHash)) << "\n";
 		out << "binary_format=" << ShaderBinaryFormatText(desc.m_Target.m_BinaryFormat) << "\n";
 		out << "target_environment=" <<
@@ -812,7 +860,9 @@ namespace gglab
 				const auto iterator = values.find(std::string(key));
 				return iterator != values.end() && iterator->second == expected;
 			};
-		return dependencyCount > 0 && equals("schema", "2") &&
+		return dependencyCount > 0 &&
+			equals("schema", std::to_string(ShaderCacheMetadataSchema)) &&
+			equals("recipe_hash_schema", std::to_string(ShaderRecipeHashSchema)) &&
 			equals("recipe", utils::ToString(ToHex(recipeHash))) &&
 			equals("binary_format", ShaderBinaryFormatText(desc.m_Target.m_BinaryFormat)) &&
 			equals("target_environment",
@@ -899,39 +949,6 @@ namespace gglab
 		}
 
 		return target;
-	}
-
-	std::wstring ShaderCompiler::BuildKeyString(const ShaderDesc& desc) noexcept
-	{
-		const auto src = utils::Canonical(desc.m_SourcePath).wstring();
-		std::wstring str;
-		str.reserve(1024);
-		const auto append = [&str](std::wstring_view name, std::wstring_view value)
-			{
-				str.append(name);
-				str.push_back(L':');
-				str.append(std::to_wstring(value.size()));
-				str.push_back(L':');
-				str.append(value);
-				str.push_back(L';');
-			};
-		append(L"src", src);
-		append(L"binary_format",
-			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_BinaryFormat)));
-		append(L"target_environment",
-			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_SpirVTargetEnvironment)));
-		append(L"binding_abi_revision",
-			std::to_wstring(desc.m_Target.m_BindingABIRevision));
-		append(L"coordinate_options",
-			std::to_wstring(static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions)));
-		append(L"dxc_version", desc.m_Target.m_DxcVersion);
-		const std::vector<std::wstring> compileArguments = BuildCompileArguments(desc);
-		for (const std::wstring& argument : compileArguments)
-		{
-			append(L"arg", argument);
-		}
-
-		return str;
 	}
 
 	std::wstring ShaderCompiler::QueryDxcVersion() const noexcept
@@ -1025,7 +1042,8 @@ namespace gglab
 		ShaderHash128 hash{};
 		if (!binary.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_WARN("ShaderCompiler::ComputeHashFromBinary: binary is empty.");
+			GGLAB_LOG_SHADER_COMPILER(LogLevel::Warning,
+				"ShaderCompiler::ComputeHashFromBinary: binary is empty.");
 			return hash;
 		}
 
@@ -1037,14 +1055,14 @@ namespace gglab
 			return hash;
 		}
 
-		// FNV-1a 64-bit hash
 		if (format == ShaderBinaryFormat::Dxil)
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
-				"ShaderCompiler::ComputeHashFromBinary: Failed to get DXIL container hash, fallback to FNV-1a hash.");
+			GGLAB_LOG_SHADER_COMPILER(LogLevel::Warning,
+				"ShaderCompiler::ComputeHashFromBinary: Failed to get DXIL container hash, fallback to SHA-256.");
 		}
-		hash.m_LowBits = FNV1a64::HashBytes64(ptr, size);
-		hash.m_HighBits = FNV1a64::HashBytes64(ptr, size, 0x9ae16a3b2f90404full);
-		return hash;
+		return TruncateSha256(ComputeSha256(
+			std::span(reinterpret_cast<const std::byte*>(ptr), size)));
 	}
 }
+
+#undef GGLAB_LOG_SHADER_COMPILER

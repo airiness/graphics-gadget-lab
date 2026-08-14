@@ -15,6 +15,8 @@ param(
 #                        tests see only the Foundation Public root.
 #   Include identity - public logical include paths must be unique across owners.
 #   Foundation boundary - Foundation must not include any upper first-party domain.
+#   Foundation consumers - ShaderCompiler foundational dependencies must come
+#                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
 #                        DevTools/*, or the Application-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
@@ -603,6 +605,24 @@ foreach ($itemPath in $foundationSourceItems) {
             Rule   = "foundation-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
             Reason = "Foundation source includes an upper first-party domain"
+        })
+    }
+}
+
+$shaderCompilerProbePaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.cpp")
+)
+foreach ($shaderCompilerPath in $shaderCompilerProbePaths) {
+    if (-not (Test-Path -LiteralPath $shaderCompilerPath -PathType Leaf)) {
+        throw "ShaderCompiler consumer probe source not found: $shaderCompilerPath"
+    }
+    $shaderCompilerContent = Get-Content -LiteralPath $shaderCompilerPath -Raw -ErrorAction Stop
+    if ($shaderCompilerContent -match '#include\s*"Core[\\/]') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-consumer"
+            Target = ConvertTo-RepoRelativePath $shaderCompilerPath
+            Reason = "ShaderCompiler foundational dependencies must not come from GGLabRuntime/Core"
         })
     }
 }

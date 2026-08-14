@@ -60,7 +60,6 @@ namespace gglab
 		static std::wstring DefaultEntry(const ShaderStage& stage) noexcept;
 		static std::wstring ToHex(ShaderHash128 hash) noexcept;
 		static std::wstring ToTarget(ShaderStage stage, ShaderModel model) noexcept;
-		static std::wstring BuildKeyString(const ShaderDesc& desc) noexcept;
 		std::wstring QueryDxcVersion() const noexcept;
 		static bool GetContainerHash(
 			const void* data, size_t size, ShaderHash128& outHash) noexcept;
