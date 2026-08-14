@@ -15,9 +15,4 @@ namespace gglab::utils
 		std::string_view text, std::string_view substring) noexcept;
 	[[nodiscard]] std::string BytesToHexString(std::span<const std::uint8_t> bytes) noexcept;
 	[[nodiscard]] std::string_view FindLeaf(std::string_view path) noexcept;
-
-	[[nodiscard]] constexpr const char* BoolToString(bool value) noexcept
-	{
-		return value ? "Yes" : "No";
-	}
 }

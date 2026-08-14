@@ -1,6 +1,104 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="HeaderSelfContainment">
+      <UniqueIdentifier>{89D3CD9C-29AE-FE21-3729-0C9C7FCFDCFC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation">
+      <UniqueIdentifier>{D13D0A53-52CB-2B1F-DE3E-872017FEF820}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Async">
+      <UniqueIdentifier>{F73AF60B-E70B-0A12-9239-E65D7311EEF7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Base">
+      <UniqueIdentifier>{28860C88-7CB2-1677-A5CC-AF5BA02280D6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Hash">
+      <UniqueIdentifier>{0DE8814A-1751-4BD0-4911-68D1FC7334B8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\IO">
+      <UniqueIdentifier>{5732D286-2222-AA18-0962-70B836BB4D87}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Logging">
+      <UniqueIdentifier>{2D64F65F-45F9-CCAD-A249-A0796E599046}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Platform">
+      <UniqueIdentifier>{892DA8DC-1492-9D56-F600-399CC87BB426}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Platform\Win">
+      <UniqueIdentifier>{9C73B382-F83A-4A66-FD6B-BC5B0BBDA4E2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\String">
+      <UniqueIdentifier>{A9BCD60A-C64F-9187-8A66-227A86D8D972}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HeaderSelfContainment\GGLabFoundation\Task">
+      <UniqueIdentifier>{70077212-31A1-12CF-0F9A-3842448C7638}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="..\..\Tests\GGLabFoundation\FoundationLinkProbe.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Async\ProgressChannel.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Async</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\CoreMacros.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\EnumFlags.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\MathUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\TypedIndex.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\TypeUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Hash\Sha256.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\IO\PathUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\IO</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Logging\Log.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Logging</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\ComTypes.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\HResult.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32NamedMutex.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32PathUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32ProcessUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32StringUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32TaskWorkerLifecycle.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\String\StringUtils.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\String</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskSystem.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskTypes.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Task</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskWorkerLifecycle.cpp">
+      <Filter>HeaderSelfContainment\GGLabFoundation\Task</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -308,6 +308,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiPanelCatalog.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiProjectionUtils.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiFormatting.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiStateStore.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />

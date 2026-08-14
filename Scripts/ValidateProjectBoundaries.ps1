@@ -15,6 +15,11 @@ param(
 #                        tests see only the Foundation Public root.
 #   Include identity - public logical include paths must be unique across owners.
 #   Foundation boundary - Foundation must not include any upper first-party domain.
+#   Foundation private access - every private header is compiler-gated to the
+#                               Foundation project even when a broad consumer
+#                               include root can physically resolve its path.
+#   Public header closure - every Foundation Public header must compile in its
+#                           own translation unit without aggregate include help.
 #   Foundation consumers - ShaderCompiler foundational dependencies must come
 #                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
@@ -47,7 +52,9 @@ $repositoryTestsDir = Join-Path $root "Tests"
 $applicationSourcesDir = Join-Path $root "Sources/Application"
 $foundationSourcesDir = Join-Path $root "Sources/GGLabFoundation"
 $foundationPublicDir = Join-Path $foundationSourcesDir "Public"
+$foundationPrivateDir = Join-Path $foundationSourcesDir "Private"
 $foundationTestsDir = Join-Path $root "Tests/GGLabFoundation"
+$foundationHeaderProbeDir = Join-Path $foundationTestsDir "HeaderSelfContainment"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 $napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
 
@@ -387,6 +394,8 @@ function Test-ProjectIncludeVisibility {
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
 $applicationIncludeRoot = '$(GGLabRepositoryRoot)Sources\Application'
+# Allowed, but deliberately not required: the current NapaVoxelCore/... layout
+# still needs this broad root. Foundation Private access is compiler-gated below.
 $repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
 $foundationPublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public'
 $foundationPrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private'
@@ -396,8 +405,7 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     @($runtimeIncludeRoot, $foundationPublicIncludeRoot)
 Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
     "Projects/Application/Application.vcxproj" `
-    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
-        $repositorySourcesIncludeRoot) `
+    @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot) `
     @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
         $repositorySourcesIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
@@ -408,7 +416,58 @@ Test-ProjectIncludeVisibility $foundationTestsProject $foundationTestsNamespace 
     "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj" `
     @($foundationPublicIncludeRoot) @($foundationPublicIncludeRoot)
 
+$foundationPrivateAccessMacro = "GGLAB_FOUNDATION_PRIVATE_ACCESS"
+function Test-ProjectPrivateAccessDefinition {
+    param(
+        [xml]$Project,
+        [System.Xml.XmlNamespaceManager]$Namespace,
+        [string]$ProjectPath,
+        [bool]$Required
+    )
+
+    $definitionNodes = @($Project.SelectNodes(
+        "//msb:ItemDefinitionGroup/msb:ClCompile/msb:PreprocessorDefinitions", $Namespace))
+    if ($Required -and $definitionNodes.Count -eq 0) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = $ProjectPath
+            Reason = "Foundation project has no compile definitions for private access"
+        })
+    }
+    foreach ($definitionNode in $definitionNodes) {
+        $definitions = @(([string]$definitionNode.InnerText).Split(';') |
+            ForEach-Object { $_.Trim() })
+        $hasPrivateAccess = $definitions -contains $foundationPrivateAccessMacro
+        if ($Required -and -not $hasPrivateAccess) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "foundation-private-access"
+                Target = $ProjectPath
+                Reason = "Foundation compile definitions must grant private-header access"
+            })
+        }
+        elseif (-not $Required -and $hasPrivateAccess) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "foundation-private-access"
+                Target = $ProjectPath
+                Reason = "only GGLabFoundation may define $foundationPrivateAccessMacro"
+            })
+        }
+    }
+}
+
+Test-ProjectPrivateAccessDefinition $foundationProject $foundationNamespace `
+    "Projects/GGLabFoundation/GGLabFoundation.vcxproj" $true
+Test-ProjectPrivateAccessDefinition $foundationTestsProject $foundationTestsNamespace `
+    "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $runtimeProject $namespace `
+    "Projects/GGLabRuntime/GGLabRuntime.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $applicationProject $applicationNamespace `
+    "Projects/Application/Application.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $napaProject $napaNamespace `
+    "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj" $false
+
 $firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
+$publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $ownershipSpecifications = @(
     [pscustomobject]@{
         Name       = "Application"
@@ -609,6 +668,38 @@ foreach ($itemPath in $foundationSourceItems) {
     }
 }
 
+$foundationPrivateHeaders = @(Get-ChildItem -LiteralPath $foundationPrivateDir -Recurse -File |
+    Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions })
+foreach ($privateHeader in $foundationPrivateHeaders) {
+    $content = Get-Content -LiteralPath $privateHeader.FullName -Raw -ErrorAction Stop
+    if ($content -notmatch
+        '#if\s+!defined\s*\(\s*GGLAB_FOUNDATION_PRIVATE_ACCESS\s*\)') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = ConvertTo-RepoRelativePath $privateHeader.FullName
+            Reason = "private header lacks the Foundation-only compile access guard"
+        })
+    }
+}
+
+$nonFoundationSourceItems = @($applicationSourceItems + $runtimeSourceItems +
+    $foundationTestsSourceItems + $napaSourceItems)
+foreach ($itemPath in $nonFoundationSourceItems) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bGGLAB_FOUNDATION_PRIVATE_ACCESS\b' -or
+        $content -match '#include\s*[<"]GGLabFoundation[\\/]Private[\\/]') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-private-access"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "non-Foundation source attempts to consume Foundation Private content"
+        })
+    }
+}
+
 $shaderCompilerProbePaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderCompiler.cpp")
@@ -627,7 +718,6 @@ foreach ($shaderCompilerPath in $shaderCompilerProbePaths) {
     }
 }
 
-$publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $logicalIncludeSpecifications = @(
     [pscustomobject]@{
         Name        = "Application"
@@ -688,6 +778,62 @@ foreach ($specification in $logicalIncludeSpecifications) {
                 FullPath = $header.FullName
             }
         }
+    }
+}
+
+$foundationTestsSourceItemSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+foreach ($itemPath in $foundationTestsSourceItems) {
+    [void]$foundationTestsSourceItemSet.Add($itemPath)
+}
+$expectedFoundationHeaderProbes = New-Object 'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
+$foundationPublicHeaders = @(Get-ChildItem -LiteralPath $foundationPublicDir -Recurse -File |
+    Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions })
+foreach ($publicHeader in $foundationPublicHeaders) {
+    $logicalPath = $publicHeader.FullName.Substring($foundationPublicDir.Length + 1).
+        Replace('\', '/')
+    $probeRelativePath = [System.IO.Path]::ChangeExtension($logicalPath, ".cpp")
+    $probePath = [System.IO.Path]::GetFullPath(
+        (Join-Path $foundationHeaderProbeDir $probeRelativePath))
+    [void]$expectedFoundationHeaderProbes.Add($probePath)
+
+    if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-header-self-containment"
+            Target = $logicalPath
+            Reason = "missing independent translation-unit probe"
+        })
+        continue
+    }
+    if (-not $foundationTestsSourceItemSet.Contains($probePath)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-header-self-containment"
+            Target = ConvertTo-RepoRelativePath $probePath
+            Reason = "header probe is not compiled by GGLabFoundationTests"
+        })
+    }
+
+    $expectedProbeContent = "#include `"$logicalPath`""
+    $actualProbeContent = (Get-Content -LiteralPath $probePath -Raw -ErrorAction Stop).Trim()
+    if ($actualProbeContent -ne $expectedProbeContent) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-header-self-containment"
+            Target = ConvertTo-RepoRelativePath $probePath
+            Reason = "probe must contain only its matching public-header include"
+        })
+    }
+}
+
+$actualFoundationHeaderProbes = @(Get-ChildItem -LiteralPath $foundationHeaderProbeDir `
+    -Recurse -File -Filter "*.cpp")
+foreach ($probe in $actualFoundationHeaderProbes) {
+    if (-not $expectedFoundationHeaderProbes.Contains($probe.FullName)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "foundation-header-self-containment"
+            Target = ConvertTo-RepoRelativePath $probe.FullName
+            Reason = "orphan probe has no matching Foundation Public header"
+        })
     }
 }
 

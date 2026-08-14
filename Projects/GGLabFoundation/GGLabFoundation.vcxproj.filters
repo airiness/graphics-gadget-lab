@@ -107,6 +107,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h">
+      <Filter>Private</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h">
       <Filter>Public\GGLabFoundation\Async</Filter>
     </ClInclude>

@@ -635,6 +635,9 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiContext.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiFormatting.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiMathWidgets.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
