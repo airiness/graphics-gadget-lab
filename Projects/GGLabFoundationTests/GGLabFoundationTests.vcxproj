@@ -85,27 +85,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Tests\GGLabFoundation\FoundationLinkProbe.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Async\ProgressChannel.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\CoreMacros.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\EnumFlags.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\MathUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\TypedIndex.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Base\TypeUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Hash\Sha256.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\IO\PathUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Logging\Log.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\ComTypes.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\HResult.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32NamedMutex.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32PathUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32ProcessUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32StringUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Platform\Win\Win32TaskWorkerLifecycle.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\String\StringUtils.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskSystem.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskTypes.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabFoundation\HeaderSelfContainment\GGLabFoundation\Task\TaskWorkerLifecycle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
@@ -113,5 +92,7 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="GGLabFoundationHeaderSelfContainment.targets" />
+  </ImportGroup>
 </Project>

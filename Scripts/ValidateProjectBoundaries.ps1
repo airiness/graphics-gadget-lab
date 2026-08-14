@@ -54,7 +54,6 @@ $foundationSourcesDir = Join-Path $root "Sources/GGLabFoundation"
 $foundationPublicDir = Join-Path $foundationSourcesDir "Public"
 $foundationPrivateDir = Join-Path $foundationSourcesDir "Private"
 $foundationTestsDir = Join-Path $root "Tests/GGLabFoundation"
-$foundationHeaderProbeDir = Join-Path $foundationTestsDir "HeaderSelfContainment"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 $napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
 
@@ -778,62 +777,6 @@ foreach ($specification in $logicalIncludeSpecifications) {
                 FullPath = $header.FullName
             }
         }
-    }
-}
-
-$foundationTestsSourceItemSet = New-Object 'System.Collections.Generic.HashSet[string]' `
-    ([System.StringComparer]::OrdinalIgnoreCase)
-foreach ($itemPath in $foundationTestsSourceItems) {
-    [void]$foundationTestsSourceItemSet.Add($itemPath)
-}
-$expectedFoundationHeaderProbes = New-Object 'System.Collections.Generic.HashSet[string]' `
-    ([System.StringComparer]::OrdinalIgnoreCase)
-$foundationPublicHeaders = @(Get-ChildItem -LiteralPath $foundationPublicDir -Recurse -File |
-    Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions })
-foreach ($publicHeader in $foundationPublicHeaders) {
-    $logicalPath = $publicHeader.FullName.Substring($foundationPublicDir.Length + 1).
-        Replace('\', '/')
-    $probeRelativePath = [System.IO.Path]::ChangeExtension($logicalPath, ".cpp")
-    $probePath = [System.IO.Path]::GetFullPath(
-        (Join-Path $foundationHeaderProbeDir $probeRelativePath))
-    [void]$expectedFoundationHeaderProbes.Add($probePath)
-
-    if (-not (Test-Path -LiteralPath $probePath -PathType Leaf)) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "foundation-header-self-containment"
-            Target = $logicalPath
-            Reason = "missing independent translation-unit probe"
-        })
-        continue
-    }
-    if (-not $foundationTestsSourceItemSet.Contains($probePath)) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "foundation-header-self-containment"
-            Target = ConvertTo-RepoRelativePath $probePath
-            Reason = "header probe is not compiled by GGLabFoundationTests"
-        })
-    }
-
-    $expectedProbeContent = "#include `"$logicalPath`""
-    $actualProbeContent = (Get-Content -LiteralPath $probePath -Raw -ErrorAction Stop).Trim()
-    if ($actualProbeContent -ne $expectedProbeContent) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "foundation-header-self-containment"
-            Target = ConvertTo-RepoRelativePath $probePath
-            Reason = "probe must contain only its matching public-header include"
-        })
-    }
-}
-
-$actualFoundationHeaderProbes = @(Get-ChildItem -LiteralPath $foundationHeaderProbeDir `
-    -Recurse -File -Filter "*.cpp")
-foreach ($probe in $actualFoundationHeaderProbes) {
-    if (-not $expectedFoundationHeaderProbes.Contains($probe.FullName)) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "foundation-header-self-containment"
-            Target = ConvertTo-RepoRelativePath $probe.FullName
-            Reason = "orphan probe has no matching Foundation Public header"
-        })
     }
 }
 
