@@ -1,5 +1,5 @@
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 
 #include <cstddef>
 #include <cstdint>

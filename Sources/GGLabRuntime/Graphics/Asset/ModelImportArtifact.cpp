@@ -1,5 +1,5 @@
 #include "Graphics/Asset/ModelImportArtifact.h"
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 
@@ -23,8 +23,8 @@ namespace gglab
 			ArtifactDigestWriter() noexcept : m_Succeeded(m_Builder.IsValid()) {}
 
 			void U8(uint8_t value) noexcept { m_Succeeded &= m_Builder.AddU8(value); }
-			void U32(uint32_t value) noexcept { m_Succeeded &= m_Builder.AddU32(value); }
-			void U64(uint64_t value) noexcept { m_Succeeded &= m_Builder.AddU64(value); }
+			void U32(uint32_t value) noexcept { m_Succeeded &= m_Builder.AddU32LE(value); }
+			void U64(uint64_t value) noexcept { m_Succeeded &= m_Builder.AddU64LE(value); }
 			void Bool(bool value) noexcept { U8(value ? 1u : 0u); }
 			void Float(float value) noexcept { U32(std::bit_cast<uint32_t>(value)); }
 			void String(std::string_view value) noexcept

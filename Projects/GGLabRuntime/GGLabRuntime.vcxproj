@@ -279,7 +279,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\Sha256.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Platform\Win\HResult.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h" />

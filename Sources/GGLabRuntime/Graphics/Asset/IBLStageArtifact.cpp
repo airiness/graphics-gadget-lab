@@ -1,6 +1,6 @@
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Utility/TextureUtils.h"
 
@@ -105,8 +105,8 @@ namespace gglab
 		Sha256Builder builder;
 		bool succeeded = builder.IsValid();
 		succeeded &= builder.AddStringUtf8("gglab.ibl.stage.content");
-		succeeded &= builder.AddU32(IBLStageArtifactSchemaVersion);
-		succeeded &= builder.AddU32(static_cast<uint32_t>(artifact.m_Stage));
+		succeeded &= builder.AddU32LE(IBLStageArtifactSchemaVersion);
+		succeeded &= builder.AddU32LE(static_cast<uint32_t>(artifact.m_Stage));
 		succeeded &= builder.AddBytes(textureDigest.m_Value);
 		if (!succeeded)
 		{

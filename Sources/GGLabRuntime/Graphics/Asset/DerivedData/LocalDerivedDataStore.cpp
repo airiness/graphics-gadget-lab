@@ -1,6 +1,6 @@
 ﻿#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
 #include "Core/Platform/Win/Win32ProcessUtils.h"
 #include "Core/Utility/PathUtils.h"
@@ -41,7 +41,7 @@ namespace gglab
 		constexpr uint64_t ContainerFixedBytes =
 			ContainerMagic.size() + 3 * sizeof(uint32_t) + sizeof(uint64_t) +
 			DerivedDataKey{}.m_Value.size() + ArtifactContentDigest{}.m_Value.size() +
-			Sha256Hash{}.m_Value.size();
+			Sha256Digest{}.m_Value.size();
 
 		class BinaryWriter
 		{
@@ -50,12 +50,12 @@ namespace gglab
 			{
 				m_Bytes.insert(m_Bytes.end(), bytes.begin(), bytes.end());
 			}
-			void AddU32(uint32_t value)
+			void AddU32LE(uint32_t value)
 			{
 				for (uint32_t i = 0; i < 4; ++i)
 					m_Bytes.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
 			}
-			void AddU64(uint64_t value)
+			void AddU64LE(uint64_t value)
 			{
 				for (uint32_t i = 0; i < 8; ++i)
 					m_Bytes.push_back(static_cast<std::byte>((value >> (i * 8)) & 0xffu));
@@ -133,7 +133,7 @@ namespace gglab
 			uint64_t payloadBytes = 0;
 			DerivedDataKey storedKey{};
 			ArtifactContentDigest storedArtifactDigest{};
-			Sha256Hash storedPayloadDigest{};
+			Sha256Digest storedPayloadDigest{};
 			const bool headerValid =
 				stream &&
 				reader.ReadBytes(magic) && reader.ReadU32(containerVersion) &&
@@ -157,7 +157,7 @@ namespace gglab
 					std::as_bytes(std::span{ artifactType.data(), artifactType.size() });
 				const auto payload = std::span(fileBytes).subspan(
 					reader.Offset() + typeBytes, static_cast<size_t>(payloadBytes));
-				const Sha256Hash payloadDigest = ComputeSha256(payload);
+				const Sha256Digest payloadDigest = ComputeSha256(payload);
 				if (std::ranges::equal(storedType, expectedType) &&
 					payloadDigest.IsValid() && payloadDigest.m_Value == storedPayloadDigest.m_Value &&
 					storedArtifactDigest.IsValid())
@@ -289,10 +289,10 @@ namespace gglab
 			return false;
 		BinaryWriter header;
 		header.AddBytes(ContainerMagic);
-		header.AddU32(ContainerVersion);
-		header.AddU32(schemaVersion);
-		header.AddU32(static_cast<uint32_t>(artifactType.size()));
-		header.AddU64(static_cast<uint64_t>(payload.size()));
+		header.AddU32LE(ContainerVersion);
+		header.AddU32LE(schemaVersion);
+		header.AddU32LE(static_cast<uint32_t>(artifactType.size()));
+		header.AddU64LE(static_cast<uint64_t>(payload.size()));
 		header.AddBytes(key.m_Value);
 		header.AddBytes(artifactContentDigest.m_Value);
 		header.AddBytes(ComputeSha256(payload).m_Value);
@@ -411,7 +411,7 @@ namespace gglab
 	void LocalDerivedDataStore::DiscardObservedCorrupt(const DerivedDataKey& key,
 		std::string_view artifactType, uint32_t schemaVersion,
 		const ArtifactContentDigest& observedArtifactContentDigest,
-		const Sha256Hash& observedPayloadDigest, LocalDerivedDataReadOptions options) noexcept
+		const Sha256Digest& observedPayloadDigest, LocalDerivedDataReadOptions options) noexcept
 	{
 		if (!IsEnabled() || !key.IsValid() || artifactType.empty() ||
 			!observedArtifactContentDigest.IsValid() || !observedPayloadDigest.IsValid())

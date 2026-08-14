@@ -803,9 +803,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Core\Hash</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\Sha256.h">
-      <Filter>Core\Hash</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\Logger.h">
       <Filter>Core\Log</Filter>
     </ClInclude>

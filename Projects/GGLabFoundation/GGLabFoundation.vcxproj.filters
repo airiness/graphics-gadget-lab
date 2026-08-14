@@ -4,6 +4,9 @@
     <Filter Include="Private">
       <UniqueIdentifier>{1F557CE7-74F6-B8D4-2D1E-CEF694A538D8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Hash">
+      <UniqueIdentifier>{39054E57-3AC5-91DD-A1F2-8DD98361E346}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public">
       <UniqueIdentifier>{65A5F962-2DEC-EF5E-BD7F-EABA2276C46E}</UniqueIdentifier>
     </Filter>
@@ -13,10 +16,16 @@
     <Filter Include="Public\GGLabFoundation\Base">
       <UniqueIdentifier>{ABF284BA-022B-9A0C-E333-8ED942902097}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabFoundation\Hash">
+      <UniqueIdentifier>{E15E9DC3-AF72-6EBB-52A4-E252E9FC5C86}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp">
       <Filter>Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp">
+      <Filter>Private\Hash</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -34,6 +43,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h">
       <Filter>Public\GGLabFoundation\Base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h">
+      <Filter>Public\GGLabFoundation\Hash</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

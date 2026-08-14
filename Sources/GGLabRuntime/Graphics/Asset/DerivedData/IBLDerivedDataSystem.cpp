@@ -63,7 +63,7 @@ namespace gglab
 			const std::filesystem::path relativePath =
 				relativeError ? key : std::filesystem::relative(key, canonicalRoot, relativeError);
 			const std::string pathText = (relativeError ? key : relativePath).generic_string();
-			bool succeeded = builder.AddU64(static_cast<uint64_t>(pathText.size()));
+			bool succeeded = builder.AddU64LE(static_cast<uint64_t>(pathText.size()));
 			succeeded &= builder.AddStringUtf8(pathText);
 
 			std::ifstream stream(key, std::ios::binary);
@@ -74,7 +74,7 @@ namespace gglab
 			}
 			std::string source(
 				(std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-			succeeded &= builder.AddU64(static_cast<uint64_t>(source.size()));
+			succeeded &= builder.AddU64LE(static_cast<uint64_t>(source.size()));
 			succeeded &= builder.AddBytes(std::as_bytes(std::span(source)));
 
 			size_t cursor = 0;
@@ -102,11 +102,11 @@ namespace gglab
 			const SourceDigest& shaderDigest) noexcept
 		{
 			bool succeeded = builder.AddStringUtf8(GetIBLStageArtifactType(stage));
-			succeeded &= builder.AddU32(IBLStageArtifactSchemaVersion);
-			succeeded &= builder.AddU32(TextureArtifactSchemaVersion);
-			succeeded &= builder.AddU32(IBLStageProducerCompatibilityVersion);
-			succeeded &= builder.AddU32(IBLBakeAlgorithmVersion);
-			succeeded &= builder.AddU32(static_cast<uint32_t>(compatibility));
+			succeeded &= builder.AddU32LE(IBLStageArtifactSchemaVersion);
+			succeeded &= builder.AddU32LE(TextureArtifactSchemaVersion);
+			succeeded &= builder.AddU32LE(IBLStageProducerCompatibilityVersion);
+			succeeded &= builder.AddU32LE(IBLBakeAlgorithmVersion);
+			succeeded &= builder.AddU32LE(static_cast<uint32_t>(compatibility));
 			if (compatibility == IBLArtifactCompatibility::AdapterScoped)
 			{
 				succeeded &= builder.AddStringUtf8(adapterScopeIdentity);
@@ -265,12 +265,12 @@ namespace gglab
 		bool succeeded = AddCommonKeyFields(environment, IBLArtifactStage::Environment,
 			m_Compatibility, m_AdapterScopeIdentity,
 			shaderDigests[static_cast<size_t>(IBLArtifactStage::Environment)]);
-		succeeded &= environment.AddU64(contentFingerprint.m_SourceContentHash);
-		succeeded &= environment.AddU64(contentFingerprint.m_ImportSettingsHash);
-		succeeded &= environment.AddU32(contentFingerprint.m_DecoderVersion);
-		succeeded &= environment.AddU32(static_cast<uint32_t>(sourceType));
-		succeeded &= environment.AddU32(config.m_EnvironmentCubemapSize);
-		succeeded &= environment.AddU32(static_cast<uint32_t>(config.m_EnvironmentCubemapFormat));
+		succeeded &= environment.AddU64LE(contentFingerprint.m_SourceContentHash);
+		succeeded &= environment.AddU64LE(contentFingerprint.m_ImportSettingsHash);
+		succeeded &= environment.AddU32LE(contentFingerprint.m_DecoderVersion);
+		succeeded &= environment.AddU32LE(static_cast<uint32_t>(sourceType));
+		succeeded &= environment.AddU32LE(config.m_EnvironmentCubemapSize);
+		succeeded &= environment.AddU32LE(static_cast<uint32_t>(config.m_EnvironmentCubemapFormat));
 		keys[static_cast<size_t>(IBLArtifactStage::Environment)] =
 			succeeded ? environment.Finish() : DerivedDataKey{};
 
@@ -280,9 +280,9 @@ namespace gglab
 			shaderDigests[static_cast<size_t>(IBLArtifactStage::Irradiance)]);
 		succeeded &=
 			irradiance.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
-		succeeded &= irradiance.AddU32(config.m_IrradianceCubemapSize);
-		succeeded &= irradiance.AddU32(static_cast<uint32_t>(config.m_IrradianceCubemapFormat));
-		succeeded &= irradiance.AddU32(config.m_IrradianceSampleCount);
+		succeeded &= irradiance.AddU32LE(config.m_IrradianceCubemapSize);
+		succeeded &= irradiance.AddU32LE(static_cast<uint32_t>(config.m_IrradianceCubemapFormat));
+		succeeded &= irradiance.AddU32LE(config.m_IrradianceSampleCount);
 		keys[static_cast<size_t>(IBLArtifactStage::Irradiance)] =
 			succeeded ? irradiance.Finish() : DerivedDataKey{};
 
@@ -292,12 +292,12 @@ namespace gglab
 			shaderDigests[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)]);
 		succeeded &=
 			specular.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
-		succeeded &= specular.AddU32(config.m_PrefilteredSpecularCubemapSize);
-		succeeded &= specular.AddU32(config.m_PrefilteredSpecularMipLevels);
+		succeeded &= specular.AddU32LE(config.m_PrefilteredSpecularCubemapSize);
+		succeeded &= specular.AddU32LE(config.m_PrefilteredSpecularMipLevels);
 		succeeded &=
-			specular.AddU32(static_cast<uint32_t>(config.m_PrefilteredSpecularCubemapFormat));
-		succeeded &= specular.AddU32(config.m_PrefilteredSpecularSampleCount);
-		succeeded &= specular.AddU32(
+			specular.AddU32LE(static_cast<uint32_t>(config.m_PrefilteredSpecularCubemapFormat));
+		succeeded &= specular.AddU32LE(config.m_PrefilteredSpecularSampleCount);
+		succeeded &= specular.AddU32LE(
 			std::bit_cast<uint32_t>(config.m_PrefilteredSpecularMaxSampleLuminance));
 		keys[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)] =
 			succeeded ? specular.Finish() : DerivedDataKey{};
@@ -305,8 +305,8 @@ namespace gglab
 		DerivedDataKeyBuilder brdf;
 		succeeded = AddCommonKeyFields(brdf, IBLArtifactStage::BrdfLut, m_Compatibility,
 			m_AdapterScopeIdentity, shaderDigests[static_cast<size_t>(IBLArtifactStage::BrdfLut)]);
-		succeeded &= brdf.AddU32(config.m_BrdfLutSize);
-		succeeded &= brdf.AddU32(static_cast<uint32_t>(config.m_BrdfLutFormat));
+		succeeded &= brdf.AddU32LE(config.m_BrdfLutSize);
+		succeeded &= brdf.AddU32LE(static_cast<uint32_t>(config.m_BrdfLutFormat));
 		keys[static_cast<size_t>(IBLArtifactStage::BrdfLut)] =
 			succeeded ? brdf.Finish() : DerivedDataKey{};
 		return keys;

@@ -257,7 +257,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Hash\Sha256.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />

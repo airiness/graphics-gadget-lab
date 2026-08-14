@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/Sha256.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/GraphicsTypes.h"
 
 #include <array>
@@ -49,8 +49,8 @@ namespace gglab
 	class DerivedDataKeyBuilder final
 	{
 	public:
-		bool AddU32(uint32_t value) noexcept { return m_Builder.AddU32(value); }
-		bool AddU64(uint64_t value) noexcept { return m_Builder.AddU64(value); }
+		bool AddU32LE(uint32_t value) noexcept { return m_Builder.AddU32LE(value); }
+		bool AddU64LE(uint64_t value) noexcept { return m_Builder.AddU64LE(value); }
 		bool AddStringUtf8(std::string_view value) noexcept
 		{
 			return m_Builder.AddStringUtf8(value);

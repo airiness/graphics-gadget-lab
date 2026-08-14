@@ -28,9 +28,6 @@
     <Filter Include="Core">
       <UniqueIdentifier>{A09D7BFC-1F79-4817-0ED1-F7C00792454D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core\Hash">
-      <UniqueIdentifier>{8A65BE32-6CF4-7887-CB70-E1C3DF9395F2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core\Input">
       <UniqueIdentifier>{6B56486C-D7A2-940D-93A5-5585769375EB}</UniqueIdentifier>
     </Filter>
@@ -305,9 +302,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Core\Hash\Sha256.cpp">
-      <Filter>Core\Hash</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\InputBase.cpp">
       <Filter>Core\Input</Filter>
