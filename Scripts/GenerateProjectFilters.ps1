@@ -326,6 +326,26 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "GGLabFoundation"
+        ProjectPath = "Projects\GGLabFoundation\GGLabFoundation.vcxproj"
+        FiltersPath = "Projects\GGLabFoundation\GGLabFoundation.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\GGLabFoundation"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "GGLabFoundationTests"
+        ProjectPath = "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj"
+        FiltersPath = "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\GGLabFoundation"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabRuntime"
         ProjectPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
         FiltersPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj.filters"
@@ -357,7 +377,7 @@ $projectSpecifications = @(
 
 $staleFilters = @()
 foreach ($specification in $projectSpecifications) {
-    $items = Get-ProjectPresentationItems $root $specification
+    $items = @(Get-ProjectPresentationItems $root $specification)
     $document = New-FiltersDocument $specification $items
     $expectedBytes = Get-XmlBytes $document
     $filtersPath = Join-Path $root $specification.FiltersPath

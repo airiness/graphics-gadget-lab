@@ -196,11 +196,61 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Validate project ownership and runtime boundaries
+      - name: Validate project ownership and first-party boundaries
         shell: pwsh
         run: |
           ./Scripts/ValidateProjectBoundaries.ps1
 
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabFoundation standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $foundationBuildArguments = @(
+            "Projects\GGLabFoundation\GGLabFoundation.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-foundation-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @foundationBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build and run GGLabFoundation link probe
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $foundationTestsBuildArguments = @(
+            "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-foundation-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @foundationTestsBuildArguments
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          & "Build\Output\x64\${{ matrix.configuration }}\GGLabFoundationTests.exe"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -297,6 +347,8 @@ jobs:
           path: |
             Build/Logs/gglab-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-application-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-foundation-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-foundation-tests-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7
