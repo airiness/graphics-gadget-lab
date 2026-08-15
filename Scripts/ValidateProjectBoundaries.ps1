@@ -787,7 +787,7 @@ foreach ($reference in $runtimeTestsProjectReferenceSet) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-graph"
             Target = "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj"
-            Reason = "first-party closure must be exactly GGLabRuntime, GGLabFoundation, GGLabTestCore and the vendored DirectXTex project"
+            Reason = "may reference only GGLabRuntime, GGLabFoundation and GGLabTestCore, plus the vendored DirectXTex project"
         })
     }
 }
