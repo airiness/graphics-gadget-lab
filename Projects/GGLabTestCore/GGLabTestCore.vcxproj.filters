@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Private">
+      <UniqueIdentifier>{38117BD9-DB85-5D90-D131-A69327A1AE1E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{A67112D9-D7B0-5029-416B-549600F8228C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabTestCore">
+      <UniqueIdentifier>{F9FA9018-B020-F689-A41C-DCF873473F5D}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabTestCore\Private\SelfTest.cpp">
+      <Filter>Private</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabTestCore\Public\GGLabTestCore\SelfTest.h">
+      <Filter>Public\GGLabTestCore</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

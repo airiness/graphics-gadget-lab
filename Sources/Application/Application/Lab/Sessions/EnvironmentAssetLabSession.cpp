@@ -1,5 +1,6 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Application/ApplicationLog.h"
+#include "GGLabFoundation/Base/TypeUtils.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -647,7 +648,7 @@ namespace gglab
 		diagnostics.m_Metrics = {
 			{.m_Name = "Elapsed", .m_Value = std::format("{:.2f} s", m_State->m_ElapsedSeconds)},
 			{.m_Name = "Selection phase",
-				.m_Value = std::to_string(std::to_underlying(m_State->m_Phase))},
+				.m_Value = std::to_string(utils::ToUnderlying(m_State->m_Phase))},
 		};
 		diagnostics.m_Checks.push_back({
 			.m_Name = "Transactional environment selection",

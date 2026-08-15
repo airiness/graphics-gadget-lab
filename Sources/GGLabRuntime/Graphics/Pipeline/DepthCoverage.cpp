@@ -1,3 +1,4 @@
+#include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
@@ -218,18 +219,18 @@ namespace gglab
 			"Raster={}/{}/ccw:{} Bias={}/{}/{} DepthClip={} "
 			"DoubleSided={} Samples={}/{} Mask=0x{:08X} "
 			"AlphaToCoverage={} AlphaVariant={}",
-			signature.m_CoverageVertexShader.Value(), std::to_underlying(signature.m_VertexProgram),
-			std::to_underlying(signature.m_Deformation),
-			std::to_underlying(signature.m_InputLayout),
-			std::to_underlying(signature.m_PositionPrecision),
-			std::to_underlying(signature.m_PositionFormat),
-			std::to_underlying(signature.m_TopologyType),
-			std::to_underlying(signature.m_PrimitiveTopology),
-			std::to_underlying(signature.m_FillMode), std::to_underlying(signature.m_CullMode),
+			signature.m_CoverageVertexShader.Value(), utils::ToUnderlying(signature.m_VertexProgram),
+			utils::ToUnderlying(signature.m_Deformation),
+			utils::ToUnderlying(signature.m_InputLayout),
+			utils::ToUnderlying(signature.m_PositionPrecision),
+			utils::ToUnderlying(signature.m_PositionFormat),
+			utils::ToUnderlying(signature.m_TopologyType),
+			utils::ToUnderlying(signature.m_PrimitiveTopology),
+			utils::ToUnderlying(signature.m_FillMode), utils::ToUnderlying(signature.m_CullMode),
 			signature.m_FrontCounterClockwise, signature.m_DepthBias, signature.m_DepthBiasClamp,
 			signature.m_SlopeScaledDepthBias, signature.m_DepthClipEnable, signature.m_DoubleSided,
 			signature.m_SampleCount, signature.m_SampleQuality, signature.m_SampleMask,
-			signature.m_AlphaToCoverageEnable, std::to_underlying(signature.m_AlphaVariant));
+			signature.m_AlphaToCoverageEnable, utils::ToUnderlying(signature.m_AlphaVariant));
 	}
 
 	std::string DescribeDepthCoverageRasterDomain(const DepthCoverageRasterDomain& domain)
@@ -241,12 +242,12 @@ namespace gglab
 			domain.m_FrameSerial, domain.m_ViewBindingId,
 			DescribeSource(domain.m_CurrentViewSource),
 			DescribeSource(domain.m_CurrentJitteredProjectionSource),
-			std::to_underlying(domain.m_ProjectionSource), domain.m_TargetWidth,
+			utils::ToUnderlying(domain.m_ProjectionSource), domain.m_TargetWidth,
 			domain.m_TargetHeight, domain.m_Viewport.m_X, domain.m_Viewport.m_Y,
 			domain.m_Viewport.m_Width, domain.m_Viewport.m_Height, domain.m_Viewport.m_MinDepth,
 			domain.m_Viewport.m_MaxDepth, domain.m_Scissor.m_Left, domain.m_Scissor.m_Top,
 			domain.m_Scissor.m_Right, domain.m_Scissor.m_Bottom,
-			std::to_underlying(domain.m_DepthConvention));
+			utils::ToUnderlying(domain.m_DepthConvention));
 	}
 
 	std::string DescribeDepthCoverageDrawPacket(const DepthCoverageDrawPacket& packet)
@@ -265,7 +266,7 @@ namespace gglab
 			packet.m_Geometry.m_IndexBuffer.m_Buffer.Index(),
 			packet.m_Geometry.m_IndexBuffer.m_Buffer.Generation(),
 			packet.m_Geometry.m_IndexBuffer.m_Offset,
-			std::to_underlying(packet.m_Geometry.m_IndexBuffer.m_Format),
+			utils::ToUnderlying(packet.m_Geometry.m_IndexBuffer.m_Format),
 			packet.m_Geometry.m_IndexBuffer.m_SizeInBytes, packet.m_IndexedDraw.m_IndexCount,
 			packet.m_IndexedDraw.m_InstanceCount, packet.m_IndexedDraw.m_StartIndexLocation,
 			packet.m_IndexedDraw.m_BaseVertexLocation, packet.m_IndexedDraw.m_StartInstanceLocation,

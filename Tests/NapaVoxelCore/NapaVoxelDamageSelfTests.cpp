@@ -1,0 +1,894 @@
+#include "NapaVoxelTestFramework.h"
+
+#include "NapaVoxelCore/Edit/VoxelDamage.h"
+#include "NapaVoxelCore/Edit/VoxelMutation.h"
+#include "NapaVoxelCore/Field/Primitive.h"
+#include "NapaVoxelCore/Hash/VoxelWorldHash.h"
+#include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
+#include "NapaVoxelCore/Meshing/ReferenceMesher.h"
+#include "NapaVoxelCore/World/VoxelRestore.h"
+#include "NapaVoxelCore/World/VoxelWorld.h"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <span>
+#include <tuple>
+#include <vector>
+
+namespace napa::voxel::testing
+{
+	namespace
+	{
+		[[nodiscard]] napa::voxel::VoxelWorldConfig MakeDamageConfig(
+			napa::voxel::CellAabb bounds = {
+				.m_Min = { -8, -8, -8 },
+				.m_MaxExclusive = { 8, 8, 8 },
+			}) noexcept
+		{
+			return {
+				.m_ChunkCellCount = 8,
+				.m_VoxelSize = 1.0f,
+				.m_SurfaceBandVoxels = 2.0f,
+				.m_LogicalCellBounds = bounds,
+			};
+		}
+
+		[[nodiscard]] napa::voxel::SphereEditRequest MakeStoneEdit(
+			napa::voxel::Double3 center = {}, double radius = 1.0,
+			double strength = 1.0, std::uint8_t damagePerHit = 128,
+			std::uint8_t breakThreshold = 255) noexcept
+		{
+			return {
+				.m_Brush = {
+					.m_CenterWorld = center,
+					.m_Radius = radius,
+					.m_Strength = strength,
+				},
+				.m_MaterialRules = {
+					.m_DamagePerHit = damagePerHit,
+					.m_StoneBreakThreshold = breakThreshold,
+				},
+			};
+		}
+
+		[[nodiscard]] bool CreateStoneWorld(
+			std::unique_ptr<napa::voxel::VoxelWorld>& world,
+			const napa::voxel::VoxelWorldConfig& config = MakeDamageConfig(),
+			double radius = 4.0)
+		{
+			using namespace napa::voxel;
+			const PrimitiveDesc primitive{
+				.m_StableId = { 1 },
+				.m_Priority = { 0 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::Sphere,
+				.m_Parameters = {
+					.m_Sphere = {
+						.m_Center = {},
+						.m_Radius = radius,
+					},
+				},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			return GeneratePrimitiveVoxelWorld(
+				config, std::span{ &primitive, 1 }, world, generation).Succeeded();
+		}
+
+		[[nodiscard]] bool CreateStoneWallWorld(
+			std::unique_ptr<napa::voxel::VoxelWorld>& world)
+		{
+			using namespace napa::voxel;
+			const PrimitiveDesc primitive{
+				.m_StableId = { 2 },
+				.m_Priority = { 0 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = {},
+						.m_HalfExtents = { 2.0, 6.0, 6.0 },
+					},
+				},
+			};
+			PrimitiveWorldGenerationResult generation{};
+			return GeneratePrimitiveVoxelWorld(MakeDamageConfig(),
+				std::span{ &primitive, 1 }, world, generation).Succeeded();
+		}
+
+		struct ChunkSurfaceEvidence
+		{
+			napa::voxel::ChunkCoord m_Chunk{};
+			napa::voxel::MeshValidationResult m_Validation{};
+			std::uint64_t m_SkippedDegenerateTriangleCount = 0;
+			napa::voxel::ChunkBoundaryContourSet m_BoundaryContours =
+				napa::voxel::MakeEmptyChunkBoundaryContourSet();
+
+			[[nodiscard]] friend bool operator==(
+				const ChunkSurfaceEvidence&, const ChunkSurfaceEvidence&) = default;
+		};
+
+		struct WorldSurfaceEvidence
+		{
+			napa::voxel::WorldMeshValidationResult m_Validation{};
+			napa::voxel::BoundaryContourValidationResult m_BoundaryValidation{};
+			std::vector<ChunkSurfaceEvidence> m_Chunks;
+
+			[[nodiscard]] friend bool operator==(
+				const WorldSurfaceEvidence&, const WorldSurfaceEvidence&) = default;
+		};
+
+		[[nodiscard]] bool BuildCellOwnerChunkDomain(const napa::voxel::VoxelWorldConfig& config,
+			std::vector<napa::voxel::ChunkCoord>& chunks)
+		{
+			using namespace napa::voxel;
+			LogicalDomainMetrics metrics{};
+			if (ComputeLogicalDomainMetrics(config, metrics).Failed())
+			{
+				return false;
+			}
+
+			chunks.clear();
+			chunks.reserve(static_cast<std::size_t>(metrics.m_CellOwnerChunkCount));
+			for (std::int32_t z = metrics.m_CellOwnerChunkBounds.m_Min.m_Z;
+				z < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Z; ++z)
+			{
+				for (std::int32_t y = metrics.m_CellOwnerChunkBounds.m_Min.m_Y;
+					y < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_Y; ++y)
+				{
+					for (std::int32_t x = metrics.m_CellOwnerChunkBounds.m_Min.m_X;
+						x < metrics.m_CellOwnerChunkBounds.m_MaxExclusive.m_X; ++x)
+					{
+						chunks.push_back({ x, y, z });
+					}
+				}
+			}
+			return chunks.size() == metrics.m_CellOwnerChunkCount;
+		}
+
+		[[nodiscard]] bool PublishCompleteMesh(const napa::voxel::VoxelWorld& world,
+			napa::voxel::VisibleMeshSet& visible, bool& publicationQuiescent)
+		{
+			using namespace napa::voxel;
+			std::vector<ChunkCoord> chunks;
+			CpuMeshBatch batch{};
+			std::unique_ptr<PendingCpuMeshBatch> pending;
+			std::unique_ptr<PreparedCpuMeshPublication> publication;
+			publicationQuiescent = false;
+			if (!BuildCellOwnerChunkDomain(world.GetConfig(), chunks) ||
+				BuildCpuMeshBatch(world, world.GetWorldVoxelRevision(), chunks, batch).Failed() ||
+				ValidateCpuMeshBatch(batch, visible, pending).Failed() || !pending ||
+				PrepareCpuMeshBatchPublication(pending, visible, publication).Failed() ||
+				pending || !publication)
+			{
+				return false;
+			}
+
+			CommitCpuMeshBatchPublication(publication, visible);
+			publicationQuiescent = !pending && !publication;
+			return publicationQuiescent && visible.HasPublishedMeshes() &&
+				visible.GetVisibleWorldRevision() == world.GetWorldVoxelRevision();
+		}
+
+		[[nodiscard]] WorldSurfaceEvidence CaptureSurfaceEvidence(
+			const napa::voxel::VisibleMeshSet& visible)
+		{
+			using namespace napa::voxel;
+			WorldSurfaceEvidence evidence{
+				.m_Validation = visible.GetWorldMeshValidation(),
+				.m_BoundaryValidation = visible.GetBoundaryValidation(),
+			};
+			evidence.m_Chunks.reserve(visible.GetChunks().size());
+			for (const ChunkMeshRecord& chunk : visible.GetChunks())
+			{
+				evidence.m_Chunks.push_back({
+					.m_Chunk = chunk.m_Chunk,
+					.m_Validation = chunk.m_Validation,
+					.m_SkippedDegenerateTriangleCount =
+						chunk.m_SkippedDegenerateTriangleCount,
+					.m_BoundaryContours = chunk.m_BoundaryContours,
+					});
+			}
+			return evidence;
+		}
+
+		[[nodiscard]] bool HashDamageWorld(
+			const napa::voxel::VoxelWorld& world, std::uint64_t& hash) noexcept
+		{
+			return napa::voxel::ComputeLogicalVoxelWorldHash(world, hash).Succeeded();
+		}
+
+		[[nodiscard]] bool CompareDamageWorlds(
+			const napa::voxel::VoxelWorld& lhs,
+			const napa::voxel::VoxelWorld& rhs) noexcept
+		{
+			using namespace napa::voxel;
+			const SampleAabb bounds = lhs.GetLogicalSampleBounds();
+			if (bounds != rhs.GetLogicalSampleBounds())
+			{
+				return false;
+			}
+			for (std::int32_t z = bounds.m_Min.m_Z; z < bounds.m_MaxExclusive.m_Z; ++z)
+			{
+				for (std::int32_t y = bounds.m_Min.m_Y; y < bounds.m_MaxExclusive.m_Y; ++y)
+				{
+					for (std::int32_t x = bounds.m_Min.m_X; x < bounds.m_MaxExclusive.m_X; ++x)
+					{
+						VoxelSample lhsSample{};
+						VoxelSample rhsSample{};
+						const SampleCoord coordinate{ x, y, z };
+						if (lhs.ReadCurrentSample(coordinate, lhsSample).Failed() ||
+							rhs.ReadCurrentSample(coordinate, rhsSample).Failed() ||
+							lhsSample != rhsSample)
+						{
+							return false;
+						}
+					}
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool IsCanonicalMarkerOrder(
+			std::span<const napa::voxel::VoxelDamageMarker> markers) noexcept
+		{
+			for (std::size_t index = 1; index < markers.size(); ++index)
+			{
+				const napa::voxel::SampleCoord previous = markers[index - 1].m_Sample;
+				const napa::voxel::SampleCoord current = markers[index].m_Sample;
+				if (std::tie(current.m_Z, current.m_Y, current.m_X) <=
+					std::tie(previous.m_Z, previous.m_Y, previous.m_X))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		void RunStoneTransitionTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			SphereEditContext centerContext{};
+			SphereEditContext retainedContext{};
+			SphereEditContext surfaceContext{};
+			const bool contextsPrepared = PrepareSphereEditContext(
+				MakeDamageConfig(), MakeStoneEdit({}, 1.0), centerContext).Succeeded() &&
+				PrepareSphereEditContext(MakeDamageConfig(),
+					MakeStoneEdit({}, 1.0, 0.5, 100, 250), retainedContext).Succeeded() &&
+				PrepareSphereEditContext(MakeDamageConfig(),
+					MakeStoneEdit({}, 1.0, 1.0, 100, 250), surfaceContext).Succeeded();
+			const VoxelSample stone{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 0,
+			};
+			VoxelSample firstHit{};
+			VoxelSample secondHit{};
+			const bool twoHitsEvaluated = contextsPrepared &&
+				EvaluateSphereEditSampleTransition(
+					centerContext, {}, stone, firstHit).Succeeded() &&
+				EvaluateSphereEditSampleTransition(
+					centerContext, {}, firstHit, secondHit).Succeeded();
+			context.Check(twoHitsEvaluated && firstHit == VoxelSample{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 128,
+				} && secondHit == VoxelSample{
+				.m_Density = 64,
+				.m_Material = VoxelMaterial::Empty,
+				.m_Damage = 0,
+				}, "Stone damage is deterministic and the threshold hit reuses Sphere Subtract");
+
+			const VoxelSample overshootStone{
+				.m_Density = 255,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 200,
+			};
+			VoxelSample overshoot{};
+			VoxelSample repeated{};
+			const bool overshootEvaluated = contextsPrepared &&
+				EvaluateSphereEditSampleTransition(surfaceContext,
+					{ 1, 0, 0 }, overshootStone, overshoot).Succeeded() &&
+				EvaluateSphereEditSampleTransition(surfaceContext,
+					{ 1, 0, 0 }, overshoot, repeated).Succeeded();
+			context.Check(overshootEvaluated && overshoot == VoxelSample{
+				.m_Density = IsoValue,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 255,
+				} && repeated == overshoot,
+				"Threshold overshoot saturates and remains on a surviving Stone Sample");
+
+			VoxelSample retained{};
+			VoxelSample continued{};
+			context.Check(contextsPrepared && EvaluateSphereEditSampleTransition(
+				retainedContext, {}, overshootStone, retained).Succeeded() &&
+				retained == VoxelSample{
+					.m_Density = 160,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 255,
+				} && EvaluateSphereEditSampleTransition(
+					retainedContext, {}, retained, continued).Succeeded() &&
+				continued == VoxelSample{
+					.m_Density = 112,
+					.m_Material = VoxelMaterial::Empty,
+					.m_Damage = 0,
+				}, "A threshold Stone Sample retains Damage and continues subtracting until Empty");
+
+			SphereEditContext disabledContext{};
+			VoxelSample disabledOutput{};
+			const VoxelSample thresholdStone{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Stone,
+				.m_Damage = 255,
+			};
+			context.Check(PrepareSphereEditContext(MakeDamageConfig(),
+				MakeStoneEdit({}, 1.0, 1.0, 0, 255), disabledContext).Succeeded() &&
+				EvaluateSphereEditSampleTransition(
+					disabledContext, {}, thresholdStone, disabledOutput).Succeeded() &&
+				disabledOutput == thresholdStone,
+				"A disabled Stone Damage path cannot subtract a previously damaged Sample");
+
+			SphereEditContext zeroStrengthContext{};
+			VoxelSample zeroStrengthOutput{};
+			context.Check(PrepareSphereEditContext(MakeDamageConfig(),
+				MakeStoneEdit({}, 1.0, 0.0), zeroStrengthContext).Succeeded() &&
+				!zeroStrengthContext.HasDensityPath() && zeroStrengthContext.HasDamagePath() &&
+				EvaluateSphereEditSampleTransition(
+					zeroStrengthContext, {}, stone, zeroStrengthOutput).Succeeded() &&
+				zeroStrengthOutput == VoxelSample{
+					.m_Density = 200,
+					.m_Material = VoxelMaterial::Stone,
+					.m_Damage = 128,
+				}, "Zero Strength keeps the Stone Damage path active without subtracting");
+
+			const VoxelSample soil{
+				.m_Density = 200,
+				.m_Material = VoxelMaterial::Soil,
+				.m_Damage = 0,
+			};
+			VoxelSample soilOutput{};
+			context.Check(contextsPrepared && EvaluateSphereEditSampleTransition(
+				centerContext, {}, soil, soilOutput).Succeeded() && soilOutput == VoxelSample{
+					.m_Density = 64,
+					.m_Material = VoxelMaterial::Empty,
+					.m_Damage = 0,
+				}, "Stone material rules do not alter the Soil subtract path");
+		}
+
+		void RunStoneMutationGoldenTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			std::unique_ptr<VoxelWorld> world;
+			if (!CreateStoneWorld(world))
+			{
+				context.Check(false, "Stone mutation fixture creates its primitive world");
+				return;
+			}
+
+			std::uint64_t initialHash = 0;
+			std::uint64_t firstHash = 0;
+			std::uint64_t secondHash = 0;
+			VoxelMutationResult first{};
+			VoxelMutationResult second{};
+			const SphereEditRequest request = MakeStoneEdit({ 3.0, 0.0, 0.0 }, 0.5);
+			const bool mutated = HashDamageWorld(*world, initialHash) &&
+				ApplySphereEdit(*world, request, first).Succeeded() &&
+				HashDamageWorld(*world, firstHash) &&
+				ApplySphereEdit(*world, request, second).Succeeded() &&
+				HashDamageWorld(*world, secondHash);
+			context.Check(mutated && first.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				first.m_BaseWorldVoxelRevision == 1 && first.m_TargetWorldVoxelRevision == 2 &&
+				first.m_SampleChanges.size() == 1 && first.m_DataDirtyChunks.size() == 1 &&
+				first.m_MeshDirtyChunks.empty() &&
+				initialHash == 16580640415625430688ull &&
+				firstHash == 3945431654558813216ull,
+				"The first Stone hit matches its exact Damage-only Golden");
+			context.Check(mutated && second.GetChangeKind() ==
+				VoxelMutationChangeKind::SurfaceChanged &&
+				second.m_BaseWorldVoxelRevision == 2 && second.m_TargetWorldVoxelRevision == 3 &&
+				second.m_SampleChanges.size() == 1 && second.m_DataDirtyChunks.size() == 1 &&
+				second.m_MeshDirtyChunks.size() == 4 &&
+				secondHash == 6835358999813787010ull,
+				"The second Stone hit matches its exact Surface Dirty Golden");
+
+			CpuMeshBatch damageOnlyBatch{};
+			context.Check(BuildCpuMeshBatch(*world, first, damageOnlyBatch).m_Error ==
+				ValidationError::MismatchedCpuMeshTargetRevision,
+				"A superseded Damage-only Mutation cannot create a Mesh Batch");
+
+			std::unique_ptr<VoxelWorld> damageOnlyWorld;
+			VoxelMutationResult damageOnlyMutation{};
+			CpuMeshBatch rejectedDamageOnlyBatch{};
+			context.Check(CreateStoneWorld(damageOnlyWorld) &&
+				ApplySphereEdit(*damageOnlyWorld, request, damageOnlyMutation).Succeeded() &&
+				damageOnlyMutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				BuildCpuMeshBatch(*damageOnlyWorld, damageOnlyMutation,
+					rejectedDamageOnlyBatch).m_Error == ValidationError::InvalidCpuMeshCandidateSet,
+				"A current Damage-only Mutation cannot create an empty Mesh Batch");
+
+			std::unique_ptr<VoxelWorld> negativeWorld;
+			VoxelMutationResult negativeFirst{};
+			VoxelMutationResult negativeSecond{};
+			const SphereEditRequest negativeRequest = MakeStoneEdit({ -3.0, 0.0, 0.0 }, 0.5);
+			context.Check(CreateStoneWorld(negativeWorld) &&
+				ApplySphereEdit(*negativeWorld, negativeRequest, negativeFirst).Succeeded() &&
+				ApplySphereEdit(*negativeWorld, negativeRequest, negativeSecond).Succeeded() &&
+				negativeFirst.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				negativeSecond.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+				negativeSecond.m_SampleChanges.size() == 1 &&
+				negativeSecond.m_SampleChanges[0].m_Coordinate == SampleCoord{ -3, 0, 0 } &&
+				negativeSecond.m_MeshDirtyChunks.size() == 4,
+				"Negative-coordinate Stone hits preserve the same two-hit contract");
+
+			std::unique_ptr<VoxelWorld> boundaryWorld;
+			VoxelMutationResult boundaryFirst{};
+			VoxelMutationResult boundarySecond{};
+			const SphereEditRequest boundaryRequest = MakeStoneEdit({}, 0.5);
+			context.Check(CreateStoneWorld(boundaryWorld) &&
+				ApplySphereEdit(*boundaryWorld, boundaryRequest, boundaryFirst).Succeeded() &&
+				ApplySphereEdit(*boundaryWorld, boundaryRequest, boundarySecond).Succeeded() &&
+				boundaryFirst.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				boundarySecond.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+				boundarySecond.m_MeshDirtyChunks.size() == 8,
+				"A Chunk-corner Stone Sample dirties all eight Mesh owners after threshold");
+
+			struct BoundaryCase
+			{
+				Double3 m_Center{};
+				std::size_t m_ExpectedMeshDirtyCount = 0;
+			};
+			const std::array boundaryCases{
+				BoundaryCase{ { 0.0, 2.0, 2.0 }, 2 },
+				BoundaryCase{ { 0.0, 0.0, 2.0 }, 4 },
+			};
+			bool allBoundaryCasesMatched = true;
+			for (const BoundaryCase& boundaryCase : boundaryCases)
+			{
+				std::unique_ptr<VoxelWorld> caseWorld;
+				VoxelMutationResult caseFirst{};
+				VoxelMutationResult caseSecond{};
+				const SphereEditRequest caseRequest = MakeStoneEdit(boundaryCase.m_Center, 0.5);
+				allBoundaryCasesMatched = allBoundaryCasesMatched &&
+					CreateStoneWorld(caseWorld) &&
+					ApplySphereEdit(*caseWorld, caseRequest, caseFirst).Succeeded() &&
+					ApplySphereEdit(*caseWorld, caseRequest, caseSecond).Succeeded() &&
+					caseFirst.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+					caseSecond.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+					caseSecond.m_MeshDirtyChunks.size() ==
+					boundaryCase.m_ExpectedMeshDirtyCount;
+			}
+			context.Check(allBoundaryCasesMatched,
+				"Chunk-face and Chunk-edge Stone hits derive their exact Mesh owners");
+
+			std::unique_ptr<VoxelWorld> zeroStrengthWorld;
+			ReferenceWorldMeshingResult initialMesh{};
+			ReferenceWorldMeshingResult damageOnlyMesh{};
+			VoxelMutationResult zeroStrengthFirst{};
+			VoxelMutationResult zeroStrengthSecond{};
+			VoxelMutationResult zeroStrengthThird{};
+			VoxelSample zeroStrengthInitialSample{};
+			VoxelSample zeroStrengthSample{};
+			const SphereEditRequest zeroStrengthRequest =
+				MakeStoneEdit({ 3.0, 0.0, 0.0 }, 0.5, 0.0);
+			const bool zeroStrengthMutated = CreateStoneWorld(zeroStrengthWorld) &&
+				zeroStrengthWorld->ReadCurrentSample(
+					{ 3, 0, 0 }, zeroStrengthInitialSample).Succeeded() &&
+				ReferenceMesher(*zeroStrengthWorld).MeshWorld(initialMesh).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthFirst).Succeeded() &&
+				ReferenceMesher(*zeroStrengthWorld).MeshWorld(damageOnlyMesh).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthSecond).Succeeded() &&
+				ApplySphereEdit(*zeroStrengthWorld,
+					zeroStrengthRequest, zeroStrengthThird).Succeeded() &&
+				zeroStrengthWorld->ReadCurrentSample(
+					{ 3, 0, 0 }, zeroStrengthSample).Succeeded();
+			context.Check(zeroStrengthMutated &&
+				zeroStrengthFirst.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				zeroStrengthFirst.m_BaseWorldVoxelRevision == 1 &&
+				zeroStrengthFirst.m_TargetWorldVoxelRevision == 2 &&
+				zeroStrengthFirst.m_SampleChanges.size() == 1 &&
+				zeroStrengthFirst.m_DataDirtyChunks.size() == 1 &&
+				zeroStrengthFirst.m_MeshDirtyChunks.empty() &&
+				zeroStrengthSecond.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				zeroStrengthSecond.m_BaseWorldVoxelRevision == 2 &&
+				zeroStrengthSecond.m_TargetWorldVoxelRevision == 3 &&
+				zeroStrengthSecond.m_SampleChanges.size() == 1 &&
+				zeroStrengthSecond.m_DataDirtyChunks.size() == 1 &&
+				zeroStrengthSecond.m_MeshDirtyChunks.empty() &&
+				zeroStrengthThird.GetChangeKind() == VoxelMutationChangeKind::None &&
+				zeroStrengthThird.m_BaseWorldVoxelRevision == 3 &&
+				zeroStrengthThird.m_TargetWorldVoxelRevision == 3 &&
+				zeroStrengthThird.m_SampleChanges.empty() &&
+				zeroStrengthThird.m_DataDirtyChunks.empty() &&
+				zeroStrengthThird.m_MeshDirtyChunks.empty() &&
+				zeroStrengthWorld->GetWorldVoxelRevision() == 3 &&
+				zeroStrengthSample.m_Density == zeroStrengthInitialSample.m_Density &&
+				zeroStrengthSample.m_Material == zeroStrengthInitialSample.m_Material &&
+				zeroStrengthSample.m_Damage == 255,
+				"Zero Strength applies Damage-only hits until saturation without changing Density");
+			context.Check(zeroStrengthMutated &&
+				initialMesh.m_Validation == damageOnlyMesh.m_Validation &&
+				initialMesh.m_BoundaryValidation == damageOnlyMesh.m_BoundaryValidation,
+				"A Damage-only Stone hit preserves world mesh hash, counts, bounds, and contours");
+
+			std::unique_ptr<VoxelWorld> disjointWorld;
+			VoxelMutationResult positiveHit{};
+			VoxelMutationResult disjointHit{};
+			VoxelSample positiveSample{};
+			context.Check(CreateStoneWorld(disjointWorld) &&
+				ApplySphereEdit(*disjointWorld, request, positiveHit).Succeeded() &&
+				ApplySphereEdit(*disjointWorld, negativeRequest, disjointHit).Succeeded() &&
+				positiveHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				disjointHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				disjointWorld->ReadCurrentSample({ 3, 0, 0 }, positiveSample).Succeeded() &&
+				positiveSample.m_Material == VoxelMaterial::Stone &&
+				positiveSample.m_Damage == 128,
+				"A disjoint second Stone hit cannot subtract the previously damaged region");
+		}
+
+		void RunStoneFullDomainOracleTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			struct OracleCase
+			{
+				SphereEditRequest m_Request{};
+				std::size_t m_HitCount = 0;
+			};
+			const std::array oracleCases{
+				OracleCase{ MakeStoneEdit({ -0.25, 0.5, -0.75 }, 1.75), 2 },
+				OracleCase{ MakeStoneEdit({ 3.0, 0.0, 0.0 }, 0.5, 0.0), 3 },
+			};
+			bool allCasesMatched = true;
+			for (const OracleCase& oracleCase : oracleCases)
+			{
+				std::unique_ptr<VoxelWorld> boundedWorld;
+				std::unique_ptr<VoxelWorld> oracleWorld;
+				allCasesMatched = allCasesMatched &&
+					CreateStoneWorld(boundedWorld) && CreateStoneWorld(oracleWorld);
+				for (std::size_t hit = 0;
+					hit < oracleCase.m_HitCount && allCasesMatched; ++hit)
+				{
+					VoxelMutationResult boundedMutation{};
+					SphereEditContext editContext{};
+					allCasesMatched = ApplySphereEdit(*boundedWorld,
+						oracleCase.m_Request, boundedMutation).Succeeded() &&
+						PrepareSphereEditContext(oracleWorld->GetConfig(),
+							oracleCase.m_Request, editContext).Succeeded();
+					std::vector<VoxelSampleChange> oracleChanges;
+					const SampleAabb bounds = oracleWorld->GetLogicalSampleBounds();
+					for (std::int32_t z = bounds.m_Min.m_Z;
+						z < bounds.m_MaxExclusive.m_Z && allCasesMatched; ++z)
+					{
+						for (std::int32_t y = bounds.m_Min.m_Y;
+							y < bounds.m_MaxExclusive.m_Y && allCasesMatched; ++y)
+						{
+							for (std::int32_t x = bounds.m_Min.m_X;
+								x < bounds.m_MaxExclusive.m_X; ++x)
+							{
+								const SampleCoord coordinate{ x, y, z };
+								VoxelSample before{};
+								VoxelSample after{};
+								bool changed = false;
+								if (oracleWorld->ReadCurrentSample(coordinate, before).Failed() ||
+									EvaluateSphereEditSampleTransition(
+										editContext, coordinate, before, after).Failed())
+								{
+									allCasesMatched = false;
+									break;
+								}
+								if (before != after)
+								{
+									oracleChanges.push_back({ coordinate, before, after });
+									if (oracleWorld->WriteCurrentSample(
+										coordinate, after, changed).Failed() || !changed)
+									{
+										allCasesMatched = false;
+										break;
+									}
+								}
+							}
+						}
+					}
+
+					std::vector<ChunkCoord> oracleDataDirty;
+					std::vector<ChunkCoord> oracleMeshDirty;
+					std::uint64_t boundedHash = 0;
+					std::uint64_t oracleHash = 0;
+					allCasesMatched = allCasesMatched &&
+						DeriveVoxelMutationDirtyChunks(oracleWorld->GetConfig(), oracleChanges,
+							oracleDataDirty, oracleMeshDirty).Succeeded() &&
+						boundedMutation.m_SampleChanges == oracleChanges &&
+						boundedMutation.m_DataDirtyChunks == oracleDataDirty &&
+						boundedMutation.m_MeshDirtyChunks == oracleMeshDirty &&
+						CompareDamageWorlds(*boundedWorld, *oracleWorld) &&
+						HashDamageWorld(*boundedWorld, boundedHash) &&
+						HashDamageWorld(*oracleWorld, oracleHash) && boundedHash == oracleHash;
+				}
+			}
+			context.Check(allCasesMatched,
+				"Stone density and zero-Strength Damage hits match the full-domain Oracle exactly");
+		}
+
+		void RunDestructionRestoreQuiescenceTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			std::unique_ptr<VoxelWorld> world;
+			VisibleMeshSet initialVisible;
+			bool initialPublicationQuiescent = false;
+			std::uint64_t initialVoxelHash = 0;
+			const bool initialized = CreateStoneWallWorld(world) && world &&
+				ComputeLogicalVoxelWorldHash(*world, initialVoxelHash).Succeeded() &&
+				PublishCompleteMesh(*world, initialVisible, initialPublicationQuiescent);
+			context.Check(initialized && initialPublicationQuiescent,
+				"Stone Wall initial Voxel and Visible Mesh evidence publishes quiescently");
+			if (!initialized)
+			{
+				return;
+			}
+
+			const WorldSurfaceEvidence initialSurface = CaptureSurfaceEvidence(initialVisible);
+			const std::size_t initialResidentChunkCount = world->GetResidentChunkCount();
+			const SphereEditRequest destructionRequest = MakeStoneEdit({ 1.0, 0.0, 0.0 }, 0.5);
+			const SphereEditRequest markerRequest = MakeStoneEdit({ -1.0, 2.0, 2.0 }, 0.5);
+			bool firstCycleDestroyedGolden = false;
+			bool repeatedCyclesMatched = true;
+			for (std::uint32_t cycle = 0; cycle < 2 && repeatedCyclesMatched; ++cycle)
+			{
+				const std::uint64_t cycleBaseRevision = world->GetWorldVoxelRevision();
+				VoxelMutationResult firstHit{};
+				VoxelMutationResult secondHit{};
+				VoxelMutationResult markerHit{};
+				VisibleMeshSet damageOnlyVisible;
+				bool damageOnlyPublicationQuiescent = false;
+				repeatedCyclesMatched = ApplySphereEdit(
+					*world, destructionRequest, firstHit).Succeeded() &&
+					firstHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+					firstHit.m_BaseWorldVoxelRevision == cycleBaseRevision &&
+					firstHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 1 &&
+					firstHit.m_SampleChanges.size() == 1 &&
+					firstHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ 1, 0, 0 } &&
+					firstHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
+					firstHit.m_MeshDirtyChunks.empty() &&
+					PublishCompleteMesh(
+						*world, damageOnlyVisible, damageOnlyPublicationQuiescent) &&
+					damageOnlyPublicationQuiescent &&
+					CaptureSurfaceEvidence(damageOnlyVisible) == initialSurface &&
+					ApplySphereEdit(*world, destructionRequest, secondHit).Succeeded() &&
+					secondHit.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+					secondHit.m_BaseWorldVoxelRevision == cycleBaseRevision + 1 &&
+					secondHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 2 &&
+					secondHit.m_SampleChanges.size() == 1 &&
+					secondHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ 1, 0, 0 } &&
+					secondHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { 0, 0, 0 } } &&
+					secondHit.m_MeshDirtyChunks.size() == 8 &&
+					ApplySphereEdit(*world, markerRequest, markerHit).Succeeded() &&
+					markerHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+					markerHit.m_BaseWorldVoxelRevision == cycleBaseRevision + 2 &&
+					markerHit.m_TargetWorldVoxelRevision == cycleBaseRevision + 3 &&
+					markerHit.m_SampleChanges.size() == 1 &&
+					markerHit.m_SampleChanges[0].m_Coordinate == SampleCoord{ -1, 2, 2 } &&
+					markerHit.m_DataDirtyChunks == std::vector<ChunkCoord>{ { -1, 0, 0 } } &&
+					markerHit.m_MeshDirtyChunks.empty();
+
+				VoxelDamageMarkerSnapshot damagedMarkers{};
+				VisibleMeshSet destroyedVisible;
+				bool destroyedPublicationQuiescent = false;
+				std::uint64_t destroyedVoxelHash = 0;
+				repeatedCyclesMatched = repeatedCyclesMatched &&
+					BuildVoxelDamageMarkerSnapshot(*world, world->GetWorldVoxelRevision(),
+						damagedMarkers).Succeeded() &&
+					damagedMarkers.m_SourceWorldVoxelRevision == cycleBaseRevision + 3 &&
+					damagedMarkers.m_TotalDamagedSampleCount == 1 &&
+					!damagedMarkers.m_Truncated && damagedMarkers.m_Markers.size() == 1 &&
+					damagedMarkers.m_Markers[0].m_Sample == SampleCoord{ -1, 2, 2 } &&
+					ComputeLogicalVoxelWorldHash(*world, destroyedVoxelHash).Succeeded() &&
+					destroyedVoxelHash != initialVoxelHash &&
+					PublishCompleteMesh(
+						*world, destroyedVisible, destroyedPublicationQuiescent) &&
+					destroyedPublicationQuiescent &&
+					CaptureSurfaceEvidence(destroyedVisible) != initialSurface;
+				if (cycle == 0 && repeatedCyclesMatched)
+				{
+					const WorldMeshValidationResult& validation =
+						destroyedVisible.GetWorldMeshValidation();
+					const auto chunk = std::find_if(destroyedVisible.GetChunks().begin(),
+						destroyedVisible.GetChunks().end(), [](const ChunkMeshRecord& record) noexcept
+						{ return record.m_Chunk == ChunkCoord{}; });
+					firstCycleDestroyedGolden = destroyedVoxelHash == 0x299d47db12f692aeull &&
+						validation.m_ValidationHash == 0x1b29e7c3f53ef189ull &&
+						validation.m_VertexCount == 2946 && validation.m_IndexCount == 2946 &&
+						validation.m_TriangleCount == 982 &&
+						chunk != destroyedVisible.GetChunks().end() &&
+						chunk->m_Validation.m_ValidationHash == 0x44e0f7f6fc8d181full &&
+						chunk->m_Validation.m_TriangleCount == 126 &&
+						chunk->m_Validation.m_QuantizedBounds == QuantizedMeshAabb{
+							.m_Min = {},
+							.m_Max = { 131072, 393216, 393216 },
+					};
+					repeatedCyclesMatched = firstCycleDestroyedGolden;
+				}
+
+				VoxelMutationResult restore{};
+				CpuMeshBatch restoreBatch{};
+				std::unique_ptr<PendingCpuMeshBatch> pending;
+				std::unique_ptr<PreparedCpuMeshPublication> publication;
+				repeatedCyclesMatched = repeatedCyclesMatched && RestoreAll(*world, restore).Succeeded() &&
+					restore.m_BaseWorldVoxelRevision == cycleBaseRevision + 3 &&
+					restore.m_TargetWorldVoxelRevision == cycleBaseRevision + 4 &&
+					restore.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+					restore.m_SampleChanges == std::vector<VoxelSampleChange>{
+						{ secondHit.m_SampleChanges[0].m_Coordinate,
+							secondHit.m_SampleChanges[0].m_After,
+							firstHit.m_SampleChanges[0].m_Before },
+						{ markerHit.m_SampleChanges[0].m_Coordinate,
+							markerHit.m_SampleChanges[0].m_After,
+							markerHit.m_SampleChanges[0].m_Before },
+					} &&
+					BuildCpuMeshBatch(*world, restore, restoreBatch).Succeeded() &&
+							restoreBatch.m_RequestedChunks == restore.m_MeshDirtyChunks &&
+							ValidateCpuMeshBatch(restoreBatch, destroyedVisible, pending).Succeeded() &&
+							pending &&
+							PrepareCpuMeshBatchPublication(
+								pending, destroyedVisible, publication).Succeeded() &&
+							!pending && publication;
+						if (repeatedCyclesMatched)
+						{
+							CommitCpuMeshBatchPublication(publication, destroyedVisible);
+						}
+
+						std::uint64_t restoredVoxelHash = 0;
+						VoxelDamageMarkerSnapshot restoredMarkers{};
+						repeatedCyclesMatched = repeatedCyclesMatched && !pending && !publication &&
+							destroyedVisible.GetVisibleWorldRevision() == cycleBaseRevision + 4 &&
+							ComputeLogicalVoxelWorldHash(*world, restoredVoxelHash).Succeeded() &&
+							restoredVoxelHash == initialVoxelHash &&
+							CaptureSurfaceEvidence(destroyedVisible) == initialSurface &&
+							world->GetResidentChunkCount() == initialResidentChunkCount &&
+							BuildVoxelDamageMarkerSnapshot(*world, world->GetWorldVoxelRevision(),
+								restoredMarkers).Succeeded() &&
+							restoredMarkers.m_SourceWorldVoxelRevision == cycleBaseRevision + 4 &&
+							restoredMarkers.m_TotalDamagedSampleCount == 0 &&
+							!restoredMarkers.m_Truncated && restoredMarkers.m_Markers.empty() &&
+							world->GetWorldVoxelRevision() == cycleBaseRevision + 4;
+			}
+
+			context.Check(firstCycleDestroyedGolden,
+				"The first Stone Wall destruction cycle matches its exact hole Mesh Golden");
+			context.Check(repeatedCyclesMatched,
+				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
+		}
+
+		void RunPlaytestBreachMeshingRegressionTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+
+			const VoxelWorldConfig config{
+				.m_ChunkCellCount = 16,
+				.m_VoxelSize = 1.0f,
+				.m_SurfaceBandVoxels = 2.0f,
+				.m_LogicalCellBounds = {
+					.m_Min = {},
+					.m_MaxExclusive = { 16, 16, 16 },
+				},
+			};
+			const PrimitiveDesc wall{
+				.m_StableId = { 1 },
+				.m_Material = VoxelMaterial::Stone,
+				.m_Shape = PrimitiveShape::AxisAlignedBox,
+				.m_Parameters = {
+					.m_AxisAlignedBox = {
+						.m_Center = { 8.0, 8.0, 8.0 },
+						.m_HalfExtents = { 3.0, 5.0, 5.0 },
+					},
+				},
+			};
+			const auto meshBreach = [&config, &wall](Double3 center,
+				ChunkMeshRecord& breached, ChunkMeshRecord& repeated)
+				{
+					std::unique_ptr<VoxelWorld> world;
+					PrimitiveWorldGenerationResult generation{};
+					VoxelMutationResult firstHit{};
+					VoxelMutationResult secondHit{};
+					const SphereEditRequest request = MakeStoneEdit(center, 4.0);
+					return GeneratePrimitiveVoxelWorld(
+						config, std::span{ &wall, 1 }, world, generation).Succeeded() && world &&
+						ApplySphereEdit(*world, request, firstHit).Succeeded() &&
+						firstHit.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+						ApplySphereEdit(*world, request, secondHit).Succeeded() &&
+						secondHit.GetChangeKind() == VoxelMutationChangeKind::SurfaceChanged &&
+						ReferenceMesher(*world).MeshChunk({}, breached).Succeeded() &&
+						ReferenceMesher(*world).MeshChunk({}, repeated).Succeeded() &&
+						breached.m_Validation == repeated.m_Validation &&
+						breached.m_WindingEvidence == repeated.m_WindingEvidence;
+				};
+
+			ChunkMeshRecord centerBreached{};
+			ChunkMeshRecord centerRepeated{};
+			const bool centerMeshed =
+				meshBreach({ 5.0, 8.0, 8.0 }, centerBreached, centerRepeated);
+			context.Check(centerMeshed &&
+				centerBreached.m_Validation.m_ValidationHash == 0x6c0a4107ba561328ull &&
+				centerBreached.m_Validation.m_VertexCount == 4542 &&
+				centerBreached.m_Validation.m_IndexCount == 4542 &&
+				centerBreached.m_Validation.m_TriangleCount == 1514,
+				"The P1 Playtest Stone breach emits one deterministic canonical surface");
+
+			constexpr std::array<double, 7> FaceCoordinates{
+				3.5, 4.0, 5.25, 8.0, 10.75, 12.0, 12.5,
+			};
+			bool faceMatrixMeshed = true;
+			for (const double z : FaceCoordinates)
+			{
+				for (const double y : FaceCoordinates)
+				{
+					ChunkMeshRecord breached{};
+					ChunkMeshRecord repeated{};
+					faceMatrixMeshed = faceMatrixMeshed &&
+						meshBreach({ 5.0, y, z }, breached, repeated);
+				}
+			}
+			context.Check(faceMatrixMeshed,
+				"P1 radius-four breaches mesh deterministically across the playable Stone face");
+		}
+
+		void RunDamageMarkerSnapshotTests(TestContext& context) noexcept
+		{
+			using namespace napa::voxel;
+			const VoxelWorldConfig largeConfig = MakeDamageConfig({
+				.m_Min = { -16, -16, -16 },
+				.m_MaxExclusive = { 16, 16, 16 },
+				});
+			std::unique_ptr<VoxelWorld> world;
+			VoxelMutationResult damageMutation{};
+			VoxelDamageMarkerSnapshot snapshot{};
+			const bool built = CreateStoneWorld(world, largeConfig, 10.0) &&
+				ApplySphereEdit(*world, MakeStoneEdit({}, 10.0), damageMutation).Succeeded() &&
+				damageMutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly &&
+				BuildVoxelDamageMarkerSnapshot(
+					*world, damageMutation.m_TargetWorldVoxelRevision, snapshot).Succeeded();
+			context.Check(built && snapshot.m_SourceWorldVoxelRevision ==
+				damageMutation.m_TargetWorldVoxelRevision &&
+				snapshot.m_Markers.size() == DefaultDamageMarkerLimit &&
+				snapshot.m_TotalDamagedSampleCount == 4169 &&
+				snapshot.m_Truncated && IsCanonicalMarkerOrder(snapshot.m_Markers) &&
+				!snapshot.m_Markers.empty() &&
+				snapshot.m_Markers.front().m_Sample == SampleCoord{ 0, 0, -10 } &&
+				snapshot.m_Markers.front().m_WorldPosition == Double3{
+					static_cast<double>(snapshot.m_Markers.front().m_Sample.m_X),
+					static_cast<double>(snapshot.m_Markers.front().m_Sample.m_Y),
+					static_cast<double>(snapshot.m_Markers.front().m_Sample.m_Z),
+				}, "Damage Marker snapshots are revision-tagged, canonical, and bounded");
+
+			const VoxelDamageMarkerSnapshot sentinel{
+				.m_SourceWorldVoxelRevision = 91,
+				.m_TotalDamagedSampleCount = 92,
+				.m_Truncated = true,
+				.m_Markers = {
+					{
+						.m_Sample = { 1, 2, 3 },
+						.m_WorldPosition = { 4.0, 5.0, 6.0 },
+						.m_Damage = 7,
+					},
+				},
+			};
+			VoxelDamageMarkerSnapshot unchanged = sentinel;
+			context.Check(BuildVoxelDamageMarkerSnapshot(
+				*world, damageMutation.m_BaseWorldVoxelRevision, unchanged).m_Error ==
+				ValidationError::MismatchedDamageMarkerSourceRevision && unchanged == sentinel,
+				"A stale Damage Marker request leaves its destination unchanged");
+		}
+	}
+
+	void RunNapaVoxelDamageSelfTests(TestContext& context) noexcept
+	{
+		RunStoneTransitionTests(context);
+		RunStoneMutationGoldenTests(context);
+		RunStoneFullDomainOracleTests(context);
+		RunDestructionRestoreQuiescenceTests(context);
+		RunPlaytestBreachMeshingRegressionTests(context);
+		RunDamageMarkerSnapshotTests(context);
+	}
+}

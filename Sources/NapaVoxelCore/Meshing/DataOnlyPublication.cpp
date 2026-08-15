@@ -1,8 +1,9 @@
 #include "NapaVoxelCore/Meshing/DataOnlyPublication.h"
 
+#include "NapaVoxelCore/Meshing/DataOnlyPublicationDetail.h"
+
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
-#include "NapaVoxelCore/Testing/DataOnlyPublicationTestAccess.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
@@ -12,7 +13,7 @@
 
 namespace napa::voxel
 {
-	namespace
+	namespace detail
 	{
 		thread_local std::uint64_t SimulatedAuthoritativeRevision = 0;
 		thread_local bool SimulatePublicationAllocationFailure = false;
@@ -49,8 +50,8 @@ namespace napa::voxel
 		{
 			return { ValidationError::StaleDataOnlyPublication };
 		}
-		const std::uint64_t authoritativeRevision = SimulatedAuthoritativeRevision != 0
-			? SimulatedAuthoritativeRevision
+		const std::uint64_t authoritativeRevision = detail::SimulatedAuthoritativeRevision != 0
+			? detail::SimulatedAuthoritativeRevision
 			: authoritativeWorld.GetWorldVoxelRevision();
 		if (mutation.m_TargetWorldVoxelRevision != authoritativeRevision ||
 			!mutation.m_MeshDirtyChunks.empty() ||
@@ -103,7 +104,7 @@ namespace napa::voxel
 			return { ValidationError::MismatchedDataOnlyPublication };
 		}
 
-		if (SimulatePublicationAllocationFailure)
+		if (detail::SimulatePublicationAllocationFailure)
 		{
 			return { ValidationError::DataOnlyPublicationAllocationFailure };
 		}
@@ -128,35 +129,5 @@ namespace napa::voxel
 		pending.reset();
 	}
 
-	ValidationResult testing::DataOnlyPublicationTestAccess::PrepareWithAuthoritativeRevision(
-		const VoxelWorld& authoritativeWorld, const VoxelMutationResult& mutation,
-		const VisibleMeshSet& visible, std::uint64_t authoritativeRevision,
-		std::unique_ptr<PendingDataOnlyPublication>& pending)
-	{
-		if (SimulatedAuthoritativeRevision != 0 || authoritativeRevision == 0)
-		{
-			return { ValidationError::InvalidDataOnlyPublication };
-		}
-		SimulatedAuthoritativeRevision = authoritativeRevision;
-		const ValidationResult result = PrepareDataOnlyPublication(
-			authoritativeWorld, mutation, visible, pending);
-		SimulatedAuthoritativeRevision = 0;
-		return result;
-	}
 
-	ValidationResult testing::DataOnlyPublicationTestAccess::PrepareWithAllocationFailure(
-		const VoxelWorld& authoritativeWorld, const VoxelMutationResult& mutation,
-		const VisibleMeshSet& visible,
-		std::unique_ptr<PendingDataOnlyPublication>& pending)
-	{
-		if (SimulatePublicationAllocationFailure)
-		{
-			return { ValidationError::InvalidDataOnlyPublication };
-		}
-		SimulatePublicationAllocationFailure = true;
-		const ValidationResult result = PrepareDataOnlyPublication(
-			authoritativeWorld, mutation, visible, pending);
-		SimulatePublicationAllocationFailure = false;
-		return result;
-	}
 }

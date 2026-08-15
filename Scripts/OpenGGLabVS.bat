@@ -6,6 +6,7 @@ for %%I in ("%SCRIPT_DIR%..") do set "ROOT=%%~fI"
 
 set "SYNC_SCRIPT=%SCRIPT_DIR%SyncShadersToVS.ps1"
 set "NORMALIZE_SCRIPT=%SCRIPT_DIR%SourcesEndingToCRLF.bat"
+set "BOM_SCRIPT=%SCRIPT_DIR%RestoreProjectFileBOM.ps1"
 set "SOLUTION=%ROOT%\GraphicsGadgetLab.sln"
 
 if not exist "%SYNC_SCRIPT%" (
@@ -20,6 +21,12 @@ if not exist "%NORMALIZE_SCRIPT%" (
     exit /b 1
 )
 
+if not exist "%BOM_SCRIPT%" (
+    echo Project BOM repair script not found: "%BOM_SCRIPT%"
+    pause
+    exit /b 1
+)
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%" -RootDir "%ROOT%"
 if errorlevel 1 (
     echo Failed to sync shader files to Visual Studio project.
@@ -30,6 +37,13 @@ if errorlevel 1 (
 call "%NORMALIZE_SCRIPT%"
 if errorlevel 1 (
     echo Failed to normalize source files to UTF-8 with CRLF line endings.
+    pause
+    exit /b 1
+)
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%BOM_SCRIPT%" -RootDir "%ROOT%"
+if errorlevel 1 (
+    echo Failed to restore UTF-8 BOM on Visual Studio project files.
     pause
     exit /b 1
 )

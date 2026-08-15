@@ -231,70 +231,28 @@
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.cpp">
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.cpp">
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDamageSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelEditSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelHashSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMesherSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMutationSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPrimitiveSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRestoreSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelStorageSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTest.cpp">
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\InputBase.cpp">
@@ -578,10 +536,10 @@
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h">
       <Filter>Application</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.h">
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.h">
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
@@ -590,22 +548,7 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTest.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Core\Input\InputBase.h">

@@ -1,12 +1,9 @@
 #include "Application/SelfTest/SelfTestRunner.h"
-#include "GGLabFoundation/Logging/Log.h"
-#include "Application/SelfTest/ArtifactCacheSelfTests.h"
-#include "Application/SelfTest/AssetDataSelfTests.h"
+#include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
+#include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
-#include "Application/SelfTest/PublicationAccountingSelfTests.h"
-#include "Application/SelfTest/RenderingContractSelfTests.h"
-#include "Application/SelfTest/SelfTest.h"
-#include "Application/SelfTest/VulkanContractSelfTests.h"
+#include "GGLabFoundation/Logging/Log.h"
+#include "GGLabTestCore/SelfTest.h"
 
 #include <algorithm>
 #include <array>
@@ -17,28 +14,16 @@ namespace gglab
 	{
 		constexpr std::array RegisteredSuites{
 			SelfTestSuiteDesc{
-				.m_Id = "artifact-cache",
-				.m_Run = &RunArtifactCacheSelfTests,
+				.m_Id = "app-devtools-view-profile",
+				.m_Run = &RunDevToolsViewProfileSelfTests,
 			},
 			SelfTestSuiteDesc{
-				.m_Id = "asset-data",
-				.m_Run = &RunAssetDataSelfTests,
+				.m_Id = "app-launch-options",
+				.m_Run = &RunLaunchOptionsSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "napa-voxel",
 				.m_Run = &RunNapaVoxelCoreSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "publication-accounting",
-				.m_Run = &RunPublicationAccountingSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "rendering-contracts",
-				.m_Run = &RunRenderingContractSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "vulkan-contracts",
-				.m_Run = &RunVulkanContractSelfTests,
 			},
 		};
 

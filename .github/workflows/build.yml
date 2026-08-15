@@ -250,11 +250,6 @@ jobs:
             exit $LASTEXITCODE
           }
 
-          & "Build\Output\x64\${{ matrix.configuration }}\GGLabFoundationTests.exe"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
       - name: Build GGLabRuntime standalone
         if: matrix.pch == 'enabled'
         shell: pwsh
@@ -330,11 +325,38 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests
+      - name: Run headless self-tests (Application)
         shell: pwsh
         working-directory: Build/Output/x64/${{ matrix.configuration }}
         run: |
           & .\GraphicsGadgetLab.exe --self-test all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests (GGLabFoundationTests)
+        shell: pwsh
+        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        run: |
+          & .\GGLabFoundationTests.exe
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests (GGLabRuntimeTests)
+        shell: pwsh
+        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        run: |
+          & .\GGLabRuntimeTests.exe --suite all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests (NapaVoxelCoreTests)
+        shell: pwsh
+        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        run: |
+          & .\NapaVoxelCoreTests.exe --suite all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }

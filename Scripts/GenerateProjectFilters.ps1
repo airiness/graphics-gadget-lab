@@ -346,6 +346,26 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "GGLabRuntimeTests"
+        ProjectPath = "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj"
+        FiltersPath = "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\GGLabRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "GGLabTestCore"
+        ProjectPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj"
+        FiltersPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\GGLabTestCore"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabRuntime"
         ProjectPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
         FiltersPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj.filters"
@@ -371,6 +391,16 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\NapaVoxelCore"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "NapaVoxelCoreTests"
+        ProjectPath = "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj"
+        FiltersPath = "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\NapaVoxelCore"; FilterPrefix = "" }
         )
     }
 )

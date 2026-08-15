@@ -79,8 +79,7 @@
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -97,8 +96,7 @@
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -155,28 +153,14 @@
     <ClCompile Include="..\..\Sources\Application\Application\Application.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoordinateSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelDamageSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelHashSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMesherSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMultiChunkSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelMutationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPrimitiveSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRestoreSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelStorageSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTest.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />
@@ -263,16 +247,11 @@
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ArtifactCacheSelfTests.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\AssetDataSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\PublicationAccountingSelfTests.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\RenderingContractSelfTests.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTest.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SpirVDecorationReader.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanContractSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32MessageHandler.h" />
@@ -387,6 +366,9 @@
     <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
       <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">
+      <Project>{d4e1b7c2-5a3f-4b6d-9e0a-8c7d2f1b6a49}</Project>
     </ProjectReference>
     <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
       <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>

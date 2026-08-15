@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35913.81
@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Application", "Projects\App
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundation", "Projects\GGLabFoundation\GGLabFoundation.vcxproj", "{5C275408-928E-43C7-A2B5-7099FEA072D4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabTestCore", "Projects\GGLabTestCore\GGLabTestCore.vcxproj", "{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntime", "Projects\GGLabRuntime\GGLabRuntime.vcxproj", "{F382CFE9-9912-487D-B999-E649C340125D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NapaVoxelCore", "Projects\NapaVoxelCore\NapaVoxelCore.vcxproj", "{37C8824E-AAAB-46F3-86B1-B03C02FE468B}"
@@ -14,6 +16,10 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{6217F100-D96D-45C6-AA08-A1D7266C505E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundationTests", "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj", "{B276486A-987A-424E-9878-91057B05DAAD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntimeTests", "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj", "{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NapaVoxelCoreTests", "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj", "{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
@@ -33,6 +39,10 @@ Global
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Debug|x64.Build.0 = Debug|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Release|x64.ActiveCfg = Release|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Release|x64.Build.0 = Release|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Debug|x64.ActiveCfg = Debug|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Debug|x64.Build.0 = Debug|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Release|x64.ActiveCfg = Release|x64
+		{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}.Release|x64.Build.0 = Release|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.ActiveCfg = Debug|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.Build.0 = Debug|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.ActiveCfg = Release|x64
@@ -45,6 +55,14 @@ Global
 		{B276486A-987A-424E-9878-91057B05DAAD}.Debug|x64.Build.0 = Debug|x64
 		{B276486A-987A-424E-9878-91057B05DAAD}.Release|x64.ActiveCfg = Release|x64
 		{B276486A-987A-424E-9878-91057B05DAAD}.Release|x64.Build.0 = Release|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Debug|x64.ActiveCfg = Debug|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Debug|x64.Build.0 = Debug|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.ActiveCfg = Release|x64
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.Build.0 = Release|x64
+		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Debug|x64.ActiveCfg = Debug|x64
+		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Debug|x64.Build.0 = Debug|x64
+		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Release|x64.ActiveCfg = Release|x64
+		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Release|x64.Build.0 = Release|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.ActiveCfg = Debug|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Debug|x64.Build.0 = Debug|x64
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77}.Release|x64.ActiveCfg = Release|x64
@@ -55,6 +73,8 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B276486A-987A-424E-9878-91057B05DAAD} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
+		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
+		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution

@@ -1,4 +1,4 @@
-﻿#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
@@ -550,9 +550,13 @@ namespace gglab
 			!errorCode && iterator != end; iterator.increment(errorCode))
 		{
 			if (!iterator->is_regular_file(errorCode))
+			{
 				continue;
-			if (!iterator->path().filename().string().contains(".ddc.tmp."))
+			}
+			if (iterator->path().filename().string().find(".ddc.tmp.") == std::string::npos)
+			{
 				continue;
+			}
 			const std::filesystem::path temporaryPath = iterator->path();
 			errorCode.clear();
 			std::filesystem::remove(temporaryPath, errorCode);
