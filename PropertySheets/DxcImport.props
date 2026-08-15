@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    DXC (DirectX Shader Compiler) NuGet integration.
+
+    Contract:
+      - The pinned DXC NuGet package (Microsoft.Direct3D.DXC 1.9.2607.13) is
+        the single source for DXC headers, dxcompiler.lib and the runtime DLL
+        copy items. Consumers import this sheet instead of wiring the package
+        props/targets imports themselves.
+      - A missing package restore is a build error; it is never silently
+        skipped.
+  -->
+  <PropertyGroup>
+    <GGLabDxcPackageVersion>1.9.2607.13</GGLabDxcPackageVersion>
+    <GGLabDxcPackageRoot>$(GGLabRepositoryRoot)packages\Microsoft.Direct3D.DXC.$(GGLabDxcPackageVersion)\build\native</GGLabDxcPackageRoot>
+  </PropertyGroup>
+  <Import Project="$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.props" Condition="Exists('$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.props')" />
+  <Import Project="$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.targets" Condition="Exists('$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.targets')" />
+  <Target Name="GGLabEnsureDxcPackage" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.props')"
+           Text="The pinned DXC NuGet package is missing: '$(GGLabDxcPackageRoot)'. Restore packages through Visual Studio/NuGet before building." />
+    <Error Condition="!Exists('$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.targets')"
+           Text="The pinned DXC NuGet package is missing: '$(GGLabDxcPackageRoot)'. Restore packages through Visual Studio/NuGet before building." />
+  </Target>
+  <ItemGroup />
+</Project>
