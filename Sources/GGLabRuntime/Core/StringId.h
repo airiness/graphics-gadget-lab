@@ -1,6 +1,18 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+// The registry configuration changes the inline semantics of StringID (name
+// registration and LookupName). Translation units that disagree with the linked
+// library are an ODR violation the linker would otherwise not diagnose, so the
+// configuration is published as a link-time contract: consumers must compile
+// StringId.h with the same GGLAB_ENABLE_STRING_ID_REGISTRY value as the
+// GGLabRuntime library they link.
+#if defined(GGLAB_ENABLE_STRING_ID_REGISTRY)
+#pragma detect_mismatch("GGLAB_ENABLE_STRING_ID_REGISTRY", "1")
+#else
+#pragma detect_mismatch("GGLAB_ENABLE_STRING_ID_REGISTRY", "0")
+#endif
+
 #include <array>
 #include <compare>
 #include <cstddef>

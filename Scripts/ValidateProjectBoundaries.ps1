@@ -721,7 +721,9 @@ foreach ($reference in $foundationTestsProjectReferenceSet) {
         })
     }
 }
-foreach ($requiredReference in @($runtimeProjectPath, $foundationProjectPath, $testCoreProjectPath)) {
+$directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj"
+$runtimeTestsRequiredReferences = @($runtimeProjectPath, $foundationProjectPath, $testCoreProjectPath)
+foreach ($requiredReference in $runtimeTestsRequiredReferences) {
     if (-not $runtimeTestsProjectReferenceSet.Contains($requiredReference)) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-graph"
@@ -730,12 +732,16 @@ foreach ($requiredReference in @($runtimeProjectPath, $foundationProjectPath, $t
         })
     }
 }
-if ($runtimeTestsProjectReferenceSet.Contains($applicationProjectPath)) {
-    $projectContractFindings.Add([pscustomobject]@{
-        Rule   = "project-graph"
-        Target = "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj"
-        Reason = "must not reference Application"
-    })
+$runtimeTestsAllowedReferences = @($runtimeProjectPath, $foundationProjectPath,
+    $testCoreProjectPath, $directXTexProjectPath)
+foreach ($reference in $runtimeTestsProjectReferenceSet) {
+    if (-not $runtimeTestsAllowedReferences.Contains($reference)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj"
+            Reason = "first-party closure must be exactly GGLabRuntime, GGLabFoundation, GGLabTestCore and the vendored DirectXTex project"
+        })
+    }
 }
 foreach ($forbiddenReference in @($applicationProjectPath, $runtimeProjectPath, $foundationProjectPath)) {
     if ($napaProjectReferenceSet.Contains($forbiddenReference)) {
