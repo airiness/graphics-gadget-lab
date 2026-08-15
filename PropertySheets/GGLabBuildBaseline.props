@@ -3,15 +3,23 @@
   <!--
     Workspace-wide C++ build baseline.
 
-    Contract: only the policy every first-party C++ target actually shares:
+    Adoption: every first-party project except NapaVoxelCore -
+      GGLabFoundation, GGLabFoundationTests, GGLabTestCore and
+      NapaVoxelCoreTests import this sheet directly; Application,
+      GGLabRuntime and GGLabRuntimeTests get it through Common.props.
+      NapaVoxelCore is a deliberate exception: it keeps an independent build
+      identity rooted at $(NapaVoxelRepositoryRoot) with a host-independent/
+      UBT posture and must not consume workspace-wide build policy.
+
+    Contract: only the policy every adopter actually shares:
       - repository root and the OutDir/IntDir layout;
       - the pinned C++20 language standard;
       - conformance mode and SDLCheck.
 
     Windows platform macros, external include roots, /utf-8, /MP and warning
-    levels are deliberately NOT here: they are not universal across
-    first-party targets. Common.props layers the Windows/runtime environment
-    on top of this baseline.
+    levels are deliberately NOT here: they are not universal across adopters.
+    Common.props layers the Windows/runtime environment on top of this
+    baseline.
   -->
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />

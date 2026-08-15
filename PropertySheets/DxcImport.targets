@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    DXC (DirectX Shader Compiler) NuGet integration, targets half.
+
+    Consumers import this from their ExtensionTargets group, after the D3D12
+    package .targets, so the DXC include directory stays in front of D3D12's
+    (both packages ship d3d12shader.h). See DxcImport.props for the full
+    contract and the package pin. GGLabDxcPackageRoot is provided by
+    DxcImport.props, which every consumer imports first.
+  -->
+  <Import Project="$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.targets" Condition="Exists('$(GGLabDxcPackageRoot)\Microsoft.Direct3D.DXC.targets')" />
+</Project>
