@@ -1,3 +1,4 @@
+#include "NapaVoxelTestAccess.h"
 #include "NapaVoxelTestFramework.h"
 
 

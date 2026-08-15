@@ -19,6 +19,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Tests\NapaVoxelCore\NapaVoxelCoreTestCases.h" />
     <ClInclude Include="..\..\Tests\NapaVoxelCore\NapaVoxelDataOnlyPublicationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\NapaVoxelCore\NapaVoxelTestAccess.h" />
     <ClInclude Include="..\..\Tests\NapaVoxelCore\NapaVoxelTestFramework.h" />
   </ItemGroup>
 </Project>

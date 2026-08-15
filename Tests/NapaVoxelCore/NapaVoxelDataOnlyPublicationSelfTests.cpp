@@ -1,5 +1,7 @@
 #include "NapaVoxelDataOnlyPublicationSelfTests.h"
 
+#include "NapaVoxelTestAccess.h"
+
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"

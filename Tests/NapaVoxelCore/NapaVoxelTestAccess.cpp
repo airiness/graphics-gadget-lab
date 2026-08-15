@@ -1,4 +1,4 @@
-#include "NapaVoxelTestFramework.h"
+#include "NapaVoxelTestAccess.h"
 
 namespace napa::voxel::testing
 {
