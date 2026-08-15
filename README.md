@@ -70,7 +70,7 @@ First-party headless self-tests run as one executable per domain:
 | Executable | Command | Coverage |
 |---|---|---|
 | `GraphicsGadgetLab.exe` | `--self-test all` | Application-owned in-app suites (`app-launch-options`, `app-devtools-view-profile`, `napa-voxel`) |
-| `GGLabRuntimeTests.exe` | `--suite all` | Runtime/Foundation contract suites (`artifact-cache`, `asset-data`, `asset-upload-scheduler`, `publication-accounting`, `rendering-contracts`, `vulkan-contracts`) |
+| `GGLabRuntimeTests.exe` | `--suite all` | Runtime/Foundation contract suites (`artifact-cache`, `asset-data`, `asset-upload-scheduler`, `publication-accounting`, `shader-compile-contracts`, `rendering-contracts`, `vulkan-contracts`) |
 | `NapaVoxelCoreTests.exe` | `--suite all` | Pure NapaVoxelCore suites compiled as C++20 (`build-contract`, `coordinate`, `damage`, `edit`, `hash`, `mesher`, `multi-chunk`, `mutation`, `primitive`, `restore`, `storage`, `publication-data-only`) |
 | `GGLabFoundationTests.exe` | (no arguments) | Foundation public-header link probe |
 
