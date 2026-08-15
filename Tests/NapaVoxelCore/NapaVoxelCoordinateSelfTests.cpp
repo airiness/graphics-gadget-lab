@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Math/Vector.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
@@ -13,7 +13,7 @@
 #include <limits>
 #include <string_view>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -30,7 +30,7 @@ namespace gglab
 			};
 		}
 
-		void RunDouble3MathTests(SelfTestContext& context) noexcept
+		void RunDouble3MathTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			constexpr Double3 lhs{ 1.0, 2.0, 3.0 };
@@ -60,7 +60,7 @@ namespace gglab
 		}
 
 		void CheckValidationError(
-			SelfTestContext& context,
+			TestContext& context,
 			const napa::voxel::VoxelWorldConfig& config,
 			napa::voxel::ValidationError expectedError,
 			std::string_view name) noexcept
@@ -70,7 +70,7 @@ namespace gglab
 			context.Check(result.m_Error == expectedError, name);
 		}
 
-		void RunCheckedArithmeticTests(SelfTestContext& context) noexcept
+		void RunCheckedArithmeticTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -178,7 +178,7 @@ namespace gglab
 				"CheckedMul matches wide arithmetic across signed boundaries");
 		}
 
-		void RunFloorDivisionTests(SelfTestContext& context) noexcept
+		void RunFloorDivisionTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -249,7 +249,7 @@ namespace gglab
 			}
 		}
 
-		void RunCoordinateOwnershipTests(SelfTestContext& context) noexcept
+		void RunCoordinateOwnershipTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -362,7 +362,7 @@ namespace gglab
 			}
 		}
 
-		void RunCanonicalOrderingTests(SelfTestContext& context) noexcept
+		void RunCanonicalOrderingTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -391,7 +391,7 @@ namespace gglab
 				"ChunkCoordZYXLess orders chunks by Z, then Y, then X");
 		}
 
-		void RunFlattenTests(SelfTestContext& context) noexcept
+		void RunFlattenTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -449,7 +449,7 @@ namespace gglab
 				"Local coordinate operations reject unsupported chunk sizes");
 		}
 
-		void RunCellCornerAndHaloTests(SelfTestContext& context) noexcept
+		void RunCellCornerAndHaloTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -540,7 +540,7 @@ namespace gglab
 				"Positive halo samples resolve through global sample ownership");
 		}
 
-		void RunCoordinateBoundsTests(SelfTestContext& context) noexcept
+		void RunCoordinateBoundsTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -643,7 +643,7 @@ namespace gglab
 		}
 
 		void RunCellOwnerChunkIntersectionTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -722,7 +722,7 @@ namespace gglab
 				"Cell-owner chunk intersection preserves negative partial chunks");
 		}
 
-		void RunLogicalDomainMetricsTests(SelfTestContext& context) noexcept
+		void RunLogicalDomainMetricsTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -838,7 +838,7 @@ namespace gglab
 				"Logical domain validation rejects uint64 sample count overflow");
 		}
 
-		void RunWorldConfigValidationTests(SelfTestContext& context) noexcept
+		void RunWorldConfigValidationTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -1001,7 +1001,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelCoordinateSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelCoordinateSelfTests(TestContext& context) noexcept
 	{
 		RunDouble3MathTests(context);
 		RunCheckedArithmeticTests(context);

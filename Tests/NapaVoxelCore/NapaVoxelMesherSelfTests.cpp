@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/MeshData.h"
@@ -16,7 +16,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -547,7 +547,7 @@ namespace gglab
 		}
 
 		void RunMeshDataLayoutTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -569,7 +569,7 @@ namespace gglab
 		}
 
 		void RunMeshQuantizationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -715,7 +715,7 @@ namespace gglab
 		}
 
 		void RunSyntheticMeshValidationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -1293,7 +1293,7 @@ namespace gglab
 		}
 
 		void RunReferenceTopologyContractTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -1355,7 +1355,7 @@ namespace gglab
 		}
 
 		void RunReferenceGradientTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -1448,7 +1448,7 @@ namespace gglab
 		}
 
 		void RunReferenceInterpolationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -1680,7 +1680,7 @@ namespace gglab
 		}
 
 		void RunReferenceTetrahedronPolygonizationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -2070,7 +2070,7 @@ namespace gglab
 		}
 
 		void RunReferenceChunkMeshingTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -2804,7 +2804,7 @@ namespace gglab
 	}
 
 	void RunNapaVoxelMesherSelfTests(
-		SelfTestContext& context) noexcept
+		TestContext& context) noexcept
 	{
 		RunMeshDataLayoutTests(context);
 		RunMeshQuantizationTests(context);

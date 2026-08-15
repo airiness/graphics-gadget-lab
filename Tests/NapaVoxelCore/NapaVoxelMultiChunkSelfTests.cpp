@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -349,7 +349,7 @@ namespace gglab
 			return true;
 		}
 
-		void RunBoundaryContourContractTests(SelfTestContext& context)
+		void RunBoundaryContourContractTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -394,7 +394,7 @@ namespace gglab
 				"Boundary normal comparison uses one SNORM16 step of tolerance");
 		}
 
-		void RunCompleteDomainTests(SelfTestContext& context)
+		void RunCompleteDomainTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -495,7 +495,7 @@ namespace gglab
 				"World mesh hashing revalidates stored Chunk evidence");
 		}
 
-		void RunBoundarySurfaceTests(SelfTestContext& context)
+		void RunBoundarySurfaceTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -690,7 +690,7 @@ namespace gglab
 				"Boundary contour validation rejects non-canonical endpoints");
 		}
 
-		void RunExactIsoCornerTests(SelfTestContext& context)
+		void RunExactIsoCornerTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -888,7 +888,7 @@ namespace gglab
 				"Fully exact-iso boundary triangles emit no interior contour");
 		}
 
-		void RunZeroGradientBoundaryFallbackTests(SelfTestContext& context)
+		void RunZeroGradientBoundaryFallbackTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -935,7 +935,7 @@ namespace gglab
 				"Zero-gradient topology fallback preserves adjacent Chunk boundary contours");
 		}
 
-		void RunCpuMeshBatchTests(SelfTestContext& context)
+		void RunCpuMeshBatchTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -1314,7 +1314,7 @@ namespace gglab
 				"An empty Mesh Batch cannot advance a published Visible revision");
 		}
 
-		void RunEmptyCpuMeshBatchTests(SelfTestContext& context)
+		void RunEmptyCpuMeshBatchTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -1344,7 +1344,7 @@ namespace gglab
 				"Visible World mesh hashing includes every Empty Mesh Chunk");
 		}
 
-		void RunGuardAllocationTests(SelfTestContext& context)
+		void RunGuardAllocationTests(TestContext& context)
 		{
 			using namespace napa::voxel;
 
@@ -1396,7 +1396,7 @@ namespace gglab
 	}
 
 	void RunNapaVoxelMultiChunkSelfTests(
-		SelfTestContext& context) noexcept
+		TestContext& context) noexcept
 	{
 		RunBoundaryContourContractTests(context);
 		RunCompleteDomainTests(context);

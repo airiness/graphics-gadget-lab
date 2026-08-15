@@ -1,8 +1,7 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
-#include "NapaVoxelCore/Testing/VoxelRestoreTestAccess.h"
 #include "NapaVoxelCore/World/VoxelRestore.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
@@ -13,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -90,7 +89,7 @@ namespace gglab
 				MutateSample(*world, { 1, 0, 0 }, DefaultVoxelSample);
 		}
 
-		void RunExactRestoreTests(SelfTestContext& context) noexcept
+		void RunExactRestoreTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			const VoxelSample stone{
@@ -256,7 +255,7 @@ namespace gglab
 				"An empty Restore Region is rejected atomically");
 		}
 
-		void RunCurrentFirstRestoreTest(SelfTestContext& context) noexcept
+		void RunCurrentFirstRestoreTest(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			std::unique_ptr<VoxelWorld> world;
@@ -283,7 +282,7 @@ namespace gglab
 				"Current-first Restore recovers the implicit Original baseline exactly");
 		}
 
-		void RunMultiChunkRestoreOrderTest(SelfTestContext& context) noexcept
+		void RunMultiChunkRestoreOrderTest(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			const VoxelSample stone{
@@ -326,7 +325,7 @@ namespace gglab
 				"Restore All orders cross-Chunk Sample Changes by global z/y/x coordinates");
 		}
 
-		void RunSparseRestoreAllTest(SelfTestContext& context) noexcept
+		void RunSparseRestoreAllTest(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			VoxelWorldConfig config = MakeRestoreConfig();
@@ -350,7 +349,7 @@ namespace gglab
 				"Restore All scans sparse resident storage instead of the full logical domain");
 		}
 
-		void RunRestoreAtomicityTests(SelfTestContext& context) noexcept
+		void RunRestoreAtomicityTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			using namespace napa::voxel::testing;
@@ -358,7 +357,7 @@ namespace gglab
 			VoxelMutationResult successfulResult{};
 			VoxelRestoreAllocationProbe successfulProbe{};
 			const bool restored = CreateDivergedRestoreWorld(successfulWorld) &&
-				VoxelRestoreTestAccess::RestoreAllWithAllocationProbe(
+				RestoreAllWithAllocationProbe(
 					*successfulWorld, successfulResult, successfulProbe).Succeeded();
 			const std::size_t allocationCount = successfulProbe.m_PrepareAllocationCount;
 			context.Check(restored && successfulResult.Changed() && allocationCount > 0 &&
@@ -381,7 +380,7 @@ namespace gglab
 				const std::size_t residentCount = allAllocationFaultsAtomic ?
 					world->GetResidentChunkCount() : 0;
 				allAllocationFaultsAtomic = allAllocationFaultsAtomic &&
-					VoxelRestoreTestAccess::RestoreAllWithAllocationProbe(
+					RestoreAllWithAllocationProbe(
 						*world, result, probe).m_Error ==
 						ValidationError::VoxelMutationAllocationFailure &&
 					probe.m_CommitAllocationCount == 0 && result == sentinel &&
@@ -403,7 +402,7 @@ namespace gglab
 			const std::uint64_t revision = exhaustedFixture ?
 				exhaustedWorld->GetWorldVoxelRevision() : 0;
 			context.Check(exhaustedFixture &&
-				VoxelRestoreTestAccess::RestoreAllWithExhaustedRevision(
+				RestoreAllWithExhaustedRevision(
 					*exhaustedWorld, exhaustedResult).m_Error ==
 					ValidationError::ArithmeticOverflow && exhaustedResult == sentinel &&
 				exhaustedWorld->GetWorldVoxelRevision() == revision &&
@@ -413,7 +412,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelRestoreSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelRestoreSelfTests(TestContext& context) noexcept
 	{
 		RunExactRestoreTests(context);
 		RunCurrentFirstRestoreTest(context);

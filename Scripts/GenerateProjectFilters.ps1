@@ -393,6 +393,16 @@ $projectSpecifications = @(
             [pscustomobject]@{ Root = "Sources\NapaVoxelCore"; FilterPrefix = "" }
         )
     }
+    [pscustomobject]@{
+        Name = "NapaVoxelCoreTests"
+        ProjectPath = "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj"
+        FiltersPath = "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\NapaVoxelCore"; FilterPrefix = "" }
+        )
+    }
 )
 
 $staleFilters = @()

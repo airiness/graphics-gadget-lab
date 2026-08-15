@@ -1,7 +1,8 @@
 #pragma once
 
-#include "NapaVoxelCore/Testing/VoxelMutationTestAccess.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
+#include "NapaVoxelCore/World/Coordinates.h"
+#include "NapaVoxelCore/World/VoxelWorld.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -10,7 +11,14 @@
 
 namespace napa::voxel::detail
 {
-	extern thread_local testing::VoxelOperationAllocationProbe* ActiveOperationAllocationProbe;
+	struct VoxelOperationAllocationProbe
+	{
+		std::size_t m_FailAtPrepareAllocation = 0;
+		std::size_t m_PrepareAllocationCount = 0;
+		std::size_t m_CommitAllocationCount = 0;
+	};
+
+	extern thread_local VoxelOperationAllocationProbe* ActiveOperationAllocationProbe;
 	extern thread_local bool SimulateExhaustedWorldRevision;
 	extern thread_local bool IsVoxelOperationCommitPhase;
 

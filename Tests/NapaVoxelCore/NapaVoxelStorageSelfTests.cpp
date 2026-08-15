@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/World/VoxelChunk.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
@@ -9,7 +9,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -27,7 +27,7 @@ namespace gglab
 			};
 		}
 
-		void RunVoxelSampleTests(SelfTestContext& context) noexcept
+		void RunVoxelSampleTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -132,7 +132,7 @@ namespace gglab
 				"Voxel validation rejects unknown materials independently");
 		}
 
-		void RunVoxelChunkTests(SelfTestContext& context) noexcept
+		void RunVoxelChunkTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -242,7 +242,7 @@ namespace gglab
 				"Chunk reads reject local coordinates outside storage");
 		}
 
-		void RunVoxelWorldTests(SelfTestContext& context) noexcept
+		void RunVoxelWorldTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -499,7 +499,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelStorageSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelStorageSelfTests(TestContext& context) noexcept
 	{
 		RunVoxelSampleTests(context);
 		RunVoxelChunkTests(context);

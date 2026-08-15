@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Edit/VoxelDamage.h"
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
@@ -18,7 +18,7 @@
 #include <tuple>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -247,7 +247,7 @@ namespace gglab
 			return true;
 		}
 
-		void RunStoneTransitionTests(SelfTestContext& context) noexcept
+		void RunStoneTransitionTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			SphereEditContext centerContext{};
@@ -357,7 +357,7 @@ namespace gglab
 				}, "Stone material rules do not alter the Soil subtract path");
 		}
 
-		void RunStoneMutationGoldenTests(SelfTestContext& context) noexcept
+		void RunStoneMutationGoldenTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			std::unique_ptr<VoxelWorld> world;
@@ -529,7 +529,7 @@ namespace gglab
 				"A disjoint second Stone hit cannot subtract the previously damaged region");
 		}
 
-		void RunStoneFullDomainOracleTests(SelfTestContext& context) noexcept
+		void RunStoneFullDomainOracleTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			struct OracleCase
@@ -612,7 +612,7 @@ namespace gglab
 				"Stone density and zero-Strength Damage hits match the full-domain Oracle exactly");
 		}
 
-		void RunDestructionRestoreQuiescenceTests(SelfTestContext& context) noexcept
+		void RunDestructionRestoreQuiescenceTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			std::unique_ptr<VoxelWorld> world;
@@ -761,7 +761,7 @@ namespace gglab
 				"Repeated Stone destruction and Restore recover exact Voxel, Mesh, Bounds, and Contour evidence");
 		}
 
-		void RunPlaytestBreachMeshingRegressionTests(SelfTestContext& context) noexcept
+		void RunPlaytestBreachMeshingRegressionTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -834,7 +834,7 @@ namespace gglab
 				"P1 radius-four breaches mesh deterministically across the playable Stone face");
 		}
 
-		void RunDamageMarkerSnapshotTests(SelfTestContext& context) noexcept
+		void RunDamageMarkerSnapshotTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			const VoxelWorldConfig largeConfig = MakeDamageConfig({
@@ -882,7 +882,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelDamageSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelDamageSelfTests(TestContext& context) noexcept
 	{
 		RunStoneTransitionTests(context);
 		RunStoneMutationGoldenTests(context);

@@ -1,5 +1,4 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
-#include "Application/SelfTest/NapaVoxelDataOnlyPublicationSelfTests.h"
 
 #include "Application/Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
@@ -26,7 +25,6 @@
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 #include "NapaVoxelCore/Meshing/DataOnlyPublication.h"
-#include "NapaVoxelCore/Testing/DataOnlyPublicationTestAccess.h"
 #include "NapaVoxelCore/World/VoxelRestore.h"
 
 #include <array>
@@ -1942,7 +1940,6 @@ namespace gglab
 		RunEmptyReplacementUploadTest(context);
 		RunReplacementUploadFailureTests(context);
 		RunReplacementUploadCancellationTests(context);
-		RunNapaVoxelDataOnlyPublicationSelfTests(context);
 		RunAtomicDataOnlyPublicationTests(context);
 		RunAtomicMeshPublicationTests(context);
 		RunLabRuntimeGenerationCancellationStressTests(context);

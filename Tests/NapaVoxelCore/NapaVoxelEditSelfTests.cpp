@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Edit/SphereEdit.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -81,7 +81,7 @@ namespace gglab
 			return true;
 		}
 
-		void RunEditTypeAndValidationTests(SelfTestContext& context) noexcept
+		void RunEditTypeAndValidationTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			context.Check(std::is_standard_layout_v<SphereEdit> &&
@@ -143,7 +143,7 @@ namespace gglab
 				"Finite sphere edit strengths clamp deterministically to zero and one");
 		}
 
-		void RunEditBoundsTests(SelfTestContext& context) noexcept
+		void RunEditBoundsTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			const VoxelWorldConfig config = MakeEditConfig();
@@ -216,7 +216,7 @@ namespace gglab
 				"A finite radius whose support addition overflows leaves the context unchanged");
 		}
 
-		void RunEditEligibilityTests(SelfTestContext& context) noexcept
+		void RunEditEligibilityTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			SphereEditContext basicContext{};
@@ -301,7 +301,7 @@ namespace gglab
 				"Rejected sphere edit evaluation leaves its output unchanged");
 		}
 
-		void RunEditBoundsOracleTests(SelfTestContext& context) noexcept
+		void RunEditBoundsOracleTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 			struct OracleCase
@@ -353,7 +353,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelEditSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelEditSelfTests(TestContext& context) noexcept
 	{
 		RunEditTypeAndValidationTests(context);
 		RunEditBoundsTests(context);

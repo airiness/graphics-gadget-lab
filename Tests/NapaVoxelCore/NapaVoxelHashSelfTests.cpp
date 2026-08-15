@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Hash/CanonicalHash.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -38,7 +38,7 @@ namespace gglab
 		}
 
 		void RunCanonicalHashWriterTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -153,7 +153,7 @@ namespace gglab
 		}
 
 		void RunLogicalVoxelWorldHashTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -290,7 +290,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelHashSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelHashSelfTests(TestContext& context) noexcept
 	{
 		RunCanonicalHashWriterTests(context);
 		RunLogicalVoxelWorldHashTests(context);

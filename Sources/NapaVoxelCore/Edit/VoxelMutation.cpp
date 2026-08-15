@@ -1,7 +1,6 @@
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 
 #include "NapaVoxelCore/Edit/VoxelOperationDetail.h"
-#include "NapaVoxelCore/Testing/VoxelMutationTestAccess.h"
 #include "NapaVoxelCore/World/VoxelChunk.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 
@@ -21,7 +20,7 @@ namespace napa::voxel
 {
 	namespace detail
 	{
-		thread_local testing::VoxelOperationAllocationProbe* ActiveOperationAllocationProbe = nullptr;
+		thread_local VoxelOperationAllocationProbe* ActiveOperationAllocationProbe = nullptr;
 		thread_local bool SimulateExhaustedWorldRevision = false;
 		thread_local bool IsVoxelOperationCommitPhase = false;
 
@@ -543,38 +542,5 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult testing::VoxelMutationTestAccess::ApplySphereEditWithAllocationProbe(
-		VoxelWorld& world, const SphereEditRequest& request,
-		VoxelMutationResult& result, VoxelMutationAllocationProbe& probe)
-	{
-		if (detail::ActiveOperationAllocationProbe != nullptr)
-		{
-			return { ValidationError::InvalidVoxelMutation };
-		}
 
-		probe.m_PrepareAllocationCount = 0;
-		probe.m_CommitAllocationCount = 0;
-		detail::IsVoxelOperationCommitPhase = false;
-		detail::ActiveOperationAllocationProbe = &probe;
-		const ValidationResult mutationResult =
-			napa::voxel::ApplySphereEdit(world, request, result);
-		detail::ActiveOperationAllocationProbe = nullptr;
-		detail::IsVoxelOperationCommitPhase = false;
-		return mutationResult;
-	}
-
-	ValidationResult testing::VoxelMutationTestAccess::ApplySphereEditWithExhaustedRevision(
-		VoxelWorld& world, const SphereEditRequest& request, VoxelMutationResult& result)
-	{
-		if (detail::SimulateExhaustedWorldRevision)
-		{
-			return { ValidationError::InvalidVoxelMutation };
-		}
-
-		detail::SimulateExhaustedWorldRevision = true;
-		const ValidationResult mutationResult =
-			napa::voxel::ApplySphereEdit(world, request, result);
-		detail::SimulateExhaustedWorldRevision = false;
-		return mutationResult;
-	}
 }

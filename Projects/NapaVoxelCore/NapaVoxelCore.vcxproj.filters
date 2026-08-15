@@ -16,9 +16,6 @@
     <Filter Include="Meshing">
       <UniqueIdentifier>{A0115B93-1EE6-C2E1-1D9A-AFB46C3F7F77}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Testing">
-      <UniqueIdentifier>{1C080EC6-1807-C3E0-1664-65CAEB7DFD5C}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Validation">
       <UniqueIdentifier>{A1E1E70A-B709-8474-B7C5-0E887A40AA4B}</UniqueIdentifier>
     </Filter>
@@ -130,6 +127,9 @@
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h">
       <Filter>Meshing</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublicationDetail.h">
+      <Filter>Meshing</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h">
       <Filter>Meshing</Filter>
     </ClInclude>
@@ -141,15 +141,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h">
       <Filter>Meshing</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\DataOnlyPublicationTestAccess.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelMutationTestAccess.h">
-      <Filter>Testing</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Testing\VoxelRestoreTestAccess.h">
-      <Filter>Testing</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
       <Filter>Validation</Filter>

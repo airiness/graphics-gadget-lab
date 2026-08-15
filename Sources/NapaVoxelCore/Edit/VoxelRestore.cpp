@@ -1,7 +1,6 @@
 #include "NapaVoxelCore/World/VoxelRestore.h"
 
 #include "NapaVoxelCore/Edit/VoxelOperationDetail.h"
-#include "NapaVoxelCore/Testing/VoxelRestoreTestAccess.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 #include "NapaVoxelCore/World/VoxelChunk.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
@@ -258,35 +257,5 @@ namespace napa::voxel
 		return {};
 	}
 
-	ValidationResult testing::VoxelRestoreTestAccess::RestoreAllWithAllocationProbe(
-		VoxelWorld& world, VoxelMutationResult& result, VoxelRestoreAllocationProbe& probe)
-	{
-		if (detail::ActiveOperationAllocationProbe != nullptr)
-		{
-			return { ValidationError::InvalidVoxelMutation };
-		}
 
-		probe.m_PrepareAllocationCount = 0;
-		probe.m_CommitAllocationCount = 0;
-		detail::IsVoxelOperationCommitPhase = false;
-		detail::ActiveOperationAllocationProbe = &probe;
-		const ValidationResult restoreResult = napa::voxel::RestoreAll(world, result);
-		detail::ActiveOperationAllocationProbe = nullptr;
-		detail::IsVoxelOperationCommitPhase = false;
-		return restoreResult;
-	}
-
-	ValidationResult testing::VoxelRestoreTestAccess::RestoreAllWithExhaustedRevision(
-		VoxelWorld& world, VoxelMutationResult& result)
-	{
-		if (detail::SimulateExhaustedWorldRevision)
-		{
-			return { ValidationError::InvalidVoxelMutation };
-		}
-
-		detail::SimulateExhaustedWorldRevision = true;
-		const ValidationResult restoreResult = napa::voxel::RestoreAll(world, result);
-		detail::SimulateExhaustedWorldRevision = false;
-		return restoreResult;
-	}
 }

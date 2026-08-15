@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "NapaVoxelTestFramework.h"
 
 #include "NapaVoxelCore/Field/DensityQuantization.h"
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -14,7 +14,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -148,7 +148,7 @@ namespace gglab
 		}
 
 		void RunPrimitiveLayoutTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -174,7 +174,7 @@ namespace gglab
 		}
 
 		void RunPrimitiveValidationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -285,7 +285,7 @@ namespace gglab
 		}
 
 		void RunSignedDistanceTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -363,7 +363,7 @@ namespace gglab
 		}
 
 		void RunDensityQuantizationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -454,7 +454,7 @@ namespace gglab
 		}
 
 		void RunPrimitiveUnionTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -554,7 +554,7 @@ namespace gglab
 		}
 
 		void RunPrimitiveWorldGenerationTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -655,7 +655,7 @@ namespace gglab
 		}
 
 		void RunPrimitiveWorldInvariantTests(
-			SelfTestContext& context) noexcept
+			TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -819,7 +819,7 @@ namespace gglab
 	}
 
 	void RunNapaVoxelPrimitiveSelfTests(
-		SelfTestContext& context) noexcept
+		TestContext& context) noexcept
 	{
 		RunPrimitiveLayoutTests(context);
 		RunPrimitiveValidationTests(context);

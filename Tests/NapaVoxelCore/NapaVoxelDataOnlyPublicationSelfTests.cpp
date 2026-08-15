@@ -1,11 +1,10 @@
-#include "Application/SelfTest/NapaVoxelDataOnlyPublicationSelfTests.h"
+#include "NapaVoxelDataOnlyPublicationSelfTests.h"
 
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 #include "NapaVoxelCore/Meshing/DataOnlyPublication.h"
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
-#include "NapaVoxelCore/Testing/DataOnlyPublicationTestAccess.h"
 #include "NapaVoxelCore/Validation/ValidationResult.h"
 #include "NapaVoxelCore/World/Coordinates.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
@@ -17,7 +16,7 @@
 #include <memory>
 #include <span>
 
-namespace gglab
+namespace napa::voxel::testing
 {
 	namespace
 	{
@@ -79,7 +78,7 @@ namespace gglab
 				mutation.GetChangeKind() == VoxelMutationChangeKind::DamageOnly;
 		}
 
-		void RunDataOnlyPublicationContractTests(SelfTestContext& context) noexcept
+		void RunDataOnlyPublicationContractTests(TestContext& context) noexcept
 		{
 			using namespace napa::voxel;
 
@@ -169,7 +168,7 @@ namespace gglab
 				std::numeric_limits<std::uint64_t>::max();
 			std::unique_ptr<PendingDataOnlyPublication> maximumPending;
 			const ValidationResult maximumPrepared = maximumFixture
-				? testing::DataOnlyPublicationTestAccess::PrepareWithAuthoritativeRevision(
+				? testing::PrepareWithAuthoritativeRevision(
 					*maximumWorld, maximumMutation, maximumVisible,
 					std::numeric_limits<std::uint64_t>::max(), maximumPending)
 				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
@@ -189,7 +188,7 @@ namespace gglab
 				allocationWorld, allocationVisible, allocationMutation);
 			std::unique_ptr<PendingDataOnlyPublication> allocationPending;
 			const ValidationResult allocationFailure = allocationFixture
-				? testing::DataOnlyPublicationTestAccess::PrepareWithAllocationFailure(
+				? testing::PrepareWithAllocationFailure(
 					*allocationWorld, allocationMutation, allocationVisible,
 					allocationPending)
 				: ValidationResult{ ValidationError::InvalidDataOnlyPublication };
@@ -230,7 +229,7 @@ namespace gglab
 		}
 	}
 
-	void RunNapaVoxelDataOnlyPublicationSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelDataOnlyPublicationSelfTests(TestContext& context) noexcept
 	{
 		RunDataOnlyPublicationContractTests(context);
 	}
