@@ -1249,6 +1249,102 @@ namespace gglab
 				"Rewritten serialized mtime fields have no authority over cache hits");
 		}
 
+		void RunBinaryReadOnceTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabBinaryReadOnce-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Binary read-once test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+
+			// The read-once unit must be self-consistent: the digest is the
+			// SHA-256 of the exact returned bytes for empty and non-empty
+			// content alike.
+			const std::filesystem::path probePath = tempRoot / L"Probe.bin";
+			constexpr std::string_view ProbeContent = "binary read-once probe content";
+			const bool probeWritten = WriteTextFile(probePath, ProbeContent);
+			const std::optional<BinaryReadWithDigest> probe =
+				ReadBinaryWithDigestOnce(probePath);
+			const bool probeSelfConsistent = probe.has_value() &&
+				probe->m_Binary.SizeInBytes() == ProbeContent.size() &&
+				std::memcmp(probe->m_Binary.Data(), ProbeContent.data(),
+					ProbeContent.size()) == 0 &&
+				probe->m_Digest == ComputeSha256(std::span(
+					reinterpret_cast<const std::byte*>(probe->m_Binary.Data()),
+					probe->m_Binary.SizeInBytes()));
+			const bool emptyProbeWritten = WriteTextFile(probePath, "");
+			const std::optional<BinaryReadWithDigest> emptyProbe =
+				ReadBinaryWithDigestOnce(probePath);
+			const bool emptyProbeSelfConsistent = emptyProbe.has_value() &&
+				emptyProbe->m_Binary.SizeInBytes() == 0 &&
+				emptyProbe->m_Digest == ComputeSha256(std::span(
+					reinterpret_cast<const std::byte*>(nullptr), std::size_t{ 0 }));
+			context.Check(probeWritten && probeSelfConsistent &&
+				emptyProbeWritten && emptyProbeSelfConsistent,
+				"Binary read-once unit hashes exactly the bytes it returns");
+
+			// Single-read invariant of LoadShaderArtifactCacheRecord, proven
+			// through the test seam: exactly one binary read happens, and the
+			// returned bytes hash to the manifest digest that validated them.
+			const std::filesystem::path recordPath = tempRoot / L"Probe.json";
+			const std::filesystem::path binaryPath = tempRoot / L"Probe.dxil";
+			const std::string binaryBytes = "published binary probe bytes";
+			ShaderArtifactCacheRecord record{};
+			record.m_Binary = ShaderBinary(binaryBytes.size());
+			std::memcpy(record.m_Binary.Data(), binaryBytes.data(), binaryBytes.size());
+			record.m_Manifest.m_BinaryFormat = ShaderBinaryFormat::Dxil;
+			record.m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] = std::byte{ 0x01 };
+			record.m_Manifest.m_BuildKey.m_DurableDigest.m_Value[0] = std::byte{ 0x02 };
+			record.m_Manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(std::span(
+				reinterpret_cast<const std::byte*>(binaryBytes.data()), binaryBytes.size()));
+			const bool recordWritten = WriteShaderArtifactCacheRecord(recordPath, record);
+			const bool binaryWritten = WriteTextFile(binaryPath, binaryBytes);
+
+			static int binaryReadOnceCallCount = 0;
+			OverrideBinaryReadOnceForTest([](const std::filesystem::path& path) noexcept
+				-> std::optional<BinaryReadWithDigest>
+				{
+					++binaryReadOnceCallCount;
+					return ReadBinaryWithDigestOnce(path);
+				});
+			const std::optional<ShaderArtifactCacheRecord> loaded =
+				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+
+			context.Check(recordWritten && binaryWritten,
+				"Read-once load fixtures are written");
+			context.Check(loaded.has_value(),
+				"Read-once load accepts the matching record and binary");
+			context.Check(binaryReadOnceCallCount == 1,
+				"Read-once load performs exactly one binary read");
+			context.Check(loaded.has_value() &&
+				loaded->m_Binary.SizeInBytes() == binaryBytes.size() &&
+				std::memcmp(loaded->m_Binary.Data(), binaryBytes.data(),
+					binaryBytes.size()) == 0,
+				"Read-once load returns the exact read bytes");
+			context.Check(loaded.has_value() &&
+				ComputeSha256(std::span(
+					reinterpret_cast<const std::byte*>(loaded->m_Binary.Data()),
+					loaded->m_Binary.SizeInBytes())) ==
+					record.m_Manifest.m_BinaryContentDigest.m_Digest,
+				"Read-once load digest matches the manifest digest");
+
+			// A digest mismatch must reject through the same single read
+			// point; the validated digest describes the returned bytes.
+			const bool binaryCorrupted = WriteTextFile(binaryPath, "different bytes");
+			const std::optional<ShaderArtifactCacheRecord> mismatchLoaded =
+				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+			const bool mismatchRejected = !mismatchLoaded.has_value() &&
+				binaryReadOnceCallCount == 2;
+			OverrideBinaryReadOnceForTest(nullptr);
+
+			context.Check(binaryCorrupted && mismatchRejected,
+				"Load rejects digest mismatches through the same single read point");
+		}
+
 		void RunCacheRecordSerializationTests(SelfTestContext& context) noexcept
 		{
 			std::error_code errorCode;
@@ -1481,6 +1577,7 @@ namespace gglab
 	{
 		RunShaderBindingABITests(context);
 		RunCoordinatePolicyTests(context);
+		RunBinaryReadOnceTests(context);
 		RunCacheRecordSerializationTests(context);
 		RunShaderArtifactContractTests(context);
 		RunCrossCheckoutIdentityTests(context);

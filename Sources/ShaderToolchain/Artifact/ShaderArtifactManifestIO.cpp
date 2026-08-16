@@ -313,6 +313,32 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		// Null selects the production read-once implementation.
+		BinaryReadOnceOverride g_BinaryReadOnceOverride = nullptr;
+	}
+
+	std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
+		const std::filesystem::path& path) noexcept
+	{
+		std::optional<ShaderBinary> binary = ReadFileBinary(path);
+		if (!binary.has_value())
+		{
+			return std::nullopt;
+		}
+		BinaryReadWithDigest result{};
+		result.m_Digest = ComputeSha256(std::span(
+			static_cast<const std::byte*>(binary->Data()), binary->SizeInBytes()));
+		result.m_Binary = std::move(*binary);
+		return result;
+	}
+
+	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept
+	{
+		g_BinaryReadOnceOverride = overrideFn;
+	}
+
 	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& manifestPath,
 		const ShaderArtifactCacheRecord& record) noexcept
 	{
@@ -929,21 +955,21 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		const std::optional<ShaderBinary> binary = ReadFileBinary(binaryPath);
-		if (!binary.has_value())
+		// The binary is read exactly once through the single read point: the
+		// manifest digest is compared against the SHA-256 of those exact
+		// in-memory bytes, and those same bytes are returned. Validation and
+		// return content can never diverge.
+		const BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr)
+			? g_BinaryReadOnceOverride
+			: &ReadBinaryWithDigestOnce;
+		const std::optional<BinaryReadWithDigest> loaded = readOnce(binaryPath);
+		if (!loaded.has_value() ||
+			loaded->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
 		{
 			return std::nullopt;
 		}
 
-		const std::optional<BinaryContentDigest> actualDigest =
-			ComputeFileContentDigest(binaryPath);
-		if (!actualDigest.has_value() ||
-			actualDigest->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
-		{
-			return std::nullopt;
-		}
-
-		record->m_Binary = *binary;
+		record->m_Binary = loaded->m_Binary;
 		return record;
 	}
 

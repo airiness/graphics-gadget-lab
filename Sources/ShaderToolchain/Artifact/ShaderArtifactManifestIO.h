@@ -22,10 +22,37 @@ namespace gglab
 	[[nodiscard]] std::optional<ShaderArtifactCacheRecord> ReadShaderArtifactCacheRecord(
 		const std::filesystem::path& manifestPath) noexcept;
 
+	// Binary read-once result: the exact loaded bytes plus the SHA-256 of
+	// those same in-memory bytes. The digest is computed from the returned
+	// bytes only, so the validated content and the returned content can never
+	// diverge.
+	struct BinaryReadWithDigest
+	{
+		ShaderBinary m_Binary{};
+		Sha256Digest m_Digest{};
+	};
+
+	// The single binary read point of LoadShaderArtifactCacheRecord: reads the
+	// file once, hashes exactly the loaded bytes, and returns both.
+	[[nodiscard]] std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
+		const std::filesystem::path& path) noexcept;
+
+	// Test seam: replace the binary read point of LoadShaderArtifactCacheRecord
+	// with a scripted reader so contract tests can deterministically prove the
+	// single-read invariant (exactly one read, and the validated digest
+	// describes the returned bytes). Passing a null function restores the
+	// production implementation. Test-only; not thread-safe against concurrent
+	// compile calls.
+	using BinaryReadOnceOverride = std::optional<BinaryReadWithDigest>(*)(
+		const std::filesystem::path& path) noexcept;
+	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept;
+
 	// Reader side of the publication protocol: the manifest document is the
-	// commit record, the binary is verified against the manifest digest. Any
-	// failure (missing/unreadable files, schema mismatch, digest mismatch,
-	// TOCTOU) is a cache miss, never fatal.
+	// commit record. The binary is read exactly once; the manifest
+	// BinaryContentDigest is compared against the SHA-256 of those exact
+	// in-memory bytes, and those same bytes are returned. Any failure
+	// (missing/unreadable files, schema mismatch, digest mismatch) is a cache
+	// miss, never fatal.
 	[[nodiscard]] std::optional<ShaderArtifactCacheRecord> LoadShaderArtifactCacheRecord(
 		const std::filesystem::path& manifestPath,
 		const std::filesystem::path& binaryPath) noexcept;
