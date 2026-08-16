@@ -4,6 +4,7 @@
 #include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/Json/JsonValue.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
@@ -542,7 +543,7 @@ namespace gglab
 			context.Check(ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity) ==
 				spirVRecipe.m_BuildKey &&
 				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, differentIdentity) !=
-					spirVRecipe.m_BuildKey,
+				spirVRecipe.m_BuildKey,
 				"Producer identity participates in the build key, not the recipe identity");
 
 			// Logical source identity: absolute paths are rejected, and the
@@ -571,7 +572,7 @@ namespace gglab
 				allReservedArgumentsRejected &= !recipe.IsSuccess() &&
 					recipe.m_Status == ShaderCompileStatus::InvalidRequest &&
 					recipe.m_Diagnostics.m_ValidationError ==
-						ShaderCompileValidationError::ReservedExtraArgument;
+					ShaderCompileValidationError::ReservedExtraArgument;
 			}
 			context.Check(allReservedArgumentsRejected,
 				"Shader validation prevents extra arguments from overriding normalized target options");
@@ -584,7 +585,7 @@ namespace gglab
 			context.Check(!mismatchedAbiRecipe.IsSuccess() &&
 				mismatchedAbiRecipe.m_Status == ShaderCompileStatus::InvalidRequest &&
 				mismatchedAbiRecipe.m_Diagnostics.m_ValidationError ==
-					ShaderCompileValidationError::UnsupportedBindingABIRevision,
+				ShaderCompileValidationError::UnsupportedBindingABIRevision,
 				"Resolve reports an explicit illegal binding ABI revision instead of correcting it");
 
 			// DXC unavailable maps to CompilerUnavailable without aborting the process.
@@ -604,7 +605,7 @@ namespace gglab
 			context.Check(!rejectedCompileResult.IsSuccess() &&
 				rejectedCompileResult.m_Status == ShaderCompileStatus::InvalidRequest &&
 				rejectedCompileResult.m_Diagnostics.m_ValidationError ==
-					ShaderCompileValidationError::ReservedExtraArgument,
+				ShaderCompileValidationError::ReservedExtraArgument,
 				"Shader compiler rejects invalid target contracts without relying on assertions");
 
 			ShaderDesc missingDesc = spirVDesc;
@@ -652,30 +653,74 @@ namespace gglab
 				"A second compiler instance resolves the same identity and reuses the shared cache");
 
 			// Two instances publishing the same recipe concurrently converge on one
-			// valid entry; neither consumes a partial publication.
-			ShaderDesc concurrentDesc = spirVDesc;
-			concurrentDesc.m_ExtraArgs = { L"-DGGLAB_CONCURRENT_PUBLICATION=1" };
-			bool firstConcurrentSucceeded = false;
-			bool secondConcurrentSucceeded = false;
-			std::thread firstConcurrent([&]() noexcept
+			// valid entry; neither consumes a partial publication. Each worker's
+			// full compile result is captured so an intermittent failure carries
+			// the structured diagnostics that localize the failing publication
+			// branch. Rounds use distinct recipes so every round races a cold
+			// cache slot instead of reusing the previous winner.
+			constexpr int ConcurrentPublicationRoundCount = 3;
+			bool allConcurrentWorkersSucceeded = true;
+			bool allConcurrentReloadsValid = true;
+			bool allConcurrentReloadsHitCache = true;
+			std::string concurrentWorkerDiagnostics;
+			for (int round = 0; round < ConcurrentPublicationRoundCount; ++round)
+			{
+				ShaderDesc roundDesc = spirVDesc;
+				roundDesc.m_ExtraArgs = {
+					std::format(L"-DGGLAB_CONCURRENT_PUBLICATION={}", round),
+				};
+
+				ShaderCompileResult firstWorkerResult{};
+				ShaderCompileResult secondWorkerResult{};
+				std::thread firstConcurrent([&]() noexcept
+					{
+						ShaderCompiler worker(shaderSourceRoot, shaderCacheRoot);
+						firstWorkerResult = worker.Compile(roundDesc);
+					});
+				std::thread secondConcurrent([&]() noexcept
+					{
+						ShaderCompiler worker(shaderSourceRoot, shaderCacheRoot);
+						secondWorkerResult = worker.Compile(roundDesc);
+					});
+				firstConcurrent.join();
+				secondConcurrent.join();
+
+				const ShaderResolvedRecipe roundRecipe = compiler.Resolve(roundDesc);
+				const ShaderCompileResult roundReload = compiler.CompileOrLoad(roundRecipe);
+
+				allConcurrentWorkersSucceeded &=
+					firstWorkerResult.IsSuccess() && secondWorkerResult.IsSuccess();
+				allConcurrentReloadsValid &= roundReload.IsSuccess();
+				allConcurrentReloadsHitCache &= roundReload.m_FromCache;
+				if (!firstWorkerResult.IsSuccess() || !secondWorkerResult.IsSuccess())
 				{
-					ShaderCompiler worker(shaderSourceRoot, shaderCacheRoot);
-					firstConcurrentSucceeded = worker.Compile(concurrentDesc).IsSuccess();
-				});
-			std::thread secondConcurrent([&]() noexcept
-				{
-					ShaderCompiler worker(shaderSourceRoot, shaderCacheRoot);
-					secondConcurrentSucceeded = worker.Compile(concurrentDesc).IsSuccess();
-				});
-			firstConcurrent.join();
-			secondConcurrent.join();
-			const ShaderResolvedRecipe concurrentRecipe = compiler.Resolve(concurrentDesc);
-			const ShaderCompileResult concurrentReload = compiler.CompileOrLoad(concurrentRecipe);
-			context.Check(firstConcurrentSucceeded && secondConcurrentSucceeded,
-				"Both concurrent compiler instances complete their publication");
-			context.Check(concurrentReload.IsSuccess(),
+					const auto AppendWorkerDiagnostics = [&concurrentWorkerDiagnostics](
+						int round, std::string_view tag,
+						const ShaderCompileResult& result) noexcept
+						{
+							concurrentWorkerDiagnostics += std::format(
+								" [round{}-{}: status={} validationError={} message=\"{}\" sourceIdentity=\"{}\"]",
+								round, tag, static_cast<int>(result.m_Status),
+								static_cast<int>(result.m_Diagnostics.m_ValidationError),
+								utils::ToString(result.m_Diagnostics.m_Message),
+								utils::ToString(result.m_Diagnostics.m_SourceIdentity));
+						};
+					if (!firstWorkerResult.IsSuccess())
+					{
+						AppendWorkerDiagnostics(round, "A", firstWorkerResult);
+					}
+					if (!secondWorkerResult.IsSuccess())
+					{
+						AppendWorkerDiagnostics(round, "B", secondWorkerResult);
+					}
+				}
+			}
+			context.Check(allConcurrentWorkersSucceeded,
+				("Both concurrent compiler instances complete their publication"
+					+ concurrentWorkerDiagnostics).c_str());
+			context.Check(allConcurrentReloadsValid,
 				"Reload after concurrent publication yields a valid artifact");
-			context.Check(concurrentReload.m_FromCache,
+			context.Check(allConcurrentReloadsHitCache,
 				"Reload after concurrent publication hits the committed cache entry");
 
 			const std::vector<std::wstring> vertexArguments = spirVRecipe.m_CompileArguments;
@@ -962,7 +1007,7 @@ namespace gglab
 				recipeA.m_RecipeId == recipeB.m_RecipeId &&
 				recipeA.m_BuildKey == recipeB.m_BuildKey &&
 				resultA.m_Artifact.m_Manifest.m_BinaryContentDigest ==
-					resultB.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				resultB.m_Artifact.m_Manifest.m_BinaryContentDigest,
 				"Same logical request resolves to the same recipe/build identity across checkout locations");
 
 			// The recipe identity must not embed physical -I arguments: a
@@ -1001,7 +1046,7 @@ namespace gglab
 			context.Check(!foreignProducerResult.IsSuccess() &&
 				foreignProducerResult.m_Status == ShaderCompileStatus::InvalidRequest &&
 				foreignProducerResult.m_Diagnostics.m_ValidationError ==
-					ShaderCompileValidationError::CompilerIdentityMismatch,
+				ShaderCompileValidationError::CompilerIdentityMismatch,
 				"CompileOrLoad rejects a recipe resolved by a different producer identity");
 
 			ShaderResolvedRecipe mutatedRequestRecipe = recipe;
@@ -1073,7 +1118,7 @@ namespace gglab
 				includeChanged && changedResult.IsSuccess() && !changedResult.m_FromCache &&
 				revalidatedResult.m_FromCache &&
 				changedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
-					firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
 				"Changed include content rebuilds the entry and the new digest re-validates");
 		}
 
@@ -1098,7 +1143,7 @@ namespace gglab
 			context.Check(whitespaceParsed && surrogateValue.has_value() &&
 				surrogateValue->IsObject() &&
 				surrogateValue->AsObject().front().second.AsString() ==
-					std::string("\xF0\x9F\x98\x80") &&
+				std::string("\xF0\x9F\x98\x80") &&
 				escapedSolidus.has_value(),
 				"JSON parser accepts whitespace, exponent numbers, escaped solidus, and astral surrogate pairs");
 
