@@ -3,6 +3,7 @@
 #include "SpirVDecorationReader.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
+#include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
@@ -774,9 +775,16 @@ namespace gglab
 				"Pixel SPIR-V compile policy preserves the HLSL SV_Position.w contract");
 
 			const std::filesystem::path spirVMetaPath = MakeManifestPath(spirVBinaryPath);
-			std::ifstream metadataInput(spirVMetaPath, std::ios::binary);
-			const std::string metadata((std::istreambuf_iterator<char>(metadataInput)),
-				std::istreambuf_iterator<char>());
+			std::string metadata;
+			{
+				std::ifstream metadataInput(spirVMetaPath, std::ios::binary);
+				metadata.assign((std::istreambuf_iterator<char>(metadataInput)),
+					std::istreambuf_iterator<char>());
+			}
+			// The read handle is closed before CompileOrLoad below: the
+			// publication protocol commits the manifest by replacing it, and a
+			// destination held open would fail that rename, classify the stale
+			// entry as committed-by-other, and skip the rebuild.
 			context.Check(metadata.find("\"recordSchemaVersion\":2") != std::string::npos &&
 				metadata.find("\"schemaVersion\":2") != std::string::npos &&
 				metadata.find("\"recipeHashSchema\":1") != std::string::npos &&
@@ -804,8 +812,16 @@ namespace gglab
 			const bool metadataChanged = ReplaceMetadataValue(
 				spirVMetaPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
-			context.Check(metadataChanged && !rejectedCacheArtifact.m_FromCache,
-				"Shader cache rejects metadata whose target contract does not match the recipe");
+			const std::optional<ShaderArtifactCacheRecord> repairedReadBack =
+				ReadShaderArtifactCacheRecord(spirVMetaPath);
+			context.Check(metadataChanged,
+				"Shader cache metadata tamper is applied");
+			context.Check(repairedReadBack.has_value() &&
+				repairedReadBack->m_Manifest.m_BindingABIRevision == 1,
+				"Rejected tampered entry is rebuilt and republished with the supported ABI revision");
+			context.Check(metadataChanged && rejectedCacheArtifact.IsSuccess() &&
+				!rejectedCacheArtifact.m_FromCache,
+				"Shader cache rejects a manifest tampered with an unsupported binding ABI revision and rebuilds it");
 
 			// A missing required durable field must also reject the entry.
 			const bool manifestFieldRemoved = ReplaceMetadataValue(
@@ -1303,6 +1319,157 @@ namespace gglab
 				"Load rejects digest mismatches through the same single read point");
 		}
 
+		void RunDirectoryRaceTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabDirectoryRace-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Directory race test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+
+			const std::filesystem::path raceDirectory =
+				tempRoot / L"Deep" / L"Race" / L"Directory";
+			bool firstCreated = false;
+			bool secondCreated = false;
+			std::thread firstCreator([&raceDirectory, &firstCreated]() noexcept
+				{
+					firstCreated = utils::CreateDirectoryIfNotExist(raceDirectory);
+				});
+			std::thread secondCreator([&raceDirectory, &secondCreated]() noexcept
+				{
+					secondCreated = utils::CreateDirectoryIfNotExist(raceDirectory);
+				});
+			firstCreator.join();
+			secondCreator.join();
+			const bool directoryExists = std::filesystem::exists(raceDirectory, errorCode);
+			context.Check(firstCreated && secondCreated && directoryExists,
+				"Concurrent directory creation treats the concurrently created directory as success");
+		}
+
+		void RunPublicationOutcomeTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabPublicationOutcome-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Publication outcome test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+
+			const std::filesystem::path sourceRoot = tempRoot / L"Sources";
+			constexpr std::string_view SourceContent =
+				"#include \"Probe.hlsli\"\n"
+				"float4 VSMain(uint id : SV_VertexID) : SV_Position "
+				"{ return float4(ProbeValue, 0, 0, 1); }\n";
+			const bool filesWritten =
+				WriteTextFile(sourceRoot / L"Probe.hlsl", SourceContent) &&
+				WriteTextFile(sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.25f;\n");
+			const std::filesystem::path cacheRoot = tempRoot / L"Cache";
+			ShaderDesc desc{
+				.m_SourcePath = L"Probe.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = { L"." },
+			};
+
+			// Baseline: producer A commits the slot with input X (0.25).
+			ShaderCompiler compilerA(sourceRoot, cacheRoot);
+			const ShaderCompileResult resultA = compilerA.Compile(desc);
+
+			// Same-input convergence: with the slot already committed by A, the
+			// cache-hit path returns the committed entry for the same input.
+			ShaderCompiler compilerB(sourceRoot, cacheRoot);
+			const ShaderCompileResult sameInputResult = compilerB.Compile(desc);
+			const bool sameInputConverged = sameInputResult.IsSuccess() &&
+				sameInputResult.m_FromCache &&
+				sameInputResult.m_Artifact.m_Manifest == resultA.m_Artifact.m_Manifest;
+
+			// Provenance conflict with a successful republish: the input
+			// changes to Y (0.5), B compiles Y, its first publication loses
+			// (renames fail), the conflict triggers republish-once, and the
+			// second publication commits B's fresh product.
+			static int publishFailuresRemaining = 0;
+			const auto InjectCountedFailures = []() noexcept
+				{
+					OverridePublishFileFailureForTest([](
+						const std::filesystem::path& /*destination*/) noexcept -> bool
+						{
+							if (publishFailuresRemaining > 0)
+							{
+								--publishFailuresRemaining;
+								return true;
+							}
+							return false;
+						});
+				};
+			const bool inputChangedForRepublish = WriteTextFile(
+				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.5f;\n");
+			// Only the binary rename is consumed: when it fails, the manifest
+			// rename step is skipped entirely, so one injected failure loses
+			// the first publication and the republish runs for real.
+			publishFailuresRemaining = 1;
+			InjectCountedFailures();
+			const ShaderCompileResult republishedResult = compilerB.Compile(desc);
+			OverridePublishFileFailureForTest(nullptr);
+			const bool republishSucceeded = republishedResult.IsSuccess() &&
+				!republishedResult.m_FromCache &&
+				republishedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
+					resultA.m_Artifact.m_Manifest.m_BinaryContentDigest;
+
+			// Unresolved provenance conflict: the input changes to Z (0.75),
+			// B compiles Z, and every rename keeps failing, so both the first
+			// publication and the republish observe the stale winner. The
+			// conflict must surface as SourceChangedDuringCompile, never as
+			// ArtifactIOFailure and never as a stale Success.
+			const bool inputChangedForConflict = WriteTextFile(
+				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.75f;\n");
+			OverridePublishFileFailureForTest([](
+				const std::filesystem::path& /*destination*/) noexcept -> bool
+				{
+					return true;
+				});
+			const ShaderCompileResult conflictResult = compilerB.Compile(desc);
+			OverridePublishFileFailureForTest(nullptr);
+			const bool conflictSurfaced = !conflictResult.IsSuccess() &&
+				conflictResult.m_Status == ShaderCompileStatus::SourceChangedDuringCompile &&
+				!conflictResult.m_Diagnostics.m_Message.empty();
+
+			// Recovery: with the seam cleared, B publishes its fresh product
+			// normally.
+			const ShaderCompileResult recoveredResult = compilerB.Compile(desc);
+
+			// Structural failure: a fresh cache root with no winner and all
+			// renames failing can never observe a committed entry and must
+			// map to ArtifactIOFailure.
+			ShaderCompiler compilerC(sourceRoot, tempRoot / L"CacheC");
+			OverridePublishFileFailureForTest([](
+				const std::filesystem::path& /*destination*/) noexcept -> bool
+				{
+					return true;
+				});
+			const ShaderCompileResult structuralFailureResult = compilerC.Compile(desc);
+			OverridePublishFileFailureForTest(nullptr);
+			const bool structuralFailureSurfaced = !structuralFailureResult.IsSuccess() &&
+				structuralFailureResult.m_Status == ShaderCompileStatus::ArtifactIOFailure;
+
+			context.Check(filesWritten && resultA.IsSuccess() && sameInputConverged,
+				"Same-input concurrent producers converge on the committed entry");
+			context.Check(inputChangedForRepublish && republishSucceeded,
+				"Provenance conflict republishes once and commits the fresh product");
+			context.Check(inputChangedForConflict && conflictSurfaced,
+				"Unresolved provenance conflict maps to SourceChangedDuringCompile, never stale Success");
+			context.Check(recoveredResult.IsSuccess(),
+				"Clearing the failure seam recovers normal publication");
+			context.Check(structuralFailureSurfaced,
+				"Publication without any committed observation maps to ArtifactIOFailure");
+		}
+
 		void RunCacheRecordSerializationTests(SelfTestContext& context) noexcept
 		{
 			std::error_code errorCode;
@@ -1585,6 +1752,8 @@ namespace gglab
 		RunCoordinatePolicyTests(context);
 		RunBinaryReadOnceTests(context);
 		RunCacheRecordSerializationTests(context);
+		RunDirectoryRaceTests(context);
+		RunPublicationOutcomeTests(context);
 		RunShaderArtifactContractTests(context);
 		RunCrossCheckoutIdentityTests(context);
 		RunRecipeAuthorityTests(context);

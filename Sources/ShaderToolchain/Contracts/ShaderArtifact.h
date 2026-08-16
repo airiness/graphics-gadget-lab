@@ -36,6 +36,11 @@ namespace gglab
 		CompilerUnavailable,
 		CompileFailed,
 		ArtifactIOFailure,
+		// The publication produced a structurally valid committed artifact,
+		// but after one republish attempt its dependency provenance still
+		// differs from what this operation actually compiled. Retryable:
+		// a retry re-reads the current inputs. Not an IO failure.
+		SourceChangedDuringCompile,
 	};
 
 	// Compile failure is a normal Toolchain outcome, not a fatal Renderer

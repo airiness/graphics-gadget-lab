@@ -37,7 +37,11 @@ namespace gglab::utils
 		{
 			return true;
 		}
-		return std::filesystem::create_directories(directory, errorCode);
+		// "Already exists after concurrent creation" is success: a losing
+		// racer's create_directories returns false with a clear error code,
+		// which must not be reported as a failure.
+		std::filesystem::create_directories(directory, errorCode);
+		return !errorCode;
 	}
 
 	bool CreateParentDirectoryIfNotExist(const std::filesystem::path& file) noexcept

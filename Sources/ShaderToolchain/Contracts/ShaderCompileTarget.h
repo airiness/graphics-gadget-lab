@@ -68,6 +68,9 @@ namespace gglab
 	{
 		ShaderCompilerKind m_Kind = ShaderCompilerKind::Dxc;
 		std::wstring m_CanonicalIdentity;
+
+		friend constexpr bool operator==(
+			const ShaderCompilerIdentity&, const ShaderCompilerIdentity&) noexcept = default;
 	};
 
 	enum class ShaderCompileValidationError : uint8_t

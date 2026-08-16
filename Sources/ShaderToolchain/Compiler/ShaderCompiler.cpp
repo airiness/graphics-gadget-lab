@@ -690,7 +690,15 @@ namespace gglab
 
 		ShaderArtifactCacheRecord record =
 			BuildCacheRecord(recipe, binary, dependencies, dependencyPhysicalPaths);
-		if (!PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record))
+
+		// Publication handoff: the publication operation performs the publish
+		// attempt, the final committed-entry observation, and the outcome
+		// classification. Success hands off the observed structurally
+		// validated committed record; CompileOrLoad never rereads the slot
+		// and never returns an uncommitted compile product.
+		const ShaderPublicationResult publication =
+			PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record);
+		if (publication.m_Outcome == ShaderPublicationOutcome::Failed)
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
 			result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::ArtifactIOFailure,
@@ -698,23 +706,67 @@ namespace gglab
 			result.m_Diagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
 			return result;
 		}
-
-		const std::optional<ShaderArtifactCacheRecord> published =
-			LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
-		if (!published.has_value() ||
-			!ValidateCacheRecordAgainstRecipe(*published, recipe))
+		if (publication.m_Outcome == ShaderPublicationOutcome::Published)
 		{
-			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
-			result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::ArtifactIOFailure,
-				L"Published shader artifact could not be validated.");
-			result.m_Diagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
+			result.m_Status = ShaderCompileStatus::Success;
+			result.m_Artifact.m_Manifest = publication.m_CommittedRecord.m_Manifest;
+			result.m_Artifact.m_Binary = publication.m_CommittedRecord.m_Binary;
+			result.m_FromCache = false;
 			return result;
 		}
 
-		result.m_Status = ShaderCompileStatus::Success;
-		result.m_Artifact.m_Manifest = published->m_Manifest;
-		result.m_Artifact.m_Binary = published->m_Binary;
-		result.m_FromCache = false;
+		// CommittedByOther: the competing committed entry is structurally
+		// valid, but Success additionally requires the input freshness
+		// closure: its dependency provenance must equal the provenance this
+		// operation's compile stage actually read.
+		if (publication.m_CommittedRecord.m_Manifest.m_Dependencies ==
+			record.m_Manifest.m_Dependencies)
+		{
+			result.m_Status = ShaderCompileStatus::Success;
+			result.m_Artifact.m_Manifest = publication.m_CommittedRecord.m_Manifest;
+			result.m_Artifact.m_Binary = publication.m_CommittedRecord.m_Binary;
+			result.m_FromCache = true;
+			return result;
+		}
+
+		// Provenance conflict: republish this operation's freshly compiled
+		// product once. The second publication runs the same attempt +
+		// observation + classification protocol.
+		const ShaderPublicationResult republished =
+			PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record);
+		if (republished.m_Outcome == ShaderPublicationOutcome::Failed)
+		{
+			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
+			result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::ArtifactIOFailure,
+				L"Shader artifact publication failed.");
+			result.m_Diagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
+			return result;
+		}
+		if (republished.m_Outcome == ShaderPublicationOutcome::Published)
+		{
+			result.m_Status = ShaderCompileStatus::Success;
+			result.m_Artifact.m_Manifest = republished.m_CommittedRecord.m_Manifest;
+			result.m_Artifact.m_Binary = republished.m_CommittedRecord.m_Binary;
+			result.m_FromCache = false;
+			return result;
+		}
+		if (republished.m_CommittedRecord.m_Manifest.m_Dependencies ==
+			record.m_Manifest.m_Dependencies)
+		{
+			result.m_Status = ShaderCompileStatus::Success;
+			result.m_Artifact.m_Manifest = republished.m_CommittedRecord.m_Manifest;
+			result.m_Artifact.m_Binary = republished.m_CommittedRecord.m_Binary;
+			result.m_FromCache = true;
+			return result;
+		}
+
+		// The conflict did not resolve: a structurally valid committed
+		// artifact exists, but its dependency provenance still differs from
+		// what this operation compiled. Retryable failure, not an IO error.
+		result.m_Status = ShaderCompileStatus::SourceChangedDuringCompile;
+		result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::SourceChangedDuringCompile,
+			L"Competing committed artifact has different dependency provenance.");
+		result.m_Diagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
 		return result;
 	}
 

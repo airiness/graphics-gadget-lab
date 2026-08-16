@@ -20,6 +20,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -456,6 +457,79 @@ namespace gglab
 				version.m_StdOut.find("unknown") == std::string::npos,
 				"CLI targets and --version report profiles and the concrete producer identity");
 		}
+
+		void RunCrossProcessHardGateTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			// Cross-process hard gate: two gglab-shaderc processes race the
+			// same cold cache slot concurrently. Both must complete their
+			// publication, and the slot's committed state must be a consistent
+			// cache hit afterwards. Rounds use distinct defines so every round
+			// races a fresh cold slot instead of reusing a previous winner.
+			const std::filesystem::path gateCache = tempRoot / L"CrossProcessGateCache";
+			constexpr int GateRoundCount = 3;
+			bool allWorkersSucceeded = true;
+			bool allThirdRunsHitCache = true;
+			bool allHashesConverged = true;
+			std::string workerDiagnostics;
+			for (int round = 0; round < GateRoundCount; ++round)
+			{
+				const std::vector<std::wstring> arguments{
+					L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+					L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--entry", L"VSMain",
+					L"--target", L"gglab-dx12", L"--include", L".", L"--cache-root",
+					gateCache.wstring(), L"--result-format", L"json", L"--define",
+					std::format(L"GGLAB_CROSS_PROCESS_GATE={}", round),
+				};
+
+				CliRunResult first{};
+				CliRunResult second{};
+				std::thread firstWorker([&]() noexcept { first = RunCli(arguments); });
+				std::thread secondWorker([&]() noexcept { second = RunCli(arguments); });
+				firstWorker.join();
+				secondWorker.join();
+
+				const CliRunResult thirdRun = RunCli(arguments);
+				const std::string firstHash = ExtractJsonField(first.m_StdOut, "binaryHash");
+				const std::string secondHash = ExtractJsonField(second.m_StdOut, "binaryHash");
+				const std::string thirdHash = ExtractJsonField(thirdRun.m_StdOut, "binaryHash");
+				allWorkersSucceeded &= first.m_ExitCode == 0 && second.m_ExitCode == 0;
+				allThirdRunsHitCache &= thirdRun.m_ExitCode == 0 &&
+					thirdRun.m_StdOut.find("\"fromCache\":true") != std::string::npos;
+				allHashesConverged &= !firstHash.empty() && firstHash == secondHash &&
+					secondHash == thirdHash;
+				if (first.m_ExitCode != 0 || second.m_ExitCode != 0 || thirdRun.m_ExitCode != 0)
+				{
+					const auto AppendProcessDiagnostics = [&workerDiagnostics](int round,
+						std::string_view tag, const CliRunResult& result) noexcept
+						{
+							workerDiagnostics += std::format(
+								" [round{}-{}: exit={} stdout=\"{}\" stderr=\"{}\"]",
+								round, tag, result.m_ExitCode, result.m_StdOut, result.m_StdErr);
+						};
+					if (first.m_ExitCode != 0)
+					{
+						AppendProcessDiagnostics(round, "A", first);
+					}
+					if (second.m_ExitCode != 0)
+					{
+						AppendProcessDiagnostics(round, "B", second);
+					}
+					if (thirdRun.m_ExitCode != 0)
+					{
+						AppendProcessDiagnostics(round, "reload", thirdRun);
+					}
+				}
+			}
+			context.Check(allWorkersSucceeded,
+				("Both concurrent gglab-shaderc processes complete their publication"
+					+ workerDiagnostics).c_str());
+			context.Check(allThirdRunsHitCache,
+				"Post-race reload hits the committed cross-process cache entry");
+			context.Check(allHashesConverged,
+				"Concurrent processes and the post-race reload agree on one committed binary digest");
+		}
 	}
 
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept
@@ -481,5 +555,6 @@ namespace gglab
 		ScopedTestDirectory scopedDirectory(tempRoot);
 		RunParityTests(context, sourceRoot, tempRoot);
 		RunCliBehaviorTests(context, sourceRoot, tempRoot);
+		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
 	}
 }

@@ -8,6 +8,7 @@
 #include <process.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -18,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -303,20 +305,14 @@ namespace gglab
 			std::error_code ignored;
 			std::filesystem::remove(path, ignored);
 		}
-
-		[[nodiscard]] bool PublishFile(
-			const std::filesystem::path& source, const std::filesystem::path& destination) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::rename(source, destination, errorCode);
-			return !errorCode;
-		}
 	}
 
 	namespace
 	{
 		// Null selects the production read-once implementation.
 		BinaryReadOnceOverride g_BinaryReadOnceOverride = nullptr;
+		// Null disables scripted rename failures.
+		PublishFileFailureInjector g_PublishFileFailureInjector = nullptr;
 	}
 
 	std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
@@ -337,6 +333,27 @@ namespace gglab
 	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept
 	{
 		g_BinaryReadOnceOverride = overrideFn;
+	}
+
+	void OverridePublishFileFailureForTest(PublishFileFailureInjector injector) noexcept
+	{
+		g_PublishFileFailureInjector = injector;
+	}
+
+	namespace
+	{
+		[[nodiscard]] bool PublishFile(
+			const std::filesystem::path& source, const std::filesystem::path& destination) noexcept
+		{
+			if (g_PublishFileFailureInjector != nullptr &&
+				g_PublishFileFailureInjector(destination))
+			{
+				return false;
+			}
+			std::error_code errorCode;
+			std::filesystem::rename(source, destination, errorCode);
+			return !errorCode;
+		}
 	}
 
 	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& manifestPath,
@@ -1007,14 +1024,18 @@ namespace gglab
 		return record;
 	}
 
-	bool PublishShaderArtifactCacheRecord(const std::filesystem::path& binaryPath,
-		const std::filesystem::path& manifestPath, const ShaderArtifactCacheRecord& record) noexcept
+	ShaderPublicationResult PublishShaderArtifactCacheRecord(
+		const std::filesystem::path& binaryPath,
+		const std::filesystem::path& manifestPath,
+		const ShaderArtifactCacheRecord& record) noexcept
 	{
+		ShaderPublicationResult result{};
+
 		const bool parentsReady = utils::CreateParentDirectoryIfNotExist(binaryPath) &&
 			utils::CreateParentDirectoryIfNotExist(manifestPath);
 		if (!parentsReady)
 		{
-			return false;
+			return result;
 		}
 
 		const std::filesystem::path tempBinaryPath = MakeUniqueTempPath(binaryPath);
@@ -1025,7 +1046,7 @@ namespace gglab
 		if (!binaryWritten)
 		{
 			RemoveFileBestEffort(tempBinaryPath);
-			return false;
+			return result;
 		}
 
 		// Validate the complete result before publication: the manifest digest
@@ -1036,47 +1057,72 @@ namespace gglab
 			publishedDigest->m_Digest != record.m_Manifest.m_BinaryContentDigest.m_Digest)
 		{
 			RemoveFileBestEffort(tempBinaryPath);
-			return false;
+			return result;
 		}
 
 		if (!WriteShaderArtifactCacheRecord(tempManifestPath, record))
 		{
 			RemoveFileBestEffort(tempBinaryPath);
 			RemoveFileBestEffort(tempManifestPath);
-			return false;
+			return result;
 		}
 
-		// Publish the immutable binary first; the manifest is the commit record.
-		if (!PublishFile(tempBinaryPath, binaryPath))
+		// Own submission attempt: the immutable binary first, the manifest
+		// last as the commit record. Rename failures do not pre-judge the
+		// winner; the final observation classifies the outcome.
+		bool binaryPublished = PublishFile(tempBinaryPath, binaryPath);
+		if (!binaryPublished)
 		{
-			// A concurrent winner may already have committed the entry.
 			std::error_code errorCode;
-			if (std::filesystem::exists(manifestPath, errorCode))
+			if (!std::filesystem::exists(manifestPath, errorCode))
 			{
-				RemoveFileBestEffort(tempBinaryPath);
-				RemoveFileBestEffort(tempManifestPath);
-				return true;
+				// Orphaned binary (no commit record): recover by removing it
+				// and retrying once; derived data is safe to discard.
+				RemoveFileBestEffort(binaryPath);
+				binaryPublished = PublishFile(tempBinaryPath, binaryPath);
 			}
-			// Orphaned binary (no commit record): recover by removing it and
-			// retrying once; derived data is safe to discard.
-			RemoveFileBestEffort(binaryPath);
-			if (!PublishFile(tempBinaryPath, binaryPath))
+		}
+		if (binaryPublished)
+		{
+			(void)PublishFile(tempManifestPath, manifestPath);
+		}
+		RemoveFileBestEffort(tempBinaryPath);
+		RemoveFileBestEffort(tempManifestPath);
+
+		// Final committed-entry observation: load and structurally validate
+		// the slot entry. Classification is based on this observation alone.
+		// A concurrent producer commits manifest-last, so an observation can
+		// land inside its commit window (no manifest yet, or a manifest whose
+		// binary has not landed). The observation therefore retries for a
+		// bounded window before the slot is classified as having no committed
+		// entry.
+		std::optional<ShaderArtifactCacheRecord> observed;
+		constexpr int MaxObservationAttempts = 64;
+		for (int attempt = 0; attempt < MaxObservationAttempts; ++attempt)
+		{
+			observed = LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
+			if (observed.has_value())
 			{
-				RemoveFileBestEffort(tempBinaryPath);
-				RemoveFileBestEffort(tempManifestPath);
-				return false;
+				break;
 			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		if (!observed.has_value())
+		{
+			return result; // Failed
+		}
+		// Structural binding beyond the load: the observed entry must belong
+		// to this slot's recipe/producer identity. A non-equivalent entry can
+		// never be disguised as a winner.
+		if (observed->m_Manifest.m_BuildKey != record.m_Manifest.m_BuildKey)
+		{
+			return result; // Failed
 		}
 
-		if (!PublishFile(tempManifestPath, manifestPath))
-		{
-			// A concurrent winner committed the manifest between our two
-			// publishes; its entry is equivalent, so discard our temporary
-			// manifest and let the caller load the committed entry.
-			RemoveFileBestEffort(tempBinaryPath);
-			RemoveFileBestEffort(tempManifestPath);
-			return true;
-		}
-		return true;
+		result.m_CommittedRecord = *observed;
+		result.m_Outcome = (observed->m_Manifest == record.m_Manifest)
+			? ShaderPublicationOutcome::Published
+			: ShaderPublicationOutcome::CommittedByOther;
+		return result;
 	}
 }

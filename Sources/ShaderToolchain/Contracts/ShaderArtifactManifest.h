@@ -106,6 +106,9 @@ namespace gglab
 	{
 		std::filesystem::path m_LogicalPath{};
 		Sha256Digest m_ContentDigest{};
+
+		friend constexpr bool operator==(
+			const ShaderArtifactDependency&, const ShaderArtifactDependency&) noexcept = default;
 	};
 
 	// Portable artifact manifest: the compile semantics and identities that
@@ -141,6 +144,12 @@ namespace gglab
 		// path + exact consumed content digest) this artifact was compiled
 		// from. The main source is the first element. No physical paths.
 		std::vector<ShaderArtifactDependency> m_Dependencies{};
+
+		// Content equivalence of two manifests: equality of the complete
+		// portable field set, including the dependency provenance and the
+		// binary content digest.
+		friend constexpr bool operator==(
+			const ShaderArtifactManifest&, const ShaderArtifactManifest&) noexcept = default;
 	};
 
 	// Local cache record: the portable manifest plus the derived local state

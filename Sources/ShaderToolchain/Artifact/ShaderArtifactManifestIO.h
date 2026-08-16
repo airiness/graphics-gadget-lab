@@ -47,6 +47,44 @@ namespace gglab
 		const std::filesystem::path& path) noexcept;
 	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept;
 
+	// Publication outcome, classified by the final committed-entry observation
+	// (never by whether this call's own renames succeeded):
+	//   Published        - the observed structurally valid committed entry is
+	//                      content-equivalent to this operation's product.
+	//   CommittedByOther - the observed structurally valid same-slot entry
+	//                      belongs to another/non-equivalent producer.
+	//   Failed           - no structurally valid committed entry was observed.
+	enum class ShaderPublicationOutcome : uint8_t
+	{
+		Published,
+		CommittedByOther,
+		Failed,
+	};
+
+	// Publication result: success hands off the committed record that the
+	// publication operation actually observed and structurally validated.
+	struct ShaderPublicationResult
+	{
+		ShaderPublicationOutcome m_Outcome = ShaderPublicationOutcome::Failed;
+		ShaderArtifactCacheRecord m_CommittedRecord{};
+
+		[[nodiscard]] bool IsSuccess() const noexcept
+		{
+			return m_Outcome != ShaderPublicationOutcome::Failed;
+		}
+	};
+
+	// Test seam: inject scripted failures into the publication rename steps
+	// without replacing the successful rename implementation, so contract
+	// tests can deterministically cover the failure branches and the final
+	// observation classification. The injector receives the destination path
+	// and returns true to fail that rename. Passing a null function restores
+	// the production implementation. Test-only; not thread-safe against
+	// concurrent compile calls.
+	using PublishFileFailureInjector = bool(*)(
+		const std::filesystem::path& destination) noexcept;
+	void OverridePublishFileFailureForTest(PublishFileFailureInjector injector) noexcept;
+
 	// Reader side of the publication protocol: the manifest document is the
 	// commit record. The binary is read exactly once; the manifest
 	// BinaryContentDigest is compared against the SHA-256 of those exact
@@ -58,12 +96,14 @@ namespace gglab
 		const std::filesystem::path& binaryPath) noexcept;
 
 	// Writer side of the publication protocol: writes a unique temporary
-	// binary and manifest document, validates the complete result, publishes
-	// the immutable binary first and the manifest last as the commit record.
-	// Concurrent winners converge on equivalent content; a partial or
-	// orphaned entry can never be consumed. Returns false only when the
-	// publication could not complete (recoverable ArtifactIOFailure).
-	[[nodiscard]] bool PublishShaderArtifactCacheRecord(
+	// binary and manifest document, attempts to publish the immutable binary
+	// first and the manifest last as the commit record, then performs the
+	// final committed-entry observation and classifies the outcome. Success
+	// hands off the observed structurally validated committed record; it does
+	// not promise that this operation's product is the filesystem writer.
+	// Failed means no structurally valid committed entry was observed
+	// (recoverable ArtifactIOFailure).
+	[[nodiscard]] ShaderPublicationResult PublishShaderArtifactCacheRecord(
 		const std::filesystem::path& binaryPath,
 		const std::filesystem::path& manifestPath,
 		const ShaderArtifactCacheRecord& record) noexcept;
