@@ -7,14 +7,15 @@
 
 namespace gglab
 {
-	// Key=value serializer for the S2 manifest model (*.meta.txt, schema=3).
-	// S3 will replace the serialized representation, not this model.
+	// Versioned, machine-readable JSON serializer for the manifest model
+	// (*.shaderartifact.json, schemaVersion=1). Unknown schema versions or
+	// malformed documents are rejected so callers treat them as cache misses.
 	[[nodiscard]] bool WriteShaderArtifactManifest(
 		const std::filesystem::path& manifestPath,
 		const ShaderArtifactManifest& manifest) noexcept;
 
-	// Parses and structurally validates a manifest. Returns nullopt on any
-	// failure (unknown schema, missing required field, malformed record):
+	// Parses and structurally validates a manifest document. Returns nullopt
+	// on any failure (missing file, unknown schema, missing/malformed field):
 	// callers treat that as a cache miss / invalid derived data.
 	[[nodiscard]] std::optional<ShaderArtifactManifest> ReadShaderArtifactManifest(
 		const std::filesystem::path& manifestPath) noexcept;

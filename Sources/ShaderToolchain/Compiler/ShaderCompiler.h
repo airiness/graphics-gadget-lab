@@ -12,7 +12,12 @@
 
 namespace gglab
 {
-	// Host-side in-process shader compiler (transitional S2/S3 producer).
+	// Producer identity of the active DXC installation, independent of any
+	// compiler instance (used by CLI --version and CI diagnostics).
+	[[nodiscard]] ShaderCompilerIdentity QueryDxcCompilerIdentity() noexcept;
+
+	// Host-side in-process shader compiler (transitional producer while the
+	// runtime keeps in-process compilation).
 	// Instances are thread-confined; multiple instances may share one cache
 	// root because cache publication follows the cross-thread/cross-process
 	// manifest-last protocol instead of process-local locking.
@@ -77,7 +82,7 @@ namespace gglab
 		[[nodiscard]] ShaderCompilerDiagnostics MakeDiagnostics(
 			ShaderCompileStatus status, std::wstring message,
 			ShaderCompileValidationError validationError =
-				ShaderCompileValidationError::None) const noexcept;
+			ShaderCompileValidationError::None) const noexcept;
 		[[nodiscard]] ShaderResolvedRecipe ResolveRecipe(const ShaderDesc& request) noexcept;
 		[[nodiscard]] ShaderCompileResult CompileOrLoadInternal(
 			const ShaderResolvedRecipe& recipe) noexcept;
@@ -97,7 +102,8 @@ namespace gglab
 		static std::wstring DefaultEntry(const ShaderStage& stage) noexcept;
 		static std::wstring ToTarget(ShaderStage stage, ShaderModel model) noexcept;
 		static ShaderRecipeId ComputeRecipeId(
-			const ShaderDesc& mergedDesc, const std::vector<std::wstring>& compileArguments) noexcept;
+			const std::filesystem::path& logicalSourcePath, const ShaderDesc& mergedDesc,
+			const std::vector<std::wstring>& compileArguments) noexcept;
 		std::wstring QueryDxcVersion() const noexcept;
 
 	private:

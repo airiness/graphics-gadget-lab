@@ -3,6 +3,7 @@
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -75,6 +76,9 @@ namespace gglab
 		ShaderCompileStatus m_Status = ShaderCompileStatus::Success;
 		ShaderCompilerDiagnostics m_Diagnostics{};
 		ShaderDesc m_Request{};
+		// Normative source identity (logical path relative to the source
+		// root); m_Request.m_SourcePath is the resolved physical path.
+		std::filesystem::path m_LogicalSourcePath{};
 		ShaderCompilerIdentity m_CompilerIdentity{};
 		ShaderRecipeId m_RecipeId{};
 		LocalShaderCacheKey m_BuildKey{};

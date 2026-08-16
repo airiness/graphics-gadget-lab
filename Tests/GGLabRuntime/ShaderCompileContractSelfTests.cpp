@@ -136,7 +136,7 @@ namespace gglab
 			const std::filesystem::path& binaryPath) noexcept
 		{
 			auto manifestPath = binaryPath;
-			manifestPath.replace_extension(L"meta.txt");
+			manifestPath += L".json";
 			return manifestPath;
 		}
 
@@ -275,7 +275,7 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool ReplaceMetadataValue(const std::filesystem::path& path,
-			std::string_view key, std::string_view replacement) noexcept
+			std::string_view target, std::string_view replacement) noexcept
 		{
 			std::ifstream input(path, std::ios::binary);
 			if (!input)
@@ -284,14 +284,12 @@ namespace gglab
 			}
 			std::string content((std::istreambuf_iterator<char>(input)),
 				std::istreambuf_iterator<char>());
-			const std::string prefix = std::string(key) + "=";
-			const size_t begin = content.find(prefix);
-			const size_t end = begin == std::string::npos ? std::string::npos : content.find('\n', begin);
-			if (begin == std::string::npos || end == std::string::npos)
+			const size_t begin = content.find(target);
+			if (begin == std::string::npos)
 			{
 				return false;
 			}
-			content.replace(begin, end - begin, prefix + std::string(replacement));
+			content.replace(begin, target.size(), replacement);
 			std::ofstream output(path, std::ios::binary | std::ios::trunc);
 			output.write(content.data(), static_cast<std::streamsize>(content.size()));
 			return output.good();
@@ -538,13 +536,22 @@ namespace gglab
 			context.Check(dxilRecipe.m_RecipeId != spirVRecipe.m_RecipeId &&
 				spirVRecipe.m_RecipeId != changedArgumentsRecipe.m_RecipeId &&
 				spirVRecipe.m_RecipeId == canonicalizedCoordinatesRecipe.m_RecipeId &&
-				spirVRecipe.m_RecipeId.m_Digest != spirVRecipe.m_BuildKey.m_Digest,
-				"Resolved recipe identity covers the normalized request and canonicalizes caller coordinate expressions");
+				spirVRecipe.m_RecipeId.m_DurableDigest != spirVRecipe.m_BuildKey.m_DurableDigest,
+				"Resolved recipe identity covers the normalized logical request and canonicalizes caller coordinate expressions");
 			context.Check(ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity) ==
 				spirVRecipe.m_BuildKey &&
 				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, differentIdentity) !=
 					spirVRecipe.m_BuildKey,
 				"Producer identity participates in the build key, not the recipe identity");
+
+			// Logical source identity: absolute paths are rejected, and the
+			// recipe identity is the logical path, not the physical checkout path.
+			ShaderDesc absoluteDesc = spirVDesc;
+			absoluteDesc.m_SourcePath = spirVRecipe.m_Request.m_SourcePath;
+			const ShaderResolvedRecipe absoluteRecipe = compiler.Resolve(absoluteDesc);
+			context.Check(!absoluteRecipe.IsSuccess() &&
+				absoluteRecipe.m_Status == ShaderCompileStatus::InvalidRequest,
+				"Resolve rejects absolute source paths outside the logical identity contract");
 
 			constexpr std::array ReservedArguments{
 				L"-spirv",
@@ -662,9 +669,12 @@ namespace gglab
 			secondConcurrent.join();
 			const ShaderResolvedRecipe concurrentRecipe = compiler.Resolve(concurrentDesc);
 			const ShaderCompileResult concurrentReload = compiler.CompileOrLoad(concurrentRecipe);
-			context.Check(firstConcurrentSucceeded && secondConcurrentSucceeded &&
-				concurrentReload.IsSuccess() && concurrentReload.m_FromCache,
-				"Concurrent compiler instances converge on one valid shared cache entry");
+			context.Check(firstConcurrentSucceeded && secondConcurrentSucceeded,
+				"Both concurrent compiler instances complete their publication");
+			context.Check(concurrentReload.IsSuccess(),
+				"Reload after concurrent publication yields a valid artifact");
+			context.Check(concurrentReload.m_FromCache,
+				"Reload after concurrent publication hits the committed cache entry");
 
 			const std::vector<std::wstring> vertexArguments = spirVRecipe.m_CompileArguments;
 			bool registerShiftsMatch = true;
@@ -718,18 +728,19 @@ namespace gglab
 			std::ifstream metadataInput(spirVMetaPath, std::ios::binary);
 			const std::string metadata((std::istreambuf_iterator<char>(metadataInput)),
 				std::istreambuf_iterator<char>());
-			context.Check(metadata.find("schema=3") != std::string::npos &&
-				metadata.find("recipe_hash_schema=1") != std::string::npos &&
-				metadata.find("recipe=") != std::string::npos &&
-				metadata.find("build_key=") != std::string::npos &&
-				metadata.find("binary_digest=") != std::string::npos &&
-				metadata.find("binary_format=spirv") != std::string::npos &&
-				metadata.find("target_environment=vulkan1.3") != std::string::npos &&
-				metadata.find("binding_abi_revision=1") != std::string::npos &&
-				metadata.find("dxc_version=") != std::string::npos,
-				"Shader metadata records schema, recipe and build identities, digest, target, ABI, and DXC identity");
+			context.Check(metadata.find("\"schemaVersion\":1") != std::string::npos &&
+				metadata.find("\"recipeHashSchema\":1") != std::string::npos &&
+				metadata.find("\"recipeId\":\"") != std::string::npos &&
+				metadata.find("\"buildKey\":\"") != std::string::npos &&
+				metadata.find("\"binaryContentDigest\":\"") != std::string::npos &&
+				metadata.find("\"binaryFormat\":\"spirv\"") != std::string::npos &&
+				metadata.find("\"spirvTargetEnvironment\":\"vulkan1.3\"") != std::string::npos &&
+				metadata.find("\"bindingAbiRevision\":1") != std::string::npos &&
+				metadata.find("\"identity\":\"") != std::string::npos &&
+				metadata.find("\"logicalSource\":\"Passes/PassForwardCoverage.hlsl\"") != std::string::npos,
+				"Shader manifest records schema, recipe and build identities, digest, target, ABI, producer identity, and the logical source");
 			const bool metadataChanged = ReplaceMetadataValue(
-				spirVMetaPath, "binding_abi_revision", "999");
+				spirVMetaPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
 			context.Check(metadataChanged && !rejectedCacheArtifact.m_FromCache,
 				"Shader cache rejects metadata whose target contract does not match the recipe");

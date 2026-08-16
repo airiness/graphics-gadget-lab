@@ -1,12 +1,15 @@
 #pragma once
 #include "Core/Hash/KeyHash.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/Shader/Shader.h"
 
+#include <array>
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <shared_mutex>
@@ -40,8 +43,15 @@ namespace gglab
 
 	struct ShaderKey
 	{
-		ShaderHash128 m_KeyHash;
-		auto AsTuple() const noexcept { return m_KeyHash.AsTuple(); }
+		// Full durable recipe identity. The KeyHash fast path only selects the
+		// bucket; equality always compares the complete digest.
+		Sha256Digest m_KeyDigest;
+		auto AsTuple() const noexcept
+		{
+			std::array<uint64_t, 4> words{};
+			std::memcpy(words.data(), m_KeyDigest.m_Value.data(), sizeof(words));
+			return std::make_tuple(words[0], words[1], words[2], words[3]);
+		}
 		constexpr bool operator==(const ShaderKey&) const noexcept = default;
 	};
 	using ShaderKeyHash = KeyHash<ShaderKey>;

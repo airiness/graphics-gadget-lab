@@ -43,7 +43,7 @@ namespace gglab
 		Dxc,
 	};
 
-	// Producer identity ("who produces it"). S1 keeps the single canonical
+	// Producer identity ("who produces it"). Keep the single canonical
 	// identity produced by QueryDxcVersion() (major.minor plus commit
 	// count/hash when available); the type split must not introduce new
 	// producer-identity inputs. Identity is an authority of the active

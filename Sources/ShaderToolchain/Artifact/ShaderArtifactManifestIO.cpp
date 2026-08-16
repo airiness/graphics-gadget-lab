@@ -5,20 +5,17 @@
 
 #include <process.h>
 
-#include <array>
 #include <atomic>
-#include <charconv>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace gglab
@@ -187,98 +184,439 @@ namespace gglab
 			return digest;
 		}
 
-		[[nodiscard]] std::string ToHex128(ShaderHash128 hash)
+		class JsonWriter final
 		{
-			return std::format("{:016x}{:016x}", hash.m_HighBits, hash.m_LowBits);
-		}
+		public:
+			[[nodiscard]] std::string Finish() && { return std::move(m_Content); }
 
-		[[nodiscard]] std::optional<ShaderHash128> ParseHex128(std::string_view hex) noexcept
-		{
-			if (hex.size() != 32)
+			void BeginObject()
 			{
-				return std::nullopt;
+				AppendCommaIfNeeded();
+				Append('{');
+				m_PendingValue = false;
 			}
-			ShaderHash128 hash{};
-			const auto parse = [&hex](std::size_t offset, uint64_t& out) noexcept
+			void EndObject()
+			{
+				Append('}');
+				m_PendingValue = true;
+			}
+			void BeginArray()
+			{
+				AppendCommaIfNeeded();
+				Append('[');
+				m_PendingValue = false;
+			}
+			void EndArray()
+			{
+				Append(']');
+				m_PendingValue = true;
+			}
+			void Key(std::string_view key)
+			{
+				AppendCommaIfNeeded();
+				WriteEscaped(key);
+				Append(':');
+				m_PendingValue = false;
+			}
+			void WriteString(std::string_view value)
+			{
+				AppendCommaIfNeeded();
+				WriteEscaped(value);
+				m_PendingValue = true;
+			}
+			void WriteWideString(std::wstring_view value)
+			{
+				WriteString(utils::ToString(value));
+			}
+			void WriteUInt(uint64_t value)
+			{
+				AppendCommaIfNeeded();
+				m_Content += std::to_string(value);
+				m_PendingValue = true;
+			}
+			void WriteInt(int64_t value)
+			{
+				AppendCommaIfNeeded();
+				m_Content += std::to_string(value);
+				m_PendingValue = true;
+			}
+
+		private:
+			void Append(char value) { m_Content += value; }
+
+			void AppendCommaIfNeeded()
+			{
+				if (m_PendingValue)
 				{
-					out = 0;
-					for (std::size_t index = 0; index < 16; ++index)
+					Append(',');
+				}
+			}
+
+			void WriteEscaped(std::string_view value)
+			{
+				Append('"');
+				for (char current : value)
+				{
+					switch (current)
 					{
-						const int digit = HexDigitValue(hex[offset + index]);
-						if (digit < 0)
+					case '"':
+						m_Content += "\\\"";
+						break;
+					case '\\':
+						m_Content += "\\\\";
+						break;
+					case '\b':
+						m_Content += "\\b";
+						break;
+					case '\f':
+						m_Content += "\\f";
+						break;
+					case '\n':
+						m_Content += "\\n";
+						break;
+					case '\r':
+						m_Content += "\\r";
+						break;
+					case '\t':
+						m_Content += "\\t";
+						break;
+					default:
+						if (static_cast<unsigned char>(current) < 0x20)
 						{
-							return false;
+							constexpr char HexChars[] = "0123456789abcdef";
+							const unsigned char byte = static_cast<unsigned char>(current);
+							m_Content += "\\u00";
+							m_Content += HexChars[(byte >> 4) & 0xF];
+							m_Content += HexChars[byte & 0xF];
 						}
-						out = (out << 4) | static_cast<uint64_t>(digit);
+						else
+						{
+							m_Content += current;
+						}
+						break;
 					}
-					return true;
-				};
-			if (!parse(0, hash.m_HighBits) || !parse(16, hash.m_LowBits))
-			{
-				return std::nullopt;
-			}
-			return hash;
-		}
-
-		[[nodiscard]] std::vector<std::wstring> SplitList(std::wstring_view text) noexcept
-		{
-			std::vector<std::wstring> result;
-			std::size_t begin = 0;
-			while (begin <= text.size())
-			{
-				const std::size_t separator = text.find(L';', begin);
-				const std::size_t end =
-					separator == std::wstring_view::npos ? text.size() : separator;
-				if (end > begin)
-				{
-					result.emplace_back(text.substr(begin, end - begin));
 				}
-				if (separator == std::wstring_view::npos)
+				Append('"');
+			}
+
+			std::string m_Content;
+			bool m_PendingValue = false;
+		};
+
+		struct JsonValue;
+		using JsonArray = std::vector<JsonValue>;
+		using JsonObject = std::vector<std::pair<std::string, JsonValue>>;
+		struct JsonValue
+		{
+			std::variant<std::monostate, bool, int64_t, std::string, JsonArray, JsonObject> m_Value;
+
+			[[nodiscard]] bool IsString() const noexcept
+			{
+				return std::holds_alternative<std::string>(m_Value);
+			}
+			[[nodiscard]] bool IsInteger() const noexcept
+			{
+				return std::holds_alternative<int64_t>(m_Value);
+			}
+			[[nodiscard]] bool IsArray() const noexcept
+			{
+				return std::holds_alternative<JsonArray>(m_Value);
+			}
+			[[nodiscard]] bool IsObject() const noexcept
+			{
+				return std::holds_alternative<JsonObject>(m_Value);
+			}
+			[[nodiscard]] const std::string& AsString() const noexcept
+			{
+				return std::get<std::string>(m_Value);
+			}
+			[[nodiscard]] int64_t AsInteger() const noexcept
+			{
+				return std::get<int64_t>(m_Value);
+			}
+			[[nodiscard]] const JsonArray& AsArray() const noexcept
+			{
+				return std::get<JsonArray>(m_Value);
+			}
+			[[nodiscard]] const JsonObject& AsObject() const noexcept
+			{
+				return std::get<JsonObject>(m_Value);
+			}
+		};
+
+		class JsonParser final
+		{
+		public:
+			explicit JsonParser(std::string_view text) noexcept : m_Text(text) {}
+
+			[[nodiscard]] std::optional<JsonValue> ParseDocument() noexcept
+			{
+				SkipWhitespace();
+				std::optional<JsonValue> value = ParseValue();
+				if (!value.has_value())
 				{
-					break;
+					return std::nullopt;
 				}
-				begin = separator + 1;
-			}
-			return result;
-		}
-
-		[[nodiscard]] std::wstring JoinList(const std::vector<std::wstring>& values)
-		{
-			std::wstring joined;
-			for (std::size_t index = 0; index < values.size(); ++index)
-			{
-				if (index > 0)
+				SkipWhitespace();
+				if (m_Position != m_Text.size())
 				{
-					joined += L";";
+					return std::nullopt;
 				}
-				joined += values[index];
+				return value;
 			}
-			return joined;
-		}
 
-		[[nodiscard]] std::optional<int64_t> ParseInt64(std::string_view text) noexcept
-		{
-			int64_t value = 0;
-			const auto [end, error] =
-				std::from_chars(text.data(), text.data() + text.size(), value);
-			if (error != std::errc{} || end != text.data() + text.size())
-			{
-				return std::nullopt;
-			}
-			return value;
-		}
+		private:
+			[[nodiscard]] bool AtEnd() const noexcept { return m_Position >= m_Text.size(); }
 
-		[[nodiscard]] std::optional<uint32_t> ParseUInt32(std::string_view text) noexcept
-		{
-			uint32_t value = 0;
-			const auto [end, error] =
-				std::from_chars(text.data(), text.data() + text.size(), value);
-			if (error != std::errc{} || end != text.data() + text.size())
+			void SkipWhitespace() noexcept
 			{
-				return std::nullopt;
+				while (!AtEnd() && (m_Text[m_Position] == ' ' || m_Text[m_Position] == '\t' ||
+					m_Text[m_Position] == '\n' || m_Text[m_Position] == '\r'))
+				{
+					++m_Position;
+				}
 			}
-			return value;
-		}
+
+			[[nodiscard]] std::optional<JsonValue> ParseValue() noexcept
+			{
+				if (AtEnd())
+				{
+					return std::nullopt;
+				}
+				switch (m_Text[m_Position])
+				{
+				case '{':
+					return ParseObject();
+				case '[':
+					return ParseArray();
+				case '"':
+					return ParseString();
+				default:
+					return ParseInteger();
+				}
+			}
+
+			[[nodiscard]] std::optional<JsonValue> ParseObject() noexcept
+			{
+				++m_Position; // '{'
+				JsonObject object;
+				SkipWhitespace();
+				if (!AtEnd() && m_Text[m_Position] == '}')
+				{
+					++m_Position;
+					return JsonValue{ std::move(object) };
+				}
+				while (true)
+				{
+					SkipWhitespace();
+					if (AtEnd() || m_Text[m_Position] != '"')
+					{
+						return std::nullopt;
+					}
+					std::optional<JsonValue> key = ParseString();
+					if (!key.has_value())
+					{
+						return std::nullopt;
+					}
+					for (const auto& existing : object)
+					{
+						if (existing.first == key->AsString())
+						{
+							return std::nullopt; // duplicate keys rejected
+						}
+					}
+					SkipWhitespace();
+					if (AtEnd() || m_Text[m_Position] != ':')
+					{
+						return std::nullopt;
+					}
+					++m_Position;
+					SkipWhitespace();
+					std::optional<JsonValue> value = ParseValue();
+					if (!value.has_value())
+					{
+						return std::nullopt;
+					}
+					object.emplace_back(key->AsString(), std::move(*value));
+					SkipWhitespace();
+					if (AtEnd())
+					{
+						return std::nullopt;
+					}
+					if (m_Text[m_Position] == ',')
+					{
+						++m_Position;
+						continue;
+					}
+					if (m_Text[m_Position] == '}')
+					{
+						++m_Position;
+						return JsonValue{ std::move(object) };
+					}
+					return std::nullopt;
+				}
+			}
+
+			[[nodiscard]] std::optional<JsonValue> ParseArray() noexcept
+			{
+				++m_Position; // '['
+				JsonArray array;
+				SkipWhitespace();
+				if (!AtEnd() && m_Text[m_Position] == ']')
+				{
+					++m_Position;
+					return JsonValue{ std::move(array) };
+				}
+				while (true)
+				{
+					SkipWhitespace();
+					std::optional<JsonValue> value = ParseValue();
+					if (!value.has_value())
+					{
+						return std::nullopt;
+					}
+					array.push_back(std::move(*value));
+					SkipWhitespace();
+					if (AtEnd())
+					{
+						return std::nullopt;
+					}
+					if (m_Text[m_Position] == ',')
+					{
+						++m_Position;
+						continue;
+					}
+					if (m_Text[m_Position] == ']')
+					{
+						++m_Position;
+						return JsonValue{ std::move(array) };
+					}
+					return std::nullopt;
+				}
+			}
+
+			[[nodiscard]] std::optional<JsonValue> ParseString() noexcept
+			{
+				++m_Position; // '"'
+				std::string value;
+				while (true)
+				{
+					if (AtEnd())
+					{
+						return std::nullopt;
+					}
+					const char current = m_Text[m_Position++];
+					if (current == '"')
+					{
+						return JsonValue{ std::move(value) };
+					}
+					if (current == '\\')
+					{
+						if (AtEnd())
+						{
+							return std::nullopt;
+						}
+						const char escaped = m_Text[m_Position++];
+						switch (escaped)
+						{
+						case '"':
+							value += '"';
+							break;
+						case '\\':
+							value += '\\';
+							break;
+						case '/':
+							value += '/';
+							break;
+						case 'b':
+							value += '\b';
+							break;
+						case 'f':
+							value += '\f';
+							break;
+						case 'n':
+							value += '\n';
+							break;
+						case 'r':
+							value += '\r';
+							break;
+						case 't':
+							value += '\t';
+							break;
+						case 'u':
+						{
+							if (m_Position + 4 > m_Text.size())
+							{
+								return std::nullopt;
+							}
+							int codeUnit = 0;
+							for (int index = 0; index < 4; ++index)
+							{
+								const int digit = HexDigitValue(m_Text[m_Position + index]);
+								if (digit < 0)
+								{
+									return std::nullopt;
+								}
+								codeUnit = (codeUnit << 4) | digit;
+							}
+							m_Position += 4;
+							if (codeUnit < 0x80)
+							{
+								value += static_cast<char>(codeUnit);
+							}
+							else if (codeUnit < 0x800)
+							{
+								value += static_cast<char>(0xC0 | (codeUnit >> 6));
+								value += static_cast<char>(0x80 | (codeUnit & 0x3F));
+							}
+							else
+							{
+								value += static_cast<char>(0xE0 | (codeUnit >> 12));
+								value += static_cast<char>(0x80 | ((codeUnit >> 6) & 0x3F));
+								value += static_cast<char>(0x80 | (codeUnit & 0x3F));
+							}
+							break;
+						}
+						default:
+							return std::nullopt;
+						}
+					}
+					else
+					{
+						value += current;
+					}
+				}
+			}
+
+			[[nodiscard]] std::optional<JsonValue> ParseInteger() noexcept
+			{
+				bool negative = false;
+				if (!AtEnd() && m_Text[m_Position] == '-')
+				{
+					negative = true;
+					++m_Position;
+				}
+				if (AtEnd() || m_Text[m_Position] < '0' || m_Text[m_Position] > '9')
+				{
+					return std::nullopt;
+				}
+				int64_t value = 0;
+				while (!AtEnd() && m_Text[m_Position] >= '0' && m_Text[m_Position] <= '9')
+				{
+					const int digit = m_Text[m_Position] - '0';
+					if (value > (INT64_MAX - digit) / 10)
+					{
+						return std::nullopt;
+					}
+					value = value * 10 + digit;
+					++m_Position;
+				}
+				return JsonValue{ negative ? -value : value };
+			}
+
+			std::string_view m_Text;
+			std::size_t m_Position = 0;
+		};
 
 		[[nodiscard]] std::optional<ShaderBinary> ReadFileBinary(
 			const std::filesystem::path& path) noexcept
@@ -350,47 +688,423 @@ namespace gglab
 			return false;
 		}
 
+		JsonWriter writer;
+		writer.BeginObject();
+		writer.Key("schemaVersion");
+		writer.WriteUInt(manifest.m_SchemaVersion);
+		writer.Key("recipeHashSchema");
+		writer.WriteUInt(manifest.m_RecipeHashSchema);
+		writer.Key("recipeId");
+		writer.WriteString(Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest));
+		writer.Key("buildKey");
+		writer.WriteString(Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest));
+		writer.Key("compiler");
+		writer.BeginObject();
+		writer.Key("kind");
+		writer.WriteString("dxc");
+		writer.Key("identity");
+		writer.WriteWideString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
+		writer.EndObject();
+		writer.Key("binaryFormat");
+		writer.WriteString(ShaderBinaryFormatText(manifest.m_BinaryFormat));
+		writer.Key("spirvTargetEnvironment");
+		writer.WriteString(SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment));
+		writer.Key("bindingAbiRevision");
+		writer.WriteUInt(manifest.m_BindingABIRevision);
+		writer.Key("coordinateOptions");
+		writer.WriteUInt(static_cast<uint32_t>(manifest.m_CoordinateOptions));
+		writer.Key("stage");
+		writer.WriteString(ShaderStageText(manifest.m_Stage));
+		writer.Key("logicalSource");
+		writer.WriteWideString(manifest.m_LogicalSourcePath.generic_wstring());
+		writer.Key("physicalSource");
+		writer.WriteString(utils::Canonical(manifest.m_SourcePath).string());
+		writer.Key("entryPoint");
+		writer.WriteWideString(manifest.m_EntryPoint);
+		writer.Key("target");
+		writer.WriteWideString(manifest.m_TargetString);
+		writer.Key("defines");
+		writer.BeginArray();
+		for (const std::wstring& define : manifest.m_Defines)
+		{
+			writer.WriteWideString(define);
+		}
+		writer.EndArray();
+		writer.Key("includeDirs");
+		writer.BeginArray();
+		for (const std::filesystem::path& includeDir : manifest.m_IncludeDirs)
+		{
+			writer.WriteString(utils::Canonical(includeDir).string());
+		}
+		writer.EndArray();
+		writer.Key("extraArgs");
+		writer.BeginArray();
+		for (const std::wstring& extraArg : manifest.m_ExtraArgs)
+		{
+			writer.WriteWideString(extraArg);
+		}
+		writer.EndArray();
+		writer.Key("dependencies");
+		writer.BeginArray();
+		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
+		{
+			writer.BeginObject();
+			writer.Key("path");
+			writer.WriteString(utils::Canonical(dependency.m_Path).string());
+			writer.Key("lastWriteTimeTicks");
+			writer.WriteInt(dependency.m_LastWriteTimeTicks);
+			writer.EndObject();
+		}
+		writer.EndArray();
+		writer.Key("binaryContentDigest");
+		writer.WriteString(Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest));
+		writer.EndObject();
+
 		std::ofstream out(manifestPath, std::ios::binary);
 		if (!out)
 		{
 			return false;
 		}
-
-		out << "schema=" << manifest.m_SchemaVersion << "\n";
-		out << "recipe_hash_schema=" << manifest.m_RecipeHashSchema << "\n";
-		out << "recipe=" << ToHex128(manifest.m_RecipeId.m_Digest) << "\n";
-		out << "build_key=" << ToHex128(manifest.m_BuildKey.m_Digest) << "\n";
-		out << "dxc_version=" <<
-			utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity) << "\n";
-		out << "binary_format=" << ShaderBinaryFormatText(manifest.m_BinaryFormat) << "\n";
-		out << "target_environment=" <<
-			SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment) << "\n";
-		out << "binding_abi_revision=" << manifest.m_BindingABIRevision << "\n";
-		out << "coordinate_options=" <<
-			static_cast<uint32_t>(manifest.m_CoordinateOptions) << "\n";
-		out << "binary_digest=" << Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest) << "\n";
-		out << "src=" << utils::Canonical(manifest.m_SourcePath).string() << "\n";
-		out << "entry=" << utils::ToString(manifest.m_EntryPoint) << "\n";
-		out << "stage=" << ShaderStageText(manifest.m_Stage) << "\n";
-		out << "target=" << utils::ToString(manifest.m_TargetString) << "\n";
-		out << "defines=" << utils::ToString(JoinList(manifest.m_Defines)) << "\n";
-		out << "includes=";
-		for (std::size_t index = 0; index < manifest.m_IncludeDirs.size(); ++index)
-		{
-			if (index > 0)
-			{
-				out << ";";
-			}
-			out << utils::Canonical(manifest.m_IncludeDirs[index]).string();
-		}
-		out << "\n";
-		out << "extra=" << utils::ToString(JoinList(manifest.m_ExtraArgs)) << "\n";
-		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
-		{
-			out << "dep=" << utils::Canonical(dependency.m_Path).string()
-				<< "|mtime=" << dependency.m_LastWriteTimeTicks << "\n";
-		}
+		const std::string content = std::move(writer).Finish();
+		out.write(content.data(), static_cast<std::streamsize>(content.size()));
 		return static_cast<bool>(out);
+	}
+
+	namespace
+	{
+		struct ManifestJsonMapper final
+		{
+			[[nodiscard]] std::optional<ShaderArtifactManifest> Map(const JsonValue& root) noexcept
+			{
+				if (!root.IsObject())
+				{
+					return std::nullopt;
+				}
+				ShaderArtifactManifest manifest{};
+				uint32_t seenMask = 0;
+				constexpr uint32_t SchemaBit = 1u << 0;
+				constexpr uint32_t RecipeHashSchemaBit = 1u << 1;
+				constexpr uint32_t RecipeIdBit = 1u << 2;
+				constexpr uint32_t BuildKeyBit = 1u << 3;
+				constexpr uint32_t CompilerBit = 1u << 4;
+				constexpr uint32_t BinaryFormatBit = 1u << 5;
+				constexpr uint32_t EnvironmentBit = 1u << 6;
+				constexpr uint32_t AbiBit = 1u << 7;
+				constexpr uint32_t CoordinatesBit = 1u << 8;
+				constexpr uint32_t StageBit = 1u << 9;
+				constexpr uint32_t LogicalSourceBit = 1u << 10;
+				constexpr uint32_t PhysicalSourceBit = 1u << 11;
+				constexpr uint32_t EntryBit = 1u << 12;
+				constexpr uint32_t TargetBit = 1u << 13;
+				constexpr uint32_t DefinesBit = 1u << 14;
+				constexpr uint32_t IncludeDirsBit = 1u << 15;
+				constexpr uint32_t ExtraArgsBit = 1u << 16;
+				constexpr uint32_t DependenciesBit = 1u << 17;
+				constexpr uint32_t DigestBit = 1u << 18;
+				constexpr uint32_t RequiredMask = SchemaBit | RecipeHashSchemaBit | RecipeIdBit |
+					BuildKeyBit | CompilerBit | BinaryFormatBit | EnvironmentBit | AbiBit |
+					CoordinatesBit | StageBit | LogicalSourceBit | PhysicalSourceBit |
+					EntryBit | TargetBit | DefinesBit | IncludeDirsBit | ExtraArgsBit |
+					DependenciesBit | DigestBit;
+
+				for (const auto& [key, value] : root.AsObject())
+				{
+					if (key == "schemaVersion")
+					{
+						if (!value.IsInteger() ||
+							value.AsInteger() != ShaderArtifactManifestSchemaVersion)
+						{
+							return std::nullopt;
+						}
+						manifest.m_SchemaVersion = static_cast<uint32_t>(value.AsInteger());
+						seenMask |= SchemaBit;
+					}
+					else if (key == "recipeHashSchema")
+					{
+						if (!value.IsInteger() || value.AsInteger() != ShaderRecipeHashSchema)
+						{
+							return std::nullopt;
+						}
+						manifest.m_RecipeHashSchema = static_cast<uint32_t>(value.AsInteger());
+						seenMask |= RecipeHashSchemaBit;
+					}
+					else if (key == "recipeId")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						const auto parsed = ParseHexSha256Digest(value.AsString());
+						if (!parsed.has_value())
+						{
+							return std::nullopt;
+						}
+						manifest.m_RecipeId.m_DurableDigest = *parsed;
+						seenMask |= RecipeIdBit;
+					}
+					else if (key == "buildKey")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						const auto parsed = ParseHexSha256Digest(value.AsString());
+						if (!parsed.has_value())
+						{
+							return std::nullopt;
+						}
+						manifest.m_BuildKey.m_DurableDigest = *parsed;
+						seenMask |= BuildKeyBit;
+					}
+					else if (key == "compiler")
+					{
+						if (!value.IsObject())
+						{
+							return std::nullopt;
+						}
+						bool hasKind = false;
+						bool hasIdentity = false;
+						for (const auto& [compilerKey, compilerValue] : value.AsObject())
+						{
+							if (compilerKey == "kind")
+							{
+								if (!compilerValue.IsString() || compilerValue.AsString() != "dxc")
+								{
+									return std::nullopt;
+								}
+								hasKind = true;
+							}
+							else if (compilerKey == "identity")
+							{
+								if (!compilerValue.IsString())
+								{
+									return std::nullopt;
+								}
+								manifest.m_CompilerIdentity.m_CanonicalIdentity =
+									utils::ToWideString(compilerValue.AsString());
+								hasIdentity = true;
+							}
+							else
+							{
+								return std::nullopt;
+							}
+						}
+						if (!hasKind || !hasIdentity)
+						{
+							return std::nullopt;
+						}
+						seenMask |= CompilerBit;
+					}
+					else if (key == "binaryFormat")
+					{
+						if (!value.IsString() ||
+							!ParseShaderBinaryFormat(value.AsString(), manifest.m_BinaryFormat))
+						{
+							return std::nullopt;
+						}
+						seenMask |= BinaryFormatBit;
+					}
+					else if (key == "spirvTargetEnvironment")
+					{
+						if (!value.IsString() ||
+							!ParseSpirVTargetEnvironment(
+								value.AsString(), manifest.m_SpirVTargetEnvironment))
+						{
+							return std::nullopt;
+						}
+						seenMask |= EnvironmentBit;
+					}
+					else if (key == "bindingAbiRevision")
+					{
+						if (!value.IsInteger() || value.AsInteger() < 0 ||
+							value.AsInteger() > UINT32_MAX)
+						{
+							return std::nullopt;
+						}
+						manifest.m_BindingABIRevision = static_cast<uint32_t>(value.AsInteger());
+						seenMask |= AbiBit;
+					}
+					else if (key == "coordinateOptions")
+					{
+						if (!value.IsInteger() || value.AsInteger() < 0 ||
+							value.AsInteger() > UINT32_MAX)
+						{
+							return std::nullopt;
+						}
+						manifest.m_CoordinateOptions =
+							static_cast<ShaderCoordinateOptions>(value.AsInteger());
+						seenMask |= CoordinatesBit;
+					}
+					else if (key == "stage")
+					{
+						if (!value.IsString() ||
+							!ParseShaderStage(value.AsString(), manifest.m_Stage))
+						{
+							return std::nullopt;
+						}
+						seenMask |= StageBit;
+					}
+					else if (key == "logicalSource")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						manifest.m_LogicalSourcePath = utils::ToWideString(value.AsString());
+						seenMask |= LogicalSourceBit;
+					}
+					else if (key == "physicalSource")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						manifest.m_SourcePath = utils::ToWideString(value.AsString());
+						seenMask |= PhysicalSourceBit;
+					}
+					else if (key == "entryPoint")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						manifest.m_EntryPoint = utils::ToWideString(value.AsString());
+						seenMask |= EntryBit;
+					}
+					else if (key == "target")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						manifest.m_TargetString = utils::ToWideString(value.AsString());
+						seenMask |= TargetBit;
+					}
+					else if (key == "defines")
+					{
+						if (!value.IsArray())
+						{
+							return std::nullopt;
+						}
+						for (const JsonValue& define : value.AsArray())
+						{
+							if (!define.IsString())
+							{
+								return std::nullopt;
+							}
+							manifest.m_Defines.push_back(utils::ToWideString(define.AsString()));
+						}
+						seenMask |= DefinesBit;
+					}
+					else if (key == "includeDirs")
+					{
+						if (!value.IsArray())
+						{
+							return std::nullopt;
+						}
+						for (const JsonValue& includeDir : value.AsArray())
+						{
+							if (!includeDir.IsString())
+							{
+								return std::nullopt;
+							}
+							manifest.m_IncludeDirs.emplace_back(
+								utils::ToWideString(includeDir.AsString()));
+						}
+						seenMask |= IncludeDirsBit;
+					}
+					else if (key == "extraArgs")
+					{
+						if (!value.IsArray())
+						{
+							return std::nullopt;
+						}
+						for (const JsonValue& extraArg : value.AsArray())
+						{
+							if (!extraArg.IsString())
+							{
+								return std::nullopt;
+							}
+							manifest.m_ExtraArgs.push_back(utils::ToWideString(extraArg.AsString()));
+						}
+						seenMask |= ExtraArgsBit;
+					}
+					else if (key == "dependencies")
+					{
+						if (!value.IsArray())
+						{
+							return std::nullopt;
+						}
+						for (const JsonValue& dependency : value.AsArray())
+						{
+							if (!dependency.IsObject())
+							{
+								return std::nullopt;
+							}
+							ShaderArtifactDependency record{};
+							bool hasPath = false;
+							bool hasTicks = false;
+							for (const auto& [dependencyKey, dependencyValue] : dependency.AsObject())
+							{
+								if (dependencyKey == "path")
+								{
+									if (!dependencyValue.IsString())
+									{
+										return std::nullopt;
+									}
+									record.m_Path = utils::ToWideString(dependencyValue.AsString());
+									hasPath = true;
+								}
+								else if (dependencyKey == "lastWriteTimeTicks")
+								{
+									if (!dependencyValue.IsInteger())
+									{
+										return std::nullopt;
+									}
+									record.m_LastWriteTimeTicks = dependencyValue.AsInteger();
+									hasTicks = true;
+								}
+								else
+								{
+									return std::nullopt;
+								}
+							}
+							if (!hasPath || !hasTicks)
+							{
+								return std::nullopt;
+							}
+							manifest.m_Dependencies.push_back(std::move(record));
+						}
+						seenMask |= DependenciesBit;
+					}
+					else if (key == "binaryContentDigest")
+					{
+						if (!value.IsString())
+						{
+							return std::nullopt;
+						}
+						const auto parsed = ParseHexSha256Digest(value.AsString());
+						if (!parsed.has_value())
+						{
+							return std::nullopt;
+						}
+						manifest.m_BinaryContentDigest.m_Digest = *parsed;
+						seenMask |= DigestBit;
+					}
+					else
+					{
+						// Unknown keys are rejected: schema evolution requires a bump.
+						return std::nullopt;
+					}
+				}
+
+				if (seenMask != RequiredMask)
+				{
+					return std::nullopt;
+				}
+				return manifest;
+			}
+		};
 	}
 
 	std::optional<ShaderArtifactManifest> ReadShaderArtifactManifest(
@@ -401,200 +1115,16 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+		const std::string content((std::istreambuf_iterator<char>(in)),
+			std::istreambuf_iterator<char>());
 
-		ShaderArtifactManifest manifest{};
-		bool hasSchema = false;
-		bool hasRecipeHashSchema = false;
-		bool hasRecipe = false;
-		bool hasBuildKey = false;
-		bool hasDxcVersion = false;
-		bool hasBinaryFormat = false;
-		bool hasTargetEnvironment = false;
-		bool hasBindingABIRevision = false;
-		bool hasCoordinateOptions = false;
-		bool hasBinaryDigest = false;
-		bool hasSource = false;
-		bool hasEntry = false;
-		bool hasStage = false;
-		bool hasTarget = false;
-
-		std::string line;
-		while (std::getline(in, line))
-		{
-			if (line.rfind("dep=", 0) == 0)
-			{
-				const std::size_t bar = line.find("|mtime=");
-				if (bar == std::string::npos || bar <= 4)
-				{
-					return std::nullopt;
-				}
-				const std::optional<int64_t> ticks =
-					ParseInt64(std::string_view(line).substr(bar + 7));
-				if (!ticks.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_Dependencies.push_back({
-					.m_Path = std::filesystem::path(line.substr(4, bar - 4)),
-					.m_LastWriteTimeTicks = *ticks,
-				});
-				continue;
-			}
-
-			const std::size_t separator = line.find('=');
-			if (separator == std::string::npos)
-			{
-				return std::nullopt;
-			}
-			const std::string_view key(line.data(), separator);
-			const std::string_view value = std::string_view(line).substr(separator + 1);
-
-			if (key == "schema")
-			{
-				const auto parsed = ParseUInt32(value);
-				if (!parsed.has_value() || *parsed != ShaderCacheMetadataSchema)
-				{
-					return std::nullopt;
-				}
-				manifest.m_SchemaVersion = *parsed;
-				hasSchema = true;
-			}
-			else if (key == "recipe_hash_schema")
-			{
-				const auto parsed = ParseUInt32(value);
-				if (!parsed.has_value() || *parsed != ShaderRecipeHashSchema)
-				{
-					return std::nullopt;
-				}
-				manifest.m_RecipeHashSchema = *parsed;
-				hasRecipeHashSchema = true;
-			}
-			else if (key == "recipe")
-			{
-				const auto parsed = ParseHex128(value);
-				if (!parsed.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_RecipeId.m_Digest = *parsed;
-				hasRecipe = true;
-			}
-			else if (key == "build_key")
-			{
-				const auto parsed = ParseHex128(value);
-				if (!parsed.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_BuildKey.m_Digest = *parsed;
-				hasBuildKey = true;
-			}
-			else if (key == "dxc_version")
-			{
-				manifest.m_CompilerIdentity.m_CanonicalIdentity = utils::ToWideString(value);
-				hasDxcVersion = true;
-			}
-			else if (key == "binary_format")
-			{
-				if (!ParseShaderBinaryFormat(value, manifest.m_BinaryFormat))
-				{
-					return std::nullopt;
-				}
-				hasBinaryFormat = true;
-			}
-			else if (key == "target_environment")
-			{
-				if (!ParseSpirVTargetEnvironment(value, manifest.m_SpirVTargetEnvironment))
-				{
-					return std::nullopt;
-				}
-				hasTargetEnvironment = true;
-			}
-			else if (key == "binding_abi_revision")
-			{
-				const auto parsed = ParseUInt32(value);
-				if (!parsed.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_BindingABIRevision = *parsed;
-				hasBindingABIRevision = true;
-			}
-			else if (key == "coordinate_options")
-			{
-				const auto parsed = ParseUInt32(value);
-				if (!parsed.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_CoordinateOptions =
-					static_cast<ShaderCoordinateOptions>(*parsed);
-				hasCoordinateOptions = true;
-			}
-			else if (key == "binary_digest")
-			{
-				const auto parsed = ParseHexSha256Digest(value);
-				if (!parsed.has_value())
-				{
-					return std::nullopt;
-				}
-				manifest.m_BinaryContentDigest.m_Digest = *parsed;
-				hasBinaryDigest = true;
-			}
-			else if (key == "src")
-			{
-				manifest.m_SourcePath = utils::ToWideString(value);
-				hasSource = true;
-			}
-			else if (key == "entry")
-			{
-				manifest.m_EntryPoint = utils::ToWideString(value);
-				hasEntry = true;
-			}
-			else if (key == "stage")
-			{
-				if (!ParseShaderStage(value, manifest.m_Stage))
-				{
-					return std::nullopt;
-				}
-				hasStage = true;
-			}
-			else if (key == "target")
-			{
-				manifest.m_TargetString = utils::ToWideString(value);
-				hasTarget = true;
-			}
-			else if (key == "defines")
-			{
-				manifest.m_Defines = SplitList(utils::ToWideString(value));
-			}
-			else if (key == "includes")
-			{
-				manifest.m_IncludeDirs.clear();
-				for (const std::wstring& dir : SplitList(utils::ToWideString(value)))
-				{
-					manifest.m_IncludeDirs.emplace_back(dir);
-				}
-			}
-			else if (key == "extra")
-			{
-				manifest.m_ExtraArgs = SplitList(utils::ToWideString(value));
-			}
-			else
-			{
-				// Unknown keys are rejected: schema evolution requires a bump.
-				return std::nullopt;
-			}
-		}
-
-		if (!hasSchema || !hasRecipeHashSchema || !hasRecipe || !hasBuildKey ||
-			!hasDxcVersion || !hasBinaryFormat || !hasTargetEnvironment ||
-			!hasBindingABIRevision || !hasCoordinateOptions || !hasBinaryDigest ||
-			!hasSource || !hasEntry || !hasStage || !hasTarget)
+		JsonParser parser(content);
+		const std::optional<JsonValue> document = parser.ParseDocument();
+		if (!document.has_value())
 		{
 			return std::nullopt;
 		}
-		return manifest;
+		return ManifestJsonMapper{}.Map(*document);
 	}
 
 	std::optional<ShaderArtifact> LoadShaderArtifact(const std::filesystem::path& manifestPath,

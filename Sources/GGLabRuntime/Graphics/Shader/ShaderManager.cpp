@@ -136,7 +136,7 @@ namespace gglab
 			return ShaderID();
 		}
 
-		const ShaderKey key{ .m_KeyHash = recipe.m_RecipeId.m_Digest };
+		const ShaderKey key{ .m_KeyDigest = recipe.m_RecipeId.m_DurableDigest };
 
 		// return if exist.
 		{
@@ -328,7 +328,7 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		for (auto& entry : job.m_Entries)
 		{
-			const ShaderKey key{ .m_KeyHash = entry.m_Recipe.m_RecipeId.m_Digest };
+			const ShaderKey key{ .m_KeyDigest = entry.m_Recipe.m_RecipeId.m_DurableDigest };
 			if (m_KeyIdMap.contains(key))
 			{
 				continue;

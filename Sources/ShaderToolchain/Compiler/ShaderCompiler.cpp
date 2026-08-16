@@ -42,32 +42,6 @@ namespace gglab
 	{
 		inline constexpr LogTag ShaderCompilerLogTag{ "SHADER_COMPILER" };
 
-		[[nodiscard]] constexpr std::uint64_t ReadBigEndianU64(
-			const Sha256Digest& digest, std::size_t offset) noexcept
-		{
-			std::uint64_t value = 0;
-			for (std::size_t byteIndex = 0; byteIndex < sizeof(value); ++byteIndex)
-			{
-				value = (value << 8u) |
-					std::to_integer<std::uint64_t>(digest.m_Value[offset + byteIndex]);
-			}
-			return value;
-		}
-
-		[[nodiscard]] constexpr ShaderHash128 TruncateSha256(
-			const Sha256Digest& digest) noexcept
-		{
-			return {
-				.m_LowBits = ReadBigEndianU64(digest, sizeof(std::uint64_t)),
-				.m_HighBits = ReadBigEndianU64(digest, 0),
-			};
-		}
-
-		[[nodiscard]] std::wstring ToHex(ShaderHash128 hash)
-		{
-			return std::format(L"{:016x}{:016x}", hash.m_HighBits, hash.m_LowBits);
-		}
-
 		[[nodiscard]] bool IsCompilerOwnedExtraArgument(std::wstring_view argument) noexcept
 		{
 			if (argument.empty())
@@ -345,7 +319,7 @@ namespace gglab
 			GGLAB_LOG_SHADER_COMPILER(LogLevel::Warning,
 				"ComputeShaderBinaryHash: Failed to get DXIL container hash, fallback to SHA-256.");
 		}
-		return TruncateSha256(ComputeSha256(
+		return ShaderDigestFastHash(ComputeSha256(
 			std::span(reinterpret_cast<const std::byte*>(ptr), size)));
 	}
 
@@ -479,12 +453,32 @@ namespace gglab
 			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
 		}
 
-		// Source and include paths supplied by shader users are relative to the configured source root.
-		if (desc.m_SourcePath.is_relative())
+		// Portable source identity: the request carries a logical path
+		// relative to the source root; the physical path is derived for IO and
+		// diagnostics only and never participates in the recipe identity.
+		if (!desc.m_SourcePath.is_relative())
 		{
-			desc.m_SourcePath = m_SourceRootDir / desc.m_SourcePath;
+			recipe.m_Status = ShaderCompileStatus::InvalidRequest;
+			recipe.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::InvalidRequest,
+				L"Shader source path must be a logical path relative to the source root.",
+				ShaderCompileValidationError::SourcePathNotCanonical);
+			recipe.m_Diagnostics.m_SourceIdentity = desc.m_SourcePath.wstring();
+			return recipe;
 		}
-		desc.m_SourcePath = utils::Canonical(desc.m_SourcePath);
+		const std::filesystem::path logicalSourcePath = desc.m_SourcePath.lexically_normal();
+		for (const std::filesystem::path& component : logicalSourcePath)
+		{
+			if (component == L"..")
+			{
+				recipe.m_Status = ShaderCompileStatus::InvalidRequest;
+				recipe.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::InvalidRequest,
+					L"Shader logical source path must stay inside the source root.",
+					ShaderCompileValidationError::SourcePathNotCanonical);
+				recipe.m_Diagnostics.m_SourceIdentity = desc.m_SourcePath.wstring();
+				return recipe;
+			}
+		}
+		desc.m_SourcePath = utils::Canonical(m_SourceRootDir / logicalSourcePath);
 		for (auto& include : desc.m_IncludeDirs)
 		{
 			if (include.is_relative())
@@ -540,9 +534,11 @@ namespace gglab
 		}
 
 		recipe.m_Request = std::move(desc);
+		recipe.m_LogicalSourcePath = logicalSourcePath;
 		recipe.m_CompilerIdentity = m_CompilerIdentity;
 		recipe.m_CompileArguments = BuildCompileArguments(recipe.m_Request);
-		recipe.m_RecipeId = ComputeRecipeId(recipe.m_Request, recipe.m_CompileArguments);
+		recipe.m_RecipeId = ComputeRecipeId(
+			recipe.m_LogicalSourcePath, recipe.m_Request, recipe.m_CompileArguments);
 		recipe.m_BuildKey = ComputeBuildKey(recipe.m_RecipeId, recipe.m_CompilerIdentity);
 		return recipe;
 	}
@@ -587,11 +583,12 @@ namespace gglab
 
 		result.m_RecipeId = recipe.m_RecipeId;
 
-		const auto keyHex = ToHex(recipe.m_BuildKey.m_Digest);
+		const std::wstring keyHex = utils::ToWideString(
+			Sha256DigestToHex(recipe.m_BuildKey.m_DurableDigest));
 		const auto binaryPath = MakeCacheBinaryPath(
 			keyHex, recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_BinaryFormat);
 		auto manifestPath = binaryPath;
-		manifestPath.replace_extension(L"meta.txt");
+		manifestPath += L".json";
 
 		std::error_code errorCode;
 		if (std::filesystem::exists(binaryPath, errorCode) &&
@@ -661,8 +658,10 @@ namespace gglab
 	std::filesystem::path ShaderCompiler::GetCacheBinaryPath(
 		const ShaderResolvedRecipe& recipe) const noexcept
 	{
-		return MakeCacheBinaryPath(ToHex(recipe.m_BuildKey.m_Digest),
-			recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_BinaryFormat);
+		const std::wstring keyHex = utils::ToWideString(
+			Sha256DigestToHex(recipe.m_BuildKey.m_DurableDigest));
+		return MakeCacheBinaryPath(
+			keyHex, recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_BinaryFormat);
 	}
 
 	std::filesystem::path ShaderCompiler::MakeCacheBinaryPath(
@@ -713,7 +712,7 @@ namespace gglab
 	{
 		ShaderArtifact artifact{};
 		ShaderArtifactManifest& manifest = artifact.m_Manifest;
-		manifest.m_SchemaVersion = ShaderCacheMetadataSchema;
+		manifest.m_SchemaVersion = ShaderArtifactManifestSchemaVersion;
 		manifest.m_RecipeHashSchema = ShaderRecipeHashSchema;
 		manifest.m_RecipeId = recipe.m_RecipeId;
 		manifest.m_BuildKey = recipe.m_BuildKey;
@@ -723,6 +722,7 @@ namespace gglab
 		manifest.m_BindingABIRevision = recipe.m_Request.m_Target.m_BindingABIRevision;
 		manifest.m_CoordinateOptions = recipe.m_Request.m_Target.m_CoordinateOptions;
 		manifest.m_Stage = recipe.m_Request.m_Stage;
+		manifest.m_LogicalSourcePath = recipe.m_LogicalSourcePath;
 		manifest.m_SourcePath = recipe.m_Request.m_SourcePath;
 		manifest.m_EntryPoint = recipe.m_Request.m_Entry;
 		manifest.m_TargetString = ToTarget(
@@ -738,13 +738,13 @@ namespace gglab
 		manifest.m_Dependencies.push_back({
 			.m_Path = recipe.m_Request.m_SourcePath,
 			.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(recipe.m_Request.m_SourcePath),
-		});
+			});
 		for (const std::filesystem::path& dependency : dependencies)
 		{
 			manifest.m_Dependencies.push_back({
 				.m_Path = dependency,
 				.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(dependency),
-			});
+				});
 		}
 		manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(std::span(
 			static_cast<const std::byte*>(binary.Data()), binary.SizeInBytes()));
@@ -767,13 +767,14 @@ namespace gglab
 		}
 		if (manifest.m_BinaryFormat != recipe.m_Request.m_Target.m_BinaryFormat ||
 			manifest.m_SpirVTargetEnvironment !=
-				recipe.m_Request.m_Target.m_SpirVTargetEnvironment ||
+			recipe.m_Request.m_Target.m_SpirVTargetEnvironment ||
 			manifest.m_BindingABIRevision != recipe.m_Request.m_Target.m_BindingABIRevision ||
 			manifest.m_CoordinateOptions != recipe.m_Request.m_Target.m_CoordinateOptions)
 		{
 			return false;
 		}
-		if (manifest.m_SourcePath != utils::Canonical(recipe.m_Request.m_SourcePath) ||
+		if (manifest.m_LogicalSourcePath != recipe.m_LogicalSourcePath ||
+			manifest.m_SourcePath != utils::Canonical(recipe.m_Request.m_SourcePath) ||
 			manifest.m_EntryPoint != recipe.m_Request.m_Entry)
 		{
 			return false;
@@ -976,14 +977,13 @@ namespace gglab
 		return args;
 	}
 
-	ShaderRecipeId ShaderCompiler::ComputeRecipeId(
+	ShaderRecipeId ShaderCompiler::ComputeRecipeId(const std::filesystem::path& logicalSourcePath,
 		const ShaderDesc& mergedDesc, const std::vector<std::wstring>& compileArguments) noexcept
 	{
 		Sha256Builder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.shader.recipe") &&
 			builder.AddU32LE(ShaderRecipeHashSchema) &&
-			builder.AddStringUtf8(
-				utils::ToString(utils::Canonical(mergedDesc.m_SourcePath).generic_wstring())) &&
+			builder.AddStringUtf8(utils::ToString(logicalSourcePath.generic_wstring())) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
 				mergedDesc.m_Target.m_BinaryFormat)) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
@@ -999,7 +999,7 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(succeeded, "Failed to encode the shader recipe identity input.");
 		ShaderRecipeId recipeId{};
-		recipeId.m_Digest = TruncateSha256(builder.Finish());
+		recipeId.m_DurableDigest = builder.Finish();
 		return recipeId;
 	}
 
@@ -1009,13 +1009,12 @@ namespace gglab
 		Sha256Builder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.shader.buildkey") &&
 			builder.AddU32LE(ShaderRecipeHashSchema) &&
-			builder.AddU64LE(recipeId.m_Digest.m_LowBits) &&
-			builder.AddU64LE(recipeId.m_Digest.m_HighBits) &&
+			builder.AddBytes(std::span(recipeId.m_DurableDigest.m_Value)) &&
 			builder.AddStringUtf8(utils::ToString(compilerIdentity.m_CanonicalIdentity));
 
 		GGLAB_ASSERT_MSG(succeeded, "Failed to encode the shader build key input.");
 		LocalShaderCacheKey buildKey{};
-		buildKey.m_Digest = TruncateSha256(builder.Finish());
+		buildKey.m_DurableDigest = builder.Finish();
 		return buildKey;
 	}
 
@@ -1127,6 +1126,56 @@ namespace gglab
 			commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
 		CoTaskMemFree(commitHash);
 		return std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
+	}
+
+	namespace
+	{
+		[[nodiscard]] std::wstring QueryDxcVersionFrom(
+			const ComPtr<IDxcCompiler3>& compiler) noexcept
+		{
+			ComPtr<IDxcVersionInfo> versionInfo;
+			if (FAILED(compiler.As(&versionInfo)))
+			{
+				return L"unknown";
+			}
+
+			UINT32 major = 0;
+			UINT32 minor = 0;
+			if (FAILED(versionInfo->GetVersion(&major, &minor)))
+			{
+				return L"unknown";
+			}
+
+			ComPtr<IDxcVersionInfo2> versionInfo2;
+			if (FAILED(compiler.As(&versionInfo2)))
+			{
+				return std::format(L"{}.{}", major, minor);
+			}
+
+			UINT32 commitCount = 0;
+			char* commitHash = nullptr;
+			if (FAILED(versionInfo2->GetCommitInfo(&commitCount, &commitHash)))
+			{
+				return std::format(L"{}.{}", major, minor);
+			}
+			const std::wstring commit =
+				commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
+			CoTaskMemFree(commitHash);
+			return std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
+		}
+	}
+
+	ShaderCompilerIdentity QueryDxcCompilerIdentity() noexcept
+	{
+		ShaderCompilerIdentity identity{};
+		ComPtr<IDxcCompiler3> compiler;
+		if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
+		{
+			identity.m_CanonicalIdentity = L"unknown";
+			return identity;
+		}
+		identity.m_CanonicalIdentity = QueryDxcVersionFrom(compiler);
+		return identity;
 	}
 }
 
