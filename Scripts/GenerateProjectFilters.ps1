@@ -373,7 +373,6 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\GGLabRuntime"; FilterPrefix = "" }
-            [pscustomobject]@{ Root = "Sources\ShaderToolchain"; FilterPrefix = "" }
             [pscustomobject]@{
                 Root = "Externals\Vender\D3D12MemoryAllocator"
                 FilterPrefix = "ThirdParty\D3D12MemoryAllocator"
@@ -382,6 +381,16 @@ $projectSpecifications = @(
                 Root = "Externals\Vender\VulkanMemoryAllocator"
                 FilterPrefix = "ThirdParty\VulkanMemoryAllocator"
             }
+        )
+    }
+    [pscustomobject]@{
+        Name = "ShaderToolchainCore"
+        ProjectPath = "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj"
+        FiltersPath = "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\ShaderToolchain"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{

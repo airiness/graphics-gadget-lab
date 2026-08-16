@@ -74,9 +74,8 @@ namespace gglab
 		struct ShaderPreloadJob;
 
 		bool RefreshShaderInternal(Shader& shader) noexcept;
-		bool RefreshShaderInternal(Shader& shader, const ShaderDesc& normalizedDesc) noexcept;
+		bool RefreshShaderInternal(Shader& shader, const ShaderResolvedRecipe& recipe) noexcept;
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
-		ShaderDesc NormalizeForActiveBackend(const ShaderDesc& desc) const noexcept;
 		static void ApplyActiveBackendTarget(
 			ShaderDesc& desc, RHIBackendType activeBackend) noexcept;
 

@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Artifact">
+      <UniqueIdentifier>{8BEA1F34-FC00-2CD6-5989-0BE953FC26AB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Compiler">
+      <UniqueIdentifier>{CD46A445-6880-F04D-CA44-565418649CA3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Contracts">
+      <UniqueIdentifier>{63D93606-F375-98EE-DFAE-235AFE6C026C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Targets">
+      <UniqueIdentifier>{36DA4998-1C94-8DED-EB53-A92F6A3F081C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp">
+      <Filter>Artifact</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp">
+      <Filter>Compiler</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h">
+      <Filter>Artifact</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.h">
+      <Filter>Compiler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifact.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactManifest.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTarget.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTypes.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

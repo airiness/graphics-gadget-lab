@@ -1,8 +1,8 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Core/Log/LogMacros.h"
+#include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
-#include "Graphics/Shader/ShaderCompiler.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
@@ -15,7 +15,6 @@
 #include <stop_token>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -30,8 +29,9 @@ namespace gglab
 		struct Entry
 		{
 			ShaderDesc m_Desc;
-			ShaderDesc m_NormalizedDesc;
-			ShaderCompileArtifact m_Artifact;
+			ShaderResolvedRecipe m_Recipe;
+			ShaderArtifact m_Artifact;
+			ShaderHash128 m_Hash{};
 		};
 
 		std::vector<ShaderDesc> m_Descs;
@@ -126,11 +126,17 @@ namespace gglab
 
 	ShaderID ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
 	{
-		ShaderDesc norm = NormalizeForActiveBackend(desc);
+		ShaderDesc activeDesc = desc;
+		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
+		const ShaderResolvedRecipe recipe = m_Compiler->Resolve(activeDesc);
+		if (!recipe.IsSuccess())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: Resolve failed: {}",
+				utils::ToString(recipe.m_Diagnostics.m_Message));
+			return ShaderID();
+		}
 
-		const auto keyHash = ShaderCompiler::ComputeRecipeHash(
-			norm, m_Compiler->GetCompilerIdentity());
-		ShaderKey key{ .m_KeyHash = keyHash };
+		const ShaderKey key{ .m_KeyHash = recipe.m_RecipeId.m_Digest };
 
 		// return if exist.
 		{
@@ -142,18 +148,20 @@ namespace gglab
 		}
 
 		// create shader if not exist
-		if (!std::filesystem::exists(norm.m_SourcePath))
+		if (!std::filesystem::exists(recipe.m_Request.m_SourcePath))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"ShaderManager::LoadShader: File not found: {}", norm.m_SourcePath.string());
+				"ShaderManager::LoadShader: File not found: {}",
+				recipe.m_Request.m_SourcePath.string());
 			return ShaderID();
 		}
 
 		std::unique_ptr<Shader> shader = std::make_unique<Shader>(desc);
-		if (!RefreshShaderInternal(*shader, norm))
+		if (!RefreshShaderInternal(*shader, recipe))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"ShaderManager::LoadShader: Shader compile failed: {}", norm.m_SourcePath.string());
+				"ShaderManager::LoadShader: Shader compile failed: {}",
+				recipe.m_Request.m_SourcePath.string());
 			return ShaderID();
 		}
 
@@ -233,24 +241,31 @@ namespace gglab
 					ShaderPreloadJob::Entry entry{};
 					entry.m_Desc = job->m_Descs[index];
 					ApplyActiveBackendTarget(entry.m_Desc, activeBackend);
-					entry.m_NormalizedDesc = compiler.NormalizeShaderDesc(entry.m_Desc);
-					if (!std::filesystem::exists(entry.m_NormalizedDesc.m_SourcePath))
+					entry.m_Recipe = compiler.Resolve(entry.m_Desc);
+					if (!entry.m_Recipe.IsSuccess())
+					{
+						return TaskResult::Failure(
+							std::format("Shader resolve failed: {}",
+								utils::ToString(entry.m_Recipe.m_Diagnostics.m_Message)));
+					}
+					if (!std::filesystem::exists(entry.m_Recipe.m_Request.m_SourcePath))
 					{
 						return TaskResult::Failure(
 							std::format("Shader source file was not found: {}",
-								entry.m_NormalizedDesc.m_SourcePath.string()));
+								entry.m_Recipe.m_Request.m_SourcePath.string()));
 					}
-					entry.m_Artifact = compiler.CompileOrLoadArtifact(entry.m_NormalizedDesc);
-					if (!entry.m_Artifact.m_Binary.IsValid())
+					const ShaderCompileResult result = compiler.CompileOrLoad(entry.m_Recipe);
+					if (!result.IsSuccess() || !result.m_Artifact.m_Binary.IsValid())
 					{
 						return TaskResult::Failure(
-							std::format("Shader compile produced no bytecode: {}",
-								entry.m_NormalizedDesc.m_SourcePath.string()));
+							std::format("Shader compile produced no bytecode: {} ({})",
+								entry.m_Recipe.m_Request.m_SourcePath.string(),
+								utils::ToString(result.m_Diagnostics.m_Message)));
 					}
 
-					std::error_code errorCode;
-					entry.m_Artifact.m_SourceTimeStamp = std::filesystem::last_write_time(
-						entry.m_NormalizedDesc.m_SourcePath, errorCode);
+					entry.m_Artifact = result.m_Artifact;
+					entry.m_Hash = ComputeShaderBinaryHash(
+						entry.m_Artifact.m_Binary, entry.m_Artifact.GetBinaryFormat());
 					job->m_Entries.push_back(std::move(entry));
 					job->m_CompletedCount.store(index + 1, std::memory_order_relaxed);
 				}
@@ -313,17 +328,14 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		for (auto& entry : job.m_Entries)
 		{
-			const ShaderKey key{
-				.m_KeyHash = ShaderCompiler::ComputeRecipeHash(
-					entry.m_NormalizedDesc, m_Compiler->GetCompilerIdentity()),
-			};
+			const ShaderKey key{ .m_KeyHash = entry.m_Recipe.m_RecipeId.m_Digest };
 			if (m_KeyIdMap.contains(key))
 			{
 				continue;
 			}
 
 			auto shader = std::make_unique<Shader>(entry.m_Desc);
-			shader->SetCompileArtifact(std::move(entry.m_Artifact), true);
+			shader->SetCompileArtifact(std::move(entry.m_Artifact), entry.m_Hash, true);
 			const ShaderID id{ static_cast<uint32_t>(m_Shaders.size()) };
 			m_Shaders.push_back(std::move(shader));
 			m_KeyIdMap.emplace(key, id);
@@ -392,7 +404,7 @@ namespace gglab
 		if (shaderId.IsValid() && shaderId.Value() < m_Shaders.size() &&
 			m_Shaders[shaderId.Value()])
 		{
-			return m_Shaders[shaderId.Value()]->GetCompileArtifact().m_Hash;
+			return m_Shaders[shaderId.Value()]->GetHash();
 		}
 		return {};
 	}
@@ -425,37 +437,35 @@ namespace gglab
 
 	bool ShaderManager::RefreshShaderInternal(Shader& shader) noexcept
 	{
-		ShaderDesc norm = NormalizeForActiveBackend(shader.GetDesc());
-		return RefreshShaderInternal(shader, norm);
+		ShaderDesc activeDesc = shader.GetDesc();
+		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
+		const ShaderResolvedRecipe recipe = m_Compiler->Resolve(activeDesc);
+		if (!recipe.IsSuccess())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::RefreshShaderInternal: Resolve failed: {}",
+				utils::ToString(recipe.m_Diagnostics.m_Message));
+			return false;
+		}
+		return RefreshShaderInternal(shader, recipe);
 	}
 
 	bool ShaderManager::RefreshShaderInternal(
-		Shader& shader, const ShaderDesc& normalizedDesc) noexcept
+		Shader& shader, const ShaderResolvedRecipe& recipe) noexcept
 	{
-		ShaderCompileArtifact artifact = m_Compiler->CompileOrLoadArtifact(normalizedDesc);
-		if (!artifact.m_Binary.IsValid())
+		const ShaderCompileResult result = m_Compiler->CompileOrLoad(recipe);
+		if (!result.IsSuccess() || !result.m_Artifact.m_Binary.IsValid())
 		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::RefreshShaderInternal: Compile failed: {}",
+				utils::ToString(result.m_Diagnostics.m_Message));
 			return false;
 		}
 
-		const auto changed = (shader.GetGeneration() == 0) ||
-			(artifact.m_Hash != shader.GetCompileArtifact().m_Hash);
+		const ShaderHash128 hash = ComputeShaderBinaryHash(
+			result.m_Artifact.m_Binary, result.m_Artifact.GetBinaryFormat());
+		const auto changed = (shader.GetGeneration() == 0) || (hash != shader.GetHash());
 
-		std::error_code errorCode;
-		artifact.m_SourceTimeStamp =
-			std::filesystem::exists(normalizedDesc.m_SourcePath, errorCode)
-			? std::filesystem::last_write_time(normalizedDesc.m_SourcePath, errorCode)
-			: std::filesystem::file_time_type{};
-
-		shader.SetCompileArtifact(std::move(artifact), changed);
+		shader.SetCompileArtifact(result.m_Artifact, hash, changed);
 		return changed;
-	}
-
-	ShaderDesc ShaderManager::NormalizeForActiveBackend(const ShaderDesc& desc) const noexcept
-	{
-		ShaderDesc activeDesc = desc;
-		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
-		return m_Compiler->NormalizeShaderDesc(activeDesc);
 	}
 
 	void ShaderManager::ApplyActiveBackendTarget(
