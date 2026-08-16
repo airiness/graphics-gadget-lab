@@ -12,7 +12,19 @@
 namespace gglab
 {
 	inline constexpr uint32_t ShaderRecipeHashSchema = 1;
-	inline constexpr uint32_t ShaderArtifactManifestSchemaVersion = 1;
+	// Portable manifest schema: versioned by the portable field set only
+	// (recipe semantics, identity algorithm, compiler identity expression,
+	// dependency provenance expression). Schema 2 adds the portable
+	// dependencies field.
+	inline constexpr uint32_t ShaderArtifactManifestSchemaVersion = 2;
+	// Local cache record schema: versioned by the document root structure and
+	// the machine-local fields (physical resolutions, dependency physical
+	// mapping). Schema 2 introduces the root-level version key, moves
+	// dependency provenance into the manifest, replaces the legacy combined
+	// dependency records with index-corresponding physical paths, and drops
+	// the unused mtime field. Local evolution never bumps the manifest
+	// schema, and portable evolution never bumps the record schema.
+	inline constexpr uint32_t ShaderArtifactCacheRecordSchemaVersion = 2;
 
 	// Fast-hash derivation for bucket/lookup acceleration only. Identity
 	// equality must always compare the full durable digest.
@@ -82,19 +94,18 @@ namespace gglab
 			const BinaryContentDigest&, const BinaryContentDigest&) noexcept = default;
 	};
 
-	// Dependency validation record. The content digest is the sole validation
-	// authority: it is computed over the exact bytes handed to the compiler,
-	// so acceptance can never drift from what was actually compiled. The
-	// logical path is the portable identity when derivable; the physical path
-	// is the local read location. The recorded mtime is unused legacy state:
-	// validation never reads it, and the field is removed together with the
-	// serialized cache record schema closure.
+	// Portable dependency provenance record. The content digest is the sole
+	// validation authority: it is computed over the exact bytes handed to the
+	// compiler, so acceptance can never drift from what was actually
+	// compiled. The logical path is the portable identity when derivable
+	// (relative to the source root; empty for includes outside it). Physical
+	// resolution is local cache state and lives in
+	// ShaderArtifactCacheRecord::m_DependencyPhysicalPaths, never in the
+	// portable manifest.
 	struct ShaderArtifactDependency
 	{
 		std::filesystem::path m_LogicalPath{};
-		std::filesystem::path m_PhysicalPath{};
 		Sha256Digest m_ContentDigest{};
-		int64_t m_LastWriteTimeTicks = 0;
 	};
 
 	// Portable artifact manifest: the compile semantics and identities that
@@ -126,6 +137,10 @@ namespace gglab
 		std::vector<std::filesystem::path> m_LogicalIncludeDirs{};
 		std::vector<std::wstring> m_ExtraArgs{};
 		BinaryContentDigest m_BinaryContentDigest{};
+		// Portable dependency provenance: what logical dependencies (logical
+		// path + exact consumed content digest) this artifact was compiled
+		// from. The main source is the first element. No physical paths.
+		std::vector<ShaderArtifactDependency> m_Dependencies{};
 	};
 
 	// Local cache record: the portable manifest plus the derived local state
@@ -137,6 +152,9 @@ namespace gglab
 		ShaderBinary m_Binary{};
 		std::filesystem::path m_PhysicalSourcePath{};
 		std::vector<std::filesystem::path> m_PhysicalIncludeDirs{};
-		std::vector<ShaderArtifactDependency> m_Dependencies{};
+		// Physical resolution for each portable dependency, index-corresponding
+		// with m_Manifest.m_Dependencies. Record parse/validation requires
+		// both lists to have identical cardinality.
+		std::vector<std::filesystem::path> m_DependencyPhysicalPaths{};
 	};
 }

@@ -351,8 +351,7 @@ namespace gglab
 		const ShaderArtifactManifest& manifest = record.m_Manifest;
 
 		nlohmann::json manifestDocument;
-		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);
-		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
+		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
 		manifestDocument["recipeId"] = Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest);
 		manifestDocument["buildKey"] = Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest);
 		nlohmann::json compiler;
@@ -394,6 +393,16 @@ namespace gglab
 		}
 		manifestDocument["binaryContentDigest"] =
 			Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest);
+		manifestDocument["dependencies"] = nlohmann::json::array();
+		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
+		{
+			nlohmann::json dependencyDocument;
+			dependencyDocument["logicalPath"] =
+				utils::ToString(dependency.m_LogicalPath.generic_wstring());
+			dependencyDocument["contentDigest"] =
+				Sha256DigestToHex(dependency.m_ContentDigest);
+			manifestDocument["dependencies"].push_back(std::move(dependencyDocument));
+		}
 
 		nlohmann::json localDocument;
 		localDocument["physicalSource"] = utils::Canonical(record.m_PhysicalSourcePath).string();
@@ -403,21 +412,17 @@ namespace gglab
 			localDocument["physicalIncludeDirs"].push_back(
 				utils::Canonical(includeDir).string());
 		}
-		localDocument["dependencies"] = nlohmann::json::array();
-		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
+		localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
+		for (const std::filesystem::path& dependencyPhysicalPath :
+			record.m_DependencyPhysicalPaths)
 		{
-			nlohmann::json dependencyDocument;
-			dependencyDocument["logicalPath"] =
-				utils::ToString(dependency.m_LogicalPath.generic_wstring());
-			dependencyDocument["physicalPath"] =
-				utils::Canonical(dependency.m_PhysicalPath).string();
-			dependencyDocument["contentDigest"] =
-				Sha256DigestToHex(dependency.m_ContentDigest);
-			dependencyDocument["lastWriteTimeTicks"] = dependency.m_LastWriteTimeTicks;
-			localDocument["dependencies"].push_back(std::move(dependencyDocument));
+			localDocument["dependencyPhysicalPaths"].push_back(
+				utils::Canonical(dependencyPhysicalPath).string());
 		}
 
 		nlohmann::json document;
+		document["recordSchemaVersion"] =
+			static_cast<std::int64_t>(ShaderArtifactCacheRecordSchemaVersion);
 		document["manifest"] = std::move(manifestDocument);
 		document["local"] = std::move(localDocument);
 
@@ -609,6 +614,13 @@ namespace gglab
 					return std::nullopt;
 				}
 
+				int64_t recordSchemaVersion = 0;
+				if (!ParseRequiredInteger(root, "recordSchemaVersion", recordSchemaVersion) ||
+					recordSchemaVersion != ShaderArtifactCacheRecordSchemaVersion)
+				{
+					return std::nullopt;
+				}
+
 				const nlohmann::json* manifestValue = FindField(root, "manifest");
 				const nlohmann::json* localValue = FindField(root, "local");
 				if (manifestValue == nullptr || !manifestValue->is_object() ||
@@ -616,7 +628,7 @@ namespace gglab
 				{
 					return std::nullopt;
 				}
-				if (root.size() != 2)
+				if (root.size() != 3)
 				{
 					return std::nullopt; // unknown keys rejected: schema bump required
 				}
@@ -624,6 +636,13 @@ namespace gglab
 				ShaderArtifactCacheRecord record{};
 				if (!MapManifest(*manifestValue, record.m_Manifest) ||
 					!MapLocal(*localValue, record))
+				{
+					return std::nullopt;
+				}
+				// Dependency cardinality invariant: every portable dependency
+				// must pair with exactly one local physical resolution.
+				if (record.m_Manifest.m_Dependencies.size() !=
+					record.m_DependencyPhysicalPaths.size())
 				{
 					return std::nullopt;
 				}
@@ -638,7 +657,7 @@ namespace gglab
 				int64_t integer = 0;
 				std::vector<std::string> strings;
 				uint32_t seenMask = 0;
-				constexpr uint32_t AllBits = (1u << 22) - 1;
+				constexpr uint32_t AllBits = (1u << 23) - 1;
 
 				if (!ParseRequiredInteger(object, "schemaVersion", integer) ||
 					integer != ShaderArtifactManifestSchemaVersion)
@@ -839,7 +858,38 @@ namespace gglab
 				manifest.m_BinaryContentDigest.m_Digest = *digest;
 				seenMask |= 1u << 21;
 
-				return seenMask == AllBits && object.size() == 22;
+				const nlohmann::json* dependencies = FindField(object, "dependencies");
+				if (dependencies == nullptr || !dependencies->is_array())
+				{
+					return false;
+				}
+				for (const nlohmann::json& dependencyValue : *dependencies)
+				{
+					if (!dependencyValue.is_object())
+					{
+						return false;
+					}
+					ShaderArtifactDependency dependency{};
+					std::string logicalPath;
+					std::string contentDigest;
+					if (!ParseRequiredString(dependencyValue, "logicalPath", logicalPath) ||
+						!ParseRequiredString(dependencyValue, "contentDigest", contentDigest) ||
+						dependencyValue.size() != 2)
+					{
+						return false;
+					}
+					const auto parsedDigest = ParseHexSha256Digest(contentDigest);
+					if (!parsedDigest.has_value())
+					{
+						return false;
+					}
+					dependency.m_LogicalPath = utils::ToWideString(logicalPath);
+					dependency.m_ContentDigest = *parsedDigest;
+					manifest.m_Dependencies.push_back(std::move(dependency));
+				}
+				seenMask |= 1u << 22;
+
+				return seenMask == AllBits && object.size() == 23;
 			}
 
 			[[nodiscard]] bool MapLocal(const nlohmann::json& object,
@@ -860,41 +910,15 @@ namespace gglab
 				{
 					record.m_PhysicalIncludeDirs.emplace_back(utils::ToWideString(includeDir));
 				}
-
-				const nlohmann::json* dependencies = FindField(object, "dependencies");
-				if (dependencies == nullptr || !dependencies->is_array())
+				strings.clear();
+				if (!ParseRequiredStringArray(object, "dependencyPhysicalPaths", strings))
 				{
 					return false;
 				}
-				for (const nlohmann::json& dependencyValue : *dependencies)
+				for (const std::string& dependencyPhysicalPath : strings)
 				{
-					if (!dependencyValue.is_object())
-					{
-						return false;
-					}
-					ShaderArtifactDependency dependency{};
-					std::string logicalPath;
-					std::string physicalPath;
-					std::string contentDigest;
-					int64_t ticks = 0;
-					if (!ParseRequiredString(dependencyValue, "logicalPath", logicalPath) ||
-						!ParseRequiredString(dependencyValue, "physicalPath", physicalPath) ||
-						!ParseRequiredString(dependencyValue, "contentDigest", contentDigest) ||
-						!ParseRequiredInteger(dependencyValue, "lastWriteTimeTicks", ticks) ||
-						dependencyValue.size() != 4)
-					{
-						return false;
-					}
-					const auto parsedDigest = ParseHexSha256Digest(contentDigest);
-					if (!parsedDigest.has_value())
-					{
-						return false;
-					}
-					dependency.m_LogicalPath = utils::ToWideString(logicalPath);
-					dependency.m_PhysicalPath = utils::ToWideString(physicalPath);
-					dependency.m_ContentDigest = *parsedDigest;
-					dependency.m_LastWriteTimeTicks = ticks;
-					record.m_Dependencies.push_back(std::move(dependency));
+					record.m_DependencyPhysicalPaths.emplace_back(
+						utils::ToWideString(dependencyPhysicalPath));
 				}
 				return object.size() == 3;
 			}

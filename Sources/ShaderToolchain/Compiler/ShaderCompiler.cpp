@@ -96,6 +96,15 @@ namespace gglab
 			Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IDxcIncludeHandler>
 		{
 		public:
+			// Physical read location plus the digest of the exact bytes handed
+			// to DXC. The portable logical identity is derived afterwards
+			// relative to the source root.
+			struct RecordedInclude
+			{
+				std::filesystem::path m_PhysicalPath{};
+				Sha256Digest m_ContentDigest{};
+			};
+
 			HRESULT RuntimeClassInitialize(ComPtr<IDxcUtils> utils,
 				const std::vector<std::filesystem::path>& includeDirs) noexcept
 			{
@@ -132,7 +141,7 @@ namespace gglab
 				return E_FAIL;
 			}
 
-			const std::vector<ShaderArtifactDependency>& Dependencies() const noexcept
+			const std::vector<RecordedInclude>& Dependencies() const noexcept
 			{
 				return m_Dependencies;
 			}
@@ -143,7 +152,7 @@ namespace gglab
 			// compiled, regardless of when files change on disk.
 			void RecordDependency(const std::filesystem::path& path, IDxcBlob* blob) noexcept
 			{
-				ShaderArtifactDependency dependency{};
+				RecordedInclude dependency{};
 				dependency.m_PhysicalPath = path;
 				dependency.m_ContentDigest = ComputeSha256(std::span(
 					static_cast<const std::byte*>(blob->GetBufferPointer()),
@@ -153,7 +162,7 @@ namespace gglab
 
 			ComPtr<IDxcUtils> m_Utils;
 			std::vector<std::filesystem::path> m_IncludeDirs;
-			std::vector<ShaderArtifactDependency> m_Dependencies;
+			std::vector<RecordedInclude> m_Dependencies;
 		};
 
 		ShaderBinary CopyShaderBinary(IDxcBlob* blob) noexcept
@@ -659,8 +668,10 @@ namespace gglab
 		}
 
 		std::vector<ShaderArtifactDependency> dependencies;
+		std::vector<std::filesystem::path> dependencyPhysicalPaths;
 		ShaderCompilerDiagnostics compileDiagnostics{};
-		ShaderBinary binary = CompileShaderBinary(recipe, dependencies, compileDiagnostics);
+		ShaderBinary binary = CompileShaderBinary(
+			recipe, dependencies, dependencyPhysicalPaths, compileDiagnostics);
 		if (!binary.IsValid() ||
 			!IsShaderBinaryFormat(binary, recipe.m_Request.m_Target.m_BinaryFormat))
 		{
@@ -677,7 +688,8 @@ namespace gglab
 			return result;
 		}
 
-		ShaderArtifactCacheRecord record = BuildCacheRecord(recipe, binary, dependencies);
+		ShaderArtifactCacheRecord record =
+			BuildCacheRecord(recipe, binary, dependencies, dependencyPhysicalPaths);
 		if (!PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record))
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
@@ -794,7 +806,8 @@ namespace gglab
 
 	ShaderArtifactCacheRecord ShaderCompiler::BuildCacheRecord(const ShaderResolvedRecipe& recipe,
 		const ShaderBinary& binary,
-		const std::vector<ShaderArtifactDependency>& dependencies) const noexcept
+		const std::vector<ShaderArtifactDependency>& dependencies,
+		const std::vector<std::filesystem::path>& dependencyPhysicalPaths) const noexcept
 	{
 		ShaderArtifactCacheRecord record{};
 		ShaderArtifactManifest& manifest = record.m_Manifest;
@@ -829,11 +842,12 @@ namespace gglab
 		manifest.m_ExtraArgs = recipe.m_Request.m_ExtraArgs;
 		manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(std::span(
 			static_cast<const std::byte*>(binary.Data()), binary.SizeInBytes()));
+		manifest.m_Dependencies = dependencies;
 
 		record.m_Binary = binary;
 		record.m_PhysicalSourcePath = recipe.m_Request.m_SourcePath;
 		record.m_PhysicalIncludeDirs = recipe.m_Request.m_IncludeDirs;
-		record.m_Dependencies = dependencies;
+		record.m_DependencyPhysicalPaths = dependencyPhysicalPaths;
 		return record;
 	}
 
@@ -874,19 +888,29 @@ namespace gglab
 			return false;
 		}
 
-		// Dependency validation: the content digest is the sole authority. The
-		// recorded mtime is unused legacy state (removed with the serialized
-		// contract closure) and must not participate in any cache-hit
-		// decision: a candidate is accepted only when a digest of the exact
-		// current bytes equals the digest of the bytes the compiler consumed.
-		std::error_code errorCode;
-		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
+		// Dependency validation: the content digest is the sole authority, and
+		// no mtime participates in any cache-hit decision. A candidate is
+		// accepted only when a digest of the exact current bytes equals the
+		// digest of the bytes the compiler consumed. Each portable dependency
+		// pairs index-wise with its local physical resolution; a cardinality
+		// mismatch is treated as invalid derived data.
+		if (record.m_Manifest.m_Dependencies.size() !=
+			record.m_DependencyPhysicalPaths.size())
 		{
-			if (!std::filesystem::exists(dependency.m_PhysicalPath, errorCode))
+			return false;
+		}
+		std::error_code errorCode;
+		for (std::size_t index = 0; index < record.m_Manifest.m_Dependencies.size(); ++index)
+		{
+			const ShaderArtifactDependency& dependency =
+				record.m_Manifest.m_Dependencies[index];
+			const std::filesystem::path& physicalPath =
+				record.m_DependencyPhysicalPaths[index];
+			if (!std::filesystem::exists(physicalPath, errorCode))
 			{
 				return false;
 			}
-			std::ifstream input(dependency.m_PhysicalPath, std::ios::binary);
+			std::ifstream input(physicalPath, std::ios::binary);
 			if (!input)
 			{
 				return false;
@@ -918,6 +942,7 @@ namespace gglab
 
 	ShaderBinary ShaderCompiler::CompileShaderBinary(const ShaderResolvedRecipe& recipe,
 		std::vector<ShaderArtifactDependency>& outDependencies,
+		std::vector<std::filesystem::path>& outDependencyPhysicalPaths,
 		ShaderCompilerDiagnostics& outDiagnostics) const noexcept
 	{
 		outDiagnostics.m_Status = ShaderCompileStatus::Success;
@@ -935,15 +960,17 @@ namespace gglab
 
 		// The source dependency digest is computed over the exact bytes DXC is
 		// about to receive and is the sole validation authority for cache
-		// hits; the physical path is the local read location only. The mtime
-		// is unused legacy state and is no longer sampled.
+		// hits. The portable provenance carries the logical identity and the
+		// digest; the physical path is local cache state kept in a parallel
+		// list.
 		outDependencies.push_back({
 			.m_LogicalPath = recipe.m_LogicalSourcePath,
-			.m_PhysicalPath = utils::Canonical(recipe.m_Request.m_SourcePath),
 			.m_ContentDigest = ComputeSha256(std::span(
 				static_cast<const std::byte*>(src->GetBufferPointer()),
 				src->GetBufferSize())),
 		});
+		outDependencyPhysicalPaths.push_back(
+			utils::Canonical(recipe.m_Request.m_SourcePath));
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();
@@ -1000,20 +1027,24 @@ namespace gglab
 			return {};
 		}
 
-		// Record include dependencies (with their loaded-content digests). The
-		// digest is the sole validation authority; the mtime is unused legacy
-		// state and is no longer sampled.
-		for (const ShaderArtifactDependency& includeDependency : includeHandler->Dependencies())
+		// Record include dependencies: the digest is the sole validation
+		// authority. The portable logical identity is derived relative to the
+		// source root when possible; the physical path goes to the parallel
+		// local list.
+		for (const ShaderIncludeHandler::RecordedInclude& includeDependency :
+			includeHandler->Dependencies())
 		{
-			ShaderArtifactDependency dependency = includeDependency;
+			ShaderArtifactDependency dependency{};
+			dependency.m_ContentDigest = includeDependency.m_ContentDigest;
 			std::error_code relativeError;
 			const std::filesystem::path relativeInclude = std::filesystem::relative(
-				dependency.m_PhysicalPath, m_SourceRootDir, relativeError);
+				includeDependency.m_PhysicalPath, m_SourceRootDir, relativeError);
 			if (!relativeError)
 			{
 				dependency.m_LogicalPath = relativeInclude.lexically_normal();
 			}
 			outDependencies.push_back(std::move(dependency));
+			outDependencyPhysicalPaths.push_back(includeDependency.m_PhysicalPath);
 		}
 
 		ComPtr<IDxcBlob> dxilBlob;

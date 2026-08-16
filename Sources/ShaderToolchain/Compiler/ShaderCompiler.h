@@ -96,12 +96,14 @@ namespace gglab
 			const std::wstring& keyHex, ShaderStage stage, ShaderBinaryFormat format) const noexcept;
 		[[nodiscard]] ShaderArtifactCacheRecord BuildCacheRecord(
 			const ShaderResolvedRecipe& recipe, const ShaderBinary& binary,
-			const std::vector<ShaderArtifactDependency>& dependencies) const noexcept;
+			const std::vector<ShaderArtifactDependency>& dependencies,
+			const std::vector<std::filesystem::path>& dependencyPhysicalPaths) const noexcept;
 		[[nodiscard]] bool ValidateCacheRecordAgainstRecipe(
 			const ShaderArtifactCacheRecord& record, const ShaderResolvedRecipe& recipe) const noexcept;
 
 		[[nodiscard]] ShaderBinary CompileShaderBinary(const ShaderResolvedRecipe& recipe,
 			std::vector<ShaderArtifactDependency>& outDependencies,
+			std::vector<std::filesystem::path>& outDependencyPhysicalPaths,
 			ShaderCompilerDiagnostics& outDiagnostics) const noexcept;
 
 	private:

@@ -777,7 +777,8 @@ namespace gglab
 			std::ifstream metadataInput(spirVMetaPath, std::ios::binary);
 			const std::string metadata((std::istreambuf_iterator<char>(metadataInput)),
 				std::istreambuf_iterator<char>());
-			context.Check(metadata.find("\"schemaVersion\":1") != std::string::npos &&
+			context.Check(metadata.find("\"recordSchemaVersion\":2") != std::string::npos &&
+				metadata.find("\"schemaVersion\":2") != std::string::npos &&
 				metadata.find("\"recipeHashSchema\":1") != std::string::npos &&
 				metadata.find("\"recipeId\":\"") != std::string::npos &&
 				metadata.find("\"buildKey\":\"") != std::string::npos &&
@@ -798,8 +799,8 @@ namespace gglab
 				metadata.find("\"physicalIncludeDirs\":") != std::string::npos &&
 				metadata.find("\"dependencies\":[") != std::string::npos &&
 				metadata.find("\"contentDigest\":\"") != std::string::npos &&
-				metadata.find("\"lastWriteTimeTicks\":") != std::string::npos,
-				"Cache record carries the complete portable manifest (profile, target semantics, logical identities) plus explicit local validation state");
+				metadata.find("\"dependencyPhysicalPaths\":[") != std::string::npos,
+				"Cache record carries the complete portable manifest (profile, target semantics, logical identities, dependency provenance) plus explicit local validation state");
 			const bool metadataChanged = ReplaceMetadataValue(
 				spirVMetaPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
@@ -1169,8 +1170,9 @@ namespace gglab
 			// The digest is the sole validation authority. An include rewritten
 			// with its previous mtime restored must still invalidate the entry:
 			// acceptance is decided by the content digest, not by metadata
-			// equality. (The forged-mtime regression below is the variant that
-			// also kills the former mtime fast path.)
+			// equality. The serialized contract no longer carries any mtime at
+			// all, so there is no recorded-mtime fast path left to bypass this
+			// check.
 			const std::filesystem::path includePath = sourceRoot / L"Probe.hlsli";
 			const std::filesystem::file_time_type includeWriteTime =
 				std::filesystem::last_write_time(includePath, errorCode);
@@ -1190,63 +1192,12 @@ namespace gglab
 			const bool includeTouched = !errorCode;
 			const ShaderCompileResult touchedResult = compiler.CompileOrLoad(recipe);
 
-			const std::filesystem::path recordPath =
-				compiler.GetCacheBinaryPath(recipe).wstring() + L".json";
-
-			// Deterministic regression against the former mtime fast path: forge
-			// a candidate whose recorded serialized mtime equals the current
-			// filesystem mtime while the content digest no longer matches. The
-			// removed fast path (current mtime == recorded mtime -> accept
-			// without hashing) would accept this stale candidate; digest-only
-			// validation must reject and rebuild it. The forged value is a small
-			// integer (12300ns since the file clock epoch) that the current JSON
-			// representation handles exactly, so the C2 proof is independent of
-			// the integer semantics work.
-			const std::filesystem::path sourcePath = sourceRoot / L"Probe.hlsl";
-			constexpr std::int64_t ForgedSerializedTicks = 12300;
-			const std::filesystem::file_time_type forgedWriteTime{
-				std::chrono::duration_cast<std::filesystem::file_time_type::duration>(
-					std::chrono::nanoseconds(ForgedSerializedTicks)) };
-			const bool sourceChangedForForgedMtime = WriteTextFile(sourcePath,
-				"// forged\n#include \"Probe.hlsli\"\n"
-				"float4 VSMain(uint id : SV_VertexID) : SV_Position "
-				"{ return float4(ProbeValue, 0, 0, 1); }\n");
-			std::filesystem::last_write_time(sourcePath, forgedWriteTime, errorCode);
-			const auto ForgedSourceTicks = [&sourcePath]() noexcept
-				{
-					std::error_code ec;
-					const std::filesystem::file_time_type time =
-						std::filesystem::last_write_time(sourcePath, ec);
-					return ec
-						? std::int64_t{ -1 }
-						: std::chrono::duration_cast<std::chrono::nanoseconds>(
-							time.time_since_epoch()).count();
-				}();
-			const bool forgedMtimeApplied = !errorCode &&
-				ForgedSourceTicks == ForgedSerializedTicks;
-			const bool forgedTicksWritten = OverwriteJsonIntegerField(
-				recordPath, "lastWriteTimeTicks", "12300");
-			const ShaderCompileResult forgedMtimeResult = compiler.CompileOrLoad(recipe);
-
-			// The serialized mtime field has no authority either: a real numeric
-			// change of the recorded ticks (0 -> 12300, not a no-op) keeps the
-			// hit because the content digest still matches.
-			const bool ticksRewritten = OverwriteJsonIntegerField(
-				recordPath, "lastWriteTimeTicks", "12300");
-			const ShaderCompileResult ticksTamperedResult = compiler.CompileOrLoad(recipe);
-
 			context.Check(includeChangedSameMtime && includeWriteTimeRestored &&
 				sameMtimeChangedResult.IsSuccess() && !sameMtimeChangedResult.m_FromCache &&
 				sameMtimeRevalidatedResult.m_FromCache,
 				"Include content changed under a restored mtime is rejected by the content digest");
 			context.Check(includeTouched && touchedResult.IsSuccess() && touchedResult.m_FromCache,
 				"Identical content with a drifted mtime remains a cache hit");
-			context.Check(forgedMtimeApplied && forgedTicksWritten && sourceChangedForForgedMtime &&
-				forgedMtimeResult.IsSuccess() && !forgedMtimeResult.m_FromCache,
-				"Equal recorded and current mtime with changed content is rejected and rebuilt");
-			context.Check(ticksRewritten && ticksTamperedResult.IsSuccess() &&
-				ticksTamperedResult.m_FromCache,
-				"Rewritten serialized mtime fields have no authority over cache hits");
 		}
 
 		void RunBinaryReadOnceTests(SelfTestContext& context) noexcept
@@ -1358,8 +1309,9 @@ namespace gglab
 			ScopedTestDirectory scopedDirectory(tempRoot);
 			const std::filesystem::path recordPath = tempRoot / L"Probe.json";
 
-			// Schema=1 round-trip through the public API, including int64
-			// values that must survive exactly (no double round-trip).
+			// Schema=2 round-trip through the public API: portable dependency
+			// provenance lives in the manifest, physical resolution lives in
+			// the local record, index-corresponding.
 			ShaderArtifactCacheRecord record{};
 			ShaderArtifactManifest& manifest = record.m_Manifest;
 			manifest.m_RecipeId.m_DurableDigest.m_Value[0] = std::byte{ 0xAB };
@@ -1373,22 +1325,22 @@ namespace gglab
 			manifest.m_Defines = { L"GGLAB_TEST=1", L"PLAIN" };
 			manifest.m_LogicalIncludeDirs = { L".", L"Common" };
 			manifest.m_ExtraArgs = { L"-DGGLAB_SERIALIZATION=1" };
-			record.m_PhysicalSourcePath = L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl";
-			record.m_PhysicalIncludeDirs = { L"C:\\Repo\\Shaders" };
-			const std::int64_t ExactTicks[] = {
-				std::numeric_limits<std::int64_t>::max(),
-				9007199254740993LL,          // 2^53 + 1: not representable in double
-				std::numeric_limits<std::int64_t>::min(),
-			};
-			for (std::size_t index = 0; index < std::size(ExactTicks); ++index)
+			for (std::size_t index = 0; index < 3; ++index)
 			{
 				ShaderArtifactDependency dependency{};
-				dependency.m_LogicalPath = std::filesystem::path(L"Passes/Probe.hlsl");
-				dependency.m_PhysicalPath = std::filesystem::path(L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl");
-				dependency.m_ContentDigest.m_Value[0] = std::byte{ static_cast<unsigned char>(index + 1) };
-				dependency.m_LastWriteTimeTicks = ExactTicks[index];
-				record.m_Dependencies.push_back(std::move(dependency));
+				dependency.m_LogicalPath =
+					std::filesystem::path(std::format(L"Passes/Dep{}.hlsl", index));
+				dependency.m_ContentDigest.m_Value[0] =
+					std::byte{ static_cast<unsigned char>(index + 1) };
+				manifest.m_Dependencies.push_back(std::move(dependency));
 			}
+			record.m_PhysicalSourcePath = L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl";
+			record.m_PhysicalIncludeDirs = { L"C:\\Repo\\Shaders" };
+			record.m_DependencyPhysicalPaths = {
+				std::filesystem::path(R"(C:\Repo\PhysA.hlsl)"),
+				std::filesystem::path(R"(C:\Repo\PhysB.hlsl)"),
+				std::filesystem::path(R"(C:\Repo\PhysC.hlsl)"),
+			};
 
 			const bool written = WriteShaderArtifactCacheRecord(recordPath, record);
 			const std::optional<ShaderArtifactCacheRecord> readBack =
@@ -1409,23 +1361,25 @@ namespace gglab
 				readBack->m_Manifest.m_ExtraArgs == record.m_Manifest.m_ExtraArgs &&
 				readBack->m_PhysicalSourcePath == record.m_PhysicalSourcePath &&
 				readBack->m_PhysicalIncludeDirs == record.m_PhysicalIncludeDirs &&
-				readBack->m_Dependencies.size() == record.m_Dependencies.size();
-			for (std::size_t index = 0; roundTripped && index < record.m_Dependencies.size(); ++index)
+				readBack->m_Manifest.m_Dependencies.size() ==
+					record.m_Manifest.m_Dependencies.size() &&
+				readBack->m_DependencyPhysicalPaths.size() ==
+					record.m_DependencyPhysicalPaths.size();
+			for (std::size_t index = 0; roundTripped &&
+				index < record.m_Manifest.m_Dependencies.size(); ++index)
 			{
 				roundTripped = roundTripped &&
-					readBack->m_Dependencies[index].m_LogicalPath ==
-						record.m_Dependencies[index].m_LogicalPath &&
-					readBack->m_Dependencies[index].m_PhysicalPath ==
-						record.m_Dependencies[index].m_PhysicalPath &&
-					readBack->m_Dependencies[index].m_ContentDigest ==
-						record.m_Dependencies[index].m_ContentDigest &&
-					readBack->m_Dependencies[index].m_LastWriteTimeTicks ==
-						record.m_Dependencies[index].m_LastWriteTimeTicks;
+					readBack->m_Manifest.m_Dependencies[index].m_LogicalPath ==
+						record.m_Manifest.m_Dependencies[index].m_LogicalPath &&
+					readBack->m_Manifest.m_Dependencies[index].m_ContentDigest ==
+						record.m_Manifest.m_Dependencies[index].m_ContentDigest &&
+					readBack->m_DependencyPhysicalPaths[index] ==
+						record.m_DependencyPhysicalPaths[index];
 			}
 			context.Check(written && roundTripped,
-				"Cache record round-trips exactly, including int64 values beyond 2^53");
+				"Cache record schema=2 round-trips provenance and physical resolution index-wise");
 
-			// Domain strictness: the document baseline is the emitted schema=1
+			// Domain strictness: the document baseline is the emitted schema=2
 			// record; each tamper must reject the document as a cache miss.
 			const auto ReadRecordText = [&recordPath]() noexcept -> std::string
 				{
@@ -1442,28 +1396,68 @@ namespace gglab
 				};
 
 			const bool duplicateKeyTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":1", "\"schemaVersion\":1,\"schemaVersion\":1");
+				"\"schemaVersion\":2", "\"schemaVersion\":2,\"schemaVersion\":2");
 			const bool duplicateKeyRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			const bool unknownFieldTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":1", "\"schemaVersion\":1,\"unknownField\":7");
+				"\"schemaVersion\":2", "\"schemaVersion\":2,\"unknownField\":7");
 			const bool unknownFieldRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			const bool typeMismatchTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":1", "\"schemaVersion\":\"1\"");
+				"\"schemaVersion\":2", "\"schemaVersion\":\"2\"");
 			const bool typeMismatchRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
 			const bool unsupportedSchemaTampered = ReplaceMetadataValue(recordPath,
-				"\"schemaVersion\":1", "\"schemaVersion\":999");
+				"\"schemaVersion\":2", "\"schemaVersion\":999");
 			const bool unsupportedSchemaRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
+
+			// Dependency cardinality invariant: dropping one physical
+			// resolution must reject the whole record.
+			const bool cardinalityTampered = ReplaceMetadataValue(recordPath,
+				R"("dependencyPhysicalPaths":["C:\\Repo\\PhysA.hlsl","C:\\Repo\\PhysB.hlsl","C:\\Repo\\PhysC.hlsl"])",
+				R"("dependencyPhysicalPaths":["C:\\Repo\\PhysA.hlsl","C:\\Repo\\PhysB.hlsl"])");
+			const bool cardinalityRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			// The record schema and the manifest schema are independent axes:
+			// bumping either one alone rejects the document.
+			const bool recordSchemaBumped = ReplaceMetadataValue(recordPath,
+				"\"recordSchemaVersion\":2", "\"recordSchemaVersion\":3");
+			const bool recordSchemaBumpedRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			const bool manifestSchemaBumped = ReplaceMetadataValue(recordPath,
+				"\"schemaVersion\":2", "\"schemaVersion\":3");
+			const bool manifestSchemaBumpedRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			// Portability self-check: the manifest sub-document carries the
+			// dependency provenance but none of the physical resolutions.
+			const std::size_t manifestBegin = baseline.find("\"manifest\":{");
+			const std::size_t manifestEnd = baseline.find(",\"recordSchemaVersion\":");
+			const bool manifestSectionFound = manifestBegin != std::string::npos &&
+				manifestEnd != std::string::npos && manifestEnd > manifestBegin;
+			const std::string manifestSection = manifestSectionFound
+				? baseline.substr(manifestBegin, manifestEnd - manifestBegin)
+				: std::string{};
+			const bool manifestSectionPortable =
+				manifestSection.find("\"logicalPath\"") != std::string::npos &&
+				manifestSection.find("\"contentDigest\"") != std::string::npos &&
+				manifestSection.find("PhysA") == std::string::npos &&
+				manifestSection.find("PhysB") == std::string::npos &&
+				manifestSection.find("PhysC") == std::string::npos &&
+				manifestSection.find("dependencyPhysicalPaths") == std::string::npos;
 
 			std::string deepDocument;
 			for (int depth = 0; depth < 80; ++depth)
@@ -1483,22 +1477,21 @@ namespace gglab
 			// Integer domain: unsigned integers beyond INT64_MAX must be
 			// rejected instead of being arithmetically converted into the
 			// int64 fields.
-			const bool overflowTicksTampered = OverwriteJsonIntegerField(
-				recordPath, "lastWriteTimeTicks", "9223372036854775808");
-			const bool overflowTicksRejected =
+			const bool overflowTampered = OverwriteJsonIntegerField(
+				recordPath, "bindingAbiRevision", "9223372036854775808");
+			const bool overflowRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			const bool uint64MaxTicksTampered = OverwriteJsonIntegerField(
-				recordPath, "lastWriteTimeTicks", "18446744073709551615");
-			const bool uint64MaxTicksRejected =
+			const bool uint64MaxTampered = OverwriteJsonIntegerField(
+				recordPath, "bindingAbiRevision", "18446744073709551615");
+			const bool uint64MaxRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
-			// Pre-migration compatibility evidence: a literal schema=1
-			// document in the previous serializer's shape must remain
-			// readable, and its integer fields must come back exactly
-			// (9007199254740993 has no double representation).
+			// Cache epoch evidence: a legacy schema=1 document (previous
+			// serializer shape, including the removed mtime field) is rejected
+			// as an unknown schema.
 			const std::filesystem::path legacyPath = tempRoot / L"Legacy.json";
 			const std::string legacyFixture =
 				R"({"manifest":{"schemaVersion":1,"recipeHashSchema":1,)"
@@ -1518,8 +1511,8 @@ namespace gglab
 				R"("contentDigest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",)"
 				R"("lastWriteTimeTicks":9007199254740993}]}})";
 			const bool legacyFixtureWritten = WriteTextFile(legacyPath, legacyFixture);
-			const std::optional<ShaderArtifactCacheRecord> legacyReadBack =
-				ReadShaderArtifactCacheRecord(legacyPath);
+			const bool legacyRejected =
+				!ReadShaderArtifactCacheRecord(legacyPath).has_value();
 
 			context.Check(!baseline.empty() && duplicateKeyTampered && duplicateKeyRejected,
 				"Cache record reader rejects duplicate object keys");
@@ -1529,46 +1522,20 @@ namespace gglab
 				"Cache record reader rejects type mismatches");
 			context.Check(unsupportedSchemaTampered && unsupportedSchemaRejected,
 				"Cache record reader rejects unsupported schema versions");
+			context.Check(cardinalityTampered && cardinalityRejected,
+				"Cache record reader rejects dependency cardinality mismatches");
+			context.Check(recordSchemaBumped && recordSchemaBumpedRejected &&
+				manifestSchemaBumped && manifestSchemaBumpedRejected,
+				"Record and manifest schema versions are independent rejection axes");
+			context.Check(manifestSectionFound && manifestSectionPortable,
+				"Manifest sub-document carries provenance without any physical path");
 			context.Check(deepDocumentWritten && deepDocumentRejected,
 				"Cache record reader rejects documents beyond the nesting depth limit");
-			context.Check(overflowTicksTampered && overflowTicksRejected &&
-				uint64MaxTicksTampered && uint64MaxTicksRejected,
+			context.Check(overflowTampered && overflowRejected &&
+				uint64MaxTampered && uint64MaxRejected,
 				"Cache record reader rejects unsigned integers beyond INT64_MAX");
-			context.Check(legacyFixtureWritten,
-				"Legacy schema=1 fixture file is written");
-			context.Check(legacyFixtureWritten && legacyReadBack.has_value(),
-				"Legacy schema=1 fixture parses through the current reader");
-			context.Check(legacyReadBack.has_value() &&
-				legacyReadBack->m_Manifest.m_SchemaVersion == 1 &&
-				legacyReadBack->m_Manifest.m_RecipeHashSchema == 1 &&
-				legacyReadBack->m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] ==
-					std::byte{ 0xAA } &&
-				legacyReadBack->m_Manifest.m_BuildKey.m_DurableDigest.m_Value[0] ==
-					std::byte{ 0xBB } &&
-				legacyReadBack->m_Manifest.m_BinaryContentDigest.m_Digest.m_Value[0] ==
-					std::byte{ 0xCC } &&
-				legacyReadBack->m_Manifest.m_TargetProfile == ShaderTargetProfile::GGLabDX12 &&
-				legacyReadBack->m_Manifest.m_BinaryFormat == ShaderBinaryFormat::Dxil &&
-				legacyReadBack->m_Manifest.m_Stage == ShaderStage::Vertex &&
-				legacyReadBack->m_Manifest.m_LogicalSourcePath ==
-					std::filesystem::path(L"Passes/LegacyProbe.hlsl") &&
-				legacyReadBack->m_Manifest.m_EntryPoint == L"VSMain" &&
-				legacyReadBack->m_Manifest.m_LogicalIncludeDirs ==
-					(std::vector<std::filesystem::path>{
-						std::filesystem::path(L"."), std::filesystem::path(L"Common") }) &&
-				legacyReadBack->m_Manifest.m_ExtraArgs ==
-					(std::vector<std::wstring>{ L"-DGGLAB_LEGACY=1" }),
-				"Legacy schema=1 fixture carries the expected portable manifest fields");
-			context.Check(legacyReadBack.has_value() &&
-				legacyReadBack->m_Dependencies.size() == 1 &&
-				legacyReadBack->m_Dependencies[0].m_LogicalPath ==
-					std::filesystem::path(L"Passes/LegacyProbe.hlsl") &&
-				legacyReadBack->m_Dependencies[0].m_PhysicalPath ==
-					std::filesystem::path(L"C:\\Legacy\\Shaders\\Passes\\LegacyProbe.hlsl") &&
-				legacyReadBack->m_Dependencies[0].m_ContentDigest.m_Value[0] ==
-					std::byte{ 0xDD } &&
-				legacyReadBack->m_Dependencies[0].m_LastWriteTimeTicks == 9007199254740993LL,
-				"Legacy schema=1 fixture keeps exact int64 semantics for lastWriteTimeTicks");
+			context.Check(legacyFixtureWritten && legacyRejected,
+				"Legacy schema=1 documents are rejected as the intentional cache epoch");
 		}
 
 	}
