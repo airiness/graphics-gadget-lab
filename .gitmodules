@@ -22,3 +22,6 @@
 [submodule "Externals/Vender/VulkanMemoryAllocator"]
 	path = Externals/Vender/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "Externals/Vender/nlohmann-json"]
+	path = Externals/Vender/nlohmann-json
+	url = https://github.com/nlohmann/json.git
