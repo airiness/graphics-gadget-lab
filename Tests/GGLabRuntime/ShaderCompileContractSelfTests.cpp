@@ -1,8 +1,8 @@
 #include "ShaderCompileContractSelfTests.h"
 
 #include "SpirVDecorationReader.h"
+#include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
-#include "GGLabFoundation/Json/JsonValue.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
@@ -26,6 +26,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -1248,83 +1249,230 @@ namespace gglab
 				"Rewritten serialized mtime fields have no authority over cache hits");
 		}
 
-		void RunJsonGrammarTests(SelfTestContext& context) noexcept
+		void RunCacheRecordSerializationTests(SelfTestContext& context) noexcept
 		{
-			using gglab::json::JsonValue;
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabCacheRecordSerialization-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Cache record serialization test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+			const std::filesystem::path recordPath = tempRoot / L"Probe.json";
 
-			const auto parseRoundTrip = [](std::string_view text, bool& parsed) noexcept
+			// Schema=1 round-trip through the public API, including int64
+			// values that must survive exactly (no double round-trip).
+			ShaderArtifactCacheRecord record{};
+			ShaderArtifactManifest& manifest = record.m_Manifest;
+			manifest.m_RecipeId.m_DurableDigest.m_Value[0] = std::byte{ 0xAB };
+			manifest.m_BuildKey.m_DurableDigest.m_Value[31] = std::byte{ 0xCD };
+			manifest.m_BinaryContentDigest.m_Digest.m_Value[16] = std::byte{ 0xEF };
+			manifest.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13;
+			manifest.m_BinaryFormat = ShaderBinaryFormat::SpirV;
+			manifest.m_Stage = ShaderStage::Compute;
+			manifest.m_LogicalSourcePath = L"Passes/Probe.hlsl";
+			manifest.m_EntryPoint = L"CSMain";
+			manifest.m_Defines = { L"GGLAB_TEST=1", L"PLAIN" };
+			manifest.m_LogicalIncludeDirs = { L".", L"Common" };
+			manifest.m_ExtraArgs = { L"-DGGLAB_SERIALIZATION=1" };
+			record.m_PhysicalSourcePath = L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl";
+			record.m_PhysicalIncludeDirs = { L"C:\\Repo\\Shaders" };
+			const std::int64_t ExactTicks[] = {
+				std::numeric_limits<std::int64_t>::max(),
+				9007199254740993LL,          // 2^53 + 1: not representable in double
+				std::numeric_limits<std::int64_t>::min(),
+			};
+			for (std::size_t index = 0; index < std::size(ExactTicks); ++index)
+			{
+				ShaderArtifactDependency dependency{};
+				dependency.m_LogicalPath = std::filesystem::path(L"Passes/Probe.hlsl");
+				dependency.m_PhysicalPath = std::filesystem::path(L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl");
+				dependency.m_ContentDigest.m_Value[0] = std::byte{ static_cast<unsigned char>(index + 1) };
+				dependency.m_LastWriteTimeTicks = ExactTicks[index];
+				record.m_Dependencies.push_back(std::move(dependency));
+			}
+
+			const bool written = WriteShaderArtifactCacheRecord(recordPath, record);
+			const std::optional<ShaderArtifactCacheRecord> readBack =
+				ReadShaderArtifactCacheRecord(recordPath);
+			bool roundTripped = readBack.has_value() &&
+				readBack->m_Manifest.m_RecipeId == record.m_Manifest.m_RecipeId &&
+				readBack->m_Manifest.m_BuildKey == record.m_Manifest.m_BuildKey &&
+				readBack->m_Manifest.m_BinaryContentDigest ==
+					record.m_Manifest.m_BinaryContentDigest &&
+				readBack->m_Manifest.m_TargetProfile == record.m_Manifest.m_TargetProfile &&
+				readBack->m_Manifest.m_BinaryFormat == record.m_Manifest.m_BinaryFormat &&
+				readBack->m_Manifest.m_Stage == record.m_Manifest.m_Stage &&
+				readBack->m_Manifest.m_LogicalSourcePath == record.m_Manifest.m_LogicalSourcePath &&
+				readBack->m_Manifest.m_EntryPoint == record.m_Manifest.m_EntryPoint &&
+				readBack->m_Manifest.m_Defines == record.m_Manifest.m_Defines &&
+				readBack->m_Manifest.m_LogicalIncludeDirs ==
+					record.m_Manifest.m_LogicalIncludeDirs &&
+				readBack->m_Manifest.m_ExtraArgs == record.m_Manifest.m_ExtraArgs &&
+				readBack->m_PhysicalSourcePath == record.m_PhysicalSourcePath &&
+				readBack->m_PhysicalIncludeDirs == record.m_PhysicalIncludeDirs &&
+				readBack->m_Dependencies.size() == record.m_Dependencies.size();
+			for (std::size_t index = 0; roundTripped && index < record.m_Dependencies.size(); ++index)
+			{
+				roundTripped = roundTripped &&
+					readBack->m_Dependencies[index].m_LogicalPath ==
+						record.m_Dependencies[index].m_LogicalPath &&
+					readBack->m_Dependencies[index].m_PhysicalPath ==
+						record.m_Dependencies[index].m_PhysicalPath &&
+					readBack->m_Dependencies[index].m_ContentDigest ==
+						record.m_Dependencies[index].m_ContentDigest &&
+					readBack->m_Dependencies[index].m_LastWriteTimeTicks ==
+						record.m_Dependencies[index].m_LastWriteTimeTicks;
+			}
+			context.Check(written && roundTripped,
+				"Cache record round-trips exactly, including int64 values beyond 2^53");
+
+			// Domain strictness: the document baseline is the emitted schema=1
+			// record; each tamper must reject the document as a cache miss.
+			const auto ReadRecordText = [&recordPath]() noexcept -> std::string
 				{
-					const std::optional<JsonValue> value = gglab::json::ParseJsonDocument(text);
-					parsed = value.has_value();
+					std::ifstream input(recordPath, std::ios::binary);
+					return input
+						? std::string((std::istreambuf_iterator<char>(input)),
+							std::istreambuf_iterator<char>())
+						: std::string{};
+				};
+			const std::string baseline = ReadRecordText();
+			const auto RestoreBaseline = [&recordPath, &baseline]() noexcept -> bool
+				{
+					return WriteTextFile(recordPath, baseline);
 				};
 
-			// External-producer compatibility: whitespace, escaped solidus,
-			// astral-plane surrogate pairs, and exponent numbers.
-			bool whitespaceParsed = false;
-			parseRoundTrip("  {\n\t\"a\" : [ true , null , 1.5e3 ]\r\n}  ", whitespaceParsed);
-			const std::optional<JsonValue> surrogateValue = gglab::json::ParseJsonDocument(
-				"{\"emoji\":\"\\uD83D\\uDE00\"}");
-			const std::optional<JsonValue> escapedSolidus = gglab::json::ParseJsonDocument(
-				"{\"url\":\"https:\\/\\/gglab\"}");
-			context.Check(whitespaceParsed && surrogateValue.has_value() &&
-				surrogateValue->IsObject() &&
-				surrogateValue->AsObject().front().second.AsString() ==
-				std::string("\xF0\x9F\x98\x80") &&
-				escapedSolidus.has_value(),
-				"JSON parser accepts whitespace, exponent numbers, escaped solidus, and astral surrogate pairs");
+			const bool duplicateKeyTampered = ReplaceMetadataValue(recordPath,
+				"\"schemaVersion\":1", "\"schemaVersion\":1,\"schemaVersion\":1");
+			const bool duplicateKeyRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
 
-			// Strictness: structural errors must be rejected, never guessed.
-			bool trailingGarbageParsed = true;
-			parseRoundTrip("{}x", trailingGarbageParsed);
-			bool duplicateKeyParsed = true;
-			parseRoundTrip("{\"a\":1,\"a\":2}", duplicateKeyParsed);
-			bool leadingZeroParsed = true;
-			parseRoundTrip("{\"a\":01}", leadingZeroParsed);
-			bool loneLowSurrogateParsed = true;
-			parseRoundTrip("{\"a\":\"\\uDE00\"}", loneLowSurrogateParsed);
-			bool badEscapeParsed = true;
-			parseRoundTrip("{\"a\":\"\\q\"}", badEscapeParsed);
-			bool rawControlParsed = true;
-			parseRoundTrip(std::string("{\"a\":\"\x01\"}"), rawControlParsed);
-			context.Check(!trailingGarbageParsed && !duplicateKeyParsed && !leadingZeroParsed &&
-				!loneLowSurrogateParsed && !badEscapeParsed && !rawControlParsed,
-				"JSON parser rejects trailing content, duplicate keys, leading zeros, lone surrogates, bad escapes, and raw control characters");
+			const bool unknownFieldTampered = ReplaceMetadataValue(recordPath,
+				"\"schemaVersion\":1", "\"schemaVersion\":1,\"unknownField\":7");
+			const bool unknownFieldRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
 
-			// The emitter must produce grammar the parser accepts: nested
-			// containers and member separators round-trip exactly.
-			gglab::json::JsonWriter writer;
-			writer.BeginObject();
-			writer.Key("schemaVersion");
-			writer.WriteInteger(1);
-			writer.Key("nested");
-			writer.BeginObject();
-			writer.Key("flags");
-			writer.WriteInteger(-2);
-			writer.Key("list");
-			writer.BeginArray();
-			writer.WriteString("a");
-			writer.WriteBool(true);
-			writer.WriteNull();
-			writer.EndArray();
-			writer.EndObject();
-			writer.Key("empty");
-			writer.BeginArray();
-			writer.EndArray();
-			writer.EndObject();
-			const std::string emitted = std::move(writer).Finish();
-			const std::optional<JsonValue> reparsed = gglab::json::ParseJsonDocument(emitted);
-			bool writerStructureValid = false;
-			if (reparsed.has_value() && reparsed->IsObject())
+			const bool typeMismatchTampered = ReplaceMetadataValue(recordPath,
+				"\"schemaVersion\":1", "\"schemaVersion\":\"1\"");
+			const bool typeMismatchRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			const bool unsupportedSchemaTampered = ReplaceMetadataValue(recordPath,
+				"\"schemaVersion\":1", "\"schemaVersion\":999");
+			const bool unsupportedSchemaRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			std::string deepDocument;
+			for (int depth = 0; depth < 80; ++depth)
 			{
-				const gglab::json::JsonObject& root = reparsed->AsObject();
-				writerStructureValid = root.size() == 3 &&
-					root.front().first == "schemaVersion" &&
-					root.front().second.AsInteger() == 1 &&
-					root.back().second.IsArray() &&
-					root.back().second.AsArray().empty();
+				deepDocument += "{\"x\":";
 			}
-			context.Check(writerStructureValid && emitted.find(",,") == std::string::npos,
-				"JSON emitter produces single-separator documents that re-parse with preserved structure");
+			deepDocument += "0";
+			for (int depth = 0; depth < 80; ++depth)
+			{
+				deepDocument += '}';
+			}
+			const bool deepDocumentWritten = WriteTextFile(recordPath, deepDocument);
+			const bool deepDocumentRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			// Integer domain: unsigned integers beyond INT64_MAX must be
+			// rejected instead of being arithmetically converted into the
+			// int64 fields.
+			const bool overflowTicksTampered = OverwriteJsonIntegerField(
+				recordPath, "lastWriteTimeTicks", "9223372036854775808");
+			const bool overflowTicksRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			const bool uint64MaxTicksTampered = OverwriteJsonIntegerField(
+				recordPath, "lastWriteTimeTicks", "18446744073709551615");
+			const bool uint64MaxTicksRejected =
+				!ReadShaderArtifactCacheRecord(recordPath).has_value();
+			RestoreBaseline();
+
+			// Pre-migration compatibility evidence: a literal schema=1
+			// document in the previous serializer's shape must remain
+			// readable, and its integer fields must come back exactly
+			// (9007199254740993 has no double representation).
+			const std::filesystem::path legacyPath = tempRoot / L"Legacy.json";
+			const std::string legacyFixture =
+				R"({"manifest":{"schemaVersion":1,"recipeHashSchema":1,)"
+				R"("recipeId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)"
+				R"("buildKey":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",)"
+				R"("compiler":{"kind":"dxc","identity":"6.7.2105.12+1.abcd"},)"
+				R"("targetProfile":"gglab-dx12","binaryFormat":"dxil","spirvTargetEnvironment":"none",)"
+				R"("bindingAbiRevision":0,"coordinateOptions":0,"stage":"vertex","shaderModel":"6_7",)"
+				R"("hlslVersion":"2021","compileFlags":1,"optimizationLevel":"O3",)"
+				R"("logicalSource":"Passes/LegacyProbe.hlsl","entryPoint":"VSMain","target":"vs_6_7",)"
+				R"("defines":[],"logicalIncludeDirs":[".","Common"],"extraArgs":["-DGGLAB_LEGACY=1"],)"
+				R"("binaryContentDigest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},)"
+				R"("local":{"physicalSource":"C:\\Legacy\\Shaders\\Passes\\LegacyProbe.hlsl",)"
+				R"("physicalIncludeDirs":["C:\\Legacy\\Shaders"],)"
+				R"("dependencies":[{"logicalPath":"Passes/LegacyProbe.hlsl",)"
+				R"("physicalPath":"C:\\Legacy\\Shaders\\Passes\\LegacyProbe.hlsl",)"
+				R"("contentDigest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",)"
+				R"("lastWriteTimeTicks":9007199254740993}]}})";
+			const bool legacyFixtureWritten = WriteTextFile(legacyPath, legacyFixture);
+			const std::optional<ShaderArtifactCacheRecord> legacyReadBack =
+				ReadShaderArtifactCacheRecord(legacyPath);
+
+			context.Check(!baseline.empty() && duplicateKeyTampered && duplicateKeyRejected,
+				"Cache record reader rejects duplicate object keys");
+			context.Check(unknownFieldTampered && unknownFieldRejected,
+				"Cache record reader rejects unknown fields");
+			context.Check(typeMismatchTampered && typeMismatchRejected,
+				"Cache record reader rejects type mismatches");
+			context.Check(unsupportedSchemaTampered && unsupportedSchemaRejected,
+				"Cache record reader rejects unsupported schema versions");
+			context.Check(deepDocumentWritten && deepDocumentRejected,
+				"Cache record reader rejects documents beyond the nesting depth limit");
+			context.Check(overflowTicksTampered && overflowTicksRejected &&
+				uint64MaxTicksTampered && uint64MaxTicksRejected,
+				"Cache record reader rejects unsigned integers beyond INT64_MAX");
+			context.Check(legacyFixtureWritten,
+				"Legacy schema=1 fixture file is written");
+			context.Check(legacyFixtureWritten && legacyReadBack.has_value(),
+				"Legacy schema=1 fixture parses through the current reader");
+			context.Check(legacyReadBack.has_value() &&
+				legacyReadBack->m_Manifest.m_SchemaVersion == 1 &&
+				legacyReadBack->m_Manifest.m_RecipeHashSchema == 1 &&
+				legacyReadBack->m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] ==
+					std::byte{ 0xAA } &&
+				legacyReadBack->m_Manifest.m_BuildKey.m_DurableDigest.m_Value[0] ==
+					std::byte{ 0xBB } &&
+				legacyReadBack->m_Manifest.m_BinaryContentDigest.m_Digest.m_Value[0] ==
+					std::byte{ 0xCC } &&
+				legacyReadBack->m_Manifest.m_TargetProfile == ShaderTargetProfile::GGLabDX12 &&
+				legacyReadBack->m_Manifest.m_BinaryFormat == ShaderBinaryFormat::Dxil &&
+				legacyReadBack->m_Manifest.m_Stage == ShaderStage::Vertex &&
+				legacyReadBack->m_Manifest.m_LogicalSourcePath ==
+					std::filesystem::path(L"Passes/LegacyProbe.hlsl") &&
+				legacyReadBack->m_Manifest.m_EntryPoint == L"VSMain" &&
+				legacyReadBack->m_Manifest.m_LogicalIncludeDirs ==
+					(std::vector<std::filesystem::path>{
+						std::filesystem::path(L"."), std::filesystem::path(L"Common") }) &&
+				legacyReadBack->m_Manifest.m_ExtraArgs ==
+					(std::vector<std::wstring>{ L"-DGGLAB_LEGACY=1" }),
+				"Legacy schema=1 fixture carries the expected portable manifest fields");
+			context.Check(legacyReadBack.has_value() &&
+				legacyReadBack->m_Dependencies.size() == 1 &&
+				legacyReadBack->m_Dependencies[0].m_LogicalPath ==
+					std::filesystem::path(L"Passes/LegacyProbe.hlsl") &&
+				legacyReadBack->m_Dependencies[0].m_PhysicalPath ==
+					std::filesystem::path(L"C:\\Legacy\\Shaders\\Passes\\LegacyProbe.hlsl") &&
+				legacyReadBack->m_Dependencies[0].m_ContentDigest.m_Value[0] ==
+					std::byte{ 0xDD } &&
+				legacyReadBack->m_Dependencies[0].m_LastWriteTimeTicks == 9007199254740993LL,
+				"Legacy schema=1 fixture keeps exact int64 semantics for lastWriteTimeTicks");
 		}
 
 	}
@@ -1333,7 +1481,7 @@ namespace gglab
 	{
 		RunShaderBindingABITests(context);
 		RunCoordinatePolicyTests(context);
-		RunJsonGrammarTests(context);
+		RunCacheRecordSerializationTests(context);
 		RunShaderArtifactContractTests(context);
 		RunCrossCheckoutIdentityTests(context);
 		RunRecipeAuthorityTests(context);

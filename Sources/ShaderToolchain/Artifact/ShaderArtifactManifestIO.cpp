@@ -1,8 +1,9 @@
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
-#include "GGLabFoundation/Json/JsonValue.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+
+#include <nlohmann/json.hpp>
 
 #include <process.h>
 
@@ -11,11 +12,13 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -320,172 +323,252 @@ namespace gglab
 		}
 
 		const ShaderArtifactManifest& manifest = record.m_Manifest;
-		json::JsonWriter writer;
-		writer.BeginObject();
 
-		writer.Key("manifest");
-		writer.BeginObject();
-		writer.Key("schemaVersion");
-		writer.WriteInteger(manifest.m_SchemaVersion);
-		writer.Key("recipeHashSchema");
-		writer.WriteInteger(manifest.m_RecipeHashSchema);
-		writer.Key("recipeId");
-		writer.WriteString(Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest));
-		writer.Key("buildKey");
-		writer.WriteString(Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest));
-		writer.Key("compiler");
-		writer.BeginObject();
-		writer.Key("kind");
-		writer.WriteString("dxc");
-		writer.Key("identity");
-		writer.WriteString(utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity));
-		writer.EndObject();
-		writer.Key("targetProfile");
-		writer.WriteString(ShaderTargetProfileText(manifest.m_TargetProfile));
-		writer.Key("binaryFormat");
-		writer.WriteString(ShaderBinaryFormatText(manifest.m_BinaryFormat));
-		writer.Key("spirvTargetEnvironment");
-		writer.WriteString(SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment));
-		writer.Key("bindingAbiRevision");
-		writer.WriteInteger(manifest.m_BindingABIRevision);
-		writer.Key("coordinateOptions");
-		writer.WriteInteger(static_cast<uint32_t>(manifest.m_CoordinateOptions));
-		writer.Key("stage");
-		writer.WriteString(ShaderStageText(manifest.m_Stage));
-		writer.Key("shaderModel");
-		writer.WriteString(ShaderModelText(manifest.m_ShaderModel));
-		writer.Key("hlslVersion");
-		writer.WriteString(utils::ToString(manifest.m_HlslVersion));
-		writer.Key("compileFlags");
-		writer.WriteInteger(static_cast<uint32_t>(manifest.m_CompileFlags));
-		writer.Key("optimizationLevel");
-		writer.WriteString(utils::ToString(manifest.m_OptimizationLevel));
-		writer.Key("logicalSource");
-		writer.WriteString(utils::ToString(manifest.m_LogicalSourcePath.generic_wstring()));
-		writer.Key("entryPoint");
-		writer.WriteString(utils::ToString(manifest.m_EntryPoint));
-		writer.Key("target");
-		writer.WriteString(utils::ToString(manifest.m_TargetString));
-		writer.Key("defines");
-		writer.BeginArray();
+		nlohmann::json manifestDocument;
+		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);
+		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
+		manifestDocument["recipeId"] = Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest);
+		manifestDocument["buildKey"] = Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest);
+		nlohmann::json compiler;
+		compiler["kind"] = "dxc";
+		compiler["identity"] = utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
+		manifestDocument["compiler"] = std::move(compiler);
+		manifestDocument["targetProfile"] = ShaderTargetProfileText(manifest.m_TargetProfile);
+		manifestDocument["binaryFormat"] = ShaderBinaryFormatText(manifest.m_BinaryFormat);
+		manifestDocument["spirvTargetEnvironment"] =
+			SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment);
+		manifestDocument["bindingAbiRevision"] =
+			static_cast<std::int64_t>(manifest.m_BindingABIRevision);
+		manifestDocument["coordinateOptions"] =
+			static_cast<std::int64_t>(manifest.m_CoordinateOptions);
+		manifestDocument["stage"] = ShaderStageText(manifest.m_Stage);
+		manifestDocument["shaderModel"] = ShaderModelText(manifest.m_ShaderModel);
+		manifestDocument["hlslVersion"] = utils::ToString(manifest.m_HlslVersion);
+		manifestDocument["compileFlags"] = static_cast<std::int64_t>(manifest.m_CompileFlags);
+		manifestDocument["optimizationLevel"] = utils::ToString(manifest.m_OptimizationLevel);
+		manifestDocument["logicalSource"] =
+			utils::ToString(manifest.m_LogicalSourcePath.generic_wstring());
+		manifestDocument["entryPoint"] = utils::ToString(manifest.m_EntryPoint);
+		manifestDocument["target"] = utils::ToString(manifest.m_TargetString);
+		manifestDocument["defines"] = nlohmann::json::array();
 		for (const std::wstring& define : manifest.m_Defines)
 		{
-			writer.WriteString(utils::ToString(define));
+			manifestDocument["defines"].push_back(utils::ToString(define));
 		}
-		writer.EndArray();
-		writer.Key("logicalIncludeDirs");
-		writer.BeginArray();
+		manifestDocument["logicalIncludeDirs"] = nlohmann::json::array();
 		for (const std::filesystem::path& includeDir : manifest.m_LogicalIncludeDirs)
 		{
-			writer.WriteString(utils::ToString(includeDir.generic_wstring()));
+			manifestDocument["logicalIncludeDirs"].push_back(
+				utils::ToString(includeDir.generic_wstring()));
 		}
-		writer.EndArray();
-		writer.Key("extraArgs");
-		writer.BeginArray();
+		manifestDocument["extraArgs"] = nlohmann::json::array();
 		for (const std::wstring& extraArg : manifest.m_ExtraArgs)
 		{
-			writer.WriteString(utils::ToString(extraArg));
+			manifestDocument["extraArgs"].push_back(utils::ToString(extraArg));
 		}
-		writer.EndArray();
-		writer.Key("binaryContentDigest");
-		writer.WriteString(Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest));
-		writer.EndObject();
+		manifestDocument["binaryContentDigest"] =
+			Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest);
 
-		writer.Key("local");
-		writer.BeginObject();
-		writer.Key("physicalSource");
-		writer.WriteString(utils::Canonical(record.m_PhysicalSourcePath).string());
-		writer.Key("physicalIncludeDirs");
-		writer.BeginArray();
+		nlohmann::json localDocument;
+		localDocument["physicalSource"] = utils::Canonical(record.m_PhysicalSourcePath).string();
+		localDocument["physicalIncludeDirs"] = nlohmann::json::array();
 		for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
 		{
-			writer.WriteString(utils::Canonical(includeDir).string());
+			localDocument["physicalIncludeDirs"].push_back(
+				utils::Canonical(includeDir).string());
 		}
-		writer.EndArray();
-		writer.Key("dependencies");
-		writer.BeginArray();
+		localDocument["dependencies"] = nlohmann::json::array();
 		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
 		{
-			writer.BeginObject();
-			writer.Key("logicalPath");
-			writer.WriteString(utils::ToString(dependency.m_LogicalPath.generic_wstring()));
-			writer.Key("physicalPath");
-			writer.WriteString(utils::Canonical(dependency.m_PhysicalPath).string());
-			writer.Key("contentDigest");
-			writer.WriteString(Sha256DigestToHex(dependency.m_ContentDigest));
-			writer.Key("lastWriteTimeTicks");
-			writer.WriteInteger(dependency.m_LastWriteTimeTicks);
-			writer.EndObject();
+			nlohmann::json dependencyDocument;
+			dependencyDocument["logicalPath"] =
+				utils::ToString(dependency.m_LogicalPath.generic_wstring());
+			dependencyDocument["physicalPath"] =
+				utils::Canonical(dependency.m_PhysicalPath).string();
+			dependencyDocument["contentDigest"] =
+				Sha256DigestToHex(dependency.m_ContentDigest);
+			dependencyDocument["lastWriteTimeTicks"] = dependency.m_LastWriteTimeTicks;
+			localDocument["dependencies"].push_back(std::move(dependencyDocument));
 		}
-		writer.EndArray();
-		writer.EndObject();
 
-		writer.EndObject();
+		nlohmann::json document;
+		document["manifest"] = std::move(manifestDocument);
+		document["local"] = std::move(localDocument);
 
 		std::ofstream out(manifestPath, std::ios::binary);
 		if (!out)
 		{
 			return false;
 		}
-		const std::string content = std::move(writer).Finish();
+		const std::string content = document.dump();
 		out.write(content.data(), static_cast<std::streamsize>(content.size()));
 		return static_cast<bool>(out);
 	}
 
 	namespace
 	{
-		[[nodiscard]] const json::JsonValue* FindField(
-			const json::JsonObject& object, std::string_view key) noexcept
+		// SAX validator enforcing the domain strictness rules that nlohmann/json
+		// does not enforce by itself: duplicate object keys are rejected and an
+		// explicit nesting depth limit (64) bounds recursion. Returning false
+		// from any event makes sax_parse report failure, which the reader maps
+		// to a cache miss. The validator runs before the DOM parse, so the DOM
+		// parse itself is bounded by this pre-check.
+		class StrictJsonSax final : public nlohmann::json_sax<nlohmann::json>
 		{
-			for (const json::JsonMember& member : object)
+		public:
+			[[nodiscard]] bool null() override { return true; }
+			[[nodiscard]] bool boolean(bool /*value*/) override { return true; }
+			[[nodiscard]] bool number_integer(nlohmann::json::number_integer_t /*value*/) override
 			{
-				if (member.first == key)
-				{
-					return &member.second;
-				}
+				return true;
 			}
-			return nullptr;
-		}
-
-		[[nodiscard]] bool ParseRequiredInteger(const json::JsonObject& object,
-			std::string_view key, int64_t& outValue) noexcept
-		{
-			const json::JsonValue* field = FindField(object, key);
-			if (field == nullptr || !field->IsInteger())
+			[[nodiscard]] bool number_unsigned(nlohmann::json::number_unsigned_t /*value*/) override
+			{
+				return true;
+			}
+			[[nodiscard]] bool number_float(nlohmann::json::number_float_t /*value*/,
+				const nlohmann::json::string_t& /*representation*/) override
+			{
+				return true;
+			}
+			[[nodiscard]] bool string(nlohmann::json::string_t& /*value*/) override
+			{
+				return true;
+			}
+			[[nodiscard]] bool binary(nlohmann::json::binary_t& /*value*/) override
+			{
+				return false; // binary payloads are outside the cache record contract
+			}
+			[[nodiscard]] bool parse_error(std::size_t /*position*/,
+				const std::string& /*lastToken*/,
+				const nlohmann::detail::exception& /*exception*/) override
 			{
 				return false;
 			}
-			outValue = field->AsInteger();
-			return true;
-		}
-
-		[[nodiscard]] bool ParseRequiredString(const json::JsonObject& object,
-			std::string_view key, std::string& outValue) noexcept
-		{
-			const json::JsonValue* field = FindField(object, key);
-			if (field == nullptr || !field->IsString())
+			[[nodiscard]] bool start_object(std::size_t /*elements*/) override
 			{
-				return false;
+				return EnterScope(true);
 			}
-			outValue = field->AsString();
-			return true;
-		}
-
-		[[nodiscard]] bool ParseRequiredStringArray(const json::JsonObject& object,
-			std::string_view key, std::vector<std::string>& outValues) noexcept
-		{
-			const json::JsonValue* field = FindField(object, key);
-			if (field == nullptr || !field->IsArray())
+			[[nodiscard]] bool start_array(std::size_t /*elements*/) override
 			{
-				return false;
+				return EnterScope(false);
 			}
-			for (const json::JsonValue& element : field->AsArray())
+			[[nodiscard]] bool key(nlohmann::json::string_t& value) override
 			{
-				if (!element.IsString())
+				if (m_ScopeIsObject.empty() || !m_ScopeIsObject.back())
 				{
 					return false;
 				}
-				outValues.push_back(element.AsString());
+				return m_KeyScopes.back().insert(value).second;
+			}
+			[[nodiscard]] bool end_object() override
+			{
+				return ExitScope();
+			}
+			[[nodiscard]] bool end_array() override
+			{
+				return ExitScope();
+			}
+
+		private:
+			[[nodiscard]] bool EnterScope(bool isObject) noexcept
+			{
+				if (m_Depth >= MaxNestingDepth)
+				{
+					return false;
+				}
+				++m_Depth;
+				m_KeyScopes.emplace_back();
+				m_ScopeIsObject.push_back(isObject);
+				return true;
+			}
+			[[nodiscard]] bool ExitScope() noexcept
+			{
+				if (m_ScopeIsObject.empty())
+				{
+					return false;
+				}
+				--m_Depth;
+				m_KeyScopes.pop_back();
+				m_ScopeIsObject.pop_back();
+				return true;
+			}
+
+			static constexpr int MaxNestingDepth = 64;
+			int m_Depth = 0;
+			std::vector<std::unordered_set<std::string>> m_KeyScopes;
+			std::vector<bool> m_ScopeIsObject;
+		};
+
+		[[nodiscard]] const nlohmann::json* FindField(
+			const nlohmann::json& object, std::string_view key) noexcept
+		{
+			if (!object.is_object())
+			{
+				return nullptr;
+			}
+			const auto found = object.find(std::string(key));
+			return found != object.end() ? &*found : nullptr;
+		}
+
+		[[nodiscard]] bool ParseRequiredInteger(const nlohmann::json& object,
+			std::string_view key, int64_t& outValue) noexcept
+		{
+			const nlohmann::json* field = FindField(object, key);
+			if (field == nullptr || !field->is_number())
+			{
+				return false;
+			}
+			// is_number_integer() covers both signed and unsigned storage, and
+			// get<int64_t> on an unsigned value above INT64_MAX is an
+			// arithmetic conversion, not a rejection. Check the unsigned
+			// storage first so values outside the int64 domain are rejected.
+			if (field->is_number_unsigned())
+			{
+				const std::uint64_t value = field->get<std::uint64_t>();
+				if (value >
+					static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+				{
+					return false;
+				}
+				outValue = static_cast<std::int64_t>(value);
+				return true;
+			}
+			if (field->is_number_integer())
+			{
+				outValue = field->get<std::int64_t>();
+				return true;
+			}
+			return false; // floating-point numbers are outside the integer contract
+		}
+
+		[[nodiscard]] bool ParseRequiredString(const nlohmann::json& object,
+			std::string_view key, std::string& outValue) noexcept
+		{
+			const nlohmann::json* field = FindField(object, key);
+			if (field == nullptr || !field->is_string())
+			{
+				return false;
+			}
+			outValue = field->get<std::string>();
+			return true;
+		}
+
+		[[nodiscard]] bool ParseRequiredStringArray(const nlohmann::json& object,
+			std::string_view key, std::vector<std::string>& outValues) noexcept
+		{
+			const nlohmann::json* field = FindField(object, key);
+			if (field == nullptr || !field->is_array())
+			{
+				return false;
+			}
+			for (const nlohmann::json& element : *field)
+			{
+				if (!element.is_string())
+				{
+					return false;
+				}
+				outValues.push_back(element.get<std::string>());
 			}
 			return true;
 		}
@@ -493,29 +576,28 @@ namespace gglab
 		struct CacheRecordJsonMapper final
 		{
 			[[nodiscard]] std::optional<ShaderArtifactCacheRecord> Map(
-				const json::JsonValue& root) noexcept
+				const nlohmann::json& root) noexcept
 			{
-				if (!root.IsObject())
+				if (!root.is_object())
 				{
 					return std::nullopt;
 				}
-				const json::JsonObject& rootObject = root.AsObject();
 
-				const json::JsonValue* manifestValue = FindField(rootObject, "manifest");
-				const json::JsonValue* localValue = FindField(rootObject, "local");
-				if (manifestValue == nullptr || !manifestValue->IsObject() ||
-					localValue == nullptr || !localValue->IsObject())
+				const nlohmann::json* manifestValue = FindField(root, "manifest");
+				const nlohmann::json* localValue = FindField(root, "local");
+				if (manifestValue == nullptr || !manifestValue->is_object() ||
+					localValue == nullptr || !localValue->is_object())
 				{
 					return std::nullopt;
 				}
-				if (rootObject.size() != 2)
+				if (root.size() != 2)
 				{
 					return std::nullopt; // unknown keys rejected: schema bump required
 				}
 
 				ShaderArtifactCacheRecord record{};
-				if (!MapManifest(manifestValue->AsObject(), record.m_Manifest) ||
-					!MapLocal(localValue->AsObject(), record))
+				if (!MapManifest(*manifestValue, record.m_Manifest) ||
+					!MapLocal(*localValue, record))
 				{
 					return std::nullopt;
 				}
@@ -523,7 +605,7 @@ namespace gglab
 			}
 
 		private:
-			[[nodiscard]] bool MapManifest(const json::JsonObject& object,
+			[[nodiscard]] bool MapManifest(const nlohmann::json& object,
 				ShaderArtifactManifest& manifest) noexcept
 			{
 				std::string text;
@@ -569,31 +651,32 @@ namespace gglab
 				manifest.m_BuildKey.m_DurableDigest = *buildKey;
 				seenMask |= 1u << 3;
 
-				const json::JsonValue* compiler = FindField(object, "compiler");
-				if (compiler == nullptr || !compiler->IsObject())
+				const nlohmann::json* compiler = FindField(object, "compiler");
+				if (compiler == nullptr || !compiler->is_object())
 				{
 					return false;
 				}
 				bool hasKind = false;
 				bool hasIdentity = false;
-				for (const json::JsonMember& member : compiler->AsObject())
+				for (const auto& member : compiler->items())
 				{
-					if (member.first == "kind")
+					if (member.key() == "kind")
 					{
-						if (!member.second.IsString() || member.second.AsString() != "dxc")
+						if (!member.value().is_string() ||
+							member.value().get<std::string>() != "dxc")
 						{
 							return false;
 						}
 						hasKind = true;
 					}
-					else if (member.first == "identity")
+					else if (member.key() == "identity")
 					{
-						if (!member.second.IsString())
+						if (!member.value().is_string())
 						{
 							return false;
 						}
 						manifest.m_CompilerIdentity.m_CanonicalIdentity =
-							utils::ToWideString(member.second.AsString());
+							utils::ToWideString(member.value().get<std::string>());
 						hasIdentity = true;
 					}
 					else
@@ -733,7 +816,7 @@ namespace gglab
 				return seenMask == AllBits && object.size() == 22;
 			}
 
-			[[nodiscard]] bool MapLocal(const json::JsonObject& object,
+			[[nodiscard]] bool MapLocal(const nlohmann::json& object,
 				ShaderArtifactCacheRecord& record) noexcept
 			{
 				std::string text;
@@ -752,28 +835,27 @@ namespace gglab
 					record.m_PhysicalIncludeDirs.emplace_back(utils::ToWideString(includeDir));
 				}
 
-				const json::JsonValue* dependencies = FindField(object, "dependencies");
-				if (dependencies == nullptr || !dependencies->IsArray())
+				const nlohmann::json* dependencies = FindField(object, "dependencies");
+				if (dependencies == nullptr || !dependencies->is_array())
 				{
 					return false;
 				}
-				for (const json::JsonValue& dependencyValue : dependencies->AsArray())
+				for (const nlohmann::json& dependencyValue : *dependencies)
 				{
-					if (!dependencyValue.IsObject())
+					if (!dependencyValue.is_object())
 					{
 						return false;
 					}
-					const json::JsonObject& dependencyObject = dependencyValue.AsObject();
 					ShaderArtifactDependency dependency{};
 					std::string logicalPath;
 					std::string physicalPath;
 					std::string contentDigest;
 					int64_t ticks = 0;
-					if (!ParseRequiredString(dependencyObject, "logicalPath", logicalPath) ||
-						!ParseRequiredString(dependencyObject, "physicalPath", physicalPath) ||
-						!ParseRequiredString(dependencyObject, "contentDigest", contentDigest) ||
-						!ParseRequiredInteger(dependencyObject, "lastWriteTimeTicks", ticks) ||
-						dependencyObject.size() != 4)
+					if (!ParseRequiredString(dependencyValue, "logicalPath", logicalPath) ||
+						!ParseRequiredString(dependencyValue, "physicalPath", physicalPath) ||
+						!ParseRequiredString(dependencyValue, "contentDigest", contentDigest) ||
+						!ParseRequiredInteger(dependencyValue, "lastWriteTimeTicks", ticks) ||
+						dependencyValue.size() != 4)
 					{
 						return false;
 					}
@@ -804,12 +886,29 @@ namespace gglab
 		const std::string content((std::istreambuf_iterator<char>(in)),
 			std::istreambuf_iterator<char>());
 
-		const std::optional<json::JsonValue> document = json::ParseJsonDocument(content);
-		if (!document.has_value())
+		try
+		{
+			StrictJsonSax strictSax;
+			if (!nlohmann::json::sax_parse(content, &strictSax))
+			{
+				return std::nullopt;
+			}
+		}
+		catch (const nlohmann::json::exception&)
 		{
 			return std::nullopt;
 		}
-		return CacheRecordJsonMapper{}.Map(*document);
+
+		nlohmann::json document;
+		try
+		{
+			document = nlohmann::json::parse(content);
+		}
+		catch (const nlohmann::json::exception&)
+		{
+			return std::nullopt;
+		}
+		return CacheRecordJsonMapper{}.Map(document);
 	}
 
 	std::optional<ShaderArtifactCacheRecord> LoadShaderArtifactCacheRecord(

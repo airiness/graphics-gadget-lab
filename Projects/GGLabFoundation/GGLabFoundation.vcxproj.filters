@@ -13,9 +13,6 @@
     <Filter Include="Private\IO">
       <UniqueIdentifier>{22E99987-9783-8F12-CC37-DC3E2C6F9DC0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Private\Json">
-      <UniqueIdentifier>{CBEBDDFA-A71A-9039-6FB3-23F13829324F}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Private\Logging">
       <UniqueIdentifier>{658AD94C-0377-D824-B822-09CDA9C3EAEB}</UniqueIdentifier>
     </Filter>
@@ -49,9 +46,6 @@
     <Filter Include="Public\GGLabFoundation\IO">
       <UniqueIdentifier>{B6EC4746-9B5B-C662-FE35-6F55FB1326B1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Public\GGLabFoundation\Json">
-      <UniqueIdentifier>{A4029C03-B4DB-C2C0-79F0-57B5B37687EE}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Public\GGLabFoundation\Logging">
       <UniqueIdentifier>{B9501CCB-C4EB-3FCC-57EB-A88BBB310FD2}</UniqueIdentifier>
     </Filter>
@@ -80,9 +74,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp">
       <Filter>Private\IO</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Json\JsonValue.cpp">
-      <Filter>Private\Json</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp">
       <Filter>Private\Logging</Filter>
@@ -142,9 +133,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h">
       <Filter>Public\GGLabFoundation\IO</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Json\JsonValue.h">
-      <Filter>Public\GGLabFoundation\Json</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h">
       <Filter>Public\GGLabFoundation\Logging</Filter>
