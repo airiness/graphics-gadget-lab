@@ -1,6 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -37,28 +36,25 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <GGLabRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</GGLabRepositoryRoot>
-    <OutDir>$(GGLabRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(GGLabRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>GGLabRuntimeTests</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -75,9 +71,7 @@
       <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -98,6 +92,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\GGLabRuntimeTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.cpp" />
   </ItemGroup>
@@ -107,6 +102,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.h" />
   </ItemGroup>
@@ -128,6 +124,6 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
-    <Import Project="..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.DXC.1.9.2607.13\build\native\Microsoft.Direct3D.DXC.targets')" />
+    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
   </ImportGroup>
 </Project>
