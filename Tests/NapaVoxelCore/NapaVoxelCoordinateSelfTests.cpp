@@ -323,7 +323,7 @@ namespace napa::voxel::testing
 							const SampleCoord sample{ x, y, z };
 							const CellCoord cell{ x, y, z };
 							OwnedSampleAddress sampleAddress{};
-							OwnedCellAddress cellAddress{};
+							cellAddress = {};
 							SampleCoord reconstructedSample{};
 							CellCoord reconstructedCell{};
 							roundTripMatches &=

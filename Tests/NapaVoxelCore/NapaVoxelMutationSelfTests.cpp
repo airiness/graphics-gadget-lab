@@ -607,7 +607,7 @@ namespace napa::voxel::testing
 				context.Check(false, "Revision exhaustion fixture creates its primitive world");
 				return;
 			}
-			const std::uint64_t revisionBefore = revisionWorld->GetWorldVoxelRevision();
+			std::uint64_t revisionBefore = revisionWorld->GetWorldVoxelRevision();
 			std::uint64_t revisionHashBefore = 0;
 			std::uint64_t revisionHashAfter = 0;
 			const std::size_t revisionResidents = revisionWorld->GetResidentChunkCount();
@@ -663,7 +663,7 @@ namespace napa::voxel::testing
 
 				std::uint64_t hashBefore = 0;
 				std::uint64_t hashAfter = 0;
-				const std::uint64_t revisionBefore = faultWorld->GetWorldVoxelRevision();
+				revisionBefore = faultWorld->GetWorldVoxelRevision();
 				const std::size_t residentsBefore = faultWorld->GetResidentChunkCount();
 				std::vector<std::uint64_t> chunkRevisionsBefore;
 				bool chunkRevisionsPreserved = true;
