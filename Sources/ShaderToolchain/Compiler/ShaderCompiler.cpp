@@ -874,20 +874,17 @@ namespace gglab
 			return false;
 		}
 
-		// Dependency validation: the mtime is the local fast path; any
-		// mismatch falls back to the authoritative content digest of the
-		// exact bytes the compiler consumed.
+		// Dependency validation: the content digest is the sole authority. The
+		// recorded mtime is unused legacy state (removed with the serialized
+		// contract closure) and must not participate in any cache-hit
+		// decision: a candidate is accepted only when a digest of the exact
+		// current bytes equals the digest of the bytes the compiler consumed.
 		std::error_code errorCode;
 		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
 		{
 			if (!std::filesystem::exists(dependency.m_PhysicalPath, errorCode))
 			{
 				return false;
-			}
-			if (utils::LastWriteTimeTicks(dependency.m_PhysicalPath) ==
-				dependency.m_LastWriteTimeTicks)
-			{
-				continue;
 			}
 			std::ifstream input(dependency.m_PhysicalPath, std::ios::binary);
 			if (!input)
@@ -937,15 +934,15 @@ namespace gglab
 		}
 
 		// The source dependency digest is computed over the exact bytes DXC is
-		// about to receive; the physical path and mtime are local fast-path
-		// state only.
+		// about to receive and is the sole validation authority for cache
+		// hits; the physical path is the local read location only. The mtime
+		// is unused legacy state and is no longer sampled.
 		outDependencies.push_back({
 			.m_LogicalPath = recipe.m_LogicalSourcePath,
 			.m_PhysicalPath = utils::Canonical(recipe.m_Request.m_SourcePath),
 			.m_ContentDigest = ComputeSha256(std::span(
 				static_cast<const std::byte*>(src->GetBufferPointer()),
 				src->GetBufferSize())),
-			.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(recipe.m_Request.m_SourcePath),
 		});
 
 		DxcBuffer buffer{};
@@ -1003,7 +1000,9 @@ namespace gglab
 			return {};
 		}
 
-		// Record include dependencies (with their loaded-content digests).
+		// Record include dependencies (with their loaded-content digests). The
+		// digest is the sole validation authority; the mtime is unused legacy
+		// state and is no longer sampled.
 		for (const ShaderArtifactDependency& includeDependency : includeHandler->Dependencies())
 		{
 			ShaderArtifactDependency dependency = includeDependency;
@@ -1014,8 +1013,6 @@ namespace gglab
 			{
 				dependency.m_LogicalPath = relativeInclude.lexically_normal();
 			}
-			dependency.m_LastWriteTimeTicks =
-				utils::LastWriteTimeTicks(dependency.m_PhysicalPath);
 			outDependencies.push_back(std::move(dependency));
 		}
 

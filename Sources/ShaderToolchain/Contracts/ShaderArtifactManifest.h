@@ -82,11 +82,13 @@ namespace gglab
 			const BinaryContentDigest&, const BinaryContentDigest&) noexcept = default;
 	};
 
-	// Dependency validation record. The content digest is the authoritative
-	// identity: it is computed over the exact bytes handed to the compiler,
-	// so it cannot drift from what was actually compiled. The logical path is
-	// the portable identity when derivable; the physical path and mtime are
-	// local cache fast-path state only.
+	// Dependency validation record. The content digest is the sole validation
+	// authority: it is computed over the exact bytes handed to the compiler,
+	// so acceptance can never drift from what was actually compiled. The
+	// logical path is the portable identity when derivable; the physical path
+	// is the local read location. The recorded mtime is unused legacy state:
+	// validation never reads it, and the field is removed together with the
+	// serialized cache record schema closure.
 	struct ShaderArtifactDependency
 	{
 		std::filesystem::path m_LogicalPath{};

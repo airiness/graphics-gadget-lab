@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -961,6 +962,49 @@ namespace gglab
 			return output.good();
 		}
 
+		// Rewrites the first occurrence of a JSON integer field's value (used
+		// to tamper with recorded cache record fields in contract tests).
+		[[nodiscard]] bool OverwriteJsonIntegerField(
+			const std::filesystem::path& path, std::string_view fieldName,
+			std::string_view replacement) noexcept
+		{
+			std::ifstream input(path, std::ios::binary);
+			if (!input)
+			{
+				return false;
+			}
+			std::string content((std::istreambuf_iterator<char>(input)),
+				std::istreambuf_iterator<char>());
+			const std::string prefix = std::string("\"") + std::string(fieldName) + "\":";
+			const std::size_t begin = content.find(prefix);
+			if (begin == std::string::npos)
+			{
+				return false;
+			}
+			std::size_t numberBegin = begin + prefix.size();
+			while (numberBegin < content.size() &&
+				(content[numberBegin] == ' ' || content[numberBegin] == '\t'))
+			{
+				++numberBegin;
+			}
+			if (numberBegin >= content.size() ||
+				(content[numberBegin] != '-' &&
+					(content[numberBegin] < '0' || content[numberBegin] > '9')))
+			{
+				return false;
+			}
+			std::size_t numberEnd = numberBegin + 1;
+			while (numberEnd < content.size() &&
+				content[numberEnd] >= '0' && content[numberEnd] <= '9')
+			{
+				++numberEnd;
+			}
+			content.replace(numberBegin, numberEnd - numberBegin, replacement);
+			std::ofstream output(path, std::ios::binary | std::ios::trunc);
+			output.write(content.data(), static_cast<std::streamsize>(content.size()));
+			return output.good();
+		}
+
 		void RunCrossCheckoutIdentityTests(SelfTestContext& context) noexcept
 		{
 			// The same logical request must produce the same recipe and build
@@ -1106,9 +1150,9 @@ namespace gglab
 			const ShaderCompileResult firstResult = compiler.CompileOrLoad(recipe);
 			const ShaderCompileResult cachedResult = compiler.CompileOrLoad(recipe);
 
-			// Changing the include content must invalidate the entry even when
-			// the mtime fast path would see a difference; the authoritative
-			// check is the content digest of the bytes DXC consumed.
+			// Changing the include content must invalidate the entry; the
+			// authoritative check is the content digest of the bytes DXC
+			// consumed.
 			const bool includeChanged = WriteTextFile(
 				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.5f;\n");
 			const ShaderCompileResult changedResult = compiler.CompileOrLoad(recipe);
@@ -1120,6 +1164,88 @@ namespace gglab
 				changedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
 				firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
 				"Changed include content rebuilds the entry and the new digest re-validates");
+
+			// The digest is the sole validation authority. An include rewritten
+			// with its previous mtime restored must still invalidate the entry:
+			// acceptance is decided by the content digest, not by metadata
+			// equality. (The forged-mtime regression below is the variant that
+			// also kills the former mtime fast path.)
+			const std::filesystem::path includePath = sourceRoot / L"Probe.hlsli";
+			const std::filesystem::file_time_type includeWriteTime =
+				std::filesystem::last_write_time(includePath, errorCode);
+			const bool includeChangedSameMtime = !errorCode &&
+				WriteTextFile(includePath, "static const float ProbeValue = 0.75f;\n");
+			std::filesystem::last_write_time(includePath, includeWriteTime, errorCode);
+			const bool includeWriteTimeRestored = !errorCode &&
+				std::filesystem::last_write_time(includePath, errorCode) == includeWriteTime;
+			const ShaderCompileResult sameMtimeChangedResult = compiler.CompileOrLoad(recipe);
+			const ShaderCompileResult sameMtimeRevalidatedResult = compiler.CompileOrLoad(recipe);
+
+			// A touched mtime with identical content must stay a hit: mtime
+			// drift alone never invalidates an entry.
+			const std::filesystem::file_time_type touchedWriteTime =
+				includeWriteTime + std::chrono::seconds(1);
+			std::filesystem::last_write_time(includePath, touchedWriteTime, errorCode);
+			const bool includeTouched = !errorCode;
+			const ShaderCompileResult touchedResult = compiler.CompileOrLoad(recipe);
+
+			const std::filesystem::path recordPath =
+				compiler.GetCacheBinaryPath(recipe).wstring() + L".json";
+
+			// Deterministic regression against the former mtime fast path: forge
+			// a candidate whose recorded serialized mtime equals the current
+			// filesystem mtime while the content digest no longer matches. The
+			// removed fast path (current mtime == recorded mtime -> accept
+			// without hashing) would accept this stale candidate; digest-only
+			// validation must reject and rebuild it. The forged value is a small
+			// integer (12300ns since the file clock epoch) that the current JSON
+			// representation handles exactly, so the C2 proof is independent of
+			// the integer semantics work.
+			const std::filesystem::path sourcePath = sourceRoot / L"Probe.hlsl";
+			constexpr std::int64_t ForgedSerializedTicks = 12300;
+			const std::filesystem::file_time_type forgedWriteTime{
+				std::chrono::duration_cast<std::filesystem::file_time_type::duration>(
+					std::chrono::nanoseconds(ForgedSerializedTicks)) };
+			const bool sourceChangedForForgedMtime = WriteTextFile(sourcePath,
+				"// forged\n#include \"Probe.hlsli\"\n"
+				"float4 VSMain(uint id : SV_VertexID) : SV_Position "
+				"{ return float4(ProbeValue, 0, 0, 1); }\n");
+			std::filesystem::last_write_time(sourcePath, forgedWriteTime, errorCode);
+			const auto ForgedSourceTicks = [&sourcePath]() noexcept
+				{
+					std::error_code ec;
+					const std::filesystem::file_time_type time =
+						std::filesystem::last_write_time(sourcePath, ec);
+					return ec
+						? std::int64_t{ -1 }
+						: std::chrono::duration_cast<std::chrono::nanoseconds>(
+							time.time_since_epoch()).count();
+				}();
+			const bool forgedMtimeApplied = !errorCode &&
+				ForgedSourceTicks == ForgedSerializedTicks;
+			const bool forgedTicksWritten = OverwriteJsonIntegerField(
+				recordPath, "lastWriteTimeTicks", "12300");
+			const ShaderCompileResult forgedMtimeResult = compiler.CompileOrLoad(recipe);
+
+			// The serialized mtime field has no authority either: a real numeric
+			// change of the recorded ticks (0 -> 12300, not a no-op) keeps the
+			// hit because the content digest still matches.
+			const bool ticksRewritten = OverwriteJsonIntegerField(
+				recordPath, "lastWriteTimeTicks", "12300");
+			const ShaderCompileResult ticksTamperedResult = compiler.CompileOrLoad(recipe);
+
+			context.Check(includeChangedSameMtime && includeWriteTimeRestored &&
+				sameMtimeChangedResult.IsSuccess() && !sameMtimeChangedResult.m_FromCache &&
+				sameMtimeRevalidatedResult.m_FromCache,
+				"Include content changed under a restored mtime is rejected by the content digest");
+			context.Check(includeTouched && touchedResult.IsSuccess() && touchedResult.m_FromCache,
+				"Identical content with a drifted mtime remains a cache hit");
+			context.Check(forgedMtimeApplied && forgedTicksWritten && sourceChangedForForgedMtime &&
+				forgedMtimeResult.IsSuccess() && !forgedMtimeResult.m_FromCache,
+				"Equal recorded and current mtime with changed content is rejected and rebuilt");
+			context.Check(ticksRewritten && ticksTamperedResult.IsSuccess() &&
+				ticksTamperedResult.m_FromCache,
+				"Rewritten serialized mtime fields have no authority over cache hits");
 		}
 
 		void RunJsonGrammarTests(SelfTestContext& context) noexcept
