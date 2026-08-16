@@ -373,6 +373,7 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\GGLabRuntime"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Sources\ShaderToolchain"; FilterPrefix = "" }
             [pscustomobject]@{
                 Root = "Externals\Vender\D3D12MemoryAllocator"
                 FilterPrefix = "ThirdParty\D3D12MemoryAllocator"

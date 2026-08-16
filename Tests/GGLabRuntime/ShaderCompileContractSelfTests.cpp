@@ -8,6 +8,8 @@
 #include "Graphics/Shader/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderPaths.h"
+#include "Targets/Vulkan13ShaderTarget.h"
+#include "Targets/VulkanShaderCompileABI.h"
 
 #include <windows.h>
 
@@ -279,7 +281,7 @@ namespace gglab
 		}
 		void RunShaderBindingABITests(SelfTestContext& context) noexcept
 		{
-			context.Check(GGLabVulkanShaderBindingABI.m_Revision == 1,
+			context.Check(GGLabVulkanShaderCompileABI.m_Revision == 1,
 				"Vulkan shader binding ABI revision is fixed at 1");
 
 			struct FixedRegisterClassCase
@@ -307,11 +309,11 @@ namespace gglab
 					++registerIndex)
 				{
 					const auto result = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
-						registerIndex, GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+						registerIndex, GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
 					const uint32_t expectedBinding = range.m_BindingShift + registerIndex;
 					allBindingsUnique &= result.IsSupported() &&
 						result.m_Location.m_DescriptorSet ==
-						GGLabVulkanShaderBindingABI.m_FixedDescriptorSet &&
+						GGLabVulkanShaderCompileABI.m_FixedDescriptorSet &&
 						result.m_Location.m_Binding == expectedBinding &&
 						expectedBinding < occupiedBindings.size() && !occupiedBindings[expectedBinding];
 					if (expectedBinding < occupiedBindings.size())
@@ -320,7 +322,7 @@ namespace gglab
 					}
 				}
 				const auto outOfRange = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
-					range.m_RegisterCount, GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+					range.m_RegisterCount, GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
 				allOutOfRangeIndicesRejected &= !outOfRange.IsSupported() &&
 					outOfRange.m_RejectionReason ==
 					VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
@@ -335,13 +337,13 @@ namespace gglab
 
 			const auto reservedSpace = EvaluateVulkanFixedShaderBinding(
 				VulkanShaderRegisterClass::ShaderResource, 0,
-				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace);
+				GGLabVulkanShaderCompileABI.m_GlobalHeapHlslRegisterSpace);
 			context.Check(!reservedSpace.IsSupported() && reservedSpace.m_RejectionReason ==
 				VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 				"Fixed bindings reject HLSL space1 reserved for global heaps");
 			const auto unsupportedSpace = EvaluateVulkanFixedShaderBinding(
 				VulkanShaderRegisterClass::ShaderResource, 0,
-				GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace + 1);
+				GGLabVulkanShaderCompileABI.m_GlobalHeapHlslRegisterSpace + 1);
 			context.Check(!unsupportedSpace.IsSupported() && unsupportedSpace.m_RejectionReason ==
 				VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
@@ -413,9 +415,9 @@ namespace gglab
 				RHIFrontFaceDefinition::AfterViewportTransform &&
 				!GGLabCoordinatePolicy.m_BackendAppliesReversedZ,
 				"RHI front face is post-viewport and reversed-Z is not backend-added");
-			context.Check(GGLabVulkanCoordinatePolicy.m_UsePositiveViewportHeight &&
-				GGLabVulkanCoordinatePolicy.m_InvertVertexProducingStageY &&
-				GGLabVulkanCoordinatePolicy.m_UseDxPositionW &&
+			context.Check(GGLabVulkanShaderCompileABI.m_InvertVertexProducingStageY &&
+				GGLabVulkanShaderCompileABI.m_UseDxPositionW &&
+				GGLabVulkanCoordinatePolicy.m_UsePositiveViewportHeight &&
 				!GGLabVulkanCoordinatePolicy.m_BackendAppliesAdditionalReversedZ,
 				"Vulkan coordinate lowering applies each required correction exactly once");
 		}
@@ -450,16 +452,16 @@ namespace gglab
 			const ShaderCompileArtifact dxilArtifact =
 				compiler.CompileOrLoadArtifact(normalizedDxil);
 
-			coverageDesc.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(coverageDesc.m_Stage);
+			coverageDesc.m_Target = MakeVulkan13CompileTarget(coverageDesc.m_Stage);
 			const ShaderDesc normalizedSpirV = compiler.NormalizeShaderDesc(coverageDesc);
 			const ShaderCompileArtifact spirVArtifact =
 				compiler.CompileOrLoadArtifact(normalizedSpirV);
 			const ShaderCompileArtifact cachedSpirVArtifact =
 				compiler.CompileOrLoadArtifact(normalizedSpirV);
 			const ShaderCompileValidationResult dxilValidation =
-				ValidateShaderDesc(normalizedDxil, compiler.GetCompilerVersion());
+				ValidateShaderDesc(normalizedDxil, compiler.GetCompilerIdentity());
 			const ShaderCompileValidationResult spirVValidation =
-				ValidateShaderDesc(normalizedSpirV, compiler.GetCompilerVersion());
+				ValidateShaderDesc(normalizedSpirV, compiler.GetCompilerIdentity());
 
 			const std::wstring dxilPath = dxilArtifact.m_BinaryPath.generic_wstring();
 			const std::wstring spirVPath = spirVArtifact.m_BinaryPath.generic_wstring();
@@ -484,14 +486,14 @@ namespace gglab
 			context.Check(cacheBlobOverwritten && !recoveredSpirVArtifact.m_FromCache &&
 				ReadSpirVDecorations(recoveredSpirVArtifact.m_Binary, recoveredReflection),
 				"Shader cache rejects a blob whose actual format disagrees with its target metadata");
-			context.Check(normalizedSpirV.m_Target.m_DxcVersion == compiler.GetCompilerVersion() &&
-				!compiler.GetCompilerVersion().empty() && compiler.GetCompilerVersion() != L"unknown",
-				"Normalized shader target records the concrete DXC compiler identity");
+			context.Check(!compiler.GetCompilerIdentity().m_CanonicalIdentity.empty() &&
+				compiler.GetCompilerIdentity().m_CanonicalIdentity != L"unknown",
+				"Active shader compiler exposes the concrete DXC producer identity");
 
 			ShaderDesc managerDesc{
 				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
 				.m_Stage = ShaderStage::Vertex,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
 			};
 			ShaderManager dxilManager(
@@ -508,22 +510,27 @@ namespace gglab
 				spirVManager.GetBytecode(spirVManagerShader).m_Format == ShaderBinaryFormat::SpirV,
 				"ShaderManager derives shader format from its active RHI backend");
 
-			const ShaderHash128 dxilRecipe = ShaderCompiler::ComputeRecipeHash(normalizedDxil);
-			const ShaderHash128 spirVRecipe = ShaderCompiler::ComputeRecipeHash(normalizedSpirV);
+			const ShaderCompilerIdentity compilerIdentity = compiler.GetCompilerIdentity();
+			ShaderCompilerIdentity differentIdentity = compilerIdentity;
+			differentIdentity.m_CanonicalIdentity += L"-different";
+			const ShaderHash128 dxilRecipe =
+				ShaderCompiler::ComputeRecipeHash(normalizedDxil, compilerIdentity);
+			const ShaderHash128 spirVRecipe =
+				ShaderCompiler::ComputeRecipeHash(normalizedSpirV, compilerIdentity);
 			auto changedABI = normalizedSpirV;
 			++changedABI.m_Target.m_BindingABIRevision;
-			auto changedDxc = normalizedSpirV;
-			changedDxc.m_Target.m_DxcVersion += L"-different";
 			auto changedCoordinates = normalizedSpirV;
 			changedCoordinates.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
 			auto changedArguments = normalizedSpirV;
 			changedArguments.m_ExtraArgs.push_back(L"-GGLAB_TEST_ARGUMENT");
 			context.Check(dxilRecipe != spirVRecipe && spirVRecipe !=
-				ShaderCompiler::ComputeRecipeHash(changedABI) && spirVRecipe !=
-				ShaderCompiler::ComputeRecipeHash(changedDxc) && spirVRecipe !=
-				ShaderCompiler::ComputeRecipeHash(changedCoordinates) && spirVRecipe !=
-				ShaderCompiler::ComputeRecipeHash(changedArguments),
-				"Shader recipe identity includes format, ABI, DXC, coordinates, and compile arguments");
+				ShaderCompiler::ComputeRecipeHash(changedABI, compilerIdentity) && spirVRecipe !=
+				ShaderCompiler::ComputeRecipeHash(normalizedSpirV, differentIdentity) &&
+				spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedCoordinates, compilerIdentity) &&
+				spirVRecipe !=
+					ShaderCompiler::ComputeRecipeHash(changedArguments, compilerIdentity),
+				"Shader recipe identity includes format, ABI, compiler identity, coordinates, and compile arguments");
 
 			constexpr std::array ReservedArguments{
 				L"-spirv",
@@ -539,29 +546,29 @@ namespace gglab
 				auto bypassDesc = normalizedSpirV;
 				bypassDesc.m_ExtraArgs = { std::wstring(argument) };
 				const ShaderCompileValidationResult result =
-					ValidateShaderDesc(bypassDesc, compiler.GetCompilerVersion());
+					ValidateShaderDesc(bypassDesc, compiler.GetCompilerIdentity());
 				allReservedArgumentsRejected &= !result.IsValid() &&
 					result.m_Error == ShaderCompileValidationError::ReservedExtraArgument;
 			}
 			context.Check(allReservedArgumentsRejected,
 				"Shader validation prevents extra arguments from overriding normalized target options");
 
-			auto mismatchedDxcDesc = normalizedSpirV;
-			mismatchedDxcDesc.m_Target.m_DxcVersion += L"-mismatch";
+			ShaderCompilerIdentity unavailableIdentity{};
+			unavailableIdentity.m_CanonicalIdentity = L"unknown";
 			auto mismatchedAbiDesc = normalizedSpirV;
 			++mismatchedAbiDesc.m_Target.m_BindingABIRevision;
 			auto mismatchedCoordinatesDesc = normalizedSpirV;
 			mismatchedCoordinatesDesc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
 			const ShaderCompileValidationResult dxcError =
-				ValidateShaderDesc(mismatchedDxcDesc, compiler.GetCompilerVersion());
+				ValidateShaderDesc(normalizedSpirV, unavailableIdentity);
 			const ShaderCompileValidationResult abiError =
-				ValidateShaderDesc(mismatchedAbiDesc, compiler.GetCompilerVersion());
+				ValidateShaderDesc(mismatchedAbiDesc, compiler.GetCompilerIdentity());
 			const ShaderCompileValidationResult coordinateError =
-				ValidateShaderDesc(mismatchedCoordinatesDesc, compiler.GetCompilerVersion());
+				ValidateShaderDesc(mismatchedCoordinatesDesc, compiler.GetCompilerIdentity());
 			context.Check(dxcError.m_Error == ShaderCompileValidationError::CompilerIdentityMismatch &&
 				abiError.m_Error == ShaderCompileValidationError::UnsupportedBindingABIRevision &&
 				coordinateError.m_Error == ShaderCompileValidationError::InvalidCoordinateOptions,
-				"Shader validation reports structured DXC, binding ABI, and coordinate errors");
+				"Shader validation reports structured compiler identity, binding ABI, and coordinate errors");
 
 			auto rejectedCompileDesc = normalizedSpirV;
 			rejectedCompileDesc.m_ExtraArgs = { L"-fspv-target-env=vulkan1.0" };
@@ -584,16 +591,16 @@ namespace gglab
 				const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(registerClass);
 				const std::wstring shift = std::to_wstring(range.m_BindingShift);
 				const std::wstring hlslSpace =
-					std::to_wstring(GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace);
+					std::to_wstring(GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
 				registerShiftsMatch &=
 					ContainsArgumentSequence(vertexArguments, { option, shift, hlslSpace });
 			}
 			const std::wstring resourceBinding =
-				std::to_wstring(GGLabVulkanShaderBindingABI.m_ResourceHeapBinding);
+				std::to_wstring(GGLabVulkanShaderCompileABI.m_ResourceHeapBinding);
 			const std::wstring samplerBinding =
-				std::to_wstring(GGLabVulkanShaderBindingABI.m_SamplerHeapBinding);
+				std::to_wstring(GGLabVulkanShaderCompileABI.m_SamplerHeapBinding);
 			const std::wstring descriptorSet =
-				std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet);
+				std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet);
 			context.Check(registerShiftsMatch && ContainsArgumentSequence(vertexArguments,
 				{ L"-fvk-bind-resource-heap", resourceBinding, descriptorSet }) &&
 				ContainsArgumentSequence(vertexArguments,
@@ -609,7 +616,7 @@ namespace gglab
 			ShaderDesc forwardPixelDesc{
 				.m_SourcePath = L"Passes/PassForwardPBR.hlsl",
 				.m_Stage = ShaderStage::Pixel,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Pixel),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel),
 				.m_Entry = L"PSMain",
 				.m_IncludeDirs = {L"."},
 			};
@@ -668,7 +675,7 @@ namespace gglab
 			ShaderDesc cullDesc{
 				.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl",
 				.m_Stage = ShaderStage::Compute,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSMain",
 				.m_IncludeDirs = {L"."},
 			};
@@ -691,7 +698,7 @@ namespace gglab
 			ShaderDesc gtaoDesc{
 				.m_SourcePath = L"Passes/PassGTAO.hlsl",
 				.m_Stage = ShaderStage::Compute,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSMain",
 				.m_IncludeDirs = {L"."},
 			};
@@ -706,7 +713,7 @@ namespace gglab
 			ShaderDesc storageDesc{
 				.m_SourcePath = L"Passes/PassRenderGraphComputeSmoke.hlsl",
 				.m_Stage = ShaderStage::Compute,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Compute),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute),
 				.m_Entry = L"CSWrite",
 				.m_IncludeDirs = {L"."},
 			};
@@ -721,7 +728,7 @@ namespace gglab
 
 			ShaderDesc fullscreenDesc = storageDesc;
 			fullscreenDesc.m_Stage = ShaderStage::Vertex;
-			fullscreenDesc.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex);
+			fullscreenDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex);
 			fullscreenDesc.m_Entry = L"VSMain";
 			const ShaderCompileArtifact fullscreenArtifact =
 				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(fullscreenDesc));

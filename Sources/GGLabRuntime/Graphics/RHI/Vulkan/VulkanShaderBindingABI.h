@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "Targets/VulkanShaderCompileABI.h"
 
 #include <array>
 #include <cstdint>
@@ -7,14 +8,6 @@
 
 namespace gglab
 {
-	enum class VulkanShaderRegisterClass : uint8_t
-	{
-		ConstantBuffer,
-		ShaderResource,
-		UnorderedAccess,
-		Sampler,
-	};
-
 	enum class VulkanDescriptorType : uint8_t
 	{
 		Mutable,
@@ -46,12 +39,6 @@ namespace gglab
 		UnsupportedBindlessResourceClass,
 	};
 
-	struct VulkanFixedRegisterRange
-	{
-		uint32_t m_BindingShift = 0;
-		uint32_t m_RegisterCount = 0;
-	};
-
 	struct VulkanShaderBindingLocation
 	{
 		uint32_t m_DescriptorSet = 0;
@@ -70,23 +57,13 @@ namespace gglab
 		}
 	};
 
+	// Vulkan runtime descriptor policy. Compiler-facing ABI numbers (revision,
+	// register spaces, descriptor sets, heap bindings, register ranges, and
+	// the compile coordinate flags) live in the shared VulkanShaderCompileABI
+	// contract; this struct holds only runtime-only descriptor publication
+	// policy and consumes the contract through GGLabVulkanShaderCompileABI.
 	struct VulkanShaderBindingABI
 	{
-		uint32_t m_Revision = 1;
-
-		uint32_t m_FixedHlslRegisterSpace = 0;
-		uint32_t m_GlobalHeapHlslRegisterSpace = 1;
-
-		uint32_t m_FixedDescriptorSet = 0;
-		uint32_t m_GlobalDescriptorSet = 1;
-		uint32_t m_ResourceHeapBinding = 0;
-		uint32_t m_SamplerHeapBinding = 1;
-
-		VulkanFixedRegisterRange m_ConstantBufferRange{ 0, 32 };
-		VulkanFixedRegisterRange m_ShaderResourceRange{ 32, 32 };
-		VulkanFixedRegisterRange m_UnorderedAccessRange{ 64, 32 };
-		VulkanFixedRegisterRange m_SamplerRange{ 96, 32 };
-
 		VulkanDescriptorType m_ResourceHeapDescriptorType = VulkanDescriptorType::Mutable;
 		std::array<VulkanDescriptorType, 2> m_ResourceHeapMutableAllowedTypes{
 			VulkanDescriptorType::SampledImage,
@@ -101,35 +78,18 @@ namespace gglab
 
 	inline constexpr VulkanShaderBindingABI GGLabVulkanShaderBindingABI{};
 
-	[[nodiscard]] constexpr VulkanFixedRegisterRange GetVulkanFixedRegisterRange(
-		VulkanShaderRegisterClass registerClass) noexcept
-	{
-		switch (registerClass)
-		{
-		case VulkanShaderRegisterClass::ConstantBuffer:
-			return GGLabVulkanShaderBindingABI.m_ConstantBufferRange;
-		case VulkanShaderRegisterClass::ShaderResource:
-			return GGLabVulkanShaderBindingABI.m_ShaderResourceRange;
-		case VulkanShaderRegisterClass::UnorderedAccess:
-			return GGLabVulkanShaderBindingABI.m_UnorderedAccessRange;
-		case VulkanShaderRegisterClass::Sampler:
-			return GGLabVulkanShaderBindingABI.m_SamplerRange;
-		}
-		return {};
-	}
-
 	[[nodiscard]] constexpr VulkanShaderBindingResult EvaluateVulkanFixedShaderBinding(
 		VulkanShaderRegisterClass registerClass, uint32_t registerIndex,
 		uint32_t registerSpace) noexcept
 	{
-		if (registerSpace == GGLabVulkanShaderBindingABI.m_GlobalHeapHlslRegisterSpace)
+		if (registerSpace == GGLabVulkanShaderCompileABI.m_GlobalHeapHlslRegisterSpace)
 		{
 			return {
 				.m_RejectionReason =
 					VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 			};
 		}
-		if (registerSpace != GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace)
+		if (registerSpace != GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace)
 		{
 			return {
 				.m_RejectionReason =
@@ -148,7 +108,7 @@ namespace gglab
 
 		return {
 			.m_Location = {
-				.m_DescriptorSet = GGLabVulkanShaderBindingABI.m_FixedDescriptorSet,
+				.m_DescriptorSet = GGLabVulkanShaderCompileABI.m_FixedDescriptorSet,
 				.m_Binding = range.m_BindingShift + registerIndex,
 			},
 		};
@@ -163,15 +123,15 @@ namespace gglab
 		case VulkanBindlessResourceClass::StorageTexture:
 			return {
 				.m_Location = {
-					.m_DescriptorSet = GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet,
-					.m_Binding = GGLabVulkanShaderBindingABI.m_ResourceHeapBinding,
+					.m_DescriptorSet = GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet,
+					.m_Binding = GGLabVulkanShaderCompileABI.m_ResourceHeapBinding,
 				},
 			};
 		case VulkanBindlessResourceClass::Sampler:
 			return {
 				.m_Location = {
-					.m_DescriptorSet = GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet,
-					.m_Binding = GGLabVulkanShaderBindingABI.m_SamplerHeapBinding,
+					.m_DescriptorSet = GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet,
+					.m_Binding = GGLabVulkanShaderCompileABI.m_SamplerHeapBinding,
 				},
 			};
 		default:

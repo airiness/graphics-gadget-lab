@@ -58,6 +58,7 @@ $foundationTestsDir = Join-Path $root "Tests/GGLabFoundation"
 $runtimeTestsDir = Join-Path $root "Tests/GGLabRuntime"
 $napaTestsDir = Join-Path $root "Tests/NapaVoxelCore"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
+$shaderToolchainSourcesDir = Join-Path $root "Sources/ShaderToolchain"
 $napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
 
 function Test-IsPathUnderRoot {
@@ -456,6 +457,7 @@ function Test-ProjectIncludeVisibility {
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
 $applicationIncludeRoot = '$(GGLabRepositoryRoot)Sources\Application'
+$shaderToolchainIncludeRoot = '$(GGLabRepositoryRoot)Sources\ShaderToolchain'
 # Allowed, but deliberately not required: the current NapaVoxelCore/... layout
 # still needs this broad root. Foundation Private access is compiler-gated below.
 $repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
@@ -469,13 +471,14 @@ $napaIncludeRoot = '$(GGLabRepositoryRoot)Sources'
 Test-ProjectIncludeVisibility $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
     @($runtimeIncludeRoot, $foundationPublicIncludeRoot) `
-    @($runtimeIncludeRoot, $foundationPublicIncludeRoot)
+    @($runtimeIncludeRoot, $foundationPublicIncludeRoot, $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
     "Projects/Application/Application.vcxproj" `
     @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($applicationIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $repositorySourcesIncludeRoot)
+        $testCorePublicIncludeRoot, $repositorySourcesIncludeRoot,
+        $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
     "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
     @($foundationPublicIncludeRoot, $foundationPrivateIncludeRoot) `
@@ -492,7 +495,7 @@ Test-ProjectIncludeVisibility $runtimeTestsProject $runtimeTestsNamespace `
     @($runtimeTestsIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($runtimeTestsIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot)
+        $testCorePublicIncludeRoot, $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $napaTestsProject $napaTestsNamespace `
     "Projects/NapaVoxelCoreTests/NapaVoxelCoreTests.vcxproj" `
     @($napaTestsIncludeRoot, $napaIncludeRoot) `
@@ -592,6 +595,10 @@ $ownershipSpecifications = @(
         Name       = "GGLabRuntime"
         SourceRoot = $runtimeSourcesDir
         ItemPaths  = $runtimeSourceItems
+        # Transitional S1 ownership: the ShaderToolchain contracts root is
+        # physically reserved for the S2 ShaderToolchainCore project, but its
+        # items are still owned by GGLabRuntime until that project exists.
+        AdditionalSourceRoots = @($shaderToolchainSourcesDir)
     }
     [pscustomobject]@{
         Name       = "NapaVoxelCore"
@@ -632,7 +639,14 @@ foreach ($specification in $ownershipSpecifications) {
             continue
         }
 
-        if (-not (Test-IsPathUnderRoot $itemPath $specification.SourceRoot)) {
+        $itemUnderOwnerRoot = Test-IsPathUnderRoot $itemPath $specification.SourceRoot
+        foreach ($ownerRoot in $specification.AdditionalSourceRoots) {
+            if (Test-IsPathUnderRoot $itemPath $ownerRoot) {
+                $itemUnderOwnerRoot = $true
+                break
+            }
+        }
+        if (-not $itemUnderOwnerRoot) {
             $projectContractFindings.Add([pscustomobject]@{
                 Rule   = "source-ownership"
                 Target = ConvertTo-RepoRelativePath $itemPath
@@ -647,9 +661,15 @@ foreach ($specification in $ownershipSpecifications) {
         [void]$firstPartyMemberships[$itemPath].Add($specification.Name)
     }
 
+    $specificationOwnerRoots = @($specification.SourceRoot)
+    foreach ($ownerRoot in $specification.AdditionalSourceRoots) {
+        $specificationOwnerRoots += $ownerRoot
+    }
     $physicalOwnerFiles = @(
-        Get-ChildItem -LiteralPath $specification.SourceRoot -Recurse -File |
-            Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
+        foreach ($ownerRoot in $specificationOwnerRoots) {
+            Get-ChildItem -LiteralPath $ownerRoot -Recurse -File |
+                Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
+        }
     )
     foreach ($file in $physicalOwnerFiles) {
         if (-not $projectItemPathSet.Contains($file.FullName)) {
@@ -670,8 +690,16 @@ $firstPartySourceFiles = @(
 )
 foreach ($file in $firstPartySourceFiles) {
     $matchingOwners = @(
-        $ownershipSpecifications |
-            Where-Object { Test-IsPathUnderRoot $file.FullName $_.SourceRoot }
+        $ownershipSpecifications | Where-Object {
+            $matchesOwnerRoot = Test-IsPathUnderRoot $file.FullName $_.SourceRoot
+            foreach ($ownerRoot in $_.AdditionalSourceRoots) {
+                if (Test-IsPathUnderRoot $file.FullName $ownerRoot) {
+                    $matchesOwnerRoot = $true
+                    break
+                }
+            }
+            $matchesOwnerRoot
+        }
     )
     if ($matchingOwners.Count -eq 0) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -920,6 +948,24 @@ foreach ($shaderCompilerPath in $shaderCompilerProbePaths) {
     }
 }
 
+# Shader Toolchain contract headers must not depend on the Graphics runtime;
+# the runtime may consume contract vocabulary, never the other way around.
+if (-not (Test-Path -LiteralPath $shaderToolchainSourcesDir -PathType Container)) {
+    throw "Shader Toolchain contracts root not found: $shaderToolchainSourcesDir"
+}
+Get-ChildItem -LiteralPath $shaderToolchainSourcesDir -Recurse -File |
+    Where-Object { $_.Extension -eq ".h" } |
+    ForEach-Object {
+        $toolchainContractContent = Get-Content -LiteralPath $_.FullName -Raw -ErrorAction Stop
+        if ($toolchainContractContent -match '#include\s*"Graphics[\\/]') {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "toolchain-contract-direction"
+                Target = ConvertTo-RepoRelativePath $_.FullName
+                Reason = "Shader Toolchain contract headers must not depend on the Graphics runtime"
+            })
+        }
+    }
+
 $logicalIncludeSpecifications = @(
     [pscustomobject]@{
         Name        = "Application"
@@ -935,6 +981,11 @@ $logicalIncludeSpecifications = @(
         Name        = "GGLabRuntime"
         ScanRoot    = $runtimeSourcesDir
         LogicalRoot = $runtimeSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "ShaderToolchain"
+        ScanRoot    = $shaderToolchainSourcesDir
+        LogicalRoot = $shaderToolchainSourcesDir
     }
     [pscustomobject]@{
         Name        = "NapaVoxelCore"

@@ -15,6 +15,7 @@
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Targets/Vulkan13ShaderTarget.h"
 #endif
 
 #include <array>
@@ -1535,7 +1536,7 @@ namespace gglab
 			ShaderDesc shaderDesc{
 				.m_SourcePath = L"Passes/PassFinalColor.hlsl",
 				.m_Stage = ShaderStage::Vertex,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
 				.m_IncludeDirs = {L"."},
 			};
@@ -1657,7 +1658,7 @@ namespace gglab
 					ShaderDesc desc{
 						.m_SourcePath = L"Passes/PassCoordinateConformance.hlsl",
 						.m_Stage = stage,
-						.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(stage),
+						.m_Target = MakeVulkan13CompileTarget(stage),
 						.m_Entry = entry,
 						.m_IncludeDirs = { L"." },
 					};

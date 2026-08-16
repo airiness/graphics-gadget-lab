@@ -78,7 +78,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -93,7 +93,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\Application;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

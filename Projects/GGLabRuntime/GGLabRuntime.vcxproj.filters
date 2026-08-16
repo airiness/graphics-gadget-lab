@@ -1,6 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Contracts">
+      <UniqueIdentifier>{41BB1C85-83A8-DF37-3D42-F651AE686417}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core">
       <UniqueIdentifier>{39776D15-E7E3-9448-D536-52E8A87EE39B}</UniqueIdentifier>
     </Filter>
@@ -120,6 +123,9 @@
     </Filter>
     <Filter Include="Scene">
       <UniqueIdentifier>{BD68801D-B093-6BBF-5056-A01967FF135B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Targets">
+      <UniqueIdentifier>{9AC23C90-30B9-D3D4-61A1-5806B09DB99D}</UniqueIdentifier>
     </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{40265C81-FE76-4393-686B-E1945C246E69}</UniqueIdentifier>
@@ -1651,6 +1657,21 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h">
       <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTarget.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTypes.h">
+      <Filter>Contracts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h">
+      <Filter>Targets</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

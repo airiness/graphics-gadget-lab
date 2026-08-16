@@ -6,8 +6,8 @@
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
-#include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
-#include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Targets/Vulkan13ShaderTarget.h"
+#include "Targets/VulkanShaderCompileABI.h"
 
 #include <dxcapi.h>
 
@@ -90,12 +90,6 @@ namespace gglab
 				return "vulkan1.3";
 			}
 			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool IsVertexProducingStage(ShaderStage stage) noexcept
-		{
-			return stage == ShaderStage::Vertex || stage == ShaderStage::Domain ||
-				stage == ShaderStage::Geometry || stage == ShaderStage::Mesh;
 		}
 
 		[[nodiscard]] bool IsCompilerOwnedExtraArgument(std::wstring_view argument) noexcept
@@ -219,7 +213,7 @@ namespace gglab
 #endif
 
 	ShaderCompileValidationResult ValidateShaderDesc(
-		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept
+		const ShaderDesc& desc, const ShaderCompilerIdentity& compilerIdentity) noexcept
 	{
 		const auto reject = [](ShaderCompileValidationError error, std::wstring message) noexcept
 			{
@@ -250,15 +244,16 @@ namespace gglab
 			return reject(ShaderCompileValidationError::EmptyEntryPoint,
 				L"Shader entry point is empty; normalize the descriptor before compiling.");
 		}
-		if (activeDxcVersion.empty() || desc.m_Target.m_DxcVersion != activeDxcVersion)
+		if (compilerIdentity.m_CanonicalIdentity.empty() ||
+			compilerIdentity.m_CanonicalIdentity == L"unknown")
 		{
 			return reject(ShaderCompileValidationError::CompilerIdentityMismatch,
-				L"Shader target DXC identity does not match the active compiler.");
+				L"Active shader compiler identity is unavailable.");
 		}
 
 		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
 		{
-			const ShaderCompileTarget expected = ShaderCompiler::MakeVulkanSpirVTarget(desc.m_Stage);
+			const ShaderCompileTarget expected = MakeVulkan13CompileTarget(desc.m_Stage);
 			if (desc.m_Target.m_SpirVTargetEnvironment != expected.m_SpirVTargetEnvironment)
 			{
 				return reject(ShaderCompileValidationError::UnsupportedSpirVTargetEnvironment,
@@ -301,7 +296,7 @@ namespace gglab
 	{
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Impl->m_Utils)));
 		GGLAB_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Impl->m_Compiler)));
-		m_DxcVersion = QueryDxcVersion();
+		m_CompilerIdentity.m_CanonicalIdentity = QueryDxcVersion();
 
 		SetSourceRootDirectory(std::move(sourceRoot));
 		SetCacheRootDirectory(std::move(cacheRoot));
@@ -324,7 +319,8 @@ namespace gglab
 
 	ShaderCompileArtifact ShaderCompiler::CompileOrLoadArtifact(const ShaderDesc& desc) noexcept
 	{
-		const ShaderCompileValidationResult validation = ValidateShaderDesc(desc, m_DxcVersion);
+		const ShaderCompileValidationResult validation =
+			ValidateShaderDesc(desc, m_CompilerIdentity);
 		if (!validation.IsValid())
 		{
 			GGLAB_LOG_SHADER_COMPILER(LogLevel::Error,
@@ -334,7 +330,7 @@ namespace gglab
 		}
 
 		ShaderCompileArtifact artifact{};
-		const auto recipeHash = ComputeRecipeHash(desc);
+		const auto recipeHash = ComputeRecipeHash(desc, m_CompilerIdentity);
 		const auto keyHex = ToHex(recipeHash);
 		const auto binaryPath =
 			MakeCacheBinaryPath(keyHex, desc.m_Stage, desc.m_Target.m_BinaryFormat);
@@ -351,7 +347,7 @@ namespace gglab
 		if (std::filesystem::exists(binaryPath, errorCode) &&
 			std::filesystem::exists(meta, errorCode))
 		{
-			if (IsMetaUpToDate(meta, desc, recipeHash))
+			if (IsMetaUpToDate(meta, desc, recipeHash, m_CompilerIdentity))
 			{
 				ComPtr<IDxcBlobEncoding> blobEncoding;
 				GGLAB_HR(m_Impl->m_Utils->LoadFile(binaryPath.c_str(), nullptr, &blobEncoding));
@@ -378,7 +374,7 @@ namespace gglab
 		// Save binary
 		(void)utils::WriteFileBinary(binaryPath,
 			std::span(static_cast<const std::byte*>(binary.Data()), binary.SizeInBytes()));
-		WriteMeta(meta, desc, deps, recipeHash);
+		WriteMeta(meta, desc, deps, recipeHash, m_CompilerIdentity);
 
 		// result
 		artifact.m_Binary = std::move(binary);
@@ -416,10 +412,9 @@ namespace gglab
 		{
 			desc.m_Target.m_Flags = m_DefaultShaderConfig.m_Target.m_Flags;
 		}
-		desc.m_Target.m_DxcVersion = m_DxcVersion;
 		if (desc.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV)
 		{
-			const ShaderCompileTarget vulkanTarget = MakeVulkanSpirVTarget(desc.m_Stage);
+			const ShaderCompileTarget vulkanTarget = MakeVulkan13CompileTarget(desc.m_Stage);
 			if (desc.m_Target.m_SpirVTargetEnvironment == ShaderSpirVTargetEnvironment::None)
 			{
 				desc.m_Target.m_SpirVTargetEnvironment =
@@ -490,24 +485,6 @@ namespace gglab
 		return desc;
 	}
 
-	ShaderCompileTarget ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage stage) noexcept
-	{
-		ShaderCompileTarget target{};
-		target.m_BinaryFormat = ShaderBinaryFormat::SpirV;
-		target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::Vulkan1_3;
-		target.m_BindingABIRevision = GGLabVulkanShaderBindingABI.m_Revision;
-		if (IsVertexProducingStage(stage) &&
-			GGLabVulkanCoordinatePolicy.m_InvertVertexProducingStageY)
-		{
-			target.m_CoordinateOptions |= ShaderCoordinateOptions::InvertY;
-		}
-		if (stage == ShaderStage::Pixel && GGLabVulkanCoordinatePolicy.m_UseDxPositionW)
-		{
-			target.m_CoordinateOptions |= ShaderCoordinateOptions::UseDxPositionW;
-		}
-		return target;
-	}
-
 	std::vector<std::wstring> ShaderCompiler::BuildCompileArguments(const ShaderDesc& desc) noexcept
 	{
 		const ShaderCompileTarget& compileTarget = desc.m_Target;
@@ -536,7 +513,7 @@ namespace gglab
 					args.emplace_back(option);
 					args.push_back(std::to_wstring(range.m_BindingShift));
 					args.push_back(std::to_wstring(
-						GGLabVulkanShaderBindingABI.m_FixedHlslRegisterSpace));
+						GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace));
 				};
 			appendRegisterShift(L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer);
 			appendRegisterShift(L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource);
@@ -544,11 +521,11 @@ namespace gglab
 			appendRegisterShift(L"-fvk-s-shift", VulkanShaderRegisterClass::Sampler);
 
 			args.emplace_back(L"-fvk-bind-resource-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_ResourceHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_ResourceHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
 			args.emplace_back(L"-fvk-bind-sampler-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_SamplerHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderBindingABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_SamplerHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
 
 			if (Test(compileTarget.m_CoordinateOptions, ShaderCoordinateOptions::InvertY))
 			{
@@ -606,7 +583,8 @@ namespace gglab
 		return args;
 	}
 
-	ShaderHash128 ShaderCompiler::ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept
+	ShaderHash128 ShaderCompiler::ComputeRecipeHash(
+		const ShaderDesc& mergedDesc, const ShaderCompilerIdentity& compilerIdentity) noexcept
 	{
 		Sha256Builder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.shader.recipe") &&
@@ -620,7 +598,7 @@ namespace gglab
 			builder.AddU32LE(mergedDesc.m_Target.m_BindingABIRevision) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
 				mergedDesc.m_Target.m_CoordinateOptions)) &&
-			builder.AddStringUtf8(utils::ToString(mergedDesc.m_Target.m_DxcVersion));
+			builder.AddStringUtf8(utils::ToString(compilerIdentity.m_CanonicalIdentity));
 
 		const std::vector<std::wstring> compileArguments = BuildCompileArguments(mergedDesc);
 		succeeded = succeeded &&
@@ -729,7 +707,8 @@ namespace gglab
 	}
 
 	void ShaderCompiler::WriteMeta(const std::filesystem::path& meta, const ShaderDesc& desc,
-		const std::vector<std::filesystem::path>& deps, ShaderHash128 recipeHash) const noexcept
+		const std::vector<std::filesystem::path>& deps, ShaderHash128 recipeHash,
+		const ShaderCompilerIdentity& compilerIdentity) const noexcept
 	{
 		const auto created = utils::CreateParentDirectoryIfNotExist(meta);
 
@@ -754,7 +733,7 @@ namespace gglab
 		out << "binding_abi_revision=" << desc.m_Target.m_BindingABIRevision << "\n";
 		out << "coordinate_options=" <<
 			static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions) << "\n";
-		out << "dxc_version=" << utils::ToString(desc.m_Target.m_DxcVersion) << "\n";
+		out << "dxc_version=" << utils::ToString(compilerIdentity.m_CanonicalIdentity) << "\n";
 		out << "src=" << src << "\n";
 		out << "entry=" << entry << "\n";
 		out << "target=" << target << "\n";
@@ -802,7 +781,8 @@ namespace gglab
 	}
 
 	bool ShaderCompiler::IsMetaUpToDate(const std::filesystem::path& meta,
-		const ShaderDesc& desc, ShaderHash128 recipeHash) const noexcept
+		const ShaderDesc& desc, ShaderHash128 recipeHash,
+		const ShaderCompilerIdentity& compilerIdentity) const noexcept
 	{
 		std::error_code errorCode;
 		if (!std::filesystem::exists(meta, errorCode))
@@ -871,7 +851,7 @@ namespace gglab
 				std::to_string(desc.m_Target.m_BindingABIRevision)) &&
 			equals("coordinate_options",
 				std::to_string(static_cast<uint32_t>(desc.m_Target.m_CoordinateOptions))) &&
-			equals("dxc_version", utils::ToString(desc.m_Target.m_DxcVersion));
+			equals("dxc_version", utils::ToString(compilerIdentity.m_CanonicalIdentity));
 	}
 
 	std::wstring ShaderCompiler::DefaultEntry(const ShaderStage& stage) noexcept

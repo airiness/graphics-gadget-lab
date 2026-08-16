@@ -1,17 +1,18 @@
 #pragma once
+#include "Contracts/ShaderCompileTarget.h"
+#include "Contracts/ShaderCompileTypes.h"
 #include "Graphics/Shader/Shader.h"
 
 #include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace gglab
 {
 	[[nodiscard]] ShaderCompileValidationResult ValidateShaderDesc(
-		const ShaderDesc& desc, std::wstring_view activeDxcVersion) noexcept;
+		const ShaderDesc& desc, const ShaderCompilerIdentity& compilerIdentity) noexcept;
 
 	class ShaderCompiler
 	{
@@ -35,16 +36,19 @@ namespace gglab
 			m_DefaultShaderConfig = defaultShaderConfig;
 		}
 		const ShaderDesc& GetDefaultShaderConfig() const noexcept { return m_DefaultShaderConfig; }
-		const std::wstring& GetCompilerVersion() const noexcept { return m_DxcVersion; }
+		const ShaderCompilerIdentity& GetCompilerIdentity() const noexcept
+		{
+			return m_CompilerIdentity;
+		}
 
 		ShaderCompileArtifact CompileOrLoadArtifact(const ShaderDesc& desc) noexcept;
 
 		ShaderDesc NormalizeShaderDesc(const ShaderDesc& userDesc) const noexcept;
 
 	public:
-		static ShaderCompileTarget MakeVulkanSpirVTarget(ShaderStage stage) noexcept;
+		static ShaderHash128 ComputeRecipeHash(
+			const ShaderDesc& mergedDesc, const ShaderCompilerIdentity& compilerIdentity) noexcept;
 		static std::vector<std::wstring> BuildCompileArguments(const ShaderDesc& desc) noexcept;
-		static ShaderHash128 ComputeRecipeHash(const ShaderDesc& mergedDesc) noexcept;
 
 	private:
 		std::filesystem::path MakeCacheBinaryPath(
@@ -52,9 +56,10 @@ namespace gglab
 		ShaderBinary CompileShader(
 			const ShaderDesc& desc, std::vector<std::filesystem::path>& outDeps) const noexcept;
 		void WriteMeta(const std::filesystem::path& meta, const ShaderDesc& desc,
-			const std::vector<std::filesystem::path>& deps, ShaderHash128 recipeHash) const noexcept;
+			const std::vector<std::filesystem::path>& deps, ShaderHash128 recipeHash,
+			const ShaderCompilerIdentity& compilerIdentity) const noexcept;
 		bool IsMetaUpToDate(const std::filesystem::path& meta, const ShaderDesc& desc,
-			ShaderHash128 recipeHash) const noexcept;
+			ShaderHash128 recipeHash, const ShaderCompilerIdentity& compilerIdentity) const noexcept;
 
 	private:
 		static std::wstring DefaultEntry(const ShaderStage& stage) noexcept;
@@ -74,6 +79,6 @@ namespace gglab
 		std::filesystem::path m_SourceRootDir;
 		std::filesystem::path m_CacheRootDir;
 		ShaderDesc m_DefaultShaderConfig;
-		std::wstring m_DxcVersion;
+		ShaderCompilerIdentity m_CompilerIdentity;
 	};
 }

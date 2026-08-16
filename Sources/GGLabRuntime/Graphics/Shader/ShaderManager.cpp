@@ -3,6 +3,8 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/Shader/ShaderCompiler.h"
+#include "Targets/DX12ShaderTarget.h"
+#include "Targets/Vulkan13ShaderTarget.h"
 
 #include <filesystem>
 #include <format>
@@ -71,6 +73,30 @@ namespace gglab
 			}
 			return "Unknown";
 		}
+
+		// Runtime-side adapter: the ShaderManager maps the active RHI backend to
+		// a Shader target profile. RHIBackendType::Unknown has no profile and is
+		// handled by the caller before this mapping runs.
+		[[nodiscard]] constexpr ShaderTargetProfile GetShaderTargetProfile(
+			RHIBackendType activeBackend) noexcept
+		{
+			return activeBackend == RHIBackendType::Vulkan
+				? ShaderTargetProfile::GGLabVulkan13
+				: ShaderTargetProfile::GGLabDX12;
+		}
+
+		[[nodiscard]] ShaderCompileTarget MakeShaderCompileTarget(
+			ShaderTargetProfile profile, ShaderStage stage) noexcept
+		{
+			switch (profile)
+			{
+			case ShaderTargetProfile::GGLabDX12:
+				return MakeDX12CompileTarget(stage);
+			case ShaderTargetProfile::GGLabVulkan13:
+				return MakeVulkan13CompileTarget(stage);
+			}
+			return {};
+		}
 	}
 
 	ShaderManager::ShaderManager(RHIBackendType activeBackend,
@@ -102,7 +128,8 @@ namespace gglab
 	{
 		ShaderDesc norm = NormalizeForActiveBackend(desc);
 
-		const auto keyHash = ShaderCompiler::ComputeRecipeHash(norm);
+		const auto keyHash = ShaderCompiler::ComputeRecipeHash(
+			norm, m_Compiler->GetCompilerIdentity());
 		ShaderKey key{ .m_KeyHash = keyHash };
 
 		// return if exist.
@@ -287,7 +314,8 @@ namespace gglab
 		for (auto& entry : job.m_Entries)
 		{
 			const ShaderKey key{
-				.m_KeyHash = ShaderCompiler::ComputeRecipeHash(entry.m_NormalizedDesc),
+				.m_KeyHash = ShaderCompiler::ComputeRecipeHash(
+					entry.m_NormalizedDesc, m_Compiler->GetCompilerIdentity()),
 			};
 			if (m_KeyIdMap.contains(key))
 			{
@@ -433,31 +461,24 @@ namespace gglab
 	void ShaderManager::ApplyActiveBackendTarget(
 		ShaderDesc& desc, RHIBackendType activeBackend) noexcept
 	{
-		switch (activeBackend)
+		if (activeBackend == RHIBackendType::Unknown)
 		{
-		case RHIBackendType::DX12:
-			desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Dxil;
-			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
-			desc.m_Target.m_BindingABIRevision = 0;
-			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
-			break;
-		case RHIBackendType::Vulkan:
-		{
-			const ShaderCompileTarget target =
-				ShaderCompiler::MakeVulkanSpirVTarget(desc.m_Stage);
-			desc.m_Target.m_BinaryFormat = target.m_BinaryFormat;
-			desc.m_Target.m_SpirVTargetEnvironment = target.m_SpirVTargetEnvironment;
-			desc.m_Target.m_BindingABIRevision = target.m_BindingABIRevision;
-			desc.m_Target.m_CoordinateOptions = target.m_CoordinateOptions;
-			break;
-		}
-		case RHIBackendType::Unknown:
 			desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
 			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
 			desc.m_Target.m_BindingABIRevision = 0;
 			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
-			break;
+			return;
 		}
-		desc.m_Target.m_DxcVersion.clear();
+
+		// Profile application: the backend is resolved, so the backend-owned
+		// target fields are force-overwritten from the profile resolver.
+		// Authoring fields (model / HLSL version / flags / optimization) stay
+		// untouched.
+		const ShaderCompileTarget backendTarget =
+			MakeShaderCompileTarget(GetShaderTargetProfile(activeBackend), desc.m_Stage);
+		desc.m_Target.m_BinaryFormat = backendTarget.m_BinaryFormat;
+		desc.m_Target.m_SpirVTargetEnvironment = backendTarget.m_SpirVTargetEnvironment;
+		desc.m_Target.m_BindingABIRevision = backendTarget.m_BindingABIRevision;
+		desc.m_Target.m_CoordinateOptions = backendTarget.m_CoordinateOptions;
 	}
 }

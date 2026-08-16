@@ -1,4 +1,6 @@
 #pragma once
+#include "Contracts/ShaderCompileTypes.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -7,13 +9,6 @@
 
 namespace gglab
 {
-	enum class ShaderBinaryFormat : uint8_t
-	{
-		Unknown,
-		Dxil,
-		SpirV,
-	};
-
 	struct ShaderHash128
 	{
 		uint64_t m_LowBits = 0;
