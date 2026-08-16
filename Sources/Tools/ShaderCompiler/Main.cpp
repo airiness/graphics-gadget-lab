@@ -151,6 +151,64 @@ namespace
 		return ExitCodeSuccess;
 	}
 
+	[[nodiscard]] std::string_view CompileStatusText(gglab::ShaderCompileStatus status) noexcept
+	{
+		switch (status)
+		{
+		case gglab::ShaderCompileStatus::Success:
+			return "success";
+		case gglab::ShaderCompileStatus::InvalidRequest:
+			return "invalid-request";
+		case gglab::ShaderCompileStatus::SourceNotFound:
+			return "source-not-found";
+		case gglab::ShaderCompileStatus::CompilerUnavailable:
+			return "compiler-unavailable";
+		case gglab::ShaderCompileStatus::CompileFailed:
+			return "compile-failed";
+		case gglab::ShaderCompileStatus::ArtifactIOFailure:
+			return "artifact-io-failure";
+		}
+		return "unknown";
+	}
+
+	int PrintJsonFailure(const gglab::ShaderCompilerDiagnostics& diagnostics,
+		std::wstring_view targetName)
+	{
+		std::string json;
+		json += "{\"success\":false,";
+		json += "\"status\":\"";
+		json += CompileStatusText(diagnostics.m_Status);
+		json += "\",";
+		json += "\"target\":\"";
+		AppendJsonEscaped(json, gglab::utils::ToString(targetName));
+		json += "\",";
+		json += "\"diagnostics\":[{\"message\":\"";
+		AppendJsonEscaped(json, gglab::utils::ToString(diagnostics.m_Message));
+		json += "\"";
+		if (!diagnostics.m_SourceIdentity.empty())
+		{
+			json += ",\"sourceIdentity\":\"";
+			AppendJsonEscaped(json, gglab::utils::ToString(diagnostics.m_SourceIdentity));
+			json += "\"";
+		}
+		json += "}]}";
+		std::wcout << gglab::utils::ToWideString(json) << L"\n";
+		return ExitCodeForStatus(diagnostics.m_Status);
+	}
+
+	int PrintTextFailure(const gglab::ShaderCompilerDiagnostics& diagnostics)
+	{
+		std::wcerr << diagnostics.m_Message << L"\n";
+		return ExitCodeForStatus(diagnostics.m_Status);
+	}
+
+	int PrintFailure(const gglab::ShaderCompilerDiagnostics& diagnostics,
+		std::wstring_view targetName, bool jsonMode)
+	{
+		return jsonMode ? PrintJsonFailure(diagnostics, targetName)
+			: PrintTextFailure(diagnostics);
+	}
+
 	int PrintJsonResult(const gglab::ShaderCompileResult& result,
 		const gglab::ShaderResolvedRecipe& recipe, const std::filesystem::path& binaryPath,
 		const std::filesystem::path& manifestPath, std::wstring_view targetName)
@@ -221,14 +279,14 @@ namespace
 		const gglab::ShaderResolvedRecipe recipe = compiler.Resolve(desc);
 		if (!recipe.IsSuccess())
 		{
-			std::wcerr << recipe.m_Diagnostics.m_Message << L"\n";
-			return ExitCodeForStatus(recipe.m_Status);
+			return PrintFailure(recipe.m_Diagnostics, targetName,
+				options.m_ResultFormat == "json");
 		}
 		const gglab::ShaderCompileResult result = compiler.CompileOrLoad(recipe);
 		if (!result.IsSuccess())
 		{
-			std::wcerr << result.m_Diagnostics.m_Message << L"\n";
-			return ExitCodeForStatus(result.m_Status);
+			return PrintFailure(result.m_Diagnostics, targetName,
+				options.m_ResultFormat == "json");
 		}
 
 		const std::filesystem::path binaryPath = compiler.GetCacheBinaryPath(recipe);

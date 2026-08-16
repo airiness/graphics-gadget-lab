@@ -1,5 +1,6 @@
 #pragma once
 #include "Contracts/ShaderArtifact.h"
+#include "Contracts/ShaderArtifactManifest.h"
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -57,7 +58,10 @@ namespace gglab
 		// identity. The resolved recipe is the single compile authority.
 		[[nodiscard]] ShaderResolvedRecipe Resolve(const ShaderDesc& request) noexcept;
 
-		// Compiles or loads the resolved recipe through the shared cache.
+		// Compiles or loads the resolved recipe through the shared cache. The
+		// recipe is re-validated against the executing compiler first: a
+		// recipe from another producer, or a mutated recipe, is rejected with
+		// a structured result instead of being re-interpreted.
 		// Compile failures are structured results, never fatal.
 		[[nodiscard]] ShaderCompileResult CompileOrLoad(
 			const ShaderResolvedRecipe& recipe) noexcept;
@@ -82,28 +86,31 @@ namespace gglab
 		[[nodiscard]] ShaderCompilerDiagnostics MakeDiagnostics(
 			ShaderCompileStatus status, std::wstring message,
 			ShaderCompileValidationError validationError =
-			ShaderCompileValidationError::None) const noexcept;
+				ShaderCompileValidationError::None) const noexcept;
 		[[nodiscard]] ShaderResolvedRecipe ResolveRecipe(const ShaderDesc& request) noexcept;
 		[[nodiscard]] ShaderCompileResult CompileOrLoadInternal(
 			const ShaderResolvedRecipe& recipe) noexcept;
+		[[nodiscard]] bool ValidateRecipeAuthority(
+			const ShaderResolvedRecipe& recipe, ShaderCompilerDiagnostics& outDiagnostics) const noexcept;
 		[[nodiscard]] std::filesystem::path MakeCacheBinaryPath(
 			const std::wstring& keyHex, ShaderStage stage, ShaderBinaryFormat format) const noexcept;
-		[[nodiscard]] ShaderArtifact BuildArtifact(
+		[[nodiscard]] ShaderArtifactCacheRecord BuildCacheRecord(
 			const ShaderResolvedRecipe& recipe, const ShaderBinary& binary,
-			const std::vector<std::filesystem::path>& dependencies) const noexcept;
-		[[nodiscard]] bool ValidateManifestAgainstRecipe(
-			const ShaderArtifactManifest& manifest, const ShaderResolvedRecipe& recipe) const noexcept;
+			const std::vector<ShaderArtifactDependency>& dependencies) const noexcept;
+		[[nodiscard]] bool ValidateCacheRecordAgainstRecipe(
+			const ShaderArtifactCacheRecord& record, const ShaderResolvedRecipe& recipe) const noexcept;
 
 		[[nodiscard]] ShaderBinary CompileShaderBinary(const ShaderResolvedRecipe& recipe,
-			std::vector<std::filesystem::path>& outDependencies,
+			std::vector<ShaderArtifactDependency>& outDependencies,
 			ShaderCompilerDiagnostics& outDiagnostics) const noexcept;
 
 	private:
 		static std::wstring DefaultEntry(const ShaderStage& stage) noexcept;
 		static std::wstring ToTarget(ShaderStage stage, ShaderModel model) noexcept;
 		static ShaderRecipeId ComputeRecipeId(
-			const std::filesystem::path& logicalSourcePath, const ShaderDesc& mergedDesc,
-			const std::vector<std::wstring>& compileArguments) noexcept;
+			const std::filesystem::path& logicalSourcePath,
+			const std::vector<std::filesystem::path>& logicalIncludeDirs,
+			const ShaderDesc& mergedDesc) noexcept;
 		std::wstring QueryDxcVersion() const noexcept;
 
 	private:

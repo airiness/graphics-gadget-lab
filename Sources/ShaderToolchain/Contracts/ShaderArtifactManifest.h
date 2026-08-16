@@ -36,8 +36,9 @@ namespace gglab
 	}
 
 	// Canonical logical shader request identity ("which variant"). Durable
-	// SHA-256; persisted serializations use the full digest, never the
-	// truncated fast hash.
+	// SHA-256 over the logical request only: logical source identity, entry,
+	// stage, target semantics, defines, logical include configuration, and
+	// extra compile options. Physical checkout locations never participate.
 	struct ShaderRecipeId final
 	{
 		Sha256Digest m_DurableDigest{};
@@ -52,8 +53,10 @@ namespace gglab
 	};
 
 	// Producer/dependency-sensitive build reuse identity: the recipe identity
-	// (durable digest) plus the compiler identity. Dependency records keep
-	// the physical mtime form and are validated at cache-hit time.
+	// (durable digest) plus the compiler identity. Dependency validation is
+	// content-based (see ShaderArtifactDependency); the key itself stays
+	// producer-stable so the same recipe reuses the entry across identical
+	// producers.
 	struct LocalShaderCacheKey final
 	{
 		Sha256Digest m_DurableDigest{};
@@ -79,16 +82,22 @@ namespace gglab
 			const BinaryContentDigest&, const BinaryContentDigest&) noexcept = default;
 	};
 
-	// Dependency validation record: physical path + last-write ticks.
+	// Dependency validation record. The content digest is the authoritative
+	// identity: it is computed over the exact bytes handed to the compiler,
+	// so it cannot drift from what was actually compiled. The logical path is
+	// the portable identity when derivable; the physical path and mtime are
+	// local cache fast-path state only.
 	struct ShaderArtifactDependency
 	{
-		std::filesystem::path m_Path{};
+		std::filesystem::path m_LogicalPath{};
+		std::filesystem::path m_PhysicalPath{};
+		Sha256Digest m_ContentDigest{};
 		int64_t m_LastWriteTimeTicks = 0;
 	};
 
-	// Authoritative in-memory artifact manifest model owned by the Shader
-	// Toolchain. Its serialized form is a versioned, machine-readable JSON
-	// document (*.shaderartifact.json, schemaVersion=1).
+	// Portable artifact manifest: the compile semantics and identities that
+	// describe the artifact itself. It must never carry checkout physical
+	// paths or local validation state.
 	struct ShaderArtifactManifest
 	{
 		uint32_t m_SchemaVersion = ShaderArtifactManifestSchemaVersion;
@@ -96,24 +105,36 @@ namespace gglab
 		ShaderRecipeId m_RecipeId{};
 		LocalShaderCacheKey m_BuildKey{};
 		ShaderCompilerIdentity m_CompilerIdentity{};
+		ShaderTargetProfile m_TargetProfile = ShaderTargetProfile::GGLabDX12;
 		ShaderBinaryFormat m_BinaryFormat = ShaderBinaryFormat::Unknown;
 		ShaderSpirVTargetEnvironment m_SpirVTargetEnvironment =
 			ShaderSpirVTargetEnvironment::None;
 		uint32_t m_BindingABIRevision = 0;
 		ShaderCoordinateOptions m_CoordinateOptions = ShaderCoordinateOptions::None;
 		ShaderStage m_Stage = ShaderStage::Vertex;
-		// Normative source identity: logical path relative to the source root
-		// (e.g. Passes/PassForwardPBR.hlsl). The physical path below is used
-		// for IO and diagnostics only and never participates in the recipe
-		// identity.
+		ShaderModel m_ShaderModel = ShaderModel::SM_6_7;
+		std::wstring m_HlslVersion{ L"2021" };
+		ShaderCompileFlags m_CompileFlags = ShaderCompileFlags::None;
+		std::wstring m_OptimizationLevel{ L"O3" };
+		// Normative source identity: logical path relative to the source root.
 		std::filesystem::path m_LogicalSourcePath{};
-		std::filesystem::path m_SourcePath{};
 		std::wstring m_EntryPoint{};
 		std::wstring m_TargetString{};
 		std::vector<std::wstring> m_Defines{};
-		std::vector<std::filesystem::path> m_IncludeDirs{};
+		std::vector<std::filesystem::path> m_LogicalIncludeDirs{};
 		std::vector<std::wstring> m_ExtraArgs{};
-		std::vector<ShaderArtifactDependency> m_Dependencies{};
 		BinaryContentDigest m_BinaryContentDigest{};
+	};
+
+	// Local cache record: the portable manifest plus the derived local state
+	// used to validate and rebuild the cache entry on this machine. The
+	// physical fields are never part of the portable artifact contract.
+	struct ShaderArtifactCacheRecord
+	{
+		ShaderArtifactManifest m_Manifest{};
+		ShaderBinary m_Binary{};
+		std::filesystem::path m_PhysicalSourcePath{};
+		std::vector<std::filesystem::path> m_PhysicalIncludeDirs{};
+		std::vector<ShaderArtifactDependency> m_Dependencies{};
 	};
 }

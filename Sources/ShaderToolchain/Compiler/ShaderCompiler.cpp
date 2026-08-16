@@ -22,6 +22,7 @@
 #include <cwctype>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <span>
 #include <string>
@@ -111,7 +112,7 @@ namespace gglab
 
 				if (SUCCEEDED(m_Utils->LoadFile(path.c_str(), nullptr, &blob)))
 				{
-					m_Includes.push_back(path);
+					RecordDependency(path, blob.Get());
 					*ppIncludeSource = blob.Detach();
 					return S_OK;
 				}
@@ -121,7 +122,7 @@ namespace gglab
 					const auto pathInDir = utils::Canonical(dir / pFilename);
 					if (SUCCEEDED(m_Utils->LoadFile(pathInDir.c_str(), nullptr, &blob)))
 					{
-						m_Includes.push_back(pathInDir);
+						RecordDependency(pathInDir, blob.Get());
 						*ppIncludeSource = blob.Detach();
 						return S_OK;
 					}
@@ -131,15 +132,28 @@ namespace gglab
 				return E_FAIL;
 			}
 
-			const std::vector<std::filesystem::path>& Includes() const noexcept
+			const std::vector<ShaderArtifactDependency>& Dependencies() const noexcept
 			{
-				return m_Includes;
+				return m_Dependencies;
 			}
 
 		private:
+			// The dependency digest is computed over the exact bytes handed to
+			// DXC, so cache validation can never drift from what was actually
+			// compiled, regardless of when files change on disk.
+			void RecordDependency(const std::filesystem::path& path, IDxcBlob* blob) noexcept
+			{
+				ShaderArtifactDependency dependency{};
+				dependency.m_PhysicalPath = path;
+				dependency.m_ContentDigest = ComputeSha256(std::span(
+					static_cast<const std::byte*>(blob->GetBufferPointer()),
+					blob->GetBufferSize()));
+				m_Dependencies.push_back(std::move(dependency));
+			}
+
 			ComPtr<IDxcUtils> m_Utils;
 			std::vector<std::filesystem::path> m_IncludeDirs;
-			std::vector<std::filesystem::path> m_Includes;
+			std::vector<ShaderArtifactDependency> m_Dependencies;
 		};
 
 		ShaderBinary CopyShaderBinary(IDxcBlob* blob) noexcept
@@ -479,6 +493,27 @@ namespace gglab
 			}
 		}
 		desc.m_SourcePath = utils::Canonical(m_SourceRootDir / logicalSourcePath);
+
+		// Logical include configuration: the identity-relevant form is the
+		// caller-relative path. Absolute include dirs are relativized against
+		// the source root when they live under it, so checkout locations never
+		// enter the recipe identity.
+		std::vector<std::filesystem::path> logicalIncludeDirs;
+		logicalIncludeDirs.reserve(desc.m_IncludeDirs.size());
+		for (const std::filesystem::path& include : desc.m_IncludeDirs)
+		{
+			if (include.is_relative())
+			{
+				logicalIncludeDirs.push_back(include.lexically_normal());
+				continue;
+			}
+			const std::filesystem::path canonicalInclude = utils::Canonical(include);
+			std::error_code relativeError;
+			const std::filesystem::path relativeInclude = std::filesystem::relative(
+				canonicalInclude, m_SourceRootDir, relativeError);
+			logicalIncludeDirs.push_back(
+				relativeError ? canonicalInclude : relativeInclude.lexically_normal());
+		}
 		for (auto& include : desc.m_IncludeDirs)
 		{
 			if (include.is_relative())
@@ -535,10 +570,11 @@ namespace gglab
 
 		recipe.m_Request = std::move(desc);
 		recipe.m_LogicalSourcePath = logicalSourcePath;
+		recipe.m_LogicalIncludeDirs = std::move(logicalIncludeDirs);
 		recipe.m_CompilerIdentity = m_CompilerIdentity;
 		recipe.m_CompileArguments = BuildCompileArguments(recipe.m_Request);
 		recipe.m_RecipeId = ComputeRecipeId(
-			recipe.m_LogicalSourcePath, recipe.m_Request, recipe.m_CompileArguments);
+			recipe.m_LogicalSourcePath, recipe.m_LogicalIncludeDirs, recipe.m_Request);
 		recipe.m_BuildKey = ComputeBuildKey(recipe.m_RecipeId, recipe.m_CompilerIdentity);
 		return recipe;
 	}
@@ -581,6 +617,19 @@ namespace gglab
 			return result;
 		}
 
+		// Authority gate: the recipe must belong to this producer and remain an
+		// internally consistent resolved state. A recipe from another compiler
+		// instance, or one mutated after Resolve, is rejected instead of being
+		// re-interpreted (which would publish new content under a stale
+		// identity).
+		ShaderCompilerDiagnostics authorityDiagnostics{};
+		if (!ValidateRecipeAuthority(recipe, authorityDiagnostics))
+		{
+			result.m_Status = authorityDiagnostics.m_Status;
+			result.m_Diagnostics = authorityDiagnostics;
+			return result;
+		}
+
 		result.m_RecipeId = recipe.m_RecipeId;
 
 		const std::wstring keyHex = utils::ToWideString(
@@ -594,12 +643,13 @@ namespace gglab
 		if (std::filesystem::exists(binaryPath, errorCode) &&
 			std::filesystem::exists(manifestPath, errorCode))
 		{
-			const std::optional<ShaderArtifact> cached =
-				LoadShaderArtifact(manifestPath, binaryPath);
-			if (cached.has_value() && ValidateManifestAgainstRecipe(cached->m_Manifest, recipe))
+			const std::optional<ShaderArtifactCacheRecord> cached =
+				LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
+			if (cached.has_value() && ValidateCacheRecordAgainstRecipe(*cached, recipe))
 			{
 				result.m_Status = ShaderCompileStatus::Success;
-				result.m_Artifact = *cached;
+				result.m_Artifact.m_Manifest = cached->m_Manifest;
+				result.m_Artifact.m_Binary = cached->m_Binary;
 				result.m_FromCache = true;
 				return result;
 			}
@@ -608,7 +658,7 @@ namespace gglab
 				utils::ToString(manifestPath.wstring()));
 		}
 
-		std::vector<std::filesystem::path> dependencies;
+		std::vector<ShaderArtifactDependency> dependencies;
 		ShaderCompilerDiagnostics compileDiagnostics{};
 		ShaderBinary binary = CompileShaderBinary(recipe, dependencies, compileDiagnostics);
 		if (!binary.IsValid() ||
@@ -627,8 +677,8 @@ namespace gglab
 			return result;
 		}
 
-		ShaderArtifact artifact = BuildArtifact(recipe, binary, dependencies);
-		if (!PublishShaderArtifact(binaryPath, manifestPath, artifact))
+		ShaderArtifactCacheRecord record = BuildCacheRecord(recipe, binary, dependencies);
+		if (!PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record))
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
 			result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::ArtifactIOFailure,
@@ -637,10 +687,10 @@ namespace gglab
 			return result;
 		}
 
-		const std::optional<ShaderArtifact> published =
-			LoadShaderArtifact(manifestPath, binaryPath);
+		const std::optional<ShaderArtifactCacheRecord> published =
+			LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
 		if (!published.has_value() ||
-			!ValidateManifestAgainstRecipe(published->m_Manifest, recipe))
+			!ValidateCacheRecordAgainstRecipe(*published, recipe))
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
 			result.m_Diagnostics = MakeDiagnostics(ShaderCompileStatus::ArtifactIOFailure,
@@ -650,9 +700,45 @@ namespace gglab
 		}
 
 		result.m_Status = ShaderCompileStatus::Success;
-		result.m_Artifact = *published;
+		result.m_Artifact.m_Manifest = published->m_Manifest;
+		result.m_Artifact.m_Binary = published->m_Binary;
 		result.m_FromCache = false;
 		return result;
+	}
+
+	bool ShaderCompiler::ValidateRecipeAuthority(
+		const ShaderResolvedRecipe& recipe, ShaderCompilerDiagnostics& outDiagnostics) const noexcept
+	{
+		if (recipe.m_CompilerIdentity.m_CanonicalIdentity !=
+			m_CompilerIdentity.m_CanonicalIdentity)
+		{
+			outDiagnostics = MakeDiagnostics(ShaderCompileStatus::InvalidRequest,
+				L"Recipe producer identity does not match the active compiler.",
+				ShaderCompileValidationError::CompilerIdentityMismatch);
+			outDiagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
+			return false;
+		}
+
+		const std::vector<std::wstring> rederivedArguments =
+			BuildCompileArguments(recipe.m_Request);
+		const ShaderRecipeId rederivedRecipeId = ComputeRecipeId(
+			recipe.m_LogicalSourcePath, recipe.m_LogicalIncludeDirs, recipe.m_Request);
+		const LocalShaderCacheKey rederivedBuildKey =
+			ComputeBuildKey(rederivedRecipeId, m_CompilerIdentity);
+		const std::filesystem::path expectedPhysicalSource = utils::Canonical(
+			m_SourceRootDir / recipe.m_LogicalSourcePath);
+
+		if (rederivedArguments != recipe.m_CompileArguments ||
+			rederivedRecipeId != recipe.m_RecipeId ||
+			rederivedBuildKey != recipe.m_BuildKey ||
+			expectedPhysicalSource != utils::Canonical(recipe.m_Request.m_SourcePath))
+		{
+			outDiagnostics = MakeDiagnostics(ShaderCompileStatus::InvalidRequest,
+				L"Resolved recipe is not an internally consistent resolved state.");
+			outDiagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
+			return false;
+		}
+		return true;
 	}
 
 	std::filesystem::path ShaderCompiler::GetCacheBinaryPath(
@@ -706,24 +792,30 @@ namespace gglab
 		return path;
 	}
 
-	ShaderArtifact ShaderCompiler::BuildArtifact(const ShaderResolvedRecipe& recipe,
+	ShaderArtifactCacheRecord ShaderCompiler::BuildCacheRecord(const ShaderResolvedRecipe& recipe,
 		const ShaderBinary& binary,
-		const std::vector<std::filesystem::path>& dependencies) const noexcept
+		const std::vector<ShaderArtifactDependency>& dependencies) const noexcept
 	{
-		ShaderArtifact artifact{};
-		ShaderArtifactManifest& manifest = artifact.m_Manifest;
+		ShaderArtifactCacheRecord record{};
+		ShaderArtifactManifest& manifest = record.m_Manifest;
 		manifest.m_SchemaVersion = ShaderArtifactManifestSchemaVersion;
 		manifest.m_RecipeHashSchema = ShaderRecipeHashSchema;
 		manifest.m_RecipeId = recipe.m_RecipeId;
 		manifest.m_BuildKey = recipe.m_BuildKey;
 		manifest.m_CompilerIdentity = recipe.m_CompilerIdentity;
+		manifest.m_TargetProfile = GetShaderTargetProfile(
+			recipe.m_Request.m_Target.m_BinaryFormat,
+			recipe.m_Request.m_Target.m_SpirVTargetEnvironment);
 		manifest.m_BinaryFormat = recipe.m_Request.m_Target.m_BinaryFormat;
 		manifest.m_SpirVTargetEnvironment = recipe.m_Request.m_Target.m_SpirVTargetEnvironment;
 		manifest.m_BindingABIRevision = recipe.m_Request.m_Target.m_BindingABIRevision;
 		manifest.m_CoordinateOptions = recipe.m_Request.m_Target.m_CoordinateOptions;
 		manifest.m_Stage = recipe.m_Request.m_Stage;
+		manifest.m_ShaderModel = recipe.m_Request.m_Target.m_Model;
+		manifest.m_HlslVersion = recipe.m_Request.m_Target.m_HlslVersion;
+		manifest.m_CompileFlags = recipe.m_Request.m_Target.m_Flags;
+		manifest.m_OptimizationLevel = recipe.m_Request.m_Target.m_OptimizationLevel;
 		manifest.m_LogicalSourcePath = recipe.m_LogicalSourcePath;
-		manifest.m_SourcePath = recipe.m_Request.m_SourcePath;
 		manifest.m_EntryPoint = recipe.m_Request.m_Entry;
 		manifest.m_TargetString = ToTarget(
 			recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_Model);
@@ -733,28 +825,22 @@ namespace gglab
 				? define.m_Name
 				: define.m_Name + L"=" + define.m_Value);
 		}
-		manifest.m_IncludeDirs = recipe.m_Request.m_IncludeDirs;
+		manifest.m_LogicalIncludeDirs = recipe.m_LogicalIncludeDirs;
 		manifest.m_ExtraArgs = recipe.m_Request.m_ExtraArgs;
-		manifest.m_Dependencies.push_back({
-			.m_Path = recipe.m_Request.m_SourcePath,
-			.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(recipe.m_Request.m_SourcePath),
-			});
-		for (const std::filesystem::path& dependency : dependencies)
-		{
-			manifest.m_Dependencies.push_back({
-				.m_Path = dependency,
-				.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(dependency),
-				});
-		}
 		manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(std::span(
 			static_cast<const std::byte*>(binary.Data()), binary.SizeInBytes()));
-		artifact.m_Binary = binary;
-		return artifact;
+
+		record.m_Binary = binary;
+		record.m_PhysicalSourcePath = recipe.m_Request.m_SourcePath;
+		record.m_PhysicalIncludeDirs = recipe.m_Request.m_IncludeDirs;
+		record.m_Dependencies = dependencies;
+		return record;
 	}
 
-	bool ShaderCompiler::ValidateManifestAgainstRecipe(
-		const ShaderArtifactManifest& manifest, const ShaderResolvedRecipe& recipe) const noexcept
+	bool ShaderCompiler::ValidateCacheRecordAgainstRecipe(
+		const ShaderArtifactCacheRecord& record, const ShaderResolvedRecipe& recipe) const noexcept
 	{
+		const ShaderArtifactManifest& manifest = record.m_Manifest;
 		if (manifest.m_RecipeId != recipe.m_RecipeId ||
 			manifest.m_BuildKey != recipe.m_BuildKey)
 		{
@@ -769,22 +855,63 @@ namespace gglab
 			manifest.m_SpirVTargetEnvironment !=
 			recipe.m_Request.m_Target.m_SpirVTargetEnvironment ||
 			manifest.m_BindingABIRevision != recipe.m_Request.m_Target.m_BindingABIRevision ||
-			manifest.m_CoordinateOptions != recipe.m_Request.m_Target.m_CoordinateOptions)
+			manifest.m_CoordinateOptions != recipe.m_Request.m_Target.m_CoordinateOptions ||
+			manifest.m_TargetProfile != GetShaderTargetProfile(
+				recipe.m_Request.m_Target.m_BinaryFormat,
+				recipe.m_Request.m_Target.m_SpirVTargetEnvironment))
 		{
 			return false;
 		}
 		if (manifest.m_LogicalSourcePath != recipe.m_LogicalSourcePath ||
-			manifest.m_SourcePath != utils::Canonical(recipe.m_Request.m_SourcePath) ||
-			manifest.m_EntryPoint != recipe.m_Request.m_Entry)
+			manifest.m_EntryPoint != recipe.m_Request.m_Entry ||
+			manifest.m_ShaderModel != recipe.m_Request.m_Target.m_Model ||
+			manifest.m_HlslVersion != recipe.m_Request.m_Target.m_HlslVersion ||
+			manifest.m_CompileFlags != recipe.m_Request.m_Target.m_Flags ||
+			manifest.m_OptimizationLevel != recipe.m_Request.m_Target.m_OptimizationLevel ||
+			manifest.m_LogicalIncludeDirs != recipe.m_LogicalIncludeDirs ||
+			record.m_PhysicalSourcePath != utils::Canonical(recipe.m_Request.m_SourcePath))
 		{
 			return false;
 		}
 
+		// Dependency validation: the mtime is the local fast path; any
+		// mismatch falls back to the authoritative content digest of the
+		// exact bytes the compiler consumed.
 		std::error_code errorCode;
-		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
+		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
 		{
-			if (!std::filesystem::exists(dependency.m_Path, errorCode) ||
-				utils::LastWriteTimeTicks(dependency.m_Path) != dependency.m_LastWriteTimeTicks)
+			if (!std::filesystem::exists(dependency.m_PhysicalPath, errorCode))
+			{
+				return false;
+			}
+			if (utils::LastWriteTimeTicks(dependency.m_PhysicalPath) ==
+				dependency.m_LastWriteTimeTicks)
+			{
+				continue;
+			}
+			std::ifstream input(dependency.m_PhysicalPath, std::ios::binary);
+			if (!input)
+			{
+				return false;
+			}
+			Sha256Builder builder;
+			std::array<char, 16 * 1024> buffer{};
+			while (input)
+			{
+				input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+				const std::streamsize count = input.gcount();
+				if (count <= 0)
+				{
+					break;
+				}
+				if (!builder.AddBytes(std::span(
+					reinterpret_cast<const std::byte*>(buffer.data()),
+					static_cast<std::size_t>(count))))
+				{
+					return false;
+				}
+			}
+			if (builder.Finish() != dependency.m_ContentDigest)
 			{
 				return false;
 			}
@@ -793,7 +920,7 @@ namespace gglab
 	}
 
 	ShaderBinary ShaderCompiler::CompileShaderBinary(const ShaderResolvedRecipe& recipe,
-		std::vector<std::filesystem::path>& outDependencies,
+		std::vector<ShaderArtifactDependency>& outDependencies,
 		ShaderCompilerDiagnostics& outDiagnostics) const noexcept
 	{
 		outDiagnostics.m_Status = ShaderCompileStatus::Success;
@@ -808,6 +935,18 @@ namespace gglab
 			outDiagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
 			return {};
 		}
+
+		// The source dependency digest is computed over the exact bytes DXC is
+		// about to receive; the physical path and mtime are local fast-path
+		// state only.
+		outDependencies.push_back({
+			.m_LogicalPath = recipe.m_LogicalSourcePath,
+			.m_PhysicalPath = utils::Canonical(recipe.m_Request.m_SourcePath),
+			.m_ContentDigest = ComputeSha256(std::span(
+				static_cast<const std::byte*>(src->GetBufferPointer()),
+				src->GetBufferSize())),
+			.m_LastWriteTimeTicks = utils::LastWriteTimeTicks(recipe.m_Request.m_SourcePath),
+		});
 
 		DxcBuffer buffer{};
 		buffer.Ptr = src->GetBufferPointer();
@@ -864,8 +1003,21 @@ namespace gglab
 			return {};
 		}
 
-		// Record includes
-		outDependencies = includeHandler->Includes();
+		// Record include dependencies (with their loaded-content digests).
+		for (const ShaderArtifactDependency& includeDependency : includeHandler->Dependencies())
+		{
+			ShaderArtifactDependency dependency = includeDependency;
+			std::error_code relativeError;
+			const std::filesystem::path relativeInclude = std::filesystem::relative(
+				dependency.m_PhysicalPath, m_SourceRootDir, relativeError);
+			if (!relativeError)
+			{
+				dependency.m_LogicalPath = relativeInclude.lexically_normal();
+			}
+			dependency.m_LastWriteTimeTicks =
+				utils::LastWriteTimeTicks(dependency.m_PhysicalPath);
+			outDependencies.push_back(std::move(dependency));
+		}
 
 		ComPtr<IDxcBlob> dxilBlob;
 		if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&dxilBlob), nullptr)))
@@ -978,12 +1130,18 @@ namespace gglab
 	}
 
 	ShaderRecipeId ShaderCompiler::ComputeRecipeId(const std::filesystem::path& logicalSourcePath,
-		const ShaderDesc& mergedDesc, const std::vector<std::wstring>& compileArguments) noexcept
+		const std::vector<std::filesystem::path>& logicalIncludeDirs,
+		const ShaderDesc& mergedDesc) noexcept
 	{
+		// Logical request encoding only: no physical checkout paths, no
+		// physical -I arguments. The same logical request must produce the
+		// same identity from any checkout location.
 		Sha256Builder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.shader.recipe") &&
 			builder.AddU32LE(ShaderRecipeHashSchema) &&
 			builder.AddStringUtf8(utils::ToString(logicalSourcePath.generic_wstring())) &&
+			builder.AddStringUtf8(utils::ToString(mergedDesc.m_Entry)) &&
+			builder.AddU32LE(static_cast<std::uint32_t>(mergedDesc.m_Stage)) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
 				mergedDesc.m_Target.m_BinaryFormat)) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
@@ -991,8 +1149,29 @@ namespace gglab
 			builder.AddU32LE(mergedDesc.m_Target.m_BindingABIRevision) &&
 			builder.AddU32LE(static_cast<std::uint32_t>(
 				mergedDesc.m_Target.m_CoordinateOptions)) &&
-			builder.AddU64LE(static_cast<std::uint64_t>(compileArguments.size()));
-		for (const std::wstring& argument : compileArguments)
+			builder.AddU32LE(static_cast<std::uint32_t>(
+				mergedDesc.m_Target.m_Model)) &&
+			builder.AddStringUtf8(utils::ToString(mergedDesc.m_Target.m_HlslVersion)) &&
+			builder.AddU32LE(static_cast<std::uint32_t>(
+				mergedDesc.m_Target.m_Flags)) &&
+			builder.AddStringUtf8(utils::ToString(mergedDesc.m_Target.m_OptimizationLevel)) &&
+			builder.AddU64LE(static_cast<std::uint64_t>(logicalIncludeDirs.size()));
+		for (const std::filesystem::path& includeDir : logicalIncludeDirs)
+		{
+			succeeded = succeeded &&
+				builder.AddStringUtf8(utils::ToString(includeDir.generic_wstring()));
+		}
+		succeeded = succeeded &&
+			builder.AddU64LE(static_cast<std::uint64_t>(mergedDesc.m_Defines.size()));
+		for (const ShaderDefine& define : mergedDesc.m_Defines)
+		{
+			succeeded = succeeded &&
+				builder.AddStringUtf8(utils::ToString(
+					define.m_Value.empty() ? define.m_Name : define.m_Name + L"=" + define.m_Value));
+		}
+		succeeded = succeeded &&
+			builder.AddU64LE(static_cast<std::uint64_t>(mergedDesc.m_ExtraArgs.size()));
+		for (const std::wstring& argument : mergedDesc.m_ExtraArgs)
 		{
 			succeeded = succeeded && builder.AddStringUtf8(utils::ToString(argument));
 		}

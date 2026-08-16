@@ -2,6 +2,7 @@
 
 #include "SpirVDecorationReader.h"
 #include "Compiler/ShaderCompiler.h"
+#include "GGLabFoundation/Json/JsonValue.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
@@ -618,7 +619,8 @@ namespace gglab
 			const std::filesystem::path badSourceRoot = tempRoot / L"BadShaderSources";
 			const std::filesystem::path badCacheRoot = tempRoot / L"BadShaderCache";
 			std::filesystem::create_directories(badSourceRoot);
-			OverwriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
+			const bool badSourceWritten =
+				OverwriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
 			ShaderCompiler badCompiler(badSourceRoot, badCacheRoot);
 			ShaderDesc badDesc{
 				.m_SourcePath = L"Bad.hlsl",
@@ -626,7 +628,7 @@ namespace gglab
 				.m_Entry = L"CSMain",
 			};
 			const ShaderCompileResult badResult = badCompiler.Compile(badDesc);
-			context.Check(!badResult.IsSuccess() &&
+			context.Check(badSourceWritten && !badResult.IsSuccess() &&
 				badResult.m_Status == ShaderCompileStatus::CompileFailed &&
 				!badResult.m_Diagnostics.m_Message.empty(),
 				"DXC syntax errors map to CompileFailed with the raw DXC diagnostics");
@@ -733,17 +735,36 @@ namespace gglab
 				metadata.find("\"recipeId\":\"") != std::string::npos &&
 				metadata.find("\"buildKey\":\"") != std::string::npos &&
 				metadata.find("\"binaryContentDigest\":\"") != std::string::npos &&
+				metadata.find("\"targetProfile\":\"gglab-vulkan13\"") != std::string::npos &&
 				metadata.find("\"binaryFormat\":\"spirv\"") != std::string::npos &&
 				metadata.find("\"spirvTargetEnvironment\":\"vulkan1.3\"") != std::string::npos &&
 				metadata.find("\"bindingAbiRevision\":1") != std::string::npos &&
+				metadata.find("\"shaderModel\":\"6_7\"") != std::string::npos &&
+				metadata.find("\"hlslVersion\":\"2021\"") != std::string::npos &&
+				metadata.find("\"compileFlags\":") != std::string::npos &&
+				metadata.find("\"optimizationLevel\":") != std::string::npos &&
+				metadata.find("\"logicalIncludeDirs\":") != std::string::npos &&
 				metadata.find("\"identity\":\"") != std::string::npos &&
-				metadata.find("\"logicalSource\":\"Passes/PassForwardCoverage.hlsl\"") != std::string::npos,
-				"Shader manifest records schema, recipe and build identities, digest, target, ABI, producer identity, and the logical source");
+				metadata.find("\"logicalSource\":\"Passes/PassForwardCoverage.hlsl\"") != std::string::npos &&
+				metadata.find("\"local\":{") != std::string::npos &&
+				metadata.find("\"physicalSource\":\"") != std::string::npos &&
+				metadata.find("\"physicalIncludeDirs\":") != std::string::npos &&
+				metadata.find("\"dependencies\":[") != std::string::npos &&
+				metadata.find("\"contentDigest\":\"") != std::string::npos &&
+				metadata.find("\"lastWriteTimeTicks\":") != std::string::npos,
+				"Cache record carries the complete portable manifest (profile, target semantics, logical identities) plus explicit local validation state");
 			const bool metadataChanged = ReplaceMetadataValue(
 				spirVMetaPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
 			context.Check(metadataChanged && !rejectedCacheArtifact.m_FromCache,
 				"Shader cache rejects metadata whose target contract does not match the recipe");
+
+			// A missing required durable field must also reject the entry.
+			const bool manifestFieldRemoved = ReplaceMetadataValue(
+				spirVMetaPath, "\"hlslVersion\":\"2021\",", "");
+			const ShaderCompileResult missingFieldArtifact = compiler.CompileOrLoad(spirVRecipe);
+			context.Check(manifestFieldRemoved && !missingFieldArtifact.m_FromCache,
+				"Shader cache rejects a manifest missing a required durable field");
 
 			SpirVDecorationReflection coverageReflection;
 			const bool coverageReflected =
@@ -886,12 +907,265 @@ namespace gglab
 				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
 		}
 
+		[[nodiscard]] bool WriteTextFile(
+			const std::filesystem::path& path, std::string_view content) noexcept
+		{
+			std::filesystem::create_directories(path.parent_path());
+			std::ofstream output(path, std::ios::binary);
+			output.write(content.data(), static_cast<std::streamsize>(content.size()));
+			return output.good();
+		}
+
+		void RunCrossCheckoutIdentityTests(SelfTestContext& context) noexcept
+		{
+			// The same logical request must produce the same recipe and build
+			// identity from two different checkout locations. The include
+			// configuration participates logically, never as a physical -I.
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabCrossCheckout-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Cross-checkout test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+
+			constexpr std::string_view IncludeContent = "#define GGLAB_CROSS_CHECKOUT 1\n";
+			constexpr std::string_view SourceContent =
+				"#include \"Common/CheckoutProbe.hlsli\"\n"
+				"float4 VSMain(uint id : SV_VertexID) : SV_Position "
+				"{ return float4(0, 0, 0, 1); }\n";
+			const std::filesystem::path checkoutA = tempRoot / L"CheckoutA";
+			const std::filesystem::path checkoutB = tempRoot / L"CheckoutB";
+			const bool filesWritten =
+				WriteTextFile(checkoutA / L"Common/CheckoutProbe.hlsli", IncludeContent) &&
+				WriteTextFile(checkoutA / L"Probe.hlsl", SourceContent) &&
+				WriteTextFile(checkoutB / L"Common/CheckoutProbe.hlsli", IncludeContent) &&
+				WriteTextFile(checkoutB / L"Probe.hlsl", SourceContent);
+
+			ShaderCompiler compilerA(checkoutA, tempRoot / L"CacheA");
+			ShaderCompiler compilerB(checkoutB, tempRoot / L"CacheB");
+			ShaderDesc descA{
+				.m_SourcePath = L"Probe.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = { L"." },
+			};
+			const ShaderResolvedRecipe recipeA = compilerA.Resolve(descA);
+			const ShaderResolvedRecipe recipeB = compilerB.Resolve(descA);
+			const ShaderCompileResult resultA = compilerA.CompileOrLoad(recipeA);
+			const ShaderCompileResult resultB = compilerB.CompileOrLoad(recipeB);
+
+			context.Check(filesWritten && recipeA.IsSuccess() && recipeB.IsSuccess() &&
+				resultA.IsSuccess() && resultB.IsSuccess() &&
+				recipeA.m_RecipeId == recipeB.m_RecipeId &&
+				recipeA.m_BuildKey == recipeB.m_BuildKey &&
+				resultA.m_Artifact.m_Manifest.m_BinaryContentDigest ==
+					resultB.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				"Same logical request resolves to the same recipe/build identity across checkout locations");
+
+			// The recipe identity must not embed physical -I arguments: a
+			// source-root-relative include configuration and its logical form
+			// must agree even though the physical paths differ.
+			ShaderDesc absoluteIncludeDesc = descA;
+			absoluteIncludeDesc.m_IncludeDirs = { checkoutA };
+			const ShaderResolvedRecipe absoluteIncludeRecipe =
+				compilerA.Resolve(absoluteIncludeDesc);
+			context.Check(absoluteIncludeRecipe.IsSuccess() &&
+				recipeA.m_RecipeId == absoluteIncludeRecipe.m_RecipeId,
+				"Absolute include dirs under the source root canonicalize to the same logical identity");
+		}
+
+		void RunRecipeAuthorityTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path shaderSourceRoot =
+				ResolveShaderSourceRoot(win32::GetExecutableDirectory());
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabRecipeAuthority-{}", GetCurrentProcessId());
+			ScopedTestDirectory scopedDirectory(tempRoot);
+			ShaderCompiler compiler(shaderSourceRoot, tempRoot / L"AuthorityCache");
+			ShaderDesc desc{
+				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = { L"." },
+			};
+			const ShaderResolvedRecipe recipe = compiler.Resolve(desc);
+
+			ShaderResolvedRecipe foreignProducerRecipe = recipe;
+			foreignProducerRecipe.m_CompilerIdentity.m_CanonicalIdentity += L"-different";
+			const ShaderCompileResult foreignProducerResult =
+				compiler.CompileOrLoad(foreignProducerRecipe);
+			context.Check(!foreignProducerResult.IsSuccess() &&
+				foreignProducerResult.m_Status == ShaderCompileStatus::InvalidRequest &&
+				foreignProducerResult.m_Diagnostics.m_ValidationError ==
+					ShaderCompileValidationError::CompilerIdentityMismatch,
+				"CompileOrLoad rejects a recipe resolved by a different producer identity");
+
+			ShaderResolvedRecipe mutatedRequestRecipe = recipe;
+			mutatedRequestRecipe.m_Request.m_ExtraArgs.push_back(L"-DGGLAB_MUTATED=1");
+			const ShaderCompileResult mutatedRequestResult =
+				compiler.CompileOrLoad(mutatedRequestRecipe);
+			context.Check(!mutatedRequestResult.IsSuccess() &&
+				mutatedRequestResult.m_Status == ShaderCompileStatus::InvalidRequest,
+				"CompileOrLoad rejects a recipe whose request was mutated after Resolve");
+
+			ShaderResolvedRecipe mutatedIdentityRecipe = recipe;
+			mutatedIdentityRecipe.m_RecipeId.m_DurableDigest.m_Value[0] ^= std::byte{ 0x01 };
+			const ShaderCompileResult mutatedIdentityResult =
+				compiler.CompileOrLoad(mutatedIdentityRecipe);
+			context.Check(!mutatedIdentityResult.IsSuccess() &&
+				mutatedIdentityResult.m_Status == ShaderCompileStatus::InvalidRequest,
+				"CompileOrLoad rejects a recipe with a tampered identity instead of publishing under a stale one");
+
+			ShaderResolvedRecipe mutatedSourceRecipe = recipe;
+			mutatedSourceRecipe.m_LogicalSourcePath = L"Passes/PassForwardPBR.hlsl";
+			const ShaderCompileResult mutatedSourceResult =
+				compiler.CompileOrLoad(mutatedSourceRecipe);
+			context.Check(!mutatedSourceResult.IsSuccess() &&
+				mutatedSourceResult.m_Status == ShaderCompileStatus::InvalidRequest,
+				"CompileOrLoad rejects a recipe whose logical source disagrees with its physical source");
+		}
+
+		void RunDependencyChangeTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const std::filesystem::path tempRoot = std::filesystem::temp_directory_path(errorCode) /
+				std::format("GGLabDependencyChange-{}", GetCurrentProcessId());
+			context.Check(!errorCode, "Dependency-change test resolves a temporary root");
+			if (errorCode)
+			{
+				return;
+			}
+			ScopedTestDirectory scopedDirectory(tempRoot);
+
+			const std::filesystem::path sourceRoot = tempRoot / L"Sources";
+			constexpr std::string_view SourceContent =
+				"#include \"Probe.hlsli\"\n"
+				"float4 VSMain(uint id : SV_VertexID) : SV_Position "
+				"{ return float4(ProbeValue, 0, 0, 1); }\n";
+			const bool filesWritten =
+				WriteTextFile(sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.25f;\n") &&
+				WriteTextFile(sourceRoot / L"Probe.hlsl", SourceContent);
+
+			ShaderCompiler compiler(sourceRoot, tempRoot / L"Cache");
+			ShaderDesc desc{
+				.m_SourcePath = L"Probe.hlsl",
+				.m_Stage = ShaderStage::Vertex,
+				.m_Entry = L"VSMain",
+				.m_IncludeDirs = { L"." },
+			};
+			const ShaderResolvedRecipe recipe = compiler.Resolve(desc);
+			const ShaderCompileResult firstResult = compiler.CompileOrLoad(recipe);
+			const ShaderCompileResult cachedResult = compiler.CompileOrLoad(recipe);
+
+			// Changing the include content must invalidate the entry even when
+			// the mtime fast path would see a difference; the authoritative
+			// check is the content digest of the bytes DXC consumed.
+			const bool includeChanged = WriteTextFile(
+				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.5f;\n");
+			const ShaderCompileResult changedResult = compiler.CompileOrLoad(recipe);
+			const ShaderCompileResult revalidatedResult = compiler.CompileOrLoad(recipe);
+
+			context.Check(filesWritten && firstResult.IsSuccess() && cachedResult.m_FromCache &&
+				includeChanged && changedResult.IsSuccess() && !changedResult.m_FromCache &&
+				revalidatedResult.m_FromCache &&
+				changedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
+					firstResult.m_Artifact.m_Manifest.m_BinaryContentDigest,
+				"Changed include content rebuilds the entry and the new digest re-validates");
+		}
+
+		void RunJsonGrammarTests(SelfTestContext& context) noexcept
+		{
+			using gglab::json::JsonValue;
+
+			const auto parseRoundTrip = [](std::string_view text, bool& parsed) noexcept
+				{
+					const std::optional<JsonValue> value = gglab::json::ParseJsonDocument(text);
+					parsed = value.has_value();
+				};
+
+			// External-producer compatibility: whitespace, escaped solidus,
+			// astral-plane surrogate pairs, and exponent numbers.
+			bool whitespaceParsed = false;
+			parseRoundTrip("  {\n\t\"a\" : [ true , null , 1.5e3 ]\r\n}  ", whitespaceParsed);
+			const std::optional<JsonValue> surrogateValue = gglab::json::ParseJsonDocument(
+				"{\"emoji\":\"\\uD83D\\uDE00\"}");
+			const std::optional<JsonValue> escapedSolidus = gglab::json::ParseJsonDocument(
+				"{\"url\":\"https:\\/\\/gglab\"}");
+			context.Check(whitespaceParsed && surrogateValue.has_value() &&
+				surrogateValue->IsObject() &&
+				surrogateValue->AsObject().front().second.AsString() ==
+					std::string("\xF0\x9F\x98\x80") &&
+				escapedSolidus.has_value(),
+				"JSON parser accepts whitespace, exponent numbers, escaped solidus, and astral surrogate pairs");
+
+			// Strictness: structural errors must be rejected, never guessed.
+			bool trailingGarbageParsed = true;
+			parseRoundTrip("{}x", trailingGarbageParsed);
+			bool duplicateKeyParsed = true;
+			parseRoundTrip("{\"a\":1,\"a\":2}", duplicateKeyParsed);
+			bool leadingZeroParsed = true;
+			parseRoundTrip("{\"a\":01}", leadingZeroParsed);
+			bool loneLowSurrogateParsed = true;
+			parseRoundTrip("{\"a\":\"\\uDE00\"}", loneLowSurrogateParsed);
+			bool badEscapeParsed = true;
+			parseRoundTrip("{\"a\":\"\\q\"}", badEscapeParsed);
+			bool rawControlParsed = true;
+			parseRoundTrip(std::string("{\"a\":\"\x01\"}"), rawControlParsed);
+			context.Check(!trailingGarbageParsed && !duplicateKeyParsed && !leadingZeroParsed &&
+				!loneLowSurrogateParsed && !badEscapeParsed && !rawControlParsed,
+				"JSON parser rejects trailing content, duplicate keys, leading zeros, lone surrogates, bad escapes, and raw control characters");
+
+			// The emitter must produce grammar the parser accepts: nested
+			// containers and member separators round-trip exactly.
+			gglab::json::JsonWriter writer;
+			writer.BeginObject();
+			writer.Key("schemaVersion");
+			writer.WriteInteger(1);
+			writer.Key("nested");
+			writer.BeginObject();
+			writer.Key("flags");
+			writer.WriteInteger(-2);
+			writer.Key("list");
+			writer.BeginArray();
+			writer.WriteString("a");
+			writer.WriteBool(true);
+			writer.WriteNull();
+			writer.EndArray();
+			writer.EndObject();
+			writer.Key("empty");
+			writer.BeginArray();
+			writer.EndArray();
+			writer.EndObject();
+			const std::string emitted = std::move(writer).Finish();
+			const std::optional<JsonValue> reparsed = gglab::json::ParseJsonDocument(emitted);
+			bool writerStructureValid = false;
+			if (reparsed.has_value() && reparsed->IsObject())
+			{
+				const gglab::json::JsonObject& root = reparsed->AsObject();
+				writerStructureValid = root.size() == 3 &&
+					root.front().first == "schemaVersion" &&
+					root.front().second.AsInteger() == 1 &&
+					root.back().second.IsArray() &&
+					root.back().second.AsArray().empty();
+			}
+			context.Check(writerStructureValid && emitted.find(",,") == std::string::npos,
+				"JSON emitter produces single-separator documents that re-parse with preserved structure");
+		}
+
 	}
 
 	void RunShaderCompileContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunShaderBindingABITests(context);
 		RunCoordinatePolicyTests(context);
+		RunJsonGrammarTests(context);
 		RunShaderArtifactContractTests(context);
+		RunCrossCheckoutIdentityTests(context);
+		RunRecipeAuthorityTests(context);
+		RunDependencyChangeTests(context);
 	}
 }

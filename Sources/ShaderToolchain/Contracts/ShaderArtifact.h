@@ -70,7 +70,10 @@ namespace gglab
 
 	// Fully resolved compile authority. The runtime keeps raw caller
 	// descriptions only as an origin/display view; compile, diagnostics,
-	// reload, and recipe identity all use this representation.
+	// reload, and recipe identity all use this representation. CompileOrLoad
+	// re-validates every field below against the executing compiler before
+	// the recipe is consumed, so a recipe cannot be re-interpreted by a
+	// different producer or after external mutation.
 	struct ShaderResolvedRecipe
 	{
 		ShaderCompileStatus m_Status = ShaderCompileStatus::Success;
@@ -79,6 +82,10 @@ namespace gglab
 		// Normative source identity (logical path relative to the source
 		// root); m_Request.m_SourcePath is the resolved physical path.
 		std::filesystem::path m_LogicalSourcePath{};
+		// Logical include configuration (relative forms); physical -I
+		// arguments are derived at compile time and never enter the recipe
+		// identity.
+		std::vector<std::filesystem::path> m_LogicalIncludeDirs{};
 		ShaderCompilerIdentity m_CompilerIdentity{};
 		ShaderRecipeId m_RecipeId{};
 		LocalShaderCacheKey m_BuildKey{};

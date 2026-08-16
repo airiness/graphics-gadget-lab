@@ -72,6 +72,7 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Json\JsonValue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp" />
@@ -93,6 +94,7 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypedIndex.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\TypeUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Json\JsonValue.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h" />

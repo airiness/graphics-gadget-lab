@@ -18,6 +18,21 @@ namespace gglab
 		GGLabVulkan13,
 	};
 
+	// Derives the target profile from the resolved target semantics. Profile
+	// version and Shader ABI revision stay independent axes: this maps the
+	// resolved fields back to the profile vocabulary for manifest/CLI
+	// serialization.
+	[[nodiscard]] constexpr ShaderTargetProfile GetShaderTargetProfile(
+		ShaderBinaryFormat binaryFormat, ShaderSpirVTargetEnvironment environment) noexcept
+	{
+		if (binaryFormat == ShaderBinaryFormat::SpirV &&
+			environment == ShaderSpirVTargetEnvironment::Vulkan1_3)
+		{
+			return ShaderTargetProfile::GGLabVulkan13;
+		}
+		return ShaderTargetProfile::GGLabDX12;
+	}
+
 	// Field ownership boundary:
 	//   backend-owned   - binaryFormat, spirvEnvironment, bindingAbiRevision,
 	//                     coordinateOptions (profile application overwrites them).

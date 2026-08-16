@@ -1,6 +1,7 @@
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Json/JsonValue.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <process.h>
@@ -15,7 +16,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <variant>
+#include <utility>
 #include <vector>
 
 namespace gglab
@@ -145,6 +146,70 @@ namespace gglab
 			return false;
 		}
 
+		[[nodiscard]] constexpr std::string_view ShaderModelText(ShaderModel model) noexcept
+		{
+			switch (model)
+			{
+			case ShaderModel::SM_6_6:
+				return "6_6";
+			case ShaderModel::SM_6_7:
+				return "6_7";
+			case ShaderModel::SM_6_8:
+				return "6_8";
+			}
+			return "unknown";
+		}
+
+		[[nodiscard]] constexpr bool ParseShaderModel(
+			std::string_view text, ShaderModel& outModel) noexcept
+		{
+			if (text == "6_6")
+			{
+				outModel = ShaderModel::SM_6_6;
+				return true;
+			}
+			if (text == "6_7")
+			{
+				outModel = ShaderModel::SM_6_7;
+				return true;
+			}
+			if (text == "6_8")
+			{
+				outModel = ShaderModel::SM_6_8;
+				return true;
+			}
+			return false;
+		}
+
+		[[nodiscard]] constexpr std::string_view ShaderTargetProfileText(
+			ShaderTargetProfile profile) noexcept
+		{
+			switch (profile)
+			{
+			case ShaderTargetProfile::GGLabDX12:
+				return "gglab-dx12";
+			case ShaderTargetProfile::GGLabVulkan13:
+				return "gglab-vulkan13";
+			}
+			return "unknown";
+		}
+
+		[[nodiscard]] constexpr bool ParseShaderTargetProfile(
+			std::string_view text, ShaderTargetProfile& outProfile) noexcept
+		{
+			if (text == "gglab-dx12")
+			{
+				outProfile = ShaderTargetProfile::GGLabDX12;
+				return true;
+			}
+			if (text == "gglab-vulkan13")
+			{
+				outProfile = ShaderTargetProfile::GGLabVulkan13;
+				return true;
+			}
+			return false;
+		}
+
 		[[nodiscard]] constexpr int HexDigitValue(char value) noexcept
 		{
 			if (value >= '0' && value <= '9')
@@ -183,440 +248,6 @@ namespace gglab
 			}
 			return digest;
 		}
-
-		class JsonWriter final
-		{
-		public:
-			[[nodiscard]] std::string Finish() && { return std::move(m_Content); }
-
-			void BeginObject()
-			{
-				AppendCommaIfNeeded();
-				Append('{');
-				m_PendingValue = false;
-			}
-			void EndObject()
-			{
-				Append('}');
-				m_PendingValue = true;
-			}
-			void BeginArray()
-			{
-				AppendCommaIfNeeded();
-				Append('[');
-				m_PendingValue = false;
-			}
-			void EndArray()
-			{
-				Append(']');
-				m_PendingValue = true;
-			}
-			void Key(std::string_view key)
-			{
-				AppendCommaIfNeeded();
-				WriteEscaped(key);
-				Append(':');
-				m_PendingValue = false;
-			}
-			void WriteString(std::string_view value)
-			{
-				AppendCommaIfNeeded();
-				WriteEscaped(value);
-				m_PendingValue = true;
-			}
-			void WriteWideString(std::wstring_view value)
-			{
-				WriteString(utils::ToString(value));
-			}
-			void WriteUInt(uint64_t value)
-			{
-				AppendCommaIfNeeded();
-				m_Content += std::to_string(value);
-				m_PendingValue = true;
-			}
-			void WriteInt(int64_t value)
-			{
-				AppendCommaIfNeeded();
-				m_Content += std::to_string(value);
-				m_PendingValue = true;
-			}
-
-		private:
-			void Append(char value) { m_Content += value; }
-
-			void AppendCommaIfNeeded()
-			{
-				if (m_PendingValue)
-				{
-					Append(',');
-				}
-			}
-
-			void WriteEscaped(std::string_view value)
-			{
-				Append('"');
-				for (char current : value)
-				{
-					switch (current)
-					{
-					case '"':
-						m_Content += "\\\"";
-						break;
-					case '\\':
-						m_Content += "\\\\";
-						break;
-					case '\b':
-						m_Content += "\\b";
-						break;
-					case '\f':
-						m_Content += "\\f";
-						break;
-					case '\n':
-						m_Content += "\\n";
-						break;
-					case '\r':
-						m_Content += "\\r";
-						break;
-					case '\t':
-						m_Content += "\\t";
-						break;
-					default:
-						if (static_cast<unsigned char>(current) < 0x20)
-						{
-							constexpr char HexChars[] = "0123456789abcdef";
-							const unsigned char byte = static_cast<unsigned char>(current);
-							m_Content += "\\u00";
-							m_Content += HexChars[(byte >> 4) & 0xF];
-							m_Content += HexChars[byte & 0xF];
-						}
-						else
-						{
-							m_Content += current;
-						}
-						break;
-					}
-				}
-				Append('"');
-			}
-
-			std::string m_Content;
-			bool m_PendingValue = false;
-		};
-
-		struct JsonValue;
-		using JsonArray = std::vector<JsonValue>;
-		using JsonObject = std::vector<std::pair<std::string, JsonValue>>;
-		struct JsonValue
-		{
-			std::variant<std::monostate, bool, int64_t, std::string, JsonArray, JsonObject> m_Value;
-
-			[[nodiscard]] bool IsString() const noexcept
-			{
-				return std::holds_alternative<std::string>(m_Value);
-			}
-			[[nodiscard]] bool IsInteger() const noexcept
-			{
-				return std::holds_alternative<int64_t>(m_Value);
-			}
-			[[nodiscard]] bool IsArray() const noexcept
-			{
-				return std::holds_alternative<JsonArray>(m_Value);
-			}
-			[[nodiscard]] bool IsObject() const noexcept
-			{
-				return std::holds_alternative<JsonObject>(m_Value);
-			}
-			[[nodiscard]] const std::string& AsString() const noexcept
-			{
-				return std::get<std::string>(m_Value);
-			}
-			[[nodiscard]] int64_t AsInteger() const noexcept
-			{
-				return std::get<int64_t>(m_Value);
-			}
-			[[nodiscard]] const JsonArray& AsArray() const noexcept
-			{
-				return std::get<JsonArray>(m_Value);
-			}
-			[[nodiscard]] const JsonObject& AsObject() const noexcept
-			{
-				return std::get<JsonObject>(m_Value);
-			}
-		};
-
-		class JsonParser final
-		{
-		public:
-			explicit JsonParser(std::string_view text) noexcept : m_Text(text) {}
-
-			[[nodiscard]] std::optional<JsonValue> ParseDocument() noexcept
-			{
-				SkipWhitespace();
-				std::optional<JsonValue> value = ParseValue();
-				if (!value.has_value())
-				{
-					return std::nullopt;
-				}
-				SkipWhitespace();
-				if (m_Position != m_Text.size())
-				{
-					return std::nullopt;
-				}
-				return value;
-			}
-
-		private:
-			[[nodiscard]] bool AtEnd() const noexcept { return m_Position >= m_Text.size(); }
-
-			void SkipWhitespace() noexcept
-			{
-				while (!AtEnd() && (m_Text[m_Position] == ' ' || m_Text[m_Position] == '\t' ||
-					m_Text[m_Position] == '\n' || m_Text[m_Position] == '\r'))
-				{
-					++m_Position;
-				}
-			}
-
-			[[nodiscard]] std::optional<JsonValue> ParseValue() noexcept
-			{
-				if (AtEnd())
-				{
-					return std::nullopt;
-				}
-				switch (m_Text[m_Position])
-				{
-				case '{':
-					return ParseObject();
-				case '[':
-					return ParseArray();
-				case '"':
-					return ParseString();
-				default:
-					return ParseInteger();
-				}
-			}
-
-			[[nodiscard]] std::optional<JsonValue> ParseObject() noexcept
-			{
-				++m_Position; // '{'
-				JsonObject object;
-				SkipWhitespace();
-				if (!AtEnd() && m_Text[m_Position] == '}')
-				{
-					++m_Position;
-					return JsonValue{ std::move(object) };
-				}
-				while (true)
-				{
-					SkipWhitespace();
-					if (AtEnd() || m_Text[m_Position] != '"')
-					{
-						return std::nullopt;
-					}
-					std::optional<JsonValue> key = ParseString();
-					if (!key.has_value())
-					{
-						return std::nullopt;
-					}
-					for (const auto& existing : object)
-					{
-						if (existing.first == key->AsString())
-						{
-							return std::nullopt; // duplicate keys rejected
-						}
-					}
-					SkipWhitespace();
-					if (AtEnd() || m_Text[m_Position] != ':')
-					{
-						return std::nullopt;
-					}
-					++m_Position;
-					SkipWhitespace();
-					std::optional<JsonValue> value = ParseValue();
-					if (!value.has_value())
-					{
-						return std::nullopt;
-					}
-					object.emplace_back(key->AsString(), std::move(*value));
-					SkipWhitespace();
-					if (AtEnd())
-					{
-						return std::nullopt;
-					}
-					if (m_Text[m_Position] == ',')
-					{
-						++m_Position;
-						continue;
-					}
-					if (m_Text[m_Position] == '}')
-					{
-						++m_Position;
-						return JsonValue{ std::move(object) };
-					}
-					return std::nullopt;
-				}
-			}
-
-			[[nodiscard]] std::optional<JsonValue> ParseArray() noexcept
-			{
-				++m_Position; // '['
-				JsonArray array;
-				SkipWhitespace();
-				if (!AtEnd() && m_Text[m_Position] == ']')
-				{
-					++m_Position;
-					return JsonValue{ std::move(array) };
-				}
-				while (true)
-				{
-					SkipWhitespace();
-					std::optional<JsonValue> value = ParseValue();
-					if (!value.has_value())
-					{
-						return std::nullopt;
-					}
-					array.push_back(std::move(*value));
-					SkipWhitespace();
-					if (AtEnd())
-					{
-						return std::nullopt;
-					}
-					if (m_Text[m_Position] == ',')
-					{
-						++m_Position;
-						continue;
-					}
-					if (m_Text[m_Position] == ']')
-					{
-						++m_Position;
-						return JsonValue{ std::move(array) };
-					}
-					return std::nullopt;
-				}
-			}
-
-			[[nodiscard]] std::optional<JsonValue> ParseString() noexcept
-			{
-				++m_Position; // '"'
-				std::string value;
-				while (true)
-				{
-					if (AtEnd())
-					{
-						return std::nullopt;
-					}
-					const char current = m_Text[m_Position++];
-					if (current == '"')
-					{
-						return JsonValue{ std::move(value) };
-					}
-					if (current == '\\')
-					{
-						if (AtEnd())
-						{
-							return std::nullopt;
-						}
-						const char escaped = m_Text[m_Position++];
-						switch (escaped)
-						{
-						case '"':
-							value += '"';
-							break;
-						case '\\':
-							value += '\\';
-							break;
-						case '/':
-							value += '/';
-							break;
-						case 'b':
-							value += '\b';
-							break;
-						case 'f':
-							value += '\f';
-							break;
-						case 'n':
-							value += '\n';
-							break;
-						case 'r':
-							value += '\r';
-							break;
-						case 't':
-							value += '\t';
-							break;
-						case 'u':
-						{
-							if (m_Position + 4 > m_Text.size())
-							{
-								return std::nullopt;
-							}
-							int codeUnit = 0;
-							for (int index = 0; index < 4; ++index)
-							{
-								const int digit = HexDigitValue(m_Text[m_Position + index]);
-								if (digit < 0)
-								{
-									return std::nullopt;
-								}
-								codeUnit = (codeUnit << 4) | digit;
-							}
-							m_Position += 4;
-							if (codeUnit < 0x80)
-							{
-								value += static_cast<char>(codeUnit);
-							}
-							else if (codeUnit < 0x800)
-							{
-								value += static_cast<char>(0xC0 | (codeUnit >> 6));
-								value += static_cast<char>(0x80 | (codeUnit & 0x3F));
-							}
-							else
-							{
-								value += static_cast<char>(0xE0 | (codeUnit >> 12));
-								value += static_cast<char>(0x80 | ((codeUnit >> 6) & 0x3F));
-								value += static_cast<char>(0x80 | (codeUnit & 0x3F));
-							}
-							break;
-						}
-						default:
-							return std::nullopt;
-						}
-					}
-					else
-					{
-						value += current;
-					}
-				}
-			}
-
-			[[nodiscard]] std::optional<JsonValue> ParseInteger() noexcept
-			{
-				bool negative = false;
-				if (!AtEnd() && m_Text[m_Position] == '-')
-				{
-					negative = true;
-					++m_Position;
-				}
-				if (AtEnd() || m_Text[m_Position] < '0' || m_Text[m_Position] > '9')
-				{
-					return std::nullopt;
-				}
-				int64_t value = 0;
-				while (!AtEnd() && m_Text[m_Position] >= '0' && m_Text[m_Position] <= '9')
-				{
-					const int digit = m_Text[m_Position] - '0';
-					if (value > (INT64_MAX - digit) / 10)
-					{
-						return std::nullopt;
-					}
-					value = value * 10 + digit;
-					++m_Position;
-				}
-				return JsonValue{ negative ? -value : value };
-			}
-
-			std::string_view m_Text;
-			std::size_t m_Position = 0;
-		};
 
 		[[nodiscard]] std::optional<ShaderBinary> ReadFileBinary(
 			const std::filesystem::path& path) noexcept
@@ -679,8 +310,8 @@ namespace gglab
 		}
 	}
 
-	bool WriteShaderArtifactManifest(const std::filesystem::path& manifestPath,
-		const ShaderArtifactManifest& manifest) noexcept
+	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& manifestPath,
+		const ShaderArtifactCacheRecord& record) noexcept
 	{
 		const bool created = utils::CreateParentDirectoryIfNotExist(manifestPath);
 		if (!created)
@@ -688,12 +319,16 @@ namespace gglab
 			return false;
 		}
 
-		JsonWriter writer;
+		const ShaderArtifactManifest& manifest = record.m_Manifest;
+		json::JsonWriter writer;
+		writer.BeginObject();
+
+		writer.Key("manifest");
 		writer.BeginObject();
 		writer.Key("schemaVersion");
-		writer.WriteUInt(manifest.m_SchemaVersion);
+		writer.WriteInteger(manifest.m_SchemaVersion);
 		writer.Key("recipeHashSchema");
-		writer.WriteUInt(manifest.m_RecipeHashSchema);
+		writer.WriteInteger(manifest.m_RecipeHashSchema);
 		writer.Key("recipeId");
 		writer.WriteString(Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest));
 		writer.Key("buildKey");
@@ -703,61 +338,88 @@ namespace gglab
 		writer.Key("kind");
 		writer.WriteString("dxc");
 		writer.Key("identity");
-		writer.WriteWideString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
+		writer.WriteString(utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity));
 		writer.EndObject();
+		writer.Key("targetProfile");
+		writer.WriteString(ShaderTargetProfileText(manifest.m_TargetProfile));
 		writer.Key("binaryFormat");
 		writer.WriteString(ShaderBinaryFormatText(manifest.m_BinaryFormat));
 		writer.Key("spirvTargetEnvironment");
 		writer.WriteString(SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment));
 		writer.Key("bindingAbiRevision");
-		writer.WriteUInt(manifest.m_BindingABIRevision);
+		writer.WriteInteger(manifest.m_BindingABIRevision);
 		writer.Key("coordinateOptions");
-		writer.WriteUInt(static_cast<uint32_t>(manifest.m_CoordinateOptions));
+		writer.WriteInteger(static_cast<uint32_t>(manifest.m_CoordinateOptions));
 		writer.Key("stage");
 		writer.WriteString(ShaderStageText(manifest.m_Stage));
+		writer.Key("shaderModel");
+		writer.WriteString(ShaderModelText(manifest.m_ShaderModel));
+		writer.Key("hlslVersion");
+		writer.WriteString(utils::ToString(manifest.m_HlslVersion));
+		writer.Key("compileFlags");
+		writer.WriteInteger(static_cast<uint32_t>(manifest.m_CompileFlags));
+		writer.Key("optimizationLevel");
+		writer.WriteString(utils::ToString(manifest.m_OptimizationLevel));
 		writer.Key("logicalSource");
-		writer.WriteWideString(manifest.m_LogicalSourcePath.generic_wstring());
-		writer.Key("physicalSource");
-		writer.WriteString(utils::Canonical(manifest.m_SourcePath).string());
+		writer.WriteString(utils::ToString(manifest.m_LogicalSourcePath.generic_wstring()));
 		writer.Key("entryPoint");
-		writer.WriteWideString(manifest.m_EntryPoint);
+		writer.WriteString(utils::ToString(manifest.m_EntryPoint));
 		writer.Key("target");
-		writer.WriteWideString(manifest.m_TargetString);
+		writer.WriteString(utils::ToString(manifest.m_TargetString));
 		writer.Key("defines");
 		writer.BeginArray();
 		for (const std::wstring& define : manifest.m_Defines)
 		{
-			writer.WriteWideString(define);
+			writer.WriteString(utils::ToString(define));
 		}
 		writer.EndArray();
-		writer.Key("includeDirs");
+		writer.Key("logicalIncludeDirs");
 		writer.BeginArray();
-		for (const std::filesystem::path& includeDir : manifest.m_IncludeDirs)
+		for (const std::filesystem::path& includeDir : manifest.m_LogicalIncludeDirs)
 		{
-			writer.WriteString(utils::Canonical(includeDir).string());
+			writer.WriteString(utils::ToString(includeDir.generic_wstring()));
 		}
 		writer.EndArray();
 		writer.Key("extraArgs");
 		writer.BeginArray();
 		for (const std::wstring& extraArg : manifest.m_ExtraArgs)
 		{
-			writer.WriteWideString(extraArg);
-		}
-		writer.EndArray();
-		writer.Key("dependencies");
-		writer.BeginArray();
-		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
-		{
-			writer.BeginObject();
-			writer.Key("path");
-			writer.WriteString(utils::Canonical(dependency.m_Path).string());
-			writer.Key("lastWriteTimeTicks");
-			writer.WriteInt(dependency.m_LastWriteTimeTicks);
-			writer.EndObject();
+			writer.WriteString(utils::ToString(extraArg));
 		}
 		writer.EndArray();
 		writer.Key("binaryContentDigest");
 		writer.WriteString(Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest));
+		writer.EndObject();
+
+		writer.Key("local");
+		writer.BeginObject();
+		writer.Key("physicalSource");
+		writer.WriteString(utils::Canonical(record.m_PhysicalSourcePath).string());
+		writer.Key("physicalIncludeDirs");
+		writer.BeginArray();
+		for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
+		{
+			writer.WriteString(utils::Canonical(includeDir).string());
+		}
+		writer.EndArray();
+		writer.Key("dependencies");
+		writer.BeginArray();
+		for (const ShaderArtifactDependency& dependency : record.m_Dependencies)
+		{
+			writer.BeginObject();
+			writer.Key("logicalPath");
+			writer.WriteString(utils::ToString(dependency.m_LogicalPath.generic_wstring()));
+			writer.Key("physicalPath");
+			writer.WriteString(utils::Canonical(dependency.m_PhysicalPath).string());
+			writer.Key("contentDigest");
+			writer.WriteString(Sha256DigestToHex(dependency.m_ContentDigest));
+			writer.Key("lastWriteTimeTicks");
+			writer.WriteInteger(dependency.m_LastWriteTimeTicks);
+			writer.EndObject();
+		}
+		writer.EndArray();
+		writer.EndObject();
+
 		writer.EndObject();
 
 		std::ofstream out(manifestPath, std::ios::binary);
@@ -772,342 +434,366 @@ namespace gglab
 
 	namespace
 	{
-		struct ManifestJsonMapper final
+		[[nodiscard]] const json::JsonValue* FindField(
+			const json::JsonObject& object, std::string_view key) noexcept
 		{
-			[[nodiscard]] std::optional<ShaderArtifactManifest> Map(const JsonValue& root) noexcept
+			for (const json::JsonMember& member : object)
+			{
+				if (member.first == key)
+				{
+					return &member.second;
+				}
+			}
+			return nullptr;
+		}
+
+		[[nodiscard]] bool ParseRequiredInteger(const json::JsonObject& object,
+			std::string_view key, int64_t& outValue) noexcept
+		{
+			const json::JsonValue* field = FindField(object, key);
+			if (field == nullptr || !field->IsInteger())
+			{
+				return false;
+			}
+			outValue = field->AsInteger();
+			return true;
+		}
+
+		[[nodiscard]] bool ParseRequiredString(const json::JsonObject& object,
+			std::string_view key, std::string& outValue) noexcept
+		{
+			const json::JsonValue* field = FindField(object, key);
+			if (field == nullptr || !field->IsString())
+			{
+				return false;
+			}
+			outValue = field->AsString();
+			return true;
+		}
+
+		[[nodiscard]] bool ParseRequiredStringArray(const json::JsonObject& object,
+			std::string_view key, std::vector<std::string>& outValues) noexcept
+		{
+			const json::JsonValue* field = FindField(object, key);
+			if (field == nullptr || !field->IsArray())
+			{
+				return false;
+			}
+			for (const json::JsonValue& element : field->AsArray())
+			{
+				if (!element.IsString())
+				{
+					return false;
+				}
+				outValues.push_back(element.AsString());
+			}
+			return true;
+		}
+
+		struct CacheRecordJsonMapper final
+		{
+			[[nodiscard]] std::optional<ShaderArtifactCacheRecord> Map(
+				const json::JsonValue& root) noexcept
 			{
 				if (!root.IsObject())
 				{
 					return std::nullopt;
 				}
-				ShaderArtifactManifest manifest{};
-				uint32_t seenMask = 0;
-				constexpr uint32_t SchemaBit = 1u << 0;
-				constexpr uint32_t RecipeHashSchemaBit = 1u << 1;
-				constexpr uint32_t RecipeIdBit = 1u << 2;
-				constexpr uint32_t BuildKeyBit = 1u << 3;
-				constexpr uint32_t CompilerBit = 1u << 4;
-				constexpr uint32_t BinaryFormatBit = 1u << 5;
-				constexpr uint32_t EnvironmentBit = 1u << 6;
-				constexpr uint32_t AbiBit = 1u << 7;
-				constexpr uint32_t CoordinatesBit = 1u << 8;
-				constexpr uint32_t StageBit = 1u << 9;
-				constexpr uint32_t LogicalSourceBit = 1u << 10;
-				constexpr uint32_t PhysicalSourceBit = 1u << 11;
-				constexpr uint32_t EntryBit = 1u << 12;
-				constexpr uint32_t TargetBit = 1u << 13;
-				constexpr uint32_t DefinesBit = 1u << 14;
-				constexpr uint32_t IncludeDirsBit = 1u << 15;
-				constexpr uint32_t ExtraArgsBit = 1u << 16;
-				constexpr uint32_t DependenciesBit = 1u << 17;
-				constexpr uint32_t DigestBit = 1u << 18;
-				constexpr uint32_t RequiredMask = SchemaBit | RecipeHashSchemaBit | RecipeIdBit |
-					BuildKeyBit | CompilerBit | BinaryFormatBit | EnvironmentBit | AbiBit |
-					CoordinatesBit | StageBit | LogicalSourceBit | PhysicalSourceBit |
-					EntryBit | TargetBit | DefinesBit | IncludeDirsBit | ExtraArgsBit |
-					DependenciesBit | DigestBit;
+				const json::JsonObject& rootObject = root.AsObject();
 
-				for (const auto& [key, value] : root.AsObject())
-				{
-					if (key == "schemaVersion")
-					{
-						if (!value.IsInteger() ||
-							value.AsInteger() != ShaderArtifactManifestSchemaVersion)
-						{
-							return std::nullopt;
-						}
-						manifest.m_SchemaVersion = static_cast<uint32_t>(value.AsInteger());
-						seenMask |= SchemaBit;
-					}
-					else if (key == "recipeHashSchema")
-					{
-						if (!value.IsInteger() || value.AsInteger() != ShaderRecipeHashSchema)
-						{
-							return std::nullopt;
-						}
-						manifest.m_RecipeHashSchema = static_cast<uint32_t>(value.AsInteger());
-						seenMask |= RecipeHashSchemaBit;
-					}
-					else if (key == "recipeId")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						const auto parsed = ParseHexSha256Digest(value.AsString());
-						if (!parsed.has_value())
-						{
-							return std::nullopt;
-						}
-						manifest.m_RecipeId.m_DurableDigest = *parsed;
-						seenMask |= RecipeIdBit;
-					}
-					else if (key == "buildKey")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						const auto parsed = ParseHexSha256Digest(value.AsString());
-						if (!parsed.has_value())
-						{
-							return std::nullopt;
-						}
-						manifest.m_BuildKey.m_DurableDigest = *parsed;
-						seenMask |= BuildKeyBit;
-					}
-					else if (key == "compiler")
-					{
-						if (!value.IsObject())
-						{
-							return std::nullopt;
-						}
-						bool hasKind = false;
-						bool hasIdentity = false;
-						for (const auto& [compilerKey, compilerValue] : value.AsObject())
-						{
-							if (compilerKey == "kind")
-							{
-								if (!compilerValue.IsString() || compilerValue.AsString() != "dxc")
-								{
-									return std::nullopt;
-								}
-								hasKind = true;
-							}
-							else if (compilerKey == "identity")
-							{
-								if (!compilerValue.IsString())
-								{
-									return std::nullopt;
-								}
-								manifest.m_CompilerIdentity.m_CanonicalIdentity =
-									utils::ToWideString(compilerValue.AsString());
-								hasIdentity = true;
-							}
-							else
-							{
-								return std::nullopt;
-							}
-						}
-						if (!hasKind || !hasIdentity)
-						{
-							return std::nullopt;
-						}
-						seenMask |= CompilerBit;
-					}
-					else if (key == "binaryFormat")
-					{
-						if (!value.IsString() ||
-							!ParseShaderBinaryFormat(value.AsString(), manifest.m_BinaryFormat))
-						{
-							return std::nullopt;
-						}
-						seenMask |= BinaryFormatBit;
-					}
-					else if (key == "spirvTargetEnvironment")
-					{
-						if (!value.IsString() ||
-							!ParseSpirVTargetEnvironment(
-								value.AsString(), manifest.m_SpirVTargetEnvironment))
-						{
-							return std::nullopt;
-						}
-						seenMask |= EnvironmentBit;
-					}
-					else if (key == "bindingAbiRevision")
-					{
-						if (!value.IsInteger() || value.AsInteger() < 0 ||
-							value.AsInteger() > UINT32_MAX)
-						{
-							return std::nullopt;
-						}
-						manifest.m_BindingABIRevision = static_cast<uint32_t>(value.AsInteger());
-						seenMask |= AbiBit;
-					}
-					else if (key == "coordinateOptions")
-					{
-						if (!value.IsInteger() || value.AsInteger() < 0 ||
-							value.AsInteger() > UINT32_MAX)
-						{
-							return std::nullopt;
-						}
-						manifest.m_CoordinateOptions =
-							static_cast<ShaderCoordinateOptions>(value.AsInteger());
-						seenMask |= CoordinatesBit;
-					}
-					else if (key == "stage")
-					{
-						if (!value.IsString() ||
-							!ParseShaderStage(value.AsString(), manifest.m_Stage))
-						{
-							return std::nullopt;
-						}
-						seenMask |= StageBit;
-					}
-					else if (key == "logicalSource")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						manifest.m_LogicalSourcePath = utils::ToWideString(value.AsString());
-						seenMask |= LogicalSourceBit;
-					}
-					else if (key == "physicalSource")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						manifest.m_SourcePath = utils::ToWideString(value.AsString());
-						seenMask |= PhysicalSourceBit;
-					}
-					else if (key == "entryPoint")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						manifest.m_EntryPoint = utils::ToWideString(value.AsString());
-						seenMask |= EntryBit;
-					}
-					else if (key == "target")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						manifest.m_TargetString = utils::ToWideString(value.AsString());
-						seenMask |= TargetBit;
-					}
-					else if (key == "defines")
-					{
-						if (!value.IsArray())
-						{
-							return std::nullopt;
-						}
-						for (const JsonValue& define : value.AsArray())
-						{
-							if (!define.IsString())
-							{
-								return std::nullopt;
-							}
-							manifest.m_Defines.push_back(utils::ToWideString(define.AsString()));
-						}
-						seenMask |= DefinesBit;
-					}
-					else if (key == "includeDirs")
-					{
-						if (!value.IsArray())
-						{
-							return std::nullopt;
-						}
-						for (const JsonValue& includeDir : value.AsArray())
-						{
-							if (!includeDir.IsString())
-							{
-								return std::nullopt;
-							}
-							manifest.m_IncludeDirs.emplace_back(
-								utils::ToWideString(includeDir.AsString()));
-						}
-						seenMask |= IncludeDirsBit;
-					}
-					else if (key == "extraArgs")
-					{
-						if (!value.IsArray())
-						{
-							return std::nullopt;
-						}
-						for (const JsonValue& extraArg : value.AsArray())
-						{
-							if (!extraArg.IsString())
-							{
-								return std::nullopt;
-							}
-							manifest.m_ExtraArgs.push_back(utils::ToWideString(extraArg.AsString()));
-						}
-						seenMask |= ExtraArgsBit;
-					}
-					else if (key == "dependencies")
-					{
-						if (!value.IsArray())
-						{
-							return std::nullopt;
-						}
-						for (const JsonValue& dependency : value.AsArray())
-						{
-							if (!dependency.IsObject())
-							{
-								return std::nullopt;
-							}
-							ShaderArtifactDependency record{};
-							bool hasPath = false;
-							bool hasTicks = false;
-							for (const auto& [dependencyKey, dependencyValue] : dependency.AsObject())
-							{
-								if (dependencyKey == "path")
-								{
-									if (!dependencyValue.IsString())
-									{
-										return std::nullopt;
-									}
-									record.m_Path = utils::ToWideString(dependencyValue.AsString());
-									hasPath = true;
-								}
-								else if (dependencyKey == "lastWriteTimeTicks")
-								{
-									if (!dependencyValue.IsInteger())
-									{
-										return std::nullopt;
-									}
-									record.m_LastWriteTimeTicks = dependencyValue.AsInteger();
-									hasTicks = true;
-								}
-								else
-								{
-									return std::nullopt;
-								}
-							}
-							if (!hasPath || !hasTicks)
-							{
-								return std::nullopt;
-							}
-							manifest.m_Dependencies.push_back(std::move(record));
-						}
-						seenMask |= DependenciesBit;
-					}
-					else if (key == "binaryContentDigest")
-					{
-						if (!value.IsString())
-						{
-							return std::nullopt;
-						}
-						const auto parsed = ParseHexSha256Digest(value.AsString());
-						if (!parsed.has_value())
-						{
-							return std::nullopt;
-						}
-						manifest.m_BinaryContentDigest.m_Digest = *parsed;
-						seenMask |= DigestBit;
-					}
-					else
-					{
-						// Unknown keys are rejected: schema evolution requires a bump.
-						return std::nullopt;
-					}
-				}
-
-				if (seenMask != RequiredMask)
+				const json::JsonValue* manifestValue = FindField(rootObject, "manifest");
+				const json::JsonValue* localValue = FindField(rootObject, "local");
+				if (manifestValue == nullptr || !manifestValue->IsObject() ||
+					localValue == nullptr || !localValue->IsObject())
 				{
 					return std::nullopt;
 				}
-				return manifest;
+				if (rootObject.size() != 2)
+				{
+					return std::nullopt; // unknown keys rejected: schema bump required
+				}
+
+				ShaderArtifactCacheRecord record{};
+				if (!MapManifest(manifestValue->AsObject(), record.m_Manifest) ||
+					!MapLocal(localValue->AsObject(), record))
+				{
+					return std::nullopt;
+				}
+				return record;
+			}
+
+		private:
+			[[nodiscard]] bool MapManifest(const json::JsonObject& object,
+				ShaderArtifactManifest& manifest) noexcept
+			{
+				std::string text;
+				int64_t integer = 0;
+				std::vector<std::string> strings;
+				uint32_t seenMask = 0;
+				constexpr uint32_t AllBits = (1u << 22) - 1;
+
+				if (!ParseRequiredInteger(object, "schemaVersion", integer) ||
+					integer != ShaderArtifactManifestSchemaVersion)
+				{
+					return false;
+				}
+				manifest.m_SchemaVersion = static_cast<uint32_t>(integer);
+				seenMask |= 1u << 0;
+				if (!ParseRequiredInteger(object, "recipeHashSchema", integer) ||
+					integer != ShaderRecipeHashSchema)
+				{
+					return false;
+				}
+				manifest.m_RecipeHashSchema = static_cast<uint32_t>(integer);
+				seenMask |= 1u << 1;
+				if (!ParseRequiredString(object, "recipeId", text))
+				{
+					return false;
+				}
+				const auto recipeId = ParseHexSha256Digest(text);
+				if (!recipeId.has_value())
+				{
+					return false;
+				}
+				manifest.m_RecipeId.m_DurableDigest = *recipeId;
+				seenMask |= 1u << 2;
+				if (!ParseRequiredString(object, "buildKey", text))
+				{
+					return false;
+				}
+				const auto buildKey = ParseHexSha256Digest(text);
+				if (!buildKey.has_value())
+				{
+					return false;
+				}
+				manifest.m_BuildKey.m_DurableDigest = *buildKey;
+				seenMask |= 1u << 3;
+
+				const json::JsonValue* compiler = FindField(object, "compiler");
+				if (compiler == nullptr || !compiler->IsObject())
+				{
+					return false;
+				}
+				bool hasKind = false;
+				bool hasIdentity = false;
+				for (const json::JsonMember& member : compiler->AsObject())
+				{
+					if (member.first == "kind")
+					{
+						if (!member.second.IsString() || member.second.AsString() != "dxc")
+						{
+							return false;
+						}
+						hasKind = true;
+					}
+					else if (member.first == "identity")
+					{
+						if (!member.second.IsString())
+						{
+							return false;
+						}
+						manifest.m_CompilerIdentity.m_CanonicalIdentity =
+							utils::ToWideString(member.second.AsString());
+						hasIdentity = true;
+					}
+					else
+					{
+						return false;
+					}
+				}
+				if (!hasKind || !hasIdentity)
+				{
+					return false;
+				}
+				seenMask |= 1u << 4;
+
+				if (!ParseRequiredString(object, "targetProfile", text) ||
+					!ParseShaderTargetProfile(text, manifest.m_TargetProfile))
+				{
+					return false;
+				}
+				seenMask |= 1u << 5;
+				if (!ParseRequiredString(object, "binaryFormat", text) ||
+					!ParseShaderBinaryFormat(text, manifest.m_BinaryFormat))
+				{
+					return false;
+				}
+				seenMask |= 1u << 6;
+				if (!ParseRequiredString(object, "spirvTargetEnvironment", text) ||
+					!ParseSpirVTargetEnvironment(text, manifest.m_SpirVTargetEnvironment))
+				{
+					return false;
+				}
+				seenMask |= 1u << 7;
+				if (!ParseRequiredInteger(object, "bindingAbiRevision", integer) ||
+					integer < 0 || integer > UINT32_MAX)
+				{
+					return false;
+				}
+				manifest.m_BindingABIRevision = static_cast<uint32_t>(integer);
+				seenMask |= 1u << 8;
+				if (!ParseRequiredInteger(object, "coordinateOptions", integer) ||
+					integer < 0 || integer > UINT32_MAX)
+				{
+					return false;
+				}
+				manifest.m_CoordinateOptions =
+					static_cast<ShaderCoordinateOptions>(integer);
+				seenMask |= 1u << 9;
+				if (!ParseRequiredString(object, "stage", text) ||
+					!ParseShaderStage(text, manifest.m_Stage))
+				{
+					return false;
+				}
+				seenMask |= 1u << 10;
+				if (!ParseRequiredString(object, "shaderModel", text) ||
+					!ParseShaderModel(text, manifest.m_ShaderModel))
+				{
+					return false;
+				}
+				seenMask |= 1u << 11;
+				if (!ParseRequiredString(object, "hlslVersion", text))
+				{
+					return false;
+				}
+				manifest.m_HlslVersion = utils::ToWideString(text);
+				seenMask |= 1u << 12;
+				if (!ParseRequiredInteger(object, "compileFlags", integer) ||
+					integer < 0 || integer > UINT32_MAX)
+				{
+					return false;
+				}
+				manifest.m_CompileFlags = static_cast<ShaderCompileFlags>(integer);
+				seenMask |= 1u << 13;
+				if (!ParseRequiredString(object, "optimizationLevel", text))
+				{
+					return false;
+				}
+				manifest.m_OptimizationLevel = utils::ToWideString(text);
+				seenMask |= 1u << 14;
+				if (!ParseRequiredString(object, "logicalSource", text))
+				{
+					return false;
+				}
+				manifest.m_LogicalSourcePath = utils::ToWideString(text);
+				seenMask |= 1u << 15;
+				if (!ParseRequiredString(object, "entryPoint", text))
+				{
+					return false;
+				}
+				manifest.m_EntryPoint = utils::ToWideString(text);
+				seenMask |= 1u << 16;
+				if (!ParseRequiredString(object, "target", text))
+				{
+					return false;
+				}
+				manifest.m_TargetString = utils::ToWideString(text);
+				seenMask |= 1u << 17;
+				if (!ParseRequiredStringArray(object, "defines", strings))
+				{
+					return false;
+				}
+				for (const std::string& define : strings)
+				{
+					manifest.m_Defines.push_back(utils::ToWideString(define));
+				}
+				seenMask |= 1u << 18;
+				strings.clear();
+				if (!ParseRequiredStringArray(object, "logicalIncludeDirs", strings))
+				{
+					return false;
+				}
+				for (const std::string& includeDir : strings)
+				{
+					manifest.m_LogicalIncludeDirs.emplace_back(utils::ToWideString(includeDir));
+				}
+				seenMask |= 1u << 19;
+				strings.clear();
+				if (!ParseRequiredStringArray(object, "extraArgs", strings))
+				{
+					return false;
+				}
+				for (const std::string& extraArg : strings)
+				{
+					manifest.m_ExtraArgs.push_back(utils::ToWideString(extraArg));
+				}
+				seenMask |= 1u << 20;
+				if (!ParseRequiredString(object, "binaryContentDigest", text))
+				{
+					return false;
+				}
+				const auto digest = ParseHexSha256Digest(text);
+				if (!digest.has_value())
+				{
+					return false;
+				}
+				manifest.m_BinaryContentDigest.m_Digest = *digest;
+				seenMask |= 1u << 21;
+
+				return seenMask == AllBits && object.size() == 22;
+			}
+
+			[[nodiscard]] bool MapLocal(const json::JsonObject& object,
+				ShaderArtifactCacheRecord& record) noexcept
+			{
+				std::string text;
+				std::vector<std::string> strings;
+				if (!ParseRequiredString(object, "physicalSource", text))
+				{
+					return false;
+				}
+				record.m_PhysicalSourcePath = utils::ToWideString(text);
+				if (!ParseRequiredStringArray(object, "physicalIncludeDirs", strings))
+				{
+					return false;
+				}
+				for (const std::string& includeDir : strings)
+				{
+					record.m_PhysicalIncludeDirs.emplace_back(utils::ToWideString(includeDir));
+				}
+
+				const json::JsonValue* dependencies = FindField(object, "dependencies");
+				if (dependencies == nullptr || !dependencies->IsArray())
+				{
+					return false;
+				}
+				for (const json::JsonValue& dependencyValue : dependencies->AsArray())
+				{
+					if (!dependencyValue.IsObject())
+					{
+						return false;
+					}
+					const json::JsonObject& dependencyObject = dependencyValue.AsObject();
+					ShaderArtifactDependency dependency{};
+					std::string logicalPath;
+					std::string physicalPath;
+					std::string contentDigest;
+					int64_t ticks = 0;
+					if (!ParseRequiredString(dependencyObject, "logicalPath", logicalPath) ||
+						!ParseRequiredString(dependencyObject, "physicalPath", physicalPath) ||
+						!ParseRequiredString(dependencyObject, "contentDigest", contentDigest) ||
+						!ParseRequiredInteger(dependencyObject, "lastWriteTimeTicks", ticks) ||
+						dependencyObject.size() != 4)
+					{
+						return false;
+					}
+					const auto parsedDigest = ParseHexSha256Digest(contentDigest);
+					if (!parsedDigest.has_value())
+					{
+						return false;
+					}
+					dependency.m_LogicalPath = utils::ToWideString(logicalPath);
+					dependency.m_PhysicalPath = utils::ToWideString(physicalPath);
+					dependency.m_ContentDigest = *parsedDigest;
+					dependency.m_LastWriteTimeTicks = ticks;
+					record.m_Dependencies.push_back(std::move(dependency));
+				}
+				return object.size() == 3;
 			}
 		};
 	}
 
-	std::optional<ShaderArtifactManifest> ReadShaderArtifactManifest(
+	std::optional<ShaderArtifactCacheRecord> ReadShaderArtifactCacheRecord(
 		const std::filesystem::path& manifestPath) noexcept
 	{
 		std::ifstream in(manifestPath, std::ios::binary);
@@ -1118,16 +804,16 @@ namespace gglab
 		const std::string content((std::istreambuf_iterator<char>(in)),
 			std::istreambuf_iterator<char>());
 
-		JsonParser parser(content);
-		const std::optional<JsonValue> document = parser.ParseDocument();
+		const std::optional<json::JsonValue> document = json::ParseJsonDocument(content);
 		if (!document.has_value())
 		{
 			return std::nullopt;
 		}
-		return ManifestJsonMapper{}.Map(*document);
+		return CacheRecordJsonMapper{}.Map(*document);
 	}
 
-	std::optional<ShaderArtifact> LoadShaderArtifact(const std::filesystem::path& manifestPath,
+	std::optional<ShaderArtifactCacheRecord> LoadShaderArtifactCacheRecord(
+		const std::filesystem::path& manifestPath,
 		const std::filesystem::path& binaryPath) noexcept
 	{
 		std::error_code errorCode;
@@ -1137,9 +823,9 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		const std::optional<ShaderArtifactManifest> manifest =
-			ReadShaderArtifactManifest(manifestPath);
-		if (!manifest.has_value())
+		std::optional<ShaderArtifactCacheRecord> record =
+			ReadShaderArtifactCacheRecord(manifestPath);
+		if (!record.has_value())
 		{
 			return std::nullopt;
 		}
@@ -1153,19 +839,17 @@ namespace gglab
 		const std::optional<BinaryContentDigest> actualDigest =
 			ComputeFileContentDigest(binaryPath);
 		if (!actualDigest.has_value() ||
-			actualDigest->m_Digest != manifest->m_BinaryContentDigest.m_Digest)
+			actualDigest->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
 		{
 			return std::nullopt;
 		}
 
-		ShaderArtifact artifact{};
-		artifact.m_Manifest = *manifest;
-		artifact.m_Binary = *binary;
-		return artifact;
+		record->m_Binary = *binary;
+		return record;
 	}
 
-	bool PublishShaderArtifact(const std::filesystem::path& binaryPath,
-		const std::filesystem::path& manifestPath, const ShaderArtifact& artifact) noexcept
+	bool PublishShaderArtifactCacheRecord(const std::filesystem::path& binaryPath,
+		const std::filesystem::path& manifestPath, const ShaderArtifactCacheRecord& record) noexcept
 	{
 		const bool parentsReady = utils::CreateParentDirectoryIfNotExist(binaryPath) &&
 			utils::CreateParentDirectoryIfNotExist(manifestPath);
@@ -1178,7 +862,7 @@ namespace gglab
 		const std::filesystem::path tempManifestPath = MakeUniqueTempPath(manifestPath);
 
 		const bool binaryWritten = utils::WriteFileBinary(tempBinaryPath, std::span(
-			static_cast<const std::byte*>(artifact.m_Binary.Data()), artifact.m_Binary.SizeInBytes()));
+			static_cast<const std::byte*>(record.m_Binary.Data()), record.m_Binary.SizeInBytes()));
 		if (!binaryWritten)
 		{
 			RemoveFileBestEffort(tempBinaryPath);
@@ -1190,13 +874,13 @@ namespace gglab
 		const std::optional<BinaryContentDigest> publishedDigest =
 			ComputeFileContentDigest(tempBinaryPath);
 		if (!publishedDigest.has_value() ||
-			publishedDigest->m_Digest != artifact.m_Manifest.m_BinaryContentDigest.m_Digest)
+			publishedDigest->m_Digest != record.m_Manifest.m_BinaryContentDigest.m_Digest)
 		{
 			RemoveFileBestEffort(tempBinaryPath);
 			return false;
 		}
 
-		if (!WriteShaderArtifactManifest(tempManifestPath, artifact.m_Manifest))
+		if (!WriteShaderArtifactCacheRecord(tempManifestPath, record))
 		{
 			RemoveFileBestEffort(tempBinaryPath);
 			RemoveFileBestEffort(tempManifestPath);

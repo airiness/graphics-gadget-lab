@@ -389,6 +389,30 @@ namespace gglab
 				!syntaxError.m_StdErr.empty(),
 				"CLI reports DXC syntax errors as compilation failures with diagnostics");
 
+			// JSON mode must stay machine-readable on the failure path: CI and
+			// editors consume the same structured diagnostics as the success
+			// document instead of scraping stderr.
+			const CliRunResult jsonSyntaxError = RunCli({
+				L"compile", L"--source-root", badSourceRoot.wstring(), L"--source", L"Bad.hlsl",
+				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
+				L"--cache-root", (tempRoot / L"BadCliCache").wstring(),
+				L"--result-format", L"json",
+			});
+			context.Check(jsonSyntaxError.m_ExitCode == 4 &&
+				jsonSyntaxError.m_StdOut.find("\"success\":false") != std::string::npos &&
+				jsonSyntaxError.m_StdOut.find("\"status\":\"compile-failed\"") != std::string::npos &&
+				jsonSyntaxError.m_StdOut.find("\"diagnostics\":[{\"message\":\"") != std::string::npos,
+				"CLI JSON mode emits a structured failure document for compile errors");
+
+			const CliRunResult jsonMissingSource = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassDoesNotExist.hlsl", L"--stage", L"vertex", L"--target", L"gglab-dx12",
+				L"--result-format", L"json",
+			});
+			context.Check(jsonMissingSource.m_ExitCode == 3 &&
+				jsonMissingSource.m_StdOut.find("\"status\":\"source-not-found\"") != std::string::npos,
+				"CLI JSON mode emits a structured failure document for missing sources");
+
 			// Artifact IO failure (cache root under a regular file) maps to exit 5.
 			const std::filesystem::path fileBlock = tempRoot / L"NotADirectory.txt";
 			const bool fileBlockWritten = WriteTextFile(fileBlock, "block");
