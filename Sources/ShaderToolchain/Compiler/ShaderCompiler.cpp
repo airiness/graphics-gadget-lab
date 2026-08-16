@@ -899,6 +899,17 @@ namespace gglab
 		{
 			return false;
 		}
+		// Main-source binding defense: the first dependency must describe the
+		// recipe's own source, in both its portable and local forms, so an
+		// empty or mismatched record can never skip source validation.
+		if (record.m_Manifest.m_Dependencies.empty() ||
+			record.m_Manifest.m_Dependencies[0].m_LogicalPath !=
+				recipe.m_LogicalSourcePath ||
+			utils::Canonical(record.m_DependencyPhysicalPaths[0]) !=
+				utils::Canonical(record.m_PhysicalSourcePath))
+		{
+			return false;
+		}
 		std::error_code errorCode;
 		for (std::size_t index = 0; index < record.m_Manifest.m_Dependencies.size(); ++index)
 		{

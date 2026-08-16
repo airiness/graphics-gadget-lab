@@ -1250,6 +1250,13 @@ namespace gglab
 			record.m_Manifest.m_BinaryFormat = ShaderBinaryFormat::Dxil;
 			record.m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] = std::byte{ 0x01 };
 			record.m_Manifest.m_BuildKey.m_DurableDigest.m_Value[0] = std::byte{ 0x02 };
+			record.m_Manifest.m_LogicalSourcePath = L"Probe.hlsl";
+			ShaderArtifactDependency mainSource{};
+			mainSource.m_LogicalPath = L"Probe.hlsl";
+			mainSource.m_ContentDigest.m_Value[0] = std::byte{ 0x03 };
+			record.m_Manifest.m_Dependencies.push_back(std::move(mainSource));
+			record.m_PhysicalSourcePath = R"(C:\Repo\Probe.hlsl)";
+			record.m_DependencyPhysicalPaths = { std::filesystem::path(R"(C:\Repo\Probe.hlsl)") };
 			record.m_Manifest.m_BinaryContentDigest.m_Digest = ComputeSha256(std::span(
 				reinterpret_cast<const std::byte*>(binaryBytes.data()), binaryBytes.size()));
 			const bool recordWritten = WriteShaderArtifactCacheRecord(recordPath, record);
@@ -1328,8 +1335,9 @@ namespace gglab
 			for (std::size_t index = 0; index < 3; ++index)
 			{
 				ShaderArtifactDependency dependency{};
-				dependency.m_LogicalPath =
-					std::filesystem::path(std::format(L"Passes/Dep{}.hlsl", index));
+				dependency.m_LogicalPath = (index == 0)
+					? std::filesystem::path(L"Passes/Probe.hlsl")
+					: std::filesystem::path(std::format(L"Passes/Dep{}.hlsl", index));
 				dependency.m_ContentDigest.m_Value[0] =
 					std::byte{ static_cast<unsigned char>(index + 1) };
 				manifest.m_Dependencies.push_back(std::move(dependency));
@@ -1337,7 +1345,7 @@ namespace gglab
 			record.m_PhysicalSourcePath = L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl";
 			record.m_PhysicalIncludeDirs = { L"C:\\Repo\\Shaders" };
 			record.m_DependencyPhysicalPaths = {
-				std::filesystem::path(R"(C:\Repo\PhysA.hlsl)"),
+				std::filesystem::path(L"C:\\Repo\\Shaders\\Passes\\Probe.hlsl"),
 				std::filesystem::path(R"(C:\Repo\PhysB.hlsl)"),
 				std::filesystem::path(R"(C:\Repo\PhysC.hlsl)"),
 			};
@@ -1422,8 +1430,8 @@ namespace gglab
 			// Dependency cardinality invariant: dropping one physical
 			// resolution must reject the whole record.
 			const bool cardinalityTampered = ReplaceMetadataValue(recordPath,
-				R"("dependencyPhysicalPaths":["C:\\Repo\\PhysA.hlsl","C:\\Repo\\PhysB.hlsl","C:\\Repo\\PhysC.hlsl"])",
-				R"("dependencyPhysicalPaths":["C:\\Repo\\PhysA.hlsl","C:\\Repo\\PhysB.hlsl"])");
+				R"("dependencyPhysicalPaths":["C:\\Repo\\Shaders\\Passes\\Probe.hlsl","C:\\Repo\\PhysB.hlsl","C:\\Repo\\PhysC.hlsl"])",
+				R"("dependencyPhysicalPaths":["C:\\Repo\\Shaders\\Passes\\Probe.hlsl","C:\\Repo\\PhysB.hlsl"])");
 			const bool cardinalityRejected =
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
@@ -1442,6 +1450,35 @@ namespace gglab
 				!ReadShaderArtifactCacheRecord(recordPath).has_value();
 			RestoreBaseline();
 
+			// Main-source binding structural invariants: the first dependency
+			// must describe the main source, in both its portable and local
+			// forms. An empty dependency list, a mismatched first logical
+			// path, or a mismatched first physical resolution must reject the
+			// record as invalid derived data.
+			const auto WriteAndReject = [&recordPath](
+				const ShaderArtifactCacheRecord& probe) noexcept
+				{
+					return WriteShaderArtifactCacheRecord(recordPath, probe) &&
+						!ReadShaderArtifactCacheRecord(recordPath).has_value();
+				};
+
+			ShaderArtifactCacheRecord emptyDependencies = record;
+			emptyDependencies.m_Manifest.m_Dependencies.clear();
+			emptyDependencies.m_DependencyPhysicalPaths.clear();
+			const bool emptyDependenciesRejected = WriteAndReject(emptyDependencies);
+
+			ShaderArtifactCacheRecord mismatchedLogicalSource = record;
+			mismatchedLogicalSource.m_Manifest.m_Dependencies[0].m_LogicalPath =
+				std::filesystem::path(L"Other/Main.hlsl");
+			const bool mismatchedLogicalSourceRejected = WriteAndReject(mismatchedLogicalSource);
+
+			ShaderArtifactCacheRecord mismatchedPhysicalSource = record;
+			mismatchedPhysicalSource.m_DependencyPhysicalPaths[0] =
+				std::filesystem::path(R"(C:\Repo\Other.hlsl)");
+			const bool mismatchedPhysicalSourceRejected = WriteAndReject(mismatchedPhysicalSource);
+
+			RestoreBaseline();
+
 			// Portability self-check: the manifest sub-document carries the
 			// dependency provenance but none of the physical resolutions.
 			const std::size_t manifestBegin = baseline.find("\"manifest\":{");
@@ -1454,9 +1491,8 @@ namespace gglab
 			const bool manifestSectionPortable =
 				manifestSection.find("\"logicalPath\"") != std::string::npos &&
 				manifestSection.find("\"contentDigest\"") != std::string::npos &&
-				manifestSection.find("PhysA") == std::string::npos &&
-				manifestSection.find("PhysB") == std::string::npos &&
-				manifestSection.find("PhysC") == std::string::npos &&
+				manifestSection.find("Phys") == std::string::npos &&
+				manifestSection.find("Repo") == std::string::npos &&
 				manifestSection.find("dependencyPhysicalPaths") == std::string::npos;
 
 			std::string deepDocument;
@@ -1527,6 +1563,9 @@ namespace gglab
 			context.Check(recordSchemaBumped && recordSchemaBumpedRejected &&
 				manifestSchemaBumped && manifestSchemaBumpedRejected,
 				"Record and manifest schema versions are independent rejection axes");
+			context.Check(emptyDependenciesRejected && mismatchedLogicalSourceRejected &&
+				mismatchedPhysicalSourceRejected,
+				"Cache record reader enforces the main-source binding invariants");
 			context.Check(manifestSectionFound && manifestSectionPortable,
 				"Manifest sub-document carries provenance without any physical path");
 			context.Check(deepDocumentWritten && deepDocumentRejected,

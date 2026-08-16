@@ -351,7 +351,8 @@ namespace gglab
 		const ShaderArtifactManifest& manifest = record.m_Manifest;
 
 		nlohmann::json manifestDocument;
-		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
+		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);
+		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
 		manifestDocument["recipeId"] = Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest);
 		manifestDocument["buildKey"] = Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest);
 		nlohmann::json compiler;
@@ -639,10 +640,19 @@ namespace gglab
 				{
 					return std::nullopt;
 				}
-				// Dependency cardinality invariant: every portable dependency
-				// must pair with exactly one local physical resolution.
-				if (record.m_Manifest.m_Dependencies.size() !=
-					record.m_DependencyPhysicalPaths.size())
+				// Structural main-source binding and dependency cardinality
+				// invariants: the main source must be present and described by
+				// the first dependency, in both its portable (logical) and
+				// local (canonical physical) forms, and every portable
+				// dependency must pair with exactly one local physical
+				// resolution. Violations are invalid derived data.
+				if (record.m_Manifest.m_Dependencies.empty() ||
+					record.m_Manifest.m_Dependencies.size() !=
+						record.m_DependencyPhysicalPaths.size() ||
+					record.m_Manifest.m_Dependencies[0].m_LogicalPath !=
+						record.m_Manifest.m_LogicalSourcePath ||
+					utils::Canonical(record.m_DependencyPhysicalPaths[0]) !=
+						utils::Canonical(record.m_PhysicalSourcePath))
 				{
 					return std::nullopt;
 				}
