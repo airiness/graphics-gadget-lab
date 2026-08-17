@@ -195,6 +195,16 @@ namespace gglab
 			return output.good();
 		}
 
+		[[nodiscard]] bool WriteBinaryFile(
+			const std::filesystem::path& path, const ShaderBinary& binary) noexcept
+		{
+			std::filesystem::create_directories(path.parent_path());
+			std::ofstream output(path, std::ios::binary);
+			output.write(static_cast<const char*>(binary.Data()),
+				static_cast<std::streamsize>(binary.SizeInBytes()));
+			return output.good();
+		}
+
 		[[nodiscard]] std::optional<ShaderBinary> ReadFileBinary(
 			const std::filesystem::path& path) noexcept
 		{
@@ -412,6 +422,102 @@ namespace gglab
 				jsonPublished.m_StdOut.find("\"cacheRecordPath\":\"") != std::string::npos &&
 				jsonHit.m_StdOut.find("\"cacheRecordPath\":\"") != std::string::npos,
 				"CLI binaryHash, binaryPath, and cacheRecordPath describe one committed artifact on publish and hit paths");
+
+			// Deterministic CommittedByOther CLI handoff. Install a structurally valid
+			// same-slot winner with the current recipe/build key and dependency
+			// provenance, but with a different valid DXIL payload and producer metadata.
+			// The changed compiler identity rejects the initial cache-hit path. Keeping
+			// the committed binary open without delete sharing prevents the child CLI
+			// from replacing it, so final observation must classify the preserved,
+			// non-equivalent entry as CommittedByOther.
+			const std::filesystem::path committedByOtherCache =
+				tempRoot / L"CliCommittedByOtherCache";
+			ShaderCompiler winnerCompiler(sourceRoot, committedByOtherCache);
+			ShaderDesc winnerDesc{};
+			winnerDesc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
+			winnerDesc.m_Stage = ShaderStage::Vertex;
+			winnerDesc.m_Target = MakeDX12CompileTarget(ShaderStage::Vertex);
+			winnerDesc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+			winnerDesc.m_Entry = L"VSMain";
+			winnerDesc.m_IncludeDirs = { L"." };
+			const ShaderResolvedRecipe winnerRecipe = winnerCompiler.Resolve(winnerDesc);
+			const ShaderCompileResult winnerBaseline =
+				winnerCompiler.CompileOrLoad(winnerRecipe);
+			const std::filesystem::path winnerBinaryPath =
+				winnerCompiler.GetCacheBinaryPath(winnerRecipe);
+			auto winnerRecordPath = winnerBinaryPath;
+			winnerRecordPath += L".json";
+			const std::optional<ShaderArtifactCacheRecord> baselineRecord =
+				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+
+			ShaderCompiler variantCompiler(sourceRoot, tempRoot / L"CliCommittedByOtherVariant");
+			ShaderDesc variantDesc = winnerDesc;
+			variantDesc.m_Target.m_Flags = ShaderCompileFlags::Debug;
+			const ShaderResolvedRecipe variantRecipe = variantCompiler.Resolve(variantDesc);
+			const ShaderCompileResult variantResult = variantCompiler.CompileOrLoad(variantRecipe);
+
+			bool competingWinnerInstalled = false;
+			ShaderArtifactCacheRecord competingWinner{};
+			if (winnerRecipe.IsSuccess() && winnerBaseline.IsSuccess() &&
+				baselineRecord.has_value() && variantRecipe.IsSuccess() &&
+				variantResult.IsSuccess() && variantResult.m_Artifact.m_Binary.IsValid())
+			{
+				competingWinner = *baselineRecord;
+				competingWinner.m_Manifest.m_CompilerIdentity.m_CanonicalIdentity +=
+					L"+cli-committed-winner";
+				competingWinner.m_Manifest.m_BinaryContentDigest =
+					variantResult.m_Artifact.m_Manifest.m_BinaryContentDigest;
+				competingWinner.m_Binary = variantResult.m_Artifact.m_Binary;
+				competingWinnerInstalled =
+					competingWinner.m_Manifest.m_RecipeId == winnerRecipe.m_RecipeId &&
+					competingWinner.m_Manifest.m_BuildKey == winnerRecipe.m_BuildKey &&
+					competingWinner.m_Manifest.m_CompilerIdentity.m_CanonicalIdentity !=
+						winnerRecipe.m_CompilerIdentity.m_CanonicalIdentity &&
+					competingWinner.m_Manifest.m_Dependencies ==
+						baselineRecord->m_Manifest.m_Dependencies &&
+					competingWinner.m_Manifest.m_Dependencies ==
+						variantResult.m_Artifact.m_Manifest.m_Dependencies &&
+					competingWinner.m_Manifest.m_BinaryContentDigest !=
+						baselineRecord->m_Manifest.m_BinaryContentDigest &&
+					WriteBinaryFile(winnerBinaryPath, competingWinner.m_Binary) &&
+					WriteShaderArtifactCacheRecord(winnerRecordPath, competingWinner);
+			}
+
+			const HANDLE winnerBinaryGuard = CreateFileW(winnerBinaryPath.c_str(), GENERIC_READ,
+				FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+			const CliRunResult committedByOther = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--entry", L"VSMain",
+				L"--target", L"gglab-dx12", L"--include", L".", L"--cache-root",
+				committedByOtherCache.wstring(), L"--result-format", L"json",
+			});
+			if (winnerBinaryGuard != INVALID_HANDLE_VALUE)
+			{
+				CloseHandle(winnerBinaryGuard);
+			}
+
+			const std::optional<ShaderArtifactCacheRecord> observedWinner =
+				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const std::string committedByOtherHash =
+				ExtractJsonField(committedByOther.m_StdOut, "binaryHash");
+			const std::string expectedWinnerHash = Sha256DigestToHex(
+				competingWinner.m_Manifest.m_BinaryContentDigest.m_Digest);
+			const std::filesystem::path cliWinnerBinaryPath = utils::ToWideString(
+				ExtractJsonField(committedByOther.m_StdOut, "binaryPath"));
+			const std::filesystem::path cliWinnerRecordPath = utils::ToWideString(
+				ExtractJsonField(committedByOther.m_StdOut, "cacheRecordPath"));
+			context.Check(competingWinnerInstalled && winnerBinaryGuard != INVALID_HANDLE_VALUE &&
+				committedByOther.m_ExitCode == 0 &&
+				committedByOther.m_StdOut.find("\"fromCache\":true") != std::string::npos &&
+				committedByOtherHash == expectedWinnerHash &&
+				cliWinnerBinaryPath.lexically_normal() == winnerBinaryPath.lexically_normal() &&
+				cliWinnerRecordPath.lexically_normal() == winnerRecordPath.lexically_normal() &&
+				observedWinner.has_value() && observedWinner->m_Manifest == competingWinner.m_Manifest &&
+				observedWinner->m_Binary.SizeInBytes() == competingWinner.m_Binary.SizeInBytes() &&
+				std::memcmp(observedWinner->m_Binary.Data(), competingWinner.m_Binary.Data(),
+					competingWinner.m_Binary.SizeInBytes()) == 0 &&
+				CliArtifactFieldsDescribeCommittedEntry(committedByOther),
+				"CLI CommittedByOther success fields describe the delivered committed winner");
 
 			// Corrupt cache binary data is rebuilt, never fatal.
 			{
