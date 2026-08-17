@@ -1,4 +1,4 @@
-#include "ShaderCompilerCommandLine.h"
+﻿#include "ShaderCompilerCommandLine.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
 #include "Contracts/ShaderCompileTarget.h"
@@ -140,14 +140,14 @@ namespace
 
 	int PrintTextResult(const gglab::ShaderCompileResult& result,
 		const gglab::ShaderResolvedRecipe& recipe, const std::filesystem::path& binaryPath,
-		const std::filesystem::path& manifestPath, std::wstring_view targetName)
+		const std::filesystem::path& recordPath, std::wstring_view targetName)
 	{
 		std::wcout << L"Compiled " << recipe.m_LogicalSourcePath.generic_wstring()
 			<< L"::" << recipe.m_Request.m_Entry << L"\n";
 		std::wcout << L"Target: " << targetName << L"\n";
 		std::wcout << L"Artifact: " << binaryPath.wstring() << L"\n";
 		std::wcout << L"Cache: " << (result.m_FromCache ? L"hit" : L"miss") << L"\n";
-		std::wcout << L"Manifest: " << manifestPath.wstring() << L"\n";
+		std::wcout << L"Cache record: " << recordPath.wstring() << L"\n";
 		return ExitCodeSuccess;
 	}
 
@@ -211,8 +211,12 @@ namespace
 
 	int PrintJsonResult(const gglab::ShaderCompileResult& result,
 		const gglab::ShaderResolvedRecipe& recipe, const std::filesystem::path& binaryPath,
-		const std::filesystem::path& manifestPath, std::wstring_view targetName)
+		const std::filesystem::path& recordPath, std::wstring_view targetName)
 	{
+		// binaryHash is the content identity of the committed artifact returned
+		// by CompileOrLoad. binaryPath and cacheRecordPath are that artifact's
+		// cache-slot locations, so all three fields describe the same committed
+		// entry for this completed operation on hit and publication paths.
 		std::string json;
 		json += "{\"success\":true,";
 		json += "\"recipeId\":\"" +
@@ -230,8 +234,8 @@ namespace
 		json += "\"binaryPath\":\"";
 		AppendJsonEscaped(json, gglab::utils::ToString(binaryPath.wstring()));
 		json += "\",";
-		json += "\"manifestPath\":\"";
-		AppendJsonEscaped(json, gglab::utils::ToString(manifestPath.wstring()));
+		json += "\"cacheRecordPath\":\"";
+		AppendJsonEscaped(json, gglab::utils::ToString(recordPath.wstring()));
 		json += "\",";
 		json += result.m_FromCache ? "\"fromCache\":true," : "\"fromCache\":false,";
 		json += "\"diagnostics\":[]}";
@@ -290,13 +294,13 @@ namespace
 		}
 
 		const std::filesystem::path binaryPath = compiler.GetCacheBinaryPath(recipe);
-		auto manifestPath = binaryPath;
-		manifestPath += L".json";
+		auto recordPath = binaryPath;
+		recordPath += L".json";
 		if (options.m_ResultFormat == "json")
 		{
-			return PrintJsonResult(result, recipe, binaryPath, manifestPath, targetName);
+			return PrintJsonResult(result, recipe, binaryPath, recordPath, targetName);
 		}
-		return PrintTextResult(result, recipe, binaryPath, manifestPath, targetName);
+		return PrintTextResult(result, recipe, binaryPath, recordPath, targetName);
 	}
 
 	int RunTargets()

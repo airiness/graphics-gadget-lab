@@ -1,4 +1,5 @@
-#include "ShaderCompilerCliContractSelfTests.h"
+﻿#include "ShaderCompilerCliContractSelfTests.h"
+#include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
 #include "GGLabFoundation/Hash/Sha256.h"
@@ -150,7 +151,39 @@ namespace gglab
 			{
 				return {};
 			}
-			return std::string(json.substr(valueBegin, end - valueBegin));
+			const std::string_view encoded = json.substr(valueBegin, end - valueBegin);
+			std::string decoded;
+			decoded.reserve(encoded.size());
+			for (std::size_t index = 0; index < encoded.size(); ++index)
+			{
+				if (encoded[index] != '\\' || index + 1 >= encoded.size())
+				{
+					decoded += encoded[index];
+					continue;
+				}
+				const char escaped = encoded[++index];
+				switch (escaped)
+				{
+				case '\\':
+					decoded += '\\';
+					break;
+				case '"':
+					decoded += '"';
+					break;
+				case 'n':
+					decoded += '\n';
+					break;
+				case 'r':
+					decoded += '\r';
+					break;
+				case 't':
+					decoded += '\t';
+					break;
+				default:
+					return {};
+				}
+			}
+			return decoded;
 		}
 
 		[[nodiscard]] bool WriteTextFile(
@@ -183,6 +216,34 @@ namespace gglab
 				return std::nullopt;
 			}
 			return binary;
+		}
+
+		[[nodiscard]] bool CliArtifactFieldsDescribeCommittedEntry(
+			const CliRunResult& result) noexcept
+		{
+			if (result.m_ExitCode != 0 ||
+				result.m_StdOut.find("\"manifestPath\"") != std::string::npos)
+			{
+				return false;
+			}
+			const std::string binaryHash = ExtractJsonField(result.m_StdOut, "binaryHash");
+			const std::string binaryPathText = ExtractJsonField(result.m_StdOut, "binaryPath");
+			const std::string recordPathText = ExtractJsonField(
+				result.m_StdOut, "cacheRecordPath");
+			if (binaryHash.empty() || binaryPathText.empty() || recordPathText.empty())
+			{
+				return false;
+			}
+			const std::filesystem::path binaryPath = utils::ToWideString(binaryPathText);
+			const std::filesystem::path recordPath = utils::ToWideString(recordPathText);
+			auto expectedRecordPath = binaryPath;
+			expectedRecordPath += L".json";
+			const std::optional<ShaderArtifactCacheRecord> committed =
+				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
+			return recordPath.lexically_normal() == expectedRecordPath.lexically_normal() &&
+				committed.has_value() &&
+				Sha256DigestToHex(
+					committed->m_Manifest.m_BinaryContentDigest.m_Digest) == binaryHash;
 		}
 
 		struct RuntimeCompileEvidence
@@ -300,6 +361,7 @@ namespace gglab
 				allParityCasesMatch &= recipeId == runtimeEvidence.m_RecipeId &&
 					buildKey == runtimeEvidence.m_BuildKey &&
 					binaryDigest == runtimeEvidence.m_BinaryDigest &&
+					CliArtifactFieldsDescribeCommittedEntry(cliResult) &&
 					cliBinary.has_value() && cliBinary->SizeInBytes() ==
 						runtimeEvidence.m_Binary.SizeInBytes() &&
 					(cliBinary->SizeInBytes() == 0 ||
@@ -329,8 +391,27 @@ namespace gglab
 			});
 			context.Check(firstRun.m_ExitCode == 0 && secondRun.m_ExitCode == 0 &&
 				firstRun.m_StdOut.find("Cache: miss") != std::string::npos &&
-				secondRun.m_StdOut.find("Cache: hit") != std::string::npos,
+				secondRun.m_StdOut.find("Cache: hit") != std::string::npos &&
+				firstRun.m_StdOut.find("Cache record: ") != std::string::npos &&
+				firstRun.m_StdOut.find("Manifest: ") == std::string::npos,
 				"CLI text output reports cache miss then hit for the same request");
+
+			const std::filesystem::path jsonContractCache = tempRoot / L"CliJsonContractCache";
+			const std::vector<std::wstring> jsonContractArguments{
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--entry", L"VSMain",
+				L"--target", L"gglab-dx12", L"--include", L".", L"--cache-root",
+				jsonContractCache.wstring(), L"--result-format", L"json",
+			};
+			const CliRunResult jsonPublished = RunCli(jsonContractArguments);
+			const CliRunResult jsonHit = RunCli(jsonContractArguments);
+			context.Check(CliArtifactFieldsDescribeCommittedEntry(jsonPublished) &&
+				CliArtifactFieldsDescribeCommittedEntry(jsonHit) &&
+				jsonPublished.m_StdOut.find("\"fromCache\":false") != std::string::npos &&
+				jsonHit.m_StdOut.find("\"fromCache\":true") != std::string::npos &&
+				jsonPublished.m_StdOut.find("\"cacheRecordPath\":\"") != std::string::npos &&
+				jsonHit.m_StdOut.find("\"cacheRecordPath\":\"") != std::string::npos,
+				"CLI binaryHash, binaryPath, and cacheRecordPath describe one committed artifact on publish and hit paths");
 
 			// Corrupt cache binary data is rebuilt, never fatal.
 			{
@@ -482,6 +563,7 @@ namespace gglab
 			bool allWorkersSucceeded = true;
 			bool allThirdRunsHitCache = true;
 			bool allHashesConverged = true;
+			bool allArtifactFieldsConsistent = true;
 			std::string workerDiagnostics;
 			for (int round = 0; round < GateRoundCount; ++round)
 			{
@@ -509,6 +591,10 @@ namespace gglab
 					thirdRun.m_StdOut.find("\"fromCache\":true") != std::string::npos;
 				allHashesConverged &= !firstHash.empty() && firstHash == secondHash &&
 					secondHash == thirdHash;
+				allArtifactFieldsConsistent &=
+					CliArtifactFieldsDescribeCommittedEntry(first) &&
+					CliArtifactFieldsDescribeCommittedEntry(second) &&
+					CliArtifactFieldsDescribeCommittedEntry(thirdRun);
 				if (first.m_ExitCode != 0 || second.m_ExitCode != 0 || thirdRun.m_ExitCode != 0)
 				{
 					const auto AppendProcessDiagnostics = [&workerDiagnostics](int round,
@@ -539,6 +625,8 @@ namespace gglab
 				"Post-race reload hits the committed cross-process cache entry");
 			context.Check(allHashesConverged,
 				"Concurrent processes and the post-race reload agree on one committed binary digest");
+			context.Check(allArtifactFieldsConsistent,
+				"Concurrent publication and reload CLI fields resolve to their committed cache entries");
 		}
 	}
 

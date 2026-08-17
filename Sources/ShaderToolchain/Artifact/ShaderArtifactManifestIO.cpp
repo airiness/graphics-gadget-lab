@@ -1,4 +1,4 @@
-#include "Artifact/ShaderArtifactManifestIO.h"
+﻿#include "Artifact/ShaderArtifactManifestIO.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
@@ -354,115 +354,139 @@ namespace gglab
 			std::filesystem::rename(source, destination, errorCode);
 			return !errorCode;
 		}
+
+		[[nodiscard]] nlohmann::json MakeManifestDocument(
+			const ShaderArtifactManifest& manifest)
+		{
+			nlohmann::json document;
+			document["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);
+			document["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
+			document["recipeId"] = Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest);
+			document["buildKey"] = Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest);
+			nlohmann::json compiler;
+			compiler["kind"] = "dxc";
+			compiler["identity"] = utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
+			document["compiler"] = std::move(compiler);
+			document["targetProfile"] = ShaderTargetProfileText(manifest.m_TargetProfile);
+			document["binaryFormat"] = ShaderBinaryFormatText(manifest.m_BinaryFormat);
+			document["spirvTargetEnvironment"] =
+				SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment);
+			document["bindingAbiRevision"] =
+				static_cast<std::int64_t>(manifest.m_BindingABIRevision);
+			document["coordinateOptions"] =
+				static_cast<std::int64_t>(manifest.m_CoordinateOptions);
+			document["stage"] = ShaderStageText(manifest.m_Stage);
+			document["shaderModel"] = ShaderModelText(manifest.m_ShaderModel);
+			document["hlslVersion"] = utils::ToString(manifest.m_HlslVersion);
+			document["compileFlags"] = static_cast<std::int64_t>(manifest.m_CompileFlags);
+			document["optimizationLevel"] = utils::ToString(manifest.m_OptimizationLevel);
+			document["logicalSource"] =
+				utils::ToString(manifest.m_LogicalSourcePath.generic_wstring());
+			document["entryPoint"] = utils::ToString(manifest.m_EntryPoint);
+			document["target"] = utils::ToString(manifest.m_TargetString);
+			document["defines"] = nlohmann::json::array();
+			for (const std::wstring& define : manifest.m_Defines)
+			{
+				document["defines"].push_back(utils::ToString(define));
+			}
+			document["logicalIncludeDirs"] = nlohmann::json::array();
+			for (const std::filesystem::path& includeDir : manifest.m_LogicalIncludeDirs)
+			{
+				document["logicalIncludeDirs"].push_back(
+					utils::ToString(includeDir.generic_wstring()));
+			}
+			document["extraArgs"] = nlohmann::json::array();
+			for (const std::wstring& extraArg : manifest.m_ExtraArgs)
+			{
+				document["extraArgs"].push_back(utils::ToString(extraArg));
+			}
+			document["binaryContentDigest"] =
+				Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest);
+			document["dependencies"] = nlohmann::json::array();
+			for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
+			{
+				nlohmann::json dependencyDocument;
+				dependencyDocument["logicalPath"] =
+					utils::ToString(dependency.m_LogicalPath.generic_wstring());
+				dependencyDocument["contentDigest"] =
+					Sha256DigestToHex(dependency.m_ContentDigest);
+				document["dependencies"].push_back(std::move(dependencyDocument));
+			}
+			return document;
+		}
 	}
 
-	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& manifestPath,
+	std::optional<std::string> SerializeShaderArtifactManifest(
+		const ShaderArtifactManifest& manifest) noexcept
+	{
+		try
+		{
+			return MakeManifestDocument(manifest).dump();
+		}
+		catch (...)
+		{
+			return std::nullopt;
+		}
+	}
+
+	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& recordPath,
 		const ShaderArtifactCacheRecord& record) noexcept
 	{
-		const bool created = utils::CreateParentDirectoryIfNotExist(manifestPath);
+		const bool created = utils::CreateParentDirectoryIfNotExist(recordPath);
 		if (!created)
 		{
 			return false;
 		}
 
-		const ShaderArtifactManifest& manifest = record.m_Manifest;
+		try
+		{
+			nlohmann::json localDocument;
+			localDocument["physicalSource"] =
+				utils::ToString(utils::Canonical(record.m_PhysicalSourcePath).wstring());
+			localDocument["physicalIncludeDirs"] = nlohmann::json::array();
+			for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
+			{
+				localDocument["physicalIncludeDirs"].push_back(
+					utils::ToString(utils::Canonical(includeDir).wstring()));
+			}
+			localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
+			for (const std::filesystem::path& dependencyPhysicalPath :
+				record.m_DependencyPhysicalPaths)
+			{
+				localDocument["dependencyPhysicalPaths"].push_back(
+					utils::ToString(utils::Canonical(dependencyPhysicalPath).wstring()));
+			}
 
-		nlohmann::json manifestDocument;
-		manifestDocument["schemaVersion"] = static_cast<std::int64_t>(manifest.m_SchemaVersion);
-		manifestDocument["recipeHashSchema"] = static_cast<std::int64_t>(manifest.m_RecipeHashSchema);
-		manifestDocument["recipeId"] = Sha256DigestToHex(manifest.m_RecipeId.m_DurableDigest);
-		manifestDocument["buildKey"] = Sha256DigestToHex(manifest.m_BuildKey.m_DurableDigest);
-		nlohmann::json compiler;
-		compiler["kind"] = "dxc";
-		compiler["identity"] = utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
-		manifestDocument["compiler"] = std::move(compiler);
-		manifestDocument["targetProfile"] = ShaderTargetProfileText(manifest.m_TargetProfile);
-		manifestDocument["binaryFormat"] = ShaderBinaryFormatText(manifest.m_BinaryFormat);
-		manifestDocument["spirvTargetEnvironment"] =
-			SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment);
-		manifestDocument["bindingAbiRevision"] =
-			static_cast<std::int64_t>(manifest.m_BindingABIRevision);
-		manifestDocument["coordinateOptions"] =
-			static_cast<std::int64_t>(manifest.m_CoordinateOptions);
-		manifestDocument["stage"] = ShaderStageText(manifest.m_Stage);
-		manifestDocument["shaderModel"] = ShaderModelText(manifest.m_ShaderModel);
-		manifestDocument["hlslVersion"] = utils::ToString(manifest.m_HlslVersion);
-		manifestDocument["compileFlags"] = static_cast<std::int64_t>(manifest.m_CompileFlags);
-		manifestDocument["optimizationLevel"] = utils::ToString(manifest.m_OptimizationLevel);
-		manifestDocument["logicalSource"] =
-			utils::ToString(manifest.m_LogicalSourcePath.generic_wstring());
-		manifestDocument["entryPoint"] = utils::ToString(manifest.m_EntryPoint);
-		manifestDocument["target"] = utils::ToString(manifest.m_TargetString);
-		manifestDocument["defines"] = nlohmann::json::array();
-		for (const std::wstring& define : manifest.m_Defines)
-		{
-			manifestDocument["defines"].push_back(utils::ToString(define));
-		}
-		manifestDocument["logicalIncludeDirs"] = nlohmann::json::array();
-		for (const std::filesystem::path& includeDir : manifest.m_LogicalIncludeDirs)
-		{
-			manifestDocument["logicalIncludeDirs"].push_back(
-				utils::ToString(includeDir.generic_wstring()));
-		}
-		manifestDocument["extraArgs"] = nlohmann::json::array();
-		for (const std::wstring& extraArg : manifest.m_ExtraArgs)
-		{
-			manifestDocument["extraArgs"].push_back(utils::ToString(extraArg));
-		}
-		manifestDocument["binaryContentDigest"] =
-			Sha256DigestToHex(manifest.m_BinaryContentDigest.m_Digest);
-		manifestDocument["dependencies"] = nlohmann::json::array();
-		for (const ShaderArtifactDependency& dependency : manifest.m_Dependencies)
-		{
-			nlohmann::json dependencyDocument;
-			dependencyDocument["logicalPath"] =
-				utils::ToString(dependency.m_LogicalPath.generic_wstring());
-			dependencyDocument["contentDigest"] =
-				Sha256DigestToHex(dependency.m_ContentDigest);
-			manifestDocument["dependencies"].push_back(std::move(dependencyDocument));
-		}
+			nlohmann::json document;
+			document["recordSchemaVersion"] =
+				static_cast<std::int64_t>(ShaderArtifactCacheRecordSchemaVersion);
+			document["manifest"] = MakeManifestDocument(record.m_Manifest);
+			document["local"] = std::move(localDocument);
 
-		nlohmann::json localDocument;
-		localDocument["physicalSource"] =
-			utils::ToString(utils::Canonical(record.m_PhysicalSourcePath).wstring());
-		localDocument["physicalIncludeDirs"] = nlohmann::json::array();
-		for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
-		{
-			localDocument["physicalIncludeDirs"].push_back(
-				utils::ToString(utils::Canonical(includeDir).wstring()));
+			std::ofstream out(recordPath, std::ios::binary);
+			if (!out)
+			{
+				return false;
+			}
+			const std::string content = document.dump();
+			out.write(content.data(), static_cast<std::streamsize>(content.size()));
+			return static_cast<bool>(out);
 		}
-		localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
-		for (const std::filesystem::path& dependencyPhysicalPath :
-			record.m_DependencyPhysicalPaths)
-		{
-			localDocument["dependencyPhysicalPaths"].push_back(
-				utils::ToString(utils::Canonical(dependencyPhysicalPath).wstring()));
-		}
-
-		nlohmann::json document;
-		document["recordSchemaVersion"] =
-			static_cast<std::int64_t>(ShaderArtifactCacheRecordSchemaVersion);
-		document["manifest"] = std::move(manifestDocument);
-		document["local"] = std::move(localDocument);
-
-		std::ofstream out(manifestPath, std::ios::binary);
-		if (!out)
+		catch (...)
 		{
 			return false;
 		}
-		const std::string content = document.dump();
-		out.write(content.data(), static_cast<std::streamsize>(content.size()));
-		return static_cast<bool>(out);
 	}
 
 	namespace
 	{
-		// SAX validator enforcing the domain strictness rules that nlohmann/json
+		// SAX validator enforcing the shader serialization strictness rules that nlohmann/json
 		// does not enforce by itself: duplicate object keys are rejected and an
 		// explicit nesting depth limit (64) bounds recursion. Returning false
 		// from any event makes sax_parse report failure, which the reader maps
 		// to a cache miss. The validator runs before the DOM parse, so the DOM
-		// parse itself is bounded by this pre-check.
+		// parse itself is bounded by this pre-check. Cache-record and manifest-only
+		// readers share this gate.
 		class StrictJsonSax final : public nlohmann::json_sax<nlohmann::json>
 		{
 		public:
@@ -549,6 +573,25 @@ namespace gglab
 			std::vector<std::unordered_set<std::string>> m_KeyScopes;
 			std::vector<bool> m_ScopeIsObject;
 		};
+
+		[[nodiscard]] std::optional<nlohmann::json> ParseJsonDocumentStrict(
+			std::string_view serializedDocument) noexcept
+		{
+			try
+			{
+				const std::string content(serializedDocument);
+				StrictJsonSax strictSax;
+				if (!nlohmann::json::sax_parse(content, &strictSax))
+				{
+					return std::nullopt;
+				}
+				return nlohmann::json::parse(content);
+			}
+			catch (...)
+			{
+				return std::nullopt;
+			}
+		}
 
 		[[nodiscard]] const nlohmann::json* FindField(
 			const nlohmann::json& object, std::string_view key) noexcept
@@ -677,7 +720,7 @@ namespace gglab
 				return record;
 			}
 
-		private:
+		public:
 			[[nodiscard]] bool MapManifest(const nlohmann::json& object,
 				ShaderArtifactManifest& manifest) noexcept
 			{
@@ -917,9 +960,12 @@ namespace gglab
 				}
 				seenMask |= 1u << 22;
 
-				return seenMask == AllBits && object.size() == 23;
+				return seenMask == AllBits && object.size() == 23 &&
+					!manifest.m_Dependencies.empty() &&
+					manifest.m_Dependencies[0].m_LogicalPath == manifest.m_LogicalSourcePath;
 			}
 
+		private:
 			[[nodiscard]] bool MapLocal(const nlohmann::json& object,
 				ShaderArtifactCacheRecord& record) noexcept
 			{
@@ -953,10 +999,27 @@ namespace gglab
 		};
 	}
 
-	std::optional<ShaderArtifactCacheRecord> ReadShaderArtifactCacheRecord(
-		const std::filesystem::path& manifestPath) noexcept
+	std::optional<ShaderArtifactManifest> DeserializeShaderArtifactManifest(
+		std::string_view serializedManifest) noexcept
 	{
-		std::ifstream in(manifestPath, std::ios::binary);
+		const std::optional<nlohmann::json> document =
+			ParseJsonDocumentStrict(serializedManifest);
+		if (!document.has_value() || !document->is_object())
+		{
+			return std::nullopt;
+		}
+		ShaderArtifactManifest manifest{};
+		if (!CacheRecordJsonMapper{}.MapManifest(*document, manifest))
+		{
+			return std::nullopt;
+		}
+		return manifest;
+	}
+
+	std::optional<ShaderArtifactCacheRecord> ReadShaderArtifactCacheRecord(
+		const std::filesystem::path& recordPath) noexcept
+	{
+		std::ifstream in(recordPath, std::ios::binary);
 		if (!in)
 		{
 			return std::nullopt;
@@ -964,44 +1027,27 @@ namespace gglab
 		const std::string content((std::istreambuf_iterator<char>(in)),
 			std::istreambuf_iterator<char>());
 
-		try
-		{
-			StrictJsonSax strictSax;
-			if (!nlohmann::json::sax_parse(content, &strictSax))
-			{
-				return std::nullopt;
-			}
-		}
-		catch (const nlohmann::json::exception&)
+		const std::optional<nlohmann::json> document = ParseJsonDocumentStrict(content);
+		if (!document.has_value())
 		{
 			return std::nullopt;
 		}
-
-		nlohmann::json document;
-		try
-		{
-			document = nlohmann::json::parse(content);
-		}
-		catch (const nlohmann::json::exception&)
-		{
-			return std::nullopt;
-		}
-		return CacheRecordJsonMapper{}.Map(document);
+		return CacheRecordJsonMapper{}.Map(*document);
 	}
 
 	std::optional<ShaderArtifactCacheRecord> LoadShaderArtifactCacheRecord(
-		const std::filesystem::path& manifestPath,
+		const std::filesystem::path& recordPath,
 		const std::filesystem::path& binaryPath) noexcept
 	{
 		std::error_code errorCode;
-		if (!std::filesystem::exists(manifestPath, errorCode) ||
+		if (!std::filesystem::exists(recordPath, errorCode) ||
 			!std::filesystem::exists(binaryPath, errorCode))
 		{
 			return std::nullopt;
 		}
 
 		std::optional<ShaderArtifactCacheRecord> record =
-			ReadShaderArtifactCacheRecord(manifestPath);
+			ReadShaderArtifactCacheRecord(recordPath);
 		if (!record.has_value())
 		{
 			return std::nullopt;
@@ -1027,20 +1073,20 @@ namespace gglab
 
 	ShaderPublicationResult PublishShaderArtifactCacheRecord(
 		const std::filesystem::path& binaryPath,
-		const std::filesystem::path& manifestPath,
+		const std::filesystem::path& recordPath,
 		const ShaderArtifactCacheRecord& record) noexcept
 	{
 		ShaderPublicationResult result{};
 
 		const bool parentsReady = utils::CreateParentDirectoryIfNotExist(binaryPath) &&
-			utils::CreateParentDirectoryIfNotExist(manifestPath);
+			utils::CreateParentDirectoryIfNotExist(recordPath);
 		if (!parentsReady)
 		{
 			return result;
 		}
 
 		const std::filesystem::path tempBinaryPath = MakeUniqueTempPath(binaryPath);
-		const std::filesystem::path tempManifestPath = MakeUniqueTempPath(manifestPath);
+		const std::filesystem::path tempRecordPath = MakeUniqueTempPath(recordPath);
 
 		const bool binaryWritten = utils::WriteFileBinary(tempBinaryPath, std::span(
 			static_cast<const std::byte*>(record.m_Binary.Data()), record.m_Binary.SizeInBytes()));
@@ -1061,23 +1107,23 @@ namespace gglab
 			return result;
 		}
 
-		if (!WriteShaderArtifactCacheRecord(tempManifestPath, record))
+		if (!WriteShaderArtifactCacheRecord(tempRecordPath, record))
 		{
 			RemoveFileBestEffort(tempBinaryPath);
-			RemoveFileBestEffort(tempManifestPath);
+			RemoveFileBestEffort(tempRecordPath);
 			return result;
 		}
 
-		// Own submission attempt: the immutable binary first, the manifest
-		// last as the commit record. Rename failures do not pre-judge the
+		// Own submission attempt: the immutable binary first, the cache record
+		// last as the commit marker. Rename failures do not pre-judge the
 		// winner; the final observation classifies the outcome.
 		bool binaryPublished = PublishFile(tempBinaryPath, binaryPath);
 		if (!binaryPublished)
 		{
 			std::error_code errorCode;
-			if (!std::filesystem::exists(manifestPath, errorCode))
+			if (!std::filesystem::exists(recordPath, errorCode))
 			{
-				// Orphaned binary (no commit record): recover by removing it
+				// Orphaned binary (no commit marker): recover by removing it
 				// and retrying once; derived data is safe to discard.
 				RemoveFileBestEffort(binaryPath);
 				binaryPublished = PublishFile(tempBinaryPath, binaryPath);
@@ -1085,15 +1131,15 @@ namespace gglab
 		}
 		if (binaryPublished)
 		{
-			(void)PublishFile(tempManifestPath, manifestPath);
+			(void)PublishFile(tempRecordPath, recordPath);
 		}
 		RemoveFileBestEffort(tempBinaryPath);
-		RemoveFileBestEffort(tempManifestPath);
+		RemoveFileBestEffort(tempRecordPath);
 
 		// Final committed-entry observation: load and structurally validate
 		// the slot entry. Classification is based on this observation alone.
-		// A concurrent producer commits manifest-last, so an observation can
-		// land inside its commit window (no manifest yet, or a manifest whose
+		// A concurrent producer commits record-last, so an observation can
+		// land inside its commit window (no record yet, or a record whose
 		// binary has not landed). The observation therefore retries for a
 		// bounded window before the slot is classified as having no committed
 		// entry.
@@ -1101,7 +1147,7 @@ namespace gglab
 		constexpr int MaxObservationAttempts = 64;
 		for (int attempt = 0; attempt < MaxObservationAttempts; ++attempt)
 		{
-			observed = LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
+			observed = LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 			if (observed.has_value())
 			{
 				break;

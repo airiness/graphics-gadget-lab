@@ -1,4 +1,4 @@
-#include "Compiler/ShaderCompiler.h"
+﻿#include "Compiler/ShaderCompiler.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Contracts/ShaderArtifactManifest.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -645,15 +645,15 @@ namespace gglab
 			Sha256DigestToHex(recipe.m_BuildKey.m_DurableDigest));
 		const auto binaryPath = MakeCacheBinaryPath(
 			keyHex, recipe.m_Request.m_Stage, recipe.m_Request.m_Target.m_BinaryFormat);
-		auto manifestPath = binaryPath;
-		manifestPath += L".json";
+		auto recordPath = binaryPath;
+		recordPath += L".json";
 
 		std::error_code errorCode;
 		if (std::filesystem::exists(binaryPath, errorCode) &&
-			std::filesystem::exists(manifestPath, errorCode))
+			std::filesystem::exists(recordPath, errorCode))
 		{
 			const std::optional<ShaderArtifactCacheRecord> cached =
-				LoadShaderArtifactCacheRecord(manifestPath, binaryPath);
+				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 			if (cached.has_value() && ValidateCacheRecordAgainstRecipe(*cached, recipe))
 			{
 				result.m_Status = ShaderCompileStatus::Success;
@@ -664,7 +664,7 @@ namespace gglab
 			}
 			GGLAB_LOG_SHADER_COMPILER(LogLevel::Info,
 				"Shader cache entry rejected as invalid derived data: {}",
-				utils::ToString(manifestPath.wstring()));
+				utils::ToString(recordPath.wstring()));
 		}
 
 		std::vector<ShaderArtifactDependency> dependencies;
@@ -697,7 +697,7 @@ namespace gglab
 		// validated committed record; CompileOrLoad never rereads the slot
 		// and never returns an uncommitted compile product.
 		const ShaderPublicationResult publication =
-			PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record);
+			PublishShaderArtifactCacheRecord(binaryPath, recordPath, record);
 		if (publication.m_Outcome == ShaderPublicationOutcome::Failed)
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;
@@ -733,7 +733,7 @@ namespace gglab
 		// product once. The second publication runs the same attempt +
 		// observation + classification protocol.
 		const ShaderPublicationResult republished =
-			PublishShaderArtifactCacheRecord(binaryPath, manifestPath, record);
+			PublishShaderArtifactCacheRecord(binaryPath, recordPath, record);
 		if (republished.m_Outcome == ShaderPublicationOutcome::Failed)
 		{
 			result.m_Status = ShaderCompileStatus::ArtifactIOFailure;

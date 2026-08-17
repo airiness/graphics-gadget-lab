@@ -1,4 +1,4 @@
-#include "ShaderCompileContractSelfTests.h"
+﻿#include "ShaderCompileContractSelfTests.h"
 
 #include "SpirVDecorationReader.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
@@ -137,12 +137,12 @@ namespace gglab
 			return output.good();
 		}
 
-		[[nodiscard]] std::filesystem::path MakeManifestPath(
+		[[nodiscard]] std::filesystem::path MakeCacheRecordPath(
 			const std::filesystem::path& binaryPath) noexcept
 		{
-			auto manifestPath = binaryPath;
-			manifestPath += L".json";
-			return manifestPath;
+			auto recordPath = binaryPath;
+			recordPath += L".json";
+			return recordPath;
 		}
 
 		constexpr std::wstring_view VulkanSdkValidationBaseline = L"1.3.296.0";
@@ -774,15 +774,15 @@ namespace gglab
 				!ContainsArgument(forwardPixelRecipe.m_CompileArguments, L"-fvk-invert-y"),
 				"Pixel SPIR-V compile policy preserves the HLSL SV_Position.w contract");
 
-			const std::filesystem::path spirVMetaPath = MakeManifestPath(spirVBinaryPath);
+			const std::filesystem::path spirVRecordPath = MakeCacheRecordPath(spirVBinaryPath);
 			std::string metadata;
 			{
-				std::ifstream metadataInput(spirVMetaPath, std::ios::binary);
+				std::ifstream metadataInput(spirVRecordPath, std::ios::binary);
 				metadata.assign((std::istreambuf_iterator<char>(metadataInput)),
 					std::istreambuf_iterator<char>());
 			}
 			// The read handle is closed before CompileOrLoad below: the
-			// publication protocol commits the manifest by replacing it, and a
+			// publication protocol commits the cache record by replacing it, and a
 			// destination held open would fail that rename, classify the stale
 			// entry as committed-by-other, and skip the rebuild.
 			context.Check(metadata.find("\"recordSchemaVersion\":2") != std::string::npos &&
@@ -810,10 +810,10 @@ namespace gglab
 				metadata.find("\"dependencyPhysicalPaths\":[") != std::string::npos,
 				"Cache record carries the complete portable manifest (profile, target semantics, logical identities, dependency provenance) plus explicit local validation state");
 			const bool metadataChanged = ReplaceMetadataValue(
-				spirVMetaPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
+				spirVRecordPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
 			const std::optional<ShaderArtifactCacheRecord> repairedReadBack =
-				ReadShaderArtifactCacheRecord(spirVMetaPath);
+				ReadShaderArtifactCacheRecord(spirVRecordPath);
 			context.Check(metadataChanged,
 				"Shader cache metadata tamper is applied");
 			context.Check(repairedReadBack.has_value() &&
@@ -825,7 +825,7 @@ namespace gglab
 
 			// A missing required durable field must also reject the entry.
 			const bool manifestFieldRemoved = ReplaceMetadataValue(
-				spirVMetaPath, "\"hlslVersion\":\"2021\",", "");
+				spirVRecordPath, "\"hlslVersion\":\"2021\",", "");
 			const ShaderCompileResult missingFieldArtifact = compiler.CompileOrLoad(spirVRecipe);
 			context.Check(manifestFieldRemoved && !missingFieldArtifact.m_FromCache,
 				"Shader cache rejects a manifest missing a required durable field");
@@ -1458,6 +1458,53 @@ namespace gglab
 			const bool structuralFailureSurfaced = !structuralFailureResult.IsSuccess() &&
 				structuralFailureResult.m_Status == ShaderCompileStatus::ArtifactIOFailure;
 
+			// CommittedByOther handoff: install a same-slot record with matching
+			// dependency provenance and a valid binary but non-equivalent producer
+			// metadata. Cache-hit validation rejects the changed compiler identity,
+			// the failure seam preserves the record during publication, and
+			// CompileOrLoad must return exactly that committed winner.
+			ShaderCompiler compilerE(sourceRoot, tempRoot / L"CacheE");
+			const ShaderResolvedRecipe winnerRecipe = compilerE.Resolve(desc);
+			const ShaderCompileResult winnerBaseline = compilerE.CompileOrLoad(winnerRecipe);
+			const std::filesystem::path winnerBinaryPath =
+				compilerE.GetCacheBinaryPath(winnerRecipe);
+			const std::filesystem::path winnerRecordPath =
+				MakeCacheRecordPath(winnerBinaryPath);
+			const std::optional<ShaderArtifactCacheRecord> winnerBaselineRecord =
+				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			bool competingWinnerInstalled = false;
+			ShaderCompileResult committedWinnerResult{};
+			static int committedWinnerFailureCalls = 0;
+			committedWinnerFailureCalls = 0;
+			if (winnerRecipe.IsSuccess() && winnerBaseline.IsSuccess() &&
+				winnerBaselineRecord.has_value() && winnerBaselineRecord->m_Binary.IsValid())
+			{
+				ShaderArtifactCacheRecord competingWinner = *winnerBaselineRecord;
+				competingWinner.m_Manifest.m_CompilerIdentity.m_CanonicalIdentity +=
+					L"+committed-winner";
+				competingWinnerInstalled =
+					OverwriteBinaryFile(winnerBinaryPath, competingWinner.m_Binary) &&
+					WriteShaderArtifactCacheRecord(winnerRecordPath, competingWinner);
+				OverridePublishFileFailureForTest([](
+					const std::filesystem::path& /*destination*/) noexcept -> bool
+					{
+						++committedWinnerFailureCalls;
+						return true;
+					});
+				committedWinnerResult = compilerE.CompileOrLoad(winnerRecipe);
+				OverridePublishFileFailureForTest(nullptr);
+			}
+			const std::optional<ShaderArtifactCacheRecord> observedWinner =
+				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
+			const bool committedWinnerReturned = competingWinnerInstalled &&
+				committedWinnerFailureCalls > 0 && committedWinnerResult.IsSuccess() &&
+				committedWinnerResult.m_FromCache && observedWinner.has_value() &&
+				committedWinnerResult.m_Artifact.m_Manifest == observedWinner->m_Manifest &&
+				committedWinnerResult.m_Artifact.m_Binary.SizeInBytes() ==
+					observedWinner->m_Binary.SizeInBytes() &&
+				std::memcmp(committedWinnerResult.m_Artifact.m_Binary.Data(),
+					observedWinner->m_Binary.Data(), observedWinner->m_Binary.SizeInBytes()) == 0;
+
 			// Slot structural binding: a committed record can be parseable and
 			// binary-digest-valid while carrying a RecipeId that does not belong
 			// to the current operation. BuildKey equality alone must never let
@@ -1468,10 +1515,10 @@ namespace gglab
 			const ShaderCompileResult bindingBaseline = compilerD.CompileOrLoad(bindingRecipe);
 			const std::filesystem::path bindingBinaryPath =
 				compilerD.GetCacheBinaryPath(bindingRecipe);
-			const std::filesystem::path bindingManifestPath =
-				MakeManifestPath(bindingBinaryPath);
+			const std::filesystem::path bindingRecordPath =
+				MakeCacheRecordPath(bindingBinaryPath);
 			const std::optional<ShaderArtifactCacheRecord> bindingBaselineRecord =
-				LoadShaderArtifactCacheRecord(bindingManifestPath, bindingBinaryPath);
+				LoadShaderArtifactCacheRecord(bindingRecordPath, bindingBinaryPath);
 			bool mismatchedRecipeRecordInstalled = false;
 			ShaderPublicationResult mismatchedRecipePublication{};
 			ShaderCompileResult mismatchedRecipeCompile{};
@@ -1482,14 +1529,14 @@ namespace gglab
 				mismatchedRecipeRecord.m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] ^=
 					std::byte{ 0x01 };
 				mismatchedRecipeRecordInstalled =
-					WriteShaderArtifactCacheRecord(bindingManifestPath, mismatchedRecipeRecord);
+					WriteShaderArtifactCacheRecord(bindingRecordPath, mismatchedRecipeRecord);
 				OverridePublishFileFailureForTest([](
 					const std::filesystem::path& /*destination*/) noexcept -> bool
 					{
 						return true;
 					});
 				mismatchedRecipePublication = PublishShaderArtifactCacheRecord(
-					bindingBinaryPath, bindingManifestPath, *bindingBaselineRecord);
+					bindingBinaryPath, bindingRecordPath, *bindingBaselineRecord);
 				mismatchedRecipeCompile = compilerD.CompileOrLoad(bindingRecipe);
 				OverridePublishFileFailureForTest(nullptr);
 			}
@@ -1508,6 +1555,8 @@ namespace gglab
 				"Clearing the failure seam recovers normal publication");
 			context.Check(structuralFailureSurfaced,
 				"Publication without any committed observation maps to ArtifactIOFailure");
+			context.Check(committedWinnerReturned,
+				"CommittedByOther returns the exact committed winner artifact used by CLI identity fields");
 			context.Check(mismatchedRecipeRejected,
 				"Publication rejects a committed same-BuildKey entry with a mismatched RecipeId");
 		}
@@ -1595,6 +1644,29 @@ namespace gglab
 			}
 			context.Check(written && roundTripped,
 				"Cache record schema=2 round-trips provenance and physical resolution index-wise");
+
+			const std::optional<std::string> serializedManifest =
+				SerializeShaderArtifactManifest(record.m_Manifest);
+			const std::optional<ShaderArtifactManifest> manifestRoundTrip =
+				serializedManifest.has_value()
+				? DeserializeShaderArtifactManifest(*serializedManifest)
+				: std::nullopt;
+			const bool manifestOnlyRoundTripped = manifestRoundTrip.has_value() &&
+				*manifestRoundTrip == record.m_Manifest;
+			context.Check(manifestOnlyRoundTripped,
+				"Manifest-only API round-trips the complete portable manifest and dependency provenance");
+
+			const bool manifestOnlyPortable = serializedManifest.has_value() &&
+				serializedManifest->find("\"dependencies\":[") != std::string::npos &&
+				serializedManifest->find("\"logicalPath\":") != std::string::npos &&
+				serializedManifest->find("\"contentDigest\":") != std::string::npos &&
+				serializedManifest->find("physicalSource") == std::string::npos &&
+				serializedManifest->find("physicalIncludeDirs") == std::string::npos &&
+				serializedManifest->find("dependencyPhysicalPaths") == std::string::npos &&
+				serializedManifest->find("lastWriteTimeTicks") == std::string::npos &&
+				serializedManifest->find("C:\\\\Repo") == std::string::npos;
+			context.Check(manifestOnlyPortable,
+				"Manifest-only serialization carries provenance without physical paths or mtime state");
 
 			// Domain strictness: the document baseline is the emitted schema=2
 			// record; each tamper must reject the document as a cache miss.

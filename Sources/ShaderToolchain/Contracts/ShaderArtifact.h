@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Contracts/ShaderArtifactManifest.h"
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"
@@ -10,8 +10,9 @@
 namespace gglab
 {
 	// Toolchain output / Runtime input. The manifest carries the authoritative
-	// identity and validation fields; the binary holds the exact published
-	// GPU bytes.
+	// identity and validation fields; the binary holds the exact bytes of the
+	// committed artifact returned by this operation (cache hit, own publication,
+	// or an equivalent committed winner).
 	struct ShaderArtifact
 	{
 		ShaderArtifactManifest m_Manifest{};
@@ -87,9 +88,10 @@ namespace gglab
 		// Normative source identity (logical path relative to the source
 		// root); m_Request.m_SourcePath is the resolved physical path.
 		std::filesystem::path m_LogicalSourcePath{};
-		// Logical include configuration (relative forms); physical -I
-		// arguments are derived at compile time and never enter the recipe
-		// identity.
+		// Normalized include identity. Directories under the source root use
+		// relative logical paths; external include directories retain canonical
+		// absolute paths and therefore explicitly bound recipe/manifest
+		// portability. Physical -I arguments are derived from m_Request.
 		std::vector<std::filesystem::path> m_LogicalIncludeDirs{};
 		ShaderCompilerIdentity m_CompilerIdentity{};
 		ShaderRecipeId m_RecipeId{};
