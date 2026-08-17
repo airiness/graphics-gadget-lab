@@ -33,31 +33,6 @@ namespace gglab
 	[[nodiscard]] std::optional<ShaderArtifactCacheRecord> ReadShaderArtifactCacheRecord(
 		const std::filesystem::path& recordPath) noexcept;
 
-	// Binary read-once result: the exact loaded bytes plus the SHA-256 of
-	// those same in-memory bytes. The digest is computed from the returned
-	// bytes only, so the validated content and the returned content can never
-	// diverge.
-	struct BinaryReadWithDigest
-	{
-		ShaderBinary m_Binary{};
-		Sha256Digest m_Digest{};
-	};
-
-	// The single binary read point of LoadShaderArtifactCacheRecord: reads the
-	// file once, hashes exactly the loaded bytes, and returns both.
-	[[nodiscard]] std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
-		const std::filesystem::path& path) noexcept;
-
-	// Test seam: replace the binary read point of LoadShaderArtifactCacheRecord
-	// with a scripted reader so contract tests can deterministically prove the
-	// single-read invariant (exactly one read, and the validated digest
-	// describes the returned bytes). Passing a null function restores the
-	// production implementation. Test-only; not thread-safe against concurrent
-	// compile calls.
-	using BinaryReadOnceOverride = std::optional<BinaryReadWithDigest>(*)(
-		const std::filesystem::path& path) noexcept;
-	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept;
-
 	// Publication outcome, classified by the final committed-entry observation
 	// (never by whether this call's own renames succeeded):
 	//   Published        - the observed structurally valid committed entry is
@@ -84,17 +59,6 @@ namespace gglab
 			return m_Outcome != ShaderPublicationOutcome::Failed;
 		}
 	};
-
-	// Test seam: inject scripted failures into the publication rename steps
-	// without replacing the successful rename implementation, so contract
-	// tests can deterministically cover the failure branches and the final
-	// observation classification. The injector receives the destination path
-	// and returns true to fail that rename. Passing a null function restores
-	// the production implementation. Test-only; not thread-safe against
-	// concurrent compile calls.
-	using PublishFileFailureInjector = bool(*)(
-		const std::filesystem::path& destination) noexcept;
-	void OverridePublishFileFailureForTest(PublishFileFailureInjector injector) noexcept;
 
 	// Reader side of the publication protocol: the cache record document is the
 	// commit marker. The binary is read exactly once; the manifest

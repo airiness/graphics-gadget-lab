@@ -1,4 +1,5 @@
 ﻿#include "ShaderCompilerCommandLine.h"
+#include "ShaderCompilerProcessFactory.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
 #include "Contracts/ShaderCompileTarget.h"
@@ -10,7 +11,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <cstdlib>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -27,8 +27,6 @@ namespace
 	constexpr int ExitCodeCompileFailed = 4;
 	constexpr int ExitCodeArtifactIOFailure = 5;
 	constexpr int ExitCodeSourceChanged = 6;
-	constexpr const wchar_t* ForceCompilerUnavailableEnvironment =
-		L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE";
 
 	class NullLogSink final : public gglab::LogSink
 	{
@@ -47,15 +45,6 @@ namespace
 			// contaminate the single machine-readable process document.
 			gglab::SetLogSink(std::make_shared<NullLogSink>());
 		}
-	}
-
-	[[nodiscard]] bool ForceCompilerUnavailableForTest() noexcept
-	{
-		wchar_t value[2]{};
-		size_t valueLength = 0;
-		return _wgetenv_s(&valueLength, value, 2,
-			ForceCompilerUnavailableEnvironment) == 0 &&
-			valueLength == 2 && value[0] == L'1';
 	}
 
 	[[nodiscard]] int ExitCodeForStatus(gglab::ShaderCompileStatus status) noexcept
@@ -294,9 +283,8 @@ namespace
 		}
 		const std::wstring targetName = gglab::utils::ToWideString(options.m_Target);
 
-		std::unique_ptr<gglab::ShaderCompiler> compiler = ForceCompilerUnavailableForTest()
-			? gglab::ShaderCompiler::MakeUnavailable(options.m_SourceRoot, options.m_CacheRoot)
-			: std::make_unique<gglab::ShaderCompiler>(options.m_SourceRoot, options.m_CacheRoot);
+		std::unique_ptr<gglab::ShaderCompiler> compiler =
+			gglab::CreateShaderCompilerForProcess(options.m_SourceRoot, options.m_CacheRoot);
 		gglab::ShaderDesc desc{};
 		desc.m_SourcePath = options.m_Source;
 		desc.m_Stage = stage;

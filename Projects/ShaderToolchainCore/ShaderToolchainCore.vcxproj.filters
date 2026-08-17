@@ -13,6 +13,9 @@
     <Filter Include="Targets">
       <UniqueIdentifier>{36DA4998-1C94-8DED-EB53-A92F6A3F081C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Testing">
+      <UniqueIdentifier>{ECAD8F71-A032-617B-C272-B7FE4082FDD1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp">
@@ -49,6 +52,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h">
       <Filter>Targets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h">
+      <Filter>Testing</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

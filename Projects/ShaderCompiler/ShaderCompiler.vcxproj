@@ -82,9 +82,11 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Main.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.cpp" />
+    <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Testing\ShaderCompilerCliTestAccess.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.h" />
+    <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerProcessFactory.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj">

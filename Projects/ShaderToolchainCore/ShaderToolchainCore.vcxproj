@@ -84,6 +84,7 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h" />
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">

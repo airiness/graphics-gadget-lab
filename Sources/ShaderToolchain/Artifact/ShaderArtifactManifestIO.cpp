@@ -1,4 +1,5 @@
 ﻿#include "Artifact/ShaderArtifactManifestIO.h"
+#include "Testing/ShaderArtifactManifestIOTestAccess.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
@@ -310,34 +311,37 @@ namespace gglab
 	namespace
 	{
 		// Null selects the production read-once implementation.
-		BinaryReadOnceOverride g_BinaryReadOnceOverride = nullptr;
+		testing::BinaryReadOnceOverride g_BinaryReadOnceOverride = nullptr;
 		// Null disables scripted rename failures.
-		PublishFileFailureInjector g_PublishFileFailureInjector = nullptr;
+		testing::PublishFileFailureInjector g_PublishFileFailureInjector = nullptr;
 	}
 
-	std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
-		const std::filesystem::path& path) noexcept
+	namespace testing
 	{
-		std::optional<ShaderBinary> binary = ReadFileBinary(path);
-		if (!binary.has_value())
+		std::optional<BinaryReadWithDigest> ReadBinaryWithDigestOnce(
+			const std::filesystem::path& path) noexcept
 		{
-			return std::nullopt;
+			std::optional<ShaderBinary> binary = ReadFileBinary(path);
+			if (!binary.has_value())
+			{
+				return std::nullopt;
+			}
+			BinaryReadWithDigest result{};
+			result.m_Digest = ComputeSha256(std::span(
+				static_cast<const std::byte*>(binary->Data()), binary->SizeInBytes()));
+			result.m_Binary = std::move(*binary);
+			return result;
 		}
-		BinaryReadWithDigest result{};
-		result.m_Digest = ComputeSha256(std::span(
-			static_cast<const std::byte*>(binary->Data()), binary->SizeInBytes()));
-		result.m_Binary = std::move(*binary);
-		return result;
-	}
 
-	void OverrideBinaryReadOnceForTest(BinaryReadOnceOverride overrideFn) noexcept
-	{
-		g_BinaryReadOnceOverride = overrideFn;
-	}
+		void OverrideBinaryReadOnce(BinaryReadOnceOverride overrideFn) noexcept
+		{
+			g_BinaryReadOnceOverride = overrideFn;
+		}
 
-	void OverridePublishFileFailureForTest(PublishFileFailureInjector injector) noexcept
-	{
-		g_PublishFileFailureInjector = injector;
+		void OverridePublishFileFailure(PublishFileFailureInjector injector) noexcept
+		{
+			g_PublishFileFailureInjector = injector;
+		}
 	}
 
 	namespace
@@ -1057,10 +1061,10 @@ namespace gglab
 		// manifest digest is compared against the SHA-256 of those exact
 		// in-memory bytes, and those same bytes are returned. Validation and
 		// return content can never diverge.
-		const BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr)
+		const testing::BinaryReadOnceOverride readOnce = (g_BinaryReadOnceOverride != nullptr)
 			? g_BinaryReadOnceOverride
-			: &ReadBinaryWithDigestOnce;
-		const std::optional<BinaryReadWithDigest> loaded = readOnce(binaryPath);
+			: &testing::ReadBinaryWithDigestOnce;
+		const std::optional<testing::BinaryReadWithDigest> loaded = readOnce(binaryPath);
 		if (!loaded.has_value() ||
 			loaded->m_Digest != record->m_Manifest.m_BinaryContentDigest.m_Digest)
 		{

@@ -1,4 +1,5 @@
 ﻿#include "ShaderCompileContractSelfTests.h"
+#include "Testing/ShaderArtifactManifestIOTestAccess.h"
 
 #include "SpirVDecorationReader.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
@@ -1234,8 +1235,8 @@ namespace gglab
 			const std::filesystem::path probePath = tempRoot / L"Probe.bin";
 			constexpr std::string_view ProbeContent = "binary read-once probe content";
 			const bool probeWritten = WriteTextFile(probePath, ProbeContent);
-			const std::optional<BinaryReadWithDigest> probe =
-				ReadBinaryWithDigestOnce(probePath);
+			const std::optional<testing::BinaryReadWithDigest> probe =
+				testing::ReadBinaryWithDigestOnce(probePath);
 			const bool probeSelfConsistent = probe.has_value() &&
 				probe->m_Binary.SizeInBytes() == ProbeContent.size() &&
 				std::memcmp(probe->m_Binary.Data(), ProbeContent.data(),
@@ -1244,8 +1245,8 @@ namespace gglab
 					reinterpret_cast<const std::byte*>(probe->m_Binary.Data()),
 					probe->m_Binary.SizeInBytes()));
 			const bool emptyProbeWritten = WriteTextFile(probePath, "");
-			const std::optional<BinaryReadWithDigest> emptyProbe =
-				ReadBinaryWithDigestOnce(probePath);
+			const std::optional<testing::BinaryReadWithDigest> emptyProbe =
+				testing::ReadBinaryWithDigestOnce(probePath);
 			const bool emptyProbeSelfConsistent = emptyProbe.has_value() &&
 				emptyProbe->m_Binary.SizeInBytes() == 0 &&
 				emptyProbe->m_Digest == ComputeSha256(std::span(
@@ -1279,11 +1280,11 @@ namespace gglab
 			const bool binaryWritten = WriteTextFile(binaryPath, binaryBytes);
 
 			static int binaryReadOnceCallCount = 0;
-			OverrideBinaryReadOnceForTest([](const std::filesystem::path& path) noexcept
-				-> std::optional<BinaryReadWithDigest>
+			testing::OverrideBinaryReadOnce([](const std::filesystem::path& path) noexcept
+				-> std::optional<testing::BinaryReadWithDigest>
 				{
 					++binaryReadOnceCallCount;
-					return ReadBinaryWithDigestOnce(path);
+					return testing::ReadBinaryWithDigestOnce(path);
 				});
 			const std::optional<ShaderArtifactCacheRecord> loaded =
 				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
@@ -1313,7 +1314,7 @@ namespace gglab
 				LoadShaderArtifactCacheRecord(recordPath, binaryPath);
 			const bool mismatchRejected = !mismatchLoaded.has_value() &&
 				binaryReadOnceCallCount == 2;
-			OverrideBinaryReadOnceForTest(nullptr);
+			testing::OverrideBinaryReadOnce(nullptr);
 
 			context.Check(binaryCorrupted && mismatchRejected,
 				"Load rejects digest mismatches through the same single read point");
@@ -1397,7 +1398,7 @@ namespace gglab
 			static int publishFailuresRemaining = 0;
 			const auto InjectCountedFailures = []() noexcept
 				{
-					OverridePublishFileFailureForTest([](
+					testing::OverridePublishFileFailure([](
 						const std::filesystem::path& /*destination*/) noexcept -> bool
 						{
 							if (publishFailuresRemaining > 0)
@@ -1416,7 +1417,7 @@ namespace gglab
 			publishFailuresRemaining = 1;
 			InjectCountedFailures();
 			const ShaderCompileResult republishedResult = compilerB.Compile(desc);
-			OverridePublishFileFailureForTest(nullptr);
+			testing::OverridePublishFileFailure(nullptr);
 			const bool republishSucceeded = republishedResult.IsSuccess() &&
 				!republishedResult.m_FromCache &&
 				republishedResult.m_Artifact.m_Manifest.m_BinaryContentDigest !=
@@ -1429,13 +1430,13 @@ namespace gglab
 			// ArtifactIOFailure and never as a stale Success.
 			const bool inputChangedForConflict = WriteTextFile(
 				sourceRoot / L"Probe.hlsli", "static const float ProbeValue = 0.75f;\n");
-			OverridePublishFileFailureForTest([](
+			testing::OverridePublishFileFailure([](
 				const std::filesystem::path& /*destination*/) noexcept -> bool
 				{
 					return true;
 				});
 			const ShaderCompileResult conflictResult = compilerB.Compile(desc);
-			OverridePublishFileFailureForTest(nullptr);
+			testing::OverridePublishFileFailure(nullptr);
 			const bool conflictSurfaced = !conflictResult.IsSuccess() &&
 				conflictResult.m_Status == ShaderCompileStatus::SourceChangedDuringCompile &&
 				!conflictResult.m_Diagnostics.m_Message.empty();
@@ -1448,13 +1449,13 @@ namespace gglab
 			// renames failing can never observe a committed entry and must
 			// map to ArtifactIOFailure.
 			ShaderCompiler compilerC(sourceRoot, tempRoot / L"CacheC");
-			OverridePublishFileFailureForTest([](
+			testing::OverridePublishFileFailure([](
 				const std::filesystem::path& /*destination*/) noexcept -> bool
 				{
 					return true;
 				});
 			const ShaderCompileResult structuralFailureResult = compilerC.Compile(desc);
-			OverridePublishFileFailureForTest(nullptr);
+			testing::OverridePublishFileFailure(nullptr);
 			const bool structuralFailureSurfaced = !structuralFailureResult.IsSuccess() &&
 				structuralFailureResult.m_Status == ShaderCompileStatus::ArtifactIOFailure;
 
@@ -1485,14 +1486,14 @@ namespace gglab
 				competingWinnerInstalled =
 					OverwriteBinaryFile(winnerBinaryPath, competingWinner.m_Binary) &&
 					WriteShaderArtifactCacheRecord(winnerRecordPath, competingWinner);
-				OverridePublishFileFailureForTest([](
+				testing::OverridePublishFileFailure([](
 					const std::filesystem::path& /*destination*/) noexcept -> bool
 					{
 						++committedWinnerFailureCalls;
 						return true;
 					});
 				committedWinnerResult = compilerE.CompileOrLoad(winnerRecipe);
-				OverridePublishFileFailureForTest(nullptr);
+				testing::OverridePublishFileFailure(nullptr);
 			}
 			const std::optional<ShaderArtifactCacheRecord> observedWinner =
 				LoadShaderArtifactCacheRecord(winnerRecordPath, winnerBinaryPath);
@@ -1530,7 +1531,7 @@ namespace gglab
 					std::byte{ 0x01 };
 				mismatchedRecipeRecordInstalled =
 					WriteShaderArtifactCacheRecord(bindingRecordPath, mismatchedRecipeRecord);
-				OverridePublishFileFailureForTest([](
+				testing::OverridePublishFileFailure([](
 					const std::filesystem::path& /*destination*/) noexcept -> bool
 					{
 						return true;
@@ -1538,7 +1539,7 @@ namespace gglab
 				mismatchedRecipePublication = PublishShaderArtifactCacheRecord(
 					bindingBinaryPath, bindingRecordPath, *bindingBaselineRecord);
 				mismatchedRecipeCompile = compilerD.CompileOrLoad(bindingRecipe);
-				OverridePublishFileFailureForTest(nullptr);
+				testing::OverridePublishFileFailure(nullptr);
 			}
 			const bool mismatchedRecipeRejected = mismatchedRecipeRecordInstalled &&
 				mismatchedRecipePublication.m_Outcome == ShaderPublicationOutcome::Failed &&
