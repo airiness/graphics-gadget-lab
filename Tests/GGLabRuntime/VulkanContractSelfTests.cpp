@@ -907,6 +907,27 @@ namespace gglab
 				context.Check(ClassifySubmitPresentTransaction(VK_ERROR_DEVICE_LOST, VK_SUCCESS) ==
 					VulkanFrameTransactionOutcome::SubmitFailed,
 					"a failed submit never reaches present");
+
+				const RHIFencePoint submittedFence{ RHIFenceHandle{ 0, 1 }, 7 };
+				const VulkanSubmitPresentResult recreatePending{
+					.m_Submitted = true,
+					.m_Presented = true,
+					.m_RecreatePending = true,
+					.m_SubmittedFencePoint = submittedFence,
+					.m_Result = VK_ERROR_OUT_OF_DATE_KHR,
+				};
+				context.Check(recreatePending.IsComplete(),
+					"a non-fatal present completes the production frame transaction");
+
+				const VulkanSubmitPresentResult fatalPresent{
+					.m_Submitted = true,
+					.m_Fatal = true,
+					.m_SubmittedFencePoint = submittedFence,
+					.m_Result = VK_ERROR_SURFACE_LOST_KHR,
+				};
+				context.Check(fatalPresent.m_SubmittedFencePoint == submittedFence &&
+					!fatalPresent.IsComplete(),
+					"fatal present preserves the submitted fence without completing the production frame");
 			}
 
 			// The frame-slot reuse gate only ever moves to a successfully

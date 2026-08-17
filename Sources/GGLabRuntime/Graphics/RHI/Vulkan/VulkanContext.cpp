@@ -408,7 +408,7 @@ namespace gglab
 			m_Bootstrap->m_Device->RecordBufferUse(buffer, result.m_SubmittedFencePoint);
 		}
 		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
-		if (!m_CompletedProductionFrame)
+		if (result.IsComplete() && !m_CompletedProductionFrame)
 		{
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 				"Vulkan completed its first production submit/present frame transaction.");

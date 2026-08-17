@@ -235,6 +235,13 @@ namespace gglab
 		// for work submitted by this frame transaction.
 		RHIFencePoint m_SubmittedFencePoint{};
 		VkResult m_Result = VK_SUCCESS;
+
+		// A committed submission alone is insufficient: production frame
+		// completion requires a non-fatal present result as well.
+		[[nodiscard]] bool IsComplete() const noexcept
+		{
+			return m_Submitted && m_Presented && !m_Fatal;
+		}
 	};
 
 	struct VulkanFrameRecording
