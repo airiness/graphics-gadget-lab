@@ -441,10 +441,20 @@ namespace gglab
 				L"SelfContained.hlsl", L"--stage", L"vertex", L"--target", L"gglab-vulkan13",
 				L"--cache-root", (tempRoot / L"ExoticCache").wstring(), L"--result-format", L"json",
 			});
-			context.Check(exoticSourceWritten && exoticDx12.m_ExitCode == 0 &&
+			const bool exoticPathsCompiled = exoticSourceWritten && exoticDx12.m_ExitCode == 0 &&
 				exoticVulkan.m_ExitCode == 0 &&
-				exoticVulkan.m_StdOut.find("\"success\":true") != std::string::npos,
-				"CLI compiles through source roots containing spaces and Unicode");
+				exoticVulkan.m_StdOut.find("\"success\":true") != std::string::npos;
+			const std::string exoticPathDiagnostics = exoticPathsCompiled
+				? "CLI compiles through source roots containing spaces and Unicode"
+				: std::format(
+					"CLI compiles through source roots containing spaces and Unicode "
+					"[sourceWritten={}, dx12Exit={}, dx12Out=\"{}\", dx12Err=\"{}\", "
+					"vulkanExit={}, vulkanOut=\"{}\", vulkanErr=\"{}\"]",
+					exoticSourceWritten, exoticDx12.m_ExitCode, exoticDx12.m_StdOut,
+					exoticDx12.m_StdErr, exoticVulkan.m_ExitCode, exoticVulkan.m_StdOut,
+					exoticVulkan.m_StdErr);
+			context.Check(exoticPathsCompiled,
+				exoticPathDiagnostics.c_str());
 
 			// Observability commands.
 			const CliRunResult targets = RunCli({ L"targets" });

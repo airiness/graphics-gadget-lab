@@ -423,19 +423,20 @@ namespace gglab
 		}
 
 		nlohmann::json localDocument;
-		localDocument["physicalSource"] = utils::Canonical(record.m_PhysicalSourcePath).string();
+		localDocument["physicalSource"] =
+			utils::ToString(utils::Canonical(record.m_PhysicalSourcePath).wstring());
 		localDocument["physicalIncludeDirs"] = nlohmann::json::array();
 		for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
 		{
 			localDocument["physicalIncludeDirs"].push_back(
-				utils::Canonical(includeDir).string());
+				utils::ToString(utils::Canonical(includeDir).wstring()));
 		}
 		localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
 		for (const std::filesystem::path& dependencyPhysicalPath :
 			record.m_DependencyPhysicalPaths)
 		{
 			localDocument["dependencyPhysicalPaths"].push_back(
-				utils::Canonical(dependencyPhysicalPath).string());
+				utils::ToString(utils::Canonical(dependencyPhysicalPath).wstring()));
 		}
 
 		nlohmann::json document;
@@ -1114,7 +1115,8 @@ namespace gglab
 		// Structural binding beyond the load: the observed entry must belong
 		// to this slot's recipe/producer identity. A non-equivalent entry can
 		// never be disguised as a winner.
-		if (observed->m_Manifest.m_BuildKey != record.m_Manifest.m_BuildKey)
+		if (observed->m_Manifest.m_RecipeId != record.m_Manifest.m_RecipeId ||
+			observed->m_Manifest.m_BuildKey != record.m_Manifest.m_BuildKey)
 		{
 			return result; // Failed
 		}

@@ -1458,6 +1458,46 @@ namespace gglab
 			const bool structuralFailureSurfaced = !structuralFailureResult.IsSuccess() &&
 				structuralFailureResult.m_Status == ShaderCompileStatus::ArtifactIOFailure;
 
+			// Slot structural binding: a committed record can be parseable and
+			// binary-digest-valid while carrying a RecipeId that does not belong
+			// to the current operation. BuildKey equality alone must never let
+			// that record classify as CommittedByOther or reach Success through
+			// matching dependency provenance.
+			ShaderCompiler compilerD(sourceRoot, tempRoot / L"CacheD");
+			const ShaderResolvedRecipe bindingRecipe = compilerD.Resolve(desc);
+			const ShaderCompileResult bindingBaseline = compilerD.CompileOrLoad(bindingRecipe);
+			const std::filesystem::path bindingBinaryPath =
+				compilerD.GetCacheBinaryPath(bindingRecipe);
+			const std::filesystem::path bindingManifestPath =
+				MakeManifestPath(bindingBinaryPath);
+			const std::optional<ShaderArtifactCacheRecord> bindingBaselineRecord =
+				LoadShaderArtifactCacheRecord(bindingManifestPath, bindingBinaryPath);
+			bool mismatchedRecipeRecordInstalled = false;
+			ShaderPublicationResult mismatchedRecipePublication{};
+			ShaderCompileResult mismatchedRecipeCompile{};
+			if (bindingRecipe.IsSuccess() && bindingBaseline.IsSuccess() &&
+				bindingBaselineRecord.has_value())
+			{
+				ShaderArtifactCacheRecord mismatchedRecipeRecord = *bindingBaselineRecord;
+				mismatchedRecipeRecord.m_Manifest.m_RecipeId.m_DurableDigest.m_Value[0] ^=
+					std::byte{ 0x01 };
+				mismatchedRecipeRecordInstalled =
+					WriteShaderArtifactCacheRecord(bindingManifestPath, mismatchedRecipeRecord);
+				OverridePublishFileFailureForTest([](
+					const std::filesystem::path& /*destination*/) noexcept -> bool
+					{
+						return true;
+					});
+				mismatchedRecipePublication = PublishShaderArtifactCacheRecord(
+					bindingBinaryPath, bindingManifestPath, *bindingBaselineRecord);
+				mismatchedRecipeCompile = compilerD.CompileOrLoad(bindingRecipe);
+				OverridePublishFileFailureForTest(nullptr);
+			}
+			const bool mismatchedRecipeRejected = mismatchedRecipeRecordInstalled &&
+				mismatchedRecipePublication.m_Outcome == ShaderPublicationOutcome::Failed &&
+				!mismatchedRecipeCompile.IsSuccess() &&
+				mismatchedRecipeCompile.m_Status == ShaderCompileStatus::ArtifactIOFailure;
+
 			context.Check(filesWritten && resultA.IsSuccess() && sameInputConverged,
 				"Same-input concurrent producers converge on the committed entry");
 			context.Check(inputChangedForRepublish && republishSucceeded,
@@ -1468,6 +1508,8 @@ namespace gglab
 				"Clearing the failure seam recovers normal publication");
 			context.Check(structuralFailureSurfaced,
 				"Publication without any committed observation maps to ArtifactIOFailure");
+			context.Check(mismatchedRecipeRejected,
+				"Publication rejects a committed same-BuildKey entry with a mismatched RecipeId");
 		}
 
 		void RunCacheRecordSerializationTests(SelfTestContext& context) noexcept
