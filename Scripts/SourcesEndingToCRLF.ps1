@@ -11,7 +11,14 @@ $TargetExtensions = @(
     ".inl", ".ixx",
     ".hlsl", ".hlsli",
     ".sln", ".vcxproj", ".filters", ".props", ".targets",
-    ".natvis", ".bat", ".cmd", ".ps1", ".json"
+    ".natvis", ".bat", ".cmd", ".ps1", ".json",
+    ".md", ".txt", ".xml", ".yml", ".yaml", ".toml", ".ini", ".config"
+)
+
+$TargetFileNames = @(
+    ".editorconfig",
+    ".gitattributes",
+    ".gitignore"
 )
 
 $ExcludeDirs = @(
@@ -46,73 +53,51 @@ function Test-IsExcludedPath {
     return $false
 }
 
-function Join-ByteArrays {
-    param(
-        [byte[]]$First,
-        [byte[]]$Second
-    )
-
-    $result = New-Object byte[] ($First.Length + $Second.Length)
-    [System.Buffer]::BlockCopy($First, 0, $result, 0, $First.Length)
-    [System.Buffer]::BlockCopy($Second, 0, $result, $First.Length, $Second.Length)
-    return $result
-}
-
-function Convert-BytesToUtf8CRLF {
+function Convert-BytesToUtf8WithoutBomCRLF {
     param(
         [byte[]]$Bytes,
         [string]$Path
     )
 
     if ($Bytes.Length -eq 0) {
-        return $Bytes
+        $text = ""
     }
-
-    $emitUtf8Bom = $false
-
-    try {
-        # Preserve an existing UTF-8 BOM.
-        if ($Bytes.Length -ge 3 -and
-            $Bytes[0] -eq 0xEF -and
-            $Bytes[1] -eq 0xBB -and
-            $Bytes[2] -eq 0xBF) {
-            $encoding = New-Object System.Text.UTF8Encoding($false, $true)
-            $text = $encoding.GetString($Bytes, 3, $Bytes.Length - 3)
-            $emitUtf8Bom = $true
+    else {
+        try {
+            # Accept a legacy UTF-8 BOM as input, but never retain it in the
+            # canonical output.
+            if ($Bytes.Length -ge 3 -and
+                $Bytes[0] -eq 0xEF -and
+                $Bytes[1] -eq 0xBB -and
+                $Bytes[2] -eq 0xBF) {
+                $encoding = New-Object System.Text.UTF8Encoding($false, $true)
+                $text = $encoding.GetString($Bytes, 3, $Bytes.Length - 3)
+            }
+            # UTF-16 LE/BE can be identified safely by its BOM. Convert it to
+            # canonical UTF-8 without BOM.
+            elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
+                $encoding = New-Object System.Text.UnicodeEncoding($false, $true, $true)
+                $text = $encoding.GetString($Bytes, 2, $Bytes.Length - 2)
+            }
+            elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFE -and $Bytes[1] -eq 0xFF) {
+                $encoding = New-Object System.Text.UnicodeEncoding($true, $true, $true)
+                $text = $encoding.GetString($Bytes, 2, $Bytes.Length - 2)
+            }
+            else {
+                # Strict decoding prevents legacy ANSI files from being silently
+                # interpreted with the wrong code page and corrupted on rewrite.
+                $encoding = New-Object System.Text.UTF8Encoding($false, $true)
+                $text = $encoding.GetString($Bytes)
+            }
         }
-        # UTF-16 LE/BE can be identified safely by its BOM. Convert it to
-        # UTF-8 with BOM so the encoding remains explicit to Windows tools.
-        elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
-            $encoding = New-Object System.Text.UnicodeEncoding($false, $true, $true)
-            $text = $encoding.GetString($Bytes, 2, $Bytes.Length - 2)
-            $emitUtf8Bom = $true
+        catch [System.Text.DecoderFallbackException] {
+            throw "File is not valid UTF-8 or BOM-marked UTF-16 and cannot be converted safely: $Path"
         }
-        elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFE -and $Bytes[1] -eq 0xFF) {
-            $encoding = New-Object System.Text.UnicodeEncoding($true, $true, $true)
-            $text = $encoding.GetString($Bytes, 2, $Bytes.Length - 2)
-            $emitUtf8Bom = $true
-        }
-        else {
-            # Strict decoding prevents legacy ANSI files from being silently
-            # interpreted with the wrong code page and corrupted on rewrite.
-            $encoding = New-Object System.Text.UTF8Encoding($false, $true)
-            $text = $encoding.GetString($Bytes)
-        }
-    }
-    catch [System.Text.DecoderFallbackException] {
-        throw "File is not valid UTF-8 or BOM-marked UTF-16 and cannot be converted safely: $Path"
     }
 
     $text = $text -replace "`r`n|`n|`r", "`r`n"
     $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
-    $utf8Bytes = $utf8.GetBytes($text)
-
-    if ($emitUtf8Bom) {
-        $utf8WithBom = New-Object System.Text.UTF8Encoding($true, $true)
-        return Join-ByteArrays ($utf8WithBom.GetPreamble()) $utf8Bytes
-    }
-
-    return $utf8Bytes
+    return $utf8.GetBytes($text)
 }
 
 function Test-BytesEqual {
@@ -142,12 +127,13 @@ if ($DryRun) {
     Write-Host "DryRun"
 }
 else {
-    Write-Host "Normalize UTF-8/CRLF"
+    Write-Host "Normalize UTF-8 without BOM/CRLF"
 }
 
 $files = Get-ChildItem -Path $Root -Recurse -File |
     Where-Object {
-        $TargetExtensions -contains $_.Extension.ToLowerInvariant() -and
+        ($TargetExtensions -contains $_.Extension.ToLowerInvariant() -or
+            $TargetFileNames -contains $_.Name.ToLowerInvariant()) -and
         -not (Test-IsExcludedPath $_.FullName)
     }
 
@@ -159,7 +145,7 @@ foreach ($file in $files) {
 
     $path = $file.FullName
     $oldBytes = [System.IO.File]::ReadAllBytes($path)
-    $newBytes = Convert-BytesToUtf8CRLF $oldBytes $path
+    $newBytes = Convert-BytesToUtf8WithoutBomCRLF $oldBytes $path
 
     if (-not (Test-BytesEqual $oldBytes $newBytes)) {
         $changed++

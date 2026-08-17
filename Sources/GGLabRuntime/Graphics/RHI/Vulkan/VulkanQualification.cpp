@@ -1,4 +1,4 @@
-﻿#include "Graphics/RHI/Vulkan/VulkanQualification.h"
+#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 

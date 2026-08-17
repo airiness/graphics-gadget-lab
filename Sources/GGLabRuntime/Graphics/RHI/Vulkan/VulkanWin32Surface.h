@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Graphics/RHI/Vulkan/VulkanSurface.h"
 
 #include <windows.h>

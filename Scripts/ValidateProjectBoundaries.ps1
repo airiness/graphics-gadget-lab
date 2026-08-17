@@ -616,7 +616,7 @@ Test-ProjectPrivateAccessDefinition $runtimeTestsProject $runtimeTestsNamespace 
     "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj" $false
 
 # Project-file encoding contract: every vcxproj and .filters file must be
-# UTF-8 with BOM so editor/tool round-trips cannot silently drop it.
+# UTF-8 without BOM so generated and editor-authored files use one encoding.
 foreach ($projectEncodingFile in @(
         Get-ChildItem -LiteralPath (Join-Path $root "Projects") -Recurse -File |
         Where-Object { $_.Extension -in @(".vcxproj", ".filters") })) {
@@ -624,11 +624,11 @@ foreach ($projectEncodingFile in @(
     $projectEncodingHasBom = ($projectEncodingBytes.Length -ge 3 -and
         $projectEncodingBytes[0] -eq 0xEF -and $projectEncodingBytes[1] -eq 0xBB -and
         $projectEncodingBytes[2] -eq 0xBF)
-    if (-not $projectEncodingHasBom) {
+    if ($projectEncodingHasBom) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-encoding"
             Target = ConvertTo-RepoRelativePath $projectEncodingFile.FullName
-            Reason = "vcxproj/.filters file must be UTF-8 with BOM"
+            Reason = "vcxproj/.filters file must be UTF-8 without BOM"
         })
     }
 }

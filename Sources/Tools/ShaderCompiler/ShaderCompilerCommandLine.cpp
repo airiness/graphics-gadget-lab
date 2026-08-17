@@ -1,4 +1,4 @@
-﻿#include "ShaderCompilerCommandLine.h"
+#include "ShaderCompilerCommandLine.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <string_view>

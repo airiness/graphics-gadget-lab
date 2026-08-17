@@ -1,4 +1,4 @@
-﻿#include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
+#include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"

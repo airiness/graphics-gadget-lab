@@ -1,4 +1,4 @@
-﻿#include "VulkanContractSelfTests.h"
+#include "VulkanContractSelfTests.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITextureValidation.h"

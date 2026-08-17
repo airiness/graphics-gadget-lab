@@ -1,4 +1,4 @@
-﻿#include "Artifact/ShaderArtifactManifestIO.h"
+#include "Artifact/ShaderArtifactManifestIO.h"
 #include "Testing/ShaderArtifactManifestIOTestAccess.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"

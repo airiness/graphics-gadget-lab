@@ -16,9 +16,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -Root "%ROOT%
 
 if errorlevel 1 (
     echo.
-    echo Failed to normalize source files to UTF-8 with CRLF line endings.
+    echo Failed to normalize source files to UTF-8 without BOM and CRLF line endings.
     exit /b %errorlevel%
 )
 
 echo.
-echo UTF-8/CRLF normalization complete.
+echo UTF-8 without BOM/CRLF normalization complete.

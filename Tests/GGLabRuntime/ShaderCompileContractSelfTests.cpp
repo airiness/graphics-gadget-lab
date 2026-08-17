@@ -1,4 +1,4 @@
-﻿#include "ShaderCompileContractSelfTests.h"
+#include "ShaderCompileContractSelfTests.h"
 #include "Testing/ShaderArtifactManifestIOTestAccess.h"
 
 #include "SpirVDecorationReader.h"

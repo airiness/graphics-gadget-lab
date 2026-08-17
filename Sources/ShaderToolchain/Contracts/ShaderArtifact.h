@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Contracts/ShaderArtifactManifest.h"
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"

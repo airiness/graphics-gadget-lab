@@ -1,4 +1,4 @@
-﻿#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"

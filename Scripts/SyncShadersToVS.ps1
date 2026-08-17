@@ -88,7 +88,7 @@ function Save-XmlDocumentIfChanged {
     $settings.IndentChars = "  "
     $settings.NewLineChars = "`r`n"
     $settings.NewLineHandling = [System.Xml.NewLineHandling]::Replace
-    $settings.Encoding = New-Object System.Text.UTF8Encoding($true)
+    $settings.Encoding = New-Object System.Text.UTF8Encoding($false)
 
     $stream = New-Object System.IO.MemoryStream
     try {

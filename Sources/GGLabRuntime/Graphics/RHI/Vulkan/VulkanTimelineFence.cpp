@@ -1,4 +1,4 @@
-﻿#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <array>
