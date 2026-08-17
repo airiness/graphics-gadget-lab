@@ -253,6 +253,12 @@ namespace gglab
 		}
 	};
 
+	enum class VulkanPresentTransitionOwnership : uint8_t
+	{
+		FrameRuntime,
+		CommandStream,
+	};
+
 	// Minimal swapchain frame lifecycle: acquire, record a known-color clear,
 	// submit, signal the graphics timeline and the per-image rendering
 	// finished semaphore, present. AbortFrame releases an acquired image with
@@ -287,14 +293,17 @@ namespace gglab
 		// image: the caller owns the drawable extent and must recreate the
 		// swapchain with the real extent before retrying.
 		[[nodiscard]] VulkanBeginFrameResult BeginFrame() noexcept;
-		// Opens the active frame's normal primary command buffer and records
-		// the swapchain-image transition into color-attachment layout. The
-		// returned command buffer is borrowed until EndFrameRecording or
-		// AbortFrame. Aborting discards every command recorded through it.
-		[[nodiscard]] VulkanFrameRecording BeginFrameRecording() noexcept;
-		// Records the transition to presentation layout and closes the normal
-		// primary command buffer. It does not submit; EndFrame consumes the
-		// finalized recording.
+		// Opens the active frame's normal primary command buffer. Qualification
+		// callers retain the default frame-runtime-managed present transitions;
+		// production RenderGraph callers select CommandStream so the compiled
+		// barrier plan remains the single transition authority. The returned
+		// command buffer is borrowed until EndFrameRecording or AbortFrame.
+		[[nodiscard]] VulkanFrameRecording BeginFrameRecording(
+			VulkanPresentTransitionOwnership transitionOwnership =
+				VulkanPresentTransitionOwnership::FrameRuntime) noexcept;
+		// Closes the normal primary command buffer and, when selected at begin,
+		// records the frame-runtime-managed transition to presentation layout.
+		// It does not submit; EndFrame consumes the finalized recording.
 		[[nodiscard]] bool EndFrameRecording() noexcept;
 		[[nodiscard]] VulkanSubmitPresentResult EndFrame() noexcept;
 		// Records the known-color clear, submits and presents the active
@@ -384,6 +393,8 @@ namespace gglab
 		bool m_DeviceLost = false;
 		bool m_NormalRecordingOpen = false;
 		bool m_NormalRecordingReady = false;
+		VulkanPresentTransitionOwnership m_PresentTransitionOwnership =
+			VulkanPresentTransitionOwnership::FrameRuntime;
 		bool m_Finalized = false;
 		bool m_DescriptorFrameTrackingAttached = false;
 	};

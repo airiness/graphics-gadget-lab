@@ -13,6 +13,8 @@
 
 #include <array>
 #include <filesystem>
+#include <optional>
+#include <string>
 
 namespace gglab
 {
@@ -83,6 +85,8 @@ namespace gglab
 			void* m_NativeWindowHandle = nullptr;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+			std::optional<std::string> m_AdapterSelector;
+			bool m_EnableDebugValidation = false;
 
 			[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
 			{

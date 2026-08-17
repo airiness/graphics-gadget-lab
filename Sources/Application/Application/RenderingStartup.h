@@ -5,11 +5,9 @@
 
 namespace gglab
 {
-	// Runs the non-renderer startup path for backend-selection CLI modes:
-	// --list-adapters enumerates and evaluates every Vulkan adapter, and an
-	// explicit --rhi vulkan creates the instance, surface, adapter, device
-	// and queue qualification before exiting. Returns the process exit code;
-	// an explicit Vulkan selection never falls back to DX12.
+	// Runs the non-renderer startup path for explicit Vulkan inspection modes.
+	// --list-adapters enumerates and evaluates every adapter before exiting;
+	// regular --rhi selection is handled by the Renderer/RHIContext factory.
 	[[nodiscard]] int RunRenderingStartupPath(
 		const ApplicationLaunchOptions& options, HWND hwnd) noexcept;
 }

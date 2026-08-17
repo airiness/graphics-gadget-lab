@@ -164,11 +164,11 @@ namespace gglab
 		m_WindowHeight = mainWindow.GetHeight();
 
 		// The backend is resolved before the ShaderManager preload starts.
-		// Explicit Vulkan selection runs the bootstrap qualification
-		// (instance, surface, adapters, profile gate, device, queue) and then
-		// exits; it never falls back to DX12.
+		// Adapter listing remains an explicit Vulkan qualification mode; a
+		// selected rendering backend continues through the normal application
+		// initialization and main loop.
 		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
-		if (m_LaunchOptions.m_ListAdapters || activeBackend == RHIBackendType::Vulkan)
+		if (m_LaunchOptions.m_ListAdapters)
 		{
 			m_ExitCode = RunRenderingStartupPath(
 				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
@@ -214,6 +214,10 @@ namespace gglab
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
+		rendererCreateInfo.m_AdapterSelector = m_LaunchOptions.m_AdapterSelector;
+#if defined(BUILD_DEBUG)
+		rendererCreateInfo.m_EnableDebugValidation = true;
+#endif
 		if (!m_Renderer->Initialize(rendererCreateInfo))
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
@@ -243,7 +247,11 @@ namespace gglab
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
+		if (!minimalVulkanProductionSmoke)
+		{
+			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+		}
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -263,7 +271,8 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
-		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
+		m_DemoManager->SetBootstrapDemo(
+			std::make_unique<DemoLoadingShell>(demoCreateInfo, minimalVulkanProductionSmoke));
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId
 			? LabId(*m_LaunchOptions.m_StartupLabId)
 			: CullingLabSession::GetId();
@@ -301,7 +310,16 @@ namespace gglab
 		default:
 			break;
 		}
-		m_DemoManager->RequestActiveDemo(startupDemoIndex);
+		if (!minimalVulkanProductionSmoke)
+		{
+			m_DemoManager->RequestActiveDemo(startupDemoIndex);
+		}
+		else
+		{
+			startupDemoName = "Demo.LoadingShell.Vulkan11BSmoke";
+			GGLAB_LOG_INFO(
+				"Vulkan production smoke mode is active; full render-pipeline parity resumes in commits 12-16.");
+		}
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
@@ -316,6 +334,7 @@ namespace gglab
 		if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
 		{
 			GGLAB_LOG_WARN("Application will continue without DevelopGui.");
+			m_DevelopGuiSystem.reset();
 		}
 		else
 		{
@@ -411,12 +430,14 @@ namespace gglab
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
 
-		auto& shadowVisualizationSettings =
-			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
+		ShadowVisualizationSettings shadowVisualizationSettings = m_DevelopGuiSystem
+			? m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow
+			: DefaultShadowVisualizationSettings();
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
-		const ViewRenderProfile effectiveViewRenderProfile =
-			m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
-				authoringViewRenderProfile);
+		const ViewRenderProfile effectiveViewRenderProfile = m_DevelopGuiSystem
+			? m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
+				authoringViewRenderProfile)
+			: authoringViewRenderProfile;
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),

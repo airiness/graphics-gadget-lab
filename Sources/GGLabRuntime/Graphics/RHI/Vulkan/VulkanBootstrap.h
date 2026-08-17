@@ -33,6 +33,12 @@ namespace gglab
 		std::string m_Prefix;
 	};
 
+	// Converts the CLI/runtime selector contract (decimal enumeration index,
+	// otherwise case-insensitive device-name or UUID prefix) into the pure
+	// adapter-selection request consumed by bootstrap.
+	[[nodiscard]] VulkanAdapterSelectionRequest ParseVulkanAdapterSelectionRequest(
+		const std::optional<std::string>& selector) noexcept;
+
 	enum class VulkanAdapterSelectionStatus : uint8_t
 	{
 		Selected,
@@ -121,4 +127,9 @@ namespace gglab
 	// destroyed immediately after each probe.
 	[[nodiscard]] VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntime(
 		const VulkanBootstrapRuntimeCreateInfo& createInfo) noexcept;
+
+	// Platform bridge implemented beside the native surface factory. Keeps the
+	// production context free of platform window types and headers.
+	[[nodiscard]] VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntimeForWindow(
+		VulkanBootstrapRuntimeCreateInfo createInfo, void* nativeWindowHandle) noexcept;
 }

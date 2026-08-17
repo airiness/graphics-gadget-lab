@@ -64,8 +64,15 @@ namespace gglab
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
+		contextDesc.m_AdapterSelector = createInfo.m_AdapterSelector;
+		contextDesc.m_EnableDebugValidation = createInfo.m_EnableDebugValidation;
 		m_RHIContext = CreateRHIContext(contextDesc);
-		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
+		if (!m_RHIContext)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer failed to create the explicitly selected RHI context.");
+			return false;
+		}
 
 		auto* device = &m_RHIContext->GetDevice();
 		m_AssetUploadScheduler =

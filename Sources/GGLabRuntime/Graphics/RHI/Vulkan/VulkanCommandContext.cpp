@@ -122,7 +122,7 @@ namespace gglab
 		if (m_CommandBuffer != VK_NULL_HANDLE || commandBuffer == VK_NULL_HANDLE ||
 			!m_Device->RequireOwnerThread("VulkanGraphicsCommandContext::BeginEncoding") ||
 			!m_UniformBuffer->IsFrameActive(frameSlotIndex) ||
-			m_Set0Frames->GetDescriptorSet(frameSlotIndex) == VK_NULL_HANDLE)
+			!m_Set0Frames->IsFrameActive(frameSlotIndex))
 		{
 			return false;
 		}
@@ -176,6 +176,25 @@ namespace gglab
 		m_ActiveColorAttachments.clear();
 		m_ActiveDepthAttachment.reset();
 		return succeeded;
+	}
+
+	void VulkanGraphicsCommandContext::AbortEncoding() noexcept
+	{
+		m_CommandBuffer = VK_NULL_HANDLE;
+		m_CurrentPipeline = nullptr;
+		m_CurrentBindingLayout = nullptr;
+		m_CurrentPipelineDesc.reset();
+		m_ActiveRenderingSignature.reset();
+		m_ActiveColorAttachments.clear();
+		m_ActiveDepthAttachment.reset();
+		m_PendingImageBarriers.clear();
+		m_PendingBufferBarriers.clear();
+		m_IsRendering = false;
+		m_HasEncodingError = false;
+		if (m_DirectComputeContext)
+		{
+			m_DirectComputeContext->ResetEncodingState();
+		}
 	}
 
 	void VulkanGraphicsCommandContext::TrackTextureUse(RHITextureHandle texture) noexcept
@@ -360,11 +379,6 @@ namespace gglab
 			pipeline, pipelineState, bindingLayout, desc))
 		{
 			Reject("SetPipeline", "the pipeline handle is not a live graphics pipeline");
-			return;
-		}
-		if (m_Set0Frames->GetLayout() != bindingLayout)
-		{
-			Reject("SetPipeline", "the active set-0 frame arena uses a different binding layout");
 			return;
 		}
 		if (bindingLayout != m_CurrentBindingLayout)
@@ -804,15 +818,10 @@ namespace gglab
 			return false;
 		}
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
-		if (fixedBindings.empty())
+		if (m_FixedDescriptorsDirty)
 		{
-			m_FixedDescriptorSet = m_Set0Frames->GetDescriptorSet(m_FrameSlotIndex);
-			m_FixedDescriptorsDirty = false;
-		}
-		else if (m_FixedDescriptorsDirty)
-		{
-			m_FixedDescriptorSet =
-				m_Set0Frames->AllocateDescriptorSet(m_FrameSlotIndex, fixedBindings);
+			m_FixedDescriptorSet = m_Set0Frames->AllocateDescriptorSet(
+				m_FrameSlotIndex, *m_CurrentBindingLayout, fixedBindings);
 			m_FixedDescriptorsDirty = false;
 		}
 		const std::array sets{
@@ -902,8 +911,7 @@ namespace gglab
 		VulkanPipelineState* pipelineState = nullptr;
 		VulkanBindingLayout* bindingLayout = nullptr;
 		if (!m_GraphicsContext->m_PipelineSystem->ResolveComputePipeline(
-			pipeline, pipelineState, bindingLayout) ||
-			m_GraphicsContext->m_Set0Frames->GetLayout() != bindingLayout)
+			pipeline, pipelineState, bindingLayout))
 		{
 			Reject("SetPipeline", "the pipeline or its active set-0 layout is invalid");
 			return;
@@ -1037,17 +1045,10 @@ namespace gglab
 			return false;
 		}
 		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
-		if (fixedBindings.empty())
+		if (m_FixedDescriptorsDirty)
 		{
-			m_FixedDescriptorSet = m_GraphicsContext->m_Set0Frames->GetDescriptorSet(
-				m_GraphicsContext->m_FrameSlotIndex);
-			m_FixedDescriptorsDirty = false;
-		}
-		else if (m_FixedDescriptorsDirty)
-		{
-			m_FixedDescriptorSet =
-				m_GraphicsContext->m_Set0Frames->AllocateDescriptorSet(
-					m_GraphicsContext->m_FrameSlotIndex, fixedBindings);
+			m_FixedDescriptorSet = m_GraphicsContext->m_Set0Frames->AllocateDescriptorSet(
+				m_GraphicsContext->m_FrameSlotIndex, *m_CurrentBindingLayout, fixedBindings);
 			m_FixedDescriptorsDirty = false;
 		}
 		const std::array sets{

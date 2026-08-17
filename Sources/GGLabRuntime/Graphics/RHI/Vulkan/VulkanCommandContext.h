@@ -31,6 +31,7 @@ namespace gglab
 		[[nodiscard]] bool BeginEncoding(
 			VkCommandBuffer commandBuffer, uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool FinishEncoding() noexcept;
+		void AbortEncoding() noexcept;
 		[[nodiscard]] bool HasEncodingError() const noexcept { return m_HasEncodingError; }
 
 		RHICommandContextHandle GetHandle() const noexcept override { return m_Handle; }

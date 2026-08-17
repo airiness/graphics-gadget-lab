@@ -26,6 +26,11 @@ namespace gglab
 		class RenderPipelineLoadingShell final : public RenderPipelineBase
 		{
 		public:
+			explicit RenderPipelineLoadingShell(bool minimalGraphicsSmoke) noexcept :
+				m_MinimalGraphicsSmoke(minimalGraphicsSmoke)
+			{
+			}
+
 			std::string_view GetName() const noexcept override
 			{
 				return "RenderPipeline.LoadingShell";
@@ -40,13 +45,17 @@ namespace gglab
 				auto* resourceRegistry = renderer->GetRenderResourceRegistry();
 				GGLAB_ASSERT_NOT_NULL(swapChain);
 				GGLAB_ASSERT_NOT_NULL(resourceRegistry);
-				resourceRegistry->EnsureShadowPreviewResources();
+				if (!m_MinimalGraphicsSmoke)
+				{
+					resourceRegistry->EnsureShadowPreviewResources();
+				}
 
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
 				const RenderViewID displayViewId = context.GetDisplayViewId();
 				rg.AddPass<LoadingShellSetupPassData>(
 					"LoadingShell.Setup",
-					[swapChain, resourceRegistry, backBufferIndex, displayViewId](
+					[swapChain, resourceRegistry, backBufferIndex, displayViewId,
+						minimalGraphicsSmoke = m_MinimalGraphicsSmoke](
 						RenderGraph::RGBuilder& builder, LoadingShellSetupPassData& data)
 					{
 						builder.SideEffect();
@@ -65,22 +74,25 @@ namespace gglab
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						targets.m_BackBuffer = builder.ImportTexture("LoadingShell.BackBuffer",
 							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-							RGTextureAccess::Present, RGContentValidity::Undefined);
+							UndefinedRHITextureState(), RGContentValidity::Undefined);
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 						data.m_BackBuffer = targets.m_BackBuffer;
 						data.m_Rtv =
 							builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 
-						auto& shadow = builder.GetBlackboard().GetOrCreate<RGShadowResources>(
-							ShadowResourcesName);
-						const auto shadowIndex = RenderResourceRegistry::TextureIndex::
-							Preview_Shadow_DirectionalShadowMap;
-						const auto* shadowDesc = resourceRegistry->GetTextureDesc(shadowIndex);
-						GGLAB_ASSERT_NOT_NULL(shadowDesc);
-						shadow.m_DirectionalShadowMapPreview =
-							builder.ImportTexture("LoadingShell.ShadowPreview",
-								resourceRegistry->GetTextureHandle(shadowIndex), *shadowDesc,
-								RGTextureAccess::None, RGContentValidity::Defined);
+						if (!minimalGraphicsSmoke)
+						{
+							auto& shadow = builder.GetBlackboard().GetOrCreate<RGShadowResources>(
+								ShadowResourcesName);
+							const auto shadowIndex = RenderResourceRegistry::TextureIndex::
+								Preview_Shadow_DirectionalShadowMap;
+							const auto* shadowDesc = resourceRegistry->GetTextureDesc(shadowIndex);
+							GGLAB_ASSERT_NOT_NULL(shadowDesc);
+							shadow.m_DirectionalShadowMapPreview =
+								builder.ImportTexture("LoadingShell.ShadowPreview",
+									resourceRegistry->GetTextureHandle(shadowIndex), *shadowDesc,
+									RGTextureAccess::None, RGContentValidity::Defined);
+						}
 					},
 					[renderer](RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
@@ -95,23 +107,31 @@ namespace gglab
 						commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
 					});
 
-				m_IBLPass.AddPass(rg, context, services);
-				if (services.m_OverlayExtension)
+				if (!m_MinimalGraphicsSmoke)
 				{
-					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
+					m_IBLPass.AddPass(rg, context, services);
+					if (services.m_OverlayExtension)
+					{
+						services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
+					}
+					m_IBLPass.AddFinishPass(rg);
 				}
-				m_IBLPass.AddFinishPass(rg);
 
 				rg.AddPass<LoadingShellFinishPassData>("LoadingShell.Finish",
-					[displayViewId](RenderGraph::RGBuilder& builder, LoadingShellFinishPassData&)
+					[displayViewId, minimalGraphicsSmoke = m_MinimalGraphicsSmoke](
+						RenderGraph::RGBuilder& builder, LoadingShellFinishPassData&)
 					{
 						builder.SideEffect();
 						auto& targets = builder.GetBlackboard()
 							.Get<RGViewTargetsTable>(ViewTargetsTableName)
 							.GetViewTargets(displayViewId);
-						auto& shadow =
-							builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-						builder.Export(shadow.m_DirectionalShadowMapPreview, RGTextureAccess::None);
+						if (!minimalGraphicsSmoke)
+						{
+							auto& shadow = builder.GetBlackboard().Get<RGShadowResources>(
+								ShadowResourcesName);
+							builder.Export(
+								shadow.m_DirectionalShadowMapPreview, RGTextureAccess::None);
+						}
 						builder.Export(targets.m_BackBuffer, RGTextureAccess::Present,
 							RHISubresourceRange{
 								.m_MipCount = 1,
@@ -122,12 +142,14 @@ namespace gglab
 			}
 
 		private:
+			bool m_MinimalGraphicsSmoke = false;
 			RenderPassIBL m_IBLPass;
 		};
 	}
 
-	std::unique_ptr<RenderPipelineBase> CreateDemoLoadingShellRenderPipeline() noexcept
+	std::unique_ptr<RenderPipelineBase>
+		CreateDemoLoadingShellRenderPipeline(bool minimalGraphicsSmoke) noexcept
 	{
-		return std::make_unique<RenderPipelineLoadingShell>();
+		return std::make_unique<RenderPipelineLoadingShell>(minimalGraphicsSmoke);
 	}
 }

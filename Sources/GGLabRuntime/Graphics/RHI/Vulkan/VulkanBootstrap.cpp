@@ -5,11 +5,40 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <format>
 #include <string_view>
 
 namespace gglab
 {
+	VulkanAdapterSelectionRequest ParseVulkanAdapterSelectionRequest(
+		const std::optional<std::string>& selector) noexcept
+	{
+		VulkanAdapterSelectionRequest request{};
+		if (!selector)
+		{
+			return request;
+		}
+
+		const std::string& value = *selector;
+		uint64_t parsedIndex = 0;
+		const bool isIndex = !value.empty() &&
+			std::ranges::all_of(value,
+				[](char c) noexcept { return c >= '0' && c <= '9'; }) &&
+			value.size() <= 10 &&
+			(std::from_chars(value.data(), value.data() + value.size(), parsedIndex).ec ==
+				std::errc{});
+		if (isIndex)
+		{
+			request.m_Kind = VulkanAdapterSelectionKind::Index;
+			request.m_Index = static_cast<uint32_t>(parsedIndex);
+			return request;
+		}
+		request.m_Kind = VulkanAdapterSelectionKind::Prefix;
+		request.m_Prefix = value;
+		return request;
+	}
+
 	namespace
 	{
 		constexpr uint32_t DefaultDiscreteRank = 0;

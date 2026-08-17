@@ -19,7 +19,6 @@
 #endif
 
 #include <array>
-#include <charconv>
 #include <cstring>
 #include <cstdint>
 #include <string_view>
@@ -30,34 +29,6 @@ namespace gglab
 	namespace
 	{
 #if GGLAB_ENABLE_VULKAN
-		[[nodiscard]] VulkanAdapterSelectionRequest MakeVulkanSelectionRequest(
-			const std::optional<std::string>& selector) noexcept
-		{
-			VulkanAdapterSelectionRequest request{};
-			if (!selector)
-			{
-				return request;
-			}
-
-			const std::string& value = *selector;
-			uint64_t parsedIndex = 0;
-			const bool isIndex = !value.empty() &&
-				std::ranges::all_of(value,
-					[](char c) noexcept { return c >= '0' && c <= '9'; }) &&
-				value.size() <= 10 &&
-				(std::from_chars(value.data(), value.data() + value.size(), parsedIndex).ec ==
-					std::errc{});
-			if (isIndex)
-			{
-				request.m_Kind = VulkanAdapterSelectionKind::Index;
-				request.m_Index = static_cast<uint32_t>(parsedIndex);
-				return request;
-			}
-			request.m_Kind = VulkanAdapterSelectionKind::Prefix;
-			request.m_Prefix = value;
-			return request;
-		}
-
 		[[nodiscard]] VulkanBootstrapOptions MakeVulkanBootstrapOptions(
 			const VulkanQualificationOptions& options,
 			const VulkanSurfaceFactoryBase& surfaceFactory) noexcept
@@ -66,7 +37,7 @@ namespace gglab
 			bootstrapOptions.m_SurfaceFactory = &surfaceFactory;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
-				MakeVulkanSelectionRequest(options.m_AdapterSelector);
+				ParseVulkanAdapterSelectionRequest(options.m_AdapterSelector);
 			return bootstrapOptions;
 		}
 
@@ -1484,7 +1455,7 @@ namespace gglab
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
 			const bool set0Initialized = set0Frames.Initialize(
-				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount());
+				&device, &uniformBuffer, runtime.GetFrameSlotCount());
 			if (!set0Initialized || !set0Frames.BeginFrame(0) ||
 				set0Frames.BeginFrame(0) || uniformBuffer.GetAlignmentInBytes() != uniformAlignment)
 			{
@@ -1514,7 +1485,7 @@ namespace gglab
 				first.m_Allocation.m_DynamicOffset % uniformAlignment != 0 ||
 				second.m_Allocation.m_DynamicOffset % uniformAlignment != 0 || overflow.IsValid() ||
 				!diagnostics || diagnostics->m_OverflowCount == 0 ||
-				set0Frames.GetDescriptorSet(0) == VK_NULL_HANDLE)
+				set0Frames.AllocateDescriptorSet(0, *layout, {}) == VK_NULL_HANDLE)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify dynamic uniform: immutable allocation, alignment or overflow failed.");
@@ -2099,7 +2070,7 @@ namespace gglab
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
 			if (!set0Frames.Initialize(
-				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount()))
+				&device, &uniformBuffer, runtime.GetFrameSlotCount()))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: set-0 frame initialization failed.");
 				return 1;

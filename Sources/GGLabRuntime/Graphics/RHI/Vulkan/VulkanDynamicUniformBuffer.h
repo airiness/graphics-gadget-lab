@@ -165,9 +165,11 @@ namespace gglab
 		std::array<ShadowSlot, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
 	};
 
-	// Owns frame-local descriptor pools and immutable set-0 snapshots. Every
-	// snapshot contains the dynamic-uniform binding plus the fixed buffer
-	// bindings supplied by the command context; pool reset remains fence-gated.
+	// Owns frame-local descriptor pools and immutable set-0 snapshots. A frame
+	// arena serves every binding layout used by that command stream; each
+	// snapshot contains the layout's dynamic-uniform bindings plus the fixed
+	// buffer bindings supplied by the command context. Pool reset remains
+	// fence-gated.
 	class VulkanSet0DynamicUniformFrames
 	{
 	public:
@@ -175,30 +177,28 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanSet0DynamicUniformFrames);
 		~VulkanSet0DynamicUniformFrames() noexcept;
 
-		[[nodiscard]] bool Initialize(VulkanDevice* device, const VulkanBindingLayout& layout,
+		[[nodiscard]] bool Initialize(VulkanDevice* device,
 			VulkanDynamicUniformBuffer* uniformBuffer, uint32_t frameSlotCount) noexcept;
 		void Finalize() noexcept;
 		[[nodiscard]] bool BeginFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] bool EndFrame(
 			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
 		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
-		[[nodiscard]] VkDescriptorSet GetDescriptorSet(uint32_t frameSlotIndex) const noexcept;
-		[[nodiscard]] const VulkanBindingLayout* GetLayout() const noexcept { return m_Layout; }
+		[[nodiscard]] bool IsFrameActive(uint32_t frameSlotIndex) const noexcept;
 		[[nodiscard]] VkDescriptorSet AllocateDescriptorSet(uint32_t frameSlotIndex,
+			const VulkanBindingLayout& layout,
 			std::span<const VulkanSet0BufferBinding> bufferBindings) noexcept;
 
 	private:
 		struct FrameSlot
 		{
 			VkDescriptorPool m_Pool = VK_NULL_HANDLE;
-			VkDescriptorSet m_Set = VK_NULL_HANDLE;
 			uint64_t m_LastResetGeneration = 0;
 			RHIFencePoint m_LastSubmittedFence{};
 			bool m_Active = false;
 		};
 
 		VulkanDevice* m_Device = nullptr;
-		const VulkanBindingLayout* m_Layout = nullptr;
 		VulkanDynamicUniformBuffer* m_UniformBuffer = nullptr;
 		std::vector<FrameSlot> m_FrameSlots;
 	};

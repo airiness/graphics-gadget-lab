@@ -4,6 +4,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 
 namespace gglab
 {
@@ -19,6 +21,8 @@ namespace gglab
 		uint32_t m_Height = 0;
 		RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
 		uint32_t m_FrameSlotCount = 2;
+		std::optional<std::string> m_AdapterSelector;
+		bool m_EnableDebugValidation = false;
 		bool m_AllowTearing = true;
 		bool m_Vsync = false;
 	};
