@@ -38,13 +38,11 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
-    <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
-    <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -55,7 +53,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -67,7 +65,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -229,7 +227,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderCompiler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
@@ -521,7 +518,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\TextureLoader.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderCompiler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
@@ -590,6 +586,9 @@
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
       <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj">
+      <Project>{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -599,7 +598,6 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
-    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

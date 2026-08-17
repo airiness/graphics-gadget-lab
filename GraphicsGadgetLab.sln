@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabTestCore", "Projects\G
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntime", "Projects\GGLabRuntime\GGLabRuntime.vcxproj", "{F382CFE9-9912-487D-B999-E649C340125D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderToolchainCore", "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj", "{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderCompiler", "Projects\ShaderCompiler\ShaderCompiler.vcxproj", "{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NapaVoxelCore", "Projects\NapaVoxelCore\NapaVoxelCore.vcxproj", "{37C8824E-AAAB-46F3-86B1-B03C02FE468B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{6217F100-D96D-45C6-AA08-A1D7266C505E}"
@@ -47,6 +51,14 @@ Global
 		{F382CFE9-9912-487D-B999-E649C340125D}.Debug|x64.Build.0 = Debug|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.ActiveCfg = Release|x64
 		{F382CFE9-9912-487D-B999-E649C340125D}.Release|x64.Build.0 = Release|x64
+		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Debug|x64.ActiveCfg = Debug|x64
+		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Debug|x64.Build.0 = Debug|x64
+		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Release|x64.ActiveCfg = Release|x64
+		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Release|x64.Build.0 = Release|x64
+		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Debug|x64.ActiveCfg = Debug|x64
+		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Debug|x64.Build.0 = Debug|x64
+		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Release|x64.ActiveCfg = Release|x64
+		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Release|x64.Build.0 = Release|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Debug|x64.ActiveCfg = Debug|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Debug|x64.Build.0 = Debug|x64
 		{37C8824E-AAAB-46F3-86B1-B03C02FE468B}.Release|x64.ActiveCfg = Release|x64

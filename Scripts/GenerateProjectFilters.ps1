@@ -384,6 +384,26 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "ShaderToolchainCore"
+        ProjectPath = "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj"
+        FiltersPath = "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\ShaderToolchain"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "ShaderCompiler"
+        ProjectPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj"
+        FiltersPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\Tools\ShaderCompiler"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "NapaVoxelCore"
         ProjectPath = "Projects\NapaVoxelCore\NapaVoxelCore.vcxproj"
         FiltersPath = "Projects\NapaVoxelCore\NapaVoxelCore.vcxproj.filters"

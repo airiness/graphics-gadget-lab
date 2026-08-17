@@ -595,7 +595,7 @@ namespace gglab
 		VkWriteDescriptorSet write{};
 		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		write.dstSet = m_GlobalSet;
-		write.dstBinding = GGLabVulkanShaderBindingABI.m_SamplerHeapBinding;
+		write.dstBinding = GGLabVulkanShaderCompileABI.m_SamplerHeapBinding;
 		write.dstArrayElement = index;
 		write.descriptorCount = 1;
 		write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -954,7 +954,7 @@ namespace gglab
 		VkWriteDescriptorSet write{};
 		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		write.dstSet = m_GlobalSet;
-		write.dstBinding = GGLabVulkanShaderBindingABI.m_ResourceHeapBinding;
+		write.dstBinding = GGLabVulkanShaderCompileABI.m_ResourceHeapBinding;
 		write.dstArrayElement = index;
 		write.descriptorCount = 1;
 		write.descriptorType = descriptorType;

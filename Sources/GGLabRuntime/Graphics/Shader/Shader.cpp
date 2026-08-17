@@ -16,14 +16,16 @@ namespace gglab
 			.m_Data = m_Artifact.m_Binary.Data(),
 			.m_SizeInBytes = m_Artifact.m_Binary.SizeInBytes(),
 			.m_Format = m_Artifact.GetBinaryFormat(),
-			.m_Hash = m_Artifact.m_Hash,
+			.m_Hash = m_Hash,
 			.m_EntryPoint = m_Desc.m_Entry,
 		};
 	}
 
-	void Shader::SetCompileArtifact(ShaderCompileArtifact artifact, bool changed) noexcept
+	void Shader::SetCompileArtifact(
+		ShaderArtifact artifact, ShaderHash128 hash, bool changed) noexcept
 	{
 		m_Artifact = std::move(artifact);
+		m_Hash = hash;
 		if (changed)
 		{
 			++m_Generation;

@@ -717,9 +717,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.cpp">
       <Filter>Graphics\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderCompiler.cpp">
-      <Filter>Graphics\Shader</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.cpp">
       <Filter>Graphics\Shader</Filter>
     </ClCompile>
@@ -1614,9 +1611,6 @@
       <Filter>Graphics\ScreenSpace</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h">
-      <Filter>Graphics\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderCompiler.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h">

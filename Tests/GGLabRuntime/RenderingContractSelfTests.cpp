@@ -27,7 +27,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
-#include "Graphics/Shader/ShaderCompiler.h"
+#include "Compiler/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferBatch.h"
 
@@ -1384,101 +1384,100 @@ namespace gglab
 				.m_Entry = L"CSMain",
 				.m_IncludeDirs = {L"."},
 			};
-			const ShaderDesc normalizedDesc = compiler.NormalizeShaderDesc(desc);
-			const ShaderCompileArtifact artifact = compiler.CompileOrLoadArtifact(normalizedDesc);
-			context.Check(artifact.m_Binary.IsValid(),
+			const ShaderCompileResult artifact = compiler.Compile(desc);
+			context.Check(artifact.IsSuccess(),
 				"Production DXC compiles screen-space and depth reconstruction helpers");
 
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileArtifact coverageVertexArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult coverageVertexArtifact =
+				compiler.Compile(desc);
 			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSAlphaTest";
-			const ShaderCompileArtifact depthAlphaArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult depthAlphaArtifact =
+				compiler.Compile(desc);
 			context.Check(
-				coverageVertexArtifact.m_Binary.IsValid() && depthAlphaArtifact.m_Binary.IsValid(),
+				coverageVertexArtifact.IsSuccess() && depthAlphaArtifact.IsSuccess(),
 				"Production DXC compiles the shared coverage vertex shader and alpha-tested prepass");
 
 			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileArtifact legacyForwardPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult legacyForwardPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileArtifact legacyGTAOContributionPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult legacyGTAOContributionPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_FORWARD_PLUS",
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileArtifact forwardPlusPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult forwardPlusPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
 				.m_Value = L"1",
 				});
-			const ShaderCompileArtifact forwardPlusGTAOContributionPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult forwardPlusGTAOContributionPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines.pop_back();
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
 				.m_Value = L"1",
 				});
-			const ShaderCompileArtifact forwardPlusValidationPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult forwardPlusValidationPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines.push_back({
 				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
 				.m_Value = L"1",
 				});
-			const ShaderCompileArtifact forwardPlusValidationGTAOContributionPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult forwardPlusValidationGTAOContributionPixelArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines.clear();
 			desc.m_SourcePath = L"Passes/PassSkybox.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileArtifact skyboxVertexArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult skyboxVertexArtifact =
+				compiler.Compile(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
-			const ShaderCompileArtifact skyboxPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(legacyForwardPixelArtifact.m_Binary.IsValid() &&
-				legacyGTAOContributionPixelArtifact.m_Binary.IsValid() &&
-				forwardPlusPixelArtifact.m_Binary.IsValid() &&
-				forwardPlusGTAOContributionPixelArtifact.m_Binary.IsValid() &&
-				forwardPlusValidationPixelArtifact.m_Binary.IsValid() &&
-				forwardPlusValidationGTAOContributionPixelArtifact.m_Binary.IsValid() &&
-				skyboxVertexArtifact.m_Binary.IsValid() &&
-				skyboxPixelArtifact.m_Binary.IsValid(),
+			const ShaderCompileResult skyboxPixelArtifact =
+				compiler.Compile(desc);
+			context.Check(legacyForwardPixelArtifact.IsSuccess() &&
+				legacyGTAOContributionPixelArtifact.IsSuccess() &&
+				forwardPlusPixelArtifact.IsSuccess() &&
+				forwardPlusGTAOContributionPixelArtifact.IsSuccess() &&
+				forwardPlusValidationPixelArtifact.IsSuccess() &&
+				forwardPlusValidationGTAOContributionPixelArtifact.IsSuccess() &&
+				skyboxVertexArtifact.IsSuccess() &&
+				skyboxPixelArtifact.IsSuccess(),
 				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";
-			const ShaderCompileArtifact forwardPlusArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult forwardPlusArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_FORWARD_PLUS_DIAGNOSTICS",
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileArtifact forwardPlusDiagnosticsArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(forwardPlusArtifact.m_Binary.IsValid() &&
-				forwardPlusDiagnosticsArtifact.m_Binary.IsValid(),
+			const ShaderCompileResult forwardPlusDiagnosticsArtifact =
+				compiler.Compile(desc);
+			context.Check(forwardPlusArtifact.IsSuccess() &&
+				forwardPlusDiagnosticsArtifact.IsSuccess(),
 				"Production DXC compiles fixed-stride Forward+ cull and diagnostics variants");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusValidation.hlsl";
@@ -1489,8 +1488,8 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileArtifact hdrDiffTileArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult hdrDiffTileArtifact =
+				compiler.Compile(desc);
 			desc.m_Entry = L"CSReduceFrame";
 			desc.m_Defines = {
 				{
@@ -1498,55 +1497,55 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileArtifact hdrDiffFrameArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(hdrDiffTileArtifact.m_Binary.IsValid() &&
-				hdrDiffFrameArtifact.m_Binary.IsValid(),
+			const ShaderCompileResult hdrDiffFrameArtifact =
+				compiler.Compile(desc);
+			context.Check(hdrDiffTileArtifact.IsSuccess() &&
+				hdrDiffFrameArtifact.IsSuccess(),
 				"Production DXC compiles deterministic Forward+ HDR diff reduction shaders");
 
 			desc.m_SourcePath = L"Passes/PassGTAO.hlsl";
 			desc.m_Entry = L"CSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileArtifact gtaoArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult gtaoArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
 			};
-			const ShaderCompileArtifact gtaoDiagnosticsArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult gtaoDiagnosticsArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{.m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1"},
 			};
-			const ShaderCompileArtifact gtaoDenoiseXArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult gtaoDenoiseXArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{.m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1"},
 			};
-			const ShaderCompileArtifact gtaoDenoiseYArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult gtaoDenoiseYArtifact =
+				compiler.Compile(desc);
 			desc.m_Defines = {
 				{.m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1"},
 			};
-			const ShaderCompileArtifact gtaoUpsampleArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(gtaoArtifact.m_Binary.IsValid() &&
-				gtaoDiagnosticsArtifact.m_Binary.IsValid() &&
-				gtaoDenoiseXArtifact.m_Binary.IsValid() &&
-				gtaoDenoiseYArtifact.m_Binary.IsValid() && gtaoUpsampleArtifact.m_Binary.IsValid(),
+			const ShaderCompileResult gtaoUpsampleArtifact =
+				compiler.Compile(desc);
+			context.Check(gtaoArtifact.IsSuccess() &&
+				gtaoDiagnosticsArtifact.IsSuccess() &&
+				gtaoDenoiseXArtifact.IsSuccess() &&
+				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
 				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
 
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileArtifact napaVoxelVertexArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+			const ShaderCompileResult napaVoxelVertexArtifact =
+				compiler.Compile(desc);
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
-			const ShaderCompileArtifact napaVoxelPixelArtifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
-			context.Check(napaVoxelVertexArtifact.m_Binary.IsValid() &&
-				napaVoxelPixelArtifact.m_Binary.IsValid(),
+			const ShaderCompileResult napaVoxelPixelArtifact =
+				compiler.Compile(desc);
+			context.Check(napaVoxelVertexArtifact.IsSuccess() &&
+				napaVoxelPixelArtifact.IsSuccess(),
 				"Production DXC compiles the Napa voxel static mesh shader");
 		}
 

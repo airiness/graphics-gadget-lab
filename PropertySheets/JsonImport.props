@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    nlohmann/json (pinned git submodule) include wiring only.
+
+    Contract:
+      - The pinned submodule Externals/Vender/nlohmann-json (v3.12.0) is the
+        single source of truth; its single_include is consumed directly and
+        is never copied into Externals/include.
+      - This sheet only adds the include directory. It does not define any
+        JSON abstraction or first-party wrapper types; each domain
+        serializer consumes nlohmann/json privately inside its .cpp files.
+      - nlohmann/json types must not appear in any first-party public
+        header.
+      - A missing submodule checkout is a build error; it is never silently
+        skipped.
+  -->
+  <PropertyGroup>
+    <GGLabNlohmannJsonRoot>$(GGLabRepositoryRoot)Externals\Vender\nlohmann-json</GGLabNlohmannJsonRoot>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(GGLabNlohmannJsonRoot)\single_include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Target Name="GGLabEnsureNlohmannJson" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(GGLabNlohmannJsonRoot)\single_include\nlohmann\json.hpp')"
+           Text="The pinned nlohmann/json submodule is missing: '$(GGLabNlohmannJsonRoot)'. Initialize/update submodules before building." />
+  </Target>
+  <ItemGroup />
+</Project>

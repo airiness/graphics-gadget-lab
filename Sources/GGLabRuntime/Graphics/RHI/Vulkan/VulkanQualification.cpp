@@ -14,7 +14,8 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
-#include "Graphics/Shader/ShaderCompiler.h"
+#include "Compiler/ShaderCompiler.h"
+#include "Targets/Vulkan13ShaderTarget.h"
 #endif
 
 #include <array>
@@ -1535,17 +1536,22 @@ namespace gglab
 			ShaderDesc shaderDesc{
 				.m_SourcePath = L"Passes/PassFinalColor.hlsl",
 				.m_Stage = ShaderStage::Vertex,
-				.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(ShaderStage::Vertex),
+				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex),
 				.m_Entry = L"VSMain",
 				.m_IncludeDirs = {L"."},
 			};
-			const ShaderCompileArtifact artifact =
-				compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(shaderDesc));
+			const ShaderCompileResult compileResult = compiler.Compile(shaderDesc);
+			if (!compileResult.IsSuccess())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify descriptors: shader compile failed.");
+				return 1;
+			}
 			const ShaderBytecode spirV{
-				.m_Data = artifact.m_Binary.Data(),
-				.m_SizeInBytes = artifact.m_Binary.SizeInBytes(),
-				.m_Format = artifact.GetBinaryFormat(),
-				.m_Hash = artifact.m_Hash,
+				.m_Data = compileResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = compileResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = compileResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(compileResult.m_Artifact.m_Binary,
+					compileResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"VSMain",
 			};
 			const VkShaderModule shaderModule =
@@ -1657,56 +1663,60 @@ namespace gglab
 					ShaderDesc desc{
 						.m_SourcePath = L"Passes/PassCoordinateConformance.hlsl",
 						.m_Stage = stage,
-						.m_Target = ShaderCompiler::MakeVulkanSpirVTarget(stage),
+						.m_Target = MakeVulkan13CompileTarget(stage),
 						.m_Entry = entry,
 						.m_IncludeDirs = { L"." },
 					};
-					return compiler.CompileOrLoadArtifact(compiler.NormalizeShaderDesc(desc));
+					return compiler.Compile(desc);
 				};
-			ShaderCompileArtifact geometryArtifact =
+			const ShaderCompileResult geometryResult =
 				compileShader(ShaderStage::Vertex, L"VSGeometry");
-			ShaderCompileArtifact fullscreenArtifact =
+			const ShaderCompileResult fullscreenResult =
 				compileShader(ShaderStage::Vertex, L"VSFullscreen");
-			ShaderCompileArtifact pixelArtifact =
+			const ShaderCompileResult pixelResult =
 				compileShader(ShaderStage::Pixel, L"PSConformance");
-			ShaderCompileArtifact depthOverrideArtifact =
+			const ShaderCompileResult depthOverrideResult =
 				compileShader(ShaderStage::Pixel, L"PSDepthOverride");
-			if (!geometryArtifact.m_Binary.IsValid() || !fullscreenArtifact.m_Binary.IsValid() ||
-				!pixelArtifact.m_Binary.IsValid() || !depthOverrideArtifact.m_Binary.IsValid() ||
-				geometryArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
-				fullscreenArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
-				pixelArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
-				depthOverrideArtifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
+			if (!geometryResult.IsSuccess() || !fullscreenResult.IsSuccess() ||
+				!pixelResult.IsSuccess() || !depthOverrideResult.IsSuccess() ||
+				geometryResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				fullscreenResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				pixelResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				depthOverrideResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: coordinate shader compilation failed.");
 				return 1;
 			}
 			const ShaderBytecode geometryShader{
-				.m_Data = geometryArtifact.m_Binary.Data(),
-				.m_SizeInBytes = geometryArtifact.m_Binary.SizeInBytes(),
-				.m_Format = geometryArtifact.GetBinaryFormat(),
-				.m_Hash = geometryArtifact.m_Hash,
+				.m_Data = geometryResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = geometryResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = geometryResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(geometryResult.m_Artifact.m_Binary,
+					geometryResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"VSGeometry",
 			};
 			const ShaderBytecode fullscreenShader{
-				.m_Data = fullscreenArtifact.m_Binary.Data(),
-				.m_SizeInBytes = fullscreenArtifact.m_Binary.SizeInBytes(),
-				.m_Format = fullscreenArtifact.GetBinaryFormat(),
-				.m_Hash = fullscreenArtifact.m_Hash,
+				.m_Data = fullscreenResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = fullscreenResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = fullscreenResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(fullscreenResult.m_Artifact.m_Binary,
+					fullscreenResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"VSFullscreen",
 			};
 			const ShaderBytecode pixelShader{
-				.m_Data = pixelArtifact.m_Binary.Data(),
-				.m_SizeInBytes = pixelArtifact.m_Binary.SizeInBytes(),
-				.m_Format = pixelArtifact.GetBinaryFormat(),
-				.m_Hash = pixelArtifact.m_Hash,
+				.m_Data = pixelResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = pixelResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = pixelResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(pixelResult.m_Artifact.m_Binary,
+					pixelResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"PSConformance",
 			};
 			const ShaderBytecode depthOverrideShader{
-				.m_Data = depthOverrideArtifact.m_Binary.Data(),
-				.m_SizeInBytes = depthOverrideArtifact.m_Binary.SizeInBytes(),
-				.m_Format = depthOverrideArtifact.GetBinaryFormat(),
-				.m_Hash = depthOverrideArtifact.m_Hash,
+				.m_Data = depthOverrideResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = depthOverrideResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = depthOverrideResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(depthOverrideResult.m_Artifact.m_Binary,
+					depthOverrideResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"PSDepthOverride",
 			};
 
