@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
@@ -16,6 +16,7 @@ namespace gglab
 	class VulkanDevice;
 	class VulkanPipelineState;
 	class VulkanPipelineSystem;
+	class VulkanComputeCommandContext;
 
 	class VulkanGraphicsCommandContext final : public RHIGraphicsCommandContext
 	{
@@ -78,7 +79,11 @@ namespace gglab
 		}
 
 	private:
+		friend class VulkanComputeCommandContext;
 		void Reject(std::string_view operation, std::string_view reason) noexcept;
+		[[nodiscard]] bool SetBufferDescriptor(uint32_t parameterIndex, RHIBufferHandle buffer,
+			uint64_t offset, VkDescriptorType descriptorType,
+			RHIBufferUsage requiredUsage, std::string_view operation) noexcept;
 		[[nodiscard]] bool BindDescriptorSets() noexcept;
 		[[nodiscard]] bool ValidateDraw(std::string_view operation, bool indexed) noexcept;
 
@@ -99,6 +104,12 @@ namespace gglab
 		std::vector<uint32_t> m_DynamicOffsets;
 		std::vector<RHIBufferHandle> m_UsedBuffers;
 		std::vector<RHITextureHandle> m_UsedTextures;
+		std::vector<VkImageMemoryBarrier2> m_PendingImageBarriers;
+		std::vector<VkBufferMemoryBarrier2> m_PendingBufferBarriers;
+		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots>
+			m_FixedBufferBindings{};
+		VkDescriptorSet m_FixedDescriptorSet = VK_NULL_HANDLE;
+		bool m_FixedDescriptorsDirty = true;
 		std::array<std::optional<RHIVertexBufferBinding>,
 			RHIVertexInputLayoutDesc::MaxVertexBuffers> m_VertexBindings{};
 		std::optional<RHIIndexBufferBinding> m_IndexBufferBinding;
@@ -108,5 +119,59 @@ namespace gglab
 		bool m_ViewportSet = false;
 		bool m_ScissorSet = false;
 		bool m_HasEncodingError = false;
+		VulkanComputeCommandContext* m_DirectComputeContext = nullptr;
+	};
+
+	class VulkanComputeCommandContext final : public RHIComputeCommandContext
+	{
+	public:
+		explicit VulkanComputeCommandContext(VulkanGraphicsCommandContext& graphicsContext) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanComputeCommandContext);
+		~VulkanComputeCommandContext() override;
+		using RHIComputeCommandContext::SetPushConstants;
+
+		RHICommandContextHandle GetHandle() const noexcept override
+		{
+			return m_GraphicsContext->GetHandle();
+		}
+		RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+		void TrackTextureUse(RHITextureHandle texture) noexcept override;
+		void TrackBufferUse(RHIBufferHandle buffer) noexcept override;
+		void TextureBarrier(std::span<const RHITextureBarrier> barriers) noexcept override;
+		void BufferBarrier(std::span<const RHIBufferBarrier> barriers) noexcept override;
+		void FlushBarriers() noexcept override;
+		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
+			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override;
+		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
+		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
+		void SetConstantBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetReadOnlyBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetReadWriteBuffer(
+			uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset = 0) noexcept override;
+		void SetPushConstants(uint32_t parameterIndex, std::span<const uint32_t> values,
+			uint32_t destOffset = 0) noexcept override;
+		void Dispatch(
+			uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept override;
+
+	private:
+		friend class VulkanGraphicsCommandContext;
+		void ResetEncodingState() noexcept;
+		void Reject(std::string_view operation, std::string_view reason) noexcept;
+		[[nodiscard]] bool SetBufferDescriptor(uint32_t parameterIndex, RHIBufferHandle buffer,
+			uint64_t offset, VkDescriptorType descriptorType,
+			RHIBufferUsage requiredUsage, std::string_view operation) noexcept;
+		[[nodiscard]] bool BindDescriptorSets() noexcept;
+
+		VulkanGraphicsCommandContext* m_GraphicsContext = nullptr;
+		VulkanPipelineState* m_CurrentPipeline = nullptr;
+		VulkanBindingLayout* m_CurrentBindingLayout = nullptr;
+		VulkanDynamicUniformState m_DynamicUniformState;
+		std::vector<uint32_t> m_DynamicOffsets;
+		std::array<std::optional<VulkanSet0BufferBinding>, RHIBindingLayoutDesc::MaxSlots>
+			m_FixedBufferBindings{};
+		VkDescriptorSet m_FixedDescriptorSet = VK_NULL_HANDLE;
+		bool m_FixedDescriptorsDirty = true;
 	};
 }

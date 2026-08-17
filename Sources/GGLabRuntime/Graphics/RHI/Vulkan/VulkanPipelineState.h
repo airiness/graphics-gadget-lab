@@ -73,6 +73,9 @@ namespace gglab
 		[[nodiscard]] bool Create(VulkanDevice* device, VulkanBindingLayout* bindingLayout,
 			const RHIGraphicsPipelineDesc& desc,
 			std::span<const VulkanShaderStageModule> shaders) noexcept;
+		[[nodiscard]] bool CreateCompute(VulkanDevice* device,
+			VulkanBindingLayout* bindingLayout, VkShaderModule shaderModule,
+			const char* entryPoint) noexcept;
 		void Release() noexcept;
 
 		[[nodiscard]] VkPipeline Get() const noexcept { return m_Pipeline; }

@@ -1,4 +1,4 @@
-#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
+﻿#include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
@@ -337,6 +337,45 @@ namespace gglab
 		}
 		SetVulkanObjectDebugName(device->Get(), VK_OBJECT_TYPE_PIPELINE,
 			reinterpret_cast<uint64_t>(m_Pipeline), "Vulkan.GraphicsPipeline");
+		return true;
+	}
+
+	bool VulkanPipelineState::CreateCompute(VulkanDevice* device,
+		VulkanBindingLayout* bindingLayout, VkShaderModule shaderModule,
+		const char* entryPoint) noexcept
+	{
+		if (m_Device != nullptr || device == nullptr || bindingLayout == nullptr ||
+			!bindingLayout->IsValid() || shaderModule == VK_NULL_HANDLE || entryPoint == nullptr ||
+			entryPoint[0] == '\0' ||
+			!device->RequireOwnerThread("VulkanPipelineState::CreateCompute"))
+		{
+			return false;
+		}
+
+		const VkPipelineShaderStageCreateInfo stage{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_COMPUTE_BIT,
+			.module = shaderModule,
+			.pName = entryPoint,
+		};
+		const VkComputePipelineCreateInfo createInfo{
+			.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+			.stage = stage,
+			.layout = bindingLayout->GetPipelineLayout(),
+		};
+		const VkResult result = vkCreateComputePipelines(
+			device->Get(), VK_NULL_HANDLE, 1, &createInfo, nullptr, &m_Pipeline);
+		if (result != VK_SUCCESS)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("vkCreateComputePipelines failed with {}.", ToString(result));
+			m_Pipeline = VK_NULL_HANDLE;
+			return false;
+		}
+
+		m_Device = device;
+		m_BindingLayout = bindingLayout;
+		SetVulkanObjectDebugName(device->Get(), VK_OBJECT_TYPE_PIPELINE,
+			reinterpret_cast<uint64_t>(m_Pipeline), "Vulkan.ComputePipeline");
 		return true;
 	}
 

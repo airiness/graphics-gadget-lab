@@ -1,4 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
+#include "Graphics/RHI/Vulkan/VulkanFormat.h"
 
 namespace gglab
 {
@@ -130,6 +132,69 @@ namespace gglab
 			break;
 		}
 		return std::nullopt;
+	}
+
+	std::optional<VkImageMemoryBarrier2> BuildVulkanTextureBarrier(
+		const RHITextureBarrier& barrier, VkImage image, const RHITextureDesc& desc) noexcept
+	{
+		if (image == VK_NULL_HANDLE ||
+			!IsRHIResourceStateValid(
+				barrier.m_Before, RHIResourceStateUsage::TextureBarrierBefore) ||
+			!IsRHIResourceStateValid(
+				barrier.m_After, RHIResourceStateUsage::TextureBarrierAfter))
+		{
+			return std::nullopt;
+		}
+
+		const std::optional<VkImageLayout> oldLayout =
+			ToVulkanImageLayout(barrier.m_Before.m_Layout);
+		const std::optional<VkImageLayout> newLayout =
+			ToVulkanImageLayout(barrier.m_After.m_Layout);
+		const RHISubresourceRange range =
+			NormalizeTextureSubresourceRange(desc, barrier.m_Subresources);
+		const VkImageAspectFlags aspects = ToVulkanImageAspectFlags(range.m_Aspects);
+		if (!oldLayout || !newLayout || range.m_MipCount == 0 ||
+			range.m_ArraySliceCount == 0 || aspects == 0)
+		{
+			return std::nullopt;
+		}
+
+		const VkImageSubresourceRange nativeRange{
+			.aspectMask = aspects,
+			.baseMipLevel = range.m_BaseMip,
+			.levelCount = range.m_MipCount,
+			.baseArrayLayer = range.m_BaseArraySlice,
+			.layerCount = range.m_ArraySliceCount,
+		};
+		return MakeVulkanImageBarrier(image, nativeRange, *oldLayout, *newLayout,
+			ToVulkanPipelineStages(barrier.m_Before.m_Stages),
+			ToVulkanAccessFlags(barrier.m_Before.m_Access),
+			ToVulkanPipelineStages(barrier.m_After.m_Stages),
+			ToVulkanAccessFlags(barrier.m_After.m_Access));
+	}
+
+	std::optional<VkBufferMemoryBarrier2> BuildVulkanBufferBarrier(
+		const RHIBufferBarrier& barrier, VkBuffer buffer) noexcept
+	{
+		if (buffer == VK_NULL_HANDLE ||
+			!IsRHIResourceStateValid(barrier.m_Before, RHIResourceStateUsage::Buffer) ||
+			!IsRHIResourceStateValid(barrier.m_After, RHIResourceStateUsage::Buffer))
+		{
+			return std::nullopt;
+		}
+
+		return VkBufferMemoryBarrier2{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+			.srcStageMask = ToVulkanPipelineStages(barrier.m_Before.m_Stages),
+			.srcAccessMask = ToVulkanAccessFlags(barrier.m_Before.m_Access),
+			.dstStageMask = ToVulkanPipelineStages(barrier.m_After.m_Stages),
+			.dstAccessMask = ToVulkanAccessFlags(barrier.m_After.m_Access),
+			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+			.buffer = buffer,
+			.offset = 0,
+			.size = VK_WHOLE_SIZE,
+		};
 	}
 
 	VkImageMemoryBarrier2 MakeVulkanImageBarrier(VkImage image,

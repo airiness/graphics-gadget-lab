@@ -1,4 +1,4 @@
-#include "VulkanContractSelfTests.h"
+﻿#include "VulkanContractSelfTests.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/RHI/RHITextureValidation.h"
@@ -356,6 +356,105 @@ namespace gglab
 				rangedBarrier.subresourceRange.baseArrayLayer == range.baseArrayLayer &&
 				rangedBarrier.subresourceRange.layerCount == range.layerCount,
 				"Vulkan image barrier construction preserves explicit subresource ranges");
+
+			const RHITextureDesc colorDesc{
+				.m_Format = RHIFormat::R8G8B8A8Unorm,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::RenderTarget |
+					RHITextureUsage::UnorderedAccess | RHITextureUsage::CopyDest,
+				.m_Extent = { 32, 16, 1 },
+			};
+			const RHITextureDesc depthDesc{
+				.m_Format = RHIFormat::D32Float,
+				.m_Usage = RHITextureUsage::DepthStencil,
+				.m_Extent = { 32, 16, 1 },
+			};
+			constexpr RHIResourceState copyDestState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::CopyDest,
+			};
+			constexpr RHIResourceState renderTargetState{
+				.m_Stages = RHIStage::RenderTarget,
+				.m_Access = RHIAccess::RenderTarget,
+				.m_Layout = RHILayout::RenderTarget,
+			};
+			constexpr RHIResourceState depthWriteState{
+				.m_Stages = RHIStage::DepthStencil,
+				.m_Access = RHIAccess::DepthStencilWrite,
+				.m_Layout = RHILayout::DepthStencilWrite,
+			};
+			constexpr RHIResourceState shaderReadState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::ShaderResource,
+			};
+			constexpr RHIResourceState storageState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::UnorderedAccess,
+			};
+			const auto undefinedToCopy = BuildVulkanTextureBarrier(
+				{ {}, UndefinedRHITextureState(), copyDestState }, image, colorDesc);
+			const auto undefinedToColor = BuildVulkanTextureBarrier(
+				{ {}, UndefinedRHITextureState(), renderTargetState }, image, colorDesc);
+			const auto undefinedToDepth = BuildVulkanTextureBarrier(
+				{ {}, UndefinedRHITextureState(), depthWriteState }, image, depthDesc);
+			const auto presentToColor = BuildVulkanTextureBarrier(
+				{ {}, PresentRHITextureState(), renderTargetState }, image, colorDesc);
+			const auto colorToPresent = BuildVulkanTextureBarrier(
+				{ {}, renderTargetState, PresentRHITextureState() }, image, colorDesc);
+			const auto copyToShader = BuildVulkanTextureBarrier(
+				{ {}, copyDestState, shaderReadState }, image, colorDesc);
+			const auto orderedStorage = BuildVulkanTextureBarrier(
+				{ {}, storageState, storageState }, image, colorDesc);
+			context.Check(undefinedToCopy && undefinedToColor && undefinedToDepth &&
+				presentToColor && colorToPresent && copyToShader && orderedStorage &&
+				undefinedToCopy->oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+				undefinedToCopy->newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+				undefinedToColor->newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+				undefinedToDepth->subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT &&
+				presentToColor->srcStageMask == VK_PIPELINE_STAGE_2_NONE &&
+				presentToColor->srcAccessMask == VK_ACCESS_2_NONE &&
+				colorToPresent->dstStageMask == VK_PIPELINE_STAGE_2_NONE &&
+				colorToPresent->dstAccessMask == VK_ACCESS_2_NONE &&
+				copyToShader->srcAccessMask == VK_ACCESS_2_TRANSFER_WRITE_BIT &&
+				copyToShader->dstAccessMask == VK_ACCESS_2_SHADER_READ_BIT &&
+				orderedStorage->oldLayout == orderedStorage->newLayout &&
+				orderedStorage->srcAccessMask ==
+				(VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT) &&
+				orderedStorage->dstAccessMask == orderedStorage->srcAccessMask,
+				"Vulkan texture barrier lowering covers the required synchronization matrix");
+
+			const VkBuffer buffer = reinterpret_cast<VkBuffer>(static_cast<uintptr_t>(23));
+			constexpr RHIResourceState graphicsStorageState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState computeStorageState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::Common,
+			};
+			const auto graphicsToCompute = BuildVulkanBufferBarrier(
+				{ {}, graphicsStorageState, computeStorageState }, buffer);
+			const auto computeToGraphics = BuildVulkanBufferBarrier(
+				{ {}, computeStorageState, graphicsStorageState }, buffer);
+			const auto sameLayoutBuffer = BuildVulkanBufferBarrier(
+				{ {}, computeStorageState, computeStorageState }, buffer);
+			context.Check(graphicsToCompute && computeToGraphics && sameLayoutBuffer &&
+				graphicsToCompute->srcStageMask == VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT &&
+				graphicsToCompute->dstStageMask == VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT &&
+				computeToGraphics->srcStageMask == VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT &&
+				computeToGraphics->dstStageMask == VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT &&
+				sameLayoutBuffer->buffer == buffer && sameLayoutBuffer->offset == 0 &&
+				sameLayoutBuffer->size == VK_WHOLE_SIZE,
+				"Vulkan buffer barriers preserve graphics-compute and same-layout dependencies");
+			context.Check(!BuildVulkanTextureBarrier(
+				{ {}, renderTargetState, UndefinedRHITextureState() }, image, colorDesc) &&
+				!BuildVulkanBufferBarrier(
+					{ {}, UndefinedRHITextureState(), computeStorageState }, buffer),
+				"Vulkan barrier builders reject invalid destination and buffer states");
 		}
 
 		void RunVulkanTextureCopyContractTests(SelfTestContext& context) noexcept

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
@@ -131,6 +131,17 @@ namespace gglab
 		}
 	};
 
+	struct VulkanSet0BufferBinding
+	{
+		uint32_t m_LogicalParameterIndex = UINT32_MAX;
+		VkDescriptorType m_DescriptorType = VK_DESCRIPTOR_TYPE_MAX_ENUM;
+		VkBuffer m_Buffer = VK_NULL_HANDLE;
+		VkDeviceSize m_Offset = 0;
+		VkDeviceSize m_Range = 0;
+
+		bool operator==(const VulkanSet0BufferBinding&) const noexcept = default;
+	};
+
 	class VulkanDynamicUniformState
 	{
 	public:
@@ -154,9 +165,9 @@ namespace gglab
 		std::array<ShadowSlot, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
 	};
 
-	// Owns the frame-local descriptor pools and dynamic-uniform writes for set 0.
-	// Fixed-resource bindings, when present in the layout, remain the caller's
-	// responsibility and must be populated before the set is bound.
+	// Owns frame-local descriptor pools and immutable set-0 snapshots. Every
+	// snapshot contains the dynamic-uniform binding plus the fixed buffer
+	// bindings supplied by the command context; pool reset remains fence-gated.
 	class VulkanSet0DynamicUniformFrames
 	{
 	public:
@@ -172,6 +183,9 @@ namespace gglab
 			uint32_t frameSlotIndex, const RHIFencePoint& submittedFence) noexcept;
 		[[nodiscard]] bool AbortFrame(uint32_t frameSlotIndex) noexcept;
 		[[nodiscard]] VkDescriptorSet GetDescriptorSet(uint32_t frameSlotIndex) const noexcept;
+		[[nodiscard]] const VulkanBindingLayout* GetLayout() const noexcept { return m_Layout; }
+		[[nodiscard]] VkDescriptorSet AllocateDescriptorSet(uint32_t frameSlotIndex,
+			std::span<const VulkanSet0BufferBinding> bufferBindings) noexcept;
 
 	private:
 		struct FrameSlot

@@ -1,5 +1,6 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Core/Log/LogMacros.h"
+#include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
@@ -25,6 +26,81 @@ namespace gglab
 			RHITextureHandle handle) noexcept
 		{
 			return std::ranges::find(handles, handle) != handles.end();
+		}
+
+		[[nodiscard]] const VulkanSet0BindingPlan* FindSet0Binding(
+			const VulkanBindingLayout& layout, uint32_t parameterIndex) noexcept
+		{
+			const VulkanBindingLayoutPlan& plan = layout.GetPlan();
+			for (uint32_t index = 0; index < plan.m_Set0BindingCount; ++index)
+			{
+				if (plan.m_Set0Bindings[index].m_LogicalParameterIndex == parameterIndex)
+				{
+					return &plan.m_Set0Bindings[index];
+				}
+			}
+			return nullptr;
+		}
+
+		[[nodiscard]] bool BuildSet0BufferBinding(VulkanDevice& device,
+			const VulkanBindingLayout& layout, uint32_t parameterIndex, RHIBufferHandle buffer,
+			uint64_t offset, VkDescriptorType descriptorType, RHIBufferUsage requiredUsage,
+			VulkanSet0BufferBinding& outBinding) noexcept
+		{
+			const VulkanSet0BindingPlan* binding = FindSet0Binding(layout, parameterIndex);
+			VulkanResourceManager& resources = device.GetResourceManager();
+			VulkanBuffer* nativeBuffer = resources.ResolveBuffer(buffer);
+			const RHIBufferDesc* desc = resources.ResolveBufferDesc(buffer);
+			if (binding == nullptr || binding->m_DescriptorCount != 1 ||
+				binding->m_DescriptorType != descriptorType || nativeBuffer == nullptr ||
+				desc == nullptr || !Test(desc->m_Usage, requiredUsage) ||
+				offset >= desc->m_SizeInBytes)
+			{
+				return false;
+			}
+
+			const VkPhysicalDeviceLimits& limits = device.GetPhysicalDeviceLimits();
+			const VkDeviceSize alignment = descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+				? limits.minUniformBufferOffsetAlignment
+				: limits.minStorageBufferOffsetAlignment;
+			if (alignment != 0 && offset % alignment != 0)
+			{
+				return false;
+			}
+			const VkDeviceSize remaining = desc->m_SizeInBytes - offset;
+			VkDeviceSize range = remaining;
+			if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+			{
+				range = std::min<VkDeviceSize>(remaining, limits.maxUniformBufferRange);
+			}
+			else if (remaining > limits.maxStorageBufferRange)
+			{
+				return false;
+			}
+			outBinding = {
+				.m_LogicalParameterIndex = parameterIndex,
+				.m_DescriptorType = descriptorType,
+				.m_Buffer = nativeBuffer->Get(),
+				.m_Offset = offset,
+				.m_Range = range,
+			};
+			return true;
+		}
+
+		template <size_t Size>
+		[[nodiscard]] std::vector<VulkanSet0BufferBinding> CollectBufferBindings(
+			const std::array<std::optional<VulkanSet0BufferBinding>, Size>& bindings)
+		{
+			std::vector<VulkanSet0BufferBinding> result;
+			result.reserve(Size);
+			for (const auto& binding : bindings)
+			{
+				if (binding)
+				{
+					result.push_back(*binding);
+				}
+			}
+			return result;
 		}
 	}
 
@@ -61,6 +137,11 @@ namespace gglab
 		m_DynamicOffsets.clear();
 		m_UsedBuffers.clear();
 		m_UsedTextures.clear();
+		m_PendingImageBarriers.clear();
+		m_PendingBufferBarriers.clear();
+		m_FixedBufferBindings.fill(std::nullopt);
+		m_FixedDescriptorSet = VK_NULL_HANDLE;
+		m_FixedDescriptorsDirty = true;
 		m_VertexBindings.fill(std::nullopt);
 		m_IndexBufferBinding.reset();
 		m_PrimitiveTopology = RHIPrimitiveTopology::Unknown;
@@ -69,6 +150,10 @@ namespace gglab
 		m_ViewportSet = false;
 		m_ScissorSet = false;
 		m_HasEncodingError = false;
+		if (m_DirectComputeContext)
+		{
+			m_DirectComputeContext->ResetEncodingState();
+		}
 		return true;
 	}
 
@@ -112,35 +197,153 @@ namespace gglab
 	void VulkanGraphicsCommandContext::TextureBarrier(
 		std::span<const RHITextureBarrier> barriers) noexcept
 	{
-		if (!barriers.empty())
+		if (barriers.empty())
 		{
-			Reject("TextureBarrier", "graphics barrier recording is not available");
+			return;
+		}
+		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
+		{
+			Reject("TextureBarrier", m_IsRendering ? "barriers are invalid inside rendering"
+				: "no command buffer is active");
+			return;
+		}
+
+		std::vector<VkImageMemoryBarrier2> nativeBarriers;
+		nativeBarriers.reserve(barriers.size());
+		for (const RHITextureBarrier& barrier : barriers)
+		{
+			VulkanResourceManager& resources = m_Device->GetResourceManager();
+			VulkanTexture* texture = resources.ResolveTexture(barrier.m_Texture);
+			const RHITextureDesc* desc = resources.ResolveTextureDesc(barrier.m_Texture);
+			const auto native = texture && desc
+				? BuildVulkanTextureBarrier(barrier, texture->Get(), *desc)
+				: std::nullopt;
+			if (!native)
+			{
+				Reject("TextureBarrier", "a barrier state, range or texture is invalid");
+				return;
+			}
+			nativeBarriers.push_back(*native);
+		}
+		m_PendingImageBarriers.insert(m_PendingImageBarriers.end(),
+			nativeBarriers.begin(), nativeBarriers.end());
+		for (const RHITextureBarrier& barrier : barriers)
+		{
+			TrackTextureUse(barrier.m_Texture);
 		}
 	}
 
 	void VulkanGraphicsCommandContext::BufferBarrier(
 		std::span<const RHIBufferBarrier> barriers) noexcept
 	{
-		if (!barriers.empty())
+		if (barriers.empty())
 		{
-			Reject("BufferBarrier", "graphics barrier recording is not available");
+			return;
+		}
+		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
+		{
+			Reject("BufferBarrier", m_IsRendering ? "barriers are invalid inside rendering"
+				: "no command buffer is active");
+			return;
+		}
+
+		std::vector<VkBufferMemoryBarrier2> nativeBarriers;
+		nativeBarriers.reserve(barriers.size());
+		for (const RHIBufferBarrier& barrier : barriers)
+		{
+			VulkanBuffer* buffer = m_Device->GetResourceManager().ResolveBuffer(barrier.m_Buffer);
+			const auto native = buffer
+				? BuildVulkanBufferBarrier(barrier, buffer->Get())
+				: std::nullopt;
+			if (!native)
+			{
+				Reject("BufferBarrier", "a barrier state or buffer is invalid");
+				return;
+			}
+			nativeBarriers.push_back(*native);
+		}
+		m_PendingBufferBarriers.insert(m_PendingBufferBarriers.end(),
+			nativeBarriers.begin(), nativeBarriers.end());
+		for (const RHIBufferBarrier& barrier : barriers)
+		{
+			TrackBufferUse(barrier.m_Buffer);
 		}
 	}
 
 	void VulkanGraphicsCommandContext::FlushBarriers() noexcept
 	{
+		if (m_PendingImageBarriers.empty() && m_PendingBufferBarriers.empty())
+		{
+			return;
+		}
+		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
+		{
+			Reject("FlushBarriers", m_IsRendering ? "barriers are invalid inside rendering"
+				: "no command buffer is active");
+			return;
+		}
+		const VkDependencyInfo dependencyInfo{
+			.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+			.bufferMemoryBarrierCount = static_cast<uint32_t>(m_PendingBufferBarriers.size()),
+			.pBufferMemoryBarriers = m_PendingBufferBarriers.data(),
+			.imageMemoryBarrierCount = static_cast<uint32_t>(m_PendingImageBarriers.size()),
+			.pImageMemoryBarriers = m_PendingImageBarriers.data(),
+		};
+		vkCmdPipelineBarrier2(m_CommandBuffer, &dependencyInfo);
+		m_PendingImageBarriers.clear();
+		m_PendingBufferBarriers.clear();
 	}
 
 	void VulkanGraphicsCommandContext::CopyBuffer(RHIBufferHandle destination,
 		uint64_t destinationOffset, RHIBufferHandle source, uint64_t sourceOffset,
 		uint64_t sizeInBytes) noexcept
 	{
-		GGLAB_UNUSED(destination);
-		GGLAB_UNUSED(destinationOffset);
-		GGLAB_UNUSED(source);
-		GGLAB_UNUSED(sourceOffset);
-		GGLAB_UNUSED(sizeInBytes);
-		Reject("CopyBuffer", "copy recording is not available on the graphics encoder");
+		if (m_CommandBuffer == VK_NULL_HANDLE || m_IsRendering)
+		{
+			Reject("CopyBuffer", m_IsRendering ? "copies are invalid inside rendering"
+				: "no command buffer is active");
+			return;
+		}
+		VulkanResourceManager& resources = m_Device->GetResourceManager();
+		VulkanBuffer* destinationBuffer = resources.ResolveBuffer(destination);
+		VulkanBuffer* sourceBuffer = resources.ResolveBuffer(source);
+		const RHIBufferDesc* destinationDesc = resources.ResolveBufferDesc(destination);
+		const RHIBufferDesc* sourceDesc = resources.ResolveBufferDesc(source);
+		if (!destinationBuffer || !sourceBuffer || !destinationDesc || !sourceDesc ||
+			sizeInBytes == 0 || destinationOffset > destinationDesc->m_SizeInBytes ||
+			sizeInBytes > destinationDesc->m_SizeInBytes - destinationOffset ||
+			sourceOffset > sourceDesc->m_SizeInBytes ||
+			sizeInBytes > sourceDesc->m_SizeInBytes - sourceOffset ||
+			!Test(destinationDesc->m_Usage, RHIBufferUsage::CopyDest) ||
+			!Test(sourceDesc->m_Usage, RHIBufferUsage::CopySource))
+		{
+			Reject("CopyBuffer", "a buffer, usage or copy range is invalid");
+			return;
+		}
+		const bool overlaps = destination == source &&
+			destinationOffset < sourceOffset + sizeInBytes &&
+			sourceOffset < destinationOffset + sizeInBytes;
+		if (overlaps)
+		{
+			Reject("CopyBuffer", "overlapping regions of the same buffer are invalid");
+			return;
+		}
+		const VkBufferCopy2 region{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
+			.srcOffset = sourceOffset,
+			.dstOffset = destinationOffset,
+			.size = sizeInBytes,
+		};
+		const VkCopyBufferInfo2 copyInfo{
+			.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+			.srcBuffer = sourceBuffer->Get(),
+			.dstBuffer = destinationBuffer->Get(),
+			.regionCount = 1,
+			.pRegions = &region,
+		};
+		vkCmdCopyBuffer2(m_CommandBuffer, &copyInfo);
+		TrackBufferUse(destination);
+		TrackBufferUse(source);
 	}
 
 	void VulkanGraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
@@ -159,6 +362,11 @@ namespace gglab
 			Reject("SetPipeline", "the pipeline handle is not a live graphics pipeline");
 			return;
 		}
+		if (m_Set0Frames->GetLayout() != bindingLayout)
+		{
+			Reject("SetPipeline", "the active set-0 frame arena uses a different binding layout");
+			return;
+		}
 		if (bindingLayout != m_CurrentBindingLayout)
 		{
 			if (!m_DynamicUniformState.Initialize(bindingLayout->GetPlan()))
@@ -167,6 +375,9 @@ namespace gglab
 				return;
 			}
 			m_DynamicOffsets.assign(bindingLayout->GetPlan().m_DynamicOffsetCount, 0);
+			m_FixedBufferBindings.fill(std::nullopt);
+			m_FixedDescriptorSet = VK_NULL_HANDLE;
+			m_FixedDescriptorsDirty = true;
 		}
 		m_CurrentPipeline = pipelineState;
 		m_CurrentBindingLayout = bindingLayout;
@@ -431,19 +642,15 @@ namespace gglab
 	void VulkanGraphicsCommandContext::SetConstantBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
-		GGLAB_UNUSED(parameterIndex);
-		GGLAB_UNUSED(buffer);
-		GGLAB_UNUSED(offset);
-		Reject("SetConstantBuffer", "fixed buffer descriptor recording is not available");
+		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RHIBufferUsage::Constant, "SetConstantBuffer");
 	}
 
 	void VulkanGraphicsCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
-		GGLAB_UNUSED(parameterIndex);
-		GGLAB_UNUSED(buffer);
-		GGLAB_UNUSED(offset);
-		Reject("SetReadOnlyBuffer", "fixed buffer descriptor recording is not available");
+		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer");
 	}
 
 	void VulkanGraphicsCommandContext::SetPushConstants(uint32_t parameterIndex,
@@ -563,6 +770,32 @@ namespace gglab
 			operation, reason);
 	}
 
+	bool VulkanGraphicsCommandContext::SetBufferDescriptor(uint32_t parameterIndex,
+		RHIBufferHandle buffer, uint64_t offset, VkDescriptorType descriptorType,
+		RHIBufferUsage requiredUsage, std::string_view operation) noexcept
+	{
+		VulkanSet0BufferBinding next{};
+		if (m_CurrentBindingLayout == nullptr || parameterIndex >= m_FixedBufferBindings.size() ||
+			!BuildSet0BufferBinding(*m_Device, *m_CurrentBindingLayout, parameterIndex,
+				buffer, offset, descriptorType, requiredUsage, next))
+		{
+			if (parameterIndex < m_FixedBufferBindings.size())
+			{
+				m_FixedBufferBindings[parameterIndex].reset();
+				m_FixedDescriptorsDirty = true;
+			}
+			Reject(operation, "the fixed-buffer binding is invalid for the active layout");
+			return false;
+		}
+		if (m_FixedBufferBindings[parameterIndex] != next)
+		{
+			m_FixedBufferBindings[parameterIndex] = next;
+			m_FixedDescriptorsDirty = true;
+		}
+		TrackBufferUse(buffer);
+		return true;
+	}
+
 	bool VulkanGraphicsCommandContext::BindDescriptorSets() noexcept
 	{
 		if (m_CurrentBindingLayout == nullptr)
@@ -570,8 +803,20 @@ namespace gglab
 			Reject("Draw", "no pipeline binding layout is active");
 			return false;
 		}
+		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
+		if (fixedBindings.empty())
+		{
+			m_FixedDescriptorSet = m_Set0Frames->GetDescriptorSet(m_FrameSlotIndex);
+			m_FixedDescriptorsDirty = false;
+		}
+		else if (m_FixedDescriptorsDirty)
+		{
+			m_FixedDescriptorSet =
+				m_Set0Frames->AllocateDescriptorSet(m_FrameSlotIndex, fixedBindings);
+			m_FixedDescriptorsDirty = false;
+		}
 		const std::array sets{
-			m_Set0Frames->GetDescriptorSet(m_FrameSlotIndex),
+			m_FixedDescriptorSet,
 			m_Device->GetDescriptorManager().GetGlobalSet(),
 		};
 		if (sets[0] == VK_NULL_HANDLE || sets[1] == VK_NULL_HANDLE)
@@ -582,6 +827,242 @@ namespace gglab
 		vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			m_CurrentBindingLayout->GetPipelineLayout(), 0, static_cast<uint32_t>(sets.size()),
 			sets.data(), static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
+		return true;
+	}
+
+	VulkanComputeCommandContext::VulkanComputeCommandContext(
+		VulkanGraphicsCommandContext& graphicsContext) noexcept :
+		m_GraphicsContext(&graphicsContext)
+	{
+		GGLAB_ASSERT_MSG(graphicsContext.m_DirectComputeContext == nullptr,
+			"A Vulkan graphics encoder may have only one direct-compute view.");
+		graphicsContext.m_DirectComputeContext = this;
+	}
+
+	VulkanComputeCommandContext::~VulkanComputeCommandContext()
+	{
+		if (m_GraphicsContext && m_GraphicsContext->m_DirectComputeContext == this)
+		{
+			m_GraphicsContext->m_DirectComputeContext = nullptr;
+		}
+	}
+
+	void VulkanComputeCommandContext::ResetEncodingState() noexcept
+	{
+		m_CurrentPipeline = nullptr;
+		m_CurrentBindingLayout = nullptr;
+		m_DynamicOffsets.clear();
+		m_FixedBufferBindings.fill(std::nullopt);
+		m_FixedDescriptorSet = VK_NULL_HANDLE;
+		m_FixedDescriptorsDirty = true;
+	}
+
+	void VulkanComputeCommandContext::TrackTextureUse(RHITextureHandle texture) noexcept
+	{
+		m_GraphicsContext->TrackTextureUse(texture);
+	}
+
+	void VulkanComputeCommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
+	{
+		m_GraphicsContext->TrackBufferUse(buffer);
+	}
+
+	void VulkanComputeCommandContext::TextureBarrier(
+		std::span<const RHITextureBarrier> barriers) noexcept
+	{
+		m_GraphicsContext->TextureBarrier(barriers);
+	}
+
+	void VulkanComputeCommandContext::BufferBarrier(
+		std::span<const RHIBufferBarrier> barriers) noexcept
+	{
+		m_GraphicsContext->BufferBarrier(barriers);
+	}
+
+	void VulkanComputeCommandContext::FlushBarriers() noexcept
+	{
+		m_GraphicsContext->FlushBarriers();
+	}
+
+	void VulkanComputeCommandContext::CopyBuffer(RHIBufferHandle destination,
+		uint64_t destinationOffset, RHIBufferHandle source, uint64_t sourceOffset,
+		uint64_t sizeInBytes) noexcept
+	{
+		m_GraphicsContext->CopyBuffer(
+			destination, destinationOffset, source, sourceOffset, sizeInBytes);
+	}
+
+	void VulkanComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
+	{
+		if (m_GraphicsContext->m_CommandBuffer == VK_NULL_HANDLE)
+		{
+			Reject("SetPipeline", "no command buffer is active");
+			return;
+		}
+		VulkanPipelineState* pipelineState = nullptr;
+		VulkanBindingLayout* bindingLayout = nullptr;
+		if (!m_GraphicsContext->m_PipelineSystem->ResolveComputePipeline(
+			pipeline, pipelineState, bindingLayout) ||
+			m_GraphicsContext->m_Set0Frames->GetLayout() != bindingLayout)
+		{
+			Reject("SetPipeline", "the pipeline or its active set-0 layout is invalid");
+			return;
+		}
+		if (bindingLayout != m_CurrentBindingLayout)
+		{
+			if (!m_DynamicUniformState.Initialize(bindingLayout->GetPlan()))
+			{
+				Reject("SetPipeline", "the dynamic-uniform binding plan is invalid");
+				return;
+			}
+			m_DynamicOffsets.assign(bindingLayout->GetPlan().m_DynamicOffsetCount, 0);
+			m_FixedBufferBindings.fill(std::nullopt);
+			m_FixedDescriptorSet = VK_NULL_HANDLE;
+			m_FixedDescriptorsDirty = true;
+		}
+		m_CurrentPipeline = pipelineState;
+		m_CurrentBindingLayout = bindingLayout;
+		vkCmdBindPipeline(m_GraphicsContext->m_CommandBuffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE, pipelineState->Get());
+	}
+
+	void VulkanComputeCommandContext::SetDescriptorTable(
+		const RHIDescriptorTableBinding& binding) noexcept
+	{
+		if (binding.m_HeapType != RHIDescriptorHeapType::CbvSrvUav &&
+			binding.m_HeapType != RHIDescriptorHeapType::Sampler)
+		{
+			Reject("SetDescriptorTable", "the descriptor heap type is not shader visible");
+		}
+	}
+
+	void VulkanComputeCommandContext::SetConstantBuffer(
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	{
+		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, RHIBufferUsage::Constant, "SetConstantBuffer");
+	}
+
+	void VulkanComputeCommandContext::SetReadOnlyBuffer(
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	{
+		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::Structured, "SetReadOnlyBuffer");
+	}
+
+	void VulkanComputeCommandContext::SetReadWriteBuffer(
+		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
+	{
+		(void)SetBufferDescriptor(parameterIndex, buffer, offset,
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, RHIBufferUsage::UnorderedAccess,
+			"SetReadWriteBuffer");
+	}
+
+	void VulkanComputeCommandContext::SetPushConstants(uint32_t parameterIndex,
+		std::span<const uint32_t> values, uint32_t destOffset) noexcept
+	{
+		if (m_CurrentBindingLayout == nullptr)
+		{
+			Reject("SetPushConstants", "no pipeline binding layout is active");
+			return;
+		}
+		const VulkanDynamicUniformUpdate update = m_DynamicUniformState.SetPushConstants(
+			parameterIndex, values, destOffset, *m_GraphicsContext->m_UniformBuffer,
+			m_GraphicsContext->m_FrameSlotIndex);
+		if (!update.IsValid() || update.m_DynamicOffsetSlot >= m_DynamicOffsets.size())
+		{
+			Reject("SetPushConstants", "the immutable dynamic-uniform allocation failed");
+			return;
+		}
+		m_DynamicOffsets[update.m_DynamicOffsetSlot] = update.m_Allocation.m_DynamicOffset;
+		TrackBufferUse(update.m_Allocation.m_Buffer);
+	}
+
+	void VulkanComputeCommandContext::Dispatch(
+		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
+	{
+		if (m_GraphicsContext->m_CommandBuffer == VK_NULL_HANDLE ||
+			m_GraphicsContext->m_IsRendering || m_CurrentPipeline == nullptr ||
+			groupCountX == 0 || groupCountY == 0 || groupCountZ == 0)
+		{
+			Reject("Dispatch", m_GraphicsContext->m_IsRendering
+				? "dispatch is invalid inside rendering"
+				: "the command buffer, pipeline or group counts are invalid");
+			return;
+		}
+		if (!BindDescriptorSets())
+		{
+			return;
+		}
+		vkCmdDispatch(m_GraphicsContext->m_CommandBuffer, groupCountX, groupCountY, groupCountZ);
+	}
+
+	void VulkanComputeCommandContext::Reject(
+		std::string_view operation, std::string_view reason) noexcept
+	{
+		m_GraphicsContext->Reject(operation, reason);
+	}
+
+	bool VulkanComputeCommandContext::SetBufferDescriptor(uint32_t parameterIndex,
+		RHIBufferHandle buffer, uint64_t offset, VkDescriptorType descriptorType,
+		RHIBufferUsage requiredUsage, std::string_view operation) noexcept
+	{
+		VulkanSet0BufferBinding next{};
+		if (m_CurrentBindingLayout == nullptr || parameterIndex >= m_FixedBufferBindings.size() ||
+			!BuildSet0BufferBinding(*m_GraphicsContext->m_Device, *m_CurrentBindingLayout,
+				parameterIndex, buffer, offset, descriptorType, requiredUsage, next))
+		{
+			if (parameterIndex < m_FixedBufferBindings.size())
+			{
+				m_FixedBufferBindings[parameterIndex].reset();
+				m_FixedDescriptorsDirty = true;
+			}
+			Reject(operation, "the fixed-buffer binding is invalid for the active layout");
+			return false;
+		}
+		if (m_FixedBufferBindings[parameterIndex] != next)
+		{
+			m_FixedBufferBindings[parameterIndex] = next;
+			m_FixedDescriptorsDirty = true;
+		}
+		TrackBufferUse(buffer);
+		return true;
+	}
+
+	bool VulkanComputeCommandContext::BindDescriptorSets() noexcept
+	{
+		if (m_CurrentBindingLayout == nullptr)
+		{
+			Reject("Dispatch", "no pipeline binding layout is active");
+			return false;
+		}
+		const std::vector fixedBindings = CollectBufferBindings(m_FixedBufferBindings);
+		if (fixedBindings.empty())
+		{
+			m_FixedDescriptorSet = m_GraphicsContext->m_Set0Frames->GetDescriptorSet(
+				m_GraphicsContext->m_FrameSlotIndex);
+			m_FixedDescriptorsDirty = false;
+		}
+		else if (m_FixedDescriptorsDirty)
+		{
+			m_FixedDescriptorSet =
+				m_GraphicsContext->m_Set0Frames->AllocateDescriptorSet(
+					m_GraphicsContext->m_FrameSlotIndex, fixedBindings);
+			m_FixedDescriptorsDirty = false;
+		}
+		const std::array sets{
+			m_FixedDescriptorSet,
+			m_GraphicsContext->m_Device->GetDescriptorManager().GetGlobalSet(),
+		};
+		if (sets[0] == VK_NULL_HANDLE || sets[1] == VK_NULL_HANDLE)
+		{
+			Reject("Dispatch", "the descriptor-set snapshot is unavailable");
+			return false;
+		}
+		vkCmdBindDescriptorSets(m_GraphicsContext->m_CommandBuffer,
+			VK_PIPELINE_BIND_POINT_COMPUTE, m_CurrentBindingLayout->GetPipelineLayout(), 0,
+			static_cast<uint32_t>(sets.size()), sets.data(),
+			static_cast<uint32_t>(m_DynamicOffsets.size()), m_DynamicOffsets.data());
 		return true;
 	}
 
