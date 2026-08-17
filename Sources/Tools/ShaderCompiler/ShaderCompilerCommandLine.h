@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -34,6 +34,9 @@ namespace gglab
 	{
 		ShaderCompilerCommand m_Command = ShaderCompilerCommand::None;
 		ShaderCompileCommandOptions m_Compile{};
+		// Pre-scanned before normal parsing so every compile usage failure can
+		// honor a caller's JSON transport request, including duplicate options.
+		bool m_JsonRequested = false;
 		std::wstring m_Error{};
 
 		[[nodiscard]] bool IsValid() const noexcept { return m_Error.empty(); }

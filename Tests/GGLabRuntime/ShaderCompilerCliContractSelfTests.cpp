@@ -18,6 +18,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -56,9 +57,67 @@ namespace gglab
 			std::string m_StdErr{};
 		};
 
-		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments) noexcept
+		class ScopedEnvironmentVariable
+		{
+		public:
+			ScopedEnvironmentVariable(std::wstring name, std::wstring_view value) noexcept :
+				m_Name(std::move(name))
+			{
+				SetLastError(ERROR_SUCCESS);
+				const DWORD required = GetEnvironmentVariableW(m_Name.c_str(), nullptr, 0);
+				if (required > 0)
+				{
+					std::vector<wchar_t> previous(required);
+					if (GetEnvironmentVariableW(m_Name.c_str(), previous.data(), required) > 0)
+					{
+						m_HadPreviousValue = true;
+						m_PreviousValue = previous.data();
+					}
+				}
+				else if (GetLastError() == ERROR_SUCCESS)
+				{
+					m_HadPreviousValue = true;
+				}
+				m_Set = SetEnvironmentVariableW(m_Name.c_str(), std::wstring(value).c_str()) != FALSE;
+			}
+
+			~ScopedEnvironmentVariable()
+			{
+				if (m_Set)
+				{
+					SetEnvironmentVariableW(m_Name.c_str(),
+						m_HadPreviousValue ? m_PreviousValue.c_str() : nullptr);
+				}
+			}
+
+			ScopedEnvironmentVariable(const ScopedEnvironmentVariable&) = delete;
+			ScopedEnvironmentVariable& operator=(const ScopedEnvironmentVariable&) = delete;
+			ScopedEnvironmentVariable(ScopedEnvironmentVariable&&) = delete;
+			ScopedEnvironmentVariable& operator=(ScopedEnvironmentVariable&&) = delete;
+
+			[[nodiscard]] bool IsSet() const noexcept { return m_Set; }
+
+		private:
+			std::wstring m_Name{};
+			std::wstring m_PreviousValue{};
+			bool m_HadPreviousValue = false;
+			bool m_Set = false;
+		};
+
+		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments,
+			bool forceCompilerUnavailable = false) noexcept
 		{
 			CliRunResult result{};
+			std::optional<ScopedEnvironmentVariable> compilerUnavailableEnvironment;
+			if (forceCompilerUnavailable)
+			{
+				compilerUnavailableEnvironment.emplace(
+					L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE", L"1");
+				if (!compilerUnavailableEnvironment->IsSet())
+				{
+					return result;
+				}
+			}
 			SECURITY_ATTRIBUTES securityAttributes{
 				.nLength = sizeof(SECURITY_ATTRIBUTES),
 				.bInheritHandle = TRUE,
@@ -97,6 +156,7 @@ namespace gglab
 				(win32::GetExecutableDirectory() / L"gglab-shaderc.exe").c_str(),
 				commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
 				nullptr, win32::GetExecutableDirectory().c_str(), &startupInfo, &processInfo);
+			compilerUnavailableEnvironment.reset();
 			CloseHandle(outWrite);
 			CloseHandle(errWrite);
 			if (!created)
@@ -134,6 +194,40 @@ namespace gglab
 			CloseHandle(errRead);
 			result.m_ExitCode = static_cast<int>(exitCode);
 			return result;
+		}
+
+		[[nodiscard]] bool IsSingleJsonDocument(const CliRunResult& result) noexcept
+		{
+			if (!result.m_StdErr.empty() || result.m_StdOut.empty())
+			{
+				return false;
+			}
+			std::string_view document = result.m_StdOut;
+			if (document.ends_with('\n'))
+			{
+				document.remove_suffix(1);
+			}
+			if (document.ends_with('\r'))
+			{
+				document.remove_suffix(1);
+			}
+			return document.size() >= 2 && document.front() == '{' && document.back() == '}' &&
+				document.find('\n') == std::string_view::npos &&
+				document.find('\r') == std::string_view::npos;
+		}
+
+		[[nodiscard]] bool HasJsonEnvelope(const CliRunResult& result,
+			std::string_view status, int exitCode, bool success) noexcept
+		{
+			return result.m_ExitCode == exitCode && IsSingleJsonDocument(result) &&
+				result.m_StdOut.find("\"command\":\"compile\"") != std::string::npos &&
+				result.m_StdOut.find(success ? "\"success\":true" : "\"success\":false") !=
+					std::string::npos &&
+				result.m_StdOut.find(std::format("\"status\":\"{}\"", status)) !=
+					std::string::npos &&
+				result.m_StdOut.find(std::format("\"exitCode\":{}", exitCode)) !=
+					std::string::npos &&
+				result.m_StdOut.find("\"diagnostics\":[") != std::string::npos;
 		}
 
 		[[nodiscard]] std::string ExtractJsonField(
@@ -577,30 +671,6 @@ namespace gglab
 				!syntaxError.m_StdErr.empty(),
 				"CLI reports DXC syntax errors as compilation failures with diagnostics");
 
-			// JSON mode must stay machine-readable on the failure path: CI and
-			// editors consume the same structured diagnostics as the success
-			// document instead of scraping stderr.
-			const CliRunResult jsonSyntaxError = RunCli({
-				L"compile", L"--source-root", badSourceRoot.wstring(), L"--source", L"Bad.hlsl",
-				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
-				L"--cache-root", (tempRoot / L"BadCliCache").wstring(),
-				L"--result-format", L"json",
-			});
-			context.Check(jsonSyntaxError.m_ExitCode == 4 &&
-				jsonSyntaxError.m_StdOut.find("\"success\":false") != std::string::npos &&
-				jsonSyntaxError.m_StdOut.find("\"status\":\"compile-failed\"") != std::string::npos &&
-				jsonSyntaxError.m_StdOut.find("\"diagnostics\":[{\"message\":\"") != std::string::npos,
-				"CLI JSON mode emits a structured failure document for compile errors");
-
-			const CliRunResult jsonMissingSource = RunCli({
-				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
-				L"Passes/PassDoesNotExist.hlsl", L"--stage", L"vertex", L"--target", L"gglab-dx12",
-				L"--result-format", L"json",
-			});
-			context.Check(jsonMissingSource.m_ExitCode == 3 &&
-				jsonMissingSource.m_StdOut.find("\"status\":\"source-not-found\"") != std::string::npos,
-				"CLI JSON mode emits a structured failure document for missing sources");
-
 			// Artifact IO failure (cache root under a regular file) maps to exit 5.
 			const std::filesystem::path fileBlock = tempRoot / L"NotADirectory.txt";
 			const bool fileBlockWritten = WriteTextFile(fileBlock, "block");
@@ -653,6 +723,143 @@ namespace gglab
 				version.m_StdOut.find("Producer: dxc") != std::string::npos &&
 				version.m_StdOut.find("unknown") == std::string::npos,
 				"CLI targets and --version report profiles and the concrete producer identity");
+		}
+
+		void RunJsonProcessContractTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			const std::filesystem::path matrixCache = tempRoot / L"JsonProcessContractCache";
+			const std::vector<std::wstring> successArguments{
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--entry", L"VSMain",
+				L"--target", L"gglab-dx12", L"--include", L".", L"--cache-root",
+				matrixCache.wstring(), L"--result-format", L"json",
+			};
+			const CliRunResult success = RunCli(successArguments);
+			const CliRunResult unknownCommand = RunCli({
+				L"unknown-command", L"--result-format", L"json",
+			});
+			const CliRunResult unknownOption = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--unknown-option", L"--result-format", L"json",
+			});
+			const CliRunResult missingRequiredOption = RunCli({
+				L"compile", L"--source", L"Passes/PassForwardCoverage.hlsl", L"--stage",
+				L"vertex", L"--target", L"gglab-dx12", L"--result-format", L"json",
+			});
+			const CliRunResult unknownStage = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"raygen", L"--target",
+				L"gglab-dx12", L"--result-format", L"json",
+			});
+			const CliRunResult unknownTarget = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-ps5", L"--result-format", L"json",
+			});
+			const CliRunResult invalidRequest = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source", L"../Outside.hlsl",
+				L"--stage", L"vertex", L"--target", L"gglab-dx12",
+				L"--result-format", L"json",
+			});
+			const CliRunResult missingSource = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassDoesNotExist.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--result-format", L"json",
+			});
+			const CliRunResult compilerUnavailable = RunCli(successArguments, true);
+
+			const std::filesystem::path badSourceRoot = tempRoot / L"JsonMatrixBadSources";
+			const bool badSourceWritten =
+				WriteTextFile(badSourceRoot / L"Bad.hlsl", "this is not valid hlsl");
+			const CliRunResult compileFailure = RunCli({
+				L"compile", L"--source-root", badSourceRoot.wstring(), L"--source", L"Bad.hlsl",
+				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
+				L"--cache-root", (tempRoot / L"JsonMatrixBadCache").wstring(),
+				L"--result-format", L"json",
+			});
+
+			const std::filesystem::path fileBlock = tempRoot / L"JsonMatrixNotADirectory.txt";
+			const bool fileBlockWritten = WriteTextFile(fileBlock, "block");
+			const CliRunResult artifactIoFailure = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--include", L".", L"--cache-root",
+				(fileBlock / L"Cache").wstring(), L"--result-format", L"json",
+			});
+
+			// A stale committed dependency record is readable but cannot be
+			// overwritten while its binary is held without delete sharing. After
+			// the include changes, both publication attempts observe the stale
+			// provenance and deterministically produce SourceChangedDuringCompile.
+			const std::filesystem::path sourceChangedRoot = tempRoot / L"JsonSourceChangedSources";
+			const std::filesystem::path sourceChangedCache = tempRoot / L"JsonSourceChangedCache";
+			const bool sourceChangedFilesWritten =
+				WriteTextFile(sourceChangedRoot / L"Probe.hlsli",
+					"static const float ProbeValue = 0.25f;\n") &&
+				WriteTextFile(sourceChangedRoot / L"Main.hlsl",
+					"#include \"Probe.hlsli\"\n"
+					"[numthreads(1, 1, 1)]\n"
+					"void CSMain(uint3 id : SV_DispatchThreadID) { float value = ProbeValue + id.x; }\n");
+			const std::vector<std::wstring> sourceChangedArguments{
+				L"compile", L"--source-root", sourceChangedRoot.wstring(), L"--source", L"Main.hlsl",
+				L"--stage", L"compute", L"--entry", L"CSMain", L"--target", L"gglab-dx12",
+				L"--include", L".", L"--cache-root", sourceChangedCache.wstring(),
+				L"--result-format", L"json",
+			};
+			const CliRunResult sourceChangedBaseline = RunCli(sourceChangedArguments);
+			const std::filesystem::path sourceChangedBinaryPath = utils::ToWideString(
+				ExtractJsonField(sourceChangedBaseline.m_StdOut, "binaryPath"));
+			const bool dependencyChanged = WriteTextFile(sourceChangedRoot / L"Probe.hlsli",
+				"static const float ProbeValue = 0.75f;\n");
+			const HANDLE sourceChangedBinaryGuard = CreateFileW(sourceChangedBinaryPath.c_str(),
+				GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+			const CliRunResult sourceChanged = RunCli(sourceChangedArguments);
+			if (sourceChangedBinaryGuard != INVALID_HANDLE_VALUE)
+			{
+				CloseHandle(sourceChangedBinaryGuard);
+			}
+
+			const CliRunResult invalidResultFormat = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--result-format", L"xml",
+			});
+			const CliRunResult duplicateResultFormat = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--result-format", L"json", L"--result-format", L"xml",
+			});
+
+			const bool allOutcomesStructured =
+				HasJsonEnvelope(success, "ok", 0, true) &&
+				HasJsonEnvelope(unknownCommand, "usage-error", 2, false) &&
+				HasJsonEnvelope(unknownOption, "usage-error", 2, false) &&
+				HasJsonEnvelope(missingRequiredOption, "usage-error", 2, false) &&
+				HasJsonEnvelope(unknownStage, "usage-error", 2, false) &&
+				HasJsonEnvelope(unknownTarget, "usage-error", 2, false) &&
+				HasJsonEnvelope(invalidRequest, "invalid-request", 3, false) &&
+				HasJsonEnvelope(missingSource, "source-not-found", 3, false) &&
+				HasJsonEnvelope(compilerUnavailable, "compiler-unavailable", 4, false) &&
+				badSourceWritten && HasJsonEnvelope(compileFailure, "compile-failed", 4, false) &&
+				fileBlockWritten &&
+					HasJsonEnvelope(artifactIoFailure, "artifact-io-failure", 5, false) &&
+				sourceChangedFilesWritten && dependencyChanged &&
+					sourceChangedBinaryGuard != INVALID_HANDLE_VALUE &&
+					HasJsonEnvelope(sourceChanged, "source-changed", 6, false);
+			context.Check(allOutcomesStructured,
+				"CLI JSON mode emits one stdout document and empty stderr for all 12 outcomes");
+
+			context.Check(invalidResultFormat.m_ExitCode == 2 &&
+				invalidResultFormat.m_StdOut.empty() &&
+				invalidResultFormat.m_StdErr.find("Invalid --result-format value: xml") !=
+					std::string::npos &&
+				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false) &&
+				ExtractJsonField(duplicateResultFormat.m_StdOut, "message") ==
+					"--result-format specified multiple times",
+				"Result-format pre-scan resolves invalid and duplicate mode selection without ambiguity");
 		}
 
 		void RunCrossProcessHardGateTests(SelfTestContext& context,
@@ -759,6 +966,7 @@ namespace gglab
 		ScopedTestDirectory scopedDirectory(tempRoot);
 		RunParityTests(context, sourceRoot, tempRoot);
 		RunCliBehaviorTests(context, sourceRoot, tempRoot);
+		RunJsonProcessContractTests(context, sourceRoot, tempRoot);
 		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
 	}
 }

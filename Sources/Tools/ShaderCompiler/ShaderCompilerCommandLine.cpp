@@ -1,4 +1,4 @@
-#include "ShaderCompilerCommandLine.h"
+﻿#include "ShaderCompilerCommandLine.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <string_view>
@@ -10,6 +10,32 @@ namespace gglab
 
 	namespace
 	{
+		struct ResultFormatScan
+		{
+			int m_OccurrenceCount = 0;
+			bool m_JsonRequested = false;
+		};
+
+		[[nodiscard]] ResultFormatScan ScanResultFormat(
+			int argumentCount, wchar_t* arguments[]) noexcept
+		{
+			ResultFormatScan scan{};
+			for (int index = 1; index < argumentCount; ++index)
+			{
+				if (std::wstring_view(arguments[index]) != L"--result-format")
+				{
+					continue;
+				}
+				++scan.m_OccurrenceCount;
+				if (index + 1 < argumentCount &&
+					std::wstring_view(arguments[index + 1]) == L"json")
+				{
+					scan.m_JsonRequested = true;
+				}
+			}
+			return scan;
+		}
+
 		[[nodiscard]] const wchar_t* TakeOptionValue(int argumentCount, wchar_t* arguments[],
 			int& index, std::wstring_view option, std::wstring& outValue,
 			std::wstring& outError) noexcept
@@ -41,6 +67,14 @@ namespace gglab
 		int argumentCount, wchar_t* arguments[]) noexcept
 	{
 		ShaderCompilerCommandLine parsed{};
+		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
+		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
+		if (resultFormat.m_OccurrenceCount > 1)
+		{
+			parsed.m_Command = ShaderCompilerCommand::Compile;
+			parsed.m_Error = L"--result-format specified multiple times";
+			return parsed;
+		}
 		if (argumentCount <= 1)
 		{
 			parsed.m_Command = ShaderCompilerCommand::Help;
@@ -186,8 +220,7 @@ namespace gglab
 		if (options.m_ResultFormat != "text" && options.m_ResultFormat != "json")
 		{
 			parsed.m_Error = L"Invalid --result-format value: " +
-				utils::ToWideString(options.m_ResultFormat) +
-				L" (expected text or json)";
+				utils::ToWideString(options.m_ResultFormat);
 			return parsed;
 		}
 		return parsed;
