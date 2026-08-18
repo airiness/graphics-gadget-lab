@@ -316,9 +316,9 @@ namespace gglab
 		}
 		else
 		{
-			startupDemoName = "Demo.LoadingShell.Vulkan11BSmoke";
+			startupDemoName = "Demo.LoadingShell.Vulkan12Smoke";
 			GGLAB_LOG_INFO(
-				"Vulkan production smoke mode is active; full render-pipeline parity resumes in commits 12-16.");
+				"Vulkan production smoke mode is active; full render-pipeline parity resumes in commits 13-16.");
 		}
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
@@ -409,11 +409,12 @@ namespace gglab
 			return false;
 		}
 
-		// DevelopGui new frame
-		const bool developGuiFrameOpen = m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		// Input routing uses the previous ImGui frame's capture decision. The
+		// new UI frame starts only after the RHI transaction is Ready so a
+		// backend can synchronize a swapchain-dependent render contract first.
 		m_InputManager->SetUICaptureState(
-			developGuiFrameOpen && m_DevelopGuiSystem->WantsKeyboardCapture(),
-			developGuiFrameOpen && m_DevelopGuiSystem->WantsMouseCapture());
+			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsKeyboardCapture(),
+			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsMouseCapture());
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
@@ -426,12 +427,10 @@ namespace gglab
 		auto rendererFrame = m_Renderer->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
-			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
-			{
-				m_DevelopGuiSystem->EndFrame();
-			}
 			return rendererFrame.IsUnavailable();
 		}
+		const bool developGuiFrameOpen =
+			m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());

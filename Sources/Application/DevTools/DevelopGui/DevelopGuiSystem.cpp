@@ -76,7 +76,8 @@ namespace gglab
 			return false;
 		}
 
-		devtools::RegisterDefaultDevelopGuiPanels(m_DevToolsRuntime.GetRegistry());
+		devtools::RegisterDefaultDevelopGuiPanels(
+			m_DevToolsRuntime.GetRegistry(), *createInfo.m_RHIContext);
 		m_State = State::Active;
 		return true;
 	}
@@ -115,7 +116,12 @@ namespace gglab
 			return false;
 		}
 
-		m_RenderBackend->NewFrame();
+		if (!m_RenderBackend->NewFrame())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"DevelopGui render backend could not prepare the current frame.");
+			return false;
+		}
 		m_PlatformBackend->NewFrame();
 		ImGui::NewFrame();
 		m_State = State::FrameOpen;

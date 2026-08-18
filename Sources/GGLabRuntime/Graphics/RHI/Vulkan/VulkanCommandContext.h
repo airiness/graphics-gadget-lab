@@ -33,6 +33,9 @@ namespace gglab
 		[[nodiscard]] bool FinishEncoding() noexcept;
 		void AbortEncoding() noexcept;
 		[[nodiscard]] bool HasEncodingError() const noexcept { return m_HasEncodingError; }
+		// Borrowed native command buffer for backend adapters such as the
+		// official ImGui Vulkan renderer. Valid only while encoding.
+		[[nodiscard]] VkCommandBuffer Get() const noexcept { return m_CommandBuffer; }
 
 		RHICommandContextHandle GetHandle() const noexcept override { return m_Handle; }
 		RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }

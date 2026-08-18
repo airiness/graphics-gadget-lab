@@ -4,6 +4,10 @@
 #include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
 #include "DevTools/DevelopGui/Backends/Windows/DevelopGuiWin32PlatformBackend.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
+#if GGLAB_ENABLE_VULKAN
+#include "DevTools/DevelopGui/Backends/Vulkan/DevelopGuiVulkanRenderBackend.h"
+#include "Graphics/RHI/Vulkan/VulkanContext.h"
+#endif
 
 namespace gglab
 {
@@ -27,6 +31,12 @@ namespace gglab
 		{
 			return std::make_unique<DevelopGuiDX12RenderBackend>();
 		}
+#if GGLAB_ENABLE_VULKAN
+		if (dynamic_cast<VulkanContext*>(&context))
+		{
+			return std::make_unique<DevelopGuiVulkanRenderBackend>();
+		}
+#endif
 
 		GGLAB_LOG_GRAPHICS_WARN(
 			"No DevelopGui render backend is registered for the current RHI backend.");

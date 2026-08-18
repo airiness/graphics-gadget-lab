@@ -236,6 +236,8 @@ namespace gglab
 		m_Width = desc.m_Width;
 		m_Height = desc.m_Height;
 		m_Vsync = desc.m_Vsync;
+		m_ValidationRequested = desc.m_EnableDebugValidation;
+		m_SwapChainGeneration = 1;
 		m_Initialized = true;
 		GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 			"Vulkan RHI context initialized on '{}'.",
@@ -477,6 +479,57 @@ namespace gglab
 		return static_cast<uint32_t>(m_Frames.size());
 	}
 
+	VulkanDevice& VulkanContext::GetVulkanDevice() noexcept
+	{
+		return *m_Bootstrap->m_Device;
+	}
+
+	const VulkanDevice& VulkanContext::GetVulkanDevice() const noexcept
+	{
+		return *m_Bootstrap->m_Device;
+	}
+
+	const VulkanSwapChain& VulkanContext::GetVulkanSwapChain() const noexcept
+	{
+		return m_Bootstrap->m_FrameRuntime->GetSwapChain();
+	}
+
+	const VulkanAdapterCapabilitySnapshot&
+		VulkanContext::GetAdapterCapabilitySnapshot() const noexcept
+	{
+		return m_Bootstrap->m_SelectedSnapshot;
+	}
+
+	bool VulkanContext::IsValidationEnabled() const noexcept
+	{
+		return m_Bootstrap && m_Bootstrap->m_HasDebugMessenger;
+	}
+
+	bool VulkanContext::IsFrameRuntimeFatal() const noexcept
+	{
+		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
+			m_Bootstrap->m_FrameRuntime->IsFatal();
+	}
+
+	bool VulkanContext::IsDeviceLost() const noexcept
+	{
+		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
+			m_Bootstrap->m_FrameRuntime->IsDeviceLost();
+	}
+
+	uint64_t VulkanContext::GetSubmittedTimelineValue() const noexcept
+	{
+		return m_Bootstrap && m_Bootstrap->m_FrameRuntime
+			? m_Bootstrap->m_FrameRuntime->GetTimelineSignalValue()
+			: 0;
+	}
+
+	bool VulkanContext::TryGetCompletedTimelineValue(uint64_t& outValue) const noexcept
+	{
+		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
+			m_Bootstrap->m_FrameRuntime->GetTimeline().GetCompletedValue(outValue) == VK_SUCCESS;
+	}
+
 	bool VulkanContext::RecreateSwapChain(uint32_t width, uint32_t height) noexcept
 	{
 		if (!m_Bootstrap || !m_Bootstrap->m_FrameRuntime || !m_SwapChain ||
@@ -500,6 +553,11 @@ namespace gglab
 		}
 		m_Width = width;
 		m_Height = height;
+		++m_SwapChainGeneration;
+		if (m_SwapChainGeneration == 0)
+		{
+			m_SwapChainGeneration = 1;
+		}
 		m_RecreatePending = false;
 		return true;
 	}

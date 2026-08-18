@@ -235,6 +235,11 @@ namespace gglab
 			uint32_t index) const noexcept;
 		[[nodiscard]] VulkanDescriptorPublicationState GetSamplerState(
 			uint32_t index) const noexcept;
+		// Returns the retained native backing only for a currently published
+		// resource descriptor. Backend adapters use this to bridge an RHI image
+		// view into a backend-owned descriptor domain.
+		[[nodiscard]] std::shared_ptr<const VulkanDescriptorBacking>
+			GetPublishedResourceBacking(uint32_t index) const noexcept;
 		[[nodiscard]] VulkanDescriptorPublicationDiagnostics GetResourceDiagnostics() const noexcept;
 		[[nodiscard]] VulkanDescriptorPublicationDiagnostics GetSamplerDiagnostics() const noexcept;
 

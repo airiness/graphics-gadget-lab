@@ -80,13 +80,15 @@ namespace gglab
 		m_IsInitialized = false;
 	}
 
-	void DevelopGuiDX12RenderBackend::NewFrame() noexcept
+	bool DevelopGuiDX12RenderBackend::NewFrame() noexcept
 	{
 		GGLAB_ASSERT(m_IsInitialized);
-		if (m_IsInitialized)
+		if (!m_IsInitialized)
 		{
-			ImGui_ImplDX12_NewFrame();
+			return false;
 		}
+		ImGui_ImplDX12_NewFrame();
+		return true;
 	}
 
 	void DevelopGuiDX12RenderBackend::RenderDrawData(

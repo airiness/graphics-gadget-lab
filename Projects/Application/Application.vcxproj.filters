@@ -43,6 +43,9 @@
     <Filter Include="DevTools\DevelopGui\Backends\DX12">
       <UniqueIdentifier>{AB5DABB7-6A75-CE07-FA69-4AAA9CCD32E9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\Vulkan">
+      <UniqueIdentifier>{BEC21DFE-AFB1-3C28-0CCF-C75715C28134}</UniqueIdentifier>
+    </Filter>
     <Filter Include="DevTools\DevelopGui\Backends\Windows">
       <UniqueIdentifier>{78A47CA5-875A-A153-70DD-EFC1A2A6F0E9}</UniqueIdentifier>
     </Filter>
@@ -85,6 +88,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.cpp">
       <Filter>ThirdParty\ImGui\backends</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
@@ -273,6 +279,9 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClCompile>
@@ -360,12 +369,18 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\DevToolsRuntime.cpp">
       <Filter>DevTools</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.h">
       <Filter>ThirdParty\ImGui\backends</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h">
@@ -569,6 +584,9 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h">
       <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.h">
+      <Filter>DevTools\DevelopGui\Backends\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClInclude>
@@ -678,6 +696,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\DevToolsRuntime.h">

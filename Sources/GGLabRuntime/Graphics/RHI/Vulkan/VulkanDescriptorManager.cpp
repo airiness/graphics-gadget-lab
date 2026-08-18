@@ -813,6 +813,20 @@ namespace gglab
 			: VulkanDescriptorPublicationState::Free;
 	}
 
+	std::shared_ptr<const VulkanDescriptorBacking>
+		VulkanDescriptorManager::GetPublishedResourceBacking(uint32_t index) const noexcept
+	{
+		if (!CheckOwnerThread("VulkanDescriptorManager::GetPublishedResourceBacking") ||
+			m_Resources.GetState(index) != VulkanDescriptorPublicationState::Live)
+		{
+			return {};
+		}
+		const std::shared_ptr<void>& backing = m_Resources.GetBacking(index);
+		return backing
+			? std::static_pointer_cast<const VulkanDescriptorBacking>(backing)
+			: std::shared_ptr<const VulkanDescriptorBacking>{};
+	}
+
 	VulkanDescriptorPublicationDiagnostics VulkanDescriptorManager::GetResourceDiagnostics()
 		const noexcept
 	{

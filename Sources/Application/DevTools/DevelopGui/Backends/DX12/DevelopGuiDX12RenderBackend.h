@@ -19,7 +19,7 @@ namespace gglab
 
 		[[nodiscard]] bool Initialize(RHIContext& context) noexcept override;
 		void Finalize() noexcept override;
-		void NewFrame() noexcept override;
+		[[nodiscard]] bool NewFrame() noexcept override;
 		void RenderDrawData(RHIGraphicsCommandContext* commandContext,
 			RHITextureViewHandle renderTarget) noexcept override;
 		[[nodiscard]] ImTextureID ResolveTextureId(

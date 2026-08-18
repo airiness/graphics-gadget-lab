@@ -117,6 +117,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles />
     </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
     <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -164,6 +169,7 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp" />
@@ -188,6 +194,7 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevToolsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabRuntimeLocator.cpp" />
@@ -237,6 +244,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
@@ -266,6 +274,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
@@ -300,6 +309,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiRenderBackend.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiSystem.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />

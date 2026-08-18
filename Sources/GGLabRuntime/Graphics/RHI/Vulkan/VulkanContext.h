@@ -16,6 +16,9 @@ namespace gglab
 	class VulkanGraphicsCommandContext;
 	class VulkanPipelineSystem;
 	class VulkanSet0DynamicUniformFrames;
+	class VulkanDevice;
+	class VulkanSwapChain;
+	struct VulkanAdapterCapabilitySnapshot;
 
 	class VulkanFrameContext final : public RHIFrameContext
 	{
@@ -66,6 +69,28 @@ namespace gglab
 		void RetireCompletedWork() noexcept override;
 		uint32_t GetFrameSlotCount() const noexcept override;
 
+		// Backend-specific integration surface. These borrowed views keep
+		// presentation resources owned by Vulkan while allowing Vulkan-only
+		// adapters to bind to the native contract.
+		[[nodiscard]] VulkanDevice& GetVulkanDevice() noexcept;
+		[[nodiscard]] const VulkanDevice& GetVulkanDevice() const noexcept;
+		[[nodiscard]] const VulkanSwapChain& GetVulkanSwapChain() const noexcept;
+		[[nodiscard]] const VulkanAdapterCapabilitySnapshot&
+			GetAdapterCapabilitySnapshot() const noexcept;
+		[[nodiscard]] uint64_t GetSwapChainGeneration() const noexcept
+		{
+			return m_SwapChainGeneration;
+		}
+		[[nodiscard]] bool IsValidationRequested() const noexcept
+		{
+			return m_ValidationRequested;
+		}
+		[[nodiscard]] bool IsValidationEnabled() const noexcept;
+		[[nodiscard]] bool IsFrameRuntimeFatal() const noexcept;
+		[[nodiscard]] bool IsDeviceLost() const noexcept;
+		[[nodiscard]] uint64_t GetSubmittedTimelineValue() const noexcept;
+		[[nodiscard]] bool TryGetCompletedTimelineValue(uint64_t& outValue) const noexcept;
+
 	private:
 		friend class VulkanContextSwapChain;
 		friend class VulkanFrameContext;
@@ -90,7 +115,9 @@ namespace gglab
 		VulkanFrameContext* m_ActiveFrame = nullptr;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		uint64_t m_SwapChainGeneration = 0;
 		bool m_Vsync = false;
+		bool m_ValidationRequested = false;
 		bool m_RecreatePending = false;
 		bool m_CompletedProductionFrame = false;
 		bool m_Initialized = false;
