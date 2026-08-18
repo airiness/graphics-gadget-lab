@@ -324,6 +324,8 @@ namespace gglab
 		auto& capabilities = snapshot.m_ProfileCapabilities;
 		capabilities.m_DynamicRendering = vulkan13Features.dynamicRendering == VK_TRUE;
 		capabilities.m_Synchronization2 = vulkan13Features.synchronization2 == VK_TRUE;
+		capabilities.m_ShaderDemoteToHelperInvocation =
+			vulkan13Features.shaderDemoteToHelperInvocation == VK_TRUE;
 		capabilities.m_TimelineSemaphore = vulkan12Features.timelineSemaphore == VK_TRUE;
 		capabilities.m_ScalarBlockLayout = vulkan12Features.scalarBlockLayout == VK_TRUE;
 		capabilities.m_SamplerAnisotropy = features2.features.samplerAnisotropy == VK_TRUE;

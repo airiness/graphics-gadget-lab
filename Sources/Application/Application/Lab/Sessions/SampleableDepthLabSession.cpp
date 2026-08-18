@@ -36,6 +36,11 @@ namespace gglab
 		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>()),
 		m_ViewportWidth(createInfo.m_WindowWidth), m_ViewportHeight(createInfo.m_WindowHeight)
 	{
+		auto& profile = GetMutableViewRenderProfile();
+		profile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
+		profile.m_Lighting.m_GTAO.m_Enabled = false;
+		profile.m_PostProcess.m_Bloom.m_Enabled = false;
+
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,

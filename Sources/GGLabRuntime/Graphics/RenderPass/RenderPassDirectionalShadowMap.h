@@ -46,6 +46,7 @@ namespace gglab
 
 	private:
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
+		ShaderID m_AlphaTestPixelShader{};
 		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};

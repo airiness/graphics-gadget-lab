@@ -10,7 +10,9 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
+#include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
@@ -310,15 +312,16 @@ namespace gglab
 		default:
 			break;
 		}
-		if (!minimalVulkanProductionSmoke)
+		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
+			(startupLab == SampleableDepthLabSession::GetId() ||
+				startupLab == AlphaTestLabSession::GetId());
+		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
 		{
 			m_DemoManager->RequestActiveDemo(startupDemoIndex);
 		}
 		else
 		{
-			startupDemoName = "Demo.LoadingShell.Vulkan12Smoke";
-			GGLAB_LOG_INFO(
-				"Vulkan production smoke mode is active; full render-pipeline parity resumes in commits 13-16.");
+			startupDemoName = "Demo.LoadingShell.VulkanProductionSmoke";
 		}
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);

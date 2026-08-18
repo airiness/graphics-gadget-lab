@@ -46,6 +46,7 @@ namespace gglab
 		GraphicsPresentQueueUnavailable,
 		DynamicRenderingUnavailable,
 		Synchronization2Unavailable,
+		ShaderDemoteToHelperInvocationUnavailable,
 		TimelineSemaphoreUnavailable,
 		ScalarBlockLayoutUnavailable,
 		SamplerAnisotropyUnavailable,
@@ -122,6 +123,7 @@ namespace gglab
 
 		bool m_DynamicRendering = false;
 		bool m_Synchronization2 = false;
+		bool m_ShaderDemoteToHelperInvocation = false;
 		bool m_TimelineSemaphore = false;
 		bool m_ScalarBlockLayout = false;
 		bool m_SamplerAnisotropy = false;
@@ -210,6 +212,8 @@ namespace gglab
 			VulkanDeviceProfileRejectionReason::DynamicRenderingUnavailable);
 		require(capabilities.m_Synchronization2,
 			VulkanDeviceProfileRejectionReason::Synchronization2Unavailable);
+		require(capabilities.m_ShaderDemoteToHelperInvocation,
+			VulkanDeviceProfileRejectionReason::ShaderDemoteToHelperInvocationUnavailable);
 		require(capabilities.m_TimelineSemaphore,
 			VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable);
 		require(capabilities.m_ScalarBlockLayout,
@@ -290,6 +294,8 @@ namespace gglab
 			return "dynamicRendering is unavailable";
 		case VulkanDeviceProfileRejectionReason::Synchronization2Unavailable:
 			return "synchronization2 is unavailable";
+		case VulkanDeviceProfileRejectionReason::ShaderDemoteToHelperInvocationUnavailable:
+			return "shaderDemoteToHelperInvocation is unavailable";
 		case VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable:
 			return "timelineSemaphore is unavailable";
 		case VulkanDeviceProfileRejectionReason::ScalarBlockLayoutUnavailable:

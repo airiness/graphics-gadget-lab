@@ -83,7 +83,7 @@ namespace gglab
 						.m_LoadOp = RHIContentLoadOp::DontCare,
 					},
 				});
-				graphicsContext->ClearDepthAttachment(1.0f, 0);
+				graphicsContext->ClearDepthAttachment(1.0f);
 
 				const auto& renderQueue =
 					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
@@ -174,12 +174,12 @@ namespace gglab
 
 			shaderDesc.m_Stage = ShaderStage::Pixel;
 			shaderDesc.m_Entry = L"PSMain";
-			const auto psId = shaderManager->LoadShader(shaderDesc);
+			m_AlphaTestPixelShader = shaderManager->LoadShader(shaderDesc);
 
 			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			m_BaseRecipe.m_VSId = vsId;
-			m_BaseRecipe.m_PSId = psId;
+			m_BaseRecipe.m_PSId = {};
 
 			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
@@ -276,6 +276,12 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
 		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
+		const RenderBucket bucket = RenderQueueBuilder::DecodeVariantBucket(variantBits);
+		GGLAB_ASSERT(bucket == RenderBucket::Opaque || bucket == RenderBucket::AlphaTest);
+		if (bucket == RenderBucket::AlphaTest)
+		{
+			recipe.m_PSId = m_AlphaTestPixelShader;
+		}
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
 		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
 		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;

@@ -60,6 +60,7 @@ namespace gglab
 				.m_HasGraphicsPresentQueue = true,
 				.m_DynamicRendering = true,
 				.m_Synchronization2 = true,
+				.m_ShaderDemoteToHelperInvocation = true,
 				.m_TimelineSemaphore = true,
 				.m_ScalarBlockLayout = true,
 				.m_SamplerAnisotropy = true,
@@ -153,6 +154,11 @@ namespace gglab
 				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_Synchronization2,
 					VulkanDeviceProfileRejectionReason::Synchronization2Unavailable,
 					"Vulkan profile reports missing synchronization2" },
+				RequiredBooleanCase{
+					&VulkanDeviceProfileCapabilities::m_ShaderDemoteToHelperInvocation,
+					VulkanDeviceProfileRejectionReason::
+						ShaderDemoteToHelperInvocationUnavailable,
+					"Vulkan profile reports missing shader demote support for alpha clipping" },
 				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_TimelineSemaphore,
 					VulkanDeviceProfileRejectionReason::TimelineSemaphoreUnavailable,
 					"Vulkan profile reports missing timeline semaphores" },
@@ -497,6 +503,7 @@ namespace gglab
 			caps.m_HasGraphicsPresentQueue = true;
 			caps.m_DynamicRendering = true;
 			caps.m_Synchronization2 = true;
+			caps.m_ShaderDemoteToHelperInvocation = true;
 			caps.m_TimelineSemaphore = true;
 			caps.m_ScalarBlockLayout = true;
 			caps.m_SamplerAnisotropy = true;
@@ -1175,6 +1182,9 @@ namespace gglab
 			ToVulkanSamplerAddressMode(RHITextureAddressMode::MirrorOnce) ==
 			VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
 			"Sampler address modes map to the exact native address modes");
+		context.Check(ToVulkanCompareOp(RHICompareOp::LessEqual) ==
+			VK_COMPARE_OP_LESS_OR_EQUAL,
+			"Shadow comparison sampling preserves LessEqual semantics");
 
 		// Non-power-of-two sample counts are rejected by the public
 		// validator, so no backend conversion can silently downgrade them.
