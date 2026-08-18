@@ -227,12 +227,9 @@ namespace gglab
 		{
 			writer.U32(instance.m_MeshIndex);
 			writer.U32(instance.m_MaterialIndex);
-			for (const auto& row : instance.m_LocalTransform.m_M)
+			for (float value : instance.m_LocalTransform.ToArray())
 			{
-				for (float value : row)
-				{
-					writer.Float(value);
-				}
+				writer.Float(value);
 			}
 		}
 

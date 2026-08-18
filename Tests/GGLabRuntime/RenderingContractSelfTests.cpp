@@ -3356,34 +3356,36 @@ namespace gglab
 			context.Check(!transientReadGraph.Compile() && hasUndefinedRead(transientReadGraph),
 				"RenderGraph reports release-visible texture/buffer read-before-write diagnostics");
 
-			RecordingDevice recordingDevice;
-			const RHITextureDesc importedDesc{
-				.m_Format = RHIFormat::R8G8B8A8Unorm,
-				.m_Usage = RHITextureUsage::Sampled,
-				.m_Extent = { 8, 8, 1 },
-			};
-			auto buildImportedRead = [&](RGContentValidity validity)
-				{
-					auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
-						.m_Device = &recordingDevice,
-						.m_TransientResourcePool =
-							reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
-						});
-					graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
-						[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
-						{
-							data.m_Texture = builder.ImportTexture("ImportedTexture",
-								RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
-							data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
-							builder.SideEffect();
-						});
-					return graph;
+			{
+				RecordingDevice recordingDevice;
+				const RHITextureDesc importedDesc{
+					.m_Format = RHIFormat::R8G8B8A8Unorm,
+					.m_Usage = RHITextureUsage::Sampled,
+					.m_Extent = { 8, 8, 1 },
 				};
-			auto undefinedImportGraph = buildImportedRead(RGContentValidity::Undefined);
-			auto definedImportGraph = buildImportedRead(RGContentValidity::Defined);
-			context.Check(!undefinedImportGraph->Compile() && hasUndefinedRead(*undefinedImportGraph) &&
-				definedImportGraph->Compile(),
-				"Imported state and content validity are explicit, independent contracts");
+				auto buildImportedRead = [&](RGContentValidity validity)
+					{
+						auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
+							.m_Device = &recordingDevice,
+							.m_TransientResourcePool =
+								reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+							});
+						graph->AddPass<TextureStorageAccessPassData>("ReadImportedTexture",
+							[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+							{
+								data.m_Texture = builder.ImportTexture("ImportedTexture",
+									RHITextureHandle{ 9, 1 }, importedDesc, UndefinedRHITextureState(), validity);
+								data.m_Texture = builder.Read(data.m_Texture, RGTextureAccess::Sample);
+								builder.SideEffect();
+							});
+						return graph;
+					};
+				auto undefinedImportGraph = buildImportedRead(RGContentValidity::Undefined);
+				auto definedImportGraph = buildImportedRead(RGContentValidity::Defined);
+				context.Check(!undefinedImportGraph->Compile() && hasUndefinedRead(*undefinedImportGraph) &&
+					definedImportGraph->Compile(),
+					"Imported state and content validity are explicit, independent contracts");
+			}
 
 			RHITextureDesc cubeDesc{
 				.m_Format = RHIFormat::R8G8B8A8Unorm,
@@ -3483,34 +3485,38 @@ namespace gglab
 				rejectsIndependentBlend && rejectsSampleQuality,
 				"Vulkan profile rejects unsupported rasterizer, blend, and sample-quality semantics");
 
-			RecordingTransferContext transferContext;
-			TransferBatch batch(transferContext);
 			const RHIResourceState shaderReadState{
 				.m_Stages = RHIStage::PixelShader,
 				.m_Access = RHIAccess::ShaderResource,
 				.m_Layout = RHILayout::ShaderResource,
 			};
-			const RHITextureHandle uploadedTexture{ 3, 1 };
-			const RHIBufferHandle uploadedBuffer{ 4, 1 };
-			const uint32_t bufferData = 17;
-			const bool transferRecorded = batch.UploadTexture(uploadedTexture, {},
-				UndefinedRHITextureState(), shaderReadState) &&
-				batch.UploadBuffer(uploadedBuffer, 0, &bufferData, sizeof(bufferData)) &&
-				batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData,
-					sizeof(bufferData));
-			const RHITransferSubmission submission = batch.Submit(false);
-			context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
-				transferContext.m_BufferBarriers.size() == 4 &&
-				transferContext.m_TextureBarriers[0].m_Before == UndefinedRHITextureState() &&
-				transferContext.m_TextureBarriers[1].m_After == shaderReadState &&
-				transferContext.m_BufferBarriers.front().m_Before.m_Layout == RHILayout::Common &&
-				transferContext.m_BufferBarriers.front().m_After.m_Layout == RHILayout::CopyDest &&
-				transferContext.m_BufferBarriers.back().m_After.m_Layout == RHILayout::Common &&
-				submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
-				submission.m_Publications[0].m_Type == RHIResourceType::Texture &&
-				submission.m_Publications[0].m_PublishedState == shaderReadState &&
-				submission.m_Publications[1].m_Type == RHIResourceType::Buffer,
-				"Transfer submission publishes one terminal state per resource with its completion fence");
+
+			{
+				RecordingTransferContext transferContext;
+				TransferBatch batch(transferContext);
+
+				const RHITextureHandle uploadedTexture{ 3, 1 };
+				const RHIBufferHandle uploadedBuffer{ 4, 1 };
+				const uint32_t bufferData = 17;
+				const bool transferRecorded = batch.UploadTexture(uploadedTexture, {},
+					UndefinedRHITextureState(), shaderReadState) &&
+					batch.UploadBuffer(uploadedBuffer, 0, &bufferData, sizeof(bufferData)) &&
+					batch.UploadBuffer(uploadedBuffer, sizeof(bufferData), &bufferData,
+						sizeof(bufferData));
+				const RHITransferSubmission submission = batch.Submit(false);
+				context.Check(transferRecorded && transferContext.m_TextureBarriers.size() == 2 &&
+					transferContext.m_BufferBarriers.size() == 4 &&
+					transferContext.m_TextureBarriers[0].m_Before == UndefinedRHITextureState() &&
+					transferContext.m_TextureBarriers[1].m_After == shaderReadState &&
+					transferContext.m_BufferBarriers.front().m_Before.m_Layout == RHILayout::Common &&
+					transferContext.m_BufferBarriers.front().m_After.m_Layout == RHILayout::CopyDest &&
+					transferContext.m_BufferBarriers.back().m_After.m_Layout == RHILayout::Common &&
+					submission.m_Completion.IsValid() && submission.m_Publications.size() == 2 &&
+					submission.m_Publications[0].m_Type == RHIResourceType::Texture &&
+					submission.m_Publications[0].m_PublishedState == shaderReadState &&
+					submission.m_Publications[1].m_Type == RHIResourceType::Buffer,
+					"Transfer submission publishes one terminal state per resource with its completion fence");
+			}
 
 			// --- Subresource-granular texture content validity ---
 			const RHITextureDesc mipTextureDesc{

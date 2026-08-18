@@ -494,44 +494,44 @@ namespace gglab
 		class StrictJsonSax final : public nlohmann::json_sax<nlohmann::json>
 		{
 		public:
-			[[nodiscard]] bool null() override { return true; }
-			[[nodiscard]] bool boolean(bool /*value*/) override { return true; }
-			[[nodiscard]] bool number_integer(nlohmann::json::number_integer_t /*value*/) override
+			bool null() override { return true; }
+			bool boolean(bool /*value*/) override { return true; }
+			bool number_integer(nlohmann::json::number_integer_t /*value*/) override
 			{
 				return true;
 			}
-			[[nodiscard]] bool number_unsigned(nlohmann::json::number_unsigned_t /*value*/) override
+			bool number_unsigned(nlohmann::json::number_unsigned_t /*value*/) override
 			{
 				return true;
 			}
-			[[nodiscard]] bool number_float(nlohmann::json::number_float_t /*value*/,
+			bool number_float(nlohmann::json::number_float_t /*value*/,
 				const nlohmann::json::string_t& /*representation*/) override
 			{
 				return true;
 			}
-			[[nodiscard]] bool string(nlohmann::json::string_t& /*value*/) override
+			bool string(nlohmann::json::string_t& /*value*/) override
 			{
 				return true;
 			}
-			[[nodiscard]] bool binary(nlohmann::json::binary_t& /*value*/) override
+			bool binary(nlohmann::json::binary_t& /*value*/) override
 			{
 				return false; // binary payloads are outside the cache record contract
 			}
-			[[nodiscard]] bool parse_error(std::size_t /*position*/,
+			bool parse_error(std::size_t /*position*/,
 				const std::string& /*lastToken*/,
 				const nlohmann::detail::exception& /*exception*/) override
 			{
 				return false;
 			}
-			[[nodiscard]] bool start_object(std::size_t /*elements*/) override
+			bool start_object(std::size_t /*elements*/) override
 			{
 				return EnterScope(true);
 			}
-			[[nodiscard]] bool start_array(std::size_t /*elements*/) override
+			bool start_array(std::size_t /*elements*/) override
 			{
 				return EnterScope(false);
 			}
-			[[nodiscard]] bool key(nlohmann::json::string_t& value) override
+			bool key(nlohmann::json::string_t& value) override
 			{
 				if (m_ScopeIsObject.empty() || !m_ScopeIsObject.back())
 				{
@@ -539,11 +539,11 @@ namespace gglab
 				}
 				return m_KeyScopes.back().insert(value).second;
 			}
-			[[nodiscard]] bool end_object() override
+			bool end_object() override
 			{
 				return ExitScope();
 			}
-			[[nodiscard]] bool end_array() override
+			bool end_array() override
 			{
 				return ExitScope();
 			}
