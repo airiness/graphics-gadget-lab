@@ -54,6 +54,8 @@ namespace gglab
 		[[nodiscard]] bool WantsKeyboardCapture() const noexcept;
 		[[nodiscard]] bool WantsMouseCapture() const noexcept;
 
+		// The returned backend bridge ID is valid for the current open ImGui
+		// frame. Callers resolve persistent RHI descriptors again each frame.
 		[[nodiscard]] ImTextureID ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept;
 
 		[[nodiscard]] DevToolsRuntime& GetDevToolsRuntime() noexcept { return m_DevToolsRuntime; }

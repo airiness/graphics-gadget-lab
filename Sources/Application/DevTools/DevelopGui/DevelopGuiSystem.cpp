@@ -253,7 +253,7 @@ namespace gglab
 
 	ImTextureID DevelopGuiSystem::ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept
 	{
-		return IsActive() && m_RenderBackend ? m_RenderBackend->ResolveTextureId(descriptor)
+		return IsFrameOpen() && m_RenderBackend ? m_RenderBackend->ResolveTextureId(descriptor)
 			: ImTextureID{};
 	}
 }

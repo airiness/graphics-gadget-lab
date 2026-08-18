@@ -19,6 +19,25 @@ namespace gglab
 	namespace
 	{
 		constexpr uint32_t DevelopGuiDescriptorPoolSize = 4096;
+
+		[[nodiscard]] constexpr bool IsTextureBindingStale(bool publicationMatches,
+			uint64_t lastTouchedFrame, uint64_t previousFrame) noexcept
+		{
+			return !publicationMatches || lastTouchedFrame < previousFrame;
+		}
+
+		[[nodiscard]] constexpr bool CanReclaimTextureBinding(bool awaitingSubmission,
+			uint64_t lastUseTimeline, uint64_t completedTimeline) noexcept
+		{
+			return !awaitingSubmission && lastUseTimeline <= completedTimeline;
+		}
+
+		static_assert(!IsTextureBindingStale(true, 4, 4));
+		static_assert(IsTextureBindingStale(true, 3, 4));
+		static_assert(IsTextureBindingStale(false, 4, 4));
+		static_assert(!CanReclaimTextureBinding(true, 0, 8));
+		static_assert(!CanReclaimTextureBinding(false, 9, 8));
+		static_assert(CanReclaimTextureBinding(false, 8, 8));
 	}
 
 	bool DevelopGuiVulkanRenderBackend::Initialize(RHIContext& context) noexcept
@@ -88,6 +107,14 @@ namespace gglab
 				return false;
 			}
 		}
+		CompletePreviousFrameTextureUses();
+		RetireStaleTextureBindings();
+		ReclaimRetiredTextureBindings();
+		++m_TextureFrameSerial;
+		if (m_TextureFrameSerial == 0)
+		{
+			m_TextureFrameSerial = 1;
+		}
 		ImGui_ImplVulkan_NewFrame();
 		return true;
 	}
@@ -128,10 +155,24 @@ namespace gglab
 		{
 			return {};
 		}
-		for (const TextureBinding& binding : m_TextureBindings)
+		for (size_t index = 0; index < m_ActiveTextureBindings.size();)
+		{
+			const TextureBinding& binding = m_ActiveTextureBindings[index];
+			if (binding.m_SourceDescriptorIndex == descriptor.m_Index &&
+				binding.m_Backing.get() != backing.get())
+			{
+				RetireTextureBinding(index);
+				continue;
+			}
+			++index;
+		}
+		for (TextureBinding& binding : m_ActiveTextureBindings)
 		{
 			if (binding.m_Backing.get() == backing.get())
 			{
+				binding.m_SourceDescriptorIndex = descriptor.m_Index;
+				binding.m_LastTouchedFrame = m_TextureFrameSerial;
+				binding.m_AwaitingSubmission = true;
 				return static_cast<ImTextureID>(
 					reinterpret_cast<uintptr_t>(binding.m_DescriptorSet));
 			}
@@ -144,11 +185,123 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR("ImGui failed to allocate a Vulkan texture descriptor.");
 			return {};
 		}
-		m_TextureBindings.push_back({
+		m_ActiveTextureBindings.push_back({
 			.m_Backing = std::move(backing),
 			.m_DescriptorSet = descriptorSet,
+			.m_SourceDescriptorIndex = descriptor.m_Index,
+			.m_LastTouchedFrame = m_TextureFrameSerial,
+			.m_AwaitingSubmission = true,
 		});
 		return static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(descriptorSet));
+	}
+
+	void DevelopGuiVulkanRenderBackend::CompletePreviousFrameTextureUses() noexcept
+	{
+		if (m_TextureFrameSerial == 0 || !m_Context)
+		{
+			return;
+		}
+		// ResolveTextureId runs before RHIContext submits the frame. The next
+		// successful GUI NewFrame is the first backend callback that can bind
+		// those touches to the committed graphics timeline value.
+		const uint64_t submittedTimeline = m_Context->GetSubmittedTimelineValue();
+		auto completeUses = [this, submittedTimeline](std::vector<TextureBinding>& bindings) noexcept
+			{
+				for (TextureBinding& binding : bindings)
+				{
+					if (binding.m_AwaitingSubmission &&
+						binding.m_LastTouchedFrame == m_TextureFrameSerial)
+					{
+						binding.m_LastUseTimelineValue =
+							std::max(binding.m_LastUseTimelineValue, submittedTimeline);
+						binding.m_AwaitingSubmission = false;
+					}
+				}
+			};
+		completeUses(m_ActiveTextureBindings);
+		completeUses(m_RetiredTextureBindings);
+	}
+
+	void DevelopGuiVulkanRenderBackend::RetireStaleTextureBindings() noexcept
+	{
+		if (!m_Device)
+		{
+			return;
+		}
+		for (size_t index = 0; index < m_ActiveTextureBindings.size();)
+		{
+			const TextureBinding& binding = m_ActiveTextureBindings[index];
+			const auto publishedBacking =
+				m_Device->GetDescriptorManager().GetPublishedResourceBacking(
+					binding.m_SourceDescriptorIndex);
+			// Keep a binding through the immediately following frame so callers
+			// resolving it every frame retain a stable ImTextureID. Replacement or
+			// one complete untouched frame makes it unreachable by contract.
+			if (IsTextureBindingStale(publishedBacking.get() == binding.m_Backing.get(),
+				binding.m_LastTouchedFrame, m_TextureFrameSerial))
+			{
+				RetireTextureBinding(index);
+				continue;
+			}
+			++index;
+		}
+	}
+
+	void DevelopGuiVulkanRenderBackend::ReclaimRetiredTextureBindings() noexcept
+	{
+		if (!m_Context || !ImGui::GetCurrentContext() ||
+			!ImGui::GetIO().BackendRendererUserData)
+		{
+			return;
+		}
+		uint64_t completedTimeline = 0;
+		if (!m_Context->TryGetCompletedTimelineValue(completedTimeline))
+		{
+			return;
+		}
+		for (size_t index = 0; index < m_RetiredTextureBindings.size();)
+		{
+			TextureBinding& binding = m_RetiredTextureBindings[index];
+			if (!CanReclaimTextureBinding(binding.m_AwaitingSubmission,
+				binding.m_LastUseTimelineValue, completedTimeline))
+			{
+				++index;
+				continue;
+			}
+			if (binding.m_DescriptorSet != VK_NULL_HANDLE)
+			{
+				ImGui_ImplVulkan_RemoveTexture(binding.m_DescriptorSet);
+			}
+			m_RetiredTextureBindings.erase(m_RetiredTextureBindings.begin() + index);
+		}
+	}
+
+	void DevelopGuiVulkanRenderBackend::RetireTextureBinding(size_t index) const noexcept
+	{
+		GGLAB_ASSERT(index < m_ActiveTextureBindings.size());
+		if (index >= m_ActiveTextureBindings.size())
+		{
+			return;
+		}
+		m_RetiredTextureBindings.push_back(std::move(m_ActiveTextureBindings[index]));
+		m_ActiveTextureBindings.erase(m_ActiveTextureBindings.begin() + index);
+	}
+
+	void DevelopGuiVulkanRenderBackend::ReleaseAllTextureBindings() noexcept
+	{
+		auto release = [](std::vector<TextureBinding>& bindings) noexcept
+			{
+				for (const TextureBinding& binding : bindings)
+				{
+					if (binding.m_DescriptorSet != VK_NULL_HANDLE)
+					{
+						ImGui_ImplVulkan_RemoveTexture(binding.m_DescriptorSet);
+					}
+				}
+				bindings.clear();
+			};
+		release(m_ActiveTextureBindings);
+		release(m_RetiredTextureBindings);
 	}
 
 	bool DevelopGuiVulkanRenderBackend::InitializeNativeBackend() noexcept
@@ -223,19 +376,13 @@ namespace gglab
 	{
 		if (ImGui::GetCurrentContext() && ImGui::GetIO().BackendRendererUserData)
 		{
-			for (const TextureBinding& binding : m_TextureBindings)
-			{
-				if (binding.m_DescriptorSet != VK_NULL_HANDLE)
-				{
-					ImGui_ImplVulkan_RemoveTexture(binding.m_DescriptorSet);
-				}
-			}
-			m_TextureBindings.clear();
+			ReleaseAllTextureBindings();
 			ImGui_ImplVulkan_Shutdown();
 		}
 		else
 		{
-			m_TextureBindings.clear();
+			m_ActiveTextureBindings.clear();
+			m_RetiredTextureBindings.clear();
 		}
 		if (m_TextureSampler != VK_NULL_HANDLE && m_Device)
 		{
@@ -246,6 +393,7 @@ namespace gglab
 		m_ColorFormat = VK_FORMAT_UNDEFINED;
 		m_MinImageCount = 0;
 		m_ImageCount = 0;
+		m_TextureFrameSerial = 0;
 	}
 
 	bool DevelopGuiVulkanRenderBackend::PresentationContractChanged() const noexcept
