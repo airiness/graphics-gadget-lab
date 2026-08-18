@@ -309,7 +309,10 @@ namespace gglab
 		{
 			if (!recreateFailed && begin.m_Status == VulkanAcquireOutcome::OutOfDate)
 			{
-				m_RecreatePending = true;
+				// The final OUT_OF_DATE attempt already completed a successful
+				// recreation. Leave the new swapchain ready for acquisition on the
+				// next tick instead of scheduling another recreation first.
+				GGLAB_ASSERT(!m_RecreatePending);
 				return RHIFrameBeginResult::Unavailable();
 			}
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
