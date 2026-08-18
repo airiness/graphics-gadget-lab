@@ -83,6 +83,16 @@ namespace gglab
 		{
 		};
 
+		template <typename T>
+		concept HasPublicPresent = requires(T & value) { value.Present(); };
+
+		template <typename T>
+		concept HasPublicFrameCompletionWait = requires(T & value) { value.WaitFrameCompletion(); };
+
+		template <typename T>
+		concept HasPublicCurrentBackBufferIndex =
+			requires(const T & value) { value.GetCurrentBackBufferIndex(); };
+
 		class RecordingOpaqueSceneExtension final : public RenderPipelineSceneExtensionBase
 		{
 		public:
@@ -767,6 +777,28 @@ namespace gglab
 
 		void RunRHIFrameAndGraphicsScopeContractTests(SelfTestContext& context) noexcept
 		{
+			static_assert(!HasPublicPresent<RHISwapChain>);
+			static_assert(!HasPublicFrameCompletionWait<RHISwapChain>);
+			static_assert(!HasPublicCurrentBackBufferIndex<RHISwapChain>);
+
+			const RHIFrameBeginResult unavailable = RHIFrameBeginResult::Unavailable();
+			const RHIFrameBeginResult fatalBegin = RHIFrameBeginResult::Fatal();
+			context.Check(unavailable.IsUnavailable() && !unavailable.IsReady() &&
+				unavailable.GetFrame() == nullptr && fatalBegin.IsFatal() &&
+				fatalBegin.GetFrame() == nullptr,
+				"RHI BeginFrame distinguishes temporary unavailability from fatal failure without a frame");
+
+			const RHIFencePoint submittedFence{ RHIFenceHandle{ 7, 1 }, 19 };
+			const RHIFrameEndResult completed = RHIFrameEndResult::Completed(submittedFence);
+			const RHIFrameEndResult fatalAfterSubmit = RHIFrameEndResult::Fatal(submittedFence);
+			const RHIFrameEndResult fatalBeforeSubmit = RHIFrameEndResult::Fatal();
+			context.Check(completed.IsCompleted() && completed.HasSubmission() &&
+				completed.GetSubmittedFence() == submittedFence &&
+				fatalAfterSubmit.IsFatal() && fatalAfterSubmit.HasSubmission() &&
+				fatalAfterSubmit.GetSubmittedFence() == submittedFence &&
+				fatalBeforeSubmit.IsFatal() && !fatalBeforeSubmit.HasSubmission(),
+				"RHI EndFrame separates transaction completion from submitted-fence lifetime semantics");
+
 			constexpr uint32_t FrameSlotCount = 2;
 			constexpr uint32_t SwapChainImageCount = 3;
 			RenderFrameBuilder::BuildResult syntheticFrame{};

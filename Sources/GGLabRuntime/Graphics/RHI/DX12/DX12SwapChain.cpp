@@ -1,9 +1,9 @@
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
+#include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
@@ -25,8 +25,6 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(
 			createInfo.m_DX12Device != nullptr, "DX12SwapChain::Initialize: device is null.");
-		GGLAB_ASSERT_MSG(createInfo.m_QueueSystem != nullptr,
-			"DX12SwapChain::Initialize: queue system is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_PresentQueue != nullptr,
 			"DX12SwapChain::Initialize: present queue is null.");
 		GGLAB_ASSERT_MSG(createInfo.m_Hwnd != nullptr, "DX12SwapChain::Initialize: hwnd is null.");
@@ -36,7 +34,6 @@ namespace gglab
 			createInfo.m_BufferCount >= 2, "DX12SwapChain::Initialize: bufferCount must be >= 2.");
 
 		m_DX12Device = createInfo.m_DX12Device;
-		m_QueueSystem = createInfo.m_QueueSystem;
 		m_PresentQueue = createInfo.m_PresentQueue;
 		m_Hwnd = createInfo.m_Hwnd;
 		m_Width = createInfo.m_Width;
@@ -55,7 +52,6 @@ namespace gglab
 
 		RefreshCurrentBackBufferIndex();
 		AcquireBackBuffers();
-		CreateSyncObjects();
 
 		return true;
 	}
@@ -68,7 +64,6 @@ namespace gglab
 			return;
 		}
 
-		WaitAllSyncObjects();
 		Reset();
 	}
 
@@ -86,9 +81,6 @@ namespace gglab
 			return;
 		}
 
-		// Wait sync objects finished
-		WaitAllSyncObjects();
-
 		m_Width = width;
 		m_Height = height;
 
@@ -103,29 +95,6 @@ namespace gglab
 
 		RefreshCurrentBackBufferIndex();
 		AcquireBackBuffers();
-		CreateSyncObjects();
-	}
-
-	void DX12SwapChain::WaitFrameCompletion() noexcept
-	{
-		GGLAB_ASSERT_MSG(
-			IsValid(), "DX12SwapChain::WaitFrameCompletion called on invalid swapchain.");
-		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
-
-		auto& fencePoint = m_SyncObjects[m_BackBufferIndex];
-		if (fencePoint.IsValid())
-		{
-			m_QueueSystem->WaitForFenceCompletion(fencePoint);
-		}
-	}
-
-	void DX12SwapChain::SetFrameCompletionFence(const RHIFencePoint& fencePoint) noexcept
-	{
-		GGLAB_ASSERT_MSG(
-			IsValid(), "DX12SwapChain::SetFrameCompletionFence called on invalid swapchain.");
-		GGLAB_ASSERT_MSG(m_BackBufferIndex < m_SyncObjects.size(), "BackBufferIndex out of range.");
-
-		m_SyncObjects[m_BackBufferIndex] = fencePoint;
 	}
 
 	RHIFormat DX12SwapChain::GetFormat() const noexcept
@@ -133,9 +102,13 @@ namespace gglab
 		return ToRHIFormat(m_Format);
 	}
 
-	void DX12SwapChain::Present() noexcept
+	bool DX12SwapChain::Present() noexcept
 	{
 		GGLAB_ASSERT_MSG(IsValid(), "DX12SwapChain::Present called on invalid swapchain.");
+		if (!IsValid())
+		{
+			return false;
+		}
 
 		UINT syncInterval = m_Vsync ? 1u : 0u;
 		UINT flags = 0u;
@@ -144,9 +117,17 @@ namespace gglab
 			flags |= DXGI_PRESENT_ALLOW_TEARING;
 		}
 
-		GGLAB_HR(m_DxgiSwapChain->Present(syncInterval, flags));
+		const HRESULT result = m_DxgiSwapChain->Present(syncInterval, flags);
+		if (FAILED(result))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"DX12 frame presentation failed (HRESULT 0x{:08X}).",
+				static_cast<uint32_t>(result));
+			return false;
+		}
 
 		RefreshCurrentBackBufferIndex();
+		return true;
 	}
 
 	DX12Texture* DX12SwapChain::GetBackBuffer(uint32_t bufferIndex) const noexcept
@@ -260,17 +241,11 @@ namespace gglab
 			}
 
 			// ResizeBuffers requires all old backbuffer references to be released.
-			// SwapChain waits for its sync objects before calling this path, so
-			// borrowed backbuffers have no remaining GPU use and can retire now.
+			// DX12Context owns the frame-lifecycle gate and reaches this path only
+			// after waiting for queued work that can reference these resources.
 			m_DX12Device->RetireCompletedRHIResources();
 		}
 		m_BackBuffers.clear();
-	}
-
-	void DX12SwapChain::CreateSyncObjects() noexcept
-	{
-		m_SyncObjects.clear();
-		m_SyncObjects.resize(m_BufferCount);
 	}
 
 	void DX12SwapChain::RefreshCurrentBackBufferIndex() noexcept
@@ -281,25 +256,12 @@ namespace gglab
 			m_BackBufferIndex < m_BufferCount, "DXGI returned invalid back buffer index.");
 	}
 
-	void DX12SwapChain::WaitAllSyncObjects() noexcept
-	{
-		for (auto& fencePoint : m_SyncObjects)
-		{
-			if (fencePoint.IsValid())
-			{
-				m_QueueSystem->WaitForFenceCompletion(fencePoint);
-			}
-		}
-	}
-
 	void DX12SwapChain::Reset() noexcept
 	{
 		ReleaseBackBuffers();
-		m_SyncObjects.clear();
 		m_DxgiSwapChain.Reset();
 
 		m_DX12Device = nullptr;
-		m_QueueSystem = nullptr;
 		m_PresentQueue = nullptr;
 		m_Hwnd = nullptr;
 		m_Width = 0;

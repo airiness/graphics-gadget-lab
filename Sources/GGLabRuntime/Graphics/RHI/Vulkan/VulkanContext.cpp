@@ -63,7 +63,6 @@ namespace gglab
 					return false;
 				}
 			}
-			m_CurrentBackBufferIndex = 0;
 			m_Valid = true;
 			return true;
 		}
@@ -86,21 +85,8 @@ namespace gglab
 			m_Valid = false;
 		}
 
-		void SetCurrentBackBufferIndex(uint32_t index) noexcept
-		{
-			GGLAB_ASSERT(index < m_BackBuffers.size());
-			m_CurrentBackBufferIndex = index;
-		}
-
-		void Finalize() noexcept override { ReleaseBackBuffers(); }
+		void Finalize() noexcept { ReleaseBackBuffers(); }
 		bool IsValid() const noexcept override { return m_Valid && !m_BackBuffers.empty(); }
-		void Resize(uint32_t width, uint32_t height) noexcept override
-		{
-			if (m_Context)
-			{
-				m_Context->Resize(width, height);
-			}
-		}
 		uint32_t GetBufferCount() const noexcept override
 		{
 			return static_cast<uint32_t>(m_BackBuffers.size());
@@ -123,27 +109,14 @@ namespace gglab
 				? m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetFormat()
 				: RHIFormat::Unknown;
 		}
-		uint32_t GetCurrentBackBufferIndex() const noexcept override
-		{
-			return m_CurrentBackBufferIndex;
-		}
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override
 		{
 			return bufferIndex < m_BackBuffers.size() ? m_BackBuffers[bufferIndex]
 				: RHITextureHandle{};
 		}
-
-		// Frame pacing, submission and presentation are transaction operations
-		// owned by VulkanContext/VulkanFrameRuntime. These legacy swapchain hooks
-		// remain no-ops so callers cannot split that transaction accidentally.
-		void WaitFrameCompletion() noexcept override {}
-		void SetFrameCompletionFence(const RHIFencePoint&) noexcept override {}
-		void Present() noexcept override {}
-
 	private:
 		VulkanContext* m_Context = nullptr;
 		std::vector<RHITextureHandle> m_BackBuffers;
-		uint32_t m_CurrentBackBufferIndex = 0;
 		bool m_Valid = false;
 	};
 
@@ -214,7 +187,7 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"Vulkan RHI initialization failed: {} (VkResult {}).",
 				bootstrap.m_Error.empty() ? "bootstrap did not create a frame runtime"
-					: bootstrap.m_Error,
+				: bootstrap.m_Error,
 				static_cast<int32_t>(bootstrap.m_Result)));
 			return false;
 		}
@@ -300,19 +273,25 @@ namespace gglab
 		return *m_PipelineSystem;
 	}
 
-	RHIFrameContext& VulkanContext::BeginFrame() noexcept
+	RHIFrameBeginResult VulkanContext::BeginFrame() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Initialized, "VulkanContext::BeginFrame called after finalization.");
 		GGLAB_ASSERT_MSG(m_ActiveFrame == nullptr,
 			"VulkanContext only supports one active frame transaction.");
+		if (!m_Initialized || m_ActiveFrame != nullptr)
+		{
+			return RHIFrameBeginResult::Fatal();
+		}
 
 		if (m_RecreatePending && !RecreateSwapChain(m_Width, m_Height))
 		{
-			GGLAB_ASSERT_MSG(false, "VulkanContext failed to recreate its pending swapchain.");
-			return *m_Frames.front();
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"VulkanContext failed to recreate its pending swapchain.");
+			return RHIFrameBeginResult::Fatal();
 		}
 
 		VulkanBeginFrameResult begin{};
+		bool recreateFailed = false;
 		for (uint32_t attempt = 0; attempt < 2; ++attempt)
 		{
 			begin = m_Bootstrap->m_FrameRuntime->BeginFrame();
@@ -322,24 +301,30 @@ namespace gglab
 			}
 			if (!RecreateSwapChain(m_Width, m_Height))
 			{
+				recreateFailed = true;
 				break;
 			}
 		}
 		if (!begin.IsAcquired())
 		{
+			if (!recreateFailed && begin.m_Status == VulkanAcquireOutcome::OutOfDate)
+			{
+				m_RecreatePending = true;
+				return RHIFrameBeginResult::Unavailable();
+			}
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"VulkanContext failed to acquire a frame (VkResult {}).",
 				static_cast<int32_t>(begin.m_Result)));
-			GGLAB_ASSERT_MSG(false, "VulkanContext cannot provide an RHI frame after acquire failure.");
-			return *m_Frames.front();
+			return RHIFrameBeginResult::Fatal();
 		}
 
 		RetireCompletedWork();
 		if (!m_Set0Frames->BeginFrame(begin.m_FrameSlotIndex))
 		{
 			GGLAB_UNUSED(m_Bootstrap->m_FrameRuntime->AbortFrame());
-			GGLAB_ASSERT_MSG(false, "VulkanContext failed to begin its frame-local descriptor arena.");
-			return *m_Frames[begin.m_FrameSlotIndex];
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"VulkanContext failed to begin its frame-local descriptor arena.");
+			return RHIFrameBeginResult::Fatal();
 		}
 		const VulkanFrameRecording recording =
 			m_Bootstrap->m_FrameRuntime->BeginFrameRecording(
@@ -350,28 +335,27 @@ namespace gglab
 			m_GraphicsContext->AbortEncoding();
 			GGLAB_UNUSED(m_Set0Frames->AbortFrame(begin.m_FrameSlotIndex));
 			GGLAB_UNUSED(m_Bootstrap->m_FrameRuntime->AbortFrame());
-			GGLAB_ASSERT_MSG(false, "VulkanContext failed to begin command encoding.");
-			return *m_Frames[begin.m_FrameSlotIndex];
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"VulkanContext failed to begin command encoding.");
+			return RHIFrameBeginResult::Fatal();
 		}
 
 		auto& frame = *m_Frames[begin.m_FrameSlotIndex];
 		frame.m_BackBufferIndex = begin.m_BackBufferIndex;
-		frame.m_SubmittedFence = {};
 		frame.m_Active = true;
 		m_ActiveFrame = &frame;
-		m_SwapChain->SetCurrentBackBufferIndex(begin.m_BackBufferIndex);
 		m_RecreatePending = begin.m_RecreatePending;
-		return frame;
+		return RHIFrameBeginResult::Ready(frame);
 	}
 
-	RHIFencePoint VulkanContext::EndFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFrameEndResult VulkanContext::EndFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<VulkanFrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"VulkanContext::EndFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return {};
+			return RHIFrameEndResult::Fatal();
 		}
 
 		const std::vector usedTextures(
@@ -383,18 +367,19 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext aborted a frame whose command stream did not finalize.");
-			AbortFrame(rhiFrame);
-			return frame->m_SubmittedFence;
+			return RHIFrameEndResult::Fatal(AbortFrame(rhiFrame));
 		}
 
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->EndFrame();
 		if (!result.m_Submitted || !result.m_SubmittedFencePoint.IsValid())
 		{
 			GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
-			FinishFrame(*frame, {});
-			return {};
+			FinishFrame(*frame);
+			return RHIFrameEndResult::Fatal();
 		}
-		if (!m_Set0Frames->EndFrame(frame->m_FrameSlotIndex, result.m_SubmittedFencePoint))
+		const bool descriptorFrameClosed =
+			m_Set0Frames->EndFrame(frame->m_FrameSlotIndex, result.m_SubmittedFencePoint);
+		if (!descriptorFrameClosed)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"VulkanContext failed to close its submitted frame-local descriptor arena.");
@@ -414,25 +399,28 @@ namespace gglab
 				"Vulkan completed its first production submit/present frame transaction.");
 			m_CompletedProductionFrame = true;
 		}
-		FinishFrame(*frame, result.m_SubmittedFencePoint);
-		return result.m_SubmittedFencePoint;
+		FinishFrame(*frame);
+		return result.IsComplete() && descriptorFrameClosed
+			? RHIFrameEndResult::Completed(result.m_SubmittedFencePoint)
+			: RHIFrameEndResult::Fatal(result.m_SubmittedFencePoint);
 	}
 
-	void VulkanContext::AbortFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFencePoint VulkanContext::AbortFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<VulkanFrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"VulkanContext::AbortFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return;
+			return {};
 		}
 
 		m_GraphicsContext->AbortEncoding();
 		GGLAB_UNUSED(m_Set0Frames->AbortFrame(frame->m_FrameSlotIndex));
 		const VulkanSubmitPresentResult result = m_Bootstrap->m_FrameRuntime->AbortFrame();
 		m_RecreatePending = m_RecreatePending || result.m_RecreatePending;
-		FinishFrame(*frame, result.m_SubmittedFencePoint);
+		FinishFrame(*frame);
+		return result.m_SubmittedFencePoint;
 	}
 
 	void VulkanContext::WaitForFence(
@@ -513,10 +501,8 @@ namespace gglab
 		return true;
 	}
 
-	void VulkanContext::FinishFrame(
-		VulkanFrameContext& frame, const RHIFencePoint& fencePoint) noexcept
+	void VulkanContext::FinishFrame(VulkanFrameContext& frame) noexcept
 	{
-		frame.m_SubmittedFence = fencePoint;
 		frame.m_Active = false;
 		m_ActiveFrame = nullptr;
 	}
@@ -525,7 +511,7 @@ namespace gglab
 	{
 		if (m_ActiveFrame)
 		{
-			AbortFrame(*m_ActiveFrame);
+			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
 		if (m_Bootstrap && m_Bootstrap->m_FrameRuntime)
 		{

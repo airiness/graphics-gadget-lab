@@ -37,6 +37,22 @@ namespace gglab
 		public:
 			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
 			~Frame() noexcept;
+			[[nodiscard]] RHIFrameBeginStatus GetBeginStatus() const noexcept
+			{
+				return m_BeginStatus;
+			}
+			[[nodiscard]] bool IsReady() const noexcept
+			{
+				return m_BeginStatus == RHIFrameBeginStatus::Ready;
+			}
+			[[nodiscard]] bool IsUnavailable() const noexcept
+			{
+				return m_BeginStatus == RHIFrameBeginStatus::Unavailable;
+			}
+			[[nodiscard]] bool IsFatal() const noexcept
+			{
+				return m_BeginStatus == RHIFrameBeginStatus::Fatal;
+			}
 			[[nodiscard]] uint64_t GetSerial() const noexcept { return m_FrameSerial; }
 			[[nodiscard]] uint32_t GetFrameSlotIndex() const noexcept
 			{
@@ -56,10 +72,17 @@ namespace gglab
 			};
 
 			Frame(Renderer* renderer, RHIFrameContext* rhiFrame, uint64_t frameSerial) noexcept :
-				m_Renderer(renderer), m_RHIFrame(rhiFrame), m_FrameSerial(frameSerial),
+				m_Renderer(renderer), m_FrameSerial(frameSerial),
 				m_FrameSlotIndex(rhiFrame ? rhiFrame->GetFrameSlotIndex() : 0),
-				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0)
+				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0),
+				m_RHIFrame(rhiFrame),
+				m_BeginStatus(RHIFrameBeginStatus::Ready)
 			{
+			}
+			explicit Frame(RHIFrameBeginStatus beginStatus) noexcept :
+				m_State(State::Ended), m_BeginStatus(beginStatus)
+			{
+				GGLAB_ASSERT(beginStatus != RHIFrameBeginStatus::Ready);
 			}
 
 			friend class Renderer;
@@ -73,6 +96,7 @@ namespace gglab
 			RenderGraph* m_RenderGraph = nullptr;
 			RHIFencePoint m_UploadFencePoint = {};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
+			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
 		};
 
 		struct CreateInfo
@@ -106,7 +130,7 @@ namespace gglab
 		[[nodiscard]] Frame BeginFrame() noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
-		void EndFrame(Frame& frame) noexcept;
+		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;
 
 		RHIContext* GetRHIContext() const noexcept { return m_RHIContext.get(); }
 		RHIDevice* GetDevice() const noexcept
@@ -241,7 +265,7 @@ namespace gglab
 	private:
 		void CreateCommonBindingLayout() noexcept;
 		void InitializeGpuBuffers() noexcept;
-		void AbortFrame(Frame& frame) noexcept;
+		[[nodiscard]] RHIFencePoint AbortFrame(Frame& frame) noexcept;
 		void EndFrameLifetime(Frame& frame) noexcept;
 		void RetireSceneGpuAllocations(
 			RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept;

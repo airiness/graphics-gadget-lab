@@ -29,7 +29,6 @@ namespace gglab
 		RHIGraphicsCommandContext& GetGraphicsContext() noexcept override;
 		RHIComputeCommandContext& GetDirectComputeContext() noexcept override;
 		RHIComputeCommandContext* GetComputeContext() noexcept override { return nullptr; }
-		RHIFencePoint GetSubmittedFence() const noexcept override { return m_SubmittedFence; }
 
 	private:
 		friend class VulkanContext;
@@ -37,7 +36,6 @@ namespace gglab
 		VulkanContext* m_Context = nullptr;
 		uint32_t m_FrameSlotIndex = 0;
 		uint32_t m_BackBufferIndex = 0;
-		RHIFencePoint m_SubmittedFence{};
 		bool m_Active = false;
 	};
 
@@ -57,9 +55,9 @@ namespace gglab
 		RHIPipelineSystem& GetPipelineSystem() noexcept override;
 		GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
 
-		RHIFrameContext& BeginFrame() noexcept override;
-		RHIFencePoint EndFrame(RHIFrameContext& frame) noexcept override;
-		void AbortFrame(RHIFrameContext& frame) noexcept override;
+		RHIFrameBeginResult BeginFrame() noexcept override;
+		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;
+		RHIFencePoint AbortFrame(RHIFrameContext& frame) noexcept override;
 		void WaitForFence(
 			RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept override;
 
@@ -75,7 +73,7 @@ namespace gglab
 		VulkanContext() noexcept = default;
 		[[nodiscard]] bool Initialize(const RHIContextDesc& desc) noexcept;
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height) noexcept;
-		void FinishFrame(VulkanFrameContext& frame, const RHIFencePoint& fencePoint) noexcept;
+		void FinishFrame(VulkanFrameContext& frame) noexcept;
 		void Finalize() noexcept;
 
 		// Bootstrap owns instance/surface/device/frame-runtime and therefore

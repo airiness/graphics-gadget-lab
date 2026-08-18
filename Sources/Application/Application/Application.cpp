@@ -418,17 +418,25 @@ namespace gglab
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
+		m_AssetManager->Tick();
+		m_EnvironmentAssetController->Tick();
 
 		auto& world = demo->GetWorld();
 		auto& camera = demo->GetCamera();
+		auto rendererFrame = m_Renderer->BeginFrame();
+		if (!rendererFrame.IsReady())
+		{
+			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
+			{
+				m_DevelopGuiSystem->EndFrame();
+			}
+			return rendererFrame.IsUnavailable();
+		}
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
-		auto rendererFrame = m_Renderer->BeginFrame();
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
-		m_AssetManager->Tick();
-		m_EnvironmentAssetController->Tick();
 
 		ShadowVisualizationSettings shadowVisualizationSettings = m_DevelopGuiSystem
 			? m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow
@@ -528,14 +536,23 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
 			m_Renderer->Render(rendererFrame, rg, renderContext);
 		}
+		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
 			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
-			m_Renderer->EndFrame(rendererFrame);
+			frameEndResult = m_Renderer->EndFrame(rendererFrame);
+		}
+		if (!frameEndResult.IsCompleted())
+		{
+			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
+			{
+				m_DevelopGuiSystem->EndFrame();
+			}
+			return false;
 		}
 
 		const DemoFrameFeedback demoFeedback{
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
-			.m_SubmittedFence = m_Renderer->GetLastSubmittedFencePoint(),
+			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_FrameIndex = m_Time->GetFrameCount(),
 			.m_BackBufferIndex = backBufferIndex,
 		};
