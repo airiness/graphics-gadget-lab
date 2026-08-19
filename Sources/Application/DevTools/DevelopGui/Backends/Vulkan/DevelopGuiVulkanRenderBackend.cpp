@@ -54,9 +54,15 @@ namespace gglab
 			return false;
 		}
 		m_Device = &m_Context->GetVulkanDevice();
-		// GGLab intentionally keeps one application-owned presentation surface.
-		// The Win32 backend can advertise platform viewports, but enabling that
-		// capability here would hand secondary swapchain ownership to ImGui.
+		// The multi-viewport policy stays in io.ConfigFlags (GGLab never enables
+		// ImGuiConfigFlags_ViewportsEnable). This capability suppression states
+		// a fact about this vendored backend pair, not that policy: the vendored
+		// Win32 backend advertises PlatformHasViewports but registers no
+		// Platform_CreateVkSurface hook, so with the flag visible
+		// ImGui_ImplVulkan_InitMultiViewportSupport() fails its CreateVkSurface
+		// assert on every native init and ImGui_ImplVulkan_CreateWindow would
+		// call the missing Vk-surface hook. Keep suppressed until a hook exists;
+		// do not re-enable it by removing this line.
 		ImGui::GetIO().BackendFlags &= ~ImGuiBackendFlags_PlatformHasViewports;
 		if (!InitializeNativeBackend())
 		{
@@ -191,7 +197,7 @@ namespace gglab
 			.m_SourceDescriptorIndex = descriptor.m_Index,
 			.m_LastTouchedFrame = m_TextureFrameSerial,
 			.m_AwaitingSubmission = true,
-		});
+			});
 		return static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(descriptorSet));
 	}
 
@@ -366,9 +372,8 @@ namespace gglab
 		}
 
 		m_SwapChainGeneration = m_Context->GetSwapChainGeneration();
-		m_ColorFormat = colorFormat;
-		m_MinImageCount = minImageCount;
-		m_ImageCount = imageCount;
+		m_PresentationContract = MakePresentationContract(
+			colorFormat, swapChain.GetMinImageCount(), imageCount);
 		return true;
 	}
 
@@ -390,24 +395,42 @@ namespace gglab
 			m_TextureSampler = VK_NULL_HANDLE;
 		}
 		m_SwapChainGeneration = 0;
-		m_ColorFormat = VK_FORMAT_UNDEFINED;
-		m_MinImageCount = 0;
-		m_ImageCount = 0;
+		m_PresentationContract = {};
 		m_TextureFrameSerial = 0;
+	}
+
+	VulkanPresentationContract DevelopGuiVulkanRenderBackend::MakePresentationContract(
+		VkFormat colorFormat, uint32_t minImageCount, uint32_t imageCount) noexcept
+	{
+		VulkanPresentationContract contract{};
+		contract.m_ColorFormat = colorFormat;
+		contract.m_ImageCount = imageCount;
+		if (imageCount >= 2)
+		{
+			contract.m_MinImageCount = std::clamp(minImageCount, 2u, imageCount);
+		}
+		return contract;
+	}
+
+	bool DevelopGuiVulkanRenderBackend::IsPresentationContractChanged(
+		const VulkanPresentationContract& initializedContract,
+		const VulkanPresentationContract& currentContract) noexcept
+	{
+		// A swapchain that no longer satisfies the renderer's image contract is
+		// always a presentation contract change; otherwise the pinned format and
+		// image-count bookkeeping are the only contract inputs. Swapchain
+		// identity, extent, and generation are deliberately not compared.
+		return currentContract.m_ImageCount < 2 ||
+			initializedContract != currentContract;
 	}
 
 	bool DevelopGuiVulkanRenderBackend::PresentationContractChanged() const noexcept
 	{
 		const VulkanSwapChain& swapChain = m_Context->GetVulkanSwapChain();
-		const uint32_t imageCount = swapChain.GetImageCount();
-		if (imageCount < 2)
-		{
-			return true;
-		}
-		return m_SwapChainGeneration != m_Context->GetSwapChainGeneration() ||
-			m_ColorFormat != swapChain.GetVkFormat() ||
-			m_MinImageCount != std::clamp(swapChain.GetMinImageCount(), 2u, imageCount) ||
-			m_ImageCount != imageCount;
+		return IsPresentationContractChanged(
+			m_PresentationContract,
+			MakePresentationContract(
+				swapChain.GetVkFormat(), swapChain.GetMinImageCount(), swapChain.GetImageCount()));
 	}
 
 	void DevelopGuiVulkanRenderBackend::CheckVkResult(VkResult result) noexcept

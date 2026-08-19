@@ -237,6 +237,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -550,6 +553,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h">
       <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.h">
       <Filter>Application\SelfTest</Filter>
