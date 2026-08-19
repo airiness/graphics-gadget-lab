@@ -362,8 +362,9 @@ namespace gglab
 		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
 		{
 			const PipelineSlot& slot = m_Pipelines[index];
-			if (slot.m_Pipeline && slot.m_ShaderHashes == shaderHashes &&
-				AreGraphicsPipelineDescriptionsEqual(slot.m_Desc, createInfo.m_Desc))
+			if (slot.m_Pipeline && slot.m_Type == PipelineType::Graphics &&
+				slot.m_ShaderHashes == shaderHashes &&
+				AreGraphicsPipelineDescriptionsEqual(slot.m_GraphicsDesc, createInfo.m_Desc))
 			{
 				return RHIPipelineHandle(index, m_PipelineGeneration);
 			}
@@ -401,11 +402,12 @@ namespace gglab
 		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_Pipelines.size());
 		PipelineSlot& slot = m_Pipelines.emplace_back();
 		slot.m_Pipeline = std::move(pipeline);
-		slot.m_Desc = createInfo.m_Desc;
+		slot.m_Type = PipelineType::Graphics;
+		slot.m_GraphicsDesc = createInfo.m_Desc;
 		for (uint32_t attributeIndex = 0;
-			attributeIndex < slot.m_Desc.m_VertexInput.m_AttributeCount; ++attributeIndex)
+			attributeIndex < slot.m_GraphicsDesc.m_VertexInput.m_AttributeCount; ++attributeIndex)
 		{
-			slot.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName = nullptr;
+			slot.m_GraphicsDesc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName = nullptr;
 		}
 		slot.m_ShaderHashes = shaderHashes;
 		return RHIPipelineHandle(index, m_PipelineGeneration);
@@ -414,10 +416,55 @@ namespace gglab
 	RHIPipelineHandle VulkanPipelineSystem::CreateComputePipeline(
 		const RHIComputePipelineCreateInfo& createInfo) noexcept
 	{
-		GGLAB_UNUSED(createInfo);
-		GGLAB_LOG_GRAPHICS_WARN(
-			"Vulkan compute pipeline creation is not available in the active backend path.");
-		return {};
+		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::CreateComputePipeline"))
+		{
+			return {};
+		}
+		VulkanBindingLayout* bindingLayout =
+			ResolveBindingLayout(createInfo.m_Desc.m_BindingLayout);
+		if (bindingLayout == nullptr || !createInfo.m_ComputeShader.IsValid() ||
+			createInfo.m_ComputeShader.m_EntryPoint.empty() ||
+			!IsVulkanShaderBytecode(createInfo.m_ComputeShader))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"VulkanPipelineSystem::CreateComputePipeline received invalid inputs.");
+			return {};
+		}
+
+		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
+		{
+			const PipelineSlot& slot = m_Pipelines[index];
+			if (slot.m_Pipeline && slot.m_Type == PipelineType::Compute &&
+				slot.m_ComputeDesc.m_BindingLayout == createInfo.m_Desc.m_BindingLayout &&
+				slot.m_ShaderHashes[0] == createInfo.m_ComputeShader.m_Hash)
+			{
+				return RHIPipelineHandle(index, m_PipelineGeneration);
+			}
+		}
+
+		VkShaderModule shaderModule =
+			CreateShaderModule(createInfo.m_ComputeShader, "Vulkan.ComputePipeline.CS");
+		if (shaderModule == VK_NULL_HANDLE)
+		{
+			return {};
+		}
+		const std::string entryPoint = utils::ToString(createInfo.m_ComputeShader.m_EntryPoint);
+		auto pipeline = std::make_unique<VulkanPipelineState>();
+		const bool created = pipeline->CreateCompute(
+			m_Device, bindingLayout, shaderModule, entryPoint.c_str());
+		DestroyShaderModule(shaderModule);
+		if (!created)
+		{
+			return {};
+		}
+
+		const auto index = static_cast<RHIPipelineHandle::IndexType>(m_Pipelines.size());
+		PipelineSlot& slot = m_Pipelines.emplace_back();
+		slot.m_Pipeline = std::move(pipeline);
+		slot.m_Type = PipelineType::Compute;
+		slot.m_ComputeDesc = createInfo.m_Desc;
+		slot.m_ShaderHashes[0] = createInfo.m_ComputeShader.m_Hash;
+		return RHIPipelineHandle(index, m_PipelineGeneration);
 	}
 
 	bool VulkanPipelineSystem::IsAlive(RHIBindingLayoutHandle layout) const noexcept
@@ -533,9 +580,33 @@ namespace gglab
 			return false;
 		}
 		const PipelineSlot& slot = m_Pipelines[pipeline.Index()];
+		if (slot.m_Type != PipelineType::Graphics)
+		{
+			return false;
+		}
 		outPipelineState = slot.m_Pipeline.get();
 		outBindingLayout = slot.m_Pipeline->GetBindingLayout();
-		outDesc = slot.m_Desc;
+		outDesc = slot.m_GraphicsDesc;
+		return outBindingLayout != nullptr;
+	}
+
+	bool VulkanPipelineSystem::ResolveComputePipeline(RHIPipelineHandle pipeline,
+		VulkanPipelineState*& outPipelineState,
+		VulkanBindingLayout*& outBindingLayout) const noexcept
+	{
+		outPipelineState = nullptr;
+		outBindingLayout = nullptr;
+		if (!IsAlive(pipeline))
+		{
+			return false;
+		}
+		const PipelineSlot& slot = m_Pipelines[pipeline.Index()];
+		if (slot.m_Type != PipelineType::Compute)
+		{
+			return false;
+		}
+		outPipelineState = slot.m_Pipeline.get();
+		outBindingLayout = slot.m_Pipeline->GetBindingLayout();
 		return outBindingLayout != nullptr;
 	}
 }

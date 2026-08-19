@@ -18,10 +18,16 @@
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
+#include "Graphics/RHI/RHIContext.h"
+#if GGLAB_ENABLE_VULKAN
+#include "DevTools/DevelopGui/Panels/VulkanBackendSummaryPanel.h"
+#include "Graphics/RHI/Vulkan/VulkanContext.h"
+#endif
 
 namespace gglab::devtools
 {
-	void RegisterDefaultDevelopGuiPanels(DevelopGuiRegistry& registry) noexcept
+	void RegisterDefaultDevelopGuiPanels(
+		DevelopGuiRegistry& registry, RHIContext& rhiContext) noexcept
 	{
 		registry.RegisterPanel(std::make_unique<AssetManagerPanel>());
 		registry.RegisterPanel(std::make_unique<CameraInspectorPanel>());
@@ -41,5 +47,13 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<PostProcessInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<ProfilingPanel>());
 		registry.RegisterPanel(std::make_unique<TaskSystemPanel>());
+#if GGLAB_ENABLE_VULKAN
+		if (dynamic_cast<VulkanContext*>(&rhiContext))
+		{
+			registry.RegisterPanel(std::make_unique<VulkanBackendSummaryPanel>());
+		}
+#else
+		(void)rhiContext;
+#endif
 	}
 }

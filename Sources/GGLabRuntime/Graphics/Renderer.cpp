@@ -40,7 +40,7 @@ namespace gglab
 	{
 		if (m_Renderer && m_State != State::Ended)
 		{
-			m_Renderer->AbortFrame(*this);
+			GGLAB_UNUSED(m_Renderer->AbortFrame(*this));
 		}
 	}
 
@@ -64,8 +64,15 @@ namespace gglab
 		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
+		contextDesc.m_AdapterSelector = createInfo.m_AdapterSelector;
+		contextDesc.m_EnableDebugValidation = createInfo.m_EnableDebugValidation;
 		m_RHIContext = CreateRHIContext(contextDesc);
-		GGLAB_ASSERT_MSG(m_RHIContext != nullptr, "Renderer failed to create an RHI context.");
+		if (!m_RHIContext)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer failed to create the explicitly selected RHI context.");
+			return false;
+		}
 
 		auto* device = &m_RHIContext->GetDevice();
 		m_AssetUploadScheduler =
@@ -160,7 +167,13 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
 		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
-		RHIFrameContext& rhiFrame = m_RHIContext->BeginFrame();
+		const RHIFrameBeginResult beginResult = m_RHIContext->BeginFrame();
+		if (!beginResult.IsReady())
+		{
+			return Frame(beginResult.GetStatus());
+		}
+		RHIFrameContext* rhiFrame = beginResult.GetFrame();
+		GGLAB_ASSERT_NOT_NULL(rhiFrame);
 
 		m_SceneCB->Tick();
 		m_ViewSB->Tick();
@@ -172,7 +185,7 @@ namespace gglab
 		m_HasActiveFrame = true;
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
-		return Frame(this, &rhiFrame, frameSerial);
+		return Frame(this, rhiFrame, frameSerial);
 	}
 
 	void Renderer::Render(
@@ -206,9 +219,6 @@ namespace gglab
 			return;
 		}
 
-		auto* swapChain = GetSwapChain();
-		GGLAB_ASSERT(renderContext.m_BackBufferIndex == swapChain->GetCurrentBackBufferIndex());
-
 		// Wait Structured Buffer upload
 		if (renderContext.m_UploadFencePoint.IsValid())
 		{
@@ -225,7 +235,7 @@ namespace gglab
 		frame.m_State = Frame::State::Recorded;
 	}
 
-	void Renderer::EndFrame(Frame& frame) noexcept
+	RHIFrameEndResult Renderer::EndFrame(Frame& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::EndFrame called before initialization.");
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
@@ -235,27 +245,41 @@ namespace gglab
 
 		if (frame.m_State != Frame::State::Recorded)
 		{
-			AbortFrame(frame);
-			return;
+			return RHIFrameEndResult::Fatal(AbortFrame(frame));
 		}
 
 		GGLAB_ASSERT_NOT_NULL(frame.m_RHIFrame);
 		GGLAB_ASSERT_NOT_NULL(frame.m_RenderGraph);
 
-		m_LastSubmittedFencePoint = m_RHIContext->EndFrame(*frame.m_RHIFrame);
-		m_IBLBakeScheduler->OnFrameSubmitted(m_LastSubmittedFencePoint);
+		const RHIFrameEndResult result = m_RHIContext->EndFrame(*frame.m_RHIFrame);
+		const RHIFencePoint submittedFence = result.GetSubmittedFence();
+		if (submittedFence.IsValid())
+		{
+			m_LastSubmittedFencePoint = submittedFence;
+			m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
+		}
+		else
+		{
+			m_IBLBakeScheduler->OnFrameAborted();
+		}
 
-		RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, m_LastSubmittedFencePoint);
+		const RHIFencePoint retirementFence =
+			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
+		if (retirementFence.IsValid())
+		{
+			RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+			frame.m_RenderGraph->Retire(retirementFence);
+		}
 
-		frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
 		EndFrameLifetime(frame);
+		return result;
 	}
 
-	void Renderer::AbortFrame(Frame& frame) noexcept
+	RHIFencePoint Renderer::AbortFrame(Frame& frame) noexcept
 	{
 		if (frame.m_State == Frame::State::Ended)
 		{
-			return;
+			return {};
 		}
 		if (m_IBLBakeScheduler)
 		{
@@ -272,17 +296,28 @@ namespace gglab
 
 		if (m_RHIContext && frame.m_RHIFrame)
 		{
-			m_RHIContext->AbortFrame(*frame.m_RHIFrame);
-			m_LastSubmittedFencePoint = frame.m_RHIFrame->GetSubmittedFence();
-			RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, m_LastSubmittedFencePoint);
-
-			if (frame.m_RenderGraph)
+			const RHIFencePoint submittedFence = m_RHIContext->AbortFrame(*frame.m_RHIFrame);
+			if (submittedFence.IsValid())
 			{
-				frame.m_RenderGraph->Retire(m_LastSubmittedFencePoint);
+				m_LastSubmittedFencePoint = submittedFence;
 			}
+			const RHIFencePoint retirementFence =
+				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
+			if (retirementFence.IsValid())
+			{
+				RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+
+				if (frame.m_RenderGraph)
+				{
+					frame.m_RenderGraph->Retire(retirementFence);
+				}
+			}
+			EndFrameLifetime(frame);
+			return submittedFence;
 		}
 
 		EndFrameLifetime(frame);
+		return {};
 	}
 
 	void Renderer::EndFrameLifetime(Frame& frame) noexcept

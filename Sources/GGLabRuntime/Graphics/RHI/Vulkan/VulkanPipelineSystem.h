@@ -114,8 +114,17 @@ namespace gglab
 		[[nodiscard]] bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			VulkanPipelineState*& outPipelineState, VulkanBindingLayout*& outBindingLayout,
 			RHIGraphicsPipelineDesc& outDesc) const noexcept;
+		[[nodiscard]] bool ResolveComputePipeline(RHIPipelineHandle pipeline,
+			VulkanPipelineState*& outPipelineState,
+			VulkanBindingLayout*& outBindingLayout) const noexcept;
 
 	private:
+		enum class PipelineType : uint8_t
+		{
+			Graphics,
+			Compute,
+		};
+
 		struct BindingLayoutSlot
 		{
 			std::unique_ptr<VulkanBindingLayout> m_Layout;
@@ -125,7 +134,9 @@ namespace gglab
 		struct PipelineSlot
 		{
 			std::unique_ptr<VulkanPipelineState> m_Pipeline;
-			RHIGraphicsPipelineDesc m_Desc{};
+			PipelineType m_Type = PipelineType::Graphics;
+			RHIGraphicsPipelineDesc m_GraphicsDesc{};
+			RHIComputePipelineDesc m_ComputeDesc{};
 			std::array<ShaderHash128, 5> m_ShaderHashes{};
 		};
 

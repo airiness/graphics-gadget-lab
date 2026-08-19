@@ -1,4 +1,4 @@
-﻿#include "ShaderCompilerCommandLine.h"
+#include "ShaderCompilerCommandLine.h"
 #include "ShaderCompilerProcessFactory.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"

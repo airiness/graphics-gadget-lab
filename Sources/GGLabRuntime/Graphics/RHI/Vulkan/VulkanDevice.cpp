@@ -75,6 +75,8 @@ namespace gglab
 		vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 		vulkan13Features.dynamicRendering = capabilities.m_DynamicRendering ? VK_TRUE : VK_FALSE;
 		vulkan13Features.synchronization2 = capabilities.m_Synchronization2 ? VK_TRUE : VK_FALSE;
+		vulkan13Features.shaderDemoteToHelperInvocation =
+			capabilities.m_ShaderDemoteToHelperInvocation ? VK_TRUE : VK_FALSE;
 		features2.pNext = &vulkan13Features;
 
 		VkPhysicalDeviceVulkan12Features vulkan12Features{};

@@ -1,4 +1,4 @@
-﻿#include "ShaderCompilerProcessFactory.h"
+#include "ShaderCompilerProcessFactory.h"
 #include "Compiler/ShaderCompiler.h"
 
 #include <cstdlib>

@@ -3,13 +3,12 @@
 #include "Core/Math/Quaternion.h"
 #include "Scene/Components.h"
 #include "Core/World.h"
-#include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
-#include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RHI/RHIFormat.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -273,8 +272,9 @@ namespace gglab
 			ImGui::Text("RG Size: %u", shadowRes->m_ShadowMapSize);
 			ImGui::Text(
 				"Texture Size: %u x %u", shadowRes->m_ShadowMapSize, shadowRes->m_ShadowMapSize);
-			ImGui::Text("Format: %s", devtools::EnumText(DXGI_FORMAT_R32_TYPELESS).data());
-			ImGui::Text("Preview SRV Format: %s", devtools::EnumText(DXGI_FORMAT_R32_FLOAT).data());
+			ImGui::Text("Format: %s", GetRHIFormatInfo(RHIFormat::R32Typeless).m_Name);
+			ImGui::Text(
+				"Preview SRV Format: %s", GetRHIFormatInfo(RHIFormat::R32Float).m_Name);
 
 			if (!shadowRes->m_DirectionalShadowMapPreview.IsValid())
 			{
@@ -315,8 +315,8 @@ namespace gglab
 			ImGui::Text("Preview Texture Size: %llu x %u",
 				static_cast<unsigned long long>(previewDesc->m_Extent.m_Width),
 				previewDesc->m_Extent.m_Height);
-			ImGui::Text("Preview Format: %s",
-				devtools::EnumText(ToDXGIFormat(previewDesc->m_Format)).data());
+			ImGui::Text(
+				"Preview Format: %s", GetRHIFormatInfo(previewDesc->m_Format).m_Name);
 			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 
 			if (!previewTextureId)

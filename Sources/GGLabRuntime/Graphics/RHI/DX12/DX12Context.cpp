@@ -92,7 +92,6 @@ namespace gglab
 
 		DX12SwapChain::CreateInfo swapChainInfo{};
 		swapChainInfo.m_DX12Device = m_Device.get();
-		swapChainInfo.m_QueueSystem = m_QueueSystem.get();
 		swapChainInfo.m_PresentQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
 		swapChainInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
 		swapChainInfo.m_Width = desc.m_Width;
@@ -110,6 +109,7 @@ namespace gglab
 		m_SwapChain = std::move(swapChain);
 		GGLAB_ASSERT_MSG(
 			m_SwapChain && m_SwapChain->IsValid(), "DX12Context failed to create the swapchain.");
+		m_BackBufferCompletionFences.resize(m_SwapChain->GetBufferCount());
 
 		m_TransferManager = std::make_unique<TransferManager>(
 			std::make_unique<DX12TransferContext>(m_Device.get(), m_QueueSystem.get()));
@@ -175,12 +175,26 @@ namespace gglab
 		return *m_QueueSystem;
 	}
 
-	RHIFrameContext& DX12Context::BeginFrame() noexcept
+	RHIFrameBeginResult DX12Context::BeginFrame() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_Initialized, "DX12Context::BeginFrame called after finalization.");
 		GGLAB_ASSERT_MSG(m_ActiveFrame == nullptr, "DX12Context only supports one active frame.");
+		if (!m_Initialized || m_ActiveFrame != nullptr || !m_SwapChain || !m_SwapChain->IsValid())
+		{
+			return RHIFrameBeginResult::Fatal();
+		}
 
-		m_SwapChain->WaitFrameCompletion();
+		const uint32_t backBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+		GGLAB_ASSERT(backBufferIndex < m_BackBufferCompletionFences.size());
+		if (backBufferIndex >= m_BackBufferCompletionFences.size())
+		{
+			return RHIFrameBeginResult::Fatal();
+		}
+		const RHIFencePoint& backBufferFence = m_BackBufferCompletionFences[backBufferIndex];
+		if (backBufferFence.IsValid())
+		{
+			m_QueueSystem->WaitForFenceCompletion(backBufferFence);
+		}
 
 		GGLAB_ASSERT(m_NextFrameSlotIndex < m_Frames.size());
 		auto& frame = *m_Frames[m_NextFrameSlotIndex];
@@ -191,7 +205,7 @@ namespace gglab
 		}
 		RetireCompletedWork();
 
-		frame.m_BackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+		frame.m_BackBufferIndex = backBufferIndex;
 		GGLAB_ASSERT(frame.m_BackBufferIndex < m_SwapChain->GetBufferCount());
 		frame.m_SubmittedFence = {};
 		frame.m_ComputeAllocator = nullptr;
@@ -201,17 +215,17 @@ namespace gglab
 		BeginGraphicsRecording(frame);
 		m_GpuProfiler->BeginFrame(frame.m_FrameSlotIndex,
 			m_QueueSystem->GetGraphicsCommandList(frame.m_FrameSlotIndex));
-		return frame;
+		return RHIFrameBeginResult::Ready(frame);
 	}
 
-	RHIFencePoint DX12Context::EndFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFrameEndResult DX12Context::EndFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<DX12FrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"DX12Context::EndFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return {};
+			return RHIFrameEndResult::Fatal();
 		}
 
 		DX12FencePoint computeFence{};
@@ -257,20 +271,26 @@ namespace gglab
 			.RecycleCommandAllocator(frame->m_GraphicsAllocator, graphicsFence);
 
 		m_DescriptorManager->EndFrame(graphicsFence);
-		m_SwapChain->SetFrameCompletionFence(graphicsFence.ToRHI());
-		m_SwapChain->Present();
-		FinishFrame(*frame, graphicsFence.ToRHI());
-		return graphicsFence.ToRHI();
+		const RHIFencePoint submittedFence = graphicsFence.ToRHI();
+		GGLAB_ASSERT(frame->m_BackBufferIndex < m_BackBufferCompletionFences.size());
+		if (frame->m_BackBufferIndex < m_BackBufferCompletionFences.size())
+		{
+			m_BackBufferCompletionFences[frame->m_BackBufferIndex] = submittedFence;
+		}
+		const bool presented = m_SwapChain->Present();
+		FinishFrame(*frame, submittedFence);
+		return presented ? RHIFrameEndResult::Completed(submittedFence)
+			: RHIFrameEndResult::Fatal(submittedFence);
 	}
 
-	void DX12Context::AbortFrame(RHIFrameContext& rhiFrame) noexcept
+	RHIFencePoint DX12Context::AbortFrame(RHIFrameContext& rhiFrame) noexcept
 	{
 		auto* frame = dynamic_cast<DX12FrameContext*>(&rhiFrame);
 		GGLAB_ASSERT_MSG(frame && frame == m_ActiveFrame && frame->m_Active,
 			"DX12Context::AbortFrame received a foreign or inactive frame.");
 		if (!frame || frame != m_ActiveFrame || !frame->m_Active)
 		{
-			return;
+			return {};
 		}
 
 		if (frame->m_ComputeAllocator)
@@ -293,7 +313,9 @@ namespace gglab
 		m_QueueSystem->GetAllocatorPool(DX12QueueType::Graphics)
 			.RecycleCommandAllocator(frame->m_GraphicsAllocator, fence);
 		m_DescriptorManager->EndFrame(fence);
-		FinishFrame(*frame, fence.ToRHI());
+		const RHIFencePoint submittedFence = fence.ToRHI();
+		FinishFrame(*frame, submittedFence);
+		return submittedFence;
 	}
 
 	void DX12Context::WaitForFence(
@@ -312,6 +334,7 @@ namespace gglab
 		}
 		WaitIdle();
 		m_SwapChain->Resize(width, height);
+		m_BackBufferCompletionFences.assign(m_SwapChain->GetBufferCount(), {});
 	}
 
 	void DX12Context::WaitIdle() noexcept
@@ -397,9 +420,10 @@ namespace gglab
 		}
 		if (m_ActiveFrame)
 		{
-			AbortFrame(*m_ActiveFrame);
+			GGLAB_UNUSED(AbortFrame(*m_ActiveFrame));
 		}
 		WaitIdle();
+		m_BackBufferCompletionFences.clear();
 		m_Frames.clear();
 		m_DirectComputeContexts.clear();
 		m_TransferManager.reset();

@@ -2,7 +2,7 @@
 
 namespace gglab
 {
-	struct SelfTestContext;
+	class SelfTestContext;
 
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept;
 }

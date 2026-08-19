@@ -64,42 +64,53 @@ namespace gglab::math
 
 	[[nodiscard]] inline bool IsFinite(const Vector2& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y);
+		return
+			IsFinite(value.m_X) &&
+			IsFinite(value.m_Y);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Vector3& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z);
+		return
+			IsFinite(value.m_X) &&
+			IsFinite(value.m_Y) &&
+			IsFinite(value.m_Z);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Vector4& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) &&
+		return
+			IsFinite(value.m_X) &&
+			IsFinite(value.m_Y) &&
+			IsFinite(value.m_Z) &&
 			IsFinite(value.m_W);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Color& value) noexcept
 	{
-		return IsFinite(value.m_R) && IsFinite(value.m_G) && IsFinite(value.m_B) &&
+		return
+			IsFinite(value.m_R) &&
+			IsFinite(value.m_G) &&
+			IsFinite(value.m_B) &&
 			IsFinite(value.m_A);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Quaternion& value) noexcept
 	{
-		return IsFinite(value.m_X) && IsFinite(value.m_Y) && IsFinite(value.m_Z) &&
+		return
+			IsFinite(value.m_X) &&
+			IsFinite(value.m_Y) &&
+			IsFinite(value.m_Z) &&
 			IsFinite(value.m_W);
 	}
 
 	[[nodiscard]] inline bool IsFinite(const Matrix& value) noexcept
 	{
-		for (const auto& row : value.m_M)
+		for (float component : value.ToArray())
 		{
-			for (float component : row)
+			if (!IsFinite(component))
 			{
-				if (!IsFinite(component))
-				{
-					return false;
-				}
+				return false;
 			}
 		}
 		return true;

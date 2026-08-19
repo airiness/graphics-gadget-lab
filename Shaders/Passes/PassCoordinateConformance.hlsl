@@ -20,6 +20,17 @@ struct CoordinateConformanceParameters
 };
 
 ConstantBuffer<CoordinateConformanceParameters> g_Pass : register(b2);
+StructuredBuffer<uint> g_ComputeInput : register(t1);
+RWStructuredBuffer<uint> g_ComputeOutput : register(u1);
+
+[numthreads(1, 1, 1)]
+void CSStorageDependency(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+	if (dispatchThreadId.x == 0)
+	{
+		g_ComputeOutput[0] += g_ComputeInput[0];
+	}
+}
 
 struct GeometryVertexInput
 {

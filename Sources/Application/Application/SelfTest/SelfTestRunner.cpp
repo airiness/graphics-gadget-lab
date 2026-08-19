@@ -2,6 +2,9 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#if GGLAB_ENABLE_VULKAN
+#include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
+#endif
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
 
@@ -25,6 +28,12 @@ namespace gglab
 				.m_Id = "napa-voxel",
 				.m_Run = &RunNapaVoxelCoreSelfTests,
 			},
+#if GGLAB_ENABLE_VULKAN
+			SelfTestSuiteDesc{
+				.m_Id = "app-developgui-vulkan-presentation-contract",
+				.m_Run = &RunDevelopGuiVulkanPresentationContractSelfTests,
+			},
+#endif
 		};
 
 		[[nodiscard]] const SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept

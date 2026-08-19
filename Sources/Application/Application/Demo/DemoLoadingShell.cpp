@@ -7,7 +7,8 @@
 
 namespace gglab
 {
-	DemoLoadingShell::DemoLoadingShell(const DemoCreateInfo& createInfo) noexcept
+	DemoLoadingShell::DemoLoadingShell(
+		const DemoCreateInfo& createInfo, bool minimalGraphicsSmoke) noexcept
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoLoadingShell requires valid create info.");
 
@@ -22,7 +23,7 @@ namespace gglab
 
 		m_CameraController = std::make_unique<CameraController>(CameraController::CreateInfo{});
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
-		m_RenderPipeline = CreateDemoLoadingShellRenderPipeline();
+		m_RenderPipeline = CreateDemoLoadingShellRenderPipeline(minimalGraphicsSmoke);
 	}
 
 	void DemoLoadingShell::OnResize(uint32_t width, uint32_t height) noexcept

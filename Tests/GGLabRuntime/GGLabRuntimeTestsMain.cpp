@@ -7,15 +7,16 @@
 #include "RenderingContractSelfTests.h"
 #include "ShaderCompileContractSelfTests.h"
 #include "ShaderCompilerCliContractSelfTests.h"
+#if GGLAB_ENABLE_VULKAN
 #include "VulkanContractSelfTests.h"
+#endif
 
 #include <algorithm>
-#include <array>
 #include <string_view>
 
 namespace
 {
-	constexpr std::array RegisteredSuites{
+	constexpr gglab::SelfTestSuiteDesc RegisteredSuites[]{
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "artifact-cache",
 			.m_Run = &gglab::RunArtifactCacheSelfTests,
@@ -44,17 +45,19 @@ namespace
 			.m_Id = "rendering-contracts",
 			.m_Run = &gglab::RunRenderingContractSelfTests,
 		},
+#if GGLAB_ENABLE_VULKAN
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "vulkan-contracts",
 			.m_Run = &gglab::RunVulkanContractSelfTests,
 		},
+#endif
 	};
 
 	[[nodiscard]] const gglab::SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
 	{
 		const auto iterator =
 			std::ranges::find(RegisteredSuites, suiteId, &gglab::SelfTestSuiteDesc::m_Id);
-		return iterator != RegisteredSuites.end() ? &*iterator : nullptr;
+		return iterator != std::ranges::end(RegisteredSuites) ? &*iterator : nullptr;
 	}
 
 	[[nodiscard]] bool RunSelection(std::string_view selection) noexcept

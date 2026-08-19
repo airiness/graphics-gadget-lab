@@ -253,65 +253,20 @@ namespace gglab
 		nativeBarriers.reserve(barriers.size());
 		for (const RHITextureBarrier& barrier : barriers)
 		{
-			if (!IsRHIResourceStateValid(
-				barrier.m_Before, RHIResourceStateUsage::TextureBarrierBefore) ||
-				!IsRHIResourceStateValid(
-					barrier.m_After, RHIResourceStateUsage::TextureBarrierAfter))
-			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::TextureBarrier rejected an invalid RHI state.");
-				m_RecordingFailed = true;
-				return;
-			}
-			const std::optional<VkImageLayout> oldLayout =
-				ToVulkanImageLayout(barrier.m_Before.m_Layout);
-			const std::optional<VkImageLayout> newLayout =
-				ToVulkanImageLayout(barrier.m_After.m_Layout);
-			if (!oldLayout || !newLayout)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::TextureBarrier could not lower an RHI layout.");
-				m_RecordingFailed = true;
-				return;
-			}
 			VulkanResourceManager& resources = m_Device->GetResourceManager();
 			VulkanTexture* texture = resources.ResolveTexture(barrier.m_Texture);
 			const RHITextureDesc* desc = resources.ResolveTextureDesc(barrier.m_Texture);
-			if (!texture || !desc)
+			const auto native = texture && desc
+				? BuildVulkanTextureBarrier(barrier, texture->Get(), *desc)
+				: std::nullopt;
+			if (!native)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::TextureBarrier received a non-live texture.");
+					"VulkanTransferContext::TextureBarrier rejected an invalid state, range or texture.");
 				m_RecordingFailed = true;
 				return;
 			}
-			const RHISubresourceRange range =
-				NormalizeTextureSubresourceRange(*desc, barrier.m_Subresources);
-			if (range.m_MipCount == 0 || range.m_ArraySliceCount == 0 ||
-				range.m_Aspects == RHITextureAspect::None)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::TextureBarrier rejected an empty subresource range.");
-				m_RecordingFailed = true;
-				return;
-			}
-
-			VkImageMemoryBarrier2 native{};
-			native.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-			native.srcStageMask = ToVulkanPipelineStages(barrier.m_Before.m_Stages);
-			native.srcAccessMask = ToVulkanAccessFlags(barrier.m_Before.m_Access);
-			native.dstStageMask = ToVulkanPipelineStages(barrier.m_After.m_Stages);
-			native.dstAccessMask = ToVulkanAccessFlags(barrier.m_After.m_Access);
-			native.oldLayout = *oldLayout;
-			native.newLayout = *newLayout;
-			native.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			native.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			native.image = texture->Get();
-			native.subresourceRange.aspectMask = ToVulkanImageAspectFlags(range.m_Aspects);
-			native.subresourceRange.baseMipLevel = range.m_BaseMip;
-			native.subresourceRange.levelCount = range.m_MipCount;
-			native.subresourceRange.baseArrayLayer = range.m_BaseArraySlice;
-			native.subresourceRange.layerCount = range.m_ArraySliceCount;
-			nativeBarriers.push_back(native);
+			nativeBarriers.push_back(*native);
 			RecordTextureUse(barrier.m_Texture);
 		}
 		const VkDependencyInfo dependencyInfo{
@@ -333,34 +288,18 @@ namespace gglab
 		nativeBarriers.reserve(barriers.size());
 		for (const RHIBufferBarrier& barrier : barriers)
 		{
-			if (!IsRHIResourceStateValid(barrier.m_Before, RHIResourceStateUsage::Buffer) ||
-				!IsRHIResourceStateValid(barrier.m_After, RHIResourceStateUsage::Buffer))
-			{
-				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::BufferBarrier rejected an invalid RHI state.");
-				m_RecordingFailed = true;
-				return;
-			}
 			VulkanBuffer* buffer = m_Device->GetResourceManager().ResolveBuffer(barrier.m_Buffer);
-			if (!buffer)
+			const auto native = buffer
+				? BuildVulkanBufferBarrier(barrier, buffer->Get())
+				: std::nullopt;
+			if (!native)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
-					"VulkanTransferContext::BufferBarrier received a non-live buffer.");
+					"VulkanTransferContext::BufferBarrier rejected an invalid state or buffer.");
 				m_RecordingFailed = true;
 				return;
 			}
-			VkBufferMemoryBarrier2 native{};
-			native.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
-			native.srcStageMask = ToVulkanPipelineStages(barrier.m_Before.m_Stages);
-			native.srcAccessMask = ToVulkanAccessFlags(barrier.m_Before.m_Access);
-			native.dstStageMask = ToVulkanPipelineStages(barrier.m_After.m_Stages);
-			native.dstAccessMask = ToVulkanAccessFlags(barrier.m_After.m_Access);
-			native.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			native.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			native.buffer = buffer->Get();
-			native.offset = 0;
-			native.size = VK_WHOLE_SIZE;
-			nativeBarriers.push_back(native);
+			nativeBarriers.push_back(*native);
 			RecordBufferUse(barrier.m_Buffer);
 		}
 		const VkDependencyInfo dependencyInfo{

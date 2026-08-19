@@ -1,4 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
+#include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <format>
@@ -63,5 +64,14 @@ namespace gglab
 
 		result.m_Surface = std::make_unique<VulkanSurface>(instance, surface);
 		return result;
+	}
+
+	VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntimeForWindow(
+		VulkanBootstrapRuntimeCreateInfo createInfo, void* nativeWindowHandle) noexcept
+	{
+		VulkanWin32SurfaceFactory surfaceFactory(
+			GetModuleHandleW(nullptr), static_cast<HWND>(nativeWindowHandle));
+		createInfo.m_BootstrapOptions.m_SurfaceFactory = &surfaceFactory;
+		return CreateVulkanBootstrapRuntime(createInfo);
 	}
 }

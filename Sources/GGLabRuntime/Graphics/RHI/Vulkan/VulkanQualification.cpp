@@ -19,7 +19,6 @@
 #endif
 
 #include <array>
-#include <charconv>
 #include <cstring>
 #include <cstdint>
 #include <string_view>
@@ -30,34 +29,6 @@ namespace gglab
 	namespace
 	{
 #if GGLAB_ENABLE_VULKAN
-		[[nodiscard]] VulkanAdapterSelectionRequest MakeVulkanSelectionRequest(
-			const std::optional<std::string>& selector) noexcept
-		{
-			VulkanAdapterSelectionRequest request{};
-			if (!selector)
-			{
-				return request;
-			}
-
-			const std::string& value = *selector;
-			uint64_t parsedIndex = 0;
-			const bool isIndex = !value.empty() &&
-				std::ranges::all_of(value,
-					[](char c) noexcept { return c >= '0' && c <= '9'; }) &&
-				value.size() <= 10 &&
-				(std::from_chars(value.data(), value.data() + value.size(), parsedIndex).ec ==
-					std::errc{});
-			if (isIndex)
-			{
-				request.m_Kind = VulkanAdapterSelectionKind::Index;
-				request.m_Index = static_cast<uint32_t>(parsedIndex);
-				return request;
-			}
-			request.m_Kind = VulkanAdapterSelectionKind::Prefix;
-			request.m_Prefix = value;
-			return request;
-		}
-
 		[[nodiscard]] VulkanBootstrapOptions MakeVulkanBootstrapOptions(
 			const VulkanQualificationOptions& options,
 			const VulkanSurfaceFactoryBase& surfaceFactory) noexcept
@@ -66,7 +37,7 @@ namespace gglab
 			bootstrapOptions.m_SurfaceFactory = &surfaceFactory;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
-				MakeVulkanSelectionRequest(options.m_AdapterSelector);
+				ParseVulkanAdapterSelectionRequest(options.m_AdapterSelector);
 			return bootstrapOptions;
 		}
 
@@ -1484,7 +1455,7 @@ namespace gglab
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
 			const bool set0Initialized = set0Frames.Initialize(
-				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount());
+				&device, &uniformBuffer, runtime.GetFrameSlotCount());
 			if (!set0Initialized || !set0Frames.BeginFrame(0) ||
 				set0Frames.BeginFrame(0) || uniformBuffer.GetAlignmentInBytes() != uniformAlignment)
 			{
@@ -1514,7 +1485,7 @@ namespace gglab
 				first.m_Allocation.m_DynamicOffset % uniformAlignment != 0 ||
 				second.m_Allocation.m_DynamicOffset % uniformAlignment != 0 || overflow.IsValid() ||
 				!diagnostics || diagnostics->m_OverflowCount == 0 ||
-				set0Frames.GetDescriptorSet(0) == VK_NULL_HANDLE)
+				set0Frames.AllocateDescriptorSet(0, *layout, {}) == VK_NULL_HANDLE)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify dynamic uniform: immutable allocation, alignment or overflow failed.");
@@ -1636,6 +1607,18 @@ namespace gglab
 				.m_DebugName = "PassConstants",
 			};
 			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+				.m_Visibility = RHIShaderStage::Compute,
+				.m_Binding = 1,
+				.m_DebugName = "ComputeInput",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::ReadWriteStorageBuffer,
+				.m_Visibility = RHIShaderStage::Compute,
+				.m_Binding = 1,
+				.m_DebugName = "ComputeOutput",
+			};
+			layoutDesc.m_Slots[layoutDesc.m_SlotCount++] = {
 				.m_Type = RHIBindingType::BindlessResourceTable,
 				.m_Visibility = RHIShaderStage::All,
 				.m_Count = 0,
@@ -1677,12 +1660,16 @@ namespace gglab
 				compileShader(ShaderStage::Pixel, L"PSConformance");
 			const ShaderCompileResult depthOverrideResult =
 				compileShader(ShaderStage::Pixel, L"PSDepthOverride");
+			const ShaderCompileResult computeResult =
+				compileShader(ShaderStage::Compute, L"CSStorageDependency");
 			if (!geometryResult.IsSuccess() || !fullscreenResult.IsSuccess() ||
 				!pixelResult.IsSuccess() || !depthOverrideResult.IsSuccess() ||
+				!computeResult.IsSuccess() ||
 				geometryResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
 				fullscreenResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
 				pixelResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
-				depthOverrideResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
+				depthOverrideResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV ||
+				computeResult.m_Artifact.GetBinaryFormat() != ShaderBinaryFormat::SpirV)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: coordinate shader compilation failed.");
 				return 1;
@@ -1718,6 +1705,14 @@ namespace gglab
 				.m_Hash = ComputeShaderBinaryHash(depthOverrideResult.m_Artifact.m_Binary,
 					depthOverrideResult.m_Artifact.GetBinaryFormat()),
 				.m_EntryPoint = L"PSDepthOverride",
+			};
+			const ShaderBytecode computeShader{
+				.m_Data = computeResult.m_Artifact.m_Binary.Data(),
+				.m_SizeInBytes = computeResult.m_Artifact.m_Binary.SizeInBytes(),
+				.m_Format = computeResult.m_Artifact.GetBinaryFormat(),
+				.m_Hash = ComputeShaderBinaryHash(computeResult.m_Artifact.m_Binary,
+					computeResult.m_Artifact.GetBinaryFormat()),
+				.m_EntryPoint = L"CSStorageDependency",
 			};
 
 			RHIGraphicsPipelineDesc geometryDesc{};
@@ -1796,9 +1791,14 @@ namespace gglab
 				.m_VertexShader = fullscreenShader,
 				.m_PixelShader = depthOverrideShader,
 				});
+			const RHIPipelineHandle computePipeline = pipelineSystem.CreateComputePipeline({
+				.m_Desc = {.m_BindingLayout = layoutHandle },
+				.m_ComputeShader = computeShader,
+				});
 			if (!geometryPipeline.IsValid() || !depthPipeline.IsValid() ||
 				!positionPipeline.IsValid() || !backCullPipeline.IsValid() ||
-				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid())
+				!depthWithoutPixelPipeline.IsValid() || !depthOverridePipeline.IsValid() ||
+				!computePipeline.IsValid())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: native pipeline creation failed.");
 				return 1;
@@ -2010,6 +2010,52 @@ namespace gglab
 			device.UnmapBuffer(vertexBuffer.Get(), { 0, sizeof(vertices) });
 			device.UnmapBuffer(indexBuffer.Get(), { 0, sizeof(indices) });
 
+			constexpr uint32_t computeInputValue = 7;
+			constexpr uint32_t computeInitialValue = 1;
+			constexpr uint32_t computeExpectedValue =
+				computeInitialValue + computeInputValue * 2;
+			const RHIBufferDesc computeInputDesc{
+				.m_SizeInBytes = sizeof(uint32_t),
+				.m_StrideInBytes = sizeof(uint32_t),
+				.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest,
+				.m_DebugName = "Qualification.ComputeInput",
+			};
+			const RHIBufferDesc computeOutputDesc{
+				.m_SizeInBytes = sizeof(uint32_t),
+				.m_StrideInBytes = sizeof(uint32_t),
+				.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::UnorderedAccess |
+					RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource,
+				.m_DebugName = "Qualification.ComputeOutput",
+			};
+			const RHIBufferDesc computeReadbackDesc{
+				.m_SizeInBytes = sizeof(uint32_t),
+				.m_Usage = RHIBufferUsage::CopyDest,
+				.m_MemoryUsage = RHIMemoryUsage::GpuToCpu,
+				.m_DebugName = "Qualification.ComputeReadback",
+			};
+			RHIBufferOwner computeInput(&device, device.CreateBuffer(computeInputDesc));
+			RHIBufferOwner computeOutput(&device, device.CreateBuffer(computeOutputDesc));
+			RHIBufferOwner computeReadback(&device, device.CreateBuffer(computeReadbackDesc));
+			if (!computeInput || !computeOutput || !computeReadback)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify compute: buffer creation failed.");
+				return 1;
+			}
+			{
+				TransferBatch batch = transferManager.BeginBatch();
+				const bool inputRecorded = batch.UploadBuffer(computeInput.Get(), 0,
+					&computeInputValue, sizeof(computeInputValue));
+				const bool outputRecorded = batch.UploadBuffer(computeOutput.Get(), 0,
+					&computeInitialValue, sizeof(computeInitialValue));
+				const RHITransferSubmission submission = batch.Submit(true);
+				if (!inputRecorded || !outputRecorded || !submission.m_Completion.IsValid() ||
+					!device.IsFencePointCompleted(submission.m_Completion))
+				{
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify compute: buffer upload failed.");
+					return 1;
+				}
+			}
+
 			const uint32_t uniformAlignment = static_cast<uint32_t>(std::max<VkDeviceSize>(
 				device.GetPhysicalDeviceLimits().minUniformBufferOffsetAlignment, 1));
 			VulkanDynamicUniformBuffer uniformBuffer;
@@ -2024,7 +2070,7 @@ namespace gglab
 			}
 			VulkanSet0DynamicUniformFrames set0Frames;
 			if (!set0Frames.Initialize(
-				&device, *layout, &uniformBuffer, runtime.GetFrameSlotCount()))
+				&device, &uniformBuffer, runtime.GetFrameSlotCount()))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: set-0 frame initialization failed.");
 				return 1;
@@ -2115,6 +2161,7 @@ namespace gglab
 
 			VulkanGraphicsCommandContext commandContext(
 				&device, &pipelineSystem, &uniformBuffer, &set0Frames);
+			VulkanComputeCommandContext computeContext(commandContext);
 			if (!commandContext.BeginEncoding(recording.m_CommandBuffer, begin.m_FrameSlotIndex))
 			{
 				GGLAB_UNUSED(set0Frames.AbortFrame(begin.m_FrameSlotIndex));
@@ -2122,6 +2169,70 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify graphics: graphics encoder did not begin.");
 				return 1;
 			}
+			constexpr RHIResourceState commonBufferState{
+				.m_Stages = RHIStage::All,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState computeReadState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::ShaderResource,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState computeReadWriteState{
+				.m_Stages = RHIStage::ComputeShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState graphicsReadWriteState{
+				.m_Stages = RHIStage::PixelShader,
+				.m_Access = RHIAccess::UnorderedAccess,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState copySourceState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopySource,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState copyDestState{
+				.m_Stages = RHIStage::Copy,
+				.m_Access = RHIAccess::CopyDest,
+				.m_Layout = RHILayout::Common,
+			};
+			const std::array computeBeginBarriers{
+				RHIBufferBarrier{ computeInput.Get(), commonBufferState, computeReadState },
+				RHIBufferBarrier{ computeOutput.Get(), commonBufferState, computeReadWriteState },
+				RHIBufferBarrier{ computeReadback.Get(), commonBufferState, copyDestState },
+			};
+			computeContext.BufferBarrier(computeBeginBarriers);
+			computeContext.FlushBarriers();
+			computeContext.SetPipeline(computePipeline);
+			computeContext.SetReadOnlyBuffer(1, computeInput.Get());
+			computeContext.SetReadWriteBuffer(2, computeOutput.Get());
+			computeContext.Dispatch(1, 1, 1);
+			const RHIBufferBarrier orderedStorageBarrier{
+				computeOutput.Get(), computeReadWriteState, computeReadWriteState
+			};
+			computeContext.BufferBarrier(std::span(&orderedStorageBarrier, 1));
+			computeContext.FlushBarriers();
+			const RHIBufferBarrier computeToGraphicsBarrier{
+				computeOutput.Get(), computeReadWriteState, graphicsReadWriteState
+			};
+			computeContext.BufferBarrier(std::span(&computeToGraphicsBarrier, 1));
+			computeContext.FlushBarriers();
+			const RHIBufferBarrier graphicsToComputeBarrier{
+				computeOutput.Get(), graphicsReadWriteState, computeReadWriteState
+			};
+			computeContext.BufferBarrier(std::span(&graphicsToComputeBarrier, 1));
+			computeContext.FlushBarriers();
+			computeContext.Dispatch(1, 1, 1);
+			const RHIBufferBarrier computeToCopyBarrier{
+				computeOutput.Get(), computeReadWriteState, copySourceState
+			};
+			computeContext.BufferBarrier(std::span(&computeToCopyBarrier, 1));
+			computeContext.FlushBarriers();
+			computeContext.CopyBuffer(computeReadback.Get(), 0, computeOutput.Get(), 0,
+				sizeof(uint32_t));
 			const auto makeParameters = [&](CoordinateConformanceMode mode, float depth = 0.0f,
 				uint32_t textureIndex = UINT32_MAX, float depthOverride = 0.0f)
 				{
@@ -2323,11 +2434,26 @@ namespace gglab
 			const bool pipelineCacheCleared = pipelineSystem.IsAlive(layoutHandle) &&
 				!pipelineSystem.IsAlive(geometryPipeline) &&
 				!pipelineSystem.IsAlive(depthWithoutPixelPipeline) &&
-				!pipelineSystem.IsAlive(depthOverridePipeline);
+				!pipelineSystem.IsAlive(depthOverridePipeline) &&
+				!pipelineSystem.IsAlive(computePipeline);
 			if (!uniformFrameEnded || !pipelineCacheCleared || runtime.WaitIdle() != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify graphics: completion, pipeline invalidation or uniform retirement failed.");
+				return 1;
+			}
+			const auto* computeReadbackValue = static_cast<const uint32_t*>(
+				device.MapBuffer(computeReadback.Get(), { 0, sizeof(uint32_t) }));
+			const bool computePassed =
+				computeReadbackValue && *computeReadbackValue == computeExpectedValue;
+			if (computeReadbackValue)
+			{
+				device.UnmapBuffer(computeReadback.Get(), {});
+			}
+			if (!computePassed)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"qualify compute: dispatch, ordered-storage barrier or copy result failed.");
 				return 1;
 			}
 
@@ -2420,7 +2546,7 @@ namespace gglab
 			transferManager.Reclaim();
 			device.RetireCompletedWork();
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
-				"qualify graphics: winding, back-face culling, depth-only shader stages, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
+				"qualify graphics/compute: command-layer barriers, buffer copy, ordered storage dispatch, winding, back-face culling, depth-only shader stages, indexed texture sampling, reversed-Z, scissor and SV_Position probes passed.");
 			return 0;
 		}
 

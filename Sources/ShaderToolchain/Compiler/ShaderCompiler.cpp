@@ -1,4 +1,4 @@
-﻿#include "Compiler/ShaderCompiler.h"
+#include "Compiler/ShaderCompiler.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Contracts/ShaderArtifactManifest.h"
 #include "GGLabFoundation/Base/CoreMacros.h"

@@ -21,6 +21,11 @@ namespace gglab
 	AlphaTestLabSession::AlphaTestLabSession(const LabSessionCreateInfo& createInfo) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
 	{
+		auto& profile = GetMutableViewRenderProfile();
+		profile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
+		profile.m_Lighting.m_GTAO.m_Enabled = false;
+		profile.m_PostProcess.m_Bloom.m_Enabled = false;
+
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = EnableCameraInputId,

@@ -13,6 +13,11 @@
 
 namespace gglab
 {
+	namespace
+	{
+		constexpr uint32_t Set0DescriptorSetsPerFrame = 256;
+	}
+
 	VulkanDynamicUniformArena::VulkanDynamicUniformArena(
 		const VulkanDynamicUniformArenaConfig& config) noexcept : m_Config(config)
 	{
@@ -373,44 +378,30 @@ namespace gglab
 	}
 
 	bool VulkanSet0DynamicUniformFrames::Initialize(VulkanDevice* device,
-		const VulkanBindingLayout& layout, VulkanDynamicUniformBuffer* uniformBuffer,
-		uint32_t frameSlotCount) noexcept
+		VulkanDynamicUniformBuffer* uniformBuffer, uint32_t frameSlotCount) noexcept
 	{
-		if (m_Device != nullptr || device == nullptr || !layout.IsValid() ||
-			uniformBuffer == nullptr || frameSlotCount == 0 ||
+		if (m_Device != nullptr || device == nullptr || uniformBuffer == nullptr ||
+			frameSlotCount == 0 ||
 			!device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::Initialize"))
 		{
 			return false;
 		}
 		m_Device = device;
-		m_Layout = &layout;
 		m_UniformBuffer = uniformBuffer;
 		m_FrameSlots.resize(frameSlotCount);
 
-		std::vector<VkDescriptorPoolSize> poolSizes;
-		for (uint32_t bindingIndex = 0;
-			bindingIndex < layout.GetPlan().m_Set0BindingCount; ++bindingIndex)
-		{
-			const VulkanSet0BindingPlan& binding = layout.GetPlan().m_Set0Bindings[bindingIndex];
-			auto iterator = std::ranges::find_if(poolSizes,
-				[&binding](const VkDescriptorPoolSize& size) noexcept
-				{
-					return size.type == binding.m_DescriptorType;
-				});
-			if (iterator == poolSizes.end())
-			{
-				poolSizes.push_back({ binding.m_DescriptorType, binding.m_DescriptorCount });
-			}
-			else
-			{
-				iterator->descriptorCount += binding.m_DescriptorCount;
-			}
-		}
+		constexpr uint32_t DescriptorCapacity =
+			Set0DescriptorSetsPerFrame * RHIBindingLayoutDesc::MaxSlots;
+		const std::array poolSizes{
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, DescriptorCapacity },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, DescriptorCapacity },
+			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, DescriptorCapacity },
+		};
 		for (uint32_t frameSlotIndex = 0; frameSlotIndex < frameSlotCount; ++frameSlotIndex)
 		{
 			VkDescriptorPoolCreateInfo poolInfo{};
 			poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			poolInfo.maxSets = 1;
+			poolInfo.maxSets = Set0DescriptorSetsPerFrame;
 			poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 			poolInfo.pPoolSizes = poolSizes.data();
 			const VkResult result = vkCreateDescriptorPool(
@@ -467,7 +458,6 @@ namespace gglab
 		}
 		m_FrameSlots.clear();
 		m_UniformBuffer = nullptr;
-		m_Layout = nullptr;
 		m_Device = nullptr;
 	}
 
@@ -499,53 +489,6 @@ namespace gglab
 				"vkResetDescriptorPool(set 0) failed with {}.", ToString(result));
 			(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
 			return false;
-		}
-		slot.m_Set = VK_NULL_HANDLE;
-		const VkDescriptorSetLayout set0Layout = m_Layout->GetSet0Layout();
-		VkDescriptorSetAllocateInfo allocateInfo{};
-		allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocateInfo.descriptorPool = slot.m_Pool;
-		allocateInfo.descriptorSetCount = 1;
-		allocateInfo.pSetLayouts = &set0Layout;
-		result = vkAllocateDescriptorSets(m_Device->Get(), &allocateInfo, &slot.m_Set);
-		if (result != VK_SUCCESS)
-		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"vkAllocateDescriptorSets(set 0) failed with {}.", ToString(result));
-			(void)m_UniformBuffer->AbortFrame(frameSlotIndex);
-			return false;
-		}
-
-		const VulkanBindingLayoutPlan& plan = m_Layout->GetPlan();
-		std::vector<VkDescriptorBufferInfo> bufferInfos;
-		std::vector<VkWriteDescriptorSet> writes;
-		bufferInfos.reserve(plan.m_DynamicOffsetCount);
-		writes.reserve(plan.m_DynamicOffsetCount);
-		for (uint32_t bindingIndex = 0; bindingIndex < plan.m_Set0BindingCount; ++bindingIndex)
-		{
-			const VulkanSet0BindingPlan& binding = plan.m_Set0Bindings[bindingIndex];
-			if (binding.m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
-			{
-				continue;
-			}
-			bufferInfos.push_back({
-				.buffer = m_UniformBuffer->GetNativeBuffer(frameSlotIndex),
-				.offset = 0,
-				.range = binding.m_SizeInBytes,
-				});
-			writes.push_back({
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet = slot.m_Set,
-				.dstBinding = binding.m_Binding,
-				.descriptorCount = 1,
-				.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-				.pBufferInfo = &bufferInfos.back(),
-				});
-		}
-		if (!writes.empty())
-		{
-			vkUpdateDescriptorSets(m_Device->Get(),
-				static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 		}
 		slot.m_LastResetGeneration = frameGeneration;
 		slot.m_LastSubmittedFence = {};
@@ -579,16 +522,107 @@ namespace gglab
 			return false;
 		}
 		FrameSlot& slot = m_FrameSlots[frameSlotIndex];
-		slot.m_Set = VK_NULL_HANDLE;
 		slot.m_Active = false;
 		return true;
 	}
 
-	VkDescriptorSet VulkanSet0DynamicUniformFrames::GetDescriptorSet(
-		uint32_t frameSlotIndex) const noexcept
+	bool VulkanSet0DynamicUniformFrames::IsFrameActive(uint32_t frameSlotIndex) const noexcept
 	{
-		return frameSlotIndex < m_FrameSlots.size() && m_FrameSlots[frameSlotIndex].m_Active
-			? m_FrameSlots[frameSlotIndex].m_Set
-			: VK_NULL_HANDLE;
+		return frameSlotIndex < m_FrameSlots.size() && m_FrameSlots[frameSlotIndex].m_Active;
+	}
+
+	VkDescriptorSet VulkanSet0DynamicUniformFrames::AllocateDescriptorSet(uint32_t frameSlotIndex,
+		const VulkanBindingLayout& bindingLayout,
+		std::span<const VulkanSet0BufferBinding> bufferBindings) noexcept
+	{
+		if (m_Device == nullptr || m_UniformBuffer == nullptr || !bindingLayout.IsValid() ||
+			frameSlotIndex >= m_FrameSlots.size() || !m_FrameSlots[frameSlotIndex].m_Active ||
+			!m_Device->RequireOwnerThread("VulkanSet0DynamicUniformFrames::AllocateDescriptorSet"))
+		{
+			return VK_NULL_HANDLE;
+		}
+
+		FrameSlot& slot = m_FrameSlots[frameSlotIndex];
+		const VkDescriptorSetLayout layout = bindingLayout.GetSet0Layout();
+		VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+		const VkDescriptorSetAllocateInfo allocateInfo{
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.descriptorPool = slot.m_Pool,
+			.descriptorSetCount = 1,
+			.pSetLayouts = &layout,
+		};
+		const VkResult result =
+			vkAllocateDescriptorSets(m_Device->Get(), &allocateInfo, &descriptorSet);
+		if (result != VK_SUCCESS)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"vkAllocateDescriptorSets(set 0 snapshot) failed with {}.", ToString(result));
+			return VK_NULL_HANDLE;
+		}
+
+		const VulkanBindingLayoutPlan& plan = bindingLayout.GetPlan();
+		std::vector<VkDescriptorBufferInfo> bufferInfos;
+		std::vector<VkWriteDescriptorSet> writes;
+		bufferInfos.reserve(plan.m_DynamicOffsetCount + bufferBindings.size());
+		writes.reserve(plan.m_DynamicOffsetCount + bufferBindings.size());
+		for (uint32_t bindingIndex = 0; bindingIndex < plan.m_Set0BindingCount; ++bindingIndex)
+		{
+			const VulkanSet0BindingPlan& binding = plan.m_Set0Bindings[bindingIndex];
+			if (binding.m_DescriptorType != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+			{
+				continue;
+			}
+			bufferInfos.push_back({
+				.buffer = m_UniformBuffer->GetNativeBuffer(frameSlotIndex),
+				.offset = 0,
+				.range = binding.m_SizeInBytes,
+				});
+			writes.push_back({
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = descriptorSet,
+				.dstBinding = binding.m_Binding,
+				.descriptorCount = 1,
+				.descriptorType = binding.m_DescriptorType,
+				.pBufferInfo = &bufferInfos.back(),
+				});
+		}
+
+		for (const VulkanSet0BufferBinding& source : bufferBindings)
+		{
+			const auto bindings = std::span<const VulkanSet0BindingPlan>(
+				plan.m_Set0Bindings.data(), plan.m_Set0BindingCount);
+			const auto binding = std::ranges::find_if(bindings,
+				[&source](const VulkanSet0BindingPlan& candidate) noexcept
+				{
+					return candidate.m_LogicalParameterIndex == source.m_LogicalParameterIndex;
+				});
+			if (binding == bindings.end() ||
+				binding->m_DescriptorType != source.m_DescriptorType ||
+				source.m_Buffer == VK_NULL_HANDLE || source.m_Range == 0)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Vulkan set-0 snapshot rejected an invalid fixed-buffer binding.");
+				return VK_NULL_HANDLE;
+			}
+			bufferInfos.push_back({
+				.buffer = source.m_Buffer,
+				.offset = source.m_Offset,
+				.range = source.m_Range,
+				});
+			writes.push_back({
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet = descriptorSet,
+				.dstBinding = binding->m_Binding,
+				.descriptorCount = 1,
+				.descriptorType = binding->m_DescriptorType,
+				.pBufferInfo = &bufferInfos.back(),
+				});
+		}
+		if (!writes.empty())
+		{
+			vkUpdateDescriptorSets(m_Device->Get(),
+				static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+		}
+		return descriptorSet;
 	}
 }

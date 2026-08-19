@@ -1,4 +1,4 @@
-﻿#include "ShaderCompilerCliContractSelfTests.h"
+#include "ShaderCompilerCliContractSelfTests.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"

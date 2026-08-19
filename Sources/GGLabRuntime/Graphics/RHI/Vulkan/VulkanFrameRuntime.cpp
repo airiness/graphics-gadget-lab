@@ -515,7 +515,8 @@ namespace gglab
 		return EndFrame();
 	}
 
-	VulkanFrameRecording VulkanFrameRuntime::BeginFrameRecording() noexcept
+	VulkanFrameRecording VulkanFrameRuntime::BeginFrameRecording(
+		VulkanPresentTransitionOwnership transitionOwnership) noexcept
 	{
 		if (!m_ActiveFrame.has_value() || m_NormalRecordingOpen || m_NormalRecordingReady)
 		{
@@ -537,18 +538,22 @@ namespace gglab
 			return {};
 		}
 
-		const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(active.m_BackBufferIndex);
-		const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
-			? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-			: VK_IMAGE_LAYOUT_UNDEFINED;
-		const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
-			oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers = &barrier;
-		vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+		if (transitionOwnership == VulkanPresentTransitionOwnership::FrameRuntime)
+		{
+			const VulkanPresentImageLayout tracked = m_LayoutTracker.Get(active.m_BackBufferIndex);
+			const VkImageLayout oldLayout = tracked == VulkanPresentImageLayout::Present
+				? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+				: VK_IMAGE_LAYOUT_UNDEFINED;
+			const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
+				oldLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true, true);
+			VkDependencyInfo dependencyInfo{};
+			dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			dependencyInfo.imageMemoryBarrierCount = 1;
+			dependencyInfo.pImageMemoryBarriers = &barrier;
+			vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+		}
 
+		m_PresentTransitionOwnership = transitionOwnership;
 		m_NormalRecordingOpen = true;
 		return {
 			.m_CommandBuffer = slot.m_NormalCommandBuffer,
@@ -568,16 +573,20 @@ namespace gglab
 		}
 		const VulkanActiveFrame active = *m_ActiveFrame;
 		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
-		const VkImage swapchainImage = m_SwapChain->GetImage(active.m_BackBufferIndex).m_Image;
-		const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, true, false);
-		VkDependencyInfo dependencyInfo{};
-		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-		dependencyInfo.imageMemoryBarrierCount = 1;
-		dependencyInfo.pImageMemoryBarriers = &barrier;
-		vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+		if (m_PresentTransitionOwnership == VulkanPresentTransitionOwnership::FrameRuntime)
+		{
+			const VkImage swapchainImage = m_SwapChain->GetImage(active.m_BackBufferIndex).m_Image;
+			const VkImageMemoryBarrier2 barrier = MakePresentImageBarrier(swapchainImage,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, true, false);
+			VkDependencyInfo dependencyInfo{};
+			dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			dependencyInfo.imageMemoryBarrierCount = 1;
+			dependencyInfo.pImageMemoryBarriers = &barrier;
+			vkCmdPipelineBarrier2(slot.m_NormalCommandBuffer, &dependencyInfo);
+		}
 		const VkResult endResult = vkEndCommandBuffer(slot.m_NormalCommandBuffer);
 		m_NormalRecordingOpen = false;
+		m_PresentTransitionOwnership = VulkanPresentTransitionOwnership::FrameRuntime;
 		if (endResult != VK_SUCCESS)
 		{
 			MarkFatal(endResult);
@@ -607,6 +616,7 @@ namespace gglab
 			m_ActiveFrame.reset();
 			m_NormalRecordingOpen = false;
 			m_NormalRecordingReady = false;
+			m_PresentTransitionOwnership = VulkanPresentTransitionOwnership::FrameRuntime;
 			return result;
 		}
 		VulkanSubmitPresentResult submitPresent =
@@ -623,6 +633,7 @@ namespace gglab
 		}
 		m_ActiveFrame.reset();
 		m_NormalRecordingReady = false;
+		m_PresentTransitionOwnership = VulkanPresentTransitionOwnership::FrameRuntime;
 		if (submitPresent.m_Presented)
 		{
 			m_LayoutTracker.Set(active.m_BackBufferIndex, VulkanPresentImageLayout::Present);
@@ -642,6 +653,7 @@ namespace gglab
 		const VulkanActiveFrame active = *m_ActiveFrame;
 		m_NormalRecordingOpen = false;
 		m_NormalRecordingReady = false;
+		m_PresentTransitionOwnership = VulkanPresentTransitionOwnership::FrameRuntime;
 		VulkanFrameSlot& slot = m_FrameSlots[active.m_FrameSlotIndex];
 		if (!m_StateMachine.TryAbort(active.m_FrameSlotIndex))
 		{

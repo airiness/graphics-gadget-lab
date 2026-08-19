@@ -10,7 +10,9 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
+#include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
@@ -164,11 +166,11 @@ namespace gglab
 		m_WindowHeight = mainWindow.GetHeight();
 
 		// The backend is resolved before the ShaderManager preload starts.
-		// Explicit Vulkan selection runs the bootstrap qualification
-		// (instance, surface, adapters, profile gate, device, queue) and then
-		// exits; it never falls back to DX12.
+		// Adapter listing remains an explicit Vulkan qualification mode; a
+		// selected rendering backend continues through the normal application
+		// initialization and main loop.
 		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
-		if (m_LaunchOptions.m_ListAdapters || activeBackend == RHIBackendType::Vulkan)
+		if (m_LaunchOptions.m_ListAdapters)
 		{
 			m_ExitCode = RunRenderingStartupPath(
 				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
@@ -214,6 +216,10 @@ namespace gglab
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
+		rendererCreateInfo.m_AdapterSelector = m_LaunchOptions.m_AdapterSelector;
+#if defined(BUILD_DEBUG)
+		rendererCreateInfo.m_EnableDebugValidation = true;
+#endif
 		if (!m_Renderer->Initialize(rendererCreateInfo))
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
@@ -243,7 +249,11 @@ namespace gglab
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
+		if (!minimalVulkanProductionSmoke)
+		{
+			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+		}
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -263,7 +273,8 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
-		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
+		m_DemoManager->SetBootstrapDemo(
+			std::make_unique<DemoLoadingShell>(demoCreateInfo, minimalVulkanProductionSmoke));
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId
 			? LabId(*m_LaunchOptions.m_StartupLabId)
 			: CullingLabSession::GetId();
@@ -301,7 +312,17 @@ namespace gglab
 		default:
 			break;
 		}
-		m_DemoManager->RequestActiveDemo(startupDemoIndex);
+		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
+			(startupLab == SampleableDepthLabSession::GetId() ||
+				startupLab == AlphaTestLabSession::GetId());
+		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
+		{
+			m_DemoManager->RequestActiveDemo(startupDemoIndex);
+		}
+		else
+		{
+			startupDemoName = "Demo.LoadingShell.VulkanProductionSmoke";
+		}
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
@@ -316,6 +337,7 @@ namespace gglab
 		if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
 		{
 			GGLAB_LOG_WARN("Application will continue without DevelopGui.");
+			m_DevelopGuiSystem.reset();
 		}
 		else
 		{
@@ -390,33 +412,42 @@ namespace gglab
 			return false;
 		}
 
-		// DevelopGui new frame
-		const bool developGuiFrameOpen = m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		// Input routing uses the previous ImGui frame's capture decision. The
+		// new UI frame starts only after the RHI transaction is Ready so a
+		// backend can synchronize a swapchain-dependent render contract first.
 		m_InputManager->SetUICaptureState(
-			developGuiFrameOpen && m_DevelopGuiSystem->WantsKeyboardCapture(),
-			developGuiFrameOpen && m_DevelopGuiSystem->WantsMouseCapture());
+			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsKeyboardCapture(),
+			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsMouseCapture());
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
 		demo->Update();
-
-		auto& world = demo->GetWorld();
-		auto& camera = demo->GetCamera();
-		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
-		// Keep the graph alive until after the frame has ended.
-		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
-		auto rendererFrame = m_Renderer->BeginFrame();
-		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
-		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 		m_AssetManager->Tick();
 		m_EnvironmentAssetController->Tick();
 
-		auto& shadowVisualizationSettings =
-			m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow;
+		auto& world = demo->GetWorld();
+		auto& camera = demo->GetCamera();
+		auto rendererFrame = m_Renderer->BeginFrame();
+		if (!rendererFrame.IsReady())
+		{
+			return rendererFrame.IsUnavailable();
+		}
+		const bool developGuiFrameOpen =
+			m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
+		// Keep the graph alive until after the frame has ended.
+		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
+		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
+		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
+
+		ShadowVisualizationSettings shadowVisualizationSettings = m_DevelopGuiSystem
+			? m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow
+			: DefaultShadowVisualizationSettings();
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
-		const ViewRenderProfile effectiveViewRenderProfile =
-			m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
-				authoringViewRenderProfile);
+		const ViewRenderProfile effectiveViewRenderProfile = m_DevelopGuiSystem
+			? m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
+				authoringViewRenderProfile)
+			: authoringViewRenderProfile;
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -507,14 +538,23 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
 			m_Renderer->Render(rendererFrame, rg, renderContext);
 		}
+		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
 			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
-			m_Renderer->EndFrame(rendererFrame);
+			frameEndResult = m_Renderer->EndFrame(rendererFrame);
+		}
+		if (!frameEndResult.IsCompleted())
+		{
+			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
+			{
+				m_DevelopGuiSystem->EndFrame();
+			}
+			return false;
 		}
 
 		const DemoFrameFeedback demoFeedback{
 			.m_RenderSceneStatus = frame.m_RenderSceneStatus,
-			.m_SubmittedFence = m_Renderer->GetLastSubmittedFencePoint(),
+			.m_SubmittedFence = frameEndResult.GetSubmittedFence(),
 			.m_FrameIndex = m_Time->GetFrameCount(),
 			.m_BackBufferIndex = backBufferIndex,
 		};

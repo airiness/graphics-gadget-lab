@@ -16,8 +16,8 @@
       - the pinned C++20 language standard;
       - conformance mode and SDLCheck.
 
-    Windows platform macros, external include roots, /utf-8, /MP and warning
-    levels are deliberately NOT here: they are not universal across adopters.
+    Windows platform macros, external include roots, /MP and warning levels are
+    deliberately NOT here: they are not universal across adopters.
     Common.props layers the Windows/runtime environment on top of this
     baseline.
   -->
@@ -33,6 +33,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <SDLCheck>true</SDLCheck>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup />
