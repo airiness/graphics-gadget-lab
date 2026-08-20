@@ -219,6 +219,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -530,6 +533,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\SampleableDepthLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\SurfaceProbeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -805,6 +811,9 @@
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
@@ -844,6 +853,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\VertexInput.hlsli">
