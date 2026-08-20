@@ -179,7 +179,11 @@ namespace gglab
 			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			m_BaseRecipe.m_VSId = vsId;
-			m_BaseRecipe.m_PSId = {};
+			// The opaque shadow bucket is depth-only and has no pixel shader.
+			// Assign ShaderID::Invalid() explicitly: a bare "= {}" would zero-initialize
+			// the TypedIndex to a *valid* id 0 (the first registered shader), which is a
+			// vertex shader and would be submitted in the pixel slot (D3D12 ERROR #94).
+			m_BaseRecipe.m_PSId = ShaderID::Invalid();
 
 			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;

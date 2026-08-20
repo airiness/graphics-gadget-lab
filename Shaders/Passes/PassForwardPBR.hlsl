@@ -3,6 +3,7 @@
 #include <Common/ForwardCoverageVaryings.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/MaterialUtils.hlsli>
+#include <Common/SurfaceEvaluation.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
 #include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
@@ -379,19 +380,20 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// Get view data
 	ViewData viewData = g_Views[IN.ViewIndex];
 
-	// BaseColor
-	const float4 baseColorSampled = SampleMaterialBaseColor(matData, IN.UV0, IN.UV1);
-	const float3 baseColor = baseColorSampled.rgb;
+	// Surface evaluation seam (gglab.surface profile): the hand-authored
+	// surface functions resolved from the runtime-driven MaterialData (factors
+	// plus texture+sampler bindings) feed the existing Forward PBR lighting
+	// below.
+	const SurfaceData surface = EvaluateSurface(matData, IN.UV0, IN.UV1);
+	const float3 baseColor = surface.BaseColor;
+	// Alpha mode / cutoff / discard stays pass-owned: resolve the surface's
+	// raw sampled alpha through the material's alpha policy here.
+	const float alpha = ResolveMaterialAlpha(matData, surface.Opacity);
 
-	float alpha = ResolveMaterialAlpha(matData, baseColorSampled.a);
-
-	// Mataliic and Roughness (linear, B=metallic, G=roughness)
-	float2 metallicRoughnessUV = SelectUV(matData.MetallicRoughnessBinding, IN.UV0, IN.UV1);
-	float4 mrSampled = SampleTextureBinding(
-		matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
-	float metallic = saturate(matData.MetallicFactor * mrSampled.b);
-	float perceptualRoughness = saturate(matData.RoughnessFactor * mrSampled.g);
-	perceptualRoughness = ClampPerceptualRoughnessForBRDF(perceptualRoughness);
+	// Metallic and Roughness (linear, resolved by the surface seam;
+	// B=metallic, G=roughness)
+	const float metallic = surface.Metallic;
+	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(surface.Roughness);
 
 	// Normal (linear)
 	float3 normalWS = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0));
@@ -446,11 +448,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
 #endif
 
-	// Emissive texture(sRGB)
-	float2 emissiveUV = SelectUV(matData.EmissiveBinding, IN.UV0, IN.UV1);
-	float3 emissiveSampled =
-		SampleTextureBinding(matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb;
-	float3 emissive = emissiveSampled * matData.EmissiveColorFactor.rgb;
+	// Emissive (resolved by the surface seam from the emissive texture)
+	const float3 emissive = surface.Emissive;
 
 	// IBL
 	float3 iblF = F_Schlick(F0, max((1.0 - perceptualRoughness).xxx, F0), NoV);

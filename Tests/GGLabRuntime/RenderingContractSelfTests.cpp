@@ -1495,6 +1495,16 @@ namespace gglab
 				skyboxPixelArtifact.IsSuccess(),
 				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
 
+			desc.m_SourcePath = L"Tests/SurfaceContractCompile.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Defines.clear();
+			const ShaderCompileResult surfaceContractArtifact =
+				compiler.Compile(desc);
+			context.Check(surfaceContractArtifact.IsSuccess(),
+				"Production DXC compiles the gglab.surface surface evaluation "
+				"seam contract (profile shape and the runtime MaterialData input)");
+
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";

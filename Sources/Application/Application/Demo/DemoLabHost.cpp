@@ -14,6 +14,7 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
+#include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
@@ -53,6 +54,11 @@ namespace gglab
 			SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create);
 		GGLAB_ASSERT_MSG(
 			sampleableDepthRegistered, "Failed to register the Sampleable Depth Lab session.");
+
+		const bool surfaceProbeRegistered = m_Runtime.RegisterLab(
+			SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create);
+		GGLAB_ASSERT_MSG(
+			surfaceProbeRegistered, "Failed to register the Surface Probe Lab session.");
 
 		const bool gtaoRegistered =
 			m_Runtime.RegisterLab(GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create);

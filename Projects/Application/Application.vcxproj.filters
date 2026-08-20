@@ -73,6 +73,15 @@
     <Filter Include="Shaders\PBR">
       <UniqueIdentifier>{7E001C9C-1187-E4FE-BCED-D7A67C4C043B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Profiles">
+      <UniqueIdentifier>{99C19D22-81FE-862E-D6AA-5E0A1342CCEB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Profiles\GGLab.Surface">
+      <UniqueIdentifier>{65D5BFED-90EF-FB21-47A0-3634C60088F7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Profiles\GGLab.Surface\1">
+      <UniqueIdentifier>{5C6E6C88-16D3-0A2D-A13E-2D6C5E32F44C}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{AEDE331A-5F4F-946B-D2B8-6AA926EDC672}</UniqueIdentifier>
     </Filter>
@@ -217,6 +226,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.cpp">
@@ -530,6 +542,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\SampleableDepthLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\SurfaceProbeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -805,6 +820,9 @@
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
@@ -846,6 +864,9 @@
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\VertexInput.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -866,6 +887,9 @@
     </None>
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json">
+      <Filter>Shaders\Profiles\GGLab.Surface\1</Filter>
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>
