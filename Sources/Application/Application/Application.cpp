@@ -12,6 +12,7 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -244,13 +245,18 @@ namespace gglab
 			runtimeRoot / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
+		const LabId startupLab = m_LaunchOptions.m_StartupLabId
+			? LabId(*m_LaunchOptions.m_StartupLabId)
+			: CullingLabSession::GetId();
+		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
+		const bool vulkanCommit14FeatureDemo = minimalVulkanProductionSmoke &&
+			startupLab == MiniPBRGridLabSession::GetId();
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
-		if (!minimalVulkanProductionSmoke)
+		if (!minimalVulkanProductionSmoke || vulkanCommit14FeatureDemo)
 		{
 			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 		}
@@ -275,9 +281,6 @@ namespace gglab
 		};
 		m_DemoManager->SetBootstrapDemo(
 			std::make_unique<DemoLoadingShell>(demoCreateInfo, minimalVulkanProductionSmoke));
-		const LabId startupLab = m_LaunchOptions.m_StartupLabId
-			? LabId(*m_LaunchOptions.m_StartupLabId)
-			: CullingLabSession::GetId();
 		const uint32_t startIndex = m_DemoManager->RegisterDemo("Demo.Start",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
 			{ return std::make_unique<StartDemo>(demoCreateInfo); });
@@ -314,7 +317,7 @@ namespace gglab
 		}
 		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
 			(startupLab == SampleableDepthLabSession::GetId() ||
-				startupLab == AlphaTestLabSession::GetId());
+				startupLab == AlphaTestLabSession::GetId() || vulkanCommit14FeatureDemo);
 		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
 		{
 			m_DemoManager->RequestActiveDemo(startupDemoIndex);

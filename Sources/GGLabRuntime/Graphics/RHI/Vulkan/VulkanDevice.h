@@ -184,6 +184,8 @@ namespace gglab
 			RHIBufferViewHandle view) const noexcept override;
 		RHIDescriptorHandle GetSamplerDescriptor(
 			RHISamplerHandle sampler) const noexcept override;
+		bool PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept override;
+		bool PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept override;
 		void RecordTextureUse(
 			RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept override;
 		void RecordBufferUse(

@@ -3242,6 +3242,22 @@ namespace gglab
 
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
 		{
+			const RGPersistentTextureImportContract pendingTexture =
+				ResolveRGPersistentTextureImportContract(false);
+			const RGPersistentTextureImportContract initializedTexture =
+				ResolveRGPersistentTextureImportContract(true);
+			const RHIResourceState sampledState =
+				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader);
+			const RGPersistentTextureImportContract sampledTexture =
+				ResolveRGPersistentTextureImportContract(true, sampledState);
+			context.Check(pendingTexture.m_InitialState == UndefinedRHITextureState() &&
+				pendingTexture.m_InitialContentValidity == RGContentValidity::Undefined &&
+				initializedTexture.m_InitialState == CommonRHIResourceState() &&
+				initializedTexture.m_InitialContentValidity == RGContentValidity::Defined &&
+				sampledTexture.m_InitialState == sampledState &&
+				sampledTexture.m_InitialContentValidity == RGContentValidity::Defined,
+				"Persistent texture imports expose Undefined first use and their explicit terminal state thereafter");
+
 			const RHIOwnedTextureCreateInfo ownedCreateInfo{};
 			context.Check(ownedCreateInfo.m_InitialState == UndefinedRHITextureState(),
 				"Owned texture create info defaults to Undefined");

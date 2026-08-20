@@ -96,6 +96,14 @@ namespace gglab
 		{
 			return {};
 		}
+		const bool descriptorPublished = m_Device->PublishSamplerDescriptor(sampler);
+		GGLAB_ASSERT_MSG(
+			descriptorPublished, "SamplerRegistry: failed to publish sampler descriptor.");
+		if (!descriptorPublished)
+		{
+			m_Device->DestroySampler(sampler);
+			return {};
+		}
 
 		SamplerID samplerId = m_SamplerIdCounter.Acquire();
 		GGLAB_ASSERT_MSG(samplerId.IsValid(), "SamplerRegistry: Invalid sampler id.");

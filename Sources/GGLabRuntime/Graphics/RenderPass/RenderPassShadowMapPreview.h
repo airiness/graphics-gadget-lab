@@ -25,6 +25,7 @@ namespace gglab
 
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
+		void AddFinishPass(RenderGraph& rg) noexcept;
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;

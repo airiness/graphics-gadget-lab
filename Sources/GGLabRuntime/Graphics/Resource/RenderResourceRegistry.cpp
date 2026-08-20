@@ -763,6 +763,10 @@ namespace gglab
 				outEntry.m_Srv = m_Device->CreateTextureView(textureHandle, srvDesc);
 				GGLAB_ASSERT_MSG(outEntry.m_Srv.IsValid(),
 					"RenderResourceRegistry: failed to create RHI texture SRV.");
+				const bool descriptorPublished = outEntry.m_Srv.IsValid() &&
+					m_Device->PublishTextureViewDescriptor(outEntry.m_Srv);
+				GGLAB_ASSERT_MSG(descriptorPublished,
+					"RenderResourceRegistry: failed to publish texture SRV descriptor.");
 
 				outEntry.m_Dirty = true;
 				if (&entries == &m_TextureEntries)
@@ -789,6 +793,10 @@ namespace gglab
 					entry.m_Srv = m_Device->CreateTextureView(textureHandle, srvDesc);
 					GGLAB_ASSERT_MSG(entry.m_Srv.IsValid(),
 						"RenderResourceRegistry: failed to create RHI texture SRV.");
+					const bool descriptorPublished = entry.m_Srv.IsValid() &&
+						m_Device->PublishTextureViewDescriptor(entry.m_Srv);
+					GGLAB_ASSERT_MSG(descriptorPublished,
+						"RenderResourceRegistry: failed to publish texture SRV descriptor.");
 
 					entry.m_SrvDesc = srvDesc;
 				}

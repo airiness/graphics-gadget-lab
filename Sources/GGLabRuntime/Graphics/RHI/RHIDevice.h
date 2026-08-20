@@ -84,6 +84,17 @@ namespace gglab
 			RHIBufferViewHandle view) const noexcept = 0;
 		virtual RHIDescriptorHandle GetSamplerDescriptor(
 			RHISamplerHandle sampler) const noexcept = 0;
+		// Makes a descriptor reachable by future GPU-visible resource tables. Backends whose
+		// descriptors are eagerly visible validate the handle and complete immediately; deferred
+		// publication backends advance their descriptor lifecycle here.
+		virtual bool PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept
+		{
+			return GetTextureViewDescriptor(view).IsValid();
+		}
+		virtual bool PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept
+		{
+			return GetSamplerDescriptor(sampler).IsValid();
+		}
 
 		virtual void RetireCompletedWork() noexcept = 0;
 	};

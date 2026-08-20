@@ -378,7 +378,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 
 	// Get view data
-	ViewData viewData = g_Views[IN.ViewIndex];
+	ViewData viewData = g_Views[GetViewDataIndex(g_Pass.ViewIndex)];
 
 	// Surface evaluation seam (gglab.surface profile): the hand-authored
 	// surface functions resolved from the runtime-driven MaterialData (factors

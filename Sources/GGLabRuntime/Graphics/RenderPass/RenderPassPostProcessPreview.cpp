@@ -224,9 +224,10 @@ namespace gglab
 		constexpr TextureIndex PreviewIndex = TextureIndex::Preview_PostProcess;
 		const auto* outputDesc = registry->GetTextureDesc(PreviewIndex);
 		GGLAB_ASSERT_NOT_NULL(outputDesc);
-		const RGTextureAccess initialAccess = registry->HasPublishedPostProcessPreview()
-			? RGTextureAccess::Sample
-			: RGTextureAccess::None;
+		const RGPersistentTextureImportContract outputImport =
+			ResolveRGPersistentTextureImportContract(
+				registry->HasPublishedPostProcessPreview() && !registry->IsDirty(PreviewIndex),
+				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader));
 		const bool pointSampledPreview =
 			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
@@ -236,14 +237,14 @@ namespace gglab
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, initialAccess,
+			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport,
 			samplerIndex, previewExposureScale,
 			registry](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
 				data.m_Output = builder.ImportTexture("PostProcess.Preview.SelectedTap",
 					registry->GetTextureHandle(TextureIndex::Preview_PostProcess), *outputDesc,
-					initialAccess, RGContentValidity::Defined);
+					outputImport.m_InitialState, outputImport.m_InitialContentValidity);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				if (!sourceViewDesc)
 				{

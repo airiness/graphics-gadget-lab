@@ -239,6 +239,20 @@ namespace gglab
 				: std::nullopt;
 			if (!native)
 			{
+				const RHISubresourceRange range = barrier.m_Subresources.value_or(
+					RHISubresourceRange{});
+				GGLAB_LOG_GRAPHICS_ERROR(
+					"Vulkan texture barrier rejection: texture={}:{} live={} desc={} "
+					"before=({},{},{}) after=({},{},{}) range=({}, {}, {}, {}, {}).",
+					barrier.m_Texture.Index(), barrier.m_Texture.Generation(), texture != nullptr,
+					desc != nullptr, static_cast<uint64_t>(barrier.m_Before.m_Stages),
+					static_cast<uint64_t>(barrier.m_Before.m_Access),
+					static_cast<uint32_t>(barrier.m_Before.m_Layout),
+					static_cast<uint64_t>(barrier.m_After.m_Stages),
+					static_cast<uint64_t>(barrier.m_After.m_Access),
+					static_cast<uint32_t>(barrier.m_After.m_Layout), range.m_BaseMip,
+					range.m_MipCount, range.m_BaseArraySlice, range.m_ArraySliceCount,
+					static_cast<uint32_t>(range.m_Aspects));
 				Reject("TextureBarrier", "a barrier state, range or texture is invalid");
 				return;
 			}
@@ -793,6 +807,25 @@ namespace gglab
 			!BuildSet0BufferBinding(*m_Device, *m_CurrentBindingLayout, parameterIndex,
 				buffer, offset, descriptorType, requiredUsage, next))
 		{
+			const VulkanSet0BindingPlan* binding = m_CurrentBindingLayout
+				? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex)
+				: nullptr;
+			const RHIBufferDesc* bufferDesc =
+				m_Device->GetResourceManager().ResolveBufferDesc(buffer);
+			const RHIBindingLayoutHandle layoutHandle = m_CurrentPipelineDesc
+				? m_CurrentPipelineDesc->m_BindingLayout
+				: RHIBindingLayoutHandle{};
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Vulkan fixed-buffer rejection: parameter={} buffer={}:{} offset={} "
+				"layout={}:{} expectedType={} expectedUsage={} bindingFound={} "
+				"bindingType={} bindingCount={} bufferSize={} bufferUsage={}.",
+				parameterIndex, buffer.Index(), buffer.Generation(), offset, layoutHandle.Index(),
+				layoutHandle.Generation(), static_cast<uint32_t>(descriptorType),
+				static_cast<uint32_t>(requiredUsage), binding != nullptr,
+				binding ? static_cast<uint32_t>(binding->m_DescriptorType) : UINT32_MAX,
+				binding ? binding->m_DescriptorCount : 0u,
+				bufferDesc ? bufferDesc->m_SizeInBytes : 0u,
+				bufferDesc ? static_cast<uint32_t>(bufferDesc->m_Usage) : 0u);
 			if (parameterIndex < m_FixedBufferBindings.size())
 			{
 				m_FixedBufferBindings[parameterIndex].reset();

@@ -1293,8 +1293,16 @@ namespace gglab
 			return false;
 		}
 		const TextureViewSlot* slot = m_TextureViews.Resolve(view);
-		return slot && slot->m_DescriptorIndex &&
-			m_Device->GetDescriptorManager().PublishResource(*slot->m_DescriptorIndex);
+		if (!slot || !slot->m_DescriptorIndex)
+		{
+			return false;
+		}
+		auto& descriptors = m_Device->GetDescriptorManager();
+		const VulkanDescriptorPublicationState state =
+			descriptors.GetResourceState(*slot->m_DescriptorIndex);
+		return state == VulkanDescriptorPublicationState::Live ||
+			(state == VulkanDescriptorPublicationState::DescriptorReady &&
+				descriptors.PublishResource(*slot->m_DescriptorIndex));
 	}
 
 	bool VulkanResourceManager::PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept
@@ -1304,8 +1312,16 @@ namespace gglab
 			return false;
 		}
 		const SamplerSlot* slot = m_Samplers.Resolve(sampler);
-		return slot && slot->m_DescriptorIndex &&
-			m_Device->GetDescriptorManager().PublishSampler(*slot->m_DescriptorIndex);
+		if (!slot || !slot->m_DescriptorIndex)
+		{
+			return false;
+		}
+		auto& descriptors = m_Device->GetDescriptorManager();
+		const VulkanDescriptorPublicationState state =
+			descriptors.GetSamplerState(*slot->m_DescriptorIndex);
+		return state == VulkanDescriptorPublicationState::Live ||
+			(state == VulkanDescriptorPublicationState::DescriptorReady &&
+				descriptors.PublishSampler(*slot->m_DescriptorIndex));
 	}
 
 	void VulkanResourceManager::RetireCompletedResources() noexcept
