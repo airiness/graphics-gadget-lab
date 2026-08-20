@@ -219,8 +219,8 @@ namespace gglab
 		m_AssetPreparation.TrackModel(ProceduralCubeModelID, "ProceduralCube", 0.6f);
 
 		components::TransformComponent transform{};
-		transform.m_Position = Vector3(0.0f, 0.75f, -6.5f);
-		transform.m_Scale = Vector3::One * 2.5f;
+		transform.m_Position = Vector3(0.0f, 0.75f, 0.0f);
+		transform.m_Scale = Vector3::One * 1.5f;
 		m_ProbeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
 			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
@@ -231,7 +231,7 @@ namespace gglab
 
 		m_FixtureConfigured = registry.valid(m_ProbeEntity) &&
 			registry.all_of<components::TransformComponent, components::ModelComponent,
-				components::MaterialInstanceComponent>(m_ProbeEntity);
+			components::MaterialInstanceComponent>(m_ProbeEntity);
 
 		BuildLighting();
 		ApplyProbeFixtures();
@@ -308,8 +308,8 @@ namespace gglab
 
 	void SurfaceProbeLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(Vector3(0.0f, 1.0f, -9.0f), Vector3(0.0f, 0.8f, 0.0f));
-		GetCamera().SetFov(50.0f);
+		GetCamera().LookAt(Vector3(3.0f, 1.0f, -9.0f), Vector3(0.0f, 0.8f, 0.0f));
+		GetCamera().SetFov(60.0f);
 		GetCamera().SetNearFar(0.1f, 250.0f);
 		GetCamera().Update();
 	}
@@ -342,14 +342,14 @@ namespace gglab
 		std::string expected = debugView == MaterialDebugView::BaseColor
 			? (textureIndex == int32_t(SurfaceTextureFixture::Checker)
 				? "Unlit base-color view: 8px purple/black checkerboard tiles across each face, "
-				  "tinted by the active base color factor."
+				"tinted by the active base color factor."
 				: "Unlit base-color view: uniform surface tinted by the active base color factor "
-				  "(factor x white texture).")
+				"(factor x white texture).")
 			: (textureIndex == int32_t(SurfaceTextureFixture::Checker)
 				? "Lit Forward PBR: 8px purple/black checkerboard tiles shading under the "
-				  "directional light, tinted by the active base color factor."
+				"directional light, tinted by the active base color factor."
 				: "Lit Forward PBR: uniform surface shading under the directional light, tinted "
-				  "by the active base color factor (factor x white texture).");
+				"by the active base color factor (factor x white texture).");
 
 		// Mechanical CPU-side check: the material instance (the source of the
 		// normal runtime material update path) must carry the active fixtures.
