@@ -93,7 +93,7 @@
     "samplerAuthoring": "deferred",
     "samplerResolution": {
       "owner": "materialBindingLayer",
-      "cardinality": "oneSamplerPerTexture2DResource"
+      "cardinality": "oneSamplerPerTexture2DBinding"
     },
     "authorableFilterModes": [],
     "authorableAddressModes": [],
@@ -105,57 +105,6 @@
       "identity": "gglab-shaderc",
       "minimumVersion": "1.0.0",
       "versionComparison": "semver"
-    },
-    "requiredTargets": [
-      "gglab-dx12",
-      "gglab-vulkan13"
-    ],
-    "compileResult": {
-      "resultFormat": "json",
-      "statusVocabulary": [
-        "ok",
-        "usage-error",
-        "invalid-request",
-        "source-not-found",
-        "compiler-unavailable",
-        "compile-failed",
-        "artifact-io-failure",
-        "source-changed"
-      ],
-      "exitCodeVocabulary": [
-        0,
-        2,
-        3,
-        4,
-        5,
-        6
-      ],
-      "binaryFormatVocabulary": [
-        "dxil",
-        "spirv"
-      ],
-      "successResultRequiredFields": [
-        "command",
-        "success",
-        "status",
-        "exitCode",
-        "recipeId",
-        "buildKey",
-        "binaryHash",
-        "binaryFormat",
-        "target",
-        "binaryPath",
-        "cacheRecordPath",
-        "fromCache",
-        "diagnostics"
-      ],
-      "failureResultRequiredFields": [
-        "command",
-        "success",
-        "status",
-        "exitCode",
-        "diagnostics"
-      ]
     }
   },
   "deferred": {
