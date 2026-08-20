@@ -411,6 +411,7 @@
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup>
