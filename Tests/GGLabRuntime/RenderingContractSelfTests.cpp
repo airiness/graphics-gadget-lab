@@ -1503,7 +1503,7 @@ namespace gglab
 				compiler.Compile(desc);
 			context.Check(surfaceContractArtifact.IsSuccess(),
 				"Production DXC compiles the gglab.surface surface evaluation "
-				"seam contract (profile shape and MaterialData ABI)");
+				"seam contract (profile shape and the runtime MaterialData input)");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

@@ -36,7 +36,6 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 		void RebuildScene() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
-		void BuildScene() noexcept;
 		void BuildLighting() noexcept;
 		void ApplyCameraPreset() noexcept;
 		void ApplyProbeFixtures() noexcept;

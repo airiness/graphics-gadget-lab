@@ -386,7 +386,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// below.
 	const SurfaceData surface = EvaluateSurface(matData, IN.UV0, IN.UV1);
 	const float3 baseColor = surface.BaseColor;
-	const float alpha = surface.Opacity;
+	// Alpha mode / cutoff / discard stays pass-owned: resolve the surface's
+	// raw sampled alpha through the material's alpha policy here.
+	const float alpha = ResolveMaterialAlpha(matData, surface.Opacity);
 
 	// Metallic and Roughness (linear, resolved by the surface seam;
 	// B=metallic, G=roughness)

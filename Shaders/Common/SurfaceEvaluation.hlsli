@@ -12,9 +12,9 @@
 // normal-map perturbation, BRDF clamps/filters, Forward+ lighting, IBL,
 // shadow, GTAO, and post-process behavior.
 //
-// Sampling policy: the existing logical texture+sampler binding semantics are
-// preserved as proven by the probe; no profile-owned sampler policy is
-// introduced.
+// Sampling: reuses the existing texture+sampler binding representation
+// (TextureIndex + SamplerIndex) as-is. The probe exercises the texture
+// fixtures; sampler authoring policy stays deferred to that representation.
 
 struct SurfaceData
 {
@@ -22,7 +22,7 @@ struct SurfaceData
 	float3 Emissive;
 	float Metallic;
 	float Roughness; // perceived roughness; BRDF clamping stays in the lighting path
-	float Opacity;
+	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
@@ -32,7 +32,9 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	// BaseColor: sampled base color texture multiplied by the runtime factor.
 	const float4 baseColorSampled = SampleMaterialBaseColor(matData, uv0, uv1);
 	surface.BaseColor = baseColorSampled.rgb;
-	surface.Opacity = ResolveMaterialAlpha(matData, baseColorSampled.a);
+	// Opacity stays the raw sampled alpha: alpha mode / cutoff / discard policy
+	// belongs to the pass, not to the surface quantities.
+	surface.Opacity = baseColorSampled.a;
 
 	// Metallic/roughness: sampled from the shared texture channel layout
 	// (B=metallic, G=roughness) and multiplied by the runtime factors.

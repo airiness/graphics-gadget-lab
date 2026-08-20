@@ -12,9 +12,10 @@
 // color/metallic-roughness/emissive textures through the existing
 // texture+sampler sampling helpers.
 //
-// The MaterialData layout stays pinned by the C++ MaterialGPU static_assert in
-// GPUStructures.h and by the runtime material table itself; the SurfaceData
-// shape is pinned by the usage below.
+// For this probe the MaterialData layout is pinned by the C++ MaterialGPU
+// static_assert in GPUStructures.h and by the runtime material table itself;
+// it is intentionally not declared as the permanent ShaderGraph binding
+// shape. The SurfaceData shape is pinned by the usage below.
 
 StructuredBuffer<MaterialData> g_SurfaceContractMaterials;
 
