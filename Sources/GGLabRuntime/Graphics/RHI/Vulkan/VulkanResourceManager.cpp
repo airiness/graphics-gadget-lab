@@ -1736,6 +1736,68 @@ namespace gglab
 		points.push_back(fencePoint);
 	}
 
+	VulkanResourceManager::RuntimeDiagnostics
+		VulkanResourceManager::GetRuntimeDiagnostics() const noexcept
+	{
+		RuntimeDiagnostics result{};
+		const auto countResourceTable = [&result](const auto& table,
+			uint32_t& liveCount, uint32_t& retiredCount) noexcept
+			{
+				for (const auto& slot : table.Slots())
+				{
+					if (slot.m_State == RHIHandleSlotState::Alive)
+					{
+						++liveCount;
+						if (slot.m_Resource)
+						{
+							result.m_LiveAllocationBytes +=
+								slot.m_Resource->GetAllocationSizeInBytes();
+						}
+					}
+					else if (slot.m_State == RHIHandleSlotState::PendingRetirement)
+					{
+						++retiredCount;
+						if (slot.m_Resource)
+						{
+							result.m_RetiredAllocationBytes +=
+								slot.m_Resource->GetAllocationSizeInBytes();
+						}
+					}
+				}
+			};
+		const auto countHandleTable = [](const auto& table,
+			uint32_t& liveCount, uint32_t& retiredCount) noexcept
+			{
+				for (const auto& slot : table.Slots())
+				{
+					liveCount += slot.m_State == RHIHandleSlotState::Alive ? 1u : 0u;
+					retiredCount +=
+						slot.m_State == RHIHandleSlotState::PendingRetirement ? 1u : 0u;
+				}
+			};
+
+		countResourceTable(m_Textures, result.m_LiveTextures, result.m_RetiredTextures);
+		countResourceTable(m_Buffers, result.m_LiveBuffers, result.m_RetiredBuffers);
+		countHandleTable(
+			m_TextureViews, result.m_LiveTextureViews, result.m_RetiredTextureViews);
+		countHandleTable(m_BufferViews, result.m_LiveBufferViews, result.m_RetiredBufferViews);
+		countHandleTable(m_Samplers, result.m_LiveSamplers, result.m_RetiredSamplers);
+
+		result.m_TextureCreateCount = m_Diagnostics.m_TextureCreateCount;
+		result.m_BufferCreateCount = m_Diagnostics.m_BufferCreateCount;
+		result.m_TextureImportCount = m_Diagnostics.m_TextureImportCount;
+		result.m_BufferImportCount = m_Diagnostics.m_BufferImportCount;
+		result.m_TextureRetireCount = m_Diagnostics.m_TextureRetireCount;
+		result.m_BufferRetireCount = m_Diagnostics.m_BufferRetireCount;
+		result.m_CreateFailureCount = m_Diagnostics.m_CreateFailureCount;
+		result.m_ImportFailureCount = m_Diagnostics.m_ImportFailureCount;
+		result.m_InvalidUseCount = m_Diagnostics.m_InvalidUseCount;
+		result.m_InvalidDestroyCount = m_Diagnostics.m_InvalidDestroyCount;
+		result.m_StaleDestroyCount = m_Diagnostics.m_StaleDestroyCount;
+		result.m_DoubleDestroyCount = m_Diagnostics.m_DoubleDestroyCount;
+		return result;
+	}
+
 	void VulkanResourceManager::ReportLiveResources() const noexcept
 	{
 		for (uint32_t index = 0; index < m_Textures.Size(); ++index)

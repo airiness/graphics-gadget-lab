@@ -8,6 +8,9 @@
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
+#include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
+#include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
@@ -813,6 +816,14 @@ namespace gglab
 				}
 				context.Check(domainsSeparate,
 					"frame-slot and backbuffer domains never cross");
+				for (uint32_t i = 0; i < 100; ++i)
+				{
+					model.CommitFrame(i % 2, i % 3);
+				}
+				context.Check(model.GetFramePairs().size() ==
+					VulkanFrameIndexModel::MaxDiagnosticFramePairs &&
+					model.GetFramePairs().back() == std::pair<uint32_t, uint32_t>{ 1, 0 },
+					"frame-pair diagnostics retain a bounded recent history");
 				model.ResetFramePairs();
 				context.Check(model.GetFramePairs().empty() && model.NextFrameSlot() == 0,
 					"reset clears pairs and restarts the ring");
@@ -1010,6 +1021,51 @@ namespace gglab
 					SelectVulkanSwapchainExtent(variable, 128, 2160);
 				context.Check(selectedVariable.width == 320 && selectedVariable.height == 1440,
 					"variable surface extent clamps the requested drawable size");
+			}
+
+			// Queue-family timestamp valid bits define the native counter's
+			// wrap mask. The profiler must preserve ordinary 64-bit deltas and
+			// correctly resolve a wrapped narrower counter.
+			{
+				context.Check(VulkanTimestampDelta(100, 160, 64) == 60,
+					"64-bit Vulkan timestamp deltas preserve the full counter range");
+				context.Check(VulkanTimestampDelta(250, 5, 8) == 11,
+					"Vulkan timestamp deltas handle queue-family counter wrap");
+				context.Check(VulkanTimestampDelta(1, 2, 0) == 0,
+					"a queue family without timestamp bits produces no timing delta");
+			}
+
+			// Validation diagnostics preserve native message severity and
+			// runtime failure diagnostics retain the first failing operation
+			// together with the last committed submission.
+			{
+				VulkanInstance validationInstance;
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT);
+				const VulkanValidationDiagnostics validation =
+					validationInstance.GetValidationDiagnostics();
+				context.Check(validation.m_ErrorCount == 1 && validation.m_WarningCount == 1 &&
+					validation.m_InfoCount == 1 && validation.m_VerboseCount == 1,
+					"Vulkan validation diagnostics preserve all severity counters");
+
+				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure(
+					{}, VK_ERROR_DEVICE_LOST, "vkQueueSubmit2", 37);
+				const VulkanRuntimeFailureDiagnostics preserved = CaptureVulkanRuntimeFailure(
+					submitFailure, VK_ERROR_SURFACE_LOST_KHR, "vkQueuePresentKHR", 41);
+				context.Check(submitFailure.m_Operation == "vkQueueSubmit2" &&
+					submitFailure.m_Result == VK_ERROR_DEVICE_LOST &&
+					submitFailure.m_LastSubmittedTimelineValue == 37,
+					"Vulkan runtime failure diagnostics capture operation, result, and submission");
+				context.Check(preserved.m_Operation == submitFailure.m_Operation &&
+					preserved.m_Result == submitFailure.m_Result &&
+					preserved.m_LastSubmittedTimelineValue == 37,
+					"Vulkan runtime failure diagnostics preserve the first fatal operation");
 			}
 
 			// Runtime health: fatal is not device lost. A surface-lost

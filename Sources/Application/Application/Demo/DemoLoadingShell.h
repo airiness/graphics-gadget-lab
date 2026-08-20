@@ -13,8 +13,7 @@ namespace gglab
 	class DemoLoadingShell final : public DemoBase
 	{
 	public:
-		explicit DemoLoadingShell(
-			const DemoCreateInfo& createInfo, bool minimalGraphicsSmoke = false) noexcept;
+		explicit DemoLoadingShell(const DemoCreateInfo& createInfo) noexcept;
 		~DemoLoadingShell() override = default;
 
 		std::string_view GetName() const noexcept override { return "Demo.LoadingShell"; }

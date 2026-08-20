@@ -1,7 +1,7 @@
 # Graphics Gadget Lab
 
 Graphics Gadget Lab (gglab) is a personal graphics research playground built
-with C++ and Direct3D 12.
+with C++, Direct3D 12, and Vulkan 1.3.
 
 It is used to experiment with rendering techniques, GPU resource management,
 render graphs, shaders, diagnostics, and small self-contained graphics Labs.
@@ -12,10 +12,10 @@ render graphs, shaders, diagnostics, and small self-contained graphics Labs.
 
 ## Highlights
 
-- Direct3D 12 renderer with DXC and HLSL
+- Runtime-selectable Direct3D 12 and Vulkan renderers with DXC and HLSL
 - Render graph and reusable render-pass pipeline
 - Runtime-selectable Labs for focused experiments
-- ImGui-based diagnostics and developer tools
+- ImGui-based diagnostics, GPU profiling, and developer tools on both RHIs
 - GPU resource, asset, and shader management experiments
 
 ## Build
@@ -42,7 +42,8 @@ Vulkan SDK.
 
 ## Run a Lab
 
-    GraphicsGadgetLab.exe --lab gglab.lab.mini_pbr_grid --absolute-mouse
+    GraphicsGadgetLab.exe --rhi dx12 --lab gglab.lab.mini_pbr_grid --absolute-mouse
+    GraphicsGadgetLab.exe --rhi vulkan --lab gglab.lab.mini_pbr_grid --absolute-mouse
 
 Run with `--help` to see the available startup options.
 
@@ -59,9 +60,29 @@ interact with the developer UI.
 The default backend is DX12. An explicit `--rhi vulkan` creates a Vulkan
 instance, Win32 surface, enumerates and evaluates every physical device
 against the GGLab Vulkan device profile, and creates a logical device and
-graphics queue; it never falls back to DX12. `--list-adapters` prints the
-profile evaluation for every adapter. Swapchain and rendering on Vulkan are
-not implemented yet.
+graphics/present queue; it never falls back to DX12. `--list-adapters` prints
+the profile evaluation for every adapter.
+
+Vulkan uses the normal Application, Renderer, RenderGraph, and backend-neutral
+RHI path. Production coverage includes graphics and direct-compute command
+encoding, bindless material resources, Texture2D/TextureCube sampling, depth
+and directional shadows, Forward PBR, IBL and skybox rendering, Forward+,
+GTAO, post processing and tone mapping, ImGui, and timestamp-based GPU
+profiling. Debug builds request `VK_LAYER_KHRONOS_validation`; validation
+errors and warnings are qualification failures.
+
+The Vulkan diagnostics panel reports adapter/profile identity, validation
+counts, descriptor publication and retained backing state, VMA heap budgets,
+resource retirement, pipeline/layout counts, frame-slot versus swapchain-image
+indices, timeline progress, and the first fatal/device-lost operation. Native
+Vulkan pipeline-cache persistence is deliberately deferred; pipeline objects
+are cached only for the current process.
+
+CI installs the pinned SDK and runtime, then builds Debug, Release, and Debug
+without PCH. Each leg runs the Application, Foundation, Runtime, rendering,
+shader compile, and Vulkan contract suites. Hardware presentation qualification
+is performed separately on supported Windows adapters because hosted CI does
+not provide a conformant display GPU.
 
 ## Self-tests
 

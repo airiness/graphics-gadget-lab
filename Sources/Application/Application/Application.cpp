@@ -10,12 +10,7 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
-#include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Application/Lab/Sessions/ForwardPlusLabSession.h"
-#include "Application/Lab/Sessions/GTAOLabSession.h"
-#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
-#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
@@ -250,20 +245,12 @@ namespace gglab
 		const LabId startupLab = m_LaunchOptions.m_StartupLabId
 			? LabId(*m_LaunchOptions.m_StartupLabId)
 			: CullingLabSession::GetId();
-		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
-		const bool validatedVulkanRendererLab = minimalVulkanProductionSmoke &&
-			(startupLab == MiniPBRGridLabSession::GetId() ||
-				startupLab == ForwardPlusLabSession::GetId() ||
-				startupLab == GTAOLabSession::GetId());
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		if (!minimalVulkanProductionSmoke || validatedVulkanRendererLab)
-		{
-			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
-		}
+		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -283,8 +270,7 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
-		m_DemoManager->SetBootstrapDemo(
-			std::make_unique<DemoLoadingShell>(demoCreateInfo, minimalVulkanProductionSmoke));
+		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const uint32_t startIndex = m_DemoManager->RegisterDemo("Demo.Start",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
 			{ return std::make_unique<StartDemo>(demoCreateInfo); });
@@ -319,17 +305,7 @@ namespace gglab
 		default:
 			break;
 		}
-		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
-			(startupLab == SampleableDepthLabSession::GetId() ||
-				startupLab == AlphaTestLabSession::GetId() || validatedVulkanRendererLab);
-		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
-		{
-			m_DemoManager->RequestActiveDemo(startupDemoIndex);
-		}
-		else
-		{
-			startupDemoName = "Demo.LoadingShell.VulkanProductionSmoke";
-		}
+		m_DemoManager->RequestActiveDemo(startupDemoIndex);
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",

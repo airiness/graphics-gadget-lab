@@ -2,6 +2,7 @@
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 
@@ -106,9 +107,9 @@ namespace gglab
 
 	VulkanGraphicsCommandContext::VulkanGraphicsCommandContext(VulkanDevice* device,
 		VulkanPipelineSystem* pipelineSystem, VulkanDynamicUniformBuffer* uniformBuffer,
-		VulkanSet0DynamicUniformFrames* set0Frames) noexcept :
+		VulkanSet0DynamicUniformFrames* set0Frames, VulkanGpuProfiler* gpuProfiler) noexcept :
 		m_Device(device), m_PipelineSystem(pipelineSystem), m_UniformBuffer(uniformBuffer),
-		m_Set0Frames(set0Frames)
+		m_Set0Frames(set0Frames), m_GpuProfiler(gpuProfiler)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		GGLAB_ASSERT_NOT_NULL(m_PipelineSystem);
@@ -154,6 +155,10 @@ namespace gglab
 		{
 			m_DirectComputeContext->ResetEncodingState();
 		}
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->BeginFrame(frameSlotIndex, m_CommandBuffer);
+		}
 		return true;
 	}
 
@@ -168,6 +173,10 @@ namespace gglab
 			return false;
 		}
 		const bool succeeded = !m_HasEncodingError;
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->EndFrame(m_FrameSlotIndex, m_CommandBuffer);
+		}
 		m_CommandBuffer = VK_NULL_HANDLE;
 		m_CurrentPipeline = nullptr;
 		m_CurrentBindingLayout = nullptr;
@@ -180,6 +189,10 @@ namespace gglab
 
 	void VulkanGraphicsCommandContext::AbortEncoding() noexcept
 	{
+		if (m_GpuProfiler && m_CommandBuffer != VK_NULL_HANDLE)
+		{
+			m_GpuProfiler->AbortFrame(m_FrameSlotIndex);
+		}
 		m_CommandBuffer = VK_NULL_HANDLE;
 		m_CurrentPipeline = nullptr;
 		m_CurrentBindingLayout = nullptr;
@@ -377,6 +390,22 @@ namespace gglab
 		vkCmdCopyBuffer2(m_CommandBuffer, &copyInfo);
 		TrackBufferUse(destination);
 		TrackBufferUse(source);
+	}
+
+	void VulkanGraphicsCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->BeginScope(m_CommandBuffer, name);
+		}
+	}
+
+	void VulkanGraphicsCommandContext::EndGpuProfileScope() noexcept
+	{
+		if (m_GpuProfiler)
+		{
+			m_GpuProfiler->EndScope(m_CommandBuffer);
+		}
 	}
 
 	void VulkanGraphicsCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
@@ -932,6 +961,16 @@ namespace gglab
 	{
 		m_GraphicsContext->CopyBuffer(
 			destination, destinationOffset, source, sourceOffset, sizeInBytes);
+	}
+
+	void VulkanComputeCommandContext::BeginGpuProfileScope(std::string_view name) noexcept
+	{
+		m_GraphicsContext->BeginGpuProfileScope(name);
+	}
+
+	void VulkanComputeCommandContext::EndGpuProfileScope() noexcept
+	{
+		m_GraphicsContext->EndGpuProfileScope();
 	}
 
 	void VulkanComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept

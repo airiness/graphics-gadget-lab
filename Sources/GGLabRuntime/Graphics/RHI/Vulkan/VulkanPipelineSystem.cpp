@@ -315,10 +315,17 @@ namespace gglab
 		}
 		const auto index =
 			static_cast<RHIBindingLayoutHandle::IndexType>(m_BindingLayouts.size());
-		m_BindingLayouts.push_back({
-			.m_Layout = std::move(layout),
-			.m_DebugName = desc.m_DebugName ? desc.m_DebugName : "",
-			});
+		BindingLayoutSlot& slot = m_BindingLayouts.emplace_back();
+		slot.m_Layout = std::move(layout);
+		slot.m_DebugName = desc.m_DebugName ? desc.m_DebugName : "";
+		slot.m_SlotCount = desc.m_SlotCount;
+		for (uint32_t slotIndex = 0; slotIndex < desc.m_SlotCount; ++slotIndex)
+		{
+			slot.m_Slots[slotIndex] = desc.m_Slots[slotIndex];
+			slot.m_SlotDebugNames[slotIndex] =
+				desc.m_Slots[slotIndex].m_DebugName ? desc.m_Slots[slotIndex].m_DebugName : "";
+			slot.m_Slots[slotIndex].m_DebugName = nullptr;
+		}
 		return RHIBindingLayoutHandle(index, m_BindingLayoutGeneration);
 	}
 
@@ -408,6 +415,10 @@ namespace gglab
 		for (uint32_t attributeIndex = 0;
 			attributeIndex < slot.m_GraphicsDesc.m_VertexInput.m_AttributeCount; ++attributeIndex)
 		{
+			slot.m_SemanticNames[attributeIndex] =
+				createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName
+				? createInfo.m_Desc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName
+				: "";
 			slot.m_GraphicsDesc.m_VertexInput.m_Attributes[attributeIndex].m_SemanticName = nullptr;
 		}
 		slot.m_ShaderHashes = shaderHashes;

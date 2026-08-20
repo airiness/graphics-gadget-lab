@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -86,6 +87,17 @@ namespace gglab
 		bool m_DeviceLost = false;
 	};
 
+	struct VulkanRuntimeFailureDiagnostics
+	{
+		std::string m_Operation;
+		VkResult m_Result = VK_SUCCESS;
+		uint64_t m_LastSubmittedTimelineValue = 0;
+	};
+
+	[[nodiscard]] VulkanRuntimeFailureDiagnostics CaptureVulkanRuntimeFailure(
+		const VulkanRuntimeFailureDiagnostics& previous, VkResult error,
+		std::string_view operation, uint64_t lastSubmittedTimelineValue) noexcept;
+
 	[[nodiscard]] VulkanRuntimeHealthState UpdateVulkanRuntimeHealth(
 		const VulkanRuntimeHealthState& state, VkResult error) noexcept;
 
@@ -107,6 +119,7 @@ namespace gglab
 	class VulkanFrameIndexModel
 	{
 	public:
+		static constexpr uint32_t MaxDiagnosticFramePairs = 64;
 		explicit VulkanFrameIndexModel(uint32_t frameSlotCount) noexcept;
 
 		[[nodiscard]] uint32_t GetFrameSlotCount() const noexcept { return m_FrameSlotCount; }
@@ -340,6 +353,10 @@ namespace gglab
 
 		[[nodiscard]] bool IsFatal() const noexcept { return m_Fatal; }
 		[[nodiscard]] bool IsDeviceLost() const noexcept { return m_DeviceLost; }
+		[[nodiscard]] const VulkanRuntimeFailureDiagnostics& GetFailureDiagnostics() const noexcept
+		{
+			return m_FailureDiagnostics;
+		}
 		[[nodiscard]] bool HasActiveFrame() const noexcept { return m_ActiveFrame.has_value(); }
 
 		// True when the fence point belongs to this runtime's graphics
@@ -384,7 +401,7 @@ namespace gglab
 		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
 			uint32_t frameSlotIndex, uint32_t backBufferIndex,
 			VkCommandBuffer commandBuffer) noexcept;
-		void MarkFatal(VkResult error) noexcept;
+		void MarkFatal(VkResult error, std::string_view operation) noexcept;
 		void DestroyFrameSlots() noexcept;
 
 		VulkanDevice* m_Device = nullptr;
@@ -398,6 +415,7 @@ namespace gglab
 		bool m_Vsync = false;
 		bool m_Fatal = false;
 		bool m_DeviceLost = false;
+		VulkanRuntimeFailureDiagnostics m_FailureDiagnostics;
 		bool m_NormalRecordingOpen = false;
 		bool m_NormalRecordingReady = false;
 		VulkanPresentTransitionOwnership m_PresentTransitionOwnership =

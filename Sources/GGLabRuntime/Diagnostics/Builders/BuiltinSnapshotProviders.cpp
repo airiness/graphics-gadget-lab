@@ -10,6 +10,7 @@
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
+#include "Diagnostics/Builders/VulkanBackendSnapshotBuilder.h"
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
@@ -23,6 +24,7 @@
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "Diagnostics/Snapshots/VulkanBackendSnapshot.h"
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
@@ -30,6 +32,8 @@
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanContext.h"
 
 namespace gglab
 {
@@ -269,12 +273,19 @@ namespace gglab
 			{
 				auto& snapshot = store.GetOrCreate<RHIPipelineSystemSnapshot>();
 				auto* rhi = context.m_Renderer ? context.m_Renderer->GetRHIContext() : nullptr;
-				auto* system =
+				auto* dx12System =
 					rhi ? dynamic_cast<DX12PipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
-				if (system)
+				auto* vulkanSystem =
+					rhi ? dynamic_cast<VulkanPipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
+				if (dx12System)
 				{
 					BuildDX12PipelineSystemSnapshot(
-						*system, context.m_Renderer->GetPipelineCache(), snapshot);
+						*dx12System, context.m_Renderer->GetPipelineCache(), snapshot);
+				}
+				else if (vulkanSystem)
+				{
+					BuildVulkanPipelineSystemSnapshot(
+						*vulkanSystem, context.m_Renderer->GetPipelineCache(), snapshot);
 				}
 				else
 				{
@@ -299,6 +310,30 @@ namespace gglab
 				if (registry)
 				{
 					BuildSamplerRegistrySnapshot(*registry, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
+			}
+		};
+
+		class VulkanBackendSnapshotProvider final : public SnapshotProvider<VulkanBackendSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Vulkan Backend";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<VulkanBackendSnapshot>();
+				auto* vulkan = context.m_Renderer
+					? dynamic_cast<VulkanContext*>(context.m_Renderer->GetRHIContext())
+					: nullptr;
+				if (vulkan)
+				{
+					BuildVulkanBackendSnapshot(*vulkan, snapshot);
 				}
 				else
 				{
@@ -331,6 +366,8 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<VulkanBackendSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);

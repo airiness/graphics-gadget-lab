@@ -14,6 +14,7 @@ namespace gglab
 {
 	class VulkanBindingLayout;
 	class VulkanDevice;
+	class VulkanGpuProfiler;
 	class VulkanPipelineState;
 	class VulkanPipelineSystem;
 	class VulkanComputeCommandContext;
@@ -23,7 +24,8 @@ namespace gglab
 	public:
 		VulkanGraphicsCommandContext(VulkanDevice* device, VulkanPipelineSystem* pipelineSystem,
 			VulkanDynamicUniformBuffer* uniformBuffer,
-			VulkanSet0DynamicUniformFrames* set0Frames) noexcept;
+			VulkanSet0DynamicUniformFrames* set0Frames,
+			VulkanGpuProfiler* gpuProfiler = nullptr) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanGraphicsCommandContext);
 		~VulkanGraphicsCommandContext() override = default;
 		using RHIGraphicsCommandContext::SetPushConstants;
@@ -46,6 +48,8 @@ namespace gglab
 		void FlushBarriers() noexcept override;
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override;
+		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void EndGpuProfileScope() noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void BeginRendering(const RHIRenderingInfo& info) noexcept override;
@@ -96,6 +100,7 @@ namespace gglab
 		VulkanPipelineSystem* m_PipelineSystem = nullptr;
 		VulkanDynamicUniformBuffer* m_UniformBuffer = nullptr;
 		VulkanSet0DynamicUniformFrames* m_Set0Frames = nullptr;
+		VulkanGpuProfiler* m_GpuProfiler = nullptr;
 		VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
 		uint32_t m_FrameSlotIndex = 0;
 		VulkanPipelineState* m_CurrentPipeline = nullptr;
@@ -146,6 +151,8 @@ namespace gglab
 		void FlushBarriers() noexcept override;
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override;
+		void BeginGpuProfileScope(std::string_view name) noexcept override;
+		void EndGpuProfileScope() noexcept override;
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
 		void SetConstantBuffer(

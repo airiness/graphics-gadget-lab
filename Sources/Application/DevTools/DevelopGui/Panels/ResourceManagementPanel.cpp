@@ -486,7 +486,11 @@ namespace gglab
 		if (!dx12Context)
 		{
 			ImGui::TextColored(devtools::style::ErrorTextColor,
-				"This diagnostic panel requires the DX12 backend.");
+				"DX12 lifecycle mutation controls are disabled on this backend.");
+			ImGui::TextWrapped(
+				"Add/destroy test resources and Flush + Collect inject DX12 queue/fence operations "
+				"that are not part of the backend-neutral RHI diagnostics contract. Vulkan memory, "
+				"resource, descriptor, and retirement state remain available in Diagnostics/RHI/Vulkan Backend.");
 			return;
 		}
 

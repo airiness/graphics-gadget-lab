@@ -55,6 +55,34 @@ namespace gglab
 			RHIResourceDebugIdentityDesc m_DebugIdentity;
 		};
 
+		struct RuntimeDiagnostics
+		{
+			uint32_t m_LiveTextures = 0;
+			uint32_t m_RetiredTextures = 0;
+			uint32_t m_LiveBuffers = 0;
+			uint32_t m_RetiredBuffers = 0;
+			uint32_t m_LiveTextureViews = 0;
+			uint32_t m_RetiredTextureViews = 0;
+			uint32_t m_LiveBufferViews = 0;
+			uint32_t m_RetiredBufferViews = 0;
+			uint32_t m_LiveSamplers = 0;
+			uint32_t m_RetiredSamplers = 0;
+			uint64_t m_LiveAllocationBytes = 0;
+			uint64_t m_RetiredAllocationBytes = 0;
+			uint64_t m_TextureCreateCount = 0;
+			uint64_t m_BufferCreateCount = 0;
+			uint64_t m_TextureImportCount = 0;
+			uint64_t m_BufferImportCount = 0;
+			uint64_t m_TextureRetireCount = 0;
+			uint64_t m_BufferRetireCount = 0;
+			uint64_t m_CreateFailureCount = 0;
+			uint64_t m_ImportFailureCount = 0;
+			uint64_t m_InvalidUseCount = 0;
+			uint64_t m_InvalidDestroyCount = 0;
+			uint64_t m_StaleDestroyCount = 0;
+			uint64_t m_DoubleDestroyCount = 0;
+		};
+
 	private:
 		struct Diagnostics
 		{
@@ -198,6 +226,7 @@ namespace gglab
 		bool PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept;
 
 		void RetireCompletedResources() noexcept;
+		[[nodiscard]] RuntimeDiagnostics GetRuntimeDiagnostics() const noexcept;
 
 	private:
 		[[nodiscard]] bool CheckOwnerThread(std::string_view operation) const noexcept;

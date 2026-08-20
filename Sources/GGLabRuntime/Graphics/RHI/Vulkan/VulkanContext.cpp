@@ -3,6 +3,7 @@
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
@@ -224,8 +225,11 @@ namespace gglab
 			Finalize();
 			return false;
 		}
+		m_GpuProfiler =
+			std::make_unique<VulkanGpuProfiler>(&device, runtime.GetFrameSlotCount());
 		m_GraphicsContext = std::make_unique<VulkanGraphicsCommandContext>(&device,
-			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get());
+			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get(),
+			m_GpuProfiler.get());
 		m_DirectComputeContext =
 			std::make_unique<VulkanComputeCommandContext>(*m_GraphicsContext);
 
@@ -282,6 +286,11 @@ namespace gglab
 	RHIPipelineSystem& VulkanContext::GetPipelineSystem() noexcept
 	{
 		return *m_PipelineSystem;
+	}
+
+	GpuProfiler* VulkanContext::GetGpuProfiler() noexcept
+	{
+		return m_GpuProfiler.get();
 	}
 
 	RHIFrameBeginResult VulkanContext::BeginFrame() noexcept
@@ -596,6 +605,7 @@ namespace gglab
 		m_SwapChain.reset();
 		m_DirectComputeContext.reset();
 		m_GraphicsContext.reset();
+		m_GpuProfiler.reset();
 		m_Set0Frames.reset();
 		m_DynamicUniformBuffer.reset();
 		m_TransferManager.reset();

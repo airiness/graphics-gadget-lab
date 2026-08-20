@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <atomic>
 #include <memory>
 #include <span>
 #include <string>
@@ -11,6 +12,14 @@
 
 namespace gglab
 {
+	struct VulkanValidationDiagnostics
+	{
+		uint64_t m_ErrorCount = 0;
+		uint64_t m_WarningCount = 0;
+		uint64_t m_InfoCount = 0;
+		uint64_t m_VerboseCount = 0;
+	};
+
 	// Owns the VkInstance and the optional VK_EXT_debug_utils messenger.
 	// Destruction order: debug messenger first, then the instance.
 	class VulkanInstance
@@ -55,6 +64,9 @@ namespace gglab
 		{
 			return m_DebugMessenger != VK_NULL_HANDLE;
 		}
+		[[nodiscard]] VulkanValidationDiagnostics GetValidationDiagnostics() const noexcept;
+		void RecordValidationMessage(
+			VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept;
 
 	private:
 		void Destroy() noexcept;
@@ -62,5 +74,9 @@ namespace gglab
 		VkInstance m_Instance = VK_NULL_HANDLE;
 		VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
 		PFN_vkDestroyDebugUtilsMessengerEXT m_DestroyDebugMessenger = nullptr;
+		std::atomic_uint64_t m_ValidationErrorCount = 0;
+		std::atomic_uint64_t m_ValidationWarningCount = 0;
+		std::atomic_uint64_t m_ValidationInfoCount = 0;
+		std::atomic_uint64_t m_ValidationVerboseCount = 0;
 	};
 }
