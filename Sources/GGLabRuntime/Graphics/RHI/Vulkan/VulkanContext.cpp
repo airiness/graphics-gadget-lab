@@ -114,6 +114,15 @@ namespace gglab
 			return bufferIndex < m_BackBuffers.size() ? m_BackBuffers[bufferIndex]
 				: RHITextureHandle{};
 		}
+		RHIResourceState GetBackBufferInitialState(uint32_t bufferIndex) const noexcept override
+		{
+			if (!IsValid() || bufferIndex >= m_BackBuffers.size())
+			{
+				return UndefinedRHITextureState();
+			}
+			return ToRHIBackBufferInitialState(
+				m_Context->m_Bootstrap->m_FrameRuntime->GetLayoutTracker().Get(bufferIndex));
+		}
 	private:
 		VulkanContext* m_Context = nullptr;
 		std::vector<RHITextureHandle> m_BackBuffers;

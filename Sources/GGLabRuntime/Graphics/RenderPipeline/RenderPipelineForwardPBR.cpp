@@ -174,7 +174,8 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
-					backBufferDesc, RGTextureAccess::Present, RGContentValidity::Undefined);
+					backBufferDesc, swapChain->GetBackBufferInitialState(frameBackBufferIndex),
+					RGContentValidity::Undefined);
 
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};

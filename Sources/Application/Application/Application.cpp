@@ -12,6 +12,8 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/ForwardPlusLabSession.h"
+#include "Application/Lab/Sessions/GTAOLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
@@ -249,14 +251,16 @@ namespace gglab
 			? LabId(*m_LaunchOptions.m_StartupLabId)
 			: CullingLabSession::GetId();
 		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
-		const bool vulkanCommit14FeatureDemo = minimalVulkanProductionSmoke &&
-			startupLab == MiniPBRGridLabSession::GetId();
+		const bool validatedVulkanRendererLab = minimalVulkanProductionSmoke &&
+			(startupLab == MiniPBRGridLabSession::GetId() ||
+				startupLab == ForwardPlusLabSession::GetId() ||
+				startupLab == GTAOLabSession::GetId());
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		if (!minimalVulkanProductionSmoke || vulkanCommit14FeatureDemo)
+		if (!minimalVulkanProductionSmoke || validatedVulkanRendererLab)
 		{
 			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 		}
@@ -317,7 +321,7 @@ namespace gglab
 		}
 		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
 			(startupLab == SampleableDepthLabSession::GetId() ||
-				startupLab == AlphaTestLabSession::GetId() || vulkanCommit14FeatureDemo);
+				startupLab == AlphaTestLabSession::GetId() || validatedVulkanRendererLab);
 		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
 		{
 			m_DemoManager->RequestActiveDemo(startupDemoIndex);

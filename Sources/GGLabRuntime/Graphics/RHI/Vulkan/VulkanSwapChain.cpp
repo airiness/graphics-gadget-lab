@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <format>
+#include <limits>
 
 namespace gglab
 {
@@ -191,6 +192,8 @@ namespace gglab
 		}
 		swapChain->m_MinImageCount = capabilities.minImageCount;
 		swapChain->m_MaxImageCount = capabilities.maxImageCount;
+		const VkExtent2D imageExtent = SelectVulkanSwapchainExtent(
+			capabilities, createInfo.m_Width, createInfo.m_Height);
 
 		// Image count policy: min + 1, clamped to the surface maximum.
 		uint32_t imageCount = capabilities.minImageCount + 1;
@@ -211,9 +214,7 @@ namespace gglab
 		swapChainCreateInfo.minImageCount = imageCount;
 		swapChainCreateInfo.imageFormat = swapChain->m_VkFormat;
 		swapChainCreateInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-		swapChainCreateInfo.imageExtent = {
-			createInfo.m_Width, createInfo.m_Height,
-		};
+		swapChainCreateInfo.imageExtent = imageExtent;
 		swapChainCreateInfo.imageArrayLayers = 1;
 		swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 		swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -232,8 +233,8 @@ namespace gglab
 				"vkCreateSwapchainKHR failed with {}.", ToString(createResult));
 			return result;
 		}
-		swapChain->m_Width = createInfo.m_Width;
-		swapChain->m_Height = createInfo.m_Height;
+		swapChain->m_Width = imageExtent.width;
+		swapChain->m_Height = imageExtent.height;
 
 		uint32_t imageCountOut = 0;
 		VkResult imageResult =
@@ -453,5 +454,22 @@ namespace gglab
 			return VK_PRESENT_MODE_IMMEDIATE_KHR;
 		}
 		return VK_PRESENT_MODE_FIFO_KHR;
+	}
+
+	VkExtent2D SelectVulkanSwapchainExtent(
+		const VkSurfaceCapabilitiesKHR& capabilities, uint32_t requestedWidth,
+		uint32_t requestedHeight) noexcept
+	{
+		if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+		{
+			return capabilities.currentExtent;
+		}
+
+		return {
+			.width = std::clamp(
+				requestedWidth, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
+			.height = std::clamp(
+				requestedHeight, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
+		};
 	}
 }

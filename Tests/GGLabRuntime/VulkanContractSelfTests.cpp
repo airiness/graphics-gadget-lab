@@ -31,6 +31,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -827,9 +828,15 @@ namespace gglab
 				context.Check(tracker.Get(0) == VulkanPresentImageLayout::Undefined &&
 					tracker.Get(2) == VulkanPresentImageLayout::Undefined,
 					"new swapchain images start Undefined");
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(0)) ==
+					UndefinedRHITextureState(),
+					"new swapchain images publish Undefined to RenderGraph imports");
 				tracker.Set(1, VulkanPresentImageLayout::Present);
 				context.Check(tracker.Get(1) == VulkanPresentImageLayout::Present,
 					"successful present updates the tracked state");
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(1)) ==
+					PresentRHITextureState(),
+					"presented swapchain images publish Present to RenderGraph imports");
 				tracker.Reset(2);
 				context.Check(tracker.GetImageCount() == 2 &&
 					tracker.Get(1) == VulkanPresentImageLayout::Undefined,
@@ -978,6 +985,31 @@ namespace gglab
 				context.Check(SelectVulkanPresentModeFromList(fifoOnly, false) ==
 					VK_PRESENT_MODE_FIFO_KHR,
 					"vsync off falls back to FIFO");
+			}
+
+			// Swapchain extent policy follows the surface contract: a fixed
+			// current extent overrides the requested client size, while a
+			// variable extent clamps each requested dimension independently.
+			{
+				VkSurfaceCapabilitiesKHR fixed{};
+				fixed.currentExtent = { 1920, 1080 };
+				fixed.minImageExtent = { 1920, 1080 };
+				fixed.maxImageExtent = { 1920, 1080 };
+				const VkExtent2D selectedFixed =
+					SelectVulkanSwapchainExtent(fixed, 1278, 1360);
+				context.Check(selectedFixed.width == 1920 && selectedFixed.height == 1080,
+					"fixed surface extent overrides a transient requested client size");
+
+				VkSurfaceCapabilitiesKHR variable{};
+				variable.currentExtent = {
+					std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()
+				};
+				variable.minImageExtent = { 320, 240 };
+				variable.maxImageExtent = { 2560, 1440 };
+				const VkExtent2D selectedVariable =
+					SelectVulkanSwapchainExtent(variable, 128, 2160);
+				context.Check(selectedVariable.width == 320 && selectedVariable.height == 1440,
+					"variable surface extent clamps the requested drawable size");
 			}
 
 			// Runtime health: fatal is not device lost. A surface-lost
@@ -1541,14 +1573,21 @@ namespace gglab
 			.m_Visibility = RHIShaderStage::All,
 			.m_Count = 0,
 		};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+			.m_Visibility = RHIShaderStage::Pixel,
+			.m_Binding = 1,
+		};
 
 		const VulkanBindingLayoutPlan plan = BuildVulkanBindingLayoutPlan(desc, 64 * 1024);
-		context.Check(plan.IsValid() && plan.m_Set0BindingCount == 3 &&
+		context.Check(plan.IsValid() && plan.m_Set0BindingCount == 4 &&
 			plan.m_DynamicOffsetCount == 2,
 			"Vulkan binding layout separates fixed set 0 from the global descriptor set");
 		context.Check(plan.m_Set0Bindings[0].m_Binding == 1 &&
 			plan.m_Set0Bindings[1].m_Binding == 2 &&
-			plan.m_Set0Bindings[2].m_Binding == 32,
+			plan.m_Set0Bindings[2].m_Binding == 32 &&
+			plan.m_Set0Bindings[3].m_Binding == 33 &&
+			plan.m_Set0Bindings[3].m_LogicalParameterIndex == 3,
 			"Set-0 bindings use the shared register-class shifts and native order");
 		context.Check(plan.GetDynamicOffsetSlot(2) == 0 &&
 			plan.GetDynamicOffsetSlot(0) == 1,

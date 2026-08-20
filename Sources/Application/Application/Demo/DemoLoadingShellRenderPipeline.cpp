@@ -74,7 +74,8 @@ namespace gglab
 						backBufferDesc.m_Format = swapChain->GetFormat();
 						targets.m_BackBuffer = builder.ImportTexture("LoadingShell.BackBuffer",
 							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-							UndefinedRHITextureState(), RGContentValidity::Undefined);
+							swapChain->GetBackBufferInitialState(backBufferIndex),
+							RGContentValidity::Undefined);
 						builder.WriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
 						data.m_BackBuffer = targets.m_BackBuffer;
 						data.m_Rtv =

@@ -52,6 +52,10 @@ namespace gglab
 		RHIFormat GetFormat() const noexcept override;
 
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override;
+		RHIResourceState GetBackBufferInitialState(uint32_t) const noexcept override
+		{
+			return PresentRHITextureState();
+		}
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
 
 	private:

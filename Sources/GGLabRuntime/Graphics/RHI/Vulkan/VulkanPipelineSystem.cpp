@@ -105,9 +105,10 @@ namespace gglab
 			return plan;
 		}
 
-		for (uint32_t parameterIndex = 0; parameterIndex < desc.m_SlotCount; ++parameterIndex)
+		uint32_t logicalParameterIndex = 0;
+		for (uint32_t slotIndex = 0; slotIndex < desc.m_SlotCount; ++slotIndex)
 		{
-			const RHIBindingSlotDesc& slot = desc.m_Slots[parameterIndex];
+			const RHIBindingSlotDesc& slot = desc.m_Slots[slotIndex];
 			if (slot.m_Type == RHIBindingType::Unknown)
 			{
 				plan.m_Error = VulkanBindingLayoutError::UnknownBindingType;
@@ -144,7 +145,7 @@ namespace gglab
 				return plan;
 			}
 			VulkanSet0BindingPlan& binding = plan.m_Set0Bindings[plan.m_Set0BindingCount++];
-			binding.m_LogicalParameterIndex = parameterIndex;
+			binding.m_LogicalParameterIndex = logicalParameterIndex++;
 			binding.m_Binding = location.m_Location.m_Binding;
 			binding.m_DescriptorType = ToVulkanDescriptorType(slot.m_Type);
 			binding.m_DescriptorCount = slot.m_Count;
