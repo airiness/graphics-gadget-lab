@@ -154,6 +154,10 @@ namespace gglab
 	{
 		return m_GpuProfiler.get();
 	}
+	const GpuProfiler* DX12Context::GetGpuProfiler() const noexcept
+	{
+		return m_GpuProfiler.get();
+	}
 	DX12Device& DX12Context::GetDX12Device() noexcept
 	{
 		return *m_Device;

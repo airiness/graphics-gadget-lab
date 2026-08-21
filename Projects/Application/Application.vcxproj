@@ -168,6 +168,7 @@
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -275,6 +276,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\AssetSnapshotText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\RHIText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

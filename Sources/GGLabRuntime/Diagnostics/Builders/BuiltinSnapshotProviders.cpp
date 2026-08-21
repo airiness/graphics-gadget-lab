@@ -1,5 +1,6 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "Diagnostics/Builders/DX12BackendSnapshotBuilder.h"
 #include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
@@ -14,6 +15,7 @@
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
@@ -261,6 +263,30 @@ namespace gglab
 			}
 		};
 
+		class DX12BackendSnapshotProvider final : public SnapshotProvider<DX12BackendSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "DirectX 12 Backend";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<DX12BackendSnapshot>();
+				auto* dx12 = context.m_Renderer
+					? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
+					: nullptr;
+				if (dx12)
+				{
+					BuildDX12BackendSnapshot(*dx12, snapshot);
+				}
+				else
+				{
+					snapshot = {};
+				}
+			}
+		};
+
 		class RHIPipelineSystemSnapshotProvider final
 			: public SnapshotProvider<RHIPipelineSystemSnapshot>
 		{
@@ -364,6 +390,8 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<DX12BackendSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
