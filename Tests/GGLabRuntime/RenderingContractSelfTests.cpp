@@ -1505,6 +1505,17 @@ namespace gglab
 				"Production DXC compiles the gglab.surface surface evaluation "
 				"seam contract (profile shape and the runtime MaterialData input)");
 
+			desc.m_SourcePath = L"Tests/SurfaceTextureContractCompile.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Defines.clear();
+			const ShaderCompileResult surfaceTextureContractArtifact =
+				compiler.Compile(desc);
+			context.Check(surfaceTextureContractArtifact.IsSuccess(),
+				"Production DXC compiles the gglab.surface texture signature "
+				"contract (generated texture parameter form, bindless sample "
+				"expression, and the profile output shape)");
+
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";
