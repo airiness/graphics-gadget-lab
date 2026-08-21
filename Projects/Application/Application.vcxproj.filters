@@ -22,6 +22,9 @@
     <Filter Include="Application\Platform\Windows">
       <UniqueIdentifier>{2BB0E059-7020-340B-AEBD-E7B9137E6E1D}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Rendering">
+      <UniqueIdentifier>{789CDC8B-C852-7A2E-64BB-03AA67E855A6}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\SelfTest">
       <UniqueIdentifier>{03F03AD5-326D-54B7-36C4-DD57A9832269}</UniqueIdentifier>
     </Filter>
@@ -252,6 +255,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp">
+      <Filter>Application\Rendering</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -277,6 +283,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\InputBase.cpp">
@@ -578,6 +587,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h">
       <Filter>Application</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h">
+      <Filter>Application\Rendering</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
@@ -594,6 +606,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Core\Input\InputBase.h">

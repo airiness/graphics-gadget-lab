@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/Vulkan/VulkanQualification.h"
+#include "Application/Rendering/VulkanQualification.h"
 
 #include <windows.h>
 

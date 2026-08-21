@@ -45,7 +45,7 @@ namespace gglab
 
 	struct VulkanQualificationOptions
 	{
-		// Both are borrowed for the duration of RunVulkanQualification.
+		// Borrowed for the duration of RunVulkanQualification.
 		const VulkanSurfaceFactoryBase* m_SurfaceFactory = nullptr;
 		VulkanQualificationHostBase* m_Host = nullptr;
 		bool m_RequestValidation = false;
@@ -77,7 +77,7 @@ namespace gglab
 	};
 
 	// Runs the deterministic Vulkan bootstrap, adapter inspection and
-	// minimal-frame/resource qualification path. This backend API never
-	// selects or falls back to another RHI.
+	// minimal-frame/resource qualification path without selecting or falling
+	// back to another RHI.
 	[[nodiscard]] int RunVulkanQualification(const VulkanQualificationOptions& options) noexcept;
 }

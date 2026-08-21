@@ -1,6 +1,6 @@
 #include "Application/RenderingStartup.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
-#include "Graphics/RHI/Vulkan/VulkanQualification.h"
+#include "Application/Rendering/VulkanQualification.h"
 #include "Graphics/Shader/ShaderPaths.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Application/Platform/Windows/Win32VulkanQualificationHost.h"

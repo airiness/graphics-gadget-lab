@@ -83,7 +83,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.cpp" />
@@ -278,7 +277,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\Buffer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.h" />

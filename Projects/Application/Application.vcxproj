@@ -164,6 +164,8 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
@@ -263,6 +265,8 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32MessageHandler.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.h" />
