@@ -165,6 +165,7 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
@@ -265,6 +266,7 @@
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32MessageHandler.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\EnumText\EnumTextDXGI.h" />

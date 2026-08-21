@@ -2,6 +2,10 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Graphics/Shader/ShaderPaths.h"
+#if GGLAB_ENABLE_VULKAN
+#include "Application/Platform/Windows/Win32VulkanQualificationHost.h"
+#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
+#endif
 
 #include <filesystem>
 
@@ -11,8 +15,14 @@ namespace gglab
 		const ApplicationLaunchOptions& options, HWND hwnd) noexcept
 	{
 		VulkanQualificationOptions qualificationOptions{};
-		qualificationOptions.m_HInstance = GetModuleHandle(nullptr);
-		qualificationOptions.m_Hwnd = hwnd;
+#if GGLAB_ENABLE_VULKAN
+		VulkanWin32SurfaceFactory surfaceFactory(GetModuleHandle(nullptr), hwnd);
+		Win32VulkanQualificationHost qualificationHost(hwnd);
+		qualificationOptions.m_SurfaceFactory = &surfaceFactory;
+		qualificationOptions.m_Host = &qualificationHost;
+#else
+		static_cast<void>(hwnd);
+#endif
 #if defined(BUILD_DEBUG)
 		qualificationOptions.m_RequestValidation = true;
 #endif

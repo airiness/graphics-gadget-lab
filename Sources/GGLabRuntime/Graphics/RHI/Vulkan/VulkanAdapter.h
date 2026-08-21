@@ -11,6 +11,63 @@
 
 namespace gglab
 {
+	enum class VulkanFormatRequirementGroup : uint8_t
+	{
+		Required,
+		GtaoAlternative,
+	};
+
+	struct VulkanFormatRequirement
+	{
+		VkFormat m_Format = VK_FORMAT_UNDEFINED;
+		VkFormatFeatureFlags2 m_RequiredFeatures = 0;
+		std::string_view m_Usage;
+		VulkanFormatRequirementGroup m_Group = VulkanFormatRequirementGroup::Required;
+	};
+
+	// Format requirements of the production rendering path. Every Required
+	// entry must pass; at least one GtaoAlternative entry must pass. Keeping the
+	// complete gate here makes the frozen device profile directly CPU-testable.
+	inline constexpr std::array GGLabVulkanFormatRequirements{
+		VulkanFormatRequirement{
+			VK_FORMAT_D32_SFLOAT,
+			VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT |
+				VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
+			"sampleable depth and shadow map",
+		},
+		VulkanFormatRequirement{
+			VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT |
+				VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
+			"HDR scene color and bloom",
+		},
+		VulkanFormatRequirement{
+			VK_FORMAT_R8G8B8A8_UNORM,
+			VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT |
+				VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
+			"preview and auxiliary targets",
+		},
+		VulkanFormatRequirement{
+			VK_FORMAT_B8G8R8A8_UNORM,
+			VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT,
+			"swapchain backbuffer",
+		},
+		VulkanFormatRequirement{
+			VK_FORMAT_R8_UNORM,
+			VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
+				VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
+			"GTAO AO (preferred)",
+			VulkanFormatRequirementGroup::GtaoAlternative,
+		},
+		VulkanFormatRequirement{
+			VK_FORMAT_R16_SFLOAT,
+			VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
+				VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
+			"GTAO AO (fallback)",
+			VulkanFormatRequirementGroup::GtaoAlternative,
+		},
+	};
+
 	// Stable physical device identity. Device and driver UUIDs are the
 	// persistent identifiers used by the adapter selector.
 	struct VulkanAdapterIdentity

@@ -1,9 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHITypes.h"
-#include "Graphics/RHI/Vulkan/VulkanAdapter.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
-#include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 
@@ -188,13 +186,14 @@ namespace gglab
 
 	struct VulkanFrameRuntimeCreateInfo
 	{
-		// All borrowed: the caller owns the bootstrap-created objects and
-		// destroys them after the frame runtime.
-		VulkanInstance* m_Instance = nullptr;
+		// Native handles and m_Device are borrowed. The bootstrap owner keeps
+		// them alive until after the frame runtime is destroyed.
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		VulkanDevice* m_Device = nullptr;
-		const VulkanAdapterCapabilitySnapshot* m_Snapshot = nullptr;
+		// Copied from the selected adapter snapshot. The frame runtime does not
+		// borrow the full snapshot merely to retain this immutable value.
+		uint32_t m_GraphicsQueueFamilyIndex = UINT32_MAX;
 		uint32_t m_FrameSlotCount = 2;
 		RHIFormat m_RequestedFormat = RHIFormat::R8G8B8A8Unorm;
 		bool m_Vsync = false;

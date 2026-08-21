@@ -286,13 +286,14 @@ namespace gglab
 		const VulkanFrameRuntimeCreateInfo& createInfo) noexcept
 	{
 		Result result{};
-		if (createInfo.m_Device == nullptr || createInfo.m_Surface == VK_NULL_HANDLE
-			|| createInfo.m_Instance == nullptr || createInfo.m_Snapshot == nullptr
+		if (createInfo.m_Device == nullptr || createInfo.m_Surface == VK_NULL_HANDLE ||
+			createInfo.m_PhysicalDevice == VK_NULL_HANDLE ||
+			createInfo.m_GraphicsQueueFamilyIndex == UINT32_MAX
 			|| createInfo.m_Width == 0 || createInfo.m_Height == 0)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
-			result.m_Error = "VulkanFrameRuntime requires instance, surface, device, snapshot "
-				"and a nonzero drawable extent.";
+			result.m_Error = "VulkanFrameRuntime requires surface, physical device, logical "
+				"device, graphics queue-family index and a nonzero drawable extent.";
 			return result;
 		}
 
@@ -325,7 +326,7 @@ namespace gglab
 		VkCommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		poolInfo.queueFamilyIndex = createInfo.m_Snapshot->m_GraphicsPresentQueueFamilyIndex;
+		poolInfo.queueFamilyIndex = createInfo.m_GraphicsQueueFamilyIndex;
 		VkCommandBufferAllocateInfo allocateInfo{};
 		allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;

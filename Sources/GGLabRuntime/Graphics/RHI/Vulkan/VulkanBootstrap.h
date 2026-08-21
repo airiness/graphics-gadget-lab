@@ -128,8 +128,4 @@ namespace gglab
 	[[nodiscard]] VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntime(
 		const VulkanBootstrapRuntimeCreateInfo& createInfo) noexcept;
 
-	// Platform bridge implemented beside the native surface factory. Keeps the
-	// production context free of platform window types and headers.
-	[[nodiscard]] VulkanBootstrapRuntimeResult CreateVulkanBootstrapRuntimeForWindow(
-		VulkanBootstrapRuntimeCreateInfo createInfo, void* nativeWindowHandle) noexcept;
 }

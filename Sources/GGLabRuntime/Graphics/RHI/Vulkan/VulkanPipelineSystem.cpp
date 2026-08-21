@@ -6,7 +6,6 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
-#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <algorithm>
 #include <array>
@@ -19,6 +18,27 @@ namespace gglab
 		[[nodiscard]] bool IsVulkanShaderBytecode(const ShaderBytecode& bytecode) noexcept
 		{
 			return !bytecode.IsValid() || bytecode.m_Format == ShaderBinaryFormat::SpirV;
+		}
+
+		[[nodiscard]] bool TryEncodeVulkanEntryPoint(
+			std::wstring_view source, std::string& outEntryPoint) noexcept
+		{
+			// GGLab shader entry points are HLSL identifiers and therefore use
+			// portable ASCII. Avoid routing backend-core pipeline creation through
+			// a platform-specific conversion utility merely because the compiler-facing
+			// shader description stores wide strings.
+			outEntryPoint.clear();
+			outEntryPoint.reserve(source.size());
+			for (const wchar_t character : source)
+			{
+				if (character <= 0 || character > 0x7f)
+				{
+					outEntryPoint.clear();
+					return false;
+				}
+				outEntryPoint.push_back(static_cast<char>(character));
+			}
+			return !outEntryPoint.empty();
 		}
 
 		[[nodiscard]] bool AreVertexInputsEqual(
@@ -360,6 +380,18 @@ namespace gglab
 			return {};
 		}
 
+		std::string vertexEntry;
+		std::string pixelEntry;
+		if (!TryEncodeVulkanEntryPoint(
+			createInfo.m_VertexShader.m_EntryPoint, vertexEntry) ||
+			(hasPixelShader && !TryEncodeVulkanEntryPoint(
+				createInfo.m_PixelShader.m_EntryPoint, pixelEntry)))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Vulkan pipeline entry points must be non-empty ASCII HLSL identifiers.");
+			return {};
+		}
+
 		const std::array shaderHashes{
 			createInfo.m_VertexShader.m_Hash,
 			createInfo.m_PixelShader.m_Hash,
@@ -390,8 +422,6 @@ namespace gglab
 			return {};
 		}
 
-		const std::string vertexEntry = utils::ToString(createInfo.m_VertexShader.m_EntryPoint);
-		const std::string pixelEntry = utils::ToString(createInfo.m_PixelShader.m_EntryPoint);
 		std::array<VulkanShaderStageModule, 2> stages{
 			VulkanShaderStageModule{ VK_SHADER_STAGE_VERTEX_BIT, vertexModule, vertexEntry.c_str() },
 			VulkanShaderStageModule{ VK_SHADER_STAGE_FRAGMENT_BIT, pixelModule, pixelEntry.c_str() },
@@ -442,6 +472,13 @@ namespace gglab
 				"VulkanPipelineSystem::CreateComputePipeline received invalid inputs.");
 			return {};
 		}
+		std::string entryPoint;
+		if (!TryEncodeVulkanEntryPoint(createInfo.m_ComputeShader.m_EntryPoint, entryPoint))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Vulkan pipeline entry points must be non-empty ASCII HLSL identifiers.");
+			return {};
+		}
 
 		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
 		{
@@ -460,7 +497,6 @@ namespace gglab
 		{
 			return {};
 		}
-		const std::string entryPoint = utils::ToString(createInfo.m_ComputeShader.m_EntryPoint);
 		auto pipeline = std::make_unique<VulkanPipelineState>();
 		const bool created = pipeline->CreateCompute(
 			m_Device, bindingLayout, shaderModule, entryPoint.c_str());

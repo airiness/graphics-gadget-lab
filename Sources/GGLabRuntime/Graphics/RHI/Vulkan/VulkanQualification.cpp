@@ -13,7 +13,6 @@
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
-#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #endif
@@ -30,11 +29,10 @@ namespace gglab
 	{
 #if GGLAB_ENABLE_VULKAN
 		[[nodiscard]] VulkanBootstrapOptions MakeVulkanBootstrapOptions(
-			const VulkanQualificationOptions& options,
-			const VulkanSurfaceFactoryBase& surfaceFactory) noexcept
+			const VulkanQualificationOptions& options) noexcept
 		{
 			VulkanBootstrapOptions bootstrapOptions{};
-			bootstrapOptions.m_SurfaceFactory = &surfaceFactory;
+			bootstrapOptions.m_SurfaceFactory = options.m_SurfaceFactory;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
 				ParseVulkanAdapterSelectionRequest(options.m_AdapterSelector);
@@ -105,16 +103,17 @@ namespace gglab
 		};
 
 		[[nodiscard]] VulkanQualificationRecreateOutcome RunQualificationRecreate(
-			VulkanFrameRuntime& runtime, HWND hwnd, bool vsync,
+			VulkanFrameRuntime& runtime, VulkanQualificationHostBase& host, bool vsync,
 			QualificationFrameStats& stats) noexcept;
 
 		// Script-level helper: a recreate must actually happen for the script
 		// to continue; both Suspended and Failed stop the deterministic
 		// qualification script (it cannot drive frames while suspended).
 		[[nodiscard]] bool RunQualificationRecreateChecked(VulkanFrameRuntime& runtime,
-			HWND hwnd, bool vsync, QualificationFrameStats& stats) noexcept
+			VulkanQualificationHostBase& host, bool vsync,
+			QualificationFrameStats& stats) noexcept
 		{
-			switch (RunQualificationRecreate(runtime, hwnd, vsync, stats))
+			switch (RunQualificationRecreate(runtime, host, vsync, stats))
 			{
 			case VulkanQualificationRecreateOutcome::Recreated:
 				return true;
@@ -145,11 +144,13 @@ namespace gglab
 		// present schedules a recreation at the next safe point (after the
 		// frame transaction completes): the platform owns the drawable
 		// extent, the runtime only owns the recreation mechanics.
-		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
-			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept;
+		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime,
+			VulkanQualificationHostBase& host, uint32_t step, bool abort,
+			QualificationFrameStats& stats) noexcept;
 
-		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime, HWND hwnd,
-			uint32_t step, bool abort, QualificationFrameStats& stats) noexcept
+		[[nodiscard]] bool RunQualificationStep(VulkanFrameRuntime& runtime,
+			VulkanQualificationHostBase& host, uint32_t step, bool abort,
+			QualificationFrameStats& stats) noexcept
 		{
 			VulkanBeginFrameResult begin = runtime.BeginFrame();
 			if (begin.m_Status == VulkanAcquireOutcome::OutOfDate)
@@ -158,7 +159,7 @@ namespace gglab
 					"qualify[{:03d}] acquire OUT_OF_DATE; recreating with the real extent and "
 					"retrying once.",
 					step));
-				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, host, runtime.GetVsync(), stats))
 				{
 					return false;
 				}
@@ -213,7 +214,7 @@ namespace gglab
 				}
 				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 					"qualify[{:03d}] recreation pending; recreating at the safe point.", step));
-				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, host, runtime.GetVsync(), stats))
 				{
 					return false;
 				}
@@ -232,20 +233,19 @@ namespace gglab
 		}
 
 		[[nodiscard]] VulkanQualificationRecreateOutcome RunQualificationRecreate(
-			VulkanFrameRuntime& runtime, HWND hwnd, bool vsync,
+			VulkanFrameRuntime& runtime, VulkanQualificationHostBase& host, bool vsync,
 			QualificationFrameStats& stats) noexcept
 		{
-			RECT clientRect{};
-			if (!GetClientRect(hwnd, &clientRect))
+			VulkanQualificationDrawableExtent extent{};
+			std::string hostError;
+			if (!host.QueryDrawableExtent(extent, hostError))
 			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("GetClientRect failed before swapchain recreate.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+					"Could not query the drawable extent before swapchain recreation: {}",
+					hostError));
 				return VulkanQualificationRecreateOutcome::Failed;
 			}
-			const uint32_t width =
-				static_cast<uint32_t>(std::max<LONG>(clientRect.right - clientRect.left, 0));
-			const uint32_t height =
-				static_cast<uint32_t>(std::max<LONG>(clientRect.bottom - clientRect.top, 0));
-			if (width == 0 || height == 0)
+			if (extent.IsEmpty())
 			{
 				// Suspended window: never create a zero-size swapchain. The
 				// caller stops driving frames until the window is restored.
@@ -255,7 +255,7 @@ namespace gglab
 			}
 
 			std::string error;
-			if (!runtime.RecreateSwapChain(width, height, vsync, error))
+			if (!runtime.RecreateSwapChain(extent.m_Width, extent.m_Height, vsync, error))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format("Swapchain recreate failed: {}", error));
 				return VulkanQualificationRecreateOutcome::Failed;
@@ -264,28 +264,10 @@ namespace gglab
 			const auto& swapChain = runtime.GetSwapChain();
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"qualify[recreate] {}x{} vsync={} presentMode={} format={} images={}",
-				width, height, vsync ? "on" : "off", PresentModeName(swapChain.GetPresentMode()),
+				extent.m_Width, extent.m_Height, vsync ? "on" : "off",
+				PresentModeName(swapChain.GetPresentMode()),
 				GetRHIFormatInfo(swapChain.GetFormat()).m_Name, swapChain.GetImageCount()));
 			return VulkanQualificationRecreateOutcome::Recreated;
-		}
-
-		[[nodiscard]] bool ResizeQualificationWindow(HWND hwnd, uint32_t width,
-			uint32_t height) noexcept
-		{
-			// The window is owned by the application platform layer; this is
-			// the only place the qualification path touches it, to drive a
-			// real WM_SIZE-style resize without a message pump.
-			const BOOL moved = SetWindowPos(hwnd, nullptr, 0, 0,
-				static_cast<int>(width), static_cast<int>(height),
-				SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-			if (!moved)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-					"SetWindowPos({}x{}) failed with error {}.", width, height,
-					static_cast<uint32_t>(GetLastError())));
-				return false;
-			}
-			return true;
 		}
 
 		// Registers a deferred-retirement probe on a reserved-but-unsubmitted
@@ -2556,19 +2538,19 @@ namespace gglab
 		// switching. Every step keeps the partial application command buffer
 		// unsubmitted; AbortFrame uses the dedicated minimal command buffer.
 		[[nodiscard]] int RunVulkanQualificationFrames(
-			VulkanFrameRuntime& runtime, HWND hwnd,
+			VulkanFrameRuntime& runtime, VulkanQualificationHostBase& host,
 			const std::filesystem::path& shaderSourceRoot,
 			const std::filesystem::path& shaderCacheRoot) noexcept
 		{
 			QualificationFrameStats stats;
 			uint32_t step = 0;
-			const auto runNormal = [&runtime, hwnd, &stats, &step]()
+			const auto runNormal = [&runtime, &host, &stats, &step]()
 				{
-					return RunQualificationStep(runtime, hwnd, step++, false, stats);
+					return RunQualificationStep(runtime, host, step++, false, stats);
 				};
-			const auto runAbort = [&runtime, hwnd, &stats, &step]()
+			const auto runAbort = [&runtime, &host, &stats, &step]()
 				{
-					return RunQualificationStep(runtime, hwnd, step++, true, stats);
+					return RunQualificationStep(runtime, host, step++, true, stats);
 				};
 
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan minimal-frame qualification started.");
@@ -2636,11 +2618,15 @@ namespace gglab
 			};
 			for (const auto& [resizeWidth, resizeHeight] : resizeSizes)
 			{
-				if (!ResizeQualificationWindow(hwnd, resizeWidth, resizeHeight))
+				std::string hostError;
+				if (!host.ResizeDrawable(resizeWidth, resizeHeight, hostError))
 				{
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+						"Could not resize the qualification drawable to {}x{}: {}",
+						resizeWidth, resizeHeight, hostError));
 					return 1;
 				}
-				if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
+				if (!RunQualificationRecreateChecked(runtime, host, runtime.GetVsync(), stats))
 				{
 					return 1;
 				}
@@ -2652,7 +2638,7 @@ namespace gglab
 
 			// Toggle VSync on and off. The actual present mode is logged after
 			// each recreate.
-			if (!RunQualificationRecreateChecked(runtime, hwnd, true, stats))
+			if (!RunQualificationRecreateChecked(runtime, host, true, stats))
 			{
 				return 1;
 			}
@@ -2663,7 +2649,7 @@ namespace gglab
 					return 1;
 				}
 			}
-			if (!RunQualificationRecreateChecked(runtime, hwnd, false, stats))
+			if (!RunQualificationRecreateChecked(runtime, host, false, stats))
 			{
 				return 1;
 			}
@@ -2678,12 +2664,22 @@ namespace gglab
 			// Exercise minimize and restore. A minimized window has a zero
 			// drawable extent: BeginFrame must never be called, no zero-size
 			// swapchain is created, and restore recreates at the real extent.
-			ShowWindow(hwnd, SW_MINIMIZE);
+			std::string hostError;
+			if (!host.SetMinimized(true, hostError))
 			{
-				RECT minimizedRect{};
-				GetClientRect(hwnd, &minimizedRect);
-				if (minimizedRect.right - minimizedRect.left != 0 ||
-					minimizedRect.bottom - minimizedRect.top != 0)
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+					"Could not minimize the qualification drawable: {}", hostError));
+				return 1;
+			}
+			{
+				VulkanQualificationDrawableExtent minimizedExtent{};
+				if (!host.QueryDrawableExtent(minimizedExtent, hostError))
+				{
+					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+						"Could not query the minimized qualification drawable: {}", hostError));
+					return 1;
+				}
+				if (!minimizedExtent.IsEmpty())
 				{
 					GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 						"Minimized window did not report a zero drawable extent.");
@@ -2692,8 +2688,13 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
 					"qualify[minimize] drawable extent is 0x0; BeginFrame skipped.");
 			}
-			ShowWindow(hwnd, SW_RESTORE);
-			if (!RunQualificationRecreateChecked(runtime, hwnd, runtime.GetVsync(), stats))
+			if (!host.SetMinimized(false, hostError))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+					"Could not restore the qualification drawable: {}", hostError));
+				return 1;
+			}
+			if (!RunQualificationRecreateChecked(runtime, host, runtime.GetVsync(), stats))
 			{
 				return 1;
 			}
@@ -2768,10 +2769,15 @@ namespace gglab
 #if GGLAB_ENABLE_VULKAN
 		if (!options.IsConfigurationValid())
 		{
-			if (!options.HasRequiredNativeSurfaceHandles())
+			if (!options.HasRequiredSurfaceFactory())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"Vulkan qualification requires non-null HINSTANCE and HWND surface handles.");
+					"Vulkan qualification requires a surface factory.");
+			}
+			else if (!options.m_ListAdapters && !options.HasRequiredPlatformHost())
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"Vulkan frame qualification requires a platform host.");
 			}
 			else
 			{
@@ -2781,34 +2787,36 @@ namespace gglab
 			return 1;
 		}
 
-		VulkanWin32SurfaceFactory surfaceFactory(options.m_HInstance, options.m_Hwnd);
 		if (options.m_ListAdapters)
 		{
 			// Inspection-only: enumerate, evaluate and log every adapter,
 			// then exit without creating a frame runtime.
 			VulkanBootstrapReport report;
 			return RunVulkanBootstrap(
-				MakeVulkanBootstrapOptions(options, surfaceFactory), report);
+				MakeVulkanBootstrapOptions(options), report);
 		}
 
-		RECT clientRect{};
-		if (!GetClientRect(options.m_Hwnd, &clientRect) ||
-			clientRect.right - clientRect.left == 0 ||
-			clientRect.bottom - clientRect.top == 0)
+		VulkanQualificationDrawableExtent extent{};
+		std::string hostError;
+		if (!options.m_Host->QueryDrawableExtent(extent, hostError))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+				"Vulkan startup could not query the drawable extent: {}", hostError));
+			return 1;
+		}
+		if (extent.IsEmpty())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan startup requires a nonzero window drawable extent.");
 			return 1;
 		}
 
 		VulkanBootstrapRuntimeCreateInfo createInfo{};
-		createInfo.m_BootstrapOptions = MakeVulkanBootstrapOptions(options, surfaceFactory);
+		createInfo.m_BootstrapOptions = MakeVulkanBootstrapOptions(options);
 		createInfo.m_FrameSlotCount = 2;
 		createInfo.m_RequestedFormat = RHIFormat::R8G8B8A8Unorm;
 		createInfo.m_Vsync = false;
-		createInfo.m_Width =
-			static_cast<uint32_t>(clientRect.right - clientRect.left);
-		createInfo.m_Height =
-			static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+		createInfo.m_Width = extent.m_Width;
+		createInfo.m_Height = extent.m_Height;
 
 		VulkanBootstrapRuntimeResult result = CreateVulkanBootstrapRuntime(createInfo);
 		if (!result.Succeeded())
@@ -2823,7 +2831,7 @@ namespace gglab
 			result.m_SelectedSnapshot.m_Identity.m_DeviceName,
 			result.m_HasDebugMessenger ? "enabled" : "disabled"));
 
-		int exitCode = RunVulkanQualificationFrames(*result.m_FrameRuntime, options.m_Hwnd,
+		int exitCode = RunVulkanQualificationFrames(*result.m_FrameRuntime, *options.m_Host,
 			options.m_ShaderSourceRoot, options.m_ShaderCacheRoot);
 
 		// Release the runtime objects while the debug messenger remains alive,
@@ -2833,8 +2841,8 @@ namespace gglab
 		result.m_Device.reset();
 		const VulkanValidationDiagnostics validation =
 			result.m_Instance->GetValidationDiagnostics();
-		if (!PassesVulkanValidationGate(options.m_RequestValidation,
-			result.m_HasDebugMessenger, validation))
+		if (!PassesVulkanQualificationValidationGate(options.m_RequestValidation,
+			result.m_HasDebugMessenger, validation.m_ErrorCount, validation.m_WarningCount))
 		{
 			if (!result.m_HasDebugMessenger)
 			{

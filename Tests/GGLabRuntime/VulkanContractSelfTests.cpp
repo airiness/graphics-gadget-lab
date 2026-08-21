@@ -108,6 +108,27 @@ namespace gglab
 
 		void RunDeviceProfileTests(SelfTestContext& context) noexcept
 		{
+			const size_t gtaoAlternativeCount = static_cast<size_t>(std::ranges::count_if(
+				GGLabVulkanFormatRequirements,
+				[](const VulkanFormatRequirement& requirement) noexcept
+				{
+					return requirement.m_Group ==
+						VulkanFormatRequirementGroup::GtaoAlternative;
+				}));
+			context.Check(GGLabVulkanFormatRequirements.size() == 6 &&
+				gtaoAlternativeCount == 2,
+				"Vulkan format profile exposes four mandatory formats and two GTAO alternatives");
+			const auto hasFormat = [](VkFormat format) noexcept
+				{
+					return std::ranges::any_of(GGLabVulkanFormatRequirements,
+						[format](const VulkanFormatRequirement& requirement) noexcept
+						{ return requirement.m_Format == format; });
+				};
+			context.Check(hasFormat(VK_FORMAT_D32_SFLOAT) &&
+				hasFormat(VK_FORMAT_R16G16B16A16_SFLOAT) &&
+				hasFormat(VK_FORMAT_B8G8R8A8_UNORM),
+				"Vulkan format profile exposes depth, HDR scene color, and swapchain gates");
+
 			const VulkanDeviceProfileCapabilities supported = MakeSupportedCapabilities();
 			context.Check(EvaluateVulkanDeviceProfile(supported).IsAccepted(),
 				"Vulkan profile accepts its exact minimum required capabilities");
@@ -1053,13 +1074,15 @@ namespace gglab
 				context.Check(validation.m_ErrorCount == 1 && validation.m_WarningCount == 1 &&
 					validation.m_InfoCount == 1 && validation.m_VerboseCount == 1,
 					"Vulkan validation diagnostics preserve all severity counters");
-				context.Check(PassesVulkanValidationGate(false, false, validation),
+				context.Check(PassesVulkanQualificationValidationGate(false, false,
+					validation.m_ErrorCount, validation.m_WarningCount),
 					"validation-disabled qualification does not require a messenger");
-				context.Check(!PassesVulkanValidationGate(true, false, {}),
+				context.Check(!PassesVulkanQualificationValidationGate(true, false, 0, 0),
 					"validation-requested qualification requires an active messenger");
-				context.Check(PassesVulkanValidationGate(true, true, {}),
+				context.Check(PassesVulkanQualificationValidationGate(true, true, 0, 0),
 					"validation-requested qualification accepts a clean messenger");
-				context.Check(!PassesVulkanValidationGate(true, true, validation),
+				context.Check(!PassesVulkanQualificationValidationGate(true, true,
+					validation.m_ErrorCount, validation.m_WarningCount),
 					"validation warnings and errors fail qualification");
 
 				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure(
@@ -1138,21 +1161,25 @@ namespace gglab
 				"Vulkan qualification rejects incomplete host configuration");
 			context.Check(!options.HasRequiredRuntimePaths(),
 				"Vulkan qualification reports missing host-supplied runtime paths");
-			context.Check(!options.HasRequiredNativeSurfaceHandles(),
-				"Vulkan qualification reports missing host-supplied native surface handles");
+			context.Check(!options.HasRequiredSurfaceFactory(),
+				"Vulkan qualification reports a missing surface factory");
+			context.Check(!options.HasRequiredPlatformHost(),
+				"Vulkan qualification reports a missing platform host");
 
 			options.m_ListAdapters = true;
 			context.Check(!options.IsConfigurationValid(),
-				"Vulkan adapter inspection rejects missing native surface handles");
-			options.m_HInstance = reinterpret_cast<HINSTANCE>(1);
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan adapter inspection requires the window handle independently");
-			options.m_Hwnd = reinterpret_cast<HWND>(1);
-			context.Check(options.HasRequiredNativeSurfaceHandles(),
-				"Vulkan qualification accepts both required native surface handles");
+				"Vulkan adapter inspection rejects a missing surface factory");
+			options.m_SurfaceFactory = reinterpret_cast<const VulkanSurfaceFactoryBase*>(1);
 			context.Check(options.IsConfigurationValid(),
-				"Vulkan adapter inspection accepts native surface handles without shader paths");
+				"Vulkan adapter inspection does not require an unused platform host");
+			context.Check(options.HasRequiredSurfaceFactory(),
+				"Vulkan qualification accepts the supplied surface factory");
 			options.m_ListAdapters = false;
+			context.Check(!options.IsConfigurationValid(),
+				"Vulkan frame qualification requires the platform host independently");
+			options.m_Host = reinterpret_cast<VulkanQualificationHostBase*>(1);
+			context.Check(options.HasRequiredPlatformHost(),
+				"Vulkan frame qualification accepts the supplied platform host");
 			context.Check(!options.IsConfigurationValid(),
 				"Vulkan frame qualification rejects missing host-supplied runtime paths");
 

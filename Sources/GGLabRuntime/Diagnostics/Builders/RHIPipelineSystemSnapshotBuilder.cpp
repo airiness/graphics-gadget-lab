@@ -5,8 +5,10 @@
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
+#if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#endif
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Shader/ShaderManager.h"
 
@@ -37,6 +39,7 @@ namespace gglab
 			return "Descriptor table";
 		}
 
+#if GGLAB_ENABLE_VULKAN
 		const char* VulkanDescriptorTypeText(VkDescriptorType type) noexcept
 		{
 			switch (type)
@@ -55,6 +58,7 @@ namespace gglab
 				return "Descriptor";
 			}
 		}
+#endif
 
 		RHIShaderSnapshot MakeShaderSnapshot(
 			RHIShaderHandle handle, ShaderHash128 hash, const ShaderManager* shaderManager) noexcept
@@ -228,6 +232,7 @@ namespace gglab
 		}
 	}
 
+#if GGLAB_ENABLE_VULKAN
 	void BuildVulkanPipelineSystemSnapshot(const VulkanPipelineSystem& system,
 		const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept
 	{
@@ -381,4 +386,5 @@ namespace gglab
 		outSnapshot.m_Cache.m_BackendBindingLayouts =
 			static_cast<uint32_t>(outSnapshot.m_BindingLayouts.size());
 	}
+#endif
 }

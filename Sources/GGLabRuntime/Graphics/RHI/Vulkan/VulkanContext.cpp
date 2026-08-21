@@ -190,8 +190,16 @@ namespace gglab
 		createInfo.m_Vsync = desc.m_Vsync;
 		createInfo.m_Width = desc.m_Width;
 		createInfo.m_Height = desc.m_Height;
-		VulkanBootstrapRuntimeResult bootstrap =
-			CreateVulkanBootstrapRuntimeForWindow(std::move(createInfo), desc.m_WindowHandle);
+		std::unique_ptr<VulkanSurfaceFactoryBase> surfaceFactory =
+			CreateVulkanPlatformSurfaceFactory(desc.m_WindowHandle);
+		if (!surfaceFactory)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Vulkan RHI could not create a platform surface factory for the window.");
+			return false;
+		}
+		createInfo.m_BootstrapOptions.m_SurfaceFactory = surfaceFactory.get();
+		VulkanBootstrapRuntimeResult bootstrap = CreateVulkanBootstrapRuntime(createInfo);
 		if (!bootstrap.Succeeded())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
