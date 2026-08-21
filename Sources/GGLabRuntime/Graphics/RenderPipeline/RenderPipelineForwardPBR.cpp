@@ -174,7 +174,8 @@ namespace gglab
 				backBufferDesc.m_Format = swapChain->GetFormat();
 
 				targets.m_BackBuffer = builder.ImportTexture("DisplayView.BackBuffer", backTexture,
-					backBufferDesc, RGTextureAccess::Present, RGContentValidity::Undefined);
+					backBufferDesc, swapChain->GetBackBufferInitialState(frameBackBufferIndex),
+					RGContentValidity::Undefined);
 
 				// Create depth buffer
 				RHITextureDesc depthBufferDesc{};
@@ -228,12 +229,17 @@ namespace gglab
 				const auto* shadowMapPreviewDesc = renderResourceRegistry->GetTextureDesc(
 					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
 				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewDesc);
+				const bool shadowPreviewInitialized = !renderResourceRegistry->IsDirty(
+					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
+				const RGPersistentTextureImportContract shadowPreviewImport =
+					ResolveRGPersistentTextureImportContract(shadowPreviewInitialized);
 
 				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
 						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
-					*shadowMapPreviewDesc, RGTextureAccess::None, RGContentValidity::Defined);
+					*shadowMapPreviewDesc, shadowPreviewImport.m_InitialState,
+					shadowPreviewImport.m_InitialContentValidity);
 			});
 
 		// SwapChain prepare backbuffer
@@ -345,6 +351,10 @@ namespace gglab
 		{
 			services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 		}
+
+		// Return the persistent shadow preview to Common after DevelopGui and other
+		// overlay consumers have declared their reads for this frame.
+		m_ShadowMapPreviewPass.AddFinishPass(rg);
 
 		// Return persistent IBL resources to Common only after every consumer and
 		// preview pass has declared its final access for this frame.

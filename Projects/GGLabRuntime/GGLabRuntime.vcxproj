@@ -83,7 +83,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.cpp" />
@@ -241,6 +240,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
 	<ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
 	<ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+	<ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBarrier.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -277,7 +277,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\Buffer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.h" />
@@ -337,6 +336,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFrameRuntime.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
 	<ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
 	<ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBarrier.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -534,6 +534,7 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
@@ -546,6 +547,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
+	<ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -554,6 +556,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
@@ -577,10 +580,13 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">

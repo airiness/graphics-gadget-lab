@@ -21,6 +21,25 @@ namespace gglab
 		ColorAttachment, // in use by this frame's rendering
 	};
 
+	[[nodiscard]] constexpr inline RHIResourceState ToRHIBackBufferInitialState(
+		VulkanPresentImageLayout layout) noexcept
+	{
+		switch (layout)
+		{
+		case VulkanPresentImageLayout::Undefined:
+			return UndefinedRHITextureState();
+		case VulkanPresentImageLayout::Present:
+			return PresentRHITextureState();
+		case VulkanPresentImageLayout::ColorAttachment:
+			return {
+				.m_Stages = RHIStage::RenderTarget,
+				.m_Access = RHIAccess::RenderTarget,
+				.m_Layout = RHILayout::RenderTarget,
+			};
+		}
+		GGLAB_UNREACHABLE("Unhandled Vulkan presentation image layout.");
+	}
+
 	// One swapchain image with its WSI-special infrastructure. The VkImage
 	// memory is owned by the presentation engine; GGLab owns the image view
 	// and the per-image rendering-finished binary semaphore. The tracked
@@ -122,4 +141,10 @@ namespace gglab
 	// FIFO. FIFO is guaranteed by the Vulkan spec.
 	[[nodiscard]] VkPresentModeKHR SelectVulkanPresentModeFromList(
 		const std::vector<VkPresentModeKHR>& availableModes, bool vsync) noexcept;
+
+	// Fixed surface extents are authoritative. Variable-extent surfaces use
+	// the requested drawable size clamped to the advertised limits.
+	[[nodiscard]] VkExtent2D SelectVulkanSwapchainExtent(
+		const VkSurfaceCapabilitiesKHR& capabilities, uint32_t requestedWidth,
+		uint32_t requestedHeight) noexcept;
 }

@@ -438,6 +438,18 @@ namespace gglab
 			: RHIDescriptorHandle{};
 	}
 
+	bool VulkanDevice::PublishTextureViewDescriptor(RHITextureViewHandle view) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::PublishTextureViewDescriptor") &&
+			m_ResourceManager.PublishTextureViewDescriptor(view);
+	}
+
+	bool VulkanDevice::PublishSamplerDescriptor(RHISamplerHandle sampler) noexcept
+	{
+		return RequireOwnerThread("VulkanDevice::PublishSamplerDescriptor") &&
+			m_ResourceManager.PublishSamplerDescriptor(sampler);
+	}
+
 	void VulkanDevice::RecordTextureUse(
 		RHITextureHandle texture, const RHIFencePoint& fencePoint) noexcept
 	{

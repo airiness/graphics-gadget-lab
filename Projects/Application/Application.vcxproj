@@ -164,10 +164,14 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -261,9 +265,12 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\LaunchOptionsSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformWindow.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32MessageHandler.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32Window.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\EnumText\EnumTextDXGI.h" />
@@ -275,6 +282,7 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\AssetSnapshotText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\RHIText.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
+    <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

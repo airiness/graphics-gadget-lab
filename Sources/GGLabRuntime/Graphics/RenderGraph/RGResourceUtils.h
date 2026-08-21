@@ -13,6 +13,24 @@ namespace gglab
 		};
 	}
 
+	struct RGPersistentTextureImportContract
+	{
+		RHIResourceState m_InitialState = UndefinedRHITextureState();
+		RGContentValidity m_InitialContentValidity = RGContentValidity::Undefined;
+	};
+
+	[[nodiscard]] constexpr inline RGPersistentTextureImportContract
+		ResolveRGPersistentTextureImportContract(bool initialized,
+			RHIResourceState initializedState = CommonRHIResourceState()) noexcept
+	{
+		return initialized
+			? RGPersistentTextureImportContract{
+				.m_InitialState = initializedState,
+				.m_InitialContentValidity = RGContentValidity::Defined,
+			}
+			: RGPersistentTextureImportContract{};
+	}
+
 	constexpr inline bool HasUavAccess(const RHIResourceState& state) noexcept
 	{
 		return Test(state.m_Access, RHIAccess::UnorderedAccess);

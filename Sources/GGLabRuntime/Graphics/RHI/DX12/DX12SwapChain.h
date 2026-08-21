@@ -52,15 +52,20 @@ namespace gglab
 		RHIFormat GetFormat() const noexcept override;
 
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override;
+		RHIResourceState GetBackBufferInitialState(uint32_t) const noexcept override
+		{
+			return PresentRHITextureState();
+		}
 		DX12Texture* GetBackBuffer(uint32_t bufferIndex) const noexcept;
-
-	private:
-		friend class DX12Context;
-
 		[[nodiscard]] uint32_t GetCurrentBackBufferIndex() const noexcept
 		{
 			return m_BackBufferIndex;
 		}
+		[[nodiscard]] bool GetVsync() const noexcept { return m_Vsync; }
+		[[nodiscard]] bool GetAllowTearing() const noexcept { return m_AllowTearing; }
+
+	private:
+		friend class DX12Context;
 		[[nodiscard]] bool Present() noexcept;
 		ComPtr<IDXGISwapChain4> CreateSwapChain() noexcept;
 		void AcquireBackBuffers() noexcept;

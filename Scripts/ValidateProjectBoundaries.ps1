@@ -103,8 +103,6 @@ $transitionalDebt = @()
 # explicit plan; entries whose violation disappears are reported as stale and
 # should be removed from the ledger.
 $knownViolations = @(
-    [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.cpp";                   Kind = "platform";  Reason = "Win32 window-control behavior; planned: decide leaf vs host ownership" },
-    [pscustomobject]@{ File = "Graphics/RHI/Vulkan/VulkanQualification.h";                     Kind = "platform";  Reason = "Windows.h/HWND; same family as VulkanQualification.cpp; planned: decide leaf vs host ownership" },
     [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; root identity carries Windows named-mutex name semantics; planned: narrow platform lock leaf" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
@@ -113,7 +111,7 @@ $knownViolations = @(
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
 $ownershipSymbolRegex = '\bDevelopGuiSystem\b'
 $platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|GetExeOutDir|bcrypt\.h'
-$platformLeafIncludeRegex = '#include\s*"(Core/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h)'
+$platformLeafIncludeRegex = '#include\s*"(Core/Platform/Win/|GGLabFoundation/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h)'
 $platformNamespaceRegex = '\bwin32::'
 $platformTypeRegex = '\bVulkanWin32Surface(Factory)?\b'
 

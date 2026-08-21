@@ -18,8 +18,8 @@ namespace gglab
 	enum class RHIBindingBackendMapping : uint8_t
 	{
 		None,
-		RootParameter,
-		DirectlyIndexed,
+		FixedBinding,
+		BindlessTable,
 	};
 
 	struct RHIBindingSlotSnapshot
@@ -33,7 +33,7 @@ namespace gglab
 		uint32_t m_SizeInBytes = 0;
 		std::string m_DebugName;
 		RHIBindingBackendMapping m_BackendMapping = RHIBindingBackendMapping::None;
-		int32_t m_RootParameter = -1;
+		int32_t m_BackendParameterIndex = -1;
 		std::string m_BackendBindingType;
 	};
 
@@ -43,11 +43,10 @@ namespace gglab
 		bool m_Alive = false;
 		std::string m_DebugName;
 		std::vector<RHIBindingSlotSnapshot> m_Slots;
-		uint32_t m_RootParameterCount = 0;
-		uint32_t m_BackendRootSignatureId = 0;
-		uint64_t m_BackendRootSignaturePointer = 0;
-		bool m_DirectlyIndexedResources = false;
-		bool m_DirectlyIndexedSamplers = false;
+		uint32_t m_BackendParameterCount = 0;
+		uint64_t m_BackendLayoutId = 0;
+		bool m_BindlessResources = false;
+		bool m_BindlessSamplers = false;
 	};
 
 	struct RHIShaderSnapshot
@@ -94,9 +93,8 @@ namespace gglab
 		uint32_t m_SampleCount = 1;
 		uint32_t m_SampleQuality = 0;
 
-		uint64_t m_BackendPipelinePointer = 0;
-		uint32_t m_BackendRootSignatureId = 0;
-		uint64_t m_BackendRootSignaturePointer = 0;
+		uint64_t m_BackendPipelineId = 0;
+		uint64_t m_BackendLayoutId = 0;
 	};
 
 	struct RHIPipelineCacheSnapshot
@@ -105,9 +103,9 @@ namespace gglab
 		uint64_t m_BackendCacheRevision = 0;
 		uint32_t m_RegisteredGraphicsPipelines = 0;
 		uint32_t m_RegisteredComputePipelines = 0;
-		uint32_t m_BackendRHIGraphicsPSOs = 0;
-		uint32_t m_BackendComputePSOs = 0;
-		uint32_t m_BackendRootSignatures = 0;
+		uint32_t m_BackendGraphicsPipelines = 0;
+		uint32_t m_BackendComputePipelines = 0;
+		uint32_t m_BackendBindingLayouts = 0;
 	};
 
 	struct RHIPipelineSystemSnapshot

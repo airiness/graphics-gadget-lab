@@ -13,7 +13,10 @@ namespace gglab
 			VkDebugUtilsMessageTypeFlagsEXT types, const VkDebugUtilsMessengerCallbackDataEXT* data,
 			void* userData) noexcept
 		{
-			GGLAB_UNUSED(userData);
+			if (auto* instance = static_cast<VulkanInstance*>(userData))
+			{
+				instance->RecordValidationMessage(severity);
+			}
 			const std::string_view severityText = ToString(severity);
 			const std::string_view typeText = [types]() -> std::string_view
 				{
@@ -54,6 +57,37 @@ namespace gglab
 	VulkanInstance::~VulkanInstance()
 	{
 		Destroy();
+	}
+
+	VulkanValidationDiagnostics VulkanInstance::GetValidationDiagnostics() const noexcept
+	{
+		return {
+			.m_ErrorCount = m_ValidationErrorCount.load(std::memory_order_relaxed),
+			.m_WarningCount = m_ValidationWarningCount.load(std::memory_order_relaxed),
+			.m_InfoCount = m_ValidationInfoCount.load(std::memory_order_relaxed),
+			.m_VerboseCount = m_ValidationVerboseCount.load(std::memory_order_relaxed),
+		};
+	}
+
+	void VulkanInstance::RecordValidationMessage(
+		VkDebugUtilsMessageSeverityFlagBitsEXT severity) noexcept
+	{
+		if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+		{
+			m_ValidationErrorCount.fetch_add(1, std::memory_order_relaxed);
+		}
+		else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		{
+			m_ValidationWarningCount.fetch_add(1, std::memory_order_relaxed);
+		}
+		else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+		{
+			m_ValidationInfoCount.fetch_add(1, std::memory_order_relaxed);
+		}
+		else
+		{
+			m_ValidationVerboseCount.fetch_add(1, std::memory_order_relaxed);
+		}
 	}
 
 	VulkanInstance::Result VulkanInstance::Create(const CreateInfo& createInfo) noexcept
@@ -219,6 +253,7 @@ namespace gglab
 					VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 					VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 				messengerCreateInfo.pfnUserCallback = DebugMessengerCallback;
+				messengerCreateInfo.pUserData = instance.get();
 				const VkResult messengerResult = createMessenger(instance->m_Instance,
 					&messengerCreateInfo, nullptr, &instance->m_DebugMessenger);
 				if (messengerResult != VK_SUCCESS)

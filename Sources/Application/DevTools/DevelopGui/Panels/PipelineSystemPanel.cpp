@@ -8,7 +8,6 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/RHI/RHIFormat.h"
-#include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 
 #include <imgui.h>
 
@@ -56,13 +55,13 @@ namespace gglab
 
 		std::string BackendMappingText(const RHIBindingSlotSnapshot& slot)
 		{
-			if (slot.m_BackendMapping == RHIBindingBackendMapping::DirectlyIndexed)
+			if (slot.m_BackendMapping == RHIBindingBackendMapping::BindlessTable)
 			{
-				return "No root parameter, DIRECTLY_INDEXED flag";
+				return slot.m_BackendBindingType;
 			}
-			if (slot.m_BackendMapping == RHIBindingBackendMapping::RootParameter)
+			if (slot.m_BackendMapping == RHIBindingBackendMapping::FixedBinding)
 			{
-				return std::format("RootParam {} {} {}", slot.m_RootParameter,
+				return std::format("Parameter {} {} {}", slot.m_BackendParameterIndex,
 					slot.m_BackendBindingType, RegisterText(slot));
 			}
 			return "-";
@@ -108,14 +107,14 @@ namespace gglab
 		void DrawBindingLayoutDetail(const RHIBindingLayoutSnapshot& layout) noexcept
 		{
 			ImGui::SeparatorText("Binding Layout Detail");
-			ImGui::Text("Handle %s | %s | Root parameters %u | RootSignature ID %u | Native 0x%llX",
+			ImGui::Text("Handle %s | %s | Backend parameters %u | Backend layout ID %llu",
 				devtools::RHIHandleText(layout.m_Handle).c_str(), layout.m_Alive ? "Alive" : "Dead",
-				layout.m_RootParameterCount, layout.m_BackendRootSignatureId,
-				static_cast<unsigned long long>(layout.m_BackendRootSignaturePointer));
-			ImGui::Text("Name: %s | Direct indexing: resources=%s samplers=%s",
+				layout.m_BackendParameterCount,
+				static_cast<unsigned long long>(layout.m_BackendLayoutId));
+			ImGui::Text("Name: %s | Bindless tables: resources=%s samplers=%s",
 				layout.m_DebugName.empty() ? "-" : layout.m_DebugName.c_str(),
-				layout.m_DirectlyIndexedResources ? "yes" : "no",
-				layout.m_DirectlyIndexedSamplers ? "yes" : "no");
+				layout.m_BindlessResources ? "yes" : "no",
+				layout.m_BindlessSamplers ? "yes" : "no");
 
 			const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX;
@@ -128,7 +127,7 @@ namespace gglab
 				ImGui::TableSetupColumn("Register");
 				ImGui::TableSetupColumn("Count");
 				ImGui::TableSetupColumn("Size");
-				ImGui::TableSetupColumn("DX12 Mapping");
+				ImGui::TableSetupColumn("Backend Mapping");
 				ImGui::TableHeadersRow();
 				for (const auto& slot : layout.m_Slots)
 				{
@@ -175,8 +174,8 @@ namespace gglab
 				ImGui::TableSetupColumn("Alive");
 				ImGui::TableSetupColumn("Debug Name");
 				ImGui::TableSetupColumn("Slots");
-				ImGui::TableSetupColumn("Root Params");
-				ImGui::TableSetupColumn("RootSignature");
+				ImGui::TableSetupColumn("Backend Params");
+				ImGui::TableSetupColumn("Backend Layout");
 				ImGui::TableHeadersRow();
 				for (const auto& layout : snapshot.m_BindingLayouts)
 				{
@@ -197,10 +196,10 @@ namespace gglab
 					ImGui::TableSetColumnIndex(3);
 					ImGui::Text("%u", static_cast<uint32_t>(layout.m_Slots.size()));
 					ImGui::TableSetColumnIndex(4);
-					ImGui::Text("%u", layout.m_RootParameterCount);
+					ImGui::Text("%u", layout.m_BackendParameterCount);
 					ImGui::TableSetColumnIndex(5);
-					ImGui::Text("ID %u / 0x%llX", layout.m_BackendRootSignatureId,
-						static_cast<unsigned long long>(layout.m_BackendRootSignaturePointer));
+					ImGui::Text("ID %llu",
+						static_cast<unsigned long long>(layout.m_BackendLayoutId));
 				}
 				ImGui::EndTable();
 			}
@@ -391,11 +390,10 @@ namespace gglab
 			ImGui::Text("Handle %s | %s | %s", devtools::RHIHandleText(pipeline.m_Handle).c_str(),
 				pipeline.m_Type == RHIPipelineSnapshotType::Graphics ? "Graphics" : "Compute",
 				pipeline.m_Alive ? "Alive" : "Dead");
-			ImGui::Text("BindingLayout %s | Backend PSO 0x%llX | RootSignature ID %u / 0x%llX",
+			ImGui::Text("BindingLayout %s | Backend pipeline ID %llu | Backend layout ID %llu",
 				devtools::RHIHandleText(pipeline.m_BindingLayout).c_str(),
-				static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer),
-				pipeline.m_BackendRootSignatureId,
-				static_cast<unsigned long long>(pipeline.m_BackendRootSignaturePointer));
+				static_cast<unsigned long long>(pipeline.m_BackendPipelineId),
+				static_cast<unsigned long long>(pipeline.m_BackendLayoutId));
 			DrawRenderPassUsages(pipeline);
 			DrawShaderTable(pipeline);
 			if (pipeline.m_Type == RHIPipelineSnapshotType::Graphics)
@@ -423,7 +421,7 @@ namespace gglab
 				ImGui::TableSetupColumn("VS/CS");
 				ImGui::TableSetupColumn("PS");
 				ImGui::TableSetupColumn("Formats");
-				ImGui::TableSetupColumn("Backend PSO");
+				ImGui::TableSetupColumn("Backend Pipeline");
 				ImGui::TableHeadersRow();
 				for (const auto& pipeline : snapshot.m_Pipelines)
 				{
@@ -461,8 +459,8 @@ namespace gglab
 					ImGui::TableSetColumnIndex(7);
 					ImGui::TextUnformatted(formats.c_str());
 					ImGui::TableSetColumnIndex(8);
-					ImGui::Text("0x%llX",
-						static_cast<unsigned long long>(pipeline.m_BackendPipelinePointer));
+					ImGui::Text("ID %llu",
+						static_cast<unsigned long long>(pipeline.m_BackendPipelineId));
 				}
 				ImGui::EndTable();
 			}
@@ -482,14 +480,14 @@ namespace gglab
 			ImGui::SeparatorText("RHI Registry");
 			ImGui::Text("Registered handles: %u graphics / %u compute",
 				cache.m_RegisteredGraphicsPipelines, cache.m_RegisteredComputePipelines);
-			ImGui::SeparatorText("DX12 Backend Cache");
-			ImGui::Text("PSOs: %u graphics / %u compute", cache.m_BackendRHIGraphicsPSOs,
-				cache.m_BackendComputePSOs);
-			ImGui::Text("Root signatures: %u", cache.m_BackendRootSignatures);
+			ImGui::SeparatorText("Backend Objects");
+			ImGui::Text("Pipelines: %u graphics / %u compute",
+				cache.m_BackendGraphicsPipelines, cache.m_BackendComputePipelines);
+			ImGui::Text("Binding layouts: %u", cache.m_BackendBindingLayouts);
 			ImGui::Spacing();
 			ImGui::TextWrapped(
-				"PipelineCache is currently a recipe resolver with caller-owned slots. "
-				"The centralized native object cache shown here is DX12PSOCache.");
+				"PipelineCache resolves backend-neutral recipes. Backend object counts describe "
+				"the process-local pipeline and binding-layout objects for the active RHI.");
 		}
 	}
 
@@ -498,14 +496,6 @@ namespace gglab
 		if (!context.m_Renderer || !context.m_Renderer->GetRHIContext())
 		{
 			ImGui::TextDisabled("RHI context is not available.");
-			return;
-		}
-
-		auto& pipelineSystem = context.m_Renderer->GetRHIContext()->GetPipelineSystem();
-		auto* dx12PipelineSystem = dynamic_cast<DX12PipelineSystem*>(&pipelineSystem);
-		if (!dx12PipelineSystem)
-		{
-			ImGui::TextDisabled("Pipeline diagnostics are not implemented for this backend.");
 			return;
 		}
 
@@ -535,7 +525,7 @@ namespace gglab
 				DrawPipelines(snapshot, state);
 				ImGui::EndTabItem();
 			}
-			if (ImGui::BeginTabItem("Cache / DX12"))
+			if (ImGui::BeginTabItem("Cache / Backend"))
 			{
 				DrawCache(snapshot);
 				ImGui::EndTabItem();

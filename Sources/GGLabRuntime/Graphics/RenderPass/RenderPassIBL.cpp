@@ -24,9 +24,12 @@ namespace gglab
 
 		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
+		const bool activeResourcesInitialized = renderResRegistry->HasInitializedActiveIBL();
+		const bool bakeResourcesInitialized = !bakeScheduler->ShouldInitializeBakeResources();
 
 		rg.AddPass<PassData>(GetRenderGraphPassName(),
-			[renderResRegistry](RenderGraph::RGBuilder& builder, PassData&)
+			[renderResRegistry, activeResourcesInitialized, bakeResourcesInitialized](
+				RenderGraph::RGBuilder& builder, PassData&)
 			{
 				builder.SideEffect();
 
@@ -35,49 +38,53 @@ namespace gglab
 
 				iblRes.m_EnvironmentCubemap = ImportRuntimeTexture(builder, *renderResRegistry,
 					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
-					"IBL.EnvironmentCubemap");
+					"IBL.EnvironmentCubemap", activeResourcesInitialized);
 
 				iblRes.m_IrradianceCubemap = ImportRuntimeTexture(builder, *renderResRegistry,
 					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
-					"IBL.IrradianceCubemap");
+					"IBL.IrradianceCubemap", activeResourcesInitialized);
 
 				iblRes.m_PrefilteredSpecularCubemap =
 					ImportRuntimeTexture(builder, *renderResRegistry,
 						RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
-						"IBL.PrefilteredSpecularCubemap");
+						"IBL.PrefilteredSpecularCubemap", activeResourcesInitialized);
 
 				iblRes.m_BrdfLut = ImportRuntimeTexture(builder, *renderResRegistry,
-					RenderResourceRegistry::TextureIndex::IBL_BrdfLut, "IBL.BrdfLut");
+					RenderResourceRegistry::TextureIndex::IBL_BrdfLut, "IBL.BrdfLut",
+					activeResourcesInitialized);
 
 				if (renderResRegistry->HasIBLBakeResources())
 				{
 					iblRes.m_BakeEnvironmentCubemap =
 						ImportRuntimeTexture(builder, *renderResRegistry,
 							RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap,
-							"IBL.Bake.EnvironmentCubemap", true);
+							"IBL.Bake.EnvironmentCubemap", bakeResourcesInitialized, true);
 					iblRes.m_BakeIrradianceCubemap =
 						ImportRuntimeTexture(builder, *renderResRegistry,
 							RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap,
-							"IBL.Bake.IrradianceCubemap", true);
+							"IBL.Bake.IrradianceCubemap", bakeResourcesInitialized, true);
 					iblRes.m_BakePrefilteredSpecularCubemap =
 						ImportRuntimeTexture(builder, *renderResRegistry,
 							RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap,
-							"IBL.Bake.PrefilteredSpecularCubemap", true);
+							"IBL.Bake.PrefilteredSpecularCubemap", bakeResourcesInitialized, true);
 					iblRes.m_BakeBrdfLut = ImportRuntimeTexture(builder, *renderResRegistry,
 						RenderResourceRegistry::TextureIndex::IBL_BrdfLut, "IBL.Bake.BrdfLut",
-						true);
+						bakeResourcesInitialized, true);
 				}
 
 				auto& previewResources = builder.GetBlackboard().GetOrCreate<RGIBLPreviewResources>(
 					IBLPreviewResourcesName);
 				auto importPreview =
-					[&builder, renderResRegistry](
+					[&builder, renderResRegistry, activeResourcesInitialized](
 						RenderResourceRegistry::TextureIndex index, const char* name) noexcept
 					{
 						const auto* desc = renderResRegistry->GetTextureDesc(index);
 						GGLAB_ASSERT_NOT_NULL(desc);
+						const RGPersistentTextureImportContract importContract =
+							ResolveRGPersistentTextureImportContract(activeResourcesInitialized);
 						return builder.ImportTexture(name, renderResRegistry->GetTextureHandle(index),
-							*desc, RGTextureAccess::None, RGContentValidity::Defined);
+							*desc, importContract.m_InitialState,
+							importContract.m_InitialContentValidity);
 					};
 				previewResources.m_EnvironmentCubemapPreview = importPreview(
 					RenderResourceRegistry::TextureIndex::Preview_IBL_EnvironmentCubemap,
@@ -149,15 +156,17 @@ namespace gglab
 
 	RGTextureId RenderPassIBL::ImportRuntimeTexture(RenderGraph::RGBuilder& builder,
 		RenderResourceRegistry& registry, RenderResourceRegistry::TextureIndex texIndex,
-		const char* name, bool bakeTarget) noexcept
+		const char* name, bool initialized, bool bakeTarget) noexcept
 	{
 		const auto* desc = bakeTarget ? registry.GetIBLBakeTextureDesc(texIndex)
 			: registry.GetTextureDesc(texIndex);
 		GGLAB_ASSERT_NOT_NULL(desc);
 
+		const RGPersistentTextureImportContract importContract =
+			ResolveRGPersistentTextureImportContract(initialized);
 		return builder.ImportTexture(name,
 			bakeTarget ? registry.GetIBLBakeTextureHandle(texIndex)
 			: registry.GetTextureHandle(texIndex),
-			*desc, RGTextureAccess::None, RGContentValidity::Defined);
+			*desc, importContract.m_InitialState, importContract.m_InitialContentValidity);
 	}
 }

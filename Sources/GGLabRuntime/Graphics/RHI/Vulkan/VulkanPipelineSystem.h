@@ -14,6 +14,8 @@ namespace gglab
 {
 	class VulkanDevice;
 	class VulkanPipelineState;
+	class PipelineCache;
+	struct RHIPipelineSystemSnapshot;
 
 	enum class VulkanBindingLayoutError : uint8_t
 	{
@@ -129,6 +131,9 @@ namespace gglab
 		{
 			std::unique_ptr<VulkanBindingLayout> m_Layout;
 			std::string m_DebugName;
+			std::array<RHIBindingSlotDesc, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
+			std::array<std::string, RHIBindingLayoutDesc::MaxSlots> m_SlotDebugNames{};
+			uint32_t m_SlotCount = 0;
 		};
 
 		struct PipelineSlot
@@ -138,6 +143,7 @@ namespace gglab
 			RHIGraphicsPipelineDesc m_GraphicsDesc{};
 			RHIComputePipelineDesc m_ComputeDesc{};
 			std::array<ShaderHash128, 5> m_ShaderHashes{};
+			std::array<std::string, RHIVertexInputLayoutDesc::MaxAttributes> m_SemanticNames{};
 		};
 
 		VulkanDevice* m_Device = nullptr;
@@ -146,5 +152,8 @@ namespace gglab
 		RHIBindingLayoutHandle::GenerationType m_BindingLayoutGeneration = 1;
 		RHIPipelineHandle::GenerationType m_PipelineGeneration = 1;
 		uint64_t m_Revision = 1;
+
+		friend void BuildVulkanPipelineSystemSnapshot(const VulkanPipelineSystem& system,
+			const PipelineCache* pipelineCache, RHIPipelineSystemSnapshot& outSnapshot) noexcept;
 	};
 }

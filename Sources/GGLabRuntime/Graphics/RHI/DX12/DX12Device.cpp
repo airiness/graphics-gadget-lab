@@ -1,6 +1,7 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
+#include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
@@ -99,6 +100,7 @@ namespace gglab
 		m_D3D12Device.Reset();
 		m_DxgiAdapter.Reset();
 		m_AdapterCompatibilityIdentity.clear();
+		m_AdapterName.clear();
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
@@ -639,6 +641,7 @@ namespace gglab
 			DXGI_ADAPTER_DESC1 desc{};
 			LARGE_INTEGER driverVersion{};
 			GGLAB_HR(m_DxgiAdapter->GetDesc1(&desc));
+			m_AdapterName = utils::ToString(desc.Description);
 			GGLAB_UNUSED(
 				m_DxgiAdapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driverVersion));
 			m_AdapterCompatibilityIdentity = std::format(

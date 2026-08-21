@@ -217,7 +217,7 @@ namespace gglab
 		// the final selected device plus the instance and surface it runs on.
 		// Destruction order (reverse declaration order) is surface, device,
 		// instance.
-		struct VulkanBootstrapQualification
+		struct VulkanBootstrapObjects
 		{
 			std::unique_ptr<VulkanInstance> m_Instance;
 			std::unique_ptr<VulkanDevice> m_Device;
@@ -229,9 +229,9 @@ namespace gglab
 		// enumeration, layout probes, selection, final device). Returns a
 		// process exit code; on success the selected objects are moved into
 		// outObjects and the caller owns their lifetime.
-		[[nodiscard]] int RunVulkanBootstrapQualification(
+		[[nodiscard]] int CreateVulkanBootstrapObjects(
 			const VulkanBootstrapOptions& options, VulkanBootstrapReport& outReport,
-			VulkanBootstrapQualification& outObjects) noexcept
+			VulkanBootstrapObjects& outObjects) noexcept
 		{
 			outReport = {};
 			outObjects = {};
@@ -531,8 +531,8 @@ namespace gglab
 	int RunVulkanBootstrap(
 		const VulkanBootstrapOptions& options, VulkanBootstrapReport& outReport) noexcept
 	{
-		VulkanBootstrapQualification objects;
-		const int exitCode = RunVulkanBootstrapQualification(options, outReport, objects);
+		VulkanBootstrapObjects objects;
+		const int exitCode = CreateVulkanBootstrapObjects(options, outReport, objects);
 		if (exitCode == 0)
 		{
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan bootstrap qualification succeeded; cleaning up.");
@@ -554,9 +554,9 @@ namespace gglab
 		}
 
 		VulkanBootstrapReport report;
-		VulkanBootstrapQualification objects;
+		VulkanBootstrapObjects objects;
 		const int exitCode =
-			RunVulkanBootstrapQualification(createInfo.m_BootstrapOptions, report, objects);
+			CreateVulkanBootstrapObjects(createInfo.m_BootstrapOptions, report, objects);
 		if (exitCode != 0)
 		{
 			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
@@ -569,11 +569,11 @@ namespace gglab
 		result.m_PhysicalDevice = objects.m_PhysicalDevice;
 
 		VulkanFrameRuntimeCreateInfo frameInfo{};
-		frameInfo.m_Instance = objects.m_Instance.get();
 		frameInfo.m_Surface = objects.m_Surface->Get();
 		frameInfo.m_PhysicalDevice = objects.m_PhysicalDevice;
 		frameInfo.m_Device = objects.m_Device.get();
-		frameInfo.m_Snapshot = &result.m_SelectedSnapshot;
+		frameInfo.m_GraphicsQueueFamilyIndex =
+			result.m_SelectedSnapshot.m_GraphicsPresentQueueFamilyIndex;
 		frameInfo.m_FrameSlotCount = createInfo.m_FrameSlotCount;
 		frameInfo.m_RequestedFormat = createInfo.m_RequestedFormat;
 		frameInfo.m_Vsync = createInfo.m_Vsync;

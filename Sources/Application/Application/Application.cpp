@@ -10,9 +10,7 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
-#include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
@@ -166,11 +164,12 @@ namespace gglab
 		m_WindowHeight = mainWindow.GetHeight();
 
 		// The backend is resolved before the ShaderManager preload starts.
-		// Adapter listing remains an explicit Vulkan qualification mode; a
+		// Inspection and hardware qualification are explicit exit modes; a
 		// selected rendering backend continues through the normal application
 		// initialization and main loop.
 		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
-		if (m_LaunchOptions.m_ListAdapters)
+		if (m_LaunchOptions.m_ListAdapters ||
+			m_LaunchOptions.m_RunVulkanQualification)
 		{
 			m_ExitCode = RunRenderingStartupPath(
 				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
@@ -244,16 +243,15 @@ namespace gglab
 			runtimeRoot / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
+		const LabId startupLab = m_LaunchOptions.m_StartupLabId
+			? LabId(*m_LaunchOptions.m_StartupLabId)
+			: CullingLabSession::GetId();
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
 				});
-		const bool minimalVulkanProductionSmoke = activeBackend == RHIBackendType::Vulkan;
-		if (!minimalVulkanProductionSmoke)
-		{
-			m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
-		}
+		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -273,11 +271,7 @@ namespace gglab
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 		};
-		m_DemoManager->SetBootstrapDemo(
-			std::make_unique<DemoLoadingShell>(demoCreateInfo, minimalVulkanProductionSmoke));
-		const LabId startupLab = m_LaunchOptions.m_StartupLabId
-			? LabId(*m_LaunchOptions.m_StartupLabId)
-			: CullingLabSession::GetId();
+		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
 		const uint32_t startIndex = m_DemoManager->RegisterDemo("Demo.Start",
 			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
 			{ return std::make_unique<StartDemo>(demoCreateInfo); });
@@ -312,17 +306,7 @@ namespace gglab
 		default:
 			break;
 		}
-		const bool explicitVulkanFeatureDemo = minimalVulkanProductionSmoke &&
-			(startupLab == SampleableDepthLabSession::GetId() ||
-				startupLab == AlphaTestLabSession::GetId());
-		if (!minimalVulkanProductionSmoke || explicitVulkanFeatureDemo)
-		{
-			m_DemoManager->RequestActiveDemo(startupDemoIndex);
-		}
-		else
-		{
-			startupDemoName = "Demo.LoadingShell.VulkanProductionSmoke";
-		}
+		m_DemoManager->RequestActiveDemo(startupDemoIndex);
 		m_LabRuntimeLocator =
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",

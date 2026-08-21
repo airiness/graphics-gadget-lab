@@ -169,7 +169,14 @@ namespace gglab
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
 		const RHITextureViewHandle view = GetViewHandle(viewId);
-		return m_Device && view.IsValid() ? m_Device->GetTextureViewDescriptor(view)
+		if (!m_Device || !view.IsValid())
+		{
+			return {};
+		}
+		const bool descriptorPublished = m_Device->PublishTextureViewDescriptor(view);
+		GGLAB_ASSERT_MSG(
+			descriptorPublished, "RenderGraph failed to publish a texture-view descriptor.");
+		return descriptorPublished ? m_Device->GetTextureViewDescriptor(view)
 			: RHIDescriptorHandle{};
 	}
 

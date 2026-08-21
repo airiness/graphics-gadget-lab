@@ -17,56 +17,6 @@ namespace gglab
 		constexpr std::string_view MutableDescriptorTypeExtensionName =
 			VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME;
 
-		// Format requirements of the current production pipeline. GTAO has a
-		// preferred R8_UNORM and a fallback R16_SFLOAT candidate; either one
-		// satisfies the gate, matching the production fallback contract.
-		struct VulkanRequiredFormat
-		{
-			VkFormat m_Format;
-			VkFormatFeatureFlags2 m_RequiredFeatures;
-			std::string_view m_Usage;
-		};
-		inline constexpr std::array RequiredFormats{
-			VulkanRequiredFormat{
-				VK_FORMAT_D32_SFLOAT,
-				VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT |
-					VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
-				"sampleable depth and shadow map",
-			},
-			VulkanRequiredFormat{
-				VK_FORMAT_R16G16B16A16_SFLOAT,
-				VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT |
-					VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
-				"HDR scene color and bloom",
-			},
-			VulkanRequiredFormat{
-				VK_FORMAT_R8G8B8A8_UNORM,
-				VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT |
-					VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
-				"preview and auxiliary targets",
-			},
-			VulkanRequiredFormat{
-				VK_FORMAT_B8G8R8A8_UNORM,
-				VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT,
-				"swapchain backbuffer",
-			},
-			VulkanRequiredFormat{
-				VK_FORMAT_R8_UNORM,
-				VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
-					VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
-				"GTAO AO (preferred)",
-			},
-			VulkanRequiredFormat{
-				VK_FORMAT_R16_SFLOAT,
-				VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
-					VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT,
-				"GTAO AO (fallback)",
-			},
-		};
-
-		constexpr uint32_t GtaoPreferredIndex = 4;
-		constexpr uint32_t GtaoFallbackIndex = 5;
-
 		[[nodiscard]] VkPhysicalDeviceProperties2 QueryDeviceProperties(
 			VkPhysicalDevice physicalDevice, VkPhysicalDeviceIDProperties& idProperties,
 			VkPhysicalDeviceDriverProperties& driverProperties,
@@ -175,8 +125,8 @@ namespace gglab
 			VkPhysicalDevice physicalDevice) noexcept
 		{
 			std::vector<VulkanFormatSupportDiagnostic> diagnostics;
-			diagnostics.reserve(RequiredFormats.size());
-			for (const VulkanRequiredFormat& requirement : RequiredFormats)
+			diagnostics.reserve(GGLabVulkanFormatRequirements.size());
+			for (const VulkanFormatRequirement& requirement : GGLabVulkanFormatRequirements)
 			{
 				VkFormatProperties2 formatProperties{};
 				formatProperties.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
@@ -199,23 +149,21 @@ namespace gglab
 			return diagnostics;
 		}
 
-		[[nodiscard]] bool IsGtaoCandidateSupported(
-			const std::vector<VulkanFormatSupportDiagnostic>& diagnostics) noexcept
-		{
-			const bool preferred = GtaoPreferredIndex < diagnostics.size() &&
-				diagnostics[GtaoPreferredIndex].m_Supported;
-			const bool fallback = GtaoFallbackIndex < diagnostics.size() &&
-				diagnostics[GtaoFallbackIndex].m_Supported;
-			return preferred || fallback;
-		}
-
 		[[nodiscard]] bool AreAllRequiredFormatsSupported(
 			const std::vector<VulkanFormatSupportDiagnostic>& diagnostics) noexcept
 		{
-			for (size_t index = 0; index < diagnostics.size(); ++index)
+			if (diagnostics.size() != GGLabVulkanFormatRequirements.size())
 			{
-				if (index == GtaoPreferredIndex || index == GtaoFallbackIndex)
+				return false;
+			}
+			bool hasSupportedGtaoAlternative = false;
+			for (size_t index = 0; index < GGLabVulkanFormatRequirements.size(); ++index)
+			{
+				const VulkanFormatRequirement& requirement =
+					GGLabVulkanFormatRequirements[index];
+				if (requirement.m_Group == VulkanFormatRequirementGroup::GtaoAlternative)
 				{
+					hasSupportedGtaoAlternative |= diagnostics[index].m_Supported;
 					continue;
 				}
 				if (!diagnostics[index].m_Supported)
@@ -223,7 +171,7 @@ namespace gglab
 					return false;
 				}
 			}
-			return IsGtaoCandidateSupported(diagnostics);
+			return hasSupportedGtaoAlternative;
 		}
 	}
 

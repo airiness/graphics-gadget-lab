@@ -16,5 +16,7 @@ namespace gglab
 		[[nodiscard]] virtual RHIFormat GetFormat() const noexcept = 0;
 		[[nodiscard]] virtual RHITextureHandle GetBackBufferHandle(
 			uint32_t bufferIndex) const noexcept = 0;
+		[[nodiscard]] virtual RHIResourceState GetBackBufferInitialState(
+			uint32_t bufferIndex) const noexcept = 0;
 	};
 }

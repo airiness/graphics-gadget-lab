@@ -52,6 +52,7 @@ namespace gglab
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }
 		IDXGIFactory7* GetDXGIFactory() const noexcept { return m_DxgiFactory.Get(); }
 		IDXGIAdapter1* GetDXGIAdapter() const noexcept { return m_DxgiAdapter.Get(); }
+		std::string_view GetAdapterName() const noexcept { return m_AdapterName; }
 
 		D3D12MA::Allocator* GetMemAllocator() const noexcept { return m_MemAllocator.Get(); }
 
@@ -163,6 +164,7 @@ namespace gglab
 		// supported features
 		FeatureSupport m_FeatureSupport;
 		std::string m_AdapterCompatibilityIdentity;
+		std::string m_AdapterName;
 
 		DX12ResourceManager m_ResourceManager;
 		DX12QueueSystem* m_QueueSystem = nullptr;

@@ -25,6 +25,5 @@ ForwardCoverageVSOutput VSMain(VertexInputP3N3T2T2Tan4 input)
 	output.UV1 = input.UV1;
 	output.TangentWS = TransformTangentWS(input.Tangent, objectData);
 	output.MaterialIndex = g_Scene.MaterialBaseIndex + objectData.MaterialIndex;
-	output.ViewIndex = GetViewDataIndex(g_Pass.ViewIndex);
 	return output;
 }

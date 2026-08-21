@@ -940,7 +940,14 @@ namespace gglab
 		}
 		const bool publicationOrphan = m_PublicationOrphanedTextures.contains(textureId);
 		const bool cancelled = texture->m_Load.m_CancelRequested || publicationOrphan;
-		const bool publishSucceeded = succeeded && !cancelled;
+		bool publishSucceeded = succeeded && !cancelled;
+		if (publishSucceeded)
+		{
+			publishSucceeded = texture->m_Gpu.m_Srv.IsValid() &&
+				m_Device->PublishTextureViewDescriptor(texture->m_Gpu.m_Srv);
+			GGLAB_ASSERT_MSG(publishSucceeded,
+				"TextureAssetSystem: failed to publish a completed texture descriptor.");
+		}
 		const bool residencyReload = texture->m_Load.m_IsReloading;
 		SetTextureState(*texture,
 			cancelled ? (residencyReload ? AssetState::CpuReady : AssetState::Cancelled)

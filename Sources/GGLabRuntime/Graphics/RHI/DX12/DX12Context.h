@@ -59,6 +59,7 @@ namespace gglab
 		TransferManager& GetTransferManager() noexcept override;
 		RHIPipelineSystem& GetPipelineSystem() noexcept override;
 		GpuProfiler* GetGpuProfiler() noexcept override;
+		const GpuProfiler* GetGpuProfiler() const noexcept;
 
 		RHIFrameBeginResult BeginFrame() noexcept override;
 		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;

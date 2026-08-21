@@ -189,6 +189,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -223,6 +226,9 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.cpp">
@@ -675,6 +681,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanInstance.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
@@ -682,9 +691,6 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResource.cpp">
@@ -812,6 +818,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -848,6 +857,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h">
       <Filter>Diagnostics</Filter>
     </ClInclude>
@@ -864,6 +876,9 @@
       <Filter>Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h">
@@ -900,6 +915,9 @@
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
@@ -1565,6 +1583,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.h">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanInstance.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
@@ -1572,9 +1593,6 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanQualification.h">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResource.h">

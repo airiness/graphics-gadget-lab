@@ -2,6 +2,7 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#include "Application/SelfTest/VulkanQualificationSelfTests.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
 #endif
@@ -23,6 +24,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-launch-options",
 				.m_Run = &RunLaunchOptionsSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-vulkan-qualification",
+				.m_Run = &RunVulkanQualificationSelfTests,
 			},
 			SelfTestSuiteDesc{
 				.m_Id = "napa-voxel",

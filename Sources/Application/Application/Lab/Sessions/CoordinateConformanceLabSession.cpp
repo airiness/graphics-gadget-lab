@@ -167,7 +167,8 @@ namespace gglab
 						resources.m_BackBuffer = builder.ImportTexture(
 							"CoordinateConformance.BackBuffer",
 							swapChain->GetBackBufferHandle(backBufferIndex), backBufferDesc,
-							RGTextureAccess::Present, RGContentValidity::Undefined);
+							swapChain->GetBackBufferInitialState(backBufferIndex),
+							RGContentValidity::Undefined);
 
 						auto& targets = builder.GetBlackboard()
 							.GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)

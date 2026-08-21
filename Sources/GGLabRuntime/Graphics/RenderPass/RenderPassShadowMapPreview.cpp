@@ -5,6 +5,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <algorithm>
@@ -129,7 +130,27 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				commandContext->DrawFullscreenTriangle();
+				renderer->GetRenderResourceRegistry()->ClearDirty(
+					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
 			});
+	}
+
+	void RenderPassShadowMapPreview::AddFinishPass(RenderGraph& rg) noexcept
+	{
+		struct FinishPassData
+		{
+		};
+		rg.AddPass<FinishPassData>(
+			"Shadow.FinishResources",
+			[](RenderGraph::RGBuilder& builder, FinishPassData&)
+			{
+				builder.SideEffect();
+				auto& shadowResources =
+					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+				builder.Export(
+					shadowResources.m_DirectionalShadowMapPreview, RGTextureAccess::None);
+			},
+			[](RGExecuteContext&, FinishPassData&) {});
 	}
 
 	void RenderPassShadowMapPreview::EnsureInitialized(const RenderServices& services) noexcept

@@ -14,11 +14,13 @@ namespace gglab
 	class VulkanContextSwapChain;
 	class VulkanDynamicUniformBuffer;
 	class VulkanGraphicsCommandContext;
+	class VulkanGpuProfiler;
 	class VulkanPipelineSystem;
 	class VulkanSet0DynamicUniformFrames;
 	class VulkanDevice;
 	class VulkanSwapChain;
 	struct VulkanAdapterCapabilitySnapshot;
+	struct VulkanBackendSnapshot;
 
 	class VulkanFrameContext final : public RHIFrameContext
 	{
@@ -56,7 +58,7 @@ namespace gglab
 		const RHISwapChain& GetSwapChain() const noexcept override;
 		TransferManager& GetTransferManager() noexcept override;
 		RHIPipelineSystem& GetPipelineSystem() noexcept override;
-		GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
+		GpuProfiler* GetGpuProfiler() noexcept override;
 
 		RHIFrameBeginResult BeginFrame() noexcept override;
 		RHIFrameEndResult EndFrame(RHIFrameContext& frame) noexcept override;
@@ -94,6 +96,8 @@ namespace gglab
 	private:
 		friend class VulkanContextSwapChain;
 		friend class VulkanFrameContext;
+		friend void BuildVulkanBackendSnapshot(
+			const VulkanContext& context, VulkanBackendSnapshot& outSnapshot) noexcept;
 
 		VulkanContext() noexcept = default;
 		[[nodiscard]] bool Initialize(const RHIContextDesc& desc) noexcept;
@@ -108,6 +112,7 @@ namespace gglab
 		std::unique_ptr<TransferManager> m_TransferManager;
 		std::unique_ptr<VulkanDynamicUniformBuffer> m_DynamicUniformBuffer;
 		std::unique_ptr<VulkanSet0DynamicUniformFrames> m_Set0Frames;
+		std::unique_ptr<VulkanGpuProfiler> m_GpuProfiler;
 		std::unique_ptr<VulkanGraphicsCommandContext> m_GraphicsContext;
 		std::unique_ptr<VulkanComputeCommandContext> m_DirectComputeContext;
 		std::unique_ptr<VulkanContextSwapChain> m_SwapChain;

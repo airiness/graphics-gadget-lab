@@ -3,6 +3,7 @@
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
+#include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
@@ -114,6 +115,15 @@ namespace gglab
 			return bufferIndex < m_BackBuffers.size() ? m_BackBuffers[bufferIndex]
 				: RHITextureHandle{};
 		}
+		RHIResourceState GetBackBufferInitialState(uint32_t bufferIndex) const noexcept override
+		{
+			if (!IsValid() || bufferIndex >= m_BackBuffers.size())
+			{
+				return UndefinedRHITextureState();
+			}
+			return ToRHIBackBufferInitialState(
+				m_Context->m_Bootstrap->m_FrameRuntime->GetLayoutTracker().Get(bufferIndex));
+		}
 	private:
 		VulkanContext* m_Context = nullptr;
 		std::vector<RHITextureHandle> m_BackBuffers;
@@ -180,8 +190,16 @@ namespace gglab
 		createInfo.m_Vsync = desc.m_Vsync;
 		createInfo.m_Width = desc.m_Width;
 		createInfo.m_Height = desc.m_Height;
-		VulkanBootstrapRuntimeResult bootstrap =
-			CreateVulkanBootstrapRuntimeForWindow(std::move(createInfo), desc.m_WindowHandle);
+		std::unique_ptr<VulkanSurfaceFactoryBase> surfaceFactory =
+			CreateVulkanPlatformSurfaceFactory(desc.m_WindowHandle);
+		if (!surfaceFactory)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Vulkan RHI could not create a platform surface factory for the window.");
+			return false;
+		}
+		createInfo.m_BootstrapOptions.m_SurfaceFactory = surfaceFactory.get();
+		VulkanBootstrapRuntimeResult bootstrap = CreateVulkanBootstrapRuntime(createInfo);
 		if (!bootstrap.Succeeded())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
@@ -215,8 +233,11 @@ namespace gglab
 			Finalize();
 			return false;
 		}
+		m_GpuProfiler =
+			std::make_unique<VulkanGpuProfiler>(&device, runtime.GetFrameSlotCount());
 		m_GraphicsContext = std::make_unique<VulkanGraphicsCommandContext>(&device,
-			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get());
+			m_PipelineSystem.get(), m_DynamicUniformBuffer.get(), m_Set0Frames.get(),
+			m_GpuProfiler.get());
 		m_DirectComputeContext =
 			std::make_unique<VulkanComputeCommandContext>(*m_GraphicsContext);
 
@@ -273,6 +294,11 @@ namespace gglab
 	RHIPipelineSystem& VulkanContext::GetPipelineSystem() noexcept
 	{
 		return *m_PipelineSystem;
+	}
+
+	GpuProfiler* VulkanContext::GetGpuProfiler() noexcept
+	{
+		return m_GpuProfiler.get();
 	}
 
 	RHIFrameBeginResult VulkanContext::BeginFrame() noexcept
@@ -587,6 +613,7 @@ namespace gglab
 		m_SwapChain.reset();
 		m_DirectComputeContext.reset();
 		m_GraphicsContext.reset();
+		m_GpuProfiler.reset();
 		m_Set0Frames.reset();
 		m_DynamicUniformBuffer.reset();
 		m_TransferManager.reset();

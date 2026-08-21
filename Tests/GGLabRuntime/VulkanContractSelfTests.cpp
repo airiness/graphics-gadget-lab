@@ -8,10 +8,12 @@
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
+#include "Graphics/RHI/Vulkan/VulkanFrameRuntime.h"
+#include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
+#include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
-#include "Graphics/RHI/Vulkan/VulkanQualification.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
@@ -31,6 +33,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -104,6 +107,27 @@ namespace gglab
 
 		void RunDeviceProfileTests(SelfTestContext& context) noexcept
 		{
+			const size_t gtaoAlternativeCount = static_cast<size_t>(std::ranges::count_if(
+				GGLabVulkanFormatRequirements,
+				[](const VulkanFormatRequirement& requirement) noexcept
+				{
+					return requirement.m_Group ==
+						VulkanFormatRequirementGroup::GtaoAlternative;
+				}));
+			context.Check(GGLabVulkanFormatRequirements.size() == 6 &&
+				gtaoAlternativeCount == 2,
+				"Vulkan format profile exposes four mandatory formats and two GTAO alternatives");
+			const auto hasFormat = [](VkFormat format) noexcept
+				{
+					return std::ranges::any_of(GGLabVulkanFormatRequirements,
+						[format](const VulkanFormatRequirement& requirement) noexcept
+						{ return requirement.m_Format == format; });
+				};
+			context.Check(hasFormat(VK_FORMAT_D32_SFLOAT) &&
+				hasFormat(VK_FORMAT_R16G16B16A16_SFLOAT) &&
+				hasFormat(VK_FORMAT_B8G8R8A8_UNORM),
+				"Vulkan format profile exposes depth, HDR scene color, and swapchain gates");
+
 			const VulkanDeviceProfileCapabilities supported = MakeSupportedCapabilities();
 			context.Check(EvaluateVulkanDeviceProfile(supported).IsAccepted(),
 				"Vulkan profile accepts its exact minimum required capabilities");
@@ -812,6 +836,14 @@ namespace gglab
 				}
 				context.Check(domainsSeparate,
 					"frame-slot and backbuffer domains never cross");
+				for (uint32_t i = 0; i < 100; ++i)
+				{
+					model.CommitFrame(i % 2, i % 3);
+				}
+				context.Check(model.GetFramePairs().size() ==
+					VulkanFrameIndexModel::MaxDiagnosticFramePairs &&
+					model.GetFramePairs().back() == std::pair<uint32_t, uint32_t>{ 1, 0 },
+					"frame-pair diagnostics retain a bounded recent history");
 				model.ResetFramePairs();
 				context.Check(model.GetFramePairs().empty() && model.NextFrameSlot() == 0,
 					"reset clears pairs and restarts the ring");
@@ -827,9 +859,15 @@ namespace gglab
 				context.Check(tracker.Get(0) == VulkanPresentImageLayout::Undefined &&
 					tracker.Get(2) == VulkanPresentImageLayout::Undefined,
 					"new swapchain images start Undefined");
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(0)) ==
+					UndefinedRHITextureState(),
+					"new swapchain images publish Undefined to RenderGraph imports");
 				tracker.Set(1, VulkanPresentImageLayout::Present);
 				context.Check(tracker.Get(1) == VulkanPresentImageLayout::Present,
 					"successful present updates the tracked state");
+				context.Check(ToRHIBackBufferInitialState(tracker.Get(1)) ==
+					PresentRHITextureState(),
+					"presented swapchain images publish Present to RenderGraph imports");
 				tracker.Reset(2);
 				context.Check(tracker.GetImageCount() == 2 &&
 					tracker.Get(1) == VulkanPresentImageLayout::Undefined,
@@ -980,6 +1018,75 @@ namespace gglab
 					"vsync off falls back to FIFO");
 			}
 
+			// Swapchain extent policy follows the surface contract: a fixed
+			// current extent overrides the requested client size, while a
+			// variable extent clamps each requested dimension independently.
+			{
+				VkSurfaceCapabilitiesKHR fixed{};
+				fixed.currentExtent = { 1920, 1080 };
+				fixed.minImageExtent = { 1920, 1080 };
+				fixed.maxImageExtent = { 1920, 1080 };
+				const VkExtent2D selectedFixed =
+					SelectVulkanSwapchainExtent(fixed, 1278, 1360);
+				context.Check(selectedFixed.width == 1920 && selectedFixed.height == 1080,
+					"fixed surface extent overrides a transient requested client size");
+
+				VkSurfaceCapabilitiesKHR variable{};
+				variable.currentExtent = {
+					std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()
+				};
+				variable.minImageExtent = { 320, 240 };
+				variable.maxImageExtent = { 2560, 1440 };
+				const VkExtent2D selectedVariable =
+					SelectVulkanSwapchainExtent(variable, 128, 2160);
+				context.Check(selectedVariable.width == 320 && selectedVariable.height == 1440,
+					"variable surface extent clamps the requested drawable size");
+			}
+
+			// Queue-family timestamp valid bits define the native counter's
+			// wrap mask. The profiler must preserve ordinary 64-bit deltas and
+			// correctly resolve a wrapped narrower counter.
+			{
+				context.Check(VulkanTimestampDelta(100, 160, 64) == 60,
+					"64-bit Vulkan timestamp deltas preserve the full counter range");
+				context.Check(VulkanTimestampDelta(250, 5, 8) == 11,
+					"Vulkan timestamp deltas handle queue-family counter wrap");
+				context.Check(VulkanTimestampDelta(1, 2, 0) == 0,
+					"a queue family without timestamp bits produces no timing delta");
+			}
+
+			// Validation diagnostics preserve native message severity and
+			// runtime failure diagnostics retain the first failing operation
+			// together with the last committed submission.
+			{
+				VulkanInstance validationInstance;
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT);
+				validationInstance.RecordValidationMessage(
+					VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT);
+				const VulkanValidationDiagnostics validation =
+					validationInstance.GetValidationDiagnostics();
+				context.Check(validation.m_ErrorCount == 1 && validation.m_WarningCount == 1 &&
+					validation.m_InfoCount == 1 && validation.m_VerboseCount == 1,
+					"Vulkan validation diagnostics preserve all severity counters");
+				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure(
+					{}, VK_ERROR_DEVICE_LOST, "vkQueueSubmit2", 37);
+				const VulkanRuntimeFailureDiagnostics preserved = CaptureVulkanRuntimeFailure(
+					submitFailure, VK_ERROR_SURFACE_LOST_KHR, "vkQueuePresentKHR", 41);
+				context.Check(submitFailure.m_Operation == "vkQueueSubmit2" &&
+					submitFailure.m_Result == VK_ERROR_DEVICE_LOST &&
+					submitFailure.m_LastSubmittedTimelineValue == 37,
+					"Vulkan runtime failure diagnostics capture operation, result, and submission");
+				context.Check(preserved.m_Operation == submitFailure.m_Operation &&
+					preserved.m_Result == submitFailure.m_Result &&
+					preserved.m_LastSubmittedTimelineValue == 37,
+					"Vulkan runtime failure diagnostics preserve the first fatal operation");
+			}
+
 			// Runtime health: fatal is not device lost. A surface-lost
 			// present or an out-of-memory result stops the runtime but the
 			// VkDevice is still usable, so cleanup still quiesces; only
@@ -1035,42 +1142,6 @@ namespace gglab
 		}
 #endif
 
-		void RunVulkanQualificationConfigurationContractTests(SelfTestContext& context) noexcept
-		{
-			VulkanQualificationOptions options{};
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan qualification rejects incomplete host configuration");
-			context.Check(!options.HasRequiredRuntimePaths(),
-				"Vulkan qualification reports missing host-supplied runtime paths");
-			context.Check(!options.HasRequiredNativeSurfaceHandles(),
-				"Vulkan qualification reports missing host-supplied native surface handles");
-
-			options.m_ListAdapters = true;
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan adapter inspection rejects missing native surface handles");
-			options.m_HInstance = reinterpret_cast<HINSTANCE>(1);
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan adapter inspection requires the window handle independently");
-			options.m_Hwnd = reinterpret_cast<HWND>(1);
-			context.Check(options.HasRequiredNativeSurfaceHandles(),
-				"Vulkan qualification accepts both required native surface handles");
-			context.Check(options.IsConfigurationValid(),
-				"Vulkan adapter inspection accepts native surface handles without shader paths");
-			options.m_ListAdapters = false;
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan frame qualification rejects missing host-supplied runtime paths");
-
-			options.m_ShaderSourceRoot = "Shaders";
-			context.Check(!options.IsConfigurationValid(),
-				"Vulkan frame qualification requires the shader cache root independently");
-			context.Check(!options.HasRequiredRuntimePaths(),
-				"Vulkan qualification requires the shader cache root independently");
-			options.m_ShaderCacheRoot = "ShaderCache";
-			context.Check(options.IsConfigurationValid(),
-				"Vulkan frame qualification accepts both required host-supplied runtime paths");
-			context.Check(options.HasRequiredRuntimePaths(),
-				"Vulkan qualification accepts both required host-supplied runtime paths");
-		}
 	}
 
 	void RunVulkanFormatContractTests(SelfTestContext& context) noexcept
@@ -1541,14 +1612,21 @@ namespace gglab
 			.m_Visibility = RHIShaderStage::All,
 			.m_Count = 0,
 		};
+		desc.m_Slots[desc.m_SlotCount++] = {
+			.m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+			.m_Visibility = RHIShaderStage::Pixel,
+			.m_Binding = 1,
+		};
 
 		const VulkanBindingLayoutPlan plan = BuildVulkanBindingLayoutPlan(desc, 64 * 1024);
-		context.Check(plan.IsValid() && plan.m_Set0BindingCount == 3 &&
+		context.Check(plan.IsValid() && plan.m_Set0BindingCount == 4 &&
 			plan.m_DynamicOffsetCount == 2,
 			"Vulkan binding layout separates fixed set 0 from the global descriptor set");
 		context.Check(plan.m_Set0Bindings[0].m_Binding == 1 &&
 			plan.m_Set0Bindings[1].m_Binding == 2 &&
-			plan.m_Set0Bindings[2].m_Binding == 32,
+			plan.m_Set0Bindings[2].m_Binding == 32 &&
+			plan.m_Set0Bindings[3].m_Binding == 33 &&
+			plan.m_Set0Bindings[3].m_LogicalParameterIndex == 3,
 			"Set-0 bindings use the shared register-class shifts and native order");
 		context.Check(plan.GetDynamicOffsetSlot(2) == 0 &&
 			plan.GetDynamicOffsetSlot(0) == 1,
@@ -1739,7 +1817,6 @@ namespace gglab
 		RunDeviceProfileTests(context);
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
-		RunVulkanQualificationConfigurationContractTests(context);
 		RunVulkanFormatContractTests(context);
 		RunVulkanPortabilityContractTests(context);
 		RunVulkanGraphicsPipelineContractTests(context);
