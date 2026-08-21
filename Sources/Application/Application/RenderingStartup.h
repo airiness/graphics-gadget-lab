@@ -5,9 +5,8 @@
 
 namespace gglab
 {
-	// Runs the non-renderer startup path for explicit Vulkan inspection modes.
-	// --list-adapters enumerates and evaluates every adapter before exiting;
-	// regular --rhi selection is handled by the Renderer/RHIContext factory.
+	// Runs explicit Vulkan inspection and hardware qualification exit modes.
+	// Regular --rhi selection is handled by the Renderer/RHIContext factory.
 	[[nodiscard]] int RunRenderingStartupPath(
 		const ApplicationLaunchOptions& options, HWND hwnd) noexcept;
 }

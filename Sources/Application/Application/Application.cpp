@@ -164,11 +164,12 @@ namespace gglab
 		m_WindowHeight = mainWindow.GetHeight();
 
 		// The backend is resolved before the ShaderManager preload starts.
-		// Adapter listing remains an explicit Vulkan qualification mode; a
+		// Inspection and hardware qualification are explicit exit modes; a
 		// selected rendering backend continues through the normal application
 		// initialization and main loop.
 		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
-		if (m_LaunchOptions.m_ListAdapters)
+		if (m_LaunchOptions.m_ListAdapters ||
+			m_LaunchOptions.m_RunVulkanQualification)
 		{
 			m_ExitCode = RunRenderingStartupPath(
 				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));

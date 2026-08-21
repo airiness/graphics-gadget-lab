@@ -2823,8 +2823,40 @@ namespace gglab
 			result.m_SelectedSnapshot.m_Identity.m_DeviceName,
 			result.m_HasDebugMessenger ? "enabled" : "disabled"));
 
-		const int exitCode = RunVulkanQualificationFrames(*result.m_FrameRuntime, options.m_Hwnd,
+		int exitCode = RunVulkanQualificationFrames(*result.m_FrameRuntime, options.m_Hwnd,
 			options.m_ShaderSourceRoot, options.m_ShaderCacheRoot);
+
+		// Release the runtime objects while the debug messenger remains alive,
+		// so validation emitted by their destruction is included in the gate.
+		result.m_FrameRuntime.reset();
+		result.m_Surface.reset();
+		result.m_Device.reset();
+		const VulkanValidationDiagnostics validation =
+			result.m_Instance->GetValidationDiagnostics();
+		if (!PassesVulkanValidationGate(options.m_RequestValidation,
+			result.m_HasDebugMessenger, validation))
+		{
+			if (!result.m_HasDebugMessenger)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"Vulkan qualification requested validation, but no debug messenger is active.");
+			}
+			else
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+					"Vulkan qualification validation gate failed: {} error message(s), "
+					"{} warning message(s).",
+					validation.m_ErrorCount, validation.m_WarningCount));
+			}
+			exitCode = 1;
+		}
+		else if (options.m_RequestValidation)
+		{
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
+				"Vulkan qualification validation gate passed: {} error message(s), "
+				"{} warning message(s).",
+				validation.m_ErrorCount, validation.m_WarningCount));
+		}
 		return exitCode;
 #else
 		GGLAB_UNUSED(options);

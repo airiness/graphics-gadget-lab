@@ -102,6 +102,7 @@ namespace gglab
 		uint32_t m_ComputePipelineCount = 0;
 		uint32_t m_BindingLayoutCount = 0;
 		bool m_GpuProfilerAvailable = false;
+		bool m_GpuProfilerEnabled = false;
 		bool m_NativePipelineCachePersistenceEnabled = false;
 
 		uint32_t m_FrameSlotCount = 0;

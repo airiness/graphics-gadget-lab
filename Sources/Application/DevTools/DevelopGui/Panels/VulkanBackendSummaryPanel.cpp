@@ -15,6 +15,11 @@ namespace gglab
 			return enabled ? "enabled" : "disabled";
 		}
 
+		const char* AvailabilityText(bool available) noexcept
+		{
+			return available ? "available" : "unavailable";
+		}
+
 		double MiB(uint64_t bytes) noexcept
 		{
 			return static_cast<double>(bytes) / (1024.0 * 1024.0);
@@ -119,9 +124,12 @@ namespace gglab
 
 		ImGui::SeparatorText("Adapter");
 		ImGui::TextUnformatted(snapshot->m_DeviceName.c_str());
-		ImGui::Text("Vulkan %u.%u.%u | vendor 0x%04X | device 0x%04X",
+		ImGui::Text("Adapter API: Vulkan %u.%u.%u | Application baseline: Vulkan %u.%u",
 			VK_VERSION_MAJOR(snapshot->m_ApiVersion), VK_VERSION_MINOR(snapshot->m_ApiVersion),
-			VK_VERSION_PATCH(snapshot->m_ApiVersion), snapshot->m_VendorId, snapshot->m_DeviceId);
+			VK_VERSION_PATCH(snapshot->m_ApiVersion), VK_VERSION_MAJOR(VK_API_VERSION_1_3),
+			VK_VERSION_MINOR(VK_API_VERSION_1_3));
+		ImGui::Text("Vendor: 0x%04X | Device: 0x%04X",
+			snapshot->m_VendorId, snapshot->m_DeviceId);
 		ImGui::Text("UUID: %s", snapshot->m_DeviceUuid.c_str());
 		if (!snapshot->m_DriverName.empty())
 		{
@@ -176,8 +184,9 @@ namespace gglab
 		ImGui::Text("Pipelines: %u graphics / %u compute | binding layouts %u",
 			snapshot->m_GraphicsPipelineCount, snapshot->m_ComputePipelineCount,
 			snapshot->m_BindingLayoutCount);
-		ImGui::Text("GPU profiler: %s | native cache persistence: %s",
-			EnabledText(snapshot->m_GpuProfilerAvailable),
+		ImGui::Text("GPU profiler: %s (%s) | native cache persistence: %s",
+			AvailabilityText(snapshot->m_GpuProfilerAvailable),
+			EnabledText(snapshot->m_GpuProfilerEnabled),
 			EnabledText(snapshot->m_NativePipelineCachePersistenceEnabled));
 		if (!snapshot->m_NativePipelineCachePersistenceEnabled)
 		{

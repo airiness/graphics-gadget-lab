@@ -55,13 +55,16 @@ interact with the developer UI.
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12
     GraphicsGadgetLab.exe --list-adapters
+    GraphicsGadgetLab.exe --vulkan-qualification
     GraphicsGadgetLab.exe --rhi vulkan --adapter <index|identity-prefix>
 
 The default backend is DX12. An explicit `--rhi vulkan` creates a Vulkan
 instance, Win32 surface, enumerates and evaluates every physical device
 against the GGLab Vulkan device profile, and creates a logical device and
 graphics/present queue; it never falls back to DX12. `--list-adapters` prints
-the profile evaluation for every adapter.
+the profile evaluation for every adapter. `--vulkan-qualification` runs the
+standalone hardware qualification harness and exits; it accepts the same
+optional `--adapter` selector.
 
 Vulkan uses the normal Application, Renderer, RenderGraph, and backend-neutral
 RHI path. Production coverage includes graphics and direct-compute command
@@ -69,7 +72,7 @@ encoding, bindless material resources, Texture2D/TextureCube sampling, depth
 and directional shadows, Forward PBR, IBL and skybox rendering, Forward+,
 GTAO, post processing and tone mapping, ImGui, and timestamp-based GPU
 profiling. Debug builds request `VK_LAYER_KHRONOS_validation`; validation
-errors and warnings are qualification failures.
+availability, errors, and warnings are hard qualification gates.
 
 The Vulkan diagnostics panel reports adapter/profile identity, validation
 counts, descriptor publication and retained backing state, VMA heap budgets,

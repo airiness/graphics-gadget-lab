@@ -199,7 +199,10 @@ namespace gglab
 				pipelines.m_Cache.m_BackendComputePipelines;
 			outSnapshot.m_BindingLayoutCount = pipelines.m_Cache.m_BackendBindingLayouts;
 		}
-		outSnapshot.m_GpuProfilerAvailable = context.m_GpuProfiler != nullptr;
+		outSnapshot.m_GpuProfilerAvailable =
+			context.m_GpuProfiler && context.m_GpuProfiler->IsAvailable();
+		outSnapshot.m_GpuProfilerEnabled =
+			context.m_GpuProfiler && context.m_GpuProfiler->IsEnabled();
 		outSnapshot.m_NativePipelineCachePersistenceEnabled = false;
 
 		outSnapshot.m_FrameSlotCount = runtime.GetFrameSlotCount();

@@ -1053,6 +1053,14 @@ namespace gglab
 				context.Check(validation.m_ErrorCount == 1 && validation.m_WarningCount == 1 &&
 					validation.m_InfoCount == 1 && validation.m_VerboseCount == 1,
 					"Vulkan validation diagnostics preserve all severity counters");
+				context.Check(PassesVulkanValidationGate(false, false, validation),
+					"validation-disabled qualification does not require a messenger");
+				context.Check(!PassesVulkanValidationGate(true, false, {}),
+					"validation-requested qualification requires an active messenger");
+				context.Check(PassesVulkanValidationGate(true, true, {}),
+					"validation-requested qualification accepts a clean messenger");
+				context.Check(!PassesVulkanValidationGate(true, true, validation),
+					"validation warnings and errors fail qualification");
 
 				const VulkanRuntimeFailureDiagnostics submitFailure = CaptureVulkanRuntimeFailure(
 					{}, VK_ERROR_DEVICE_LOST, "vkQueueSubmit2", 37);

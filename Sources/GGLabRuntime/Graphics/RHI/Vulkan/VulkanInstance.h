@@ -20,6 +20,15 @@ namespace gglab
 		uint64_t m_VerboseCount = 0;
 	};
 
+	[[nodiscard]] constexpr inline bool PassesVulkanValidationGate(
+		bool validationRequested, bool debugMessengerActive,
+		const VulkanValidationDiagnostics& diagnostics) noexcept
+	{
+		return !validationRequested ||
+			(debugMessengerActive && diagnostics.m_ErrorCount == 0 &&
+				diagnostics.m_WarningCount == 0);
+	}
+
 	// Owns the VkInstance and the optional VK_EXT_debug_utils messenger.
 	// Destruction order: debug messenger first, then the instance.
 	class VulkanInstance
