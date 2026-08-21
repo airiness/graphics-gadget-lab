@@ -104,11 +104,13 @@
       "componentOrder": [
         {
           "position": 0,
-          "meaning": "texture binding index into the shared texture resource heap"
+          "role": "textureBindingIndex",
+          "description": "index into the shared texture resource heap"
         },
         {
           "position": 1,
-          "meaning": "sampler binding index into the shared sampler heap"
+          "role": "samplerBindingIndex",
+          "description": "index into the shared sampler heap"
         }
       ]
     },
@@ -116,6 +118,7 @@
       "resourceHeapBuiltin": "ResourceDescriptorHeap",
       "resourceElementType": "Texture2D<float4>",
       "samplerHeapBuiltin": "SamplerDescriptorHeap",
+      "samplerElementType": "SamplerState",
       "indexScope": "NonUniformResourceIndex",
       "operation": "Sample",
       "coordinateType": "float2",
