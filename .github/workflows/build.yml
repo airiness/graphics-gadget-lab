@@ -273,6 +273,52 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build GGLabAppRuntime standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $appRuntimeBuildArguments = @(
+            "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @appRuntimeBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabAppRuntimeTests standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $appRuntimeTestsBuildArguments = @(
+            "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-app-runtime-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @appRuntimeTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Build Application standalone
         shell: pwsh
         run: |
@@ -325,11 +371,13 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests (Application)
+      - name: Run headless self-tests from unrelated CWD (Application)
         shell: pwsh
-        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        working-directory: ${{ runner.temp }}
         run: |
-          & .\GraphicsGadgetLab.exe --self-test all
+          $application = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
+          & $application --self-test all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -348,6 +396,16 @@ jobs:
         working-directory: Build/Output/x64/${{ matrix.configuration }}
         run: |
           & .\GGLabRuntimeTests.exe --suite all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests (GGLabAppRuntimeTests)
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        run: |
+          & .\GGLabAppRuntimeTests.exe
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -372,5 +430,7 @@ jobs:
             Build/Logs/gglab-foundation-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-foundation-tests-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-app-runtime-tests-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7
