@@ -1,6 +1,6 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
-#include "Application/LoadingProgress.h"
+#include "LoadingProgress.h"
 #include "Application/Lab/LabParameter.h"
 #include "Application/Lab/LabRunConfig.h"
 #include "Application/Lab/LabTypes.h"

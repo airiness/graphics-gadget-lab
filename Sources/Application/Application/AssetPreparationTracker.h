@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/LoadingProgress.h"
+#include "LoadingProgress.h"
 #include "Graphics/GraphicsTypes.h"
 
 #include <string>

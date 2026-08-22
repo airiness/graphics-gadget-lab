@@ -1,4 +1,4 @@
-#include "Application/LoadingProgress.h"
+#include "LoadingProgress.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 
 #include <algorithm>

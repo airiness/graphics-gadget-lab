@@ -1218,6 +1218,19 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$applicationToolingBoundaryRegex =
+    '#include\s*[<"]DevTools[\\/]|\bDevelopGuiSystem\b|\bDevelopGuiContext\b|\bImGui\w*\b'
+foreach ($itemPath in $applicationCoreContractPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $applicationToolingBoundaryRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-tooling-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "common Application orchestration depends on concrete development tooling"
+        })
+    }
+}
+
 $presentationContractChecks = @(
     [pscustomobject]@{
         Path = Join-Path $runtimeSourcesDir "Graphics/RHI/RHIContext.h"

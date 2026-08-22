@@ -30,6 +30,13 @@ namespace gglab
 		context.Check(config.HasCapability(AppRuntimeCapability::BuiltInContent) &&
 			config.HasCapability(AppRuntimeCapability::DevelopmentTools),
 			"Host selects current content and tooling capabilities explicitly");
+		ApplicationLaunchOptions noToolingOptions = options;
+		noToolingOptions.m_DisableDevelopmentTools = true;
+		const AppRuntimeConfig noToolingConfig = TranslateApplicationLaunchOptions(
+			noToolingOptions, { 1920, 1080 }, true);
+		context.Check(noToolingConfig.HasCapability(AppRuntimeCapability::BuiltInContent) &&
+			!noToolingConfig.HasCapability(AppRuntimeCapability::DevelopmentTools),
+			"Host can omit optional development tooling without disabling built-in content");
 
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";

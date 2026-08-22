@@ -107,6 +107,17 @@ namespace gglab
 					"app-path-composition",
 					"Path-composition proof is an explicit self-test exit mode");
 			}
+			{
+				const auto result = parse({ "--no-devtools" });
+				context.Check(result.IsValid() &&
+					result.m_Options.m_DisableDevelopmentTools,
+					"--no-devtools disables optional desktop tooling for production startup");
+			}
+			{
+				const auto result = parse({ "--no-devtools", "--no-devtools" });
+				context.Check(!result.IsValid(),
+					"--no-devtools rejects duplicate specification");
+			}
 		}
 	}
 

@@ -27,8 +27,12 @@ namespace gglab
 		config.m_InitialPointerMode = options.m_StartWithAbsoluteMouse
 			? AppRuntimePointerMode::Absolute
 			: AppRuntimePointerMode::Relative;
-		config.m_Capabilities =
-			AppRuntimeCapability::BuiltInContent | AppRuntimeCapability::DevelopmentTools;
+		config.m_Capabilities = AppRuntimeCapability::BuiltInContent;
+		if (!options.m_DisableDevelopmentTools)
+		{
+			config.m_Capabilities =
+				config.m_Capabilities | AppRuntimeCapability::DevelopmentTools;
+		}
 		config.m_RequestRuntimeValidation = requestRuntimeValidation;
 
 		switch (options.m_StartupDemo)

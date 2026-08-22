@@ -43,6 +43,10 @@ namespace gglab
 		{
 			return m_RenderVisualizationSettings;
 		}
+		const RenderVisualizationSettings& GetRenderVisualizationSettings() const noexcept
+		{
+			return m_RenderVisualizationSettings;
+		}
 		ViewRenderSettingsOverrides& GetViewRenderSettingsOverrides() noexcept
 		{
 			return m_ViewRenderSettingsOverrides;

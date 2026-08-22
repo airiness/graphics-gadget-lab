@@ -1,6 +1,6 @@
 #pragma once
 #include "Application/Demo/DemoTypes.h"
-#include "Application/LoadingProgress.h"
+#include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <optional>

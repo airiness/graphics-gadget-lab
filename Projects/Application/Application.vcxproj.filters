@@ -31,6 +31,9 @@
     <Filter Include="Application\SelfTest">
       <UniqueIdentifier>{03F03AD5-326D-54B7-36C4-DD57A9832269}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Tooling">
+      <UniqueIdentifier>{E660C71D-EF6A-9715-0B5D-08696F85D0FA}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Core">
       <UniqueIdentifier>{A09D7BFC-1F79-4817-0ED1-F7C00792454D}</UniqueIdentifier>
     </Filter>
@@ -249,9 +252,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\LoadingProgress.cpp">
-      <Filter>Application</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Main.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -338,6 +338,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiApplicationTooling.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp">
       <Filter>DevTools\DevelopGui</Filter>
@@ -596,9 +599,6 @@
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\LoadingProgress.h">
-      <Filter>Application</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Platform\PlatformHost.h">
       <Filter>Application\Platform</Filter>
     </ClInclude>
@@ -655,6 +655,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Tooling\ApplicationToolingComposition.h">
+      <Filter>Application\Tooling</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Core\Input\InputBase.h">
       <Filter>Core\Input</Filter>

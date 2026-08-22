@@ -3,6 +3,7 @@
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
+#include "Application/Tooling/ApplicationToolingComposition.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
@@ -11,8 +12,9 @@
 #include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Application/LoadingProgress.h"
+#include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
+#include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
@@ -28,15 +30,9 @@
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
-#include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
-#include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "DevTools/DevelopGui/LoadingOverlay.h"
-#include "DevTools/DevelopGui/DevelopGuiSystem.h"
-#include "DevTools/DevelopGui/Panels/DemoPanel.h"
-#include "DevTools/DevelopGui/Panels/LabPanel.h"
 
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -297,35 +293,26 @@ namespace gglab
 
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
-			m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
-			const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
+			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
 				.m_RHIContext = m_Renderer->GetRHIContext(),
-				.m_SettingsPath = m_RuntimePaths.m_SettingsRoot / "imgui.ini",
-			};
-			if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
+				.m_TaskSystem = m_TaskSystem.get(),
+				.m_DemoManager = m_DemoManager.get(),
+				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
+				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,
+				});
+			if (!m_ApplicationTooling)
 			{
-				GGLAB_LOG_WARN("Application will continue without DevelopGui.");
-				m_DevelopGuiSystem.reset();
+				GGLAB_LOG_WARN("Application will continue without optional development tooling.");
 			}
 			else
 			{
-				m_DevelopGuiSystem->GetDevToolsRuntime().SetTaskSystem(m_TaskSystem.get());
-				m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
-					std::make_unique<LabSnapshotProvider>(
-						[runtimeLocator = m_LabRuntimeLocator.get()]() noexcept
-							-> const LabSnapshotSourceBase*
-						{
-							return runtimeLocator
-								? runtimeLocator->GetLabRuntimeIfCreated()
-								: nullptr;
-						}),
-					SnapshotUpdatePolicy::EveryFrame);
-				m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
-					std::make_unique<DemoPanel>(m_DemoManager.get()));
-				m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
-					std::make_unique<LabPanel>(m_LabRuntimeLocator.get()));
+				GGLAB_LOG_INFO("Optional application tooling initialized.");
 			}
+		}
+		else
+		{
+			GGLAB_LOG_INFO("Optional application tooling omitted by host composition.");
 		}
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
@@ -379,12 +366,13 @@ namespace gglab
 			return false;
 		}
 
-		// Input routing uses the previous ImGui frame's capture decision. The
+		// Input routing uses the previous optional tooling frame's capture decision. The
 		// new UI frame starts only after the RHI transaction is Ready so a
 		// backend can synchronize a swapchain-dependent render contract first.
-		input.SetUICaptureState(
-			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsKeyboardCapture(),
-			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsMouseCapture());
+		const ApplicationToolingInputCapture toolingInputCapture = m_ApplicationTooling
+			? m_ApplicationTooling->GetPreviousFrameInputCapture()
+			: ApplicationToolingInputCapture{};
+		input.SetUICaptureState(toolingInputCapture.m_Keyboard, toolingInputCapture.m_Pointer);
 
 		// Update demo
 		auto* demo = m_DemoManager->GetActiveDemo();
@@ -399,22 +387,22 @@ namespace gglab
 		{
 			return rendererFrame.IsUnavailable();
 		}
-		const bool developGuiFrameOpen =
-			m_DevelopGuiSystem && m_DevelopGuiSystem->BeginFrame();
+		ApplicationToolingFrame toolingFrame(m_ApplicationTooling.get());
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph rg(m_Renderer->CreateRenderGraphCreateInfo());
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 
-		ShadowVisualizationSettings shadowVisualizationSettings = m_DevelopGuiSystem
-			? m_DevelopGuiSystem->GetDevToolsRuntime().GetRenderVisualizationSettings().m_Shadow
-			: DefaultShadowVisualizationSettings();
+		ShadowVisualizationSettings shadowVisualizationSettings =
+			DefaultShadowVisualizationSettings();
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
-		const ViewRenderProfile effectiveViewRenderProfile = m_DevelopGuiSystem
-			? m_DevelopGuiSystem->GetDevToolsRuntime().ResolveViewRenderProfile(
-				authoringViewRenderProfile)
-			: authoringViewRenderProfile;
+		ViewRenderProfile effectiveViewRenderProfile = authoringViewRenderProfile;
+		if (m_ApplicationTooling)
+		{
+			m_ApplicationTooling->ResolveFrameSettings(authoringViewRenderProfile,
+				shadowVisualizationSettings, effectiveViewRenderProfile);
+		}
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -442,7 +430,7 @@ namespace gglab
 			.m_Renderer = m_Renderer.get(),
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get(),
-			.m_OverlayExtension = m_DevelopGuiSystem.get(),
+			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
 		};
 
 		// Build RenderGraph
@@ -459,45 +447,45 @@ namespace gglab
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
-			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
-			{
-				m_DevelopGuiSystem->EndFrame();
-			}
 			return false;
 		}
 
-		// Draw menus before Renderer::Render()
-		if (developGuiFrameOpen && m_DevelopGuiSystem->IsFrameOpen())
+		// Draw optional application tooling before Renderer::Render().
+		if (toolingFrame.IsOpen())
 		{
-			GGLAB_CPU_PROFILE_SCOPE("DevelopGUI");
-			DevelopGuiContext guiContext{};
-			guiContext.m_Camera = &camera;
-			guiContext.m_CameraController = &demo->GetCameraController();
-			guiContext.m_CameraRig = &demo->GetCameraRig();
-			guiContext.m_Renderer = m_Renderer.get();
-			guiContext.m_World = &world;
-			guiContext.m_RenderViews = std::span<RenderView>(frame.m_RenderViews);
-			guiContext.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues);
-			guiContext.m_MainRenderView = &frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)];
-			guiContext.m_AuthoringViewRenderProfile = &authoringViewRenderProfile;
-			guiContext.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile;
-			guiContext.m_AssetManager = m_AssetManager.get();
-			guiContext.m_EnvironmentAssetController = m_EnvironmentAssetController.get();
-			guiContext.m_RenderGraph = &rg;
-			guiContext.m_DirectionalShadowSettings =
-				frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings;
-			guiContext.m_DebugDrawSystem = m_DebugDrawSystem.get();
-			guiContext.m_DebugDrawFrame = frame.m_DebugDrawFrame;
-
-			m_DevelopGuiSystem->Draw(guiContext);
+			GGLAB_CPU_PROFILE_SCOPE("ApplicationTooling");
+			std::optional<LoadingProgress> loadingProgress;
 			if (!shaderPreload.IsReady())
 			{
-				DrawLoadingOverlay(GetStartupLoadingProgress());
+				loadingProgress = GetStartupLoadingProgress();
 			}
-			else if (const auto loadingProgress = m_DemoManager->GetLoadingProgress())
+			else
 			{
-				DrawLoadingOverlay(*loadingProgress);
+				loadingProgress = m_DemoManager->GetLoadingProgress();
 			}
+
+			const ApplicationToolingFrameContext toolingContext{
+				.m_Camera = &camera,
+				.m_CameraController = &demo->GetCameraController(),
+				.m_CameraRig = &demo->GetCameraRig(),
+				.m_Renderer = m_Renderer.get(),
+				.m_World = &world,
+				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
+				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
+				.m_MainRenderView =
+					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
+				.m_AssetManager = m_AssetManager.get(),
+				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				.m_RenderGraph = &rg,
+				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
+				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
+				.m_DirectionalShadowSettings =
+					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
+				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
+				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
+			};
+			toolingFrame.Draw(toolingContext);
 		}
 
 		// Render
@@ -512,10 +500,6 @@ namespace gglab
 		}
 		if (!frameEndResult.IsCompleted())
 		{
-			if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
-			{
-				m_DevelopGuiSystem->EndFrame();
-			}
 			return false;
 		}
 
@@ -527,11 +511,8 @@ namespace gglab
 		};
 		m_DemoManager->OnFrameSubmitted(demoFeedback);
 
-		// Pipelines without a DevelopGui render pass must still close the ImGui frame.
-		if (m_DevelopGuiSystem && m_DevelopGuiSystem->IsFrameOpen())
-		{
-			m_DevelopGuiSystem->EndFrame();
-		}
+		// Pipelines without an overlay pass still complete the optional tooling frame.
+		toolingFrame.Complete();
 
 		return true;
 	}
@@ -594,11 +575,7 @@ namespace gglab
 				m_Renderer->GetAssetUploadScheduler()->Finalize();
 
 				m_RenderFrameBuilder.reset();
-				if (m_DevelopGuiSystem)
-				{
-					m_DevelopGuiSystem->Finalize();
-					m_DevelopGuiSystem.reset();
-				}
+				m_ApplicationTooling.reset();
 				m_LabRuntimeLocator.reset();
 				m_DemoManager.reset();
 				m_DebugDrawSystem.reset();
@@ -613,11 +590,7 @@ namespace gglab
 		}
 
 		m_RenderFrameBuilder.reset();
-		if (m_DevelopGuiSystem)
-		{
-			m_DevelopGuiSystem->Finalize();
-			m_DevelopGuiSystem.reset();
-		}
+		m_ApplicationTooling.reset();
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();

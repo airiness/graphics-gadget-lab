@@ -21,7 +21,7 @@ namespace gglab
 	class ShaderManager;
 	class DemoManager;
 	class RenderFrameBuilder;
-	class DevelopGuiSystem;
+	class ApplicationToolingIntegrationBase;
 	class DebugDrawSystem;
 	class PlatformHost;
 	class Time;
@@ -116,7 +116,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
-		std::unique_ptr<DevelopGuiSystem> m_DevelopGuiSystem;
+		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
 		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;

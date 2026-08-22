@@ -63,6 +63,10 @@ namespace gglab
 		[[nodiscard]] ImTextureID ResolveTextureId(RHIDescriptorHandle descriptor) const noexcept;
 
 		[[nodiscard]] DevToolsRuntime& GetDevToolsRuntime() noexcept { return m_DevToolsRuntime; }
+		[[nodiscard]] const DevToolsRuntime& GetDevToolsRuntime() const noexcept
+		{
+			return m_DevToolsRuntime;
+		}
 
 	private:
 		std::unique_ptr<DevelopGuiPlatformBackend> m_PlatformBackend;

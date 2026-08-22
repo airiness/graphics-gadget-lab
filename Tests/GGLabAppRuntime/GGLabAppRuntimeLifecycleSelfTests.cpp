@@ -1,5 +1,6 @@
 #include "GGLabAppRuntime.h"
 #include "ApplicationInput.h"
+#include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <filesystem>
@@ -8,6 +9,117 @@ namespace gglab
 {
 	namespace
 	{
+		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
+		{
+		public:
+			ApplicationToolingInputCapture GetPreviousFrameInputCapture()
+				const noexcept override
+			{
+				return {};
+			}
+
+			void ResolveFrameSettings(const ViewRenderProfile&,
+				ShadowVisualizationSettings&, ViewRenderProfile&) const noexcept override
+			{
+			}
+
+			bool BeginFrame() noexcept override
+			{
+				++m_BeginCount;
+				return m_BeginSucceeds;
+			}
+
+			void Draw(const ApplicationToolingFrameContext&) noexcept override { ++m_DrawCount; }
+
+			void EndFrame(ApplicationToolingFrameEndReason reason) noexcept override
+			{
+				++m_EndCount;
+				m_LastEndReason = reason;
+			}
+
+			RenderPipelineOverlayExtensionBase* GetOverlayExtension() noexcept override
+			{
+				return m_HasOverlay
+					? reinterpret_cast<RenderPipelineOverlayExtensionBase*>(this)
+					: nullptr;
+			}
+
+			bool m_BeginSucceeds = true;
+			bool m_HasOverlay = true;
+			uint32_t m_BeginCount = 0;
+			uint32_t m_DrawCount = 0;
+			uint32_t m_EndCount = 0;
+			ApplicationToolingFrameEndReason m_LastEndReason =
+				ApplicationToolingFrameEndReason::Completed;
+		};
+
+		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
+		{
+			{
+				ApplicationToolingFrame frame(nullptr);
+				frame.Draw({});
+				frame.Complete();
+				context.Check(!frame.IsOpen() && frame.GetOverlayExtension() == nullptr,
+					"Disabled or failed optional tooling opens no frame and needs no closure");
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				tooling.m_BeginSucceeds = false;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(tooling.m_BeginCount == 1 && tooling.m_DrawCount == 0 &&
+					tooling.m_EndCount == 0 && !frame.IsOpen(),
+					"Tooling BeginFrame failure is never paired with a false closure");
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				{
+					ApplicationToolingFrame frame(&tooling);
+					frame.Draw({});
+				}
+				context.Check(tooling.m_BeginCount == 1 && tooling.m_DrawCount == 1 &&
+					tooling.m_EndCount == 1 &&
+					tooling.m_LastEndReason == ApplicationToolingFrameEndReason::Aborted,
+					"Early frame failure aborts one successfully opened tooling frame exactly once");
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				ApplicationToolingFrame frame(&tooling);
+				const bool exposedOverlay = frame.GetOverlayExtension() != nullptr;
+				frame.Draw({});
+				frame.Complete();
+				frame.Complete();
+				context.Check(exposedOverlay && tooling.m_DrawCount == 1 &&
+					tooling.m_EndCount == 1 &&
+					tooling.m_LastEndReason == ApplicationToolingFrameEndReason::Completed &&
+					frame.GetOverlayExtension() == nullptr,
+					"Normal completion closes once and retires the frame overlay extension");
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				tooling.m_HasOverlay = false;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Complete();
+				context.Check(tooling.m_EndCount == 1 &&
+					tooling.m_LastEndReason == ApplicationToolingFrameEndReason::Completed,
+					"A pipeline without an overlay pass still completes its tooling frame once");
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Abort();
+				frame.Abort();
+				context.Check(tooling.m_EndCount == 1 &&
+					tooling.m_LastEndReason == ApplicationToolingFrameEndReason::Aborted,
+					"Explicit render failure abort is idempotent");
+			}
+		}
+
 		void RunApplicationInputSelfTests(SelfTestContext& context) noexcept
 		{
 			ApplicationInput input;
@@ -90,6 +202,7 @@ namespace gglab
 		void RunLifecycleSelfTests(SelfTestContext& context) noexcept
 		{
 			RunApplicationInputSelfTests(context);
+			RunApplicationToolingSelfTests(context);
 			{
 				GGLabAppRuntime runtime;
 				context.Check(

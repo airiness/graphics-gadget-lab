@@ -48,6 +48,16 @@ namespace gglab
 				result.m_Options.m_StartWithAbsoluteMouse = true;
 				continue;
 			}
+			if (argument == "--no-devtools")
+			{
+				if (result.m_Options.m_DisableDevelopmentTools)
+				{
+					result.m_Error = "Option '--no-devtools' may only be specified once.";
+					return result;
+				}
+				result.m_Options.m_DisableDevelopmentTools = true;
+				continue;
+			}
 			if (argument == "--rhi")
 			{
 				if (result.m_Options.m_RhiBackendSpecified)
@@ -192,6 +202,7 @@ namespace gglab
 		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
 				result.m_Options.m_StartWithAbsoluteMouse ||
+				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
 				result.m_Options.m_RunVulkanQualification || result.m_Options.m_AdapterSelector))
 		{
@@ -212,7 +223,8 @@ namespace gglab
 		}
 		if (result.m_Options.m_RunVulkanQualification &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
-				result.m_Options.m_StartWithAbsoluteMouse))
+				result.m_Options.m_StartWithAbsoluteMouse ||
+				result.m_Options.m_DisableDevelopmentTools))
 		{
 			result.m_Error =
 				"Option '--vulkan-qualification' cannot be combined with interactive startup options.";
@@ -257,6 +269,7 @@ namespace gglab
 			"  --demo <start|playground|lab>   Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
+			"  --no-devtools                   Disable optional desktop development tooling.\n"
 			"  --rhi <dx12|vulkan>             Select the RHI backend (default: dx12).\n"
 			"                                  Explicit 'vulkan' never falls back to DX12.\n"
 			"  --list-adapters                 Enumerate Vulkan adapters with profile\n"

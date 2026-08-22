@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/LoadingOverlay.h"
-#include "Application/LoadingProgress.h"
+#include "LoadingProgress.h"
 
 #include <algorithm>
 #include <cmath>

@@ -2,15 +2,19 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
   </ItemGroup>
 </Project>
