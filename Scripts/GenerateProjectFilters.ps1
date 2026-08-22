@@ -326,6 +326,26 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "GGLabAppRuntime"
+        ProjectPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+        FiltersPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\GGLabAppRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "GGLabAppRuntimeTests"
+        ProjectPath = "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+        FiltersPath = "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\GGLabAppRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabFoundation"
         ProjectPath = "Projects\GGLabFoundation\GGLabFoundation.vcxproj"
         FiltersPath = "Projects\GGLabFoundation\GGLabFoundation.vcxproj.filters"
