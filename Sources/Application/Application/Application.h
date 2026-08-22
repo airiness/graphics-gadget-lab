@@ -16,6 +16,7 @@ namespace gglab
 	class EnvironmentAssetController;
 	class TaskSystem;
 	class InputManager;
+	class ApplicationInput;
 	class ShaderManager;
 	class DemoManager;
 	class RenderFrameBuilder;
@@ -23,8 +24,6 @@ namespace gglab
 	class DebugDrawSystem;
 	class PlatformHost;
 	class Time;
-	class Keyboard;
-	class Mouse;
 	class World;
 	class LabRuntimeLocatorBase;
 	struct PlatformEvent;
@@ -76,11 +75,9 @@ namespace gglab
 			return m_EnvironmentAssetController.get();
 		}
 		TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem.get(); }
-		InputManager* GetInputManager() const noexcept { return m_InputManager.get(); }
+		ApplicationInput* GetInput() const noexcept;
 		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
 
-		Keyboard* GetKeyboard() const noexcept;
-		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
 
 	private:

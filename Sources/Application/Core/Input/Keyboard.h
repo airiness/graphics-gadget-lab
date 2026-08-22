@@ -188,6 +188,17 @@ namespace gglab
 		MaxKeyCode = 0xff,
 	};
 
+	[[nodiscard]] constexpr bool IsValidKeyCodeValue(int32_t key) noexcept
+	{
+		return key >= static_cast<int32_t>(KeyCode::None) &&
+			key < static_cast<int32_t>(KeyCode::MaxKeyCode);
+	}
+
+	static_assert(!IsValidKeyCodeValue(-1));
+	static_assert(IsValidKeyCodeValue(static_cast<int32_t>(KeyCode::None)));
+	static_assert(IsValidKeyCodeValue(static_cast<int32_t>(KeyCode::OemClear)));
+	static_assert(!IsValidKeyCodeValue(static_cast<int32_t>(KeyCode::MaxKeyCode)));
+
 	class Keyboard final : public InputBase
 	{
 	private:
@@ -403,8 +414,7 @@ namespace gglab
 
 			void SetKeyBit(int32_t key) noexcept
 			{
-				if (key >= static_cast<int32_t>(KeyCode::None) ||
-					key < static_cast<int32_t>(KeyCode::MaxKeyCode))
+				if (IsValidKeyCodeValue(key))
 				{
 					auto ptr = reinterpret_cast<uint32_t*>(this);
 
@@ -435,6 +445,7 @@ namespace gglab
 		bool IsKeyPressed(KeyCode key) const noexcept;
 		bool IsKeyReleased(KeyCode key) const noexcept;
 		bool IsKeyHeld(KeyCode key) const noexcept;
+		void Reset() noexcept;
 
 	private:
 		State GetState() noexcept;

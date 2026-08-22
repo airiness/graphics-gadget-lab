@@ -66,11 +66,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />

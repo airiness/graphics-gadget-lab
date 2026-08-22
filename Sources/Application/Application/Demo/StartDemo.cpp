@@ -1,7 +1,5 @@
 #include "Application/Demo/StartDemo.h"
-#include "Core/Input/InputManager.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
+#include "Application/Input/ApplicationCameraInput.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Math/Transform.h"
 #include "Core/Time.h"
@@ -186,29 +184,15 @@ namespace gglab
 
 	void StartDemo::Update() noexcept
 	{
-		auto* inputManager = m_Services.m_InputManager;
+		auto* input = m_Services.m_Input;
 		auto* time = m_Services.m_Time;
-		GGLAB_ASSERT_NOT_NULL(inputManager);
+		GGLAB_ASSERT_NOT_NULL(input);
 		GGLAB_ASSERT_NOT_NULL(time);
-
-		auto* mouse = inputManager->GetMouse();
-		auto* keyboard = inputManager->GetKeyboard();
-		const auto mouseCoord = mouse->GetMouseCoord();
-		CameraInput input{};
-		input.m_Front = keyboard->IsKeyHeld(KeyCode::W);
-		input.m_Back = keyboard->IsKeyHeld(KeyCode::S);
-		input.m_Left = keyboard->IsKeyHeld(KeyCode::A);
-		input.m_Right = keyboard->IsKeyHeld(KeyCode::D);
-		input.m_Up = keyboard->IsKeyHeld(KeyCode::Q);
-		input.m_Down = keyboard->IsKeyHeld(KeyCode::E);
-		input.m_Accelerate = keyboard->IsKeyHeld(KeyCode::LeftShift);
-		input.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
-		input.m_MouseDelta = mouseCoord;
 
 		Camera& camera = m_CameraRig.GetActiveCamera();
 		CameraController& controller = m_CameraRig.GetActiveCameraController();
 		const float deltaTime = static_cast<float>(time->GetDeltaTime());
-		controller.Update(camera, input, deltaTime);
+		controller.Update(camera, BuildCameraInput(*input), deltaTime);
 
 		m_AnimationTime += std::max(deltaTime, 0.0f);
 		auto& registry = m_World.GetRegistry();

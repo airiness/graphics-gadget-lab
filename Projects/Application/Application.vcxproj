@@ -157,6 +157,7 @@
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
@@ -210,6 +211,7 @@
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\StartDemo.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\AssetPreparationTracker.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCatalog.cpp" />
@@ -246,6 +248,7 @@
     <ClCompile Include="..\..\Sources\Application\Core\Input\Keyboard.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Main.cpp" />
     <ClCompile Include="..\..\Sources\Application\Core\Input\Mouse.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Core\Input\WindowsInputMapping.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationPch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
@@ -263,6 +266,7 @@
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
@@ -337,6 +341,7 @@
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\StartDemo.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.h" />
     <ClInclude Include="..\..\Sources\Application\Application\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\Application\Application\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCatalog.h" />
@@ -379,6 +384,7 @@
     <ClInclude Include="..\..\Sources\Application\Core\Input\InputManager.h" />
     <ClInclude Include="..\..\Sources\Application\Core\Input\Keyboard.h" />
     <ClInclude Include="..\..\Sources\Application\Core\Input\Mouse.h" />
+    <ClInclude Include="..\..\Sources\Application\Core\Input\WindowsInputMapping.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationPch.h" />
   </ItemGroup>
   <ItemGroup>

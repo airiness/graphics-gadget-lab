@@ -65,6 +65,8 @@ namespace gglab
 		void SetWindowHandle(HWND window) noexcept;
 
 		Vector2 GetMouseCoord() const noexcept;
+		Vector2 GetAbsolutePosition() const noexcept;
+		Vector2 GetRelativeDelta() const noexcept;
 		int64_t GetScrollWheelDeltaY() const noexcept;
 
 		bool IsMouseButtonPressed(MouseButton button) const noexcept;
@@ -78,6 +80,7 @@ namespace gglab
 		void SetCursorVisible(bool visible) const noexcept;
 
 		void SetClipToWindow(bool isClip) const noexcept;
+		void Reset() noexcept;
 
 	private:
 		State GetState() noexcept;

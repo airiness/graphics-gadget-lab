@@ -15,6 +15,10 @@ namespace gglab
 			auto state = GetState();
 			m_StateTracker.Update(state, m_WindowHandle);
 		}
+		else
+		{
+			m_StateTracker.Reset();
+		}
 
 		if (GetForegroundWindow() == m_WindowHandle && m_Mode == MouseMode::Relative)
 		{
@@ -46,6 +50,18 @@ namespace gglab
 		default:
 			GGLAB_UNREACHABLE("Invalid Mouse Mode.");
 		}
+	}
+
+	Vector2 Mouse::GetAbsolutePosition() const noexcept
+	{
+		return Vector2(static_cast<float>(m_StateTracker.m_AbsoluteX),
+			static_cast<float>(m_StateTracker.m_AbsoluteY));
+	}
+
+	Vector2 Mouse::GetRelativeDelta() const noexcept
+	{
+		return Vector2(static_cast<float>(m_StateTracker.m_RelativeX),
+			static_cast<float>(m_StateTracker.m_RelativeY));
 	}
 
 	int64_t Mouse::GetScrollWheelDeltaY() const noexcept
@@ -176,6 +192,13 @@ namespace gglab
 		rect.bottom = lr.y;
 
 		ClipCursor(&rect);
+	}
+
+	void Mouse::Reset() noexcept
+	{
+		m_StateTracker.Reset();
+		SetClipToWindow(false);
+		SetCursorVisible(true);
 	}
 
 	void Mouse::StateTracker::Update(const State& state, HWND windowHandle) noexcept

@@ -15,7 +15,10 @@ namespace gglab
 		{
 			auto state = GetState();
 			m_StateTracker.Update(state);
+			return;
 		}
+
+		m_StateTracker.Reset();
 	}
 
 	bool Keyboard::IsKeyPressed(KeyCode key) const noexcept
@@ -31,6 +34,11 @@ namespace gglab
 	bool Keyboard::IsKeyHeld(KeyCode key) const noexcept
 	{
 		return m_StateTracker.m_LastState.IsKeyDown(key);
+	}
+
+	void Keyboard::Reset() noexcept
+	{
+		m_StateTracker.Reset();
 	}
 
 	Keyboard::State Keyboard::GetState() noexcept

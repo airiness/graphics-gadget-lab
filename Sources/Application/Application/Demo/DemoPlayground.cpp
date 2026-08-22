@@ -1,9 +1,7 @@
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Input/ApplicationCameraInput.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Time.h"
-#include "Core/Input/InputManager.h"
-#include "Core/Input/Mouse.h"
-#include "Core/Input/Keyboard.h"
 #include "Scene/Components.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
@@ -164,29 +162,15 @@ namespace gglab
 
 	void DemoPlayground::Update() noexcept
 	{
-		auto* inputManager = m_Services.m_InputManager;
+		auto* input = m_Services.m_Input;
 		auto* time = m_Services.m_Time;
-		GGLAB_ASSERT_NOT_NULL(inputManager);
+		GGLAB_ASSERT_NOT_NULL(input);
 		GGLAB_ASSERT_NOT_NULL(time);
-		auto* mouse = inputManager->GetMouse();
-		auto* keyboard = inputManager->GetKeyboard();
-		const auto mouseCoord = mouse->GetMouseCoord();
 		const auto deltaTime = static_cast<float>(time->GetDeltaTime());
-
-		CameraInput camInput{};
-		camInput.m_Front = keyboard->IsKeyHeld(KeyCode::W);
-		camInput.m_Back = keyboard->IsKeyHeld(KeyCode::S);
-		camInput.m_Left = keyboard->IsKeyHeld(KeyCode::A);
-		camInput.m_Right = keyboard->IsKeyHeld(KeyCode::D);
-		camInput.m_Up = keyboard->IsKeyHeld(KeyCode::Q);
-		camInput.m_Down = keyboard->IsKeyHeld(KeyCode::E);
-		camInput.m_Accelerate = keyboard->IsKeyHeld(KeyCode::LeftShift);
-		camInput.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
-		camInput.m_MouseDelta = mouseCoord;
 
 		Camera& camera = m_CameraRig.GetActiveCamera();
 		CameraController& controller = m_CameraRig.GetActiveCameraController();
-		controller.Update(camera, camInput, deltaTime);
+		controller.Update(camera, BuildCameraInput(*input), deltaTime);
 		camera.Update();
 	}
 

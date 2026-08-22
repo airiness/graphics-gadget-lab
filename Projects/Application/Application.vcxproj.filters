@@ -7,6 +7,9 @@
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{1FFC426C-B4FE-2E33-E96F-82BD8EC5B60B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Input">
+      <UniqueIdentifier>{131CE94D-44F0-6897-6F9B-4BC455EC210F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Lab">
       <UniqueIdentifier>{A314A76E-CEBA-AB71-D031-B1CBD25678B6}</UniqueIdentifier>
     </Filter>
@@ -162,6 +165,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\Demo\StartDemo.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.cpp">
+      <Filter>Application\Input</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCatalog.cpp">
       <Filter>Application\Lab</Filter>
     </ClCompile>
@@ -267,6 +273,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -310,6 +319,9 @@
       <Filter>Core\Input</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Core\Input\Mouse.cpp">
+      <Filter>Core\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Core\Input\WindowsInputMapping.cpp">
       <Filter>Core\Input</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\DevTools\AssetSnapshotText.cpp">
@@ -479,6 +491,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.h">
+      <Filter>Application\Input</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCatalog.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
@@ -608,6 +623,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
@@ -642,6 +660,9 @@
       <Filter>Core\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Core\Input\Mouse.h">
+      <Filter>Core\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Core\Input\WindowsInputMapping.h">
       <Filter>Core\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\DevTools\AssetSnapshotText.h">

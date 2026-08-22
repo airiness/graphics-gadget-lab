@@ -1,7 +1,5 @@
 #include "Application/Lab/LabSessionBase.h"
-#include "Core/Input/InputManager.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
+#include "Application/Input/ApplicationCameraInput.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/CameraController.h"
@@ -95,27 +93,12 @@ namespace gglab
 
 	void LabSessionBase::UpdateCamera(float deltaTime) noexcept
 	{
-		auto* inputManager = m_Services.m_InputManager;
-		GGLAB_ASSERT_NOT_NULL(inputManager);
-
-		auto* mouse = inputManager->GetMouse();
-		auto* keyboard = inputManager->GetKeyboard();
-		const auto mouseCoord = mouse->GetMouseCoord();
-
-		CameraInput input{};
-		input.m_Front = keyboard->IsKeyHeld(KeyCode::W);
-		input.m_Back = keyboard->IsKeyHeld(KeyCode::S);
-		input.m_Left = keyboard->IsKeyHeld(KeyCode::A);
-		input.m_Right = keyboard->IsKeyHeld(KeyCode::D);
-		input.m_Up = keyboard->IsKeyHeld(KeyCode::Q);
-		input.m_Down = keyboard->IsKeyHeld(KeyCode::E);
-		input.m_Accelerate = keyboard->IsKeyHeld(KeyCode::LeftShift);
-		input.m_IsMouseRelative = mouse->GetMouseMode() == Mouse::MouseMode::Relative;
-		input.m_MouseDelta = mouseCoord;
+		auto* input = m_Services.m_Input;
+		GGLAB_ASSERT_NOT_NULL(input);
 
 		Camera& camera = m_CameraRig.GetActiveCamera();
 		CameraController& controller = m_CameraRig.GetActiveCameraController();
-		controller.Update(camera, input, deltaTime);
+		controller.Update(camera, BuildCameraInput(*input), deltaTime);
 		camera.Update();
 	}
 

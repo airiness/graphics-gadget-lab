@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "ApplicationInput.h"
 #include "GGLabTestCore/SelfTest.h"
 
 #include <cstdint>
@@ -8,6 +9,61 @@ namespace gglab
 {
 	namespace
 	{
+		void RunApplicationInputSelfTests(SelfTestContext& context) noexcept
+		{
+			ApplicationInput input;
+			context.Check(!input.IsAvailable() &&
+				!input.IsKeyHeld(AppInputKey::W) &&
+				!input.IsPointerButtonHeld(AppPointerButton::Left),
+				"Unavailable input starts as a safe all-released fallback");
+
+			ApplicationInputSnapshot pressed{};
+			pressed.m_IsAvailable = true;
+			pressed.m_KeysHeld[static_cast<size_t>(AppInputKey::W)] = true;
+			pressed.m_PointerButtonsHeld[static_cast<size_t>(AppPointerButton::Left)] = true;
+			pressed.m_PointerPosition = { 320.0f, 180.0f };
+			pressed.m_PointerDelta = { 4.0f, -2.0f };
+			pressed.m_ScrollDeltaY = 120;
+			input.Publish(pressed);
+			context.Check(input.IsAvailable() && input.IsKeyPressed(AppInputKey::W) &&
+				input.IsKeyHeld(AppInputKey::W) &&
+				input.IsPointerButtonPressed(AppPointerButton::Left) &&
+				input.GetPointerDelta().m_X == 4.0f && input.GetScrollDeltaY() == 120,
+				"Published state derives key, pointer, and scroll transitions");
+
+			input.Publish(pressed);
+			context.Check(!input.IsKeyPressed(AppInputKey::W) &&
+				input.IsKeyHeld(AppInputKey::W) &&
+				!input.IsPointerButtonPressed(AppPointerButton::Left),
+				"Held state does not repeat pressed transitions");
+
+			ApplicationInputSnapshot released = pressed;
+			released.m_KeysHeld[static_cast<size_t>(AppInputKey::W)] = false;
+			released.m_PointerButtonsHeld[static_cast<size_t>(AppPointerButton::Left)] = false;
+			input.Publish(released);
+			context.Check(input.IsKeyReleased(AppInputKey::W) &&
+				input.IsPointerButtonReleased(AppPointerButton::Left),
+				"Released transitions are derived from consecutive snapshots");
+
+			input.SetUICaptureState(true, true);
+			context.Check(input.IsKeyboardCapturedByUI() && input.IsPointerCapturedByUI(),
+				"UI capture is explicit neutral routing state");
+			input.SetPointerMode(AppPointerMode::Absolute);
+			context.Check(input.GetPointerMode() == AppPointerMode::Absolute &&
+				input.GetPointerDelta().m_X == 0.0f &&
+				input.GetPointerPosition().m_X == 320.0f,
+				"Pointer mode transition clears relative motion and preserves position");
+
+			input.Reset();
+			context.Check(!input.IsAvailable() && !input.IsKeyReleased(AppInputKey::W) &&
+				!input.IsKeyboardCapturedByUI() && !input.IsPointerCapturedByUI() &&
+				input.GetPointerMode() == AppPointerMode::Absolute,
+				"Lifecycle reset clears transient state while preserving requested pointer mode");
+			context.Check(!input.IsKeyHeld(static_cast<AppInputKey>(255)) &&
+				!input.IsPointerButtonHeld(static_cast<AppPointerButton>(255)),
+				"Invalid neutral input codes are rejected safely");
+		}
+
 		class FakeBootstrapService final : public AppRuntimeBootstrapServiceBase
 		{
 		public:
@@ -69,6 +125,7 @@ namespace gglab
 
 		void RunLifecycleSelfTests(SelfTestContext& context) noexcept
 		{
+			RunApplicationInputSelfTests(context);
 			FakeBootstrapService service(true);
 			{
 				GGLabAppRuntime runtime;

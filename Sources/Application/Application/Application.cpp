@@ -11,13 +11,12 @@
 #include "Application/Demo/DemoTypes.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
+#include "ApplicationInput.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -172,7 +171,7 @@ namespace gglab
 		}
 		if (m_RuntimeConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute)
 		{
-			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
+			m_InputManager->GetApplicationInput()->SetPointerMode(AppPointerMode::Absolute);
 		}
 
 		// ShaderManager
@@ -238,7 +237,7 @@ namespace gglab
 					.m_AssetManager = m_AssetManager.get(),
 					.m_ShaderManager = m_ShaderManager.get(),
 					.m_TaskSystem = m_TaskSystem.get(),
-					.m_InputManager = m_InputManager.get(),
+					.m_Input = m_InputManager->GetApplicationInput(),
 					.m_Time = m_Time.get(),
 					.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
 					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
@@ -356,24 +355,17 @@ namespace gglab
 			});
 		m_AssetManager->DrainLoadCompletions();
 
-		// Toggle Mouse Input Mode
-		if (const auto keyboard = GetKeyboard())
+		ApplicationInput& input = *m_InputManager->GetApplicationInput();
+		if (input.IsKeyPressed(AppInputKey::T))
 		{
-			if (keyboard->IsKeyPressed(KeyCode::T))
-			{
-				if (const auto mouse = GetMouse())
-				{
-					mouse->SetMouseMode((mouse->GetMouseMode() == Mouse::MouseMode::Absolute)
-						? Mouse::MouseMode::Relative
-						: Mouse::MouseMode::Absolute);
-				}
-			}
+			input.SetPointerMode(input.GetPointerMode() == AppPointerMode::Absolute
+				? AppPointerMode::Relative
+				: AppPointerMode::Absolute);
+		}
 
-			// Exit application when ESC pressed
-			if (keyboard->IsKeyPressed(KeyCode::Escape))
-			{
-				return false;
-			}
+		if (input.IsKeyPressed(AppInputKey::Escape))
+		{
+			return false;
 		}
 
 		const ShaderPreloadStatus shaderPreload = m_ShaderManager->GetPreloadStatus();
@@ -388,7 +380,7 @@ namespace gglab
 		// Input routing uses the previous ImGui frame's capture decision. The
 		// new UI frame starts only after the RHI transaction is Ready so a
 		// backend can synchronize a swapchain-dependent render contract first.
-		m_InputManager->SetUICaptureState(
+		input.SetUICaptureState(
 			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsKeyboardCapture(),
 			m_DevelopGuiSystem && m_DevelopGuiSystem->WantsMouseCapture());
 
@@ -635,7 +627,11 @@ namespace gglab
 
 		m_EnvironmentAssetController.reset();
 		m_ShaderManager.reset();
-		m_InputManager.reset();
+		if (m_InputManager)
+		{
+			m_InputManager->Finalize();
+			m_InputManager.reset();
+		}
 		m_Time.reset();
 		m_TaskSystem.reset();
 
@@ -649,24 +645,9 @@ namespace gglab
 		m_LifecycleState = preserveFailure ? LifecycleState::Failed : LifecycleState::Stopped;
 	}
 
-	Keyboard* Application::GetKeyboard() const noexcept
+	ApplicationInput* Application::GetInput() const noexcept
 	{
-		if (const auto input = GetInputManager())
-		{
-			return input->GetKeyboard();
-		}
-
-		return nullptr;
-	}
-
-	Mouse* Application::GetMouse() const noexcept
-	{
-		if (const auto input = GetInputManager())
-		{
-			return input->GetMouse();
-		}
-
-		return nullptr;
+		return m_InputManager ? m_InputManager->GetApplicationInput() : nullptr;
 	}
 
 	void Application::InitializeAssets() noexcept
@@ -765,10 +746,18 @@ namespace gglab
 
 	void Application::OnActive() noexcept
 	{
+		if (m_InputManager)
+		{
+			m_InputManager->OnActive();
+		}
 	}
 
 	void Application::OnInactive() noexcept
 	{
+		if (m_InputManager)
+		{
+			m_InputManager->OnInactive();
+		}
 	}
 
 	void Application::OnSuspend() noexcept
@@ -779,6 +768,10 @@ namespace gglab
 		}
 
 		m_IsSuspended = true;
+		if (m_InputManager)
+		{
+			m_InputManager->OnSuspend();
+		}
 
 		if (m_Renderer)
 		{
@@ -794,6 +787,10 @@ namespace gglab
 		}
 
 		m_IsSuspended = false;
+		if (m_InputManager)
+		{
+			m_InputManager->OnResume();
+		}
 
 		if (m_Renderer)
 		{

@@ -8,7 +8,7 @@ namespace gglab
 	class AssetManager;
 	class DebugDrawContext;
 	class EnvironmentAssetController;
-	class InputManager;
+	class ApplicationInput;
 	class Renderer;
 	class ShaderManager;
 	class TaskSystem;
@@ -20,7 +20,7 @@ namespace gglab
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		TaskSystem* m_TaskSystem = nullptr;
-		InputManager* m_InputManager = nullptr;
+		ApplicationInput* m_Input = nullptr;
 		Time* m_Time = nullptr;
 		DebugDrawContext* m_DebugDraw = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
@@ -28,7 +28,7 @@ namespace gglab
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_Renderer && m_AssetManager && m_ShaderManager && m_TaskSystem &&
-				m_InputManager && m_Time && m_DebugDraw && m_EnvironmentAssetController;
+				m_Input && m_Time && m_DebugDraw && m_EnvironmentAssetController;
 		}
 	};
 

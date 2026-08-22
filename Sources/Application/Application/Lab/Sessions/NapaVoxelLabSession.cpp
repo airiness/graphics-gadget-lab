@@ -1,9 +1,7 @@
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 
+#include "ApplicationInput.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Core/Input/InputManager.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
 #include "Core/Math/MathFunctions.h"
 #include "Graphics/Camera.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
@@ -579,27 +577,21 @@ namespace gglab
 	{
 		if (m_RuntimeState == NapaVoxelRuntimeState::Failed ||
 			m_RuntimeState == NapaVoxelRuntimeState::Exiting ||
-			!m_Services.m_InputManager)
+			!m_Services.m_Input)
 		{
 			return;
 		}
 
-		auto* keyboard = m_Services.m_InputManager->GetKeyboard();
-		auto* mouse = m_Services.m_InputManager->GetMouse();
-		if (!keyboard || !mouse)
-		{
-			return;
-		}
-
-		const bool keyboardCapturedByUI = m_Services.m_InputManager->IsKeyboardCapturedByUI();
+		const ApplicationInput& input = *m_Services.m_Input;
+		const bool keyboardCapturedByUI = input.IsKeyboardCapturedByUI();
 		if (!keyboardCapturedByUI)
 		{
-			if (keyboard->IsKeyPressed(KeyCode::B))
+			if (input.IsKeyPressed(AppInputKey::B))
 			{
 				m_ShowChunkBounds = !m_ShowChunkBounds;
 				GGLAB_UNUSED(GetMutableParameters().Set(ShowChunkBoundsId, m_ShowChunkBounds));
 			}
-			if (keyboard->IsKeyPressed(KeyCode::M))
+			if (input.IsKeyPressed(AppInputKey::M))
 			{
 				m_SurfaceMode = m_SurfaceMode == NapaVoxelSurfaceMode::Shaded
 					? NapaVoxelSurfaceMode::Wireframe
@@ -612,22 +604,22 @@ namespace gglab
 				}
 			}
 
-			if (keyboard->IsKeyPressed(KeyCode::R))
+			if (input.IsKeyPressed(AppInputKey::R))
 			{
 				GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreAll());
 			}
-			if (keyboard->IsKeyPressed(KeyCode::C) && m_ProbeChunk)
+			if (input.IsKeyPressed(AppInputKey::C) && m_ProbeChunk)
 			{
 				GGLAB_UNUSED(m_CommandQueue.EnqueueRestoreProbeChunk(*m_ProbeChunk));
 			}
-			if (keyboard->IsKeyPressed(KeyCode::Space))
+			if (input.IsKeyPressed(AppInputKey::Space))
 			{
 				GGLAB_UNUSED(m_CommandQueue.EnqueueScriptedBoundaryShot(BuildBoundaryShot()));
 			}
 		}
 
-		if (m_Services.m_InputManager->IsMouseCapturedByUI() ||
-			!mouse->IsMouseButtonPressed(MouseButton::LeftButton))
+		if (input.IsPointerCapturedByUI() ||
+			!input.IsPointerButtonPressed(AppPointerButton::Left))
 		{
 			return;
 		}
@@ -637,8 +629,8 @@ namespace gglab
 			return;
 		}
 		const bool moveProbe = !keyboardCapturedByUI &&
-			(keyboard->IsKeyHeld(KeyCode::LeftShift) ||
-				keyboard->IsKeyHeld(KeyCode::RightShift));
+			(input.IsKeyHeld(AppInputKey::LeftShift) ||
+				input.IsKeyHeld(AppInputKey::RightShift));
 		if (moveProbe)
 		{
 			GGLAB_UNUSED(m_CommandQueue.EnqueueMoveProbeRay(ray));
@@ -855,20 +847,17 @@ namespace gglab
 
 	bool NapaVoxelLabSession::BuildCursorRay(NapaVoxelRay& ray) const noexcept
 	{
-		if (!m_Services.m_InputManager || m_WindowWidth == 0 || m_WindowHeight == 0)
+		if (!m_Services.m_Input || m_WindowWidth == 0 || m_WindowHeight == 0)
 		{
 			return false;
 		}
-		const Mouse* mouse = m_Services.m_InputManager->GetMouse();
-		if (!mouse)
-		{
-			return false;
-		}
+		const ApplicationInput& input = *m_Services.m_Input;
 		Vector2 cursor(static_cast<float>(m_WindowWidth) * 0.5f,
 			static_cast<float>(m_WindowHeight) * 0.5f);
-		if (mouse->GetMouseMode() == Mouse::MouseMode::Absolute)
+		if (input.GetPointerMode() == AppPointerMode::Absolute)
 		{
-			cursor = mouse->GetMouseCoord();
+			const AppInputVector2 pointerPosition = input.GetPointerPosition();
+			cursor = Vector2(pointerPosition.m_X, pointerPosition.m_Y);
 		}
 		const float clipX = cursor.m_X / static_cast<float>(m_WindowWidth) * 2.0f - 1.0f;
 		const float clipY = 1.0f - cursor.m_Y / static_cast<float>(m_WindowHeight) * 2.0f;

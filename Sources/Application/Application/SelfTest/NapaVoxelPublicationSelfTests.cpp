@@ -4,9 +4,7 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 
-#include "Core/Input/InputManager.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
+#include "ApplicationInput.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -1644,7 +1642,7 @@ namespace gglab
 			Renderer renderer;
 			ShaderManager shaderManager(device.GetBackendType(),
 				injectedRoot / "Shaders", injectedRoot / "ShaderCache");
-			InputManager inputManager;
+			ApplicationInput input;
 			Time time;
 			NapaVoxelLabSwitchTestState state{
 				.m_Device = &device,
@@ -1658,7 +1656,7 @@ namespace gglab
 					.m_AssetManager = &assetManager,
 					.m_ShaderManager = &shaderManager,
 					.m_TaskSystem = &taskSystem,
-					.m_InputManager = &inputManager,
+					.m_Input = &input,
 					.m_Time = &time,
 					// The lifecycle-only sessions never issue DebugDraw or environment requests.
 					.m_DebugDraw = reinterpret_cast<DebugDrawContext*>(&renderer),
