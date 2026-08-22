@@ -1,6 +1,8 @@
 #pragma once
-#include "Application/ApplicationLaunchOptions.h"
+#include "AppRuntimeConfig.h"
+#include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "RuntimePaths.h"
 
 #include <cstdint>
 #include <memory>
@@ -43,10 +45,10 @@ namespace gglab
 		struct CreateInfo
 		{
 			std::wstring_view m_WindowName;
-			uint32_t m_WindowWidth = 0;
-			uint32_t m_WindowHeight = 0;
 			std::unique_ptr<PlatformHost> m_PlatformHost;
-			ApplicationLaunchOptions m_LaunchOptions{};
+			AppRuntimeConfig m_RuntimeConfig{};
+			RuntimePaths m_RuntimePaths{};
+			AppRuntimeHostServices m_HostServices{};
 		};
 
 	public:
@@ -102,7 +104,9 @@ namespace gglab
 
 		std::wstring m_WindowName;
 		std::unique_ptr<PlatformHost> m_PlatformHost;
-		ApplicationLaunchOptions m_LaunchOptions{};
+		AppRuntimeConfig m_RuntimeConfig{};
+		RuntimePaths m_RuntimePaths{};
+		AppRuntimeHostServices m_HostServices{};
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
@@ -120,7 +124,6 @@ namespace gglab
 		bool m_PlatformHostInitializationAttempted = false;
 		bool m_ShutdownComplete = false;
 		bool m_IsSuspended = false;
-		bool m_ExitAfterInitialize = false;
 		int m_ExitCode = 0;
 	};
 }

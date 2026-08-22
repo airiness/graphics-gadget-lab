@@ -22,6 +22,19 @@ namespace gglab
 		}
 
 		m_LifecycleState = AppRuntimeLifecycleState::Initializing;
+		if (!createInfo.m_Config.IsValid())
+		{
+			m_LifecycleState = AppRuntimeLifecycleState::Failed;
+			Shutdown();
+			return AppRuntimeInitializeResult::InvalidConfig;
+		}
+		if (!createInfo.m_Paths.IsValid())
+		{
+			m_LifecycleState = AppRuntimeLifecycleState::Failed;
+			Shutdown();
+			return AppRuntimeInitializeResult::InvalidRuntimePaths;
+		}
+
 		m_BootstrapService = createInfo.m_BootstrapService;
 		if (!m_BootstrapService)
 		{
@@ -31,7 +44,8 @@ namespace gglab
 		}
 
 		m_BootstrapInitializationAttempted = true;
-		if (!m_BootstrapService->Initialize())
+		if (!m_BootstrapService->Initialize(
+			createInfo.m_Config, createInfo.m_Paths, createInfo.m_HostServices))
 		{
 			m_LifecycleState = AppRuntimeLifecycleState::Failed;
 			Shutdown();

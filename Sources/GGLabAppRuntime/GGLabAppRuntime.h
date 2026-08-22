@@ -1,6 +1,9 @@
 #pragma once
 
+#include "AppRuntimeConfig.h"
+#include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "RuntimePaths.h"
 
 #include <cstdint>
 
@@ -23,6 +26,8 @@ namespace gglab
 		Succeeded,
 		AlreadyInitialized,
 		InvalidState,
+		InvalidConfig,
+		InvalidRuntimePaths,
 		MissingBootstrapService,
 		BootstrapServiceFailed,
 	};
@@ -49,12 +54,16 @@ namespace gglab
 	public:
 		virtual ~AppRuntimeBootstrapServiceBase() = default;
 
-		[[nodiscard]] virtual bool Initialize() noexcept = 0;
+		[[nodiscard]] virtual bool Initialize(const AppRuntimeConfig& config,
+			const RuntimePaths& paths, const AppRuntimeHostServices& hostServices) noexcept = 0;
 		virtual void Shutdown() noexcept = 0;
 	};
 
 	struct GGLabAppRuntimeCreateInfo
 	{
+		AppRuntimeConfig m_Config{};
+		RuntimePaths m_Paths{};
+		AppRuntimeHostServices m_HostServices{};
 		AppRuntimeBootstrapServiceBase* m_BootstrapService = nullptr;
 	};
 

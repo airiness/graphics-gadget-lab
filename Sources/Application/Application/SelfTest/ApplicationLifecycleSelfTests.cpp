@@ -5,6 +5,7 @@
 #include "Application/Platform/PlatformWindow.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <utility>
 
@@ -65,11 +66,27 @@ namespace gglab
 
 		Application::CreateInfo MakeCreateInfo(std::unique_ptr<PlatformHost> host) noexcept
 		{
+			const std::filesystem::path runtimeRoot =
+				std::filesystem::temp_directory_path() / "gglab-application-lifecycle-self-test";
 			return {
 				.m_WindowName = L"ApplicationLifecycleSelfTest",
-				.m_WindowWidth = 640,
-				.m_WindowHeight = 480,
 				.m_PlatformHost = std::move(host),
+				.m_RuntimeConfig = {
+					.m_RhiBackend = AppRuntimeRHIBackend::DX12,
+					.m_InitialExtent = { 640, 480 },
+					.m_Capabilities = AppRuntimeCapability::BuiltInContent,
+				},
+				.m_RuntimePaths = {
+					.m_RuntimeRoot = runtimeRoot,
+					.m_AssetRoot = runtimeRoot / "Assets",
+					.m_ShaderSourceRoot = runtimeRoot / "Shaders",
+					.m_ShaderCacheRoot = runtimeRoot / "ShaderCache",
+					.m_IblDerivedDataRoot = runtimeRoot / "DerivedDataCache" / "IBL",
+					.m_TextureDerivedDataRoot =
+						runtimeRoot / "DerivedDataCache" / "Texture",
+					.m_EnvironmentAssetRoot = runtimeRoot / "Assets" / "Textures" / "Skybox",
+					.m_SettingsRoot = runtimeRoot,
+				},
 			};
 		}
 	}

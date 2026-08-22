@@ -2,7 +2,6 @@
 #include "Application/ApplicationLog.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
-#include "Application/RenderingStartup.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
@@ -14,7 +13,6 @@
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
-#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
@@ -48,11 +46,30 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] RHIBackendType ToRHIBackendType(AppRuntimeRHIBackend backend) noexcept
+		{
+			switch (backend)
+			{
+			case AppRuntimeRHIBackend::DX12:
+				return RHIBackendType::DX12;
+			case AppRuntimeRHIBackend::Vulkan:
+				return RHIBackendType::Vulkan;
+			default:
+				return RHIBackendType::Unknown;
+			}
+		}
+	}
+
 	Application::Application(CreateInfo createInfo) noexcept :
-		m_WindowWidth(createInfo.m_WindowWidth), m_WindowHeight(createInfo.m_WindowHeight),
+		m_WindowWidth(createInfo.m_RuntimeConfig.m_InitialExtent.m_Width),
+		m_WindowHeight(createInfo.m_RuntimeConfig.m_InitialExtent.m_Height),
 		m_WindowName(createInfo.m_WindowName),
 		m_PlatformHost(std::move(createInfo.m_PlatformHost)),
-		m_LaunchOptions(std::move(createInfo.m_LaunchOptions))
+		m_RuntimeConfig(std::move(createInfo.m_RuntimeConfig)),
+		m_RuntimePaths(std::move(createInfo.m_RuntimePaths)),
+		m_HostServices(std::move(createInfo.m_HostServices))
 	{
 	}
 
@@ -63,8 +80,7 @@ namespace gglab
 
 	void Application::Run() noexcept
 	{
-		if (m_LifecycleState != LifecycleState::Running || !m_PlatformHost ||
-			m_ExitAfterInitialize)
+		if (m_LifecycleState != LifecycleState::Running || !m_PlatformHost)
 		{
 			return;
 		}
@@ -101,8 +117,23 @@ namespace gglab
 
 		// Logger
 		InitializeLogging();
+		if (!m_RuntimeConfig.IsValid())
+		{
+			GGLAB_LOG_ERROR("Application requires a valid host-supplied runtime config.");
+			return FailInitialization();
+		}
+		if (!m_RuntimePaths.IsValid())
+		{
+			GGLAB_LOG_ERROR("Application requires valid absolute host-supplied runtime paths.");
+			return FailInitialization();
+		}
+		if (!m_RuntimeConfig.HasCapability(AppRuntimeCapability::BuiltInContent))
+		{
+			GGLAB_LOG_ERROR("Current Application composition requires built-in content capability.");
+			return FailInitialization();
+		}
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
-			.m_WorkerLifecycle = std::make_shared<win32::Win32TaskWorkerLifecycle>(),
+			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
 			});
 
 		if (!m_PlatformHost)
@@ -127,20 +158,7 @@ namespace gglab
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
-		// The backend is resolved before the ShaderManager preload starts.
-		// Inspection and hardware qualification are explicit exit modes; a
-		// selected rendering backend continues through the normal application
-		// initialization and main loop.
-		const RHIBackendType activeBackend = m_LaunchOptions.m_RhiBackend;
-		if (m_LaunchOptions.m_ListAdapters ||
-			m_LaunchOptions.m_RunVulkanQualification)
-		{
-			m_ExitCode = RunRenderingStartupPath(
-				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
-			m_ExitAfterInitialize = true;
-			m_LifecycleState = LifecycleState::Running;
-			return true;
-		}
+		const RHIBackendType activeBackend = ToRHIBackendType(m_RuntimeConfig.m_RhiBackend);
 
 		// Time
 		m_Time = std::make_unique<Time>();
@@ -154,7 +172,7 @@ namespace gglab
 			GGLAB_LOG_WARN(
 				"Application will continue without GameInput keyboard and mouse controls.");
 		}
-		if (m_LaunchOptions.m_StartWithAbsoluteMouse)
+		if (m_RuntimeConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute)
 		{
 			m_InputManager->GetMouse()->SetMouseMode(Mouse::MouseMode::Absolute);
 		}
@@ -179,10 +197,9 @@ namespace gglab
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
-		rendererCreateInfo.m_AdapterSelector = m_LaunchOptions.m_AdapterSelector;
-#if defined(BUILD_DEBUG)
-		rendererCreateInfo.m_EnableDebugValidation = true;
-#endif
+		rendererCreateInfo.m_AdapterSelector = m_RuntimeConfig.m_AdapterSelector;
+		rendererCreateInfo.m_EnableDebugValidation =
+			m_RuntimeConfig.m_RequestRuntimeValidation;
 		if (!m_Renderer->Initialize(rendererCreateInfo))
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
@@ -204,8 +221,8 @@ namespace gglab
 			runtimeRoot / "DerivedDataCache" / "Texture";
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
-		const LabId startupLab = m_LaunchOptions.m_StartupLabId
-			? LabId(*m_LaunchOptions.m_StartupLabId)
+		const LabId startupLab = m_RuntimeConfig.m_StartupLabId
+			? LabId(*m_RuntimeConfig.m_StartupLabId)
 			: CullingLabSession::GetId();
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
@@ -251,17 +268,17 @@ namespace gglab
 		}
 		uint32_t startupDemoIndex = startIndex;
 		std::string_view startupDemoName = "Demo.Start";
-		switch (m_LaunchOptions.m_StartupDemo)
+		switch (m_RuntimeConfig.m_StartupDemo)
 		{
-		case ApplicationStartupDemo::Playground:
+		case AppRuntimeStartupDemo::Playground:
 			startupDemoIndex = playgroundIndex;
 			startupDemoName = "Demo.Playground";
 			break;
-		case ApplicationStartupDemo::LabHost:
+		case AppRuntimeStartupDemo::LabHost:
 			startupDemoIndex = labHostIndex;
 			startupDemoName = "Demo.LabHost";
 			break;
-		case ApplicationStartupDemo::Start:
+		case AppRuntimeStartupDemo::Start:
 		default:
 			break;
 		}
@@ -270,32 +287,46 @@ namespace gglab
 			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			startupDemoName, startupLab.GetName(),
-			m_LaunchOptions.m_StartWithAbsoluteMouse ? "absolute" : "relative");
+			m_RuntimeConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute
+				? "absolute"
+				: "relative");
+		GGLAB_LOG_INFO(
+			"Runtime paths: assets='{}', shaders='{}', shader_cache='{}', ibl_ddc='{}', texture_ddc='{}'.",
+			m_RuntimePaths.m_AssetRoot.string(), m_RuntimePaths.m_ShaderSourceRoot.string(),
+			m_RuntimePaths.m_ShaderCacheRoot.string(),
+			m_RuntimePaths.m_IblDerivedDataRoot.string(),
+			m_RuntimePaths.m_TextureDerivedDataRoot.string());
 
-		m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
-		const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
-			.m_Window = &mainWindow,
-			.m_RHIContext = m_Renderer->GetRHIContext(),
-		};
-		if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
+		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
-			GGLAB_LOG_WARN("Application will continue without DevelopGui.");
-			m_DevelopGuiSystem.reset();
-		}
-		else
-		{
-			m_DevelopGuiSystem->GetDevToolsRuntime().SetTaskSystem(m_TaskSystem.get());
-			m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
-				std::make_unique<LabSnapshotProvider>(
-					[runtimeLocator = m_LabRuntimeLocator.get()]() noexcept -> const LabSnapshotSourceBase*
-					{
-						return runtimeLocator ? runtimeLocator->GetLabRuntimeIfCreated() : nullptr;
-					}),
-				SnapshotUpdatePolicy::EveryFrame);
-			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
-				std::make_unique<DemoPanel>(m_DemoManager.get()));
-			m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
-				std::make_unique<LabPanel>(m_LabRuntimeLocator.get()));
+			m_DevelopGuiSystem = std::make_unique<DevelopGuiSystem>();
+			const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
+				.m_Window = &mainWindow,
+				.m_RHIContext = m_Renderer->GetRHIContext(),
+			};
+			if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
+			{
+				GGLAB_LOG_WARN("Application will continue without DevelopGui.");
+				m_DevelopGuiSystem.reset();
+			}
+			else
+			{
+				m_DevelopGuiSystem->GetDevToolsRuntime().SetTaskSystem(m_TaskSystem.get());
+				m_DevelopGuiSystem->GetDevToolsRuntime().GetDiagnostics().RegisterProvider(
+					std::make_unique<LabSnapshotProvider>(
+						[runtimeLocator = m_LabRuntimeLocator.get()]() noexcept
+							-> const LabSnapshotSourceBase*
+						{
+							return runtimeLocator
+								? runtimeLocator->GetLabRuntimeIfCreated()
+								: nullptr;
+						}),
+					SnapshotUpdatePolicy::EveryFrame);
+				m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
+					std::make_unique<DemoPanel>(m_DemoManager.get()));
+				m_DevelopGuiSystem->GetDevToolsRuntime().GetRegistry().RegisterPanel(
+					std::make_unique<LabPanel>(m_LabRuntimeLocator.get()));
+			}
 		}
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();

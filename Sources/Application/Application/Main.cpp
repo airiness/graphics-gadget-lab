@@ -1,7 +1,11 @@
 #include "Application/Application.h"
+#include "Application/ApplicationHostConfiguration.h"
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+#include "Application/RenderingStartup.h"
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -40,13 +44,29 @@ int main(int argc, char* argv[])
 	}
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
+	const gglab::RuntimePaths runtimePaths =
+		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
+	constexpr gglab::AppRuntimeExtent InitialExtent{ 1920, 1080 };
+#if defined(BUILD_DEBUG)
+	constexpr bool RequestRuntimeValidation = true;
+#else
+	constexpr bool RequestRuntimeValidation = false;
+#endif
+	if (launchResult.m_Options.m_ListAdapters ||
+		launchResult.m_Options.m_RunVulkanQualification)
+	{
+		return gglab::RunRenderingStartupPath(launchResult.m_Options, runtimePaths,
+			hInstance, RequestRuntimeValidation);
+	}
 
 	gglab::Application::CreateInfo createInfo{};
 	createInfo.m_WindowName = L"GraphicsGadgetLab";
-	createInfo.m_WindowWidth = 1920;
-	createInfo.m_WindowHeight = 1080;
 	createInfo.m_PlatformHost = std::make_unique<gglab::Win32PlatformHost>(hInstance);
-	createInfo.m_LaunchOptions = launchResult.m_Options;
+	createInfo.m_RuntimeConfig = gglab::TranslateApplicationLaunchOptions(
+		launchResult.m_Options, InitialExtent, RequestRuntimeValidation);
+	createInfo.m_RuntimePaths = runtimePaths;
+	createInfo.m_HostServices.m_TaskWorkerLifecycle =
+		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();
 
 	gglab::Application application(std::move(createInfo));
 	if (!application.Initialize())

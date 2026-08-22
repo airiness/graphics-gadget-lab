@@ -1123,6 +1123,9 @@ $appRuntimeForbiddenDependencyRegex = `
     '\bImGui\b|\bDevelopGui\w*\b|\bDXC\b|dxcapi[.]h|GetModuleFileName|' +
     'GetExecutableDirectory|GetExeOutDir|\bwin32::|\bLantern\b'
 $appRuntimeWideTextRegex = '\bwchar_t\b|\bstd::wstring(?:_view)?\b'
+$appRuntimePublicUpperIncludeRegex = `
+    '#include\s*[<"](?:Application[\\/]|Core[\\/]|Graphics[\\/]|Diagnostics[\\/]|' +
+    'DevTools[\\/]|NapaVoxelCore[\\/]|ShaderToolchain[\\/]|Compiler[\\/])'
 $napaTestsForbiddenIncludeRegex = '#include\s*[<"](?:GGLab|Application[\\/]|DevTools[\\/]|Core[\\/]|Graphics[\\/]|Diagnostics[\\/]|Sources[\\/]|Shader[\\/])'
 foreach ($itemPath in $napaTestsSourceItems) {
     $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
@@ -1187,7 +1190,34 @@ foreach ($itemPath in $appRuntimeSourceItems) {
             Reason = "portable public contract exposes unledgered wide-text API"
         })
     }
+    if ($extension -in $publicHeaderExtensions -and
+        $content -match $appRuntimePublicUpperIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "app-runtime-public-contract"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "portable public contract includes an upper first-party domain"
+        })
+    }
 }
+
+$applicationCoreContractPaths = @(
+    (Join-Path $applicationSourcesDir "Application/Application.cpp"),
+    (Join-Path $applicationSourcesDir "Application/Application.h")
+)
+$applicationCoreHostControlRegex = `
+    '\bApplicationLaunchOptions\b|\bm_ListAdapters\b|' +
+    '\bm_RunVulkanQualification\b|\bRunRenderingStartupPath\b'
+foreach ($itemPath in $applicationCoreContractPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $applicationCoreHostControlRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-host-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "ordinary Application runtime contains host-only launch control"
+        })
+    }
+}
+
 foreach ($itemPath in $foundationSourceItems) {
     $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
     if ($extension -notin $firstPartySourceExtensions) {

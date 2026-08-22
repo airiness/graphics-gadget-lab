@@ -129,6 +129,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\Application.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -260,6 +263,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp">
       <Filter>Application\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
@@ -431,6 +437,9 @@
     <ClInclude Include="..\..\Sources\Application\Application\Application.h">
       <Filter>Application</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.h">
+      <Filter>Application</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h">
       <Filter>Application</Filter>
     </ClInclude>
@@ -595,6 +604,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h">
       <Filter>Application\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.h">
       <Filter>Application\SelfTest</Filter>
