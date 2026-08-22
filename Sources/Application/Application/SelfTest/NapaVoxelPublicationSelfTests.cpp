@@ -7,7 +7,6 @@
 #include "Core/Input/InputManager.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"
-#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -17,7 +16,6 @@
 #include "Graphics/RHI/RHITransferContext.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -1633,17 +1631,19 @@ namespace gglab
 			// Close background submission before AssetManager queues its optional test textures.
 			taskSystem.Shutdown();
 			SamplerRegistry samplerRegistry({ .m_Device = &device });
+			const std::filesystem::path injectedRoot =
+				std::filesystem::temp_directory_path() / "gglab-napa-lifecycle-self-test";
 			AssetManager assetManager({
 				.m_Device = &device,
 				.m_TaskSystem = &taskSystem,
 				.m_TransferManager = &transferManager,
 				.m_AssetUploadScheduler = &scheduler,
 				.m_SamplerRegistry = &samplerRegistry,
+				.m_AssetRoot = injectedRoot / "Assets",
 				});
 			Renderer renderer;
-			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			ShaderManager shaderManager(device.GetBackendType(),
-				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
+				injectedRoot / "Shaders", injectedRoot / "ShaderCache");
 			InputManager inputManager;
 			Time time;
 			NapaVoxelLabSwitchTestState state{

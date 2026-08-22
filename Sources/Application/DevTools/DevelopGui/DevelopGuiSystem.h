@@ -7,6 +7,9 @@
 
 #include <imgui.h>
 
+#include <filesystem>
+#include <string>
+
 namespace gglab
 {
 	class DevelopGuiPlatformBackend;
@@ -30,6 +33,7 @@ namespace gglab
 		{
 			PlatformWindow* m_Window = nullptr;
 			RHIContext* m_RHIContext = nullptr;
+			std::filesystem::path m_SettingsPath;
 		};
 
 	public:
@@ -64,6 +68,7 @@ namespace gglab
 		std::unique_ptr<DevelopGuiPlatformBackend> m_PlatformBackend;
 		std::unique_ptr<DevelopGuiRenderBackend> m_RenderBackend;
 		DevToolsRuntime m_DevToolsRuntime;
+		std::string m_SettingsPath;
 		State m_State = State::Inactive;
 	};
 }

@@ -240,6 +240,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp">
+      <Filter>Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -936,6 +939,9 @@
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h">
+      <Filter>Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.h">

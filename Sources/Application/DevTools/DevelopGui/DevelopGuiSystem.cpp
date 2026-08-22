@@ -39,7 +39,8 @@ namespace gglab
 
 	bool DevelopGuiSystem::Initialize(const CreateInfo& createInfo) noexcept
 	{
-		if (m_State != State::Inactive || !createInfo.m_Window || !createInfo.m_RHIContext)
+		if (m_State != State::Inactive || !createInfo.m_Window || !createInfo.m_RHIContext ||
+			createInfo.m_SettingsPath.empty() || !createInfo.m_SettingsPath.is_absolute())
 		{
 			return false;
 		}
@@ -52,6 +53,8 @@ namespace gglab
 		}
 
 		ImGuiIO& io = ImGui::GetIO();
+		m_SettingsPath = createInfo.m_SettingsPath.string();
+		io.IniFilename = m_SettingsPath.c_str();
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		ImGui::StyleColorsDark();
@@ -73,6 +76,7 @@ namespace gglab
 			m_RenderBackend.reset();
 			m_PlatformBackend.reset();
 			ImGui::DestroyContext();
+			m_SettingsPath.clear();
 			return false;
 		}
 
@@ -104,6 +108,7 @@ namespace gglab
 		}
 
 		ImGui::DestroyContext();
+		m_SettingsPath.clear();
 		m_State = State::Inactive;
 	}
 

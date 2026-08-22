@@ -1,4 +1,5 @@
 #include "Graphics/Asset/AssetManager.h"
+#include "Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -121,6 +122,7 @@ namespace gglab
 	AssetManager::AssetManager(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device), m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
+		m_AssetRoot(createInfo.m_AssetRoot),
 		m_TextureArtifactCache(createInfo.m_TextureArtifactCache),
 		m_ModelImportArtifactCache(createInfo.m_ModelImportArtifactCache),
 		m_AssetLoadCoordinator({
@@ -136,6 +138,7 @@ namespace gglab
 				.m_AssetUploadScheduler = createInfo.m_AssetUploadScheduler,
 				.m_StateEvents = &m_AssetStateEventQueue,
 				.m_ArtifactCache = &m_TextureArtifactCache,
+				.m_AssetRoot = createInfo.m_AssetRoot,
 				})),
 				m_SamplerRegistry(createInfo.m_SamplerRegistry),
 				m_MaterialTextureSampling(createInfo.m_MaterialTextureSampling)
@@ -144,6 +147,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_TransferManager != nullptr, "TransferManager is null!");
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_SamplerRegistry != nullptr, "SamplerRegistry is null!");
+		GGLAB_ASSERT_MSG(!m_AssetRoot.empty() && m_AssetRoot.is_absolute(),
+			"AssetManager requires an absolute asset root.");
 		m_TextureAssets->InitializeReservedTextures();
 	}
 
@@ -1401,7 +1406,13 @@ namespace gglab
 			return {};
 		}
 
-		const auto canonicalPath = utils::Canonical(path);
+		const auto canonicalPath = ResolveAssetPath(m_AssetRoot, path);
+		if (canonicalPath.empty())
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"AssetManager::LoadModelAsync rejected a path outside the injected asset root.");
+			return {};
+		}
 		std::error_code errorCode;
 		if (!std::filesystem::exists(canonicalPath, errorCode) ||
 			!std::filesystem::is_regular_file(canonicalPath, errorCode))
@@ -1468,8 +1479,9 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_WARN("AssetManager rejected texture loading after shutdown began.");
 			return {};
 		}
+		const std::filesystem::path resolvedPath = ResolveAssetPath(m_AssetRoot, path);
 		const TextureAssetSystem::TextureLoadRequest systemRequest =
-			m_TextureAssets->LoadTextureAsync(path, semantic, priority);
+			m_TextureAssets->LoadTextureAsync(resolvedPath, semantic, priority);
 		TextureLoadRequest request{
 			.m_TextureId = systemRequest.m_TextureId,
 			.m_Generation = systemRequest.m_Generation,

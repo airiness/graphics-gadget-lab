@@ -1,7 +1,5 @@
 #include "Application/Platform/Windows/Win32PlatformHost.h"
 
-#include <Shlwapi.h>
-
 namespace gglab
 {
 	Win32PlatformHost::Win32PlatformHost(HINSTANCE instance) noexcept :
@@ -13,13 +11,6 @@ namespace gglab
 		if (m_IsInitialized)
 		{
 			return false;
-		}
-
-		WCHAR executablePath[MAX_PATH]{};
-		if (GetModuleFileNameW(nullptr, executablePath, MAX_PATH) > 0)
-		{
-			PathRemoveFileSpecW(executablePath);
-			SetCurrentDirectoryW(executablePath);
 		}
 
 		m_QuitRequested = false;

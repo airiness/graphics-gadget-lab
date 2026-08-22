@@ -1,5 +1,7 @@
 #include "AssetDataSelfTests.h"
 #include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabFoundation/IO/PathUtils.h"
+#include "Graphics/Asset/AssetPaths.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
@@ -1077,6 +1079,25 @@ namespace gglab
 				RHITextureValidationError::UnsupportedUploadFormat,
 				"RHI texture upload validation explicitly rejects unsupported multi-plane data");
 		}
+
+		void RunAssetPathTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path assetRoot =
+				std::filesystem::temp_directory_path() / "gglab-asset-path-self-test" / "Assets";
+			const std::filesystem::path expected =
+				utils::Canonical(assetRoot / "Textures" / "UVTest1K.png");
+			context.Check(ResolveAssetPath(
+				assetRoot, "Assets/Textures/UVTest1K.png") == expected,
+				"Injected asset root preserves the legacy Assets logical prefix");
+			context.Check(ResolveAssetPath(assetRoot, "Textures/UVTest1K.png") == expected,
+				"Injected asset root resolves root-relative content identities");
+			const std::filesystem::path external =
+				utils::Canonical(std::filesystem::temp_directory_path() / "external-texture.png");
+			context.Check(ResolveAssetPath(assetRoot, external) == external,
+				"Explicit absolute asset paths remain externally addressable");
+			context.Check(ResolveAssetPath(assetRoot, "../outside.png").empty(),
+				"Relative asset paths cannot escape the injected root");
+		}
 	}
 
 	void RunAssetDataSelfTests(SelfTestContext& context) noexcept
@@ -1089,5 +1110,6 @@ namespace gglab
 		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
 		RunRHITextureValidationTests(context);
+		RunAssetPathTests(context);
 	}
 }

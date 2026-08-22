@@ -1218,6 +1218,37 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$pathDiscoveryAllowed = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+foreach ($allowedPath in @(
+        (Join-Path $applicationSourcesDir "Application/Main.cpp"),
+        (Join-Path $applicationSourcesDir "Application/Platform/Windows/Win32PathUtils.cpp"),
+        (Join-Path $applicationSourcesDir "Application/Platform/Windows/Win32PathUtils.h"))) {
+    [void]$pathDiscoveryAllowed.Add([System.IO.Path]::GetFullPath($allowedPath))
+}
+foreach ($itemPath in $applicationSourceItems) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bSetCurrentDirectory(?:A|W)?\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-runtime-paths"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "Application mutates the process current working directory"
+        })
+    }
+    if ($content -match '\bGetExecutableDirectory\b' -and
+        -not $pathDiscoveryAllowed.Contains([System.IO.Path]::GetFullPath($itemPath))) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-runtime-paths"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "executable-directory discovery escaped the Windows composition root"
+        })
+    }
+}
 foreach ($itemPath in $foundationSourceItems) {
     $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
     if ($extension -notin $firstPartySourceExtensions) {

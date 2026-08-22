@@ -84,6 +84,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.cpp" />
@@ -453,6 +454,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBase.h" />

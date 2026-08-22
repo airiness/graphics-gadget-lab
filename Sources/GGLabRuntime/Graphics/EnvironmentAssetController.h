@@ -36,6 +36,7 @@ namespace gglab
 		{
 			AssetManager* m_AssetManager = nullptr;
 			EnvironmentLightingSystem* m_EnvironmentLighting = nullptr;
+			std::filesystem::path m_AssetRoot;
 		};
 
 		explicit EnvironmentAssetController(const CreateInfo& createInfo) noexcept;
@@ -83,6 +84,7 @@ namespace gglab
 
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentLightingSystem* m_EnvironmentLighting = nullptr;
+		std::filesystem::path m_AssetRoot;
 		std::vector<EnvironmentMapEntry> m_Entries;
 		AssetOwnerScope m_ActiveOwner;
 		AssetOwnerScope m_PendingOwner;

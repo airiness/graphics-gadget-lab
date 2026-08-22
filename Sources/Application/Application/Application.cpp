@@ -12,7 +12,6 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
 #include "Application/LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Core/Time.h"
 #include "Core/Profiling/CpuProfiler.h"
@@ -26,7 +25,6 @@
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
@@ -178,11 +176,8 @@ namespace gglab
 		}
 
 		// ShaderManager
-		const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
-		const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
-		const std::filesystem::path shaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot);
 		m_ShaderManager = std::make_unique<ShaderManager>(
-			activeBackend, shaderSourceRoot, shaderCacheRoot);
+			activeBackend, m_RuntimePaths.m_ShaderSourceRoot, m_RuntimePaths.m_ShaderCacheRoot);
 		InitializeAssets();
 
 		// Renderer
@@ -192,8 +187,8 @@ namespace gglab
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_IblDerivedDataCacheDirectory =
-			runtimeRoot / "DerivedDataCache" / "IBL";
-		rendererCreateInfo.m_ShaderSourceRoot = shaderSourceRoot;
+			m_RuntimePaths.m_IblDerivedDataRoot;
+		rendererCreateInfo.m_ShaderSourceRoot = m_RuntimePaths.m_ShaderSourceRoot;
 		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
@@ -218,7 +213,8 @@ namespace gglab
 		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
 		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
 		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
-			runtimeRoot / "DerivedDataCache" / "Texture";
+			m_RuntimePaths.m_TextureDerivedDataRoot;
+		assetManagerCreateInfo.m_AssetRoot = m_RuntimePaths.m_AssetRoot;
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
 		const LabId startupLab = m_RuntimeConfig.m_StartupLabId
@@ -228,8 +224,9 @@ namespace gglab
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
+				.m_AssetRoot = m_RuntimePaths.m_AssetRoot,
 				});
-		m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
+		m_EnvironmentAssetController->Initialize(m_RuntimePaths.m_EnvironmentAssetRoot);
 
 		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
@@ -303,6 +300,7 @@ namespace gglab
 			const DevelopGuiSystem::CreateInfo developGuiCreateInfo{
 				.m_Window = &mainWindow,
 				.m_RHIContext = m_Renderer->GetRHIContext(),
+				.m_SettingsPath = m_RuntimePaths.m_SettingsRoot / "imgui.ini",
 			};
 			if (!m_DevelopGuiSystem->Initialize(developGuiCreateInfo))
 			{

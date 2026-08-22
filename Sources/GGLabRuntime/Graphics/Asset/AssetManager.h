@@ -106,6 +106,7 @@ namespace gglab
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 			TextureArtifactCacheConfig m_TextureArtifactCache{};
 			ModelImportArtifactCacheConfig m_ModelImportArtifactCache{};
+			std::filesystem::path m_AssetRoot;
 			std::filesystem::path m_TextureDerivedDataCacheDirectory;
 		};
 
@@ -332,6 +333,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		std::filesystem::path m_AssetRoot;
 		TextureArtifactCache m_TextureArtifactCache;
 		ModelImportArtifactCache m_ModelImportArtifactCache;
 		AssetLoadCoordinator m_AssetLoadCoordinator;
