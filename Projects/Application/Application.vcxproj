@@ -153,11 +153,14 @@
       <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -262,6 +265,8 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Tooling\ApplicationToolingComposition.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.h" />
@@ -269,6 +274,7 @@
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationContentRegistrationSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationInputSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

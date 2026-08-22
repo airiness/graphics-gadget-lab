@@ -1,17 +1,14 @@
 #include "Application/Application.h"
 #include "Application/ApplicationLog.h"
+#include "Application/Content/ApplicationContentRegistration.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
-#include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
 #include "Application/Demo/DemoManager.h"
-#include "Application/Demo/DemoPlayground.h"
-#include "Application/Demo/StartDemo.h"
 #include "Application/Demo/DemoTypes.h"
-#include "Application/Lab/Sessions/CullingLabSession.h"
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
 #include "LoadingProgress.h"
@@ -63,7 +60,8 @@ namespace gglab
 		m_PlatformHost(std::move(createInfo.m_PlatformHost)),
 		m_RuntimeConfig(std::move(createInfo.m_RuntimeConfig)),
 		m_RuntimePaths(std::move(createInfo.m_RuntimePaths)),
-		m_HostServices(std::move(createInfo.m_HostServices))
+		m_HostServices(std::move(createInfo.m_HostServices)),
+		m_ContentRegistration(std::move(createInfo.m_ContentRegistration))
 	{
 	}
 
@@ -121,9 +119,9 @@ namespace gglab
 			GGLAB_LOG_ERROR("Application requires valid absolute host-supplied runtime paths.");
 			return FailInitialization();
 		}
-		if (!m_RuntimeConfig.HasCapability(AppRuntimeCapability::BuiltInContent))
+		if (!m_ContentRegistration.IsValid())
 		{
-			GGLAB_LOG_ERROR("Current Application composition requires built-in content capability.");
+			GGLAB_LOG_ERROR("Application requires valid host-selected content registrations.");
 			return FailInitialization();
 		}
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
@@ -214,9 +212,20 @@ namespace gglab
 		assetManagerCreateInfo.m_AssetRoot = m_RuntimePaths.m_AssetRoot;
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
 		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
-		const LabId startupLab = m_RuntimeConfig.m_StartupLabId
-			? LabId(*m_RuntimeConfig.m_StartupLabId)
-			: CullingLabSession::GetId();
+		std::optional<std::string_view> startupLabId;
+		if (m_RuntimeConfig.m_StartupLabId)
+		{
+			startupLabId = *m_RuntimeConfig.m_StartupLabId;
+		}
+		const ApplicationContentSelection contentSelection =
+			ResolveApplicationContentSelection(
+				m_ContentRegistration, m_RuntimeConfig.m_StartupDemoId, startupLabId);
+		if (!contentSelection.Succeeded())
+		{
+			GGLAB_LOG_ERROR("Host-selected startup content is unavailable (status={}).",
+				static_cast<uint32_t>(contentSelection.m_Status));
+			return FailInitialization();
+		}
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
@@ -244,43 +253,45 @@ namespace gglab
 			.m_WindowHeight = m_WindowHeight,
 		};
 		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
-		const uint32_t startIndex = m_DemoManager->RegisterDemo("Demo.Start",
-			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
-			{ return std::make_unique<StartDemo>(demoCreateInfo); });
-		const uint32_t playgroundIndex = m_DemoManager->RegisterDemo("Demo.Playground",
-			[demoCreateInfo]() noexcept -> std::unique_ptr<DemoBase>
-			{ return std::make_unique<DemoPlayground>(demoCreateInfo); });
-		const uint32_t labHostIndex = m_DemoManager->RegisterDemo("Demo.LabHost",
-			[demoCreateInfo, startupLab]() noexcept -> std::unique_ptr<DemoBase>
-			{ return std::make_unique<DemoLabHost>(demoCreateInfo, startupLab); });
-		if (startIndex >= m_DemoManager->GetDemoCount() ||
-			playgroundIndex >= m_DemoManager->GetDemoCount() ||
-			labHostIndex >= m_DemoManager->GetDemoCount())
+		const std::span<const LabRegistration> labRegistrations = m_ContentRegistration.m_Labs;
+		std::optional<uint32_t> startupDemoIndex;
+		std::optional<uint32_t> labHostIndex;
+		for (const ApplicationDemoRegistration& registration : m_ContentRegistration.m_Demos)
 		{
-			GGLAB_LOG_ERROR("Failed to register startup demos.");
+			const uint32_t registeredIndex = m_DemoManager->RegisterDemo(registration.m_Id,
+				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations,
+					factory = registration.m_Factory]() noexcept -> std::unique_ptr<DemoBase>
+				{ return factory(demoCreateInfo, startupLab, labRegistrations); });
+			if (registeredIndex >= m_DemoManager->GetDemoCount())
+			{
+				GGLAB_LOG_ERROR("Failed to register demo '{}'.", registration.m_Id);
+				return FailInitialization();
+			}
+			if (&registration == contentSelection.m_StartupDemo)
+			{
+				startupDemoIndex = registeredIndex;
+			}
+			if (registration.m_ProvidesLabRuntime)
+			{
+				labHostIndex = registeredIndex;
+			}
+		}
+		if (!startupDemoIndex)
+		{
+			GGLAB_LOG_ERROR("Failed to resolve the registered startup demo.");
 			return FailInitialization();
 		}
-		uint32_t startupDemoIndex = startIndex;
-		std::string_view startupDemoName = "Demo.Start";
-		switch (m_RuntimeConfig.m_StartupDemo)
+		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
+		if (labHostIndex)
 		{
-		case AppRuntimeStartupDemo::Playground:
-			startupDemoIndex = playgroundIndex;
-			startupDemoName = "Demo.Playground";
-			break;
-		case AppRuntimeStartupDemo::LabHost:
-			startupDemoIndex = labHostIndex;
-			startupDemoName = "Demo.LabHost";
-			break;
-		case AppRuntimeStartupDemo::Start:
-		default:
-			break;
+			m_LabRuntimeLocator =
+				std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), *labHostIndex);
 		}
-		m_DemoManager->RequestActiveDemo(startupDemoIndex);
-		m_LabRuntimeLocator =
-			std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), labHostIndex);
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
-			startupDemoName, startupLab.GetName(),
+			m_RuntimeConfig.m_StartupDemoId,
+			contentSelection.m_StartupLab.IsValid()
+				? contentSelection.m_StartupLab.GetName()
+				: std::string_view("none"),
 			m_RuntimeConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute
 				? "absolute"
 				: "relative");

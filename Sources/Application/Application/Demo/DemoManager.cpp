@@ -86,6 +86,12 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR("DemoManager: cannot register an invalid demo slot.");
 			return InvalidDemoIndex;
 		}
+		if (std::ranges::any_of(m_DemoSlots,
+			[&name](const DemoSlot& slot) noexcept { return slot.m_Name == name; }))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DemoManager: demo '{}' is already registered.", name);
+			return InvalidDemoIndex;
+		}
 
 		const uint32_t registeredIndex = static_cast<uint32_t>(m_DemoSlots.size());
 		m_DemoSlots.push_back({

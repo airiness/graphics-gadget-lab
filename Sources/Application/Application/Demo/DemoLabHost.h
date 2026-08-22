@@ -2,12 +2,15 @@
 #include "Application/Demo/DemoBase.h"
 #include "Application/Lab/LabRuntime.h"
 
+#include <span>
+
 namespace gglab
 {
 	class DemoLabHost final : public DemoBase
 	{
 	public:
-		DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab) noexcept;
+		DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab,
+			std::span<const LabRegistration> labRegistrations) noexcept;
 		~DemoLabHost() override = default;
 
 		std::string_view GetName() const noexcept override { return "Demo.LabHost"; }
@@ -42,10 +45,15 @@ namespace gglab
 
 		LabRuntime& GetLabRuntime() noexcept { return m_Runtime; }
 		const LabRuntime& GetLabRuntime() const noexcept { return m_Runtime; }
-		bool IsValid() const noexcept { return m_StartupLab.IsValid(); }
+		bool IsValid() const noexcept
+		{
+			return m_RegistrationsValid && m_StartupLab.IsValid() &&
+				m_Runtime.GetCatalog().Find(m_StartupLab);
+		}
 
 	private:
 		LabId m_StartupLab;
 		LabRuntime m_Runtime;
+		bool m_RegistrationsValid = true;
 	};
 }

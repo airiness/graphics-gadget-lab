@@ -1,5 +1,6 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/SelfTest/ApplicationHostConfigurationSelfTests.h"
+#include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/ApplicationInputSelfTests.h"
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
@@ -24,6 +25,10 @@ namespace gglab
 	namespace
 	{
 		constexpr std::array RegisteredSuites{
+			SelfTestSuiteDesc{
+				.m_Id = "app-content-registration",
+				.m_Run = &RunApplicationContentRegistrationSelfTests,
+			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-input",
 				.m_Run = &RunApplicationInputSelfTests,

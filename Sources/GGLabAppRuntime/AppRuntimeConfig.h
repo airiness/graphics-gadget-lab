@@ -13,13 +13,6 @@ namespace gglab
 		Vulkan,
 	};
 
-	enum class AppRuntimeStartupDemo : uint8_t
-	{
-		Start,
-		Playground,
-		LabHost,
-	};
-
 	enum class AppRuntimePointerMode : uint8_t
 	{
 		Relative,
@@ -29,8 +22,7 @@ namespace gglab
 	enum class AppRuntimeCapability : uint32_t
 	{
 		None = 0,
-		BuiltInContent = 1u << 0,
-		DevelopmentTools = 1u << 1,
+		DevelopmentTools = 1u << 0,
 	};
 
 	[[nodiscard]] constexpr AppRuntimeCapability operator|(
@@ -50,7 +42,7 @@ namespace gglab
 	{
 		AppRuntimeRHIBackend m_RhiBackend = AppRuntimeRHIBackend::Unknown;
 		std::optional<std::string> m_AdapterSelector;
-		AppRuntimeStartupDemo m_StartupDemo = AppRuntimeStartupDemo::Start;
+		std::string m_StartupDemoId;
 		std::optional<std::string> m_StartupLabId;
 		AppRuntimeExtent m_InitialExtent{};
 		AppRuntimePointerMode m_InitialPointerMode = AppRuntimePointerMode::Relative;

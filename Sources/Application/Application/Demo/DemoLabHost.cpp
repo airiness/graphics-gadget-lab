@@ -1,25 +1,10 @@
 #include "Application/Demo/DemoLabHost.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Application/Lab/Sessions/AssetPublicationLabSession.h"
-#include "Application/Lab/Sessions/AssetResidencyLabSession.h"
-#include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
-#include "Application/Lab/Sessions/ForwardPlusLabSession.h"
-#include "Application/Lab/Sessions/GTAOLabSession.h"
-#include "Application/Lab/Sessions/AlphaTestLabSession.h"
-#include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
-#include "Application/Lab/Sessions/MathFoundationLabSession.h"
-#include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
-#include "Application/Lab/Sessions/NapaVoxelLabSession.h"
-#include "Application/Lab/Sessions/PostProcessLabSession.h"
-#include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
-#include "Application/Lab/Sessions/SampleableDepthLabSession.h"
-#include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
-#include "Application/Lab/Sessions/TaskSystemLabSession.h"
 
 namespace gglab
 {
-	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab) noexcept :
+	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab,
+		std::span<const LabRegistration> labRegistrations) noexcept :
 		m_StartupLab(startupLab),
 		m_Runtime({
 			.m_Services = createInfo.m_Services,
@@ -27,78 +12,11 @@ namespace gglab
 			.m_WindowHeight = createInfo.m_WindowHeight,
 			})
 	{
-		const bool registered =
-			m_Runtime.RegisterLab(CullingLabSession::GetDescriptor(), &CullingLabSession::Create);
-		GGLAB_ASSERT_MSG(registered, "Failed to register the Culling Lab session.");
-
-		const bool miniPbrRegistered = m_Runtime.RegisterLab(
-			MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create);
-		GGLAB_ASSERT_MSG(miniPbrRegistered, "Failed to register the Mini PBR Grid Lab session.");
-
-		const bool postProcessRegistered = m_Runtime.RegisterLab(
-			PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create);
-		GGLAB_ASSERT_MSG(postProcessRegistered, "Failed to register the Post Process Lab session.");
-
-		const bool renderGraphComputeRegistered = m_Runtime.RegisterLab(
-			RenderGraphComputeLabSession::GetDescriptor(), &RenderGraphComputeLabSession::Create);
-		GGLAB_ASSERT_MSG(renderGraphComputeRegistered,
-			"Failed to register the RenderGraph Compute Lab session.");
-
-		const bool coordinateConformanceRegistered = m_Runtime.RegisterLab(
-			CoordinateConformanceLabSession::GetDescriptor(),
-			&CoordinateConformanceLabSession::Create);
-		GGLAB_ASSERT_MSG(coordinateConformanceRegistered,
-			"Failed to register the Coordinate Conformance Lab session.");
-
-		const bool sampleableDepthRegistered = m_Runtime.RegisterLab(
-			SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			sampleableDepthRegistered, "Failed to register the Sampleable Depth Lab session.");
-
-		const bool surfaceProbeRegistered = m_Runtime.RegisterLab(
-			SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			surfaceProbeRegistered, "Failed to register the Surface Probe Lab session.");
-
-		const bool gtaoRegistered =
-			m_Runtime.RegisterLab(GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create);
-		GGLAB_ASSERT_MSG(gtaoRegistered, "Failed to register the GTAO Lab session.");
-
-		const bool forwardPlusRegistered = m_Runtime.RegisterLab(
-			ForwardPlusLabSession::GetDescriptor(), &ForwardPlusLabSession::Create);
-		GGLAB_ASSERT_MSG(forwardPlusRegistered, "Failed to register the Forward+ Lab session.");
-
-		const bool alphaTestRegistered = m_Runtime.RegisterLab(
-			AlphaTestLabSession::GetDescriptor(), &AlphaTestLabSession::Create);
-		GGLAB_ASSERT_MSG(alphaTestRegistered, "Failed to register the Alpha Test Lab session.");
-
-		const bool mathFoundationRegistered = m_Runtime.RegisterLab(
-			MathFoundationLabSession::GetDescriptor(), &MathFoundationLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			mathFoundationRegistered, "Failed to register the Math Foundation Lab session.");
-
-		const bool taskSystemRegistered = m_Runtime.RegisterLab(
-			TaskSystemLabSession::GetDescriptor(), &TaskSystemLabSession::Create);
-		GGLAB_ASSERT_MSG(taskSystemRegistered, "Failed to register the Task System Lab session.");
-
-		const bool assetPublicationRegistered = m_Runtime.RegisterLab(
-			AssetPublicationLabSession::GetDescriptor(), &AssetPublicationLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			assetPublicationRegistered, "Failed to register the Asset Publication Lab session.");
-
-		const bool assetResidencyRegistered = m_Runtime.RegisterLab(
-			AssetResidencyLabSession::GetDescriptor(), &AssetResidencyLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			assetResidencyRegistered, "Failed to register the Asset Residency Lab session.");
-
-		const bool environmentAssetRegistered = m_Runtime.RegisterLab(
-			EnvironmentAssetLabSession::GetDescriptor(), &EnvironmentAssetLabSession::Create);
-		GGLAB_ASSERT_MSG(
-			environmentAssetRegistered, "Failed to register the Environment Asset Lab session.");
-
-		const bool napaVoxelRegistered = m_Runtime.RegisterLab(
-			NapaVoxelLabSession::GetDescriptor(), &NapaVoxelLabSession::Create);
-		GGLAB_ASSERT_MSG(napaVoxelRegistered, "Failed to register the Napa Voxel Lab session.");
+		for (const LabRegistration& registration : labRegistrations)
+		{
+			m_RegistrationsValid = m_Runtime.RegisterLab(
+				registration.m_Descriptor, registration.m_Factory) && m_RegistrationsValid;
+		}
 	}
 
 	void DemoLabHost::BeginPrepare() noexcept

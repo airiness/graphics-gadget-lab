@@ -1,4 +1,5 @@
 #include "Application/ApplicationHostConfiguration.h"
+#include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/Shader/ShaderPaths.h"
 
@@ -22,30 +23,29 @@ namespace gglab
 			break;
 		}
 		config.m_AdapterSelector = options.m_AdapterSelector;
-		config.m_StartupLabId = options.m_StartupLabId;
+		config.m_StartupLabId =
+			options.m_StartupLabId.value_or(std::string(DesktopDefaultLabId));
 		config.m_InitialExtent = initialExtent;
 		config.m_InitialPointerMode = options.m_StartWithAbsoluteMouse
 			? AppRuntimePointerMode::Absolute
 			: AppRuntimePointerMode::Relative;
-		config.m_Capabilities = AppRuntimeCapability::BuiltInContent;
 		if (!options.m_DisableDevelopmentTools)
 		{
-			config.m_Capabilities =
-				config.m_Capabilities | AppRuntimeCapability::DevelopmentTools;
+			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;
 		}
 		config.m_RequestRuntimeValidation = requestRuntimeValidation;
 
 		switch (options.m_StartupDemo)
 		{
 		case ApplicationStartupDemo::Playground:
-			config.m_StartupDemo = AppRuntimeStartupDemo::Playground;
+			config.m_StartupDemoId = DesktopPlaygroundDemoId;
 			break;
 		case ApplicationStartupDemo::LabHost:
-			config.m_StartupDemo = AppRuntimeStartupDemo::LabHost;
+			config.m_StartupDemoId = DesktopLabHostDemoId;
 			break;
 		case ApplicationStartupDemo::Start:
 		default:
-			config.m_StartupDemo = AppRuntimeStartupDemo::Start;
+			config.m_StartupDemoId = DesktopStartDemoId;
 			break;
 		}
 		return config;

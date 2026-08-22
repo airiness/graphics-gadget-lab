@@ -1218,6 +1218,33 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$applicationContentFrameworkPaths = @(
+	(Join-Path $applicationSourcesDir "Application/Application.cpp"),
+	(Join-Path $applicationSourcesDir "Application/Demo/DemoLabHost.cpp")
+)
+$applicationConcreteContentRegex =
+	'#include\s*[<"]Application[\\/]Lab[\\/]Sessions[\\/]'
+foreach ($itemPath in $applicationContentFrameworkPaths) {
+	$content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+	if ($content -match $applicationConcreteContentRegex) {
+		$projectContractFindings.Add([pscustomobject]@{
+			Rule   = "application-content-registration-boundary"
+			Target = ConvertTo-RepoRelativePath $itemPath
+			Reason = "shared Application framework depends on concrete Demo/Lab content"
+		})
+	}
+}
+$applicationConcreteDemoRegex =
+	'#include\s*[<"]Application[\\/]Demo[\\/](?:DemoLabHost|DemoPlayground|StartDemo)[.]h'
+$applicationCoreContent = Get-Content -LiteralPath $applicationCoreContractPaths[0] -Raw -ErrorAction Stop
+if ($applicationCoreContent -match $applicationConcreteDemoRegex) {
+	$projectContractFindings.Add([pscustomobject]@{
+		Rule   = "application-content-registration-boundary"
+		Target = ConvertTo-RepoRelativePath $applicationCoreContractPaths[0]
+		Reason = "shared Application orchestration depends on a concrete Demo implementation"
+	})
+}
+
 $applicationToolingBoundaryRegex =
     '#include\s*[<"]DevTools[\\/]|\bDevelopGuiSystem\b|\bDevelopGuiContext\b|\bImGui\w*\b'
 foreach ($itemPath in $applicationCoreContractPaths) {

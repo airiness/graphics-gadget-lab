@@ -19,7 +19,7 @@ namespace gglab
 			options, { 1920, 1080 }, true);
 		context.Check(config.IsValid() && config.m_RhiBackend == AppRuntimeRHIBackend::Vulkan &&
 			config.m_AdapterSelector == "0" &&
-			config.m_StartupDemo == AppRuntimeStartupDemo::LabHost &&
+			config.m_StartupDemoId == "Demo.LabHost" &&
 			config.m_StartupLabId == "gglab.lab.culling",
 			"Windows launch policy translates backend, adapter, demo, and Lab identity explicitly");
 		context.Check(config.m_InitialExtent.m_Width == 1920 &&
@@ -27,16 +27,19 @@ namespace gglab
 			config.m_InitialPointerMode == AppRuntimePointerMode::Absolute &&
 			config.m_RequestRuntimeValidation,
 			"Host translation carries extent, pointer mode, and validation request explicitly");
-		context.Check(config.HasCapability(AppRuntimeCapability::BuiltInContent) &&
-			config.HasCapability(AppRuntimeCapability::DevelopmentTools),
-			"Host selects current content and tooling capabilities explicitly");
+		context.Check(config.HasCapability(AppRuntimeCapability::DevelopmentTools),
+			"Host selects optional development tooling explicitly");
 		ApplicationLaunchOptions noToolingOptions = options;
 		noToolingOptions.m_DisableDevelopmentTools = true;
 		const AppRuntimeConfig noToolingConfig = TranslateApplicationLaunchOptions(
 			noToolingOptions, { 1920, 1080 }, true);
-		context.Check(noToolingConfig.HasCapability(AppRuntimeCapability::BuiltInContent) &&
-			!noToolingConfig.HasCapability(AppRuntimeCapability::DevelopmentTools),
-			"Host can omit optional development tooling without disabling built-in content");
+		context.Check(!noToolingConfig.HasCapability(AppRuntimeCapability::DevelopmentTools),
+			"Host can omit optional development tooling");
+		const AppRuntimeConfig defaultContentConfig = TranslateApplicationLaunchOptions(
+			ApplicationLaunchOptions{}, { 1920, 1080 }, true);
+		context.Check(defaultContentConfig.m_StartupDemoId == "Demo.Start" &&
+			defaultContentConfig.m_StartupLabId == "gglab.lab.culling",
+			"Windows host policy supplies explicit stable default Demo and Lab identities");
 
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";

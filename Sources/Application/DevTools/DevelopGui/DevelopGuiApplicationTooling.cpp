@@ -32,7 +32,7 @@ namespace gglab
 				const ApplicationToolingCompositionCreateInfo& createInfo) noexcept
 			{
 				if (!createInfo.m_Window || !createInfo.m_RHIContext ||
-					!createInfo.m_DemoManager || !createInfo.m_LabRuntimeLocator ||
+					!createInfo.m_DemoManager ||
 					!m_System.Initialize({
 						.m_Window = createInfo.m_Window,
 						.m_RHIContext = createInfo.m_RHIContext,
@@ -44,20 +44,19 @@ namespace gglab
 
 				auto& runtime = m_System.GetDevToolsRuntime();
 				runtime.SetTaskSystem(createInfo.m_TaskSystem);
-				runtime.GetDiagnostics().RegisterProvider(
-					std::make_unique<LabSnapshotProvider>(
-						[runtimeLocator = createInfo.m_LabRuntimeLocator]() noexcept
-							-> const LabSnapshotSourceBase*
-						{
-							return runtimeLocator
-								? runtimeLocator->GetLabRuntimeIfCreated()
-								: nullptr;
-						}),
-					SnapshotUpdatePolicy::EveryFrame);
 				runtime.GetRegistry().RegisterPanel(
 					std::make_unique<DemoPanel>(createInfo.m_DemoManager));
-				runtime.GetRegistry().RegisterPanel(
-					std::make_unique<LabPanel>(createInfo.m_LabRuntimeLocator));
+				if (createInfo.m_LabRuntimeLocator)
+				{
+					runtime.GetDiagnostics().RegisterProvider(
+						std::make_unique<LabSnapshotProvider>(
+							[runtimeLocator = createInfo.m_LabRuntimeLocator]() noexcept
+								-> const LabSnapshotSourceBase*
+							{ return runtimeLocator->GetLabRuntimeIfCreated(); }),
+						SnapshotUpdatePolicy::EveryFrame);
+					runtime.GetRegistry().RegisterPanel(
+						std::make_unique<LabPanel>(createInfo.m_LabRuntimeLocator));
+				}
 				return true;
 			}
 

@@ -1,6 +1,7 @@
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 
 #include "Application/Application.h"
+#include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 
@@ -73,8 +74,8 @@ namespace gglab
 				.m_PlatformHost = std::move(host),
 				.m_RuntimeConfig = {
 					.m_RhiBackend = AppRuntimeRHIBackend::DX12,
+					.m_StartupDemoId = "test.demo.start",
 					.m_InitialExtent = { 640, 480 },
-					.m_Capabilities = AppRuntimeCapability::BuiltInContent,
 				},
 				.m_RuntimePaths = {
 					.m_RuntimeRoot = runtimeRoot,
@@ -87,6 +88,7 @@ namespace gglab
 					.m_EnvironmentAssetRoot = runtimeRoot / "Assets" / "Textures" / "Skybox",
 					.m_SettingsRoot = runtimeRoot,
 				},
+				.m_ContentRegistration = CreateDesktopApplicationContent(),
 			};
 		}
 	}

@@ -4,6 +4,9 @@
     <Filter Include="Application">
       <UniqueIdentifier>{9EBA6052-D97D-91F9-B271-B22D9900DBB9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Content">
+      <UniqueIdentifier>{0382EA84-9AB2-15A7-C7B6-46B50FD9C883}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{1FFC426C-B4FE-2E33-E96F-82BD8EC5B60B}</UniqueIdentifier>
     </Filter>
@@ -147,6 +150,12 @@
     <ClCompile Include="..\..\Sources\Application\Application\AssetPreparationTracker.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.cpp">
+      <Filter>Application\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.cpp">
+      <Filter>Application\Content</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabHost.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
@@ -272,6 +281,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp">
       <Filter>Application\Rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
@@ -470,6 +482,12 @@
     <ClInclude Include="..\..\Sources\Application\Application\AssetPreparationTracker.h">
       <Filter>Application</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.h">
+      <Filter>Application\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.h">
+      <Filter>Application\Content</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoBase.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
@@ -625,6 +643,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h">
       <Filter>Application\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationContentRegistrationSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">
       <Filter>Application\SelfTest</Filter>

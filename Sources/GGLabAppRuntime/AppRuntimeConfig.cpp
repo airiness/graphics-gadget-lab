@@ -18,19 +18,8 @@ namespace gglab
 		{
 			return false;
 		}
-		if (m_StartupLabId &&
-			(m_StartupLabId->empty() || m_StartupDemo != AppRuntimeStartupDemo::LabHost))
+		if (m_StartupDemoId.empty() || (m_StartupLabId && m_StartupLabId->empty()))
 		{
-			return false;
-		}
-
-		switch (m_StartupDemo)
-		{
-		case AppRuntimeStartupDemo::Start:
-		case AppRuntimeStartupDemo::Playground:
-		case AppRuntimeStartupDemo::LabHost:
-			break;
-		default:
 			return false;
 		}
 

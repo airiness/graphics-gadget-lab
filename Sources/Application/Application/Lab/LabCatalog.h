@@ -12,6 +12,12 @@ namespace gglab
 	using LabSessionFactory = std::unique_ptr<LabSessionBase>(*)(
 		const LabSessionCreateInfo& createInfo) noexcept;
 
+	struct LabRegistration
+	{
+		LabDescriptor m_Descriptor;
+		LabSessionFactory m_Factory = nullptr;
+	};
+
 	class LabCatalog
 	{
 	public:

@@ -182,8 +182,8 @@ namespace gglab
 			return {
 				.m_Config = {
 					.m_RhiBackend = AppRuntimeRHIBackend::DX12,
+					.m_StartupDemoId = "test.demo.start",
 					.m_InitialExtent = { 1280, 720 },
-					.m_Capabilities = AppRuntimeCapability::BuiltInContent,
 				},
 				.m_Paths = {
 					.m_RuntimeRoot = runtimeRoot,
@@ -250,6 +250,13 @@ namespace gglab
 				AppRuntimeInitializeResult::InvalidConfig &&
 				invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid shared config fails atomically");
+
+			GGLabAppRuntimeCreateInfo missingStartupDemo = MakeCreateInfo();
+			missingStartupDemo.m_Config.m_StartupDemoId.clear();
+			GGLabAppRuntime missingStartupDemoRuntime;
+			context.Check(missingStartupDemoRuntime.Initialize(missingStartupDemo) ==
+				AppRuntimeInitializeResult::InvalidConfig,
+				"Shared runtime config requires an explicit host-selected startup Demo ID");
 
 			GGLabAppRuntimeCreateInfo invalidPaths = MakeCreateInfo();
 			invalidPaths.m_Paths.m_AssetRoot.clear();

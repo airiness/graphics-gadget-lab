@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/Content/ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -49,6 +50,7 @@ namespace gglab
 			AppRuntimeConfig m_RuntimeConfig{};
 			RuntimePaths m_RuntimePaths{};
 			AppRuntimeHostServices m_HostServices{};
+			ApplicationContentRegistration m_ContentRegistration{};
 		};
 
 	public:
@@ -105,6 +107,7 @@ namespace gglab
 		AppRuntimeConfig m_RuntimeConfig{};
 		RuntimePaths m_RuntimePaths{};
 		AppRuntimeHostServices m_HostServices{};
+		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RHIContextFactoryBase> m_RHIContextFactory;
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<Time> m_Time;

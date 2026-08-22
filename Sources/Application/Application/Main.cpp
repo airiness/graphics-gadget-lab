@@ -1,6 +1,7 @@
 #include "Application/Application.h"
 #include "Application/ApplicationHostConfiguration.h"
 #include "Application/ApplicationLaunchOptions.h"
+#include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
 #include "Application/RenderingStartup.h"
 #include "Application/SelfTest/SelfTestRunner.h"
@@ -73,6 +74,7 @@ int main(int argc, char* argv[])
 	createInfo.m_RuntimeConfig = gglab::TranslateApplicationLaunchOptions(
 		launchResult.m_Options, InitialExtent, RequestRuntimeValidation);
 	createInfo.m_RuntimePaths = runtimePaths;
+	createInfo.m_ContentRegistration = gglab::CreateDesktopApplicationContent();
 	createInfo.m_HostServices.m_TaskWorkerLifecycle =
 		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();
 
