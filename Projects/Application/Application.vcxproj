@@ -420,6 +420,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
+    <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup>
@@ -447,6 +448,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

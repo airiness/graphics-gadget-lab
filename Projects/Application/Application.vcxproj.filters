@@ -85,6 +85,9 @@
     <Filter Include="Shaders\Profiles\GGLab.Surface\1">
       <UniqueIdentifier>{5C6E6C88-16D3-0A2D-A13E-2D6C5E32F44C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Profiles\GGLab.Surface\2">
+      <UniqueIdentifier>{DA183BB6-6864-225B-9F3B-41B47C5CEC9B}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{AEDE331A-5F4F-946B-D2B8-6AA926EDC672}</UniqueIdentifier>
     </Filter>
@@ -850,6 +853,9 @@
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
@@ -917,6 +923,9 @@
     </None>
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json">
       <Filter>Shaders\Profiles\GGLab.Surface\1</Filter>
+    </None>
+    <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json">
+      <Filter>Shaders\Profiles\GGLab.Surface\2</Filter>
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>

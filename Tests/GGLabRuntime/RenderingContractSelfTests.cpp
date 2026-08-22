@@ -30,6 +30,7 @@
 #include "Compiler/ShaderCompiler.h"
 #include "Graphics/Shader/ShaderPaths.h"
 #include "Graphics/TransferBatch.h"
+#include "Targets/Vulkan13ShaderTarget.h"
 
 #include <filesystem>
 #include <type_traits>
@@ -1504,6 +1505,31 @@ namespace gglab
 			context.Check(surfaceContractArtifact.IsSuccess(),
 				"Production DXC compiles the gglab.surface surface evaluation "
 				"seam contract (profile shape and the runtime MaterialData input)");
+
+			desc.m_SourcePath = L"Tests/SurfaceTextureContractCompile.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const ShaderCompileResult surfaceTextureContractArtifact =
+				compiler.Compile(desc);
+			context.Check(surfaceTextureContractArtifact.IsSuccess() &&
+				surfaceTextureContractArtifact.m_Artifact.GetBinaryFormat() ==
+					ShaderBinaryFormat::Dxil,
+				"Production DXC compiles the gglab.surface texture signature "
+				"contract for the DX12 target (generated texture parameter form, "
+				"bindless sample expression, and the profile output shape) to DXIL");
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult surfaceTextureContractSpirVArtifact =
+				compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(surfaceTextureContractSpirVArtifact.IsSuccess() &&
+				surfaceTextureContractSpirVArtifact.m_Artifact.GetBinaryFormat() ==
+					ShaderBinaryFormat::SpirV,
+				"Production DXC compiles the gglab.surface texture signature "
+				"contract for the Vulkan 1.3 target through the toolchain "
+				"bindless-heap binding arguments to SPIR-V");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
