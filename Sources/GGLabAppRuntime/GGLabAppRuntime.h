@@ -28,8 +28,6 @@ namespace gglab
 		InvalidState,
 		InvalidConfig,
 		InvalidRuntimePaths,
-		MissingBootstrapService,
-		BootstrapServiceFailed,
 	};
 
 	enum class AppRuntimeTickResult : uint8_t
@@ -46,25 +44,11 @@ namespace gglab
 		ExitRequested,
 	};
 
-	// Minimal initialization seam for the first reusable lifecycle target.
-	// Once Initialize is attempted, Shutdown is called exactly once regardless
-	// of whether initialization succeeds. Broader host policy stays outside this contract.
-	class AppRuntimeBootstrapServiceBase
-	{
-	public:
-		virtual ~AppRuntimeBootstrapServiceBase() = default;
-
-		[[nodiscard]] virtual bool Initialize(const AppRuntimeConfig& config,
-			const RuntimePaths& paths, const AppRuntimeHostServices& hostServices) noexcept = 0;
-		virtual void Shutdown() noexcept = 0;
-	};
-
 	struct GGLabAppRuntimeCreateInfo
 	{
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
-		AppRuntimeBootstrapServiceBase* m_BootstrapService = nullptr;
 	};
 
 	class GGLabAppRuntime final
@@ -86,9 +70,6 @@ namespace gglab
 		}
 
 	private:
-		AppRuntimeBootstrapServiceBase* m_BootstrapService = nullptr;
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;
-		bool m_BootstrapInitializationAttempted = false;
-		bool m_ShutdownComplete = false;
 	};
 }

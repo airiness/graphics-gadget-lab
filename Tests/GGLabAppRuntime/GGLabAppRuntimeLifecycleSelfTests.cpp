@@ -2,7 +2,6 @@
 #include "ApplicationInput.h"
 #include "GGLabTestCore/SelfTest.h"
 
-#include <cstdint>
 #include <filesystem>
 
 namespace gglab
@@ -64,41 +63,7 @@ namespace gglab
 				"Invalid neutral input codes are rejected safely");
 		}
 
-		class FakeBootstrapService final : public AppRuntimeBootstrapServiceBase
-		{
-		public:
-			explicit FakeBootstrapService(bool initializeResult) noexcept :
-				m_InitializeResult(initializeResult)
-			{}
-
-			[[nodiscard]] bool Initialize(const AppRuntimeConfig& config,
-				const RuntimePaths& paths,
-				const AppRuntimeHostServices& hostServices) noexcept override
-			{
-				++m_InitializeCount;
-				m_ReceivedValidConfig = config.IsValid();
-				m_ReceivedValidPaths = paths.IsValid();
-				m_ReceivedWorkerLifecycle = hostServices.m_TaskWorkerLifecycle != nullptr;
-				return m_InitializeResult;
-			}
-
-			void Shutdown() noexcept override
-			{
-				++m_ShutdownCount;
-			}
-
-			uint32_t m_InitializeCount = 0;
-			uint32_t m_ShutdownCount = 0;
-			bool m_ReceivedValidConfig = false;
-			bool m_ReceivedValidPaths = false;
-			bool m_ReceivedWorkerLifecycle = false;
-
-		private:
-			bool m_InitializeResult = false;
-		};
-
-		[[nodiscard]] GGLabAppRuntimeCreateInfo MakeCreateInfo(
-			AppRuntimeBootstrapServiceBase* service) noexcept
+		[[nodiscard]] GGLabAppRuntimeCreateInfo MakeCreateInfo() noexcept
 		{
 			const std::filesystem::path runtimeRoot =
 				std::filesystem::temp_directory_path() / "gglab-app-runtime-test";
@@ -119,26 +84,24 @@ namespace gglab
 					.m_EnvironmentAssetRoot = runtimeRoot / "Assets" / "Textures" / "Skybox",
 					.m_SettingsRoot = runtimeRoot,
 				},
-				.m_BootstrapService = service,
 			};
 		}
 
 		void RunLifecycleSelfTests(SelfTestContext& context) noexcept
 		{
 			RunApplicationInputSelfTests(context);
-			FakeBootstrapService service(true);
 			{
 				GGLabAppRuntime runtime;
 				context.Check(
 					runtime.GetLifecycleState() == AppRuntimeLifecycleState::Uninitialized,
 					"App runtime starts uninitialized");
-				context.Check(runtime.Initialize(MakeCreateInfo(&service)) ==
+				context.Check(runtime.Initialize(MakeCreateInfo()) ==
 					AppRuntimeInitializeResult::Succeeded,
-					"No-op host service initializes the app runtime");
-				context.Check(service.m_InitializeCount == 1 && service.m_ReceivedValidConfig &&
-					service.m_ReceivedValidPaths && !service.m_ReceivedWorkerLifecycle &&
+					"Valid explicit config and paths initialize the app runtime");
+				context.Check(runtime.Initialize(MakeCreateInfo()) ==
+					AppRuntimeInitializeResult::AlreadyInitialized &&
 					runtime.Tick() == AppRuntimeTickResult::Continue,
-					"Bootstrap receives explicit valid config, paths, and optional host services");
+					"Running app runtime rejects repeated initialization");
 
 				runtime.HandleHostEvent(AppHostEventType::Suspended);
 				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Suspended &&
@@ -155,64 +118,33 @@ namespace gglab
 
 				runtime.Shutdown();
 				runtime.Shutdown();
-				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped &&
-					service.m_ShutdownCount == 1,
-					"Repeated shutdown releases initialized services exactly once");
+				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped,
+					"Repeated shutdown is idempotent");
 			}
-			context.Check(service.m_ShutdownCount == 1,
-				"Destructor fallback is idempotent after explicit shutdown");
 
-			FakeBootstrapService failingService(false);
-			{
-				GGLabAppRuntime runtime;
-				context.Check(runtime.Initialize(MakeCreateInfo(&failingService)) ==
-					AppRuntimeInitializeResult::BootstrapServiceFailed,
-					"Bootstrap service failure is reported to the host");
-				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Failed &&
-					failingService.m_InitializeCount == 1 &&
-					failingService.m_ShutdownCount == 1,
-					"Partial initialization failure rolls back exactly once");
-				runtime.Shutdown();
-				context.Check(failingService.m_ShutdownCount == 1,
-					"Repeated shutdown preserves the failed terminal state");
-			}
-			context.Check(failingService.m_ShutdownCount == 1,
-				"Failed runtime destructor does not repeat rollback");
-
-			GGLabAppRuntime missingServiceRuntime;
-			context.Check(missingServiceRuntime.Initialize(MakeCreateInfo(nullptr)) ==
-				AppRuntimeInitializeResult::MissingBootstrapService &&
-				missingServiceRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
-				"Missing required bootstrap service fails atomically");
-
-			FakeBootstrapService untouchedService(true);
 			GGLabAppRuntime stoppedRuntime;
 			stoppedRuntime.Shutdown();
 			stoppedRuntime.Shutdown();
-			context.Check(stoppedRuntime.Initialize(MakeCreateInfo(&untouchedService)) ==
+			context.Check(stoppedRuntime.Initialize(MakeCreateInfo()) ==
 				AppRuntimeInitializeResult::InvalidState &&
-				stoppedRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped &&
-				untouchedService.m_InitializeCount == 0 && untouchedService.m_ShutdownCount == 0,
-				"Stopped runtime cannot reinitialize or touch host services");
+				stoppedRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped,
+				"Stopped runtime cannot reinitialize");
 
-			FakeBootstrapService invalidInputService(true);
-			GGLabAppRuntimeCreateInfo invalidConfig = MakeCreateInfo(&invalidInputService);
+			GGLabAppRuntimeCreateInfo invalidConfig = MakeCreateInfo();
 			invalidConfig.m_Config.m_InitialExtent.m_Width = 0;
 			GGLabAppRuntime invalidConfigRuntime;
 			context.Check(invalidConfigRuntime.Initialize(invalidConfig) ==
 				AppRuntimeInitializeResult::InvalidConfig &&
-				invalidInputService.m_InitializeCount == 0 &&
-				invalidInputService.m_ShutdownCount == 0,
-				"Invalid shared config fails before touching host services");
+				invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
+				"Invalid shared config fails atomically");
 
-			GGLabAppRuntimeCreateInfo invalidPaths = MakeCreateInfo(&invalidInputService);
+			GGLabAppRuntimeCreateInfo invalidPaths = MakeCreateInfo();
 			invalidPaths.m_Paths.m_AssetRoot.clear();
 			GGLabAppRuntime invalidPathsRuntime;
 			context.Check(invalidPathsRuntime.Initialize(invalidPaths) ==
 				AppRuntimeInitializeResult::InvalidRuntimePaths &&
-				invalidInputService.m_InitializeCount == 0 &&
-				invalidInputService.m_ShutdownCount == 0,
-				"Invalid runtime paths fail before touching host services");
+				invalidPathsRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
+				"Invalid runtime paths fail atomically");
 		}
 	}
 }

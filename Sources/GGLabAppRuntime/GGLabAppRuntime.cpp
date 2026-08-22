@@ -25,31 +25,12 @@ namespace gglab
 		if (!createInfo.m_Config.IsValid())
 		{
 			m_LifecycleState = AppRuntimeLifecycleState::Failed;
-			Shutdown();
 			return AppRuntimeInitializeResult::InvalidConfig;
 		}
 		if (!createInfo.m_Paths.IsValid())
 		{
 			m_LifecycleState = AppRuntimeLifecycleState::Failed;
-			Shutdown();
 			return AppRuntimeInitializeResult::InvalidRuntimePaths;
-		}
-
-		m_BootstrapService = createInfo.m_BootstrapService;
-		if (!m_BootstrapService)
-		{
-			m_LifecycleState = AppRuntimeLifecycleState::Failed;
-			Shutdown();
-			return AppRuntimeInitializeResult::MissingBootstrapService;
-		}
-
-		m_BootstrapInitializationAttempted = true;
-		if (!m_BootstrapService->Initialize(
-			createInfo.m_Config, createInfo.m_Paths, createInfo.m_HostServices))
-		{
-			m_LifecycleState = AppRuntimeLifecycleState::Failed;
-			Shutdown();
-			return AppRuntimeInitializeResult::BootstrapServiceFailed;
 		}
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
@@ -97,7 +78,7 @@ namespace gglab
 
 	void GGLabAppRuntime::Shutdown() noexcept
 	{
-		if (m_ShutdownComplete ||
+		if (m_LifecycleState == AppRuntimeLifecycleState::Stopped ||
 			m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown)
 		{
 			return;
@@ -105,14 +86,6 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
-		if (m_BootstrapInitializationAttempted && m_BootstrapService)
-		{
-			m_BootstrapService->Shutdown();
-			m_BootstrapInitializationAttempted = false;
-		}
-		m_BootstrapService = nullptr;
-
-		m_ShutdownComplete = true;
 		m_LifecycleState = preserveFailure
 			? AppRuntimeLifecycleState::Failed
 			: AppRuntimeLifecycleState::Stopped;
