@@ -20,7 +20,7 @@ namespace gglab
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		TaskSystem* m_TaskSystem = nullptr;
-		ApplicationInput* m_Input = nullptr;
+		const ApplicationInput* m_Input = nullptr;
 		Time* m_Time = nullptr;
 		DebugDrawContext* m_DebugDraw = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;

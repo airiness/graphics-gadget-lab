@@ -78,7 +78,7 @@ namespace gglab
 
 	void GGLabAppRuntime::Shutdown() noexcept
 	{
-		if (m_LifecycleState == AppRuntimeLifecycleState::Stopped ||
+		if (m_ShutdownComplete ||
 			m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown)
 		{
 			return;
@@ -86,6 +86,8 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
+		// Later ownership slices must complete resource teardown before setting this marker.
+		m_ShutdownComplete = true;
 		m_LifecycleState = preserveFailure
 			? AppRuntimeLifecycleState::Failed
 			: AppRuntimeLifecycleState::Stopped;

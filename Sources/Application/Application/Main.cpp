@@ -36,7 +36,9 @@ int main(int argc, char* argv[])
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
 	}
-	if (launchResult.m_Options.m_SelfTestSelection)
+	if (launchResult.m_Options.m_SelfTestSelection &&
+		*launchResult.m_Options.m_SelfTestSelection !=
+			gglab::ApplicationPathCompositionSelfTestSelection)
 	{
 		return gglab::RunApplicationSelfTests(*launchResult.m_Options.m_SelfTestSelection)
 			? EXIT_SUCCESS
@@ -46,6 +48,12 @@ int main(int argc, char* argv[])
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 	const gglab::RuntimePaths runtimePaths =
 		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
+	if (launchResult.m_Options.m_SelfTestSelection)
+	{
+		return gglab::RunApplicationPathCompositionSelfTest(runtimePaths)
+			? EXIT_SUCCESS
+			: EXIT_FAILURE;
+	}
 	constexpr gglab::AppRuntimeExtent InitialExtent{ 1920, 1080 };
 #if defined(BUILD_DEBUG)
 	constexpr bool RequestRuntimeValidation = true;

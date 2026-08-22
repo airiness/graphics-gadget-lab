@@ -382,6 +382,17 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Prove runtime path composition from unrelated CWD
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $application = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
+          & $application --self-test app-path-composition
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run headless self-tests (GGLabFoundationTests)
         shell: pwsh
         working-directory: Build/Output/x64/${{ matrix.configuration }}

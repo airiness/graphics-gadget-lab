@@ -71,5 +71,6 @@ namespace gglab
 
 	private:
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;
+		bool m_ShutdownComplete = false;
 	};
 }

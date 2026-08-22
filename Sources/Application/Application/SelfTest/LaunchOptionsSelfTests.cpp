@@ -101,6 +101,12 @@ namespace gglab
 				context.Check(!result.IsValid(),
 					"--vulkan-qualification rejects interactive Lab startup");
 			}
+			{
+				const auto result = parse({ "--self-test", "app-path-composition" });
+				context.Check(result.IsValid() && result.m_Options.m_SelfTestSelection ==
+					"app-path-composition",
+					"Path-composition proof is an explicit self-test exit mode");
+			}
 		}
 	}
 
