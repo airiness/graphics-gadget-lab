@@ -1,9 +1,9 @@
 #pragma once
-#include "Application/Demo/DemoTypes.h"
+#include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
-#include "Application/Lab/LabParameter.h"
-#include "Application/Lab/LabRunConfig.h"
-#include "Application/Lab/LabTypes.h"
+#include "Lab/LabParameter.h"
+#include "Lab/LabRunConfig.h"
+#include "Lab/LabTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/World.h"
 #include "Graphics/CameraRig.h"

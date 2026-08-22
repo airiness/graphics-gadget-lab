@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
-#include "Application/Demo/DemoManager.h"
+#include "Demo/DemoManager.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
 #include <imgui.h>

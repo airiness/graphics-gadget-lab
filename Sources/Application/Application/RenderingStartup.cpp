@@ -1,5 +1,5 @@
 #include "Application/RenderingStartup.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"

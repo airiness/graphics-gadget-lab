@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"

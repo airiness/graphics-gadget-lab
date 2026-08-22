@@ -48,7 +48,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -59,25 +59,51 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationContentRegistration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationContentRegistration.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabInterfaces.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabPresetSchema.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
   </ItemGroup>

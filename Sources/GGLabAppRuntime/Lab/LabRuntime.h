@@ -1,8 +1,8 @@
 #pragma once
-#include "Application/Lab/LabCatalog.h"
-#include "Application/Lab/LabCommandQueue.h"
-#include "Application/Lab/LabInterfaces.h"
-#include "Application/Lab/LabSessionBase.h"
+#include "Lab/LabCatalog.h"
+#include "Lab/LabCommandQueue.h"
+#include "Lab/LabInterfaces.h"
+#include "Lab/LabSessionBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 

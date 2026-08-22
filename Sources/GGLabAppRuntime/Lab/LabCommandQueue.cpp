@@ -1,4 +1,4 @@
-#include "Application/Lab/LabCommandQueue.h"
+#include "Lab/LabCommandQueue.h"
 
 namespace gglab
 {

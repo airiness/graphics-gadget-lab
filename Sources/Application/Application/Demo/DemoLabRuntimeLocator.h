@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Lab/LabInterfaces.h"
+#include "Lab/LabInterfaces.h"
 
 namespace gglab
 {

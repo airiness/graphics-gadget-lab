@@ -1,6 +1,6 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
-#include "Application/Lab/LabRuntime.h"
+#include "Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
 

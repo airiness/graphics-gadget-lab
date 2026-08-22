@@ -1,5 +1,5 @@
 #include "Core/Input/InputBase.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 
 namespace gglab

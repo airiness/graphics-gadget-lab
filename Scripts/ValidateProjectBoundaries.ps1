@@ -605,10 +605,10 @@ Test-ProjectIncludeVisibility $runtimeTestsProject $runtimeTestsNamespace `
         $testCorePublicIncludeRoot, $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
-    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot) `
-    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot)
+    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
+    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainProject $shaderToolchainNamespace `
     "Projects/ShaderToolchainCore/ShaderToolchainCore.vcxproj" `
     @($shaderToolchainIncludeRoot, $foundationPublicIncludeRoot) `
@@ -1053,7 +1053,7 @@ $runtimeTestsAllowedReferences = @($runtimeProjectPath, $foundationProjectPath,
     $testCoreProjectPath, $shaderToolchainProjectPath, $shaderCompilerProjectPath,
     $directXTexProjectPath)
 $appRuntimeTestsRequiredReferences = @(
-    $appRuntimeProjectPath, $foundationProjectPath, $testCoreProjectPath)
+    $appRuntimeProjectPath, $runtimeProjectPath, $foundationProjectPath, $testCoreProjectPath)
 foreach ($requiredReference in $appRuntimeTestsRequiredReferences) {
     if (-not $appRuntimeTestsProjectReferenceSet.Contains($requiredReference)) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -1124,8 +1124,8 @@ $appRuntimeForbiddenDependencyRegex = `
     'GetExecutableDirectory|GetExeOutDir|\bwin32::|\bLantern\b'
 $appRuntimeWideTextRegex = '\bwchar_t\b|\bstd::wstring(?:_view)?\b'
 $appRuntimePublicUpperIncludeRegex = `
-    '#include\s*[<"](?:Application[\\/]|Core[\\/]|Graphics[\\/]|Diagnostics[\\/]|' +
-    'DevTools[\\/]|NapaVoxelCore[\\/]|ShaderToolchain[\\/]|Compiler[\\/])'
+    '#include\s*[<"](?:Application[\\/]|DevTools[\\/]|NapaVoxelCore[\\/]|' +
+    'ShaderToolchain[\\/]|Compiler[\\/])'
 $napaTestsForbiddenIncludeRegex = '#include\s*[<"](?:GGLab|Application[\\/]|DevTools[\\/]|Core[\\/]|Graphics[\\/]|Diagnostics[\\/]|Sources[\\/]|Shader[\\/])'
 foreach ($itemPath in $napaTestsSourceItems) {
     $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
@@ -1195,7 +1195,7 @@ foreach ($itemPath in $appRuntimeSourceItems) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "app-runtime-public-contract"
             Target = ConvertTo-RepoRelativePath $itemPath
-            Reason = "portable public contract includes an upper first-party domain"
+            Reason = "portable public contract includes a host, tooling, compiler, or optional-content domain"
         })
     }
 }

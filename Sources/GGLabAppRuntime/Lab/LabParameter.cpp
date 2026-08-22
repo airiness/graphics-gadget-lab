@@ -1,5 +1,5 @@
-#include "Application/Lab/LabParameter.h"
-#include "Application/ApplicationLog.h"
+#include "Lab/LabParameter.h"
+#include "AppRuntimeLog.h"
 
 #include <algorithm>
 

@@ -1,4 +1,5 @@
 #include "GGLabAppRuntime.h"
+#include "ApplicationFrameworkSelfTests.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -201,6 +202,7 @@ namespace gglab
 
 		void RunLifecycleSelfTests(SelfTestContext& context) noexcept
 		{
+			RunApplicationFrameworkSelfTests(context);
 			RunApplicationInputSelfTests(context);
 			RunApplicationToolingSelfTests(context);
 			{

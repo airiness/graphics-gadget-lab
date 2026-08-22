@@ -1,7 +1,7 @@
 #pragma once
-#include "Application/Lab/LabParameter.h"
-#include "Application/Lab/LabRunConfig.h"
-#include "Application/Lab/LabTypes.h"
+#include "Lab/LabParameter.h"
+#include "Lab/LabRunConfig.h"
+#include "Lab/LabTypes.h"
 
 #include <optional>
 

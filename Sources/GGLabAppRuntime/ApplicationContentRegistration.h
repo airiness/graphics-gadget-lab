@@ -1,6 +1,6 @@
 #pragma once
-#include "Application/Demo/DemoBase.h"
-#include "Application/Lab/LabCatalog.h"
+#include "Demo/DemoBase.h"
+#include "Lab/LabCatalog.h"
 
 #include <cstdint>
 #include <memory>

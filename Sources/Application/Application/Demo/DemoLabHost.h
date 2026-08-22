@@ -1,6 +1,6 @@
 #pragma once
-#include "Application/Demo/DemoBase.h"
-#include "Application/Lab/LabRuntime.h"
+#include "Demo/DemoBase.h"
+#include "Lab/LabRuntime.h"
 
 #include <span>
 

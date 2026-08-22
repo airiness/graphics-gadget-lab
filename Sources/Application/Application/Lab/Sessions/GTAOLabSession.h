@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Application/AssetPreparationTracker.h"
-#include "Application/Lab/LabSessionBase.h"
+#include "AssetPreparationTracker.h"
+#include "Lab/LabSessionBase.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
 
 namespace gglab

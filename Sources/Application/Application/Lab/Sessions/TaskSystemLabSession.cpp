@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Camera.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Lab/LabSessionBase.h"
+#include "Lab/LabSessionBase.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
 
 namespace gglab

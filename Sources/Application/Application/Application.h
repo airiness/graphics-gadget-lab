@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Content/ApplicationContentRegistration.h"
+#include "ApplicationContentRegistration.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"

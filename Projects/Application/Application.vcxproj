@@ -153,7 +153,6 @@
       <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Application.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.cpp" />
@@ -191,7 +190,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp" />
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
@@ -216,13 +214,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\StartDemo.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\AssetPreparationTracker.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCatalog.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCommandQueue.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabParameter.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabRuntime.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabSession.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp" />
@@ -265,12 +256,10 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Application.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Tooling\ApplicationToolingComposition.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\Application\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
@@ -313,9 +302,6 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoBase.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoManager.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoTypes.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\EntityPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\DemoPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
@@ -350,17 +336,6 @@
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\StartDemo.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\AssetPreparationTracker.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCatalog.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCommandQueue.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabInterfaces.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabParameter.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabPresetSchema.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabRunConfig.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabRuntime.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSession.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSessionBase.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelRaycast.h" />
@@ -370,8 +345,6 @@
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\AssetPublicationLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\AssetResidencyLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\EnvironmentAssetLabSession.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSnapshot.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\AlphaTestLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\CullingLabSession.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\Sessions\MathFoundationLabSession.h" />

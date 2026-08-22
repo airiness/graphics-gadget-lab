@@ -1,6 +1,6 @@
-#include "Application/Lab/LabCatalog.h"
-#include "Application/ApplicationLog.h"
-#include "Application/Lab/LabSessionBase.h"
+#include "Lab/LabCatalog.h"
+#include "AppRuntimeLog.h"
+#include "Lab/LabSessionBase.h"
 
 namespace gglab
 {

@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"

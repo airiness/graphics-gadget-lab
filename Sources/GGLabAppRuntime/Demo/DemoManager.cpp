@@ -1,5 +1,5 @@
-#include "Application/Demo/DemoManager.h"
-#include "Application/ApplicationLog.h"
+#include "Demo/DemoManager.h"
+#include "AppRuntimeLog.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"

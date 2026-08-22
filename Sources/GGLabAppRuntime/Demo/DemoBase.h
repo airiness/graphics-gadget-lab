@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Demo/DemoTypes.h"
+#include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
@@ -37,7 +37,7 @@ namespace gglab
 		}
 
 		virtual void OnEnter() noexcept {}
-		virtual void OnResize(uint32_t width, uint32_t height) noexcept {}
+		virtual void OnResize(uint32_t, uint32_t) noexcept {}
 		virtual void OnExit() noexcept {}
 		virtual void Update() noexcept = 0;
 		virtual void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept

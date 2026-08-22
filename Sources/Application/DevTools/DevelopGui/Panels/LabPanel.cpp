@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
-#include "Application/Lab/LabInterfaces.h"
-#include "Application/Lab/LabRuntime.h"
+#include "Lab/LabInterfaces.h"
+#include "Lab/LabRuntime.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"

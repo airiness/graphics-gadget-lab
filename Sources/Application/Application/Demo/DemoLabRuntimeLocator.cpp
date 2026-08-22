@@ -1,7 +1,7 @@
 #include "Application/Demo/DemoLabRuntimeLocator.h"
-#include "Application/Demo/DemoBase.h"
+#include "Demo/DemoBase.h"
 #include "Application/Demo/DemoLabHost.h"
-#include "Application/Demo/DemoManager.h"
+#include "Demo/DemoManager.h"
 
 namespace gglab
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Demo/DemoBase.h"
+#include "Demo/DemoBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIFence.h"
 

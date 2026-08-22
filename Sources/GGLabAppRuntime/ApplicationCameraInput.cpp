@@ -1,4 +1,4 @@
-#include "Application/Input/ApplicationCameraInput.h"
+#include "ApplicationCameraInput.h"
 
 namespace gglab
 {

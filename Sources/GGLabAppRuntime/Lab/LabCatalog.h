@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Lab/LabTypes.h"
+#include "Lab/LabTypes.h"
 
 #include <memory>
 #include <vector>

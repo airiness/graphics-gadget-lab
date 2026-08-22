@@ -1,19 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Demo">
+      <UniqueIdentifier>{D743B9F7-27D2-6396-D43D-2810D1C81323}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Lab">
+      <UniqueIdentifier>{CFE283C1-17BA-8AD4-F54D-B87C473B1758}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationContentRegistration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.cpp">
+      <Filter>Demo</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.cpp">
+      <Filter>Lab</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationCameraInput.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationContentRegistration.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeHostServices.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h">
+      <Filter>Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.h">
+      <Filter>Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoTypes.h">
+      <Filter>Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabInterfaces.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabPresetSchema.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSnapshot.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabTypes.h">
+      <Filter>Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
   </ItemGroup>

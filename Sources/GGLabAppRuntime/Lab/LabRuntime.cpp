@@ -1,5 +1,5 @@
-#include "Application/Lab/LabRuntime.h"
-#include "Application/ApplicationLog.h"
+#include "Lab/LabRuntime.h"
+#include "AppRuntimeLog.h"
 #include "Core/Time.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"

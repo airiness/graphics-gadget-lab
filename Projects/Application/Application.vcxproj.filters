@@ -10,9 +10,6 @@
     <Filter Include="Application\Demo">
       <UniqueIdentifier>{1FFC426C-B4FE-2E33-E96F-82BD8EC5B60B}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Application\Input">
-      <UniqueIdentifier>{131CE94D-44F0-6897-6F9B-4BC455EC210F}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Application\Lab">
       <UniqueIdentifier>{A314A76E-CEBA-AB71-D031-B1CBD25678B6}</UniqueIdentifier>
     </Filter>
@@ -147,12 +144,6 @@
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationPch.cpp">
       <Filter>Application</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\AssetPreparationTracker.cpp">
-      <Filter>Application</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.cpp">
-      <Filter>Application\Content</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.cpp">
       <Filter>Application\Content</Filter>
     </ClCompile>
@@ -168,32 +159,11 @@
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoManager.cpp">
-      <Filter>Application\Demo</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoPlayground.cpp">
       <Filter>Application\Demo</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Demo\StartDemo.cpp">
       <Filter>Application\Demo</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.cpp">
-      <Filter>Application\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCatalog.cpp">
-      <Filter>Application\Lab</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabCommandQueue.cpp">
-      <Filter>Application\Lab</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabParameter.cpp">
-      <Filter>Application\Lab</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabRuntime.cpp">
-      <Filter>Application\Lab</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\Application\Application\Lab\LabSession.cpp">
-      <Filter>Application\Lab</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp">
       <Filter>Application\Lab\NapaVoxel</Filter>
@@ -473,23 +443,11 @@
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h">
       <Filter>Application</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h">
-      <Filter>Application</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationPch.h">
       <Filter>Application</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\AssetPreparationTracker.h">
-      <Filter>Application</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Content\ApplicationContentRegistration.h">
-      <Filter>Application\Content</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Content\DesktopApplicationContent.h">
       <Filter>Application\Content</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoBase.h">
-      <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLabHost.h">
       <Filter>Application\Demo</Filter>
@@ -503,53 +461,11 @@
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoManager.h">
-      <Filter>Application\Demo</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoPlayground.h">
-      <Filter>Application\Demo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoTypes.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Input\ApplicationCameraInput.h">
-      <Filter>Application\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCatalog.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabCommandQueue.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabInterfaces.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabParameter.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabPresetSchema.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabRunConfig.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabRuntime.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSession.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSessionBase.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabSnapshot.h">
-      <Filter>Application\Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\Application\Application\Lab\LabTypes.h">
-      <Filter>Application\Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
       <Filter>Application\Lab\NapaVoxel</Filter>

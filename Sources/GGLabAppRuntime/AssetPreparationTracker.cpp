@@ -1,4 +1,4 @@
-#include "Application/AssetPreparationTracker.h"
+#include "AssetPreparationTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
 

@@ -1,4 +1,4 @@
-#include "Application/Content/ApplicationContentRegistration.h"
+#include "ApplicationContentRegistration.h"
 
 #include <algorithm>
 #include <cstddef>

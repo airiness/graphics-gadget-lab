@@ -1,7 +1,7 @@
 #include "Application/SelfTest/ApplicationInputSelfTests.h"
 
-#include "Application/Demo/DemoTypes.h"
-#include "Application/Input/ApplicationCameraInput.h"
+#include "Demo/DemoTypes.h"
+#include "ApplicationCameraInput.h"
 #include "ApplicationInput.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/WindowsInputMapping.h"

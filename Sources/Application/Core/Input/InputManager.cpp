@@ -1,5 +1,5 @@
 #include "Core/Input/InputManager.h"
-#include "Application/ApplicationLog.h"
+#include "AppRuntimeLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "Core/Input/Keyboard.h"
 #include "Core/Input/Mouse.h"

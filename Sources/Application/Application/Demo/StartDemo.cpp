@@ -1,5 +1,5 @@
 #include "Application/Demo/StartDemo.h"
-#include "Application/Input/ApplicationCameraInput.h"
+#include "ApplicationCameraInput.h"
 #include "Core/Math/Quaternion.h"
 #include "Core/Math/Transform.h"
 #include "Core/Time.h"

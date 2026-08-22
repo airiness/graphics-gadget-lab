@@ -1,5 +1,5 @@
 #pragma once
-#include "Application/Content/ApplicationContentRegistration.h"
+#include "ApplicationContentRegistration.h"
 
 #include <string_view>
 
