@@ -235,18 +235,17 @@ namespace gglab
 		{
 			outReport = {};
 			outObjects = {};
+			if (!options.m_IsHostAbiSupported)
+			{
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"Vulkan bootstrap does not support the host presentation ABI.");
+				return 1;
+			}
 			if (options.m_SurfaceFactory == nullptr)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan bootstrap requires a surface factory.");
 				return 1;
 			}
-
-			if (sizeof(void*) != 8)
-			{
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("Vulkan backend requires Windows x64.");
-				return 1;
-			}
-
 			VulkanInstance::CreateInfo instanceCreateInfo{};
 			instanceCreateInfo.m_RequestValidation = options.m_RequestValidation;
 			instanceCreateInfo.m_RequiredInstanceExtensions =
@@ -304,10 +303,6 @@ namespace gglab
 			{
 				VulkanAdapterCapabilitySnapshot snapshot = QueryVulkanAdapterCapabilitySnapshot(
 					instance->Get(), physicalDevices[index], surface->Get(), index);
-				snapshot.m_ProfileCapabilities.m_IsWindowsX64 = true;
-				snapshot.m_ProfileCapabilities.m_HasVulkanLoader = true;
-				snapshot.m_ProfileCapabilities.m_HasWin32SurfaceExtension = true;
-
 				// Preliminary evaluation neutralizes the descriptor-set layout
 				// gate because the probe has not run yet; "not probed" must never
 				// report as "unsupported". Adapters that fail any other

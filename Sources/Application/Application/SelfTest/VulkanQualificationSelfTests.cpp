@@ -20,6 +20,7 @@ namespace gglab
 		context.Check(!options.IsConfigurationValid(),
 			"Vulkan adapter inspection rejects a missing surface factory");
 		options.m_SurfaceFactory = reinterpret_cast<const VulkanSurfaceFactoryBase*>(1);
+		options.m_IsHostAbiSupported = true;
 		context.Check(options.IsConfigurationValid(),
 			"Vulkan adapter inspection does not require an unused platform host");
 		context.Check(options.HasRequiredSurfaceFactory(),

@@ -48,6 +48,7 @@ namespace gglab
 		// Borrowed for the duration of RunVulkanQualification.
 		const VulkanSurfaceFactoryBase* m_SurfaceFactory = nullptr;
 		VulkanQualificationHostBase* m_Host = nullptr;
+		bool m_IsHostAbiSupported = false;
 		bool m_RequestValidation = false;
 		bool m_ListAdapters = false;
 		std::optional<std::string> m_AdapterSelector;

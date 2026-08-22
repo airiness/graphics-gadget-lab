@@ -44,10 +44,4 @@ namespace gglab
 			RequiredInstanceExtensionNames() const noexcept = 0;
 		[[nodiscard]] virtual Result Create(VkInstance instance) const noexcept = 0;
 	};
-
-	// Creates the surface factory selected by the current platform build. The
-	// caller owns the factory and must keep it alive through instance/surface
-	// bootstrap. Native handle interpretation remains in the platform leaf.
-	[[nodiscard]] std::unique_ptr<VulkanSurfaceFactoryBase>
-		CreateVulkanPlatformSurfaceFactory(void* nativeWindowHandle) noexcept;
 }

@@ -1218,6 +1218,34 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$presentationContractChecks = @(
+    [pscustomobject]@{
+        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/RHIContext.h"
+        Pattern = '\bm_WindowHandle\b|\bm_Backend\s*='
+        Reason = "portable RHI context descriptor contains backend or native-window composition state"
+    },
+    [pscustomobject]@{
+        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/Vulkan/VulkanContext.cpp"
+        Pattern = '\bCreateVulkanPlatformSurfaceFactory\b'
+        Reason = "common Vulkan context selects a platform surface factory through build convention"
+    },
+    [pscustomobject]@{
+        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
+        Pattern = '\bm_IsWindowsX64\b|\bm_HasVulkanLoader\b|\bm_HasWin32SurfaceExtension\b|\bWin32SurfaceExtensionUnavailable\b'
+        Reason = "core Vulkan device profile contains host ABI, loader, or Win32 WSI policy"
+    }
+)
+foreach ($check in $presentationContractChecks) {
+    $content = Get-Content -LiteralPath $check.Path -Raw -ErrorAction Stop
+    if ($content -match $check.Pattern) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "rhi-presentation-boundary"
+            Target = ConvertTo-RepoRelativePath $check.Path
+            Reason = $check.Reason
+        })
+    }
+}
+
 $pathDiscoveryAllowed = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
 foreach ($allowedPath in @(

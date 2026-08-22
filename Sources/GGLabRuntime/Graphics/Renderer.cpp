@@ -52,6 +52,12 @@ namespace gglab
 
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
+		if (createInfo.m_RHIContextFactory == nullptr)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer initialization requires a host-supplied RHI context factory.");
+			return false;
+		}
 		if (!createInfo.HasRequiredRuntimePaths())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -60,13 +66,11 @@ namespace gglab
 		}
 
 		RHIContextDesc contextDesc{};
-		contextDesc.m_Backend = createInfo.m_Backend;
-		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
 		contextDesc.m_AdapterSelector = createInfo.m_AdapterSelector;
 		contextDesc.m_EnableDebugValidation = createInfo.m_EnableDebugValidation;
-		m_RHIContext = CreateRHIContext(contextDesc);
+		m_RHIContext = createInfo.m_RHIContextFactory->CreateContext(contextDesc);
 		if (!m_RHIContext)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(

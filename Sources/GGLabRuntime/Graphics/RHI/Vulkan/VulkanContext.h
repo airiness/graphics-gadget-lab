@@ -9,6 +9,7 @@
 namespace gglab
 {
 	struct VulkanBootstrapRuntimeResult;
+	class VulkanSurfaceFactoryBase;
 	class VulkanComputeCommandContext;
 	class VulkanContext;
 	class VulkanContextSwapChain;
@@ -48,7 +49,8 @@ namespace gglab
 	{
 	public:
 		[[nodiscard]] static std::unique_ptr<VulkanContext> Create(
-			const RHIContextDesc& desc) noexcept;
+			const RHIContextDesc& desc, const VulkanSurfaceFactoryBase& surfaceFactory,
+			bool isHostAbiSupported) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanContext);
 		~VulkanContext() override;
 
@@ -100,7 +102,8 @@ namespace gglab
 			const VulkanContext& context, VulkanBackendSnapshot& outSnapshot) noexcept;
 
 		VulkanContext() noexcept = default;
-		[[nodiscard]] bool Initialize(const RHIContextDesc& desc) noexcept;
+		[[nodiscard]] bool Initialize(const RHIContextDesc& desc,
+			const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept;
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height) noexcept;
 		void FinishFrame(VulkanFrameContext& frame) noexcept;
 		void Finalize() noexcept;

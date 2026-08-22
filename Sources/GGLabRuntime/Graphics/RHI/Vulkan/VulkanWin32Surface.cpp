@@ -64,15 +64,4 @@ namespace gglab
 		result.m_Surface = std::make_unique<VulkanSurface>(instance, surface);
 		return result;
 	}
-
-	std::unique_ptr<VulkanSurfaceFactoryBase> CreateVulkanPlatformSurfaceFactory(
-		void* nativeWindowHandle) noexcept
-	{
-		if (nativeWindowHandle == nullptr)
-		{
-			return {};
-		}
-		return std::make_unique<VulkanWin32SurfaceFactory>(
-			GetModuleHandleW(nullptr), static_cast<HWND>(nativeWindowHandle));
-	}
 }

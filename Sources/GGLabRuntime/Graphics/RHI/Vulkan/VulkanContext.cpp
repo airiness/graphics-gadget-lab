@@ -156,10 +156,11 @@ namespace gglab
 		return *m_Context->m_DirectComputeContext;
 	}
 
-	std::unique_ptr<VulkanContext> VulkanContext::Create(const RHIContextDesc& desc) noexcept
+	std::unique_ptr<VulkanContext> VulkanContext::Create(const RHIContextDesc& desc,
+		const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept
 	{
 		auto context = std::unique_ptr<VulkanContext>(new VulkanContext());
-		if (!context->Initialize(desc))
+		if (!context->Initialize(desc, surfaceFactory, isHostAbiSupported))
 		{
 			return {};
 		}
@@ -171,17 +172,19 @@ namespace gglab
 		Finalize();
 	}
 
-	bool VulkanContext::Initialize(const RHIContextDesc& desc) noexcept
+	bool VulkanContext::Initialize(const RHIContextDesc& desc,
+		const VulkanSurfaceFactoryBase& surfaceFactory, bool isHostAbiSupported) noexcept
 	{
-		if (desc.m_WindowHandle == nullptr || desc.m_Width == 0 || desc.m_Height == 0 ||
-			desc.m_FrameSlotCount == 0)
+		if (desc.m_Width == 0 || desc.m_Height == 0 || desc.m_FrameSlotCount == 0)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"VulkanContext requires a window, a nonzero extent and at least one frame slot.");
+				"VulkanContext requires a nonzero extent and at least one frame slot.");
 			return false;
 		}
 
 		VulkanBootstrapRuntimeCreateInfo createInfo{};
+		createInfo.m_BootstrapOptions.m_SurfaceFactory = &surfaceFactory;
+		createInfo.m_BootstrapOptions.m_IsHostAbiSupported = isHostAbiSupported;
 		createInfo.m_BootstrapOptions.m_RequestValidation = desc.m_EnableDebugValidation;
 		createInfo.m_BootstrapOptions.m_SelectionRequest =
 			ParseVulkanAdapterSelectionRequest(desc.m_AdapterSelector);
@@ -190,15 +193,6 @@ namespace gglab
 		createInfo.m_Vsync = desc.m_Vsync;
 		createInfo.m_Width = desc.m_Width;
 		createInfo.m_Height = desc.m_Height;
-		std::unique_ptr<VulkanSurfaceFactoryBase> surfaceFactory =
-			CreateVulkanPlatformSurfaceFactory(desc.m_WindowHandle);
-		if (!surfaceFactory)
-		{
-			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"Vulkan RHI could not create a platform surface factory for the window.");
-			return false;
-		}
-		createInfo.m_BootstrapOptions.m_SurfaceFactory = surfaceFactory.get();
 		VulkanBootstrapRuntimeResult bootstrap = CreateVulkanBootstrapRuntime(createInfo);
 		if (!bootstrap.Succeeded())
 		{

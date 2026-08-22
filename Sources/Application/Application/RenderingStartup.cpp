@@ -45,6 +45,7 @@ namespace gglab
 		static_cast<void>(hwnd);
 #endif
 		qualificationOptions.m_RequestValidation = requestValidation;
+		qualificationOptions.m_IsHostAbiSupported = sizeof(void*) == 8;
 		qualificationOptions.m_ListAdapters = options.m_ListAdapters;
 		qualificationOptions.m_AdapterSelector = options.m_AdapterSelector;
 		qualificationOptions.m_ShaderSourceRoot = runtimePaths.m_ShaderSourceRoot;

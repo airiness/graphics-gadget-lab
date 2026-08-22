@@ -2,6 +2,7 @@
 #include "Application/ApplicationLog.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Demo/DemoLabHost.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Application/Demo/DemoLoadingShell.h"
@@ -156,6 +157,8 @@ namespace gglab
 		m_WindowHeight = mainWindow.GetHeight();
 
 		const RHIBackendType activeBackend = ToRHIBackendType(m_RuntimeConfig.m_RhiBackend);
+		m_RHIContextFactory =
+			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
 
 		// Time
 		m_Time = std::make_unique<Time>();
@@ -182,13 +185,12 @@ namespace gglab
 		// Renderer
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
-		rendererCreateInfo.m_Backend = activeBackend;
+		rendererCreateInfo.m_RHIContextFactory = m_RHIContextFactory.get();
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_IblDerivedDataCacheDirectory =
 			m_RuntimePaths.m_IblDerivedDataRoot;
 		rendererCreateInfo.m_ShaderSourceRoot = m_RuntimePaths.m_ShaderSourceRoot;
-		rendererCreateInfo.m_NativeWindowHandle = mainWindow.GetNativeHandle();
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		rendererCreateInfo.m_AdapterSelector = m_RuntimeConfig.m_AdapterSelector;
@@ -624,6 +626,7 @@ namespace gglab
 			m_Renderer->Finalize();
 			m_Renderer.reset();
 		}
+		m_RHIContextFactory.reset();
 
 		m_EnvironmentAssetController.reset();
 		m_ShaderManager.reset();

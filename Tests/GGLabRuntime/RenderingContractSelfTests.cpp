@@ -612,6 +612,26 @@ namespace gglab
 
 		void RunRuntimePathConfigurationContractTests(SelfTestContext& context) noexcept
 		{
+			class RecordingContextFactory final : public RHIContextFactoryBase
+			{
+			public:
+				std::unique_ptr<RHIContext> CreateContext(
+					const RHIContextDesc& desc) const noexcept override
+				{
+					m_CreateCalled = true;
+					m_Desc = desc;
+					return {};
+				}
+
+				mutable bool m_CreateCalled = false;
+				mutable RHIContextDesc m_Desc{};
+			};
+
+			static_assert(std::is_abstract_v<RHIContextFactoryBase>);
+			static_assert(std::has_virtual_destructor_v<RHIContextFactoryBase>);
+			static_assert(std::is_same_v<decltype(Renderer::CreateInfo::m_RHIContextFactory),
+				const RHIContextFactoryBase*>);
+
 			Renderer::CreateInfo createInfo{};
 			context.Check(!createInfo.HasRequiredRuntimePaths(),
 				"Renderer configuration rejects missing host-supplied runtime paths");
@@ -621,6 +641,19 @@ namespace gglab
 			createInfo.m_ShaderSourceRoot = "Shaders";
 			context.Check(createInfo.HasRequiredRuntimePaths(),
 				"Renderer configuration accepts both required host-supplied runtime paths");
+
+			Renderer missingFactoryRenderer;
+			context.Check(!missingFactoryRenderer.Initialize(createInfo),
+				"Renderer rejects a missing host-supplied RHI context factory");
+
+			RecordingContextFactory factory;
+			createInfo.m_RHIContextFactory = &factory;
+			createInfo.m_Width = 1280;
+			createInfo.m_Height = 720;
+			Renderer renderer;
+			context.Check(!renderer.Initialize(createInfo) && factory.m_CreateCalled &&
+				factory.m_Desc.m_Width == 1280 && factory.m_Desc.m_Height == 720,
+				"Renderer borrows the host factory and forwards only neutral context settings");
 		}
 
 		void RunNapaVoxelRenderGraphContractTests(SelfTestContext& context) noexcept

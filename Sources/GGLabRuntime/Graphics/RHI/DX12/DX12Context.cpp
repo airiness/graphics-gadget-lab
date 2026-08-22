@@ -51,9 +51,9 @@ namespace gglab
 		return m_Context->AcquireComputeContext(*this);
 	}
 
-	DX12Context::DX12Context(const RHIContextDesc& desc) noexcept
+	DX12Context::DX12Context(const RHIContextDesc& desc, HWND window) noexcept
 	{
-		GGLAB_ASSERT_MSG(desc.m_WindowHandle != nullptr, "DX12Context requires a window handle.");
+		GGLAB_ASSERT_MSG(window != nullptr, "DX12Context requires a window handle.");
 		GGLAB_ASSERT_MSG(
 			desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
 		GGLAB_ASSERT_MSG(desc.m_FrameSlotCount >= 2,
@@ -93,7 +93,7 @@ namespace gglab
 		DX12SwapChain::CreateInfo swapChainInfo{};
 		swapChainInfo.m_DX12Device = m_Device.get();
 		swapChainInfo.m_PresentQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
-		swapChainInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
+		swapChainInfo.m_Hwnd = window;
 		swapChainInfo.m_Width = desc.m_Width;
 		swapChainInfo.m_Height = desc.m_Height;
 		swapChainInfo.m_Format = ToDXGIFormat(desc.m_BackBufferFormat);

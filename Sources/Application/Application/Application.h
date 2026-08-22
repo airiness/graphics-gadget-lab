@@ -12,6 +12,7 @@
 namespace gglab
 {
 	class Renderer;
+	class RHIContextFactoryBase;
 	class AssetManager;
 	class EnvironmentAssetController;
 	class TaskSystem;
@@ -104,6 +105,7 @@ namespace gglab
 		AppRuntimeConfig m_RuntimeConfig{};
 		RuntimePaths m_RuntimePaths{};
 		AppRuntimeHostServices m_HostServices{};
+		std::unique_ptr<RHIContextFactoryBase> m_RHIContextFactory;
 		std::unique_ptr<Renderer> m_Renderer;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;

@@ -33,6 +33,7 @@ namespace gglab
 		{
 			VulkanBootstrapOptions bootstrapOptions{};
 			bootstrapOptions.m_SurfaceFactory = options.m_SurfaceFactory;
+			bootstrapOptions.m_IsHostAbiSupported = options.m_IsHostAbiSupported;
 			bootstrapOptions.m_RequestValidation = options.m_RequestValidation;
 			bootstrapOptions.m_SelectionRequest =
 				ParseVulkanAdapterSelectionRequest(options.m_AdapterSelector);

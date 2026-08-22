@@ -153,6 +153,7 @@
       <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Application.cpp" />
+    <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\RenderingStartup.cpp" />
@@ -261,6 +262,7 @@
     <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
     <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationHostConfiguration.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLog.h" />
     <ClInclude Include="..\..\Sources\Application\Application\ApplicationLaunchOptions.h" />

@@ -258,6 +258,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
@@ -606,6 +609,9 @@
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32PlatformHost.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32RHIContextFactory.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Platform\Windows\Win32VulkanQualificationHost.h">
