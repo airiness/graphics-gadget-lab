@@ -24,6 +24,7 @@ namespace gglab
 
 	private:
 		Win32Window m_MainWindow;
+		bool m_IsInitialized = false;
 		bool m_QuitRequested = false;
 	};
 }

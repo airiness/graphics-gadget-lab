@@ -1,4 +1,5 @@
 #include "Application/SelfTest/SelfTestRunner.h"
+#include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
@@ -17,6 +18,10 @@ namespace gglab
 	namespace
 	{
 		constexpr std::array RegisteredSuites{
+			SelfTestSuiteDesc{
+				.m_Id = "app-lifecycle",
+				.m_Run = &RunApplicationLifecycleSelfTests,
+			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-devtools-view-profile",
 				.m_Run = &RunDevToolsViewProfileSelfTests,

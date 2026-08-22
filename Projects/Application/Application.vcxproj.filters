@@ -261,6 +261,9 @@
     <ClCompile Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.cpp">
       <Filter>Application\Rendering</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -592,6 +595,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\Rendering\VulkanQualification.h">
       <Filter>Application\Rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\Application\Application\SelfTest\ApplicationLifecycleSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\Application\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h">
       <Filter>Application\SelfTest</Filter>

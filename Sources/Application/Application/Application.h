@@ -30,6 +30,16 @@ namespace gglab
 	class Application
 	{
 	public:
+		enum class LifecycleState : uint8_t
+		{
+			Uninitialized,
+			Initializing,
+			Running,
+			Failed,
+			ShuttingDown,
+			Stopped,
+		};
+
 		struct CreateInfo
 		{
 			std::wstring_view m_WindowName;
@@ -42,10 +52,13 @@ namespace gglab
 	public:
 		explicit Application(CreateInfo createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Application);
-		~Application();
+		~Application() noexcept;
 
+		[[nodiscard]] bool Initialize() noexcept;
 		void Run() noexcept;
-		bool IsInitialized() const noexcept { return m_IsInitialized; }
+		void Shutdown() noexcept;
+		bool IsInitialized() const noexcept { return m_LifecycleState == LifecycleState::Running; }
+		LifecycleState GetLifecycleState() const noexcept { return m_LifecycleState; }
 
 		// Process exit code. Non-zero when startup validation, backend bootstrap,
 		// or qualification fails.
@@ -68,14 +81,9 @@ namespace gglab
 		Mouse* GetMouse() const noexcept;
 		Time* GetTime() const noexcept { return m_Time.get(); }
 
-		static void CreateApplicationInstance(CreateInfo createInfo) noexcept;
-		static Application* GetInstance() noexcept;
-		static void DestroyApplicationInstance() noexcept;
-
 	private:
-		void Initialize() noexcept;
+		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
-		void Finalize() noexcept;
 
 		void InitializeAssets() noexcept;
 		[[nodiscard]] LoadingProgress GetStartupLoadingProgress() const noexcept;
@@ -87,9 +95,6 @@ namespace gglab
 		void OnSuspend() noexcept;
 		void OnResume() noexcept;
 		void OnResize(uint32_t width, uint32_t height) noexcept;
-
-	private:
-		static std::unique_ptr<Application> s_Application;
 
 	private:
 		uint32_t m_WindowWidth = 0;
@@ -111,7 +116,9 @@ namespace gglab
 		std::unique_ptr<DevelopGuiSystem> m_DevelopGuiSystem;
 		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
 
-		bool m_IsInitialized = false;
+		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
+		bool m_PlatformHostInitializationAttempted = false;
+		bool m_ShutdownComplete = false;
 		bool m_IsSuspended = false;
 		bool m_ExitAfterInitialize = false;
 		int m_ExitCode = 0;

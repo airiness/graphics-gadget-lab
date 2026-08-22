@@ -48,53 +48,6 @@
 
 namespace gglab
 {
-	std::unique_ptr<Application> Application::s_Application;
-
-	Keyboard* Application::GetKeyboard() const noexcept
-	{
-		if (const auto input = GetInputManager())
-		{
-			return input->GetKeyboard();
-		}
-
-		return nullptr;
-	}
-
-	Mouse* Application::GetMouse() const noexcept
-	{
-		if (const auto input = GetInputManager())
-		{
-			return input->GetMouse();
-		}
-
-		return nullptr;
-	}
-
-	void Application::CreateApplicationInstance(CreateInfo createInfo) noexcept
-	{
-		if (s_Application == nullptr)
-		{
-			s_Application = std::make_unique<Application>(std::move(createInfo));
-			s_Application->Initialize();
-		}
-	}
-
-	Application* Application::GetInstance() noexcept
-	{
-		GGLAB_ASSERT_MSG(s_Application != nullptr,
-			"Application instance is not created. Call CreateApplicationInstance first.");
-		return s_Application.get();
-	}
-
-	void Application::DestroyApplicationInstance() noexcept
-	{
-		if (s_Application)
-		{
-			s_Application->Finalize();
-			s_Application.reset();
-		}
-	}
-
 	Application::Application(CreateInfo createInfo) noexcept :
 		m_WindowWidth(createInfo.m_WindowWidth), m_WindowHeight(createInfo.m_WindowHeight),
 		m_WindowName(createInfo.m_WindowName),
@@ -103,11 +56,15 @@ namespace gglab
 	{
 	}
 
-	Application::~Application() = default;
+	Application::~Application() noexcept
+	{
+		Shutdown();
+	}
 
 	void Application::Run() noexcept
 	{
-		if (!m_IsInitialized || !m_PlatformHost || m_ExitAfterInitialize)
+		if (m_LifecycleState != LifecycleState::Running || !m_PlatformHost ||
+			m_ExitAfterInitialize)
 		{
 			return;
 		}
@@ -129,12 +86,18 @@ namespace gglab
 		}
 	}
 
-	void Application::Initialize() noexcept
+	bool Application::Initialize() noexcept
 	{
-		if (m_IsInitialized)
+		if (m_LifecycleState == LifecycleState::Running)
 		{
-			return;
+			return true;
 		}
+		if (m_LifecycleState != LifecycleState::Uninitialized)
+		{
+			return false;
+		}
+
+		m_LifecycleState = LifecycleState::Initializing;
 
 		// Logger
 		InitializeLogging();
@@ -145,7 +108,7 @@ namespace gglab
 		if (!m_PlatformHost)
 		{
 			GGLAB_LOG_ERROR("Application requires a platform host.");
-			return;
+			return FailInitialization();
 		}
 
 		const PlatformWindowCreateInfo windowCreateInfo{
@@ -153,10 +116,11 @@ namespace gglab
 			.m_Width = m_WindowWidth,
 			.m_Height = m_WindowHeight,
 		};
+		m_PlatformHostInitializationAttempted = true;
 		if (!m_PlatformHost->Initialize(windowCreateInfo))
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the platform host.");
-			return;
+			return FailInitialization();
 		}
 
 		auto& mainWindow = m_PlatformHost->GetMainWindow();
@@ -174,8 +138,8 @@ namespace gglab
 			m_ExitCode = RunRenderingStartupPath(
 				m_LaunchOptions, static_cast<HWND>(mainWindow.GetNativeHandle()));
 			m_ExitAfterInitialize = true;
-			m_IsInitialized = true;
-			return;
+			m_LifecycleState = LifecycleState::Running;
+			return true;
 		}
 
 		// Time
@@ -222,10 +186,7 @@ namespace gglab
 		if (!m_Renderer->Initialize(rendererCreateInfo))
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
-			m_ExitCode = 1;
-			m_ExitAfterInitialize = true;
-			m_IsInitialized = true;
-			return;
+			return FailInitialization();
 		}
 
 		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
@@ -286,9 +247,7 @@ namespace gglab
 			labHostIndex >= m_DemoManager->GetDemoCount())
 		{
 			GGLAB_LOG_ERROR("Failed to register startup demos.");
-			m_IsInitialized = true;
-			Finalize();
-			return;
+			return FailInitialization();
 		}
 		uint32_t startupDemoIndex = startIndex;
 		std::string_view startupDemoName = "Demo.Start";
@@ -341,12 +300,13 @@ namespace gglab
 
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
 
-		m_IsInitialized = true;
+		m_LifecycleState = LifecycleState::Running;
+		return true;
 	}
 
 	bool Application::Tick() noexcept
 	{
-		if (!m_IsInitialized)
+		if (m_LifecycleState != LifecycleState::Running)
 		{
 			return true;
 		}
@@ -553,54 +513,81 @@ namespace gglab
 		return true;
 	}
 
-	void Application::Finalize() noexcept
+	bool Application::FailInitialization() noexcept
 	{
-		if (!m_IsInitialized)
+		if (m_ExitCode == 0)
+		{
+			m_ExitCode = 1;
+		}
+		m_LifecycleState = LifecycleState::Failed;
+		Shutdown();
+		return false;
+	}
+
+	void Application::Shutdown() noexcept
+	{
+		if (m_ShutdownComplete || m_LifecycleState == LifecycleState::ShuttingDown)
 		{
 			return;
 		}
 
-		// Early-exit startup paths never completed the renderer subsystems.
-		if (m_ExitAfterInitialize)
+		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
+		m_LifecycleState = LifecycleState::ShuttingDown;
+
+		if (m_AssetManager)
 		{
+			// Close public submission before client OnExit hooks release their interests.
+			m_AssetManager->BeginShutdown();
+
+			// Release active and pending demo/Lab asset interests while their services
+			// are still alive. GPU-facing session objects remain alive until WaitIdle.
+			if (m_DemoManager)
+			{
+				m_DemoManager->PrepareForAssetShutdown();
+			}
+
+			// Commit the pinned fallback before releasing environment texture leases.
+			m_EnvironmentAssetController.reset();
+
+			// Stop workers and deliver terminal completion notifications while task
+			// consumers are still alive.
 			if (m_TaskSystem)
 			{
 				m_TaskSystem->Shutdown();
+				m_TaskSystem->PumpCompletions();
+				m_AssetManager->DrainLoadCompletions();
 			}
-			if (m_PlatformHost)
+
+			GGLAB_ASSERT_MSG(m_Renderer && m_Renderer->IsInitialized(),
+				"Application asset lifetime requires an initialized renderer.");
+			if (m_Renderer && m_Renderer->IsInitialized())
 			{
-				m_PlatformHost->Finalize();
+				// Task completions only enqueue CPU-ready streaming payloads. Drain CPU-ready
+				// and upload-ready work before waiting for the uploads submitted by that work.
+				m_Renderer->GetAssetUploadScheduler()->DrainReadyWork();
+
+				// Must flush here for gpu resource safe release next
+				m_Renderer->GetRHIContext()->WaitIdle();
+				m_Renderer->GetAssetUploadScheduler()->Finalize();
+
+				m_RenderFrameBuilder.reset();
+				if (m_DevelopGuiSystem)
+				{
+					m_DevelopGuiSystem->Finalize();
+					m_DevelopGuiSystem.reset();
+				}
+				m_LabRuntimeLocator.reset();
+				m_DemoManager.reset();
+				m_DebugDrawSystem.reset();
+				m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
+				m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
 			}
-			m_IsInitialized = false;
-			return;
+			m_AssetManager.reset();
 		}
-
-		// Close public submission before client OnExit hooks release their interests.
-		m_AssetManager->BeginShutdown();
-
-		// Release active and pending demo/Lab asset interests while their services
-		// are still alive. GPU-facing session objects remain alive until WaitIdle.
-		m_DemoManager->PrepareForAssetShutdown();
-
-		// Commit the pinned fallback before releasing environment texture leases.
-		m_EnvironmentAssetController.reset();
-
-		// Stop workers and deliver terminal completion notifications while task
-		// consumers are still alive.
-		if (m_TaskSystem)
+		else if (m_TaskSystem)
 		{
 			m_TaskSystem->Shutdown();
-			m_TaskSystem->PumpCompletions();
-			m_AssetManager->DrainLoadCompletions();
 		}
-
-		// Task completions only enqueue CPU-ready streaming payloads. Drain CPU-ready
-		// and upload-ready work before waiting for the uploads submitted by that work.
-		m_Renderer->GetAssetUploadScheduler()->DrainReadyWork();
-
-		// Must flush here for gpu resource safe release next
-		m_Renderer->GetRHIContext()->WaitIdle();
-		m_Renderer->GetAssetUploadScheduler()->Finalize();
 
 		m_RenderFrameBuilder.reset();
 		if (m_DevelopGuiSystem)
@@ -611,21 +598,46 @@ namespace gglab
 		m_LabRuntimeLocator.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();
-		m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
-		m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
-		m_AssetManager.reset();
+		if (m_Renderer)
+		{
+			m_Renderer->Finalize();
+			m_Renderer.reset();
+		}
 
-		m_Renderer->Finalize();
-		m_Renderer.reset();
-
+		m_EnvironmentAssetController.reset();
 		m_ShaderManager.reset();
 		m_InputManager.reset();
 		m_Time.reset();
 		m_TaskSystem.reset();
 
-		m_PlatformHost->Finalize();
+		if (m_PlatformHost && m_PlatformHostInitializationAttempted)
+		{
+			m_PlatformHost->Finalize();
+			m_PlatformHostInitializationAttempted = false;
+		}
 
-		m_IsInitialized = false;
+		m_ShutdownComplete = true;
+		m_LifecycleState = preserveFailure ? LifecycleState::Failed : LifecycleState::Stopped;
+	}
+
+	Keyboard* Application::GetKeyboard() const noexcept
+	{
+		if (const auto input = GetInputManager())
+		{
+			return input->GetKeyboard();
+		}
+
+		return nullptr;
+	}
+
+	Mouse* Application::GetMouse() const noexcept
+	{
+		if (const auto input = GetInputManager())
+		{
+			return input->GetMouse();
+		}
+
+		return nullptr;
 	}
 
 	void Application::InitializeAssets() noexcept
@@ -762,7 +774,7 @@ namespace gglab
 
 	void Application::OnResize(uint32_t width, uint32_t height) noexcept
 	{
-		if (!m_IsInitialized)
+		if (m_LifecycleState != LifecycleState::Running)
 		{
 			return;
 		}

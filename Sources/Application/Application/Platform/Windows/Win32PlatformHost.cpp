@@ -10,6 +10,11 @@ namespace gglab
 
 	bool Win32PlatformHost::Initialize(const PlatformWindowCreateInfo& createInfo) noexcept
 	{
+		if (m_IsInitialized)
+		{
+			return false;
+		}
+
 		WCHAR executablePath[MAX_PATH]{};
 		if (GetModuleFileNameW(nullptr, executablePath, MAX_PATH) > 0)
 		{
@@ -18,13 +23,17 @@ namespace gglab
 		}
 
 		m_QuitRequested = false;
-		return m_MainWindow.Initialize(createInfo);
+		m_IsInitialized = m_MainWindow.Initialize(createInfo);
+		return m_IsInitialized;
 	}
 
 	void Win32PlatformHost::Finalize() noexcept
 	{
-		m_MainWindow.Finalize();
-		m_QuitRequested = true;
+		if (m_IsInitialized)
+		{
+			m_MainWindow.Finalize();
+			m_IsInitialized = false;
+		}
 	}
 
 	void Win32PlatformHost::PumpEvents() noexcept

@@ -48,16 +48,14 @@ int main(int argc, char* argv[])
 	createInfo.m_PlatformHost = std::make_unique<gglab::Win32PlatformHost>(hInstance);
 	createInfo.m_LaunchOptions = launchResult.m_Options;
 
-	gglab::Application::CreateApplicationInstance(std::move(createInfo));
-	auto* application = gglab::Application::GetInstance();
-	if (!application->IsInitialized())
+	gglab::Application application(std::move(createInfo));
+	if (!application.Initialize())
 	{
-		gglab::Application::DestroyApplicationInstance();
 		return EXIT_FAILURE;
 	}
-	application->Run();
-	const int exitCode = application->GetExitCode();
-	gglab::Application::DestroyApplicationInstance();
+	application.Run();
+	const int exitCode = application.GetExitCode();
+	application.Shutdown();
 
 	return exitCode == 0 ? EXIT_SUCCESS : exitCode;
 }
