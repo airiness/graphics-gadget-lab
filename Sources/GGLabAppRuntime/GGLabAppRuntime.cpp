@@ -2,11 +2,6 @@
 
 namespace gglab
 {
-	GGLabAppRuntime::~GGLabAppRuntime() noexcept
-	{
-		Shutdown();
-	}
-
 	AppRuntimeInitializeResult GGLabAppRuntime::Initialize(
 		const GGLabAppRuntimeCreateInfo& createInfo) noexcept
 	{
@@ -32,6 +27,10 @@ namespace gglab
 			m_LifecycleState = AppRuntimeLifecycleState::Failed;
 			return AppRuntimeInitializeResult::InvalidRuntimePaths;
 		}
+
+		m_Config = createInfo.m_Config;
+		m_Paths = createInfo.m_Paths;
+		m_HostServices = createInfo.m_HostServices;
 
 		m_LifecycleState = AppRuntimeLifecycleState::Running;
 		return AppRuntimeInitializeResult::Succeeded;
@@ -76,20 +75,4 @@ namespace gglab
 		}
 	}
 
-	void GGLabAppRuntime::Shutdown() noexcept
-	{
-		if (m_ShutdownComplete ||
-			m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown)
-		{
-			return;
-		}
-
-		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
-		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
-		// Later ownership slices must complete resource teardown before setting this marker.
-		m_ShutdownComplete = true;
-		m_LifecycleState = preserveFailure
-			? AppRuntimeLifecycleState::Failed
-			: AppRuntimeLifecycleState::Stopped;
-	}
 }

@@ -14,7 +14,7 @@ namespace gglab
 	{
 	public:
 		explicit DemoLoadingShell(const DemoCreateInfo& createInfo) noexcept;
-		~DemoLoadingShell() override = default;
+		~DemoLoadingShell() override;
 
 		std::string_view GetName() const noexcept override { return "Demo.LoadingShell"; }
 		void OnResize(uint32_t width, uint32_t height) noexcept override;

@@ -15,10 +15,17 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationToolingIntegration.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AppRuntimeConfig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp">
+      <Filter>Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShellRenderPipeline.cpp">
+      <Filter>Demo</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.cpp">
       <Filter>Demo</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntimeServices.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.cpp">
       <Filter>Lab</Filter>
     </ClCompile>
@@ -47,6 +54,12 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AppRuntimeLog.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h">
+      <Filter>Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.h">
+      <Filter>Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShellRenderPipeline.h">
       <Filter>Demo</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.h">

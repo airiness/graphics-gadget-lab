@@ -1,4 +1,4 @@
-#include "Application/Demo/DemoLoadingShellRenderPipeline.h"
+#include "Demo/DemoLoadingShellRenderPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

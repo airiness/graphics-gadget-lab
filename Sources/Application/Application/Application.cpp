@@ -1,12 +1,11 @@
 #include "Application/Application.h"
 #include "AppRuntimeLog.h"
-#include "ApplicationContentRegistration.h"
+#include "GGLabAppRuntime.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
-#include "Application/Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
 #include "ApplicationToolingIntegration.h"
@@ -18,9 +17,7 @@
 #include "Core/Profiling/CpuProfiler.h"
 #include "Core/Input/InputManager.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -28,31 +25,12 @@
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 
-#include <filesystem>
 #include <optional>
 #include <span>
-#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] RHIBackendType ToRHIBackendType(AppRuntimeRHIBackend backend) noexcept
-		{
-			switch (backend)
-			{
-			case AppRuntimeRHIBackend::DX12:
-				return RHIBackendType::DX12;
-			case AppRuntimeRHIBackend::Vulkan:
-				return RHIBackendType::Vulkan;
-			default:
-				return RHIBackendType::Unknown;
-			}
-		}
-	}
-
 	Application::Application(CreateInfo createInfo) noexcept :
 		m_WindowWidth(createInfo.m_RuntimeConfig.m_InitialExtent.m_Width),
 		m_WindowHeight(createInfo.m_RuntimeConfig.m_InitialExtent.m_Height),
@@ -109,24 +87,24 @@ namespace gglab
 
 		// Logger
 		InitializeLogging();
-		if (!m_RuntimeConfig.IsValid())
-		{
-			GGLAB_LOG_ERROR("Application requires a valid host-supplied runtime config.");
-			return FailInitialization();
-		}
-		if (!m_RuntimePaths.IsValid())
-		{
-			GGLAB_LOG_ERROR("Application requires valid absolute host-supplied runtime paths.");
-			return FailInitialization();
-		}
 		if (!m_ContentRegistration.IsValid())
 		{
 			GGLAB_LOG_ERROR("Application requires valid host-selected content registrations.");
 			return FailInitialization();
 		}
-		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
-			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
+
+		m_AppRuntime = std::make_unique<GGLabAppRuntime>();
+		const AppRuntimeInitializeResult runtimeInitializeResult = m_AppRuntime->Initialize({
+			.m_Config = m_RuntimeConfig,
+			.m_Paths = m_RuntimePaths,
+			.m_HostServices = m_HostServices,
 			});
+		if (runtimeInitializeResult != AppRuntimeInitializeResult::Succeeded)
+		{
+			GGLAB_LOG_ERROR("Failed to initialize the shared app runtime (status={}).",
+				static_cast<uint32_t>(runtimeInitializeResult));
+			return FailInitialization();
+		}
 
 		if (!m_PlatformHost)
 		{
@@ -150,14 +128,6 @@ namespace gglab
 		m_WindowWidth = mainWindow.GetWidth();
 		m_WindowHeight = mainWindow.GetHeight();
 
-		const RHIBackendType activeBackend = ToRHIBackendType(m_RuntimeConfig.m_RhiBackend);
-		m_RHIContextFactory =
-			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
-
-		// Time
-		m_Time = std::make_unique<Time>();
-		m_Time->Initialize();
-
 		// InputManager
 		m_InputManager = std::make_unique<InputManager>();
 		const bool gameInputAvailable = m_InputManager->Initialize(mainWindow.GetNativeHandle());
@@ -171,144 +141,47 @@ namespace gglab
 			m_InputManager->GetApplicationInput()->SetPointerMode(AppPointerMode::Absolute);
 		}
 
-		// ShaderManager
-		m_ShaderManager = std::make_unique<ShaderManager>(
-			activeBackend, m_RuntimePaths.m_ShaderSourceRoot, m_RuntimePaths.m_ShaderCacheRoot);
-		InitializeAssets();
-
-		// Renderer
-		m_Renderer = std::make_unique<Renderer>();
-		Renderer::CreateInfo rendererCreateInfo{};
-		rendererCreateInfo.m_RHIContextFactory = m_RHIContextFactory.get();
-		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
-		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
-		rendererCreateInfo.m_IblDerivedDataCacheDirectory =
-			m_RuntimePaths.m_IblDerivedDataRoot;
-		rendererCreateInfo.m_ShaderSourceRoot = m_RuntimePaths.m_ShaderSourceRoot;
-		rendererCreateInfo.m_Width = m_WindowWidth;
-		rendererCreateInfo.m_Height = m_WindowHeight;
-		rendererCreateInfo.m_AdapterSelector = m_RuntimeConfig.m_AdapterSelector;
-		rendererCreateInfo.m_EnableDebugValidation =
-			m_RuntimeConfig.m_RequestRuntimeValidation;
-		if (!m_Renderer->Initialize(rendererCreateInfo))
-		{
-			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
-			return FailInitialization();
-		}
-
-		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
-			.m_Device = m_Renderer->GetDevice(),
-			.m_FrameSlotCount = m_Renderer->GetRHIContext()->GetFrameSlotCount(),
-			});
-
-		AssetManager::CreateInfo assetManagerCreateInfo{};
-		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
-		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
-		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
-		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
-		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
-		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
-			m_RuntimePaths.m_TextureDerivedDataRoot;
-		assetManagerCreateInfo.m_AssetRoot = m_RuntimePaths.m_AssetRoot;
-		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
-		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
-		std::optional<std::string_view> startupLabId;
-		if (m_RuntimeConfig.m_StartupLabId)
-		{
-			startupLabId = *m_RuntimeConfig.m_StartupLabId;
-		}
-		const ApplicationContentSelection contentSelection =
-			ResolveApplicationContentSelection(
-				m_ContentRegistration, m_RuntimeConfig.m_StartupDemoId, startupLabId);
-		if (!contentSelection.Succeeded())
-		{
-			GGLAB_LOG_ERROR("Host-selected startup content is unavailable (status={}).",
-				static_cast<uint32_t>(contentSelection.m_Status));
-			return FailInitialization();
-		}
-		m_EnvironmentAssetController =
-			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
-				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
-				.m_AssetRoot = m_RuntimePaths.m_AssetRoot,
+		const RHIBackendType activeBackend = m_RuntimeConfig.m_RhiBackend ==
+			AppRuntimeRHIBackend::DX12 ? RHIBackendType::DX12 : RHIBackendType::Vulkan;
+		m_RHIContextFactory =
+			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
+		const AppRuntimeServiceInitializeResult serviceInitializeResult =
+			m_AppRuntime->InitializeServices({
+				.m_RHIContextFactory = m_RHIContextFactory.get(),
+				.m_Input = m_InputManager->GetApplicationInput(),
+				.m_ContentRegistration = std::move(m_ContentRegistration),
+				.m_WindowWidth = m_WindowWidth,
+				.m_WindowHeight = m_WindowHeight,
 				});
-		m_EnvironmentAssetController->Initialize(m_RuntimePaths.m_EnvironmentAssetRoot);
-
-		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
-		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
-
-		const DemoCreateInfo demoCreateInfo{
-			.m_Services =
-				{
-					.m_Renderer = m_Renderer.get(),
-					.m_AssetManager = m_AssetManager.get(),
-					.m_ShaderManager = m_ShaderManager.get(),
-					.m_TaskSystem = m_TaskSystem.get(),
-					.m_Input = m_InputManager->GetApplicationInput(),
-					.m_Time = m_Time.get(),
-					.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
-					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
-				},
-			.m_WindowWidth = m_WindowWidth,
-			.m_WindowHeight = m_WindowHeight,
-		};
-		m_DemoManager->SetBootstrapDemo(std::make_unique<DemoLoadingShell>(demoCreateInfo));
-		const std::span<const LabRegistration> labRegistrations = m_ContentRegistration.m_Labs;
-		std::optional<uint32_t> startupDemoIndex;
-		std::optional<uint32_t> labHostIndex;
-		for (const ApplicationDemoRegistration& registration : m_ContentRegistration.m_Demos)
+		if (serviceInitializeResult != AppRuntimeServiceInitializeResult::Succeeded)
 		{
-			const uint32_t registeredIndex = m_DemoManager->RegisterDemo(registration.m_Id,
-				[demoCreateInfo, startupLab = contentSelection.m_StartupLab, labRegistrations,
-					factory = registration.m_Factory]() noexcept -> std::unique_ptr<DemoBase>
-				{ return factory(demoCreateInfo, startupLab, labRegistrations); });
-			if (registeredIndex >= m_DemoManager->GetDemoCount())
-			{
-				GGLAB_LOG_ERROR("Failed to register demo '{}'.", registration.m_Id);
-				return FailInitialization();
-			}
-			if (&registration == contentSelection.m_StartupDemo)
-			{
-				startupDemoIndex = registeredIndex;
-			}
-			if (registration.m_ProvidesLabRuntime)
-			{
-				labHostIndex = registeredIndex;
-			}
-		}
-		if (!startupDemoIndex)
-		{
-			GGLAB_LOG_ERROR("Failed to resolve the registered startup demo.");
+			GGLAB_LOG_ERROR("Failed to compose shared runtime services (status={}).",
+				static_cast<uint32_t>(serviceInitializeResult));
 			return FailInitialization();
 		}
-		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
+
+		m_Renderer = m_AppRuntime->GetRenderer();
+		m_Time = m_AppRuntime->GetTime();
+		m_TaskSystem = m_AppRuntime->GetTaskSystem();
+		m_AssetManager = m_AppRuntime->GetAssetManager();
+		m_EnvironmentAssetController = m_AppRuntime->GetEnvironmentAssetController();
+		m_ShaderManager = m_AppRuntime->GetShaderManager();
+		m_DemoManager = m_AppRuntime->GetDemoManager();
+		m_RenderFrameBuilder = m_AppRuntime->GetRenderFrameBuilder();
+		m_DebugDrawSystem = m_AppRuntime->GetDebugDrawSystem();
+		const std::optional<uint32_t> labHostIndex = m_AppRuntime->GetLabHostDemoIndex();
 		if (labHostIndex)
 		{
 			m_LabRuntimeLocator =
-				std::make_unique<DemoLabRuntimeLocator>(m_DemoManager.get(), *labHostIndex);
+				std::make_unique<DemoLabRuntimeLocator>(m_DemoManager, *labHostIndex);
 		}
-		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
-			m_RuntimeConfig.m_StartupDemoId,
-			contentSelection.m_StartupLab.IsValid()
-				? contentSelection.m_StartupLab.GetName()
-				: std::string_view("none"),
-			m_RuntimeConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute
-				? "absolute"
-				: "relative");
-		GGLAB_LOG_INFO(
-			"Runtime paths: assets='{}', shaders='{}', shader_cache='{}', ibl_ddc='{}', texture_ddc='{}'.",
-			m_RuntimePaths.m_AssetRoot.string(), m_RuntimePaths.m_ShaderSourceRoot.string(),
-			m_RuntimePaths.m_ShaderCacheRoot.string(),
-			m_RuntimePaths.m_IblDerivedDataRoot.string(),
-			m_RuntimePaths.m_TextureDerivedDataRoot.string());
-
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
 				.m_RHIContext = m_Renderer->GetRHIContext(),
-				.m_TaskSystem = m_TaskSystem.get(),
-				.m_DemoManager = m_DemoManager.get(),
+				.m_TaskSystem = m_TaskSystem,
+				.m_DemoManager = m_DemoManager,
 				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,
 				});
@@ -325,8 +198,6 @@ namespace gglab
 		{
 			GGLAB_LOG_INFO("Optional application tooling omitted by host composition.");
 		}
-
-		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
 
 		m_LifecycleState = LifecycleState::Running;
 		return true;
@@ -438,9 +309,9 @@ namespace gglab
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
 		const RenderServices services{
-			.m_Renderer = m_Renderer.get(),
-			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get(),
+			.m_Renderer = m_Renderer,
+			.m_AssetManager = m_AssetManager,
+			.m_ShaderManager = m_ShaderManager,
 			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
 		};
 
@@ -468,7 +339,7 @@ namespace gglab
 			std::optional<LoadingProgress> loadingProgress;
 			if (!shaderPreload.IsReady())
 			{
-				loadingProgress = GetStartupLoadingProgress();
+				loadingProgress = m_AppRuntime->GetStartupLoadingProgress();
 			}
 			else
 			{
@@ -479,16 +350,16 @@ namespace gglab
 				.m_Camera = &camera,
 				.m_CameraController = &demo->GetCameraController(),
 				.m_CameraRig = &demo->GetCameraRig(),
-				.m_Renderer = m_Renderer.get(),
+				.m_Renderer = m_Renderer,
 				.m_World = &world,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
 				.m_MainRenderView =
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
-				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				.m_AssetManager = m_AssetManager,
+				.m_EnvironmentAssetController = m_EnvironmentAssetController,
 				.m_RenderGraph = &rg,
-				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
+				.m_DebugDrawSystem = m_DebugDrawSystem,
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_DirectionalShadowSettings =
 					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
@@ -549,79 +420,31 @@ namespace gglab
 		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
 		m_LifecycleState = LifecycleState::ShuttingDown;
 
-		if (m_AssetManager)
-		{
-			// Close public submission before client OnExit hooks release their interests.
-			m_AssetManager->BeginShutdown();
-
-			// Release active and pending demo/Lab asset interests while their services
-			// are still alive. GPU-facing session objects remain alive until WaitIdle.
-			if (m_DemoManager)
-			{
-				m_DemoManager->PrepareForAssetShutdown();
-			}
-
-			// Commit the pinned fallback before releasing environment texture leases.
-			m_EnvironmentAssetController.reset();
-
-			// Stop workers and deliver terminal completion notifications while task
-			// consumers are still alive.
-			if (m_TaskSystem)
-			{
-				m_TaskSystem->Shutdown();
-				m_TaskSystem->PumpCompletions();
-				m_AssetManager->DrainLoadCompletions();
-			}
-
-			GGLAB_ASSERT_MSG(m_Renderer && m_Renderer->IsInitialized(),
-				"Application asset lifetime requires an initialized renderer.");
-			if (m_Renderer && m_Renderer->IsInitialized())
-			{
-				// Task completions only enqueue CPU-ready streaming payloads. Drain CPU-ready
-				// and upload-ready work before waiting for the uploads submitted by that work.
-				m_Renderer->GetAssetUploadScheduler()->DrainReadyWork();
-
-				// Must flush here for gpu resource safe release next
-				m_Renderer->GetRHIContext()->WaitIdle();
-				m_Renderer->GetAssetUploadScheduler()->Finalize();
-
-				m_RenderFrameBuilder.reset();
-				m_ApplicationTooling.reset();
-				m_LabRuntimeLocator.reset();
-				m_DemoManager.reset();
-				m_DebugDrawSystem.reset();
-				m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
-				m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
-			}
-			m_AssetManager.reset();
-		}
-		else if (m_TaskSystem)
-		{
-			m_TaskSystem->Shutdown();
-		}
-
-		m_RenderFrameBuilder.reset();
+		// Host-owned tooling and concrete Lab lookup must release their references
+		// before the shared runtime destroys Demo/Lab and rendering services.
 		m_ApplicationTooling.reset();
 		m_LabRuntimeLocator.reset();
-		m_DemoManager.reset();
-		m_DebugDrawSystem.reset();
-		if (m_Renderer)
+		if (m_AppRuntime)
 		{
-			m_Renderer->Finalize();
-			m_Renderer.reset();
+			m_AppRuntime->Shutdown();
 		}
+
+		m_Renderer = nullptr;
+		m_Time = nullptr;
+		m_TaskSystem = nullptr;
+		m_AssetManager = nullptr;
+		m_EnvironmentAssetController = nullptr;
+		m_ShaderManager = nullptr;
+		m_DemoManager = nullptr;
+		m_RenderFrameBuilder = nullptr;
+		m_DebugDrawSystem = nullptr;
 		m_RHIContextFactory.reset();
 
-		m_EnvironmentAssetController.reset();
-		m_ShaderManager.reset();
 		if (m_InputManager)
 		{
 			m_InputManager->Finalize();
 			m_InputManager.reset();
 		}
-		m_Time.reset();
-		m_TaskSystem.reset();
-
 		if (m_PlatformHost && m_PlatformHostInitializationAttempted)
 		{
 			m_PlatformHost->Finalize();
@@ -635,78 +458,6 @@ namespace gglab
 	ApplicationInput* Application::GetInput() const noexcept
 	{
 		return m_InputManager ? m_InputManager->GetApplicationInput() : nullptr;
-	}
-
-	void Application::InitializeAssets() noexcept
-	{
-		// Shader preload
-		{
-			std::vector<ShaderDesc> shaderDescs;
-			const auto addShader =
-				[&shaderDescs](const wchar_t* sourcePath, ShaderStage stage, const wchar_t* entry)
-				{
-					shaderDescs.push_back({
-						.m_SourcePath = sourcePath,
-						.m_Stage = stage,
-						.m_Entry = entry,
-						});
-				};
-			const auto addGraphicsShader = [&addShader](const wchar_t* sourcePath)
-				{
-					addShader(sourcePath, ShaderStage::Vertex, L"VSMain");
-					addShader(sourcePath, ShaderStage::Pixel, L"PSMain");
-				};
-
-			addShader(L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain");
-			addShader(L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain");
-			addShader(L"Passes/PassDepthPrepass.hlsl", ShaderStage::Pixel, L"PSAlphaTest");
-			addShader(L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain");
-			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
-			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
-			addGraphicsShader(L"Passes/PassFinalColor.hlsl");
-			addGraphicsShader(L"Passes/PassBloom.hlsl");
-			addGraphicsShader(L"Passes/PassPostProcessPreview.hlsl");
-			addGraphicsShader(L"Passes/PassDebugDraw.hlsl");
-			addGraphicsShader(L"Passes/PassSkybox.hlsl");
-			addGraphicsShader(L"Passes/PassIBLEnvironment.hlsl");
-			addGraphicsShader(L"Passes/PassIBLEnvironmentMip.hlsl");
-			addGraphicsShader(L"Passes/PassIBLIrradiance.hlsl");
-			addGraphicsShader(L"Passes/PassIBLPrefilteredSpecular.hlsl");
-			addGraphicsShader(L"Passes/PassIBLBrdfLUT.hlsl");
-			addGraphicsShader(L"Passes/PassIBLCubemapPreview.hlsl");
-
-			GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
-				*m_TaskSystem, std::move(shaderDescs), TaskPriority::Critical));
-		}
-	}
-
-	LoadingProgress Application::GetStartupLoadingProgress() const noexcept
-	{
-		const ShaderPreloadStatus status = m_ShaderManager->GetPreloadStatus();
-		const float fraction = status.m_TotalCount > 0
-			? static_cast<float>(status.m_CompletedCount) /
-			static_cast<float>(status.m_TotalCount)
-			: 0.0f;
-		if (status.HasFailed())
-		{
-			return {
-				.m_Status = LoadingStatus::Failed,
-				.m_Fraction = fraction,
-				.m_Title = "Starting Graphics Gadget Lab",
-				.m_Stage = "Shader preload failed",
-				.m_Detail = status.m_Error.empty() ? "The shader preload task was cancelled."
-												   : status.m_Error,
-			};
-		}
-
-		return {
-			.m_Status = status.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
-			.m_Fraction = status.IsReady() ? 1.0f : fraction,
-			.m_Title = "Starting Graphics Gadget Lab",
-			.m_Stage = status.IsReady() ? "Shaders ready" : "Preloading shaders",
-			.m_Detail = status.m_CurrentShader.empty() ? "Waiting for a shader worker."
-													   : status.m_CurrentShader,
-		};
 	}
 
 	void Application::HandlePlatformEvent(const PlatformEvent& event) noexcept

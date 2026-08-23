@@ -1,6 +1,6 @@
-#include "Application/Demo/DemoLoadingShell.h"
+#include "Demo/DemoLoadingShell.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Application/Demo/DemoLoadingShellRenderPipeline.h"
+#include "Demo/DemoLoadingShellRenderPipeline.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
@@ -24,6 +24,8 @@ namespace gglab
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 		m_RenderPipeline = CreateDemoLoadingShellRenderPipeline();
 	}
+
+	DemoLoadingShell::~DemoLoadingShell() = default;
 
 	void DemoLoadingShell::OnResize(uint32_t width, uint32_t height) noexcept
 	{

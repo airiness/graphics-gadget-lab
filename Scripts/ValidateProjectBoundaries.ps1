@@ -585,7 +585,8 @@ Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
     @($appRuntimeIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot) `
-    @($appRuntimeIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot)
+    @($appRuntimeIncludeRoot, $runtimeIncludeRoot, $foundationPublicIncludeRoot,
+        $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
     "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
     @($foundationPublicIncludeRoot, $foundationPrivateIncludeRoot) `

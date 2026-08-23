@@ -35,10 +35,14 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\GGLabBuildBaseline.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\GGLabBuildBaseline.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -96,5 +100,7 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
+  </ImportGroup>
 </Project>

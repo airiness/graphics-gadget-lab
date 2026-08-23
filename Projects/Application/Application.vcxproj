@@ -210,8 +210,6 @@
     <ClCompile Include="..\..\Sources\Application\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabHost.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLabRuntimeLocator.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.cpp" />
-    <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\DemoPlayground.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Demo\StartDemo.cpp" />
     <ClCompile Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp" />
@@ -332,8 +330,6 @@
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
     <ClInclude Include="..\..\Sources\Application\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLabHost.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShell.h" />
-    <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\Application\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />

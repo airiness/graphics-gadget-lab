@@ -48,7 +48,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -59,7 +59,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -72,7 +72,10 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\ApplicationInput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntimeServices.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp" />
@@ -92,6 +95,8 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\AssetPreparationTracker.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShellRenderPipeline.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.h" />

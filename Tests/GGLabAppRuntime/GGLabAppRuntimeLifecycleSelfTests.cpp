@@ -3,6 +3,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "Graphics/RHI/RHIContext.h"
 
 #include <filesystem>
 
@@ -10,6 +11,32 @@ namespace gglab
 {
 	namespace
 	{
+		class NullRHIContextFactory final : public RHIContextFactoryBase
+		{
+		public:
+			std::unique_ptr<RHIContext> CreateContext(
+				const RHIContextDesc&) const noexcept override
+			{
+				return nullptr;
+			}
+		};
+
+		std::unique_ptr<DemoBase> CreateLifecycleTestDemo(const DemoCreateInfo&,
+			const LabId&, std::span<const LabRegistration>) noexcept
+		{
+			return nullptr;
+		}
+
+		ApplicationContentRegistration MakeContentRegistration()
+		{
+			ApplicationContentRegistration registration;
+			registration.m_Demos.push_back({
+				.m_Id = "test.demo.start",
+				.m_Factory = &CreateLifecycleTestDemo,
+				});
+			return registration;
+		}
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -267,6 +294,41 @@ namespace gglab
 				AppRuntimeInitializeResult::InvalidRuntimePaths &&
 				invalidPathsRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid runtime paths fail atomically");
+
+			GGLabAppRuntime invalidServiceCreateInfoRuntime;
+			GGLAB_UNUSED(invalidServiceCreateInfoRuntime.Initialize(MakeCreateInfo()));
+			context.Check(invalidServiceCreateInfoRuntime.InitializeServices({}) ==
+				AppRuntimeServiceInitializeResult::InvalidCreateInfo &&
+				invalidServiceCreateInfoRuntime.GetLifecycleState() ==
+				AppRuntimeLifecycleState::Failed,
+				"Invalid service composition fails atomically before creating runtime services");
+
+			NullRHIContextFactory nullRhiContextFactory;
+			ApplicationInput input;
+			GGLabAppRuntime invalidContentRuntime;
+			GGLAB_UNUSED(invalidContentRuntime.Initialize(MakeCreateInfo()));
+			context.Check(invalidContentRuntime.InitializeServices({
+				.m_RHIContextFactory = &nullRhiContextFactory,
+				.m_Input = &input,
+				.m_WindowWidth = 640,
+				.m_WindowHeight = 480,
+				}) == AppRuntimeServiceInitializeResult::InvalidContentRegistration &&
+				!invalidContentRuntime.AreServicesInitialized(),
+				"Service composition rejects an invalid content registration before RHI work");
+
+			GGLabAppRuntime rendererFailureRuntime;
+			GGLAB_UNUSED(rendererFailureRuntime.Initialize(MakeCreateInfo()));
+			context.Check(rendererFailureRuntime.InitializeServices({
+				.m_RHIContextFactory = &nullRhiContextFactory,
+				.m_Input = &input,
+				.m_ContentRegistration = MakeContentRegistration(),
+				.m_WindowWidth = 640,
+				.m_WindowHeight = 480,
+				}) == AppRuntimeServiceInitializeResult::RendererInitializationFailed &&
+				rendererFailureRuntime.GetLifecycleState() ==
+				AppRuntimeLifecycleState::Failed &&
+				!rendererFailureRuntime.AreServicesInitialized(),
+				"Renderer creation failure tears down partially composed runtime services");
 		}
 	}
 }

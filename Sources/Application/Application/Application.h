@@ -13,6 +13,7 @@
 namespace gglab
 {
 	class Renderer;
+	class GGLabAppRuntime;
 	class RHIContextFactoryBase;
 	class AssetManager;
 	class EnvironmentAssetController;
@@ -29,7 +30,6 @@ namespace gglab
 	class World;
 	class LabRuntimeLocatorBase;
 	struct PlatformEvent;
-	struct LoadingProgress;
 	class Application
 	{
 	public:
@@ -71,24 +71,22 @@ namespace gglab
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
 
-		Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
-		AssetManager* GetAssetManager() const noexcept { return m_AssetManager.get(); }
+		Renderer* GetRenderer() const noexcept { return m_Renderer; }
+		AssetManager* GetAssetManager() const noexcept { return m_AssetManager; }
 		EnvironmentAssetController* GetEnvironmentAssetController() const noexcept
 		{
-			return m_EnvironmentAssetController.get();
+			return m_EnvironmentAssetController;
 		}
-		TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem.get(); }
+		TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem; }
 		ApplicationInput* GetInput() const noexcept;
-		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager.get(); }
+		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
 
-		Time* GetTime() const noexcept { return m_Time.get(); }
+		Time* GetTime() const noexcept { return m_Time; }
 
 	private:
 		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
 
-		void InitializeAssets() noexcept;
-		[[nodiscard]] LoadingProgress GetStartupLoadingProgress() const noexcept;
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
 		// Platform lifecycle handlers
@@ -109,18 +107,19 @@ namespace gglab
 		AppRuntimeHostServices m_HostServices{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RHIContextFactoryBase> m_RHIContextFactory;
-		std::unique_ptr<Renderer> m_Renderer;
-		std::unique_ptr<Time> m_Time;
-		std::unique_ptr<TaskSystem> m_TaskSystem;
-		std::unique_ptr<AssetManager> m_AssetManager;
-		std::unique_ptr<EnvironmentAssetController> m_EnvironmentAssetController;
 		std::unique_ptr<InputManager> m_InputManager;
-		std::unique_ptr<ShaderManager> m_ShaderManager;
-		std::unique_ptr<DemoManager> m_DemoManager;
+		std::unique_ptr<GGLabAppRuntime> m_AppRuntime;
+		Renderer* m_Renderer = nullptr;
+		Time* m_Time = nullptr;
+		TaskSystem* m_TaskSystem = nullptr;
+		AssetManager* m_AssetManager = nullptr;
+		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
+		ShaderManager* m_ShaderManager = nullptr;
+		DemoManager* m_DemoManager = nullptr;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
-		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
+		RenderFrameBuilder* m_RenderFrameBuilder = nullptr;
 		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
-		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
+		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
