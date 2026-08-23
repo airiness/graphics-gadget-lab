@@ -75,6 +75,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShellRenderPipeline.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntimeFrame.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\GGLabAppRuntimeServices.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCatalog.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.cpp" />

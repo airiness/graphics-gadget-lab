@@ -36,19 +36,6 @@ namespace gglab
 		return AppRuntimeInitializeResult::Succeeded;
 	}
 
-	AppRuntimeTickResult GGLabAppRuntime::Tick() const noexcept
-	{
-		switch (m_LifecycleState)
-		{
-		case AppRuntimeLifecycleState::Running:
-			return AppRuntimeTickResult::Continue;
-		case AppRuntimeLifecycleState::Suspended:
-			return AppRuntimeTickResult::Suspended;
-		default:
-			return AppRuntimeTickResult::Exit;
-		}
-	}
-
 	void GGLabAppRuntime::HandleHostEvent(AppHostEventType eventType) noexcept
 	{
 		switch (eventType)

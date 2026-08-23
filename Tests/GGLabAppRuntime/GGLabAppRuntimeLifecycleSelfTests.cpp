@@ -244,6 +244,12 @@ namespace gglab
 					AppRuntimeInitializeResult::AlreadyInitialized &&
 					runtime.Tick() == AppRuntimeTickResult::Continue,
 					"Running app runtime rejects repeated initialization");
+				RecordingApplicationTooling uncomposedTooling;
+				context.Check(runtime.Tick({
+					.m_ApplicationTooling = &uncomposedTooling,
+					}) == AppRuntimeTickResult::Continue &&
+					uncomposedTooling.m_BeginCount == 0,
+					"A lifecycle-only runtime never opens a production tooling frame");
 
 				runtime.HandleHostEvent(AppHostEventType::Suspended);
 				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Suspended &&

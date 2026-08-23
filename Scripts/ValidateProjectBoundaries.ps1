@@ -1259,6 +1259,22 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$applicationFrameOrchestrationRegex =
+    '\bRenderFrameBuilder\b|\bRenderGraph\b|\bDebugDrawSystem\b|' +
+    '\bShaderPreloadStatus\b|\bPumpCompletions\s*\(|\bDrainLoadCompletions\s*\(|' +
+    '\bTickTransitions\s*\(|\bBeginFrame\s*\(|\bBuildRenderGraph\s*\(|' +
+    '\bEndFrame\s*\(|\bOnFrameSubmitted\s*\('
+foreach ($itemPath in $applicationCoreContractPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $applicationFrameOrchestrationRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-frame-orchestration-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "Windows Application shell contains shared production frame orchestration"
+        })
+    }
+}
+
 $presentationContractChecks = @(
     [pscustomobject]@{
         Path = Join-Path $runtimeSourcesDir "Graphics/RHI/RHIContext.h"

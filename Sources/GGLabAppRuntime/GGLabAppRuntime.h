@@ -66,6 +66,7 @@ namespace gglab
 	};
 
 	class ApplicationInput;
+	class ApplicationToolingIntegrationBase;
 	class AssetManager;
 	class DebugDrawSystem;
 	class DemoManager;
@@ -93,6 +94,11 @@ namespace gglab
 		}
 	};
 
+	struct AppRuntimeTickInfo
+	{
+		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
+	};
+
 	class GGLabAppRuntime final
 	{
 	public:
@@ -104,7 +110,8 @@ namespace gglab
 			const GGLabAppRuntimeCreateInfo& createInfo) noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult InitializeServices(
 			AppRuntimeServiceCreateInfo createInfo) noexcept;
-		[[nodiscard]] AppRuntimeTickResult Tick() const noexcept;
+		[[nodiscard]] AppRuntimeTickResult Tick(AppRuntimeTickInfo tickInfo = {}) noexcept;
+		void Resize(uint32_t width, uint32_t height) noexcept;
 		void HandleHostEvent(AppHostEventType eventType) noexcept;
 		void Shutdown() noexcept;
 

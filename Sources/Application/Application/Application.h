@@ -12,22 +12,11 @@
 
 namespace gglab
 {
-	class Renderer;
 	class GGLabAppRuntime;
 	class RHIContextFactoryBase;
-	class AssetManager;
-	class EnvironmentAssetController;
-	class TaskSystem;
 	class InputManager;
-	class ApplicationInput;
-	class ShaderManager;
-	class DemoManager;
-	class RenderFrameBuilder;
 	class ApplicationToolingIntegrationBase;
-	class DebugDrawSystem;
 	class PlatformHost;
-	class Time;
-	class World;
 	class LabRuntimeLocatorBase;
 	struct PlatformEvent;
 	class Application
@@ -71,18 +60,6 @@ namespace gglab
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
 
-		Renderer* GetRenderer() const noexcept { return m_Renderer; }
-		AssetManager* GetAssetManager() const noexcept { return m_AssetManager; }
-		EnvironmentAssetController* GetEnvironmentAssetController() const noexcept
-		{
-			return m_EnvironmentAssetController;
-		}
-		TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem; }
-		ApplicationInput* GetInput() const noexcept;
-		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
-
-		Time* GetTime() const noexcept { return m_Time; }
-
 	private:
 		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
@@ -109,17 +86,8 @@ namespace gglab
 		std::unique_ptr<RHIContextFactoryBase> m_RHIContextFactory;
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<GGLabAppRuntime> m_AppRuntime;
-		Renderer* m_Renderer = nullptr;
-		Time* m_Time = nullptr;
-		TaskSystem* m_TaskSystem = nullptr;
-		AssetManager* m_AssetManager = nullptr;
-		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
-		ShaderManager* m_ShaderManager = nullptr;
-		DemoManager* m_DemoManager = nullptr;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
-		RenderFrameBuilder* m_RenderFrameBuilder = nullptr;
 		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
-		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
