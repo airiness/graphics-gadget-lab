@@ -12,6 +12,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <algorithm>
 #include <memory>
@@ -385,60 +386,24 @@ namespace gglab
 
 		if (!m_ForwardPBRShaderSet.IsValid())
 		{
-			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Vertex;
-			shaderDesc.m_Entry = L"VSMain";
-			m_ForwardPBRShaderSet.m_CoverageVertexShader = shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Pixel;
-			shaderDesc.m_Entry = L"PSMain";
+			m_ForwardPBRShaderSet.m_CoverageVertexShader =
+				shaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
 			m_ForwardPBRShaderSet.m_LegacyShadingPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_FORWARD_PLUS",
-					.m_Value = L"1",
-				},
-			};
+				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_Defines.push_back({
-				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
-				.m_Value = L"1",
-				});
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
-					.m_Value = L"1",
-				},
-			};
+				shaderManager->LoadProgram(
+					shader_programs::ForwardPBRForwardPlusValidationPixel);
 			m_ForwardPBRShaderSet.m_LegacyGTAOContributionPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-			shaderDesc.m_Defines.push_back({
-				.m_Name = L"GGLAB_FORWARD_PLUS",
-				.m_Value = L"1",
-				});
+				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-			shaderDesc.m_Defines.push_back({
-				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
-				.m_Value = L"1",
-				});
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
-				shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Pixel;
-			shaderDesc.m_Entry = L"PSAlphaTest";
-			shaderDesc.m_Defines.clear();
-			m_ForwardPBRShaderSet.m_AlphaTestPixelShader = shaderManager->LoadShader(shaderDesc);
+				shaderManager->LoadProgram(
+					shader_programs::ForwardPBRForwardPlusValidationGTAOPixel);
+			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
+				shaderManager->LoadProgram(shader_programs::DepthPrepassAlphaTestPixel);
 		}
 
 		if (!m_ForwardPBRShaderSet.IsValid())

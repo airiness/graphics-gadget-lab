@@ -174,7 +174,8 @@ namespace gglab
 	private:
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
-		void BeginInitialShaderPreload() noexcept;
+		[[nodiscard]] bool BeginInitialShaderPreload(
+			const ApplicationContentSelection& contentSelection) noexcept;
 		void Resize(uint32_t width, uint32_t height) noexcept;
 
 		AppRuntimeConfig m_Config{};

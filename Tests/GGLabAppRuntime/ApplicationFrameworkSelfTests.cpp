@@ -56,6 +56,15 @@ namespace gglab
 		context.Check(minimal.IsValid() && minimal.m_Labs.empty() &&
 			minimalSelection.Succeeded(),
 			"A minimal host can register one supported Demo and omit optional Lab content");
+		ShaderProgramDemandSet minimalDemands;
+		context.Check(AppendSelectedContentShaderProgramDemand(
+			minimalSelection, minimalDemands) && minimalDemands.GetPrograms().empty(),
+			"Content without shader demand contributes an empty stable snapshot");
+
+		ApplicationContentRegistration invalidShaderDemand = minimal;
+		invalidShaderDemand.m_Demos.front().m_ShaderPrograms.push_back({});
+		context.Check(!invalidShaderDemand.IsValid(),
+			"Content registration rejects invalid shader program identities");
 
 		context.Check(ResolveApplicationContentSelection(
 			minimal, "test.demo.unknown", std::nullopt).m_Status ==
@@ -79,6 +88,17 @@ namespace gglab
 		context.Check(ResolveApplicationContentSelection(
 			labSubset, "test.demo.lab", "test.lab.supported").Succeeded(),
 			"A host-selected Lab subset resolves its supported startup Lab");
+		labSubset.m_Labs.front().m_ShaderPrograms.push_back({
+			.m_ProgramId = "gglab.shader.test",
+			.m_VariantId = "compute",
+			});
+		const ApplicationContentSelection shaderSelection = ResolveApplicationContentSelection(
+			labSubset, "test.demo.lab", "test.lab.supported");
+		ShaderProgramDemandSet selectedDemands;
+		context.Check(shaderSelection.Succeeded() &&
+			AppendSelectedContentShaderProgramDemand(shaderSelection, selectedDemands) &&
+			selectedDemands.GetPrograms().size() == 1,
+			"Only the selected content contributes its stable shader program demand");
 		context.Check(ResolveApplicationContentSelection(
 			labSubset, "test.demo.lab", "test.lab.unavailable").m_Status ==
 			ApplicationContentSelectionStatus::StartupLabUnavailable,

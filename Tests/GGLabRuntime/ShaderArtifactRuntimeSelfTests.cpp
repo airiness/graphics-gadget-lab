@@ -1,6 +1,7 @@
 #include "ShaderArtifactRuntimeSelfTests.h"
 
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
 
 #include "GGLabFoundation/Hash/Sha256.h"
 
@@ -130,6 +131,56 @@ namespace gglab
 			context.Check(
 				baseline.m_Manifest.m_ArtifactId != changedStage.m_Manifest.m_ArtifactId,
 				"Runtime ArtifactId changes when compatibility semantics change");
+		}
+
+		void RunProgramRegistryTests(SelfTestContext& context) noexcept
+		{
+			const ShaderProgramRef programRef{
+				.m_ProgramId = "gglab.shader.test",
+				.m_VariantId = "vertex.default",
+			};
+			const ShaderProgramRef secondProgramRef{
+				.m_ProgramId = "gglab.shader.test",
+				.m_VariantId = "pixel.default",
+			};
+			const ShaderArtifactRef firstArtifact = MakeRef(MakeDxilArtifact());
+			ShaderRuntimeArtifact changedArtifact = MakeDxilArtifact();
+			changedArtifact.m_Manifest.m_Stage = ShaderStage::Pixel;
+			RefreshArtifactIdentity(changedArtifact);
+			const ShaderArtifactRef secondArtifact = MakeRef(changedArtifact);
+
+			ShaderProgramRegistry registry;
+			context.Check(
+				registry.Bind(programRef, firstArtifact) == ShaderProgramBindStatus::Bound &&
+					registry.Resolve(programRef) == firstArtifact &&
+					registry.GetMappingCount() == 1,
+				"Program registry resolves a stable ProgramRef to its bound ArtifactRef");
+			context.Check(
+				registry.Bind(programRef, firstArtifact) ==
+					ShaderProgramBindStatus::AlreadyBound &&
+					registry.GetMappingCount() == 1,
+				"Program registry treats an identical binding as idempotent");
+			context.Check(
+				registry.Bind(programRef, secondArtifact) == ShaderProgramBindStatus::Rebound &&
+					registry.Resolve(programRef) == secondArtifact,
+				"Program registry explicitly replaces a program's active immutable artifact");
+			context.Check(
+				registry.Bind({}, firstArtifact) == ShaderProgramBindStatus::InvalidProgram &&
+					registry.Bind(secondProgramRef, {}) ==
+						ShaderProgramBindStatus::InvalidArtifact &&
+					!registry.Resolve(secondProgramRef).has_value(),
+				"Program registry rejects invalid identities without publishing a mapping");
+
+			ShaderProgramDemandSet demands;
+			const std::array declaredPrograms{ programRef, secondProgramRef, programRef };
+			context.Check(demands.AddRange(declaredPrograms) &&
+				demands.GetPrograms().size() == 2 &&
+				demands.GetPrograms()[0] == programRef &&
+				demands.GetPrograms()[1] == secondProgramRef,
+				"Program demand aggregation preserves declaration order and removes duplicates");
+			context.Check(
+				demands.Add({}) == ShaderProgramDemandAddStatus::InvalidProgram,
+				"Program demand aggregation rejects invalid stable identities");
 		}
 
 		void RunCompatibilityTests(SelfTestContext& context) noexcept
@@ -340,6 +391,7 @@ namespace gglab
 	void RunShaderArtifactRuntimeSelfTests(SelfTestContext& context) noexcept
 	{
 		RunIdentityTests(context);
+		RunProgramRegistryTests(context);
 		RunCompatibilityTests(context);
 		RunStoreTests(context);
 	}

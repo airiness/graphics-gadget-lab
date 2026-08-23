@@ -1,18 +1,15 @@
 #pragma once
-#include "Contracts/ShaderArtifact.h"
-#include "Core/Hash/KeyHash.h"
-#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
-#include "Graphics/Shader/Shader.h"
+#include "Graphics/Shader/ShaderTypes.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
 
-#include <array>
 #include <atomic>
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -20,7 +17,7 @@
 
 namespace gglab
 {
-	class ShaderCompiler;
+	class Shader;
 	class TaskSystem;
 
 	struct ShaderPreloadStatus
@@ -42,21 +39,6 @@ namespace gglab
 		}
 	};
 
-	struct ShaderKey
-	{
-		// Full durable recipe identity. The KeyHash fast path only selects the
-		// bucket; equality always compares the complete digest.
-		Sha256Digest m_KeyDigest;
-		auto AsTuple() const noexcept
-		{
-			std::array<uint64_t, 4> words{};
-			std::memcpy(words.data(), m_KeyDigest.m_Value.data(), sizeof(words));
-			return std::make_tuple(words[0], words[1], words[2], words[3]);
-		}
-		constexpr bool operator==(const ShaderKey&) const noexcept = default;
-	};
-	using ShaderKeyHash = KeyHash<ShaderKey>;
-
 	class ShaderManager
 	{
 	public:
@@ -65,13 +47,15 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager();
 
-		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
 		RHIBackendType GetActiveBackend() const noexcept { return m_ActiveBackend; }
 
-		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
+		ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
-			std::vector<ShaderDesc> descList, TaskPriority priority = TaskPriority::High) noexcept;
+			std::vector<ShaderProgramRef> programRefs,
+			TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
+		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
+			const ShaderProgramRef& programRef) const noexcept;
 
 		int32_t RefreshChanged() noexcept;
 		bool RefreshShader(ShaderID shaderId) noexcept;
@@ -82,22 +66,20 @@ namespace gglab
 		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
 
 	private:
+		struct BuildState;
 		struct ShaderPreloadJob;
 
 		bool RefreshShaderInternal(Shader& shader) noexcept;
-		bool RefreshShaderInternal(Shader& shader, const ShaderResolvedRecipe& recipe) noexcept;
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
-		static void ApplyActiveBackendTarget(
-			ShaderDesc& desc, RHIBackendType activeBackend) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
-		std::unordered_map<ShaderKey, ShaderID, ShaderKeyHash> m_KeyIdMap;
+		std::unordered_map<ShaderProgramRef, ShaderID, ShaderProgramRefHash> m_ProgramIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
+		ShaderProgramRegistry m_ProgramRegistry;
 
-		std::unique_ptr<ShaderCompiler> m_Compiler;
+		std::unique_ptr<BuildState> m_BuildState;
 		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
-		ShaderDesc m_DefaultShaderConfig{};
 		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
 		TaskHandle m_PreloadTask{};
 		TaskStatus m_PreloadStatus = TaskStatus::Invalid;

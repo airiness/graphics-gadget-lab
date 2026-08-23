@@ -11,6 +11,7 @@
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -125,18 +126,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Compute;
-		shaderDesc.m_Entry = L"CSMain";
-		m_PipelineRecipes[0].m_CSId = shaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Defines = {
-			{
-				.m_Name = L"GGLAB_FORWARD_PLUS_DIAGNOSTICS",
-				.m_Value = L"1",
-			},
-		};
-		m_PipelineRecipes[1].m_CSId = shaderManager->LoadShader(shaderDesc);
+		m_PipelineRecipes[0].m_CSId =
+			shaderManager->LoadProgram(shader_programs::ForwardPlusCullCompute);
+		m_PipelineRecipes[1].m_CSId =
+			shaderManager->LoadProgram(shader_programs::ForwardPlusCullDiagnosticsCompute);
 
 		auto* rhiContext = renderer->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);

@@ -16,6 +16,7 @@
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"
 #include "Core/Time.h"
 
@@ -49,47 +50,6 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] std::vector<ShaderDesc> BuildTransitionalInitialShaderDemandSnapshot()
-		{
-			constexpr size_t initialShaderDemandCount = 30;
-			std::vector<ShaderDesc> shaderDescs;
-			shaderDescs.reserve(initialShaderDemandCount);
-			const auto addShader =
-				[&shaderDescs](const wchar_t* sourcePath, ShaderStage stage, const wchar_t* entry)
-				{
-					shaderDescs.push_back({
-						.m_SourcePath = sourcePath,
-						.m_Stage = stage,
-						.m_Entry = entry,
-						});
-				};
-			const auto addGraphicsShader = [&addShader](const wchar_t* sourcePath)
-				{
-					addShader(sourcePath, ShaderStage::Vertex, L"VSMain");
-					addShader(sourcePath, ShaderStage::Pixel, L"PSMain");
-				};
-
-			addShader(L"Passes/PassForwardCoverage.hlsl", ShaderStage::Vertex, L"VSMain");
-			addShader(L"Passes/PassForwardPBR.hlsl", ShaderStage::Pixel, L"PSMain");
-			addShader(L"Passes/PassDepthPrepass.hlsl", ShaderStage::Pixel, L"PSAlphaTest");
-			addShader(L"Passes/PassForwardPlusCull.hlsl", ShaderStage::Compute, L"CSMain");
-			addGraphicsShader(L"Passes/PassDirectionalShadowMap.hlsl");
-			addGraphicsShader(L"Passes/PassShadowMapPreview.hlsl");
-			addGraphicsShader(L"Passes/PassFinalColor.hlsl");
-			addGraphicsShader(L"Passes/PassBloom.hlsl");
-			addGraphicsShader(L"Passes/PassPostProcessPreview.hlsl");
-			addGraphicsShader(L"Passes/PassDebugDraw.hlsl");
-			addGraphicsShader(L"Passes/PassSkybox.hlsl");
-			addGraphicsShader(L"Passes/PassIBLEnvironment.hlsl");
-			addGraphicsShader(L"Passes/PassIBLEnvironmentMip.hlsl");
-			addGraphicsShader(L"Passes/PassIBLIrradiance.hlsl");
-			addGraphicsShader(L"Passes/PassIBLPrefilteredSpecular.hlsl");
-			addGraphicsShader(L"Passes/PassIBLBrdfLUT.hlsl");
-			addGraphicsShader(L"Passes/PassIBLCubemapPreview.hlsl");
-			GGLAB_ASSERT_MSG(shaderDescs.size() == initialShaderDemandCount,
-				"Initial shader demand must preserve the validated 30-entry startup baseline.");
-			return shaderDescs;
-		}
 	}
 
 	AppRuntimeServiceInitializeResult GGLabAppRuntime::InitializeServices(
@@ -143,7 +103,11 @@ namespace gglab
 			});
 		m_ShaderManager = std::make_unique<ShaderManager>(
 			activeBackend, m_Paths.m_ShaderSourceRoot, m_Paths.m_ShaderCacheRoot);
-		BeginInitialShaderPreload();
+		if (!BeginInitialShaderPreload(contentSelection))
+		{
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::InvalidContentRegistration);
+		}
 
 		m_Renderer = std::make_unique<Renderer>();
 		Renderer::CreateInfo rendererCreateInfo{};
@@ -265,16 +229,19 @@ namespace gglab
 		return result;
 	}
 
-	void GGLabAppRuntime::BeginInitialShaderPreload() noexcept
+	bool GGLabAppRuntime::BeginInitialShaderPreload(
+		const ApplicationContentSelection& contentSelection) noexcept
 	{
-		// Freeze the validated transitional desktop baseline before eager preload.
-		// Host/content aggregation waits for Slice 10A's stable artifact identities;
-		// do not expose ShaderDesc authoring data through the AppRuntime contract.
-		// Loading progress observes this same ShaderManager preload operation.
-		std::vector<ShaderDesc> shaderDemandSnapshot =
-			BuildTransitionalInitialShaderDemandSnapshot();
+		ShaderProgramDemandSet demands;
+		if (!demands.AddRange(shader_programs::GetRendererInitialShaderProgramDemand()) ||
+			!AppendSelectedContentShaderProgramDemand(contentSelection, demands))
+		{
+			return false;
+		}
+		std::vector<ShaderProgramRef> shaderDemandSnapshot = demands.ReleasePrograms();
 		GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
 			*m_TaskSystem, std::move(shaderDemandSnapshot), TaskPriority::Critical));
+		return true;
 	}
 
 	LoadingProgress GGLabAppRuntime::GetStartupLoadingProgress() const noexcept

@@ -119,19 +119,7 @@ namespace gglab
 		const ShaderArtifact& artifact)
 	{
 		ShaderRuntimeArtifact runtimeArtifact{};
-		runtimeArtifact.m_Manifest.m_TargetProfile = artifact.m_Manifest.m_TargetProfile;
-		runtimeArtifact.m_Manifest.m_BinaryFormat = artifact.m_Manifest.m_BinaryFormat;
-		runtimeArtifact.m_Manifest.m_SpirVTargetEnvironment =
-			artifact.m_Manifest.m_SpirVTargetEnvironment;
-		runtimeArtifact.m_Manifest.m_BindingABIRevision =
-			artifact.m_Manifest.m_BindingABIRevision;
-		runtimeArtifact.m_Manifest.m_CoordinateOptions =
-			artifact.m_Manifest.m_CoordinateOptions;
-		runtimeArtifact.m_Manifest.m_Stage = artifact.m_Manifest.m_Stage;
-		runtimeArtifact.m_Manifest.m_BinaryContentDigest =
-			artifact.m_Manifest.m_BinaryContentDigest;
-		runtimeArtifact.m_Manifest.m_ArtifactId =
-			ComputeShaderArtifactId(runtimeArtifact.m_Manifest);
+		runtimeArtifact.m_Manifest = BuildShaderRuntimeArtifactManifest(artifact.m_Manifest);
 		runtimeArtifact.m_Binary = artifact.m_Binary;
 		return runtimeArtifact;
 	}

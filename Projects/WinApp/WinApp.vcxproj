@@ -388,6 +388,9 @@
     <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
       <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">
+      <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli" />

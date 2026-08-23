@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
@@ -166,15 +167,10 @@ namespace gglab
 
 		if (!m_IsInitialized)
 		{
-			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassDirectionalShadowMap.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Vertex;
-			shaderDesc.m_Entry = L"VSMain";
-			const auto vsId = shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_Stage = ShaderStage::Pixel;
-			shaderDesc.m_Entry = L"PSMain";
-			m_AlphaTestPixelShader = shaderManager->LoadShader(shaderDesc);
+			const auto vsId =
+				shaderManager->LoadProgram(shader_programs::DirectionalShadowMapVertex);
+			m_AlphaTestPixelShader =
+				shaderManager->LoadProgram(shader_programs::DirectionalShadowMapPixel);
 
 			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;

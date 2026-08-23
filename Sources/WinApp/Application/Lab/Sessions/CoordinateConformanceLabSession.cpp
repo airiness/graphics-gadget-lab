@@ -7,6 +7,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <algorithm>
 
@@ -392,18 +393,14 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(m_Device);
 				GGLAB_ASSERT_NOT_NULL(shaderManager);
 
-				ShaderDesc shaderDesc{};
-				shaderDesc.m_SourcePath = L"Passes/PassCoordinateConformance.hlsl";
-				shaderDesc.m_Stage = ShaderStage::Vertex;
-				shaderDesc.m_Entry = L"VSGeometry";
-				const ShaderID geometryVS = shaderManager->LoadShader(shaderDesc);
-				shaderDesc.m_Entry = L"VSFullscreen";
-				const ShaderID fullscreenVS = shaderManager->LoadShader(shaderDesc);
-				shaderDesc.m_Stage = ShaderStage::Pixel;
-				shaderDesc.m_Entry = L"PSMarker";
-				const ShaderID markerPS = shaderManager->LoadShader(shaderDesc);
-				shaderDesc.m_Entry = L"PSConformance";
-				const ShaderID conformancePS = shaderManager->LoadShader(shaderDesc);
+				const ShaderID geometryVS =
+					shaderManager->LoadProgram(shader_programs::CoordinateGeometryVertex);
+				const ShaderID fullscreenVS =
+					shaderManager->LoadProgram(shader_programs::CoordinateFullscreenVertex);
+				const ShaderID markerPS =
+					shaderManager->LoadProgram(shader_programs::CoordinateMarkerPixel);
+				const ShaderID conformancePS =
+					shaderManager->LoadProgram(shader_programs::CoordinateConformancePixel);
 
 				const RHIBindingLayoutHandle bindingLayout = m_Renderer->GetCommonBindingLayout();
 				const RHIFormat backBufferFormat = m_Renderer->GetSwapChain()->GetFormat();

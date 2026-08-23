@@ -11,6 +11,7 @@
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <cstdint>
 
@@ -130,25 +131,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassForwardPlusValidation.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Compute;
-		shaderDesc.m_Entry = L"CSReduceTiles";
-		shaderDesc.m_Defines = {
-			{
-				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_TILES",
-				.m_Value = L"1",
-			},
-		};
-		m_TilePipelineRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Entry = L"CSReduceFrame";
-		shaderDesc.m_Defines = {
-			{
-				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME",
-				.m_Value = L"1",
-			},
-		};
-		m_FramePipelineRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
+		m_TilePipelineRecipe.m_CSId =
+			shaderManager->LoadProgram(shader_programs::ForwardPlusValidationTilesCompute);
+		m_FramePipelineRecipe.m_CSId =
+			shaderManager->LoadProgram(shader_programs::ForwardPlusValidationFrameCompute);
 
 		auto* rhiContext = renderer->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);

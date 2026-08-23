@@ -3,6 +3,8 @@
 #include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "Graphics/Shader/Shader.h"
+#include "Graphics/Shader/ShaderProgramCatalogPrivate.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
@@ -14,7 +16,6 @@
 #include <shared_mutex>
 #include <stop_token>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -24,17 +25,24 @@
 
 namespace gglab
 {
+	struct ShaderManager::BuildState
+	{
+		std::unique_ptr<ShaderCompiler> m_Compiler;
+		ShaderDesc m_DefaultShaderConfig{};
+	};
+
 	struct ShaderManager::ShaderPreloadJob
 	{
 		struct Entry
 		{
-			ShaderDesc m_Desc;
+			ShaderProgramRef m_ProgramRef;
 			ShaderResolvedRecipe m_Recipe;
-			ShaderArtifact m_Artifact;
+			ShaderRuntimeArtifact m_Artifact;
+			ShaderArtifactRef m_ArtifactRef{};
 			ShaderHash128 m_Hash{};
 		};
 
-		std::vector<ShaderDesc> m_Descs;
+		std::vector<ShaderProgramRef> m_Programs;
 		std::vector<Entry> m_Entries;
 		std::vector<std::string> m_Labels;
 		std::atomic_uint32_t m_CompletedCount = 0;
@@ -50,28 +58,6 @@ namespace gglab
 #else
 			return false;
 #endif
-		}
-
-		[[nodiscard]] constexpr std::string_view ShaderStageAbbreviation(ShaderStage stage) noexcept
-		{
-			switch (stage)
-			{
-			case ShaderStage::Vertex:
-				return "VS";
-			case ShaderStage::Pixel:
-				return "PS";
-			case ShaderStage::Hull:
-				return "HS";
-			case ShaderStage::Domain:
-				return "DS";
-			case ShaderStage::Geometry:
-				return "GS";
-			case ShaderStage::Mesh:
-				return "MS";
-			case ShaderStage::Compute:
-				return "CS";
-			}
-			return "Unknown";
 		}
 
 		// Runtime-side adapter: the ShaderManager maps the active RHI backend to
@@ -97,97 +83,151 @@ namespace gglab
 			}
 			return {};
 		}
+
+		void ApplyActiveBackendTarget(
+			ShaderDesc& desc, RHIBackendType activeBackend) noexcept
+		{
+			if (activeBackend == RHIBackendType::Unknown)
+			{
+				desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
+				desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
+				desc.m_Target.m_BindingABIRevision = 0;
+				desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
+				return;
+			}
+
+			const ShaderCompileTarget backendTarget =
+				MakeShaderCompileTarget(GetShaderTargetProfile(activeBackend), desc.m_Stage);
+			desc.m_Target.m_BinaryFormat = backendTarget.m_BinaryFormat;
+			desc.m_Target.m_SpirVTargetEnvironment = backendTarget.m_SpirVTargetEnvironment;
+			desc.m_Target.m_BindingABIRevision = backendTarget.m_BindingABIRevision;
+			desc.m_Target.m_CoordinateOptions = backendTarget.m_CoordinateOptions;
+		}
+
+		[[nodiscard]] ShaderRuntimeArtifact MakeRuntimeArtifact(
+			ShaderArtifact artifact) noexcept
+		{
+			ShaderRuntimeArtifact runtimeArtifact{};
+			runtimeArtifact.m_Manifest =
+				BuildShaderRuntimeArtifactManifest(artifact.m_Manifest);
+			runtimeArtifact.m_Binary = std::move(artifact.m_Binary);
+			return runtimeArtifact;
+		}
 	}
 
 	ShaderManager::ShaderManager(RHIBackendType activeBackend,
 		std::filesystem::path shaderSourceRoot, std::filesystem::path shaderCacheRoot) noexcept :
-		m_ActiveBackend(activeBackend)
+		m_BuildState(std::make_unique<BuildState>()), m_ActiveBackend(activeBackend)
 	{
-		m_Compiler = std::make_unique<ShaderCompiler>(
+		m_BuildState->m_Compiler = std::make_unique<ShaderCompiler>(
 			std::move(shaderSourceRoot), std::move(shaderCacheRoot));
 
-		m_DefaultShaderConfig.m_Target.m_Flags |=
+		m_BuildState->m_DefaultShaderConfig.m_Target.m_Flags |=
 			IsHostDebuggerAttached() ? ShaderCompileFlags::Debug : ShaderCompileFlags::None;
-		ApplyActiveBackendTarget(m_DefaultShaderConfig, m_ActiveBackend);
-		m_DefaultShaderConfig.m_IncludeDirs = { m_Compiler->GetSourceRootDirectory() };
-		m_DefaultShaderConfig.m_Defines = {};
-		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
+		ApplyActiveBackendTarget(m_BuildState->m_DefaultShaderConfig, m_ActiveBackend);
+		m_BuildState->m_DefaultShaderConfig.m_IncludeDirs = {
+			m_BuildState->m_Compiler->GetSourceRootDirectory()
+		};
+		m_BuildState->m_DefaultShaderConfig.m_Defines = {};
+		m_BuildState->m_Compiler->SetDefaultShaderConfig(
+			m_BuildState->m_DefaultShaderConfig);
 	}
 
 	ShaderManager::~ShaderManager() = default;
 
-	void ShaderManager::SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept
+	ShaderID ShaderManager::LoadProgram(const ShaderProgramRef& programRef) noexcept
 	{
-		std::unique_lock lock(m_Mutex);
-		m_DefaultShaderConfig = defaultDesc;
-		ApplyActiveBackendTarget(m_DefaultShaderConfig, m_ActiveBackend);
-		m_Compiler->SetDefaultShaderConfig(m_DefaultShaderConfig);
-	}
-
-	ShaderID ShaderManager::LoadShader(const ShaderDesc& desc) noexcept
-	{
-		ShaderDesc activeDesc = desc;
-		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
-		const ShaderResolvedRecipe recipe = m_Compiler->Resolve(activeDesc);
-		if (!recipe.IsSuccess())
+		if (!programRef.IsValid())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadShader: Resolve failed: {}",
-				utils::ToString(recipe.m_Diagnostics.m_Message));
-			return ShaderID();
+			return {};
 		}
-
-		const ShaderKey key{ .m_KeyDigest = recipe.m_RecipeId.m_DurableDigest };
-
-		// return if exist.
 		{
 			std::shared_lock lock(m_Mutex);
-			if (auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
+			if (const auto iterator = m_ProgramIdMap.find(programRef);
+				iterator != m_ProgramIdMap.end())
 			{
-				return it->second;
+				return iterator->second;
 			}
 		}
 
-		// create shader if not exist
+		std::optional<ShaderDesc> activeDesc =
+			ResolveTransitionalShaderProgramBuild(programRef);
+		if (!activeDesc)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"ShaderManager::LoadProgram: unknown program '{}::{}'.",
+				programRef.m_ProgramId, programRef.m_VariantId);
+			return {};
+		}
+		ApplyActiveBackendTarget(*activeDesc, m_ActiveBackend);
+		const ShaderResolvedRecipe recipe = m_BuildState->m_Compiler->Resolve(*activeDesc);
+		if (!recipe.IsSuccess())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::LoadProgram: Resolve failed: {}",
+				utils::ToString(recipe.m_Diagnostics.m_Message));
+			return {};
+		}
+
 		if (!std::filesystem::exists(recipe.m_Request.m_SourcePath))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"ShaderManager::LoadShader: File not found: {}",
+				"ShaderManager::LoadProgram: File not found: {}",
 				recipe.m_Request.m_SourcePath.string());
-			return ShaderID();
+			return {};
 		}
 
-		std::unique_ptr<Shader> shader = std::make_unique<Shader>(desc);
-		if (!RefreshShaderInternal(*shader, recipe))
+		ShaderCompileResult compileResult =
+			m_BuildState->m_Compiler->CompileOrLoad(recipe);
+		if (!compileResult.IsSuccess() || !compileResult.m_Artifact.m_Binary.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"ShaderManager::LoadShader: Shader compile failed: {}",
-				recipe.m_Request.m_SourcePath.string());
-			return ShaderID();
+				"ShaderManager::LoadProgram: Compile failed: {}",
+				utils::ToString(compileResult.m_Diagnostics.m_Message));
+			return {};
 		}
+		ShaderRuntimeArtifact runtimeArtifact =
+			MakeRuntimeArtifact(std::move(compileResult.m_Artifact));
+		const ShaderArtifactRef artifactRef{
+			.m_ArtifactId = runtimeArtifact.m_Manifest.m_ArtifactId,
+		};
+		const ShaderHash128 hash = ComputeShaderBinaryHash(
+			runtimeArtifact.m_Binary, runtimeArtifact.m_Manifest.m_BinaryFormat);
+		auto shader = std::make_unique<Shader>(programRef, recipe.m_Request.m_Entry);
+		shader->SetRuntimeArtifact(std::move(runtimeArtifact), artifactRef, hash, true);
 
 		{
 			std::unique_lock lock(m_Mutex);
-			if (auto it = m_KeyIdMap.find(key); it != m_KeyIdMap.end())
+			if (const auto iterator = m_ProgramIdMap.find(programRef);
+				iterator != m_ProgramIdMap.end())
 			{
-				return it->second;
+				return iterator->second;
+			}
+			const ShaderProgramBindStatus bindStatus =
+				m_ProgramRegistry.Bind(programRef, artifactRef);
+			if (bindStatus == ShaderProgramBindStatus::InvalidProgram ||
+				bindStatus == ShaderProgramBindStatus::InvalidArtifact ||
+				bindStatus == ShaderProgramBindStatus::Failed)
+			{
+				return {};
 			}
 
 			ShaderID id{ static_cast<uint32_t>(m_Shaders.size()) };
 			m_Shaders.push_back(std::move(shader));
-			m_KeyIdMap.emplace(key, id);
+			m_ProgramIdMap.emplace(programRef, id);
 			return id;
 		}
 	}
 
 	TaskHandle ShaderManager::PreloadAsync(
-		TaskSystem& taskSystem, std::vector<ShaderDesc> descList, TaskPriority priority) noexcept
+		TaskSystem& taskSystem, std::vector<ShaderProgramRef> programRefs,
+		TaskPriority priority) noexcept
 	{
 		if (m_PreloadStatus == TaskStatus::Queued || m_PreloadStatus == TaskStatus::Running)
 		{
 			return m_PreloadTask;
 		}
 
-		if (descList.empty())
+		if (programRefs.empty())
 		{
 			m_PreloadStatus = TaskStatus::Succeeded;
 			m_PreloadError.clear();
@@ -198,23 +238,24 @@ namespace gglab
 
 		ShaderDesc defaultConfig;
 		RHIBackendType activeBackend = RHIBackendType::Unknown;
-		const std::filesystem::path shaderSourceRoot = m_Compiler->GetSourceRootDirectory();
-		const std::filesystem::path shaderCacheRoot = m_Compiler->GetCacheRootDirectory();
+		const std::filesystem::path shaderSourceRoot =
+			m_BuildState->m_Compiler->GetSourceRootDirectory();
+		const std::filesystem::path shaderCacheRoot =
+			m_BuildState->m_Compiler->GetCacheRootDirectory();
 		{
 			std::shared_lock lock(m_Mutex);
-			defaultConfig = m_DefaultShaderConfig;
+			defaultConfig = m_BuildState->m_DefaultShaderConfig;
 			activeBackend = m_ActiveBackend;
 		}
 
 		auto job = std::make_shared<ShaderPreloadJob>();
-		job->m_Descs = std::move(descList);
-		job->m_Entries.reserve(job->m_Descs.size());
-		job->m_Labels.reserve(job->m_Descs.size());
-		for (const ShaderDesc& desc : job->m_Descs)
+		job->m_Programs = std::move(programRefs);
+		job->m_Entries.reserve(job->m_Programs.size());
+		job->m_Labels.reserve(job->m_Programs.size());
+		for (const ShaderProgramRef& program : job->m_Programs)
 		{
 			job->m_Labels.push_back(
-				std::format("{} [{}]", desc.m_SourcePath.filename().generic_string(),
-					ShaderStageAbbreviation(desc.m_Stage)));
+				std::format("{}::{}", program.m_ProgramId, program.m_VariantId));
 		}
 
 		m_PreloadJob = job;
@@ -230,7 +271,7 @@ namespace gglab
 			{
 				ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
 				compiler.SetDefaultShaderConfig(defaultConfig);
-				for (uint32_t index = 0; index < job->m_Descs.size(); ++index)
+				for (uint32_t index = 0; index < job->m_Programs.size(); ++index)
 				{
 					if (stopToken.stop_requested())
 					{
@@ -239,9 +280,18 @@ namespace gglab
 
 					job->m_CurrentIndex.store(index, std::memory_order_relaxed);
 					ShaderPreloadJob::Entry entry{};
-					entry.m_Desc = job->m_Descs[index];
-					ApplyActiveBackendTarget(entry.m_Desc, activeBackend);
-					entry.m_Recipe = compiler.Resolve(entry.m_Desc);
+					entry.m_ProgramRef = job->m_Programs[index];
+					std::optional<ShaderDesc> desc =
+						ResolveTransitionalShaderProgramBuild(entry.m_ProgramRef);
+					if (!desc)
+					{
+						return TaskResult::Failure(std::format(
+							"Unknown shader program: {}::{}",
+							entry.m_ProgramRef.m_ProgramId,
+							entry.m_ProgramRef.m_VariantId));
+					}
+					ApplyActiveBackendTarget(*desc, activeBackend);
+					entry.m_Recipe = compiler.Resolve(*desc);
 					if (!entry.m_Recipe.IsSuccess())
 					{
 						return TaskResult::Failure(
@@ -254,7 +304,7 @@ namespace gglab
 							std::format("Shader source file was not found: {}",
 								entry.m_Recipe.m_Request.m_SourcePath.string()));
 					}
-					const ShaderCompileResult result = compiler.CompileOrLoad(entry.m_Recipe);
+					ShaderCompileResult result = compiler.CompileOrLoad(entry.m_Recipe);
 					if (!result.IsSuccess() || !result.m_Artifact.m_Binary.IsValid())
 					{
 						return TaskResult::Failure(
@@ -263,9 +313,13 @@ namespace gglab
 								utils::ToString(result.m_Diagnostics.m_Message)));
 					}
 
-					entry.m_Artifact = result.m_Artifact;
+					entry.m_Artifact = MakeRuntimeArtifact(std::move(result.m_Artifact));
+					entry.m_ArtifactRef = {
+						.m_ArtifactId = entry.m_Artifact.m_Manifest.m_ArtifactId,
+					};
 					entry.m_Hash = ComputeShaderBinaryHash(
-						entry.m_Artifact.m_Binary, entry.m_Artifact.GetBinaryFormat());
+						entry.m_Artifact.m_Binary,
+						entry.m_Artifact.m_Manifest.m_BinaryFormat);
 					job->m_Entries.push_back(std::move(entry));
 					job->m_CompletedCount.store(index + 1, std::memory_order_relaxed);
 				}
@@ -308,7 +362,7 @@ namespace gglab
 			return result;
 		}
 
-		result.m_TotalCount = static_cast<uint32_t>(job->m_Descs.size());
+		result.m_TotalCount = static_cast<uint32_t>(job->m_Programs.size());
 		result.m_CompletedCount = job->m_CompletedCount.load(std::memory_order_relaxed);
 		const uint32_t currentIndex = job->m_CurrentIndex.load(std::memory_order_relaxed);
 		if (currentIndex < job->m_Labels.size())
@@ -320,7 +374,7 @@ namespace gglab
 
 	bool ShaderManager::PublishPreloadJob(ShaderPreloadJob& job) noexcept
 	{
-		if (job.m_Entries.size() != job.m_Descs.size())
+		if (job.m_Entries.size() != job.m_Programs.size())
 		{
 			return false;
 		}
@@ -328,17 +382,26 @@ namespace gglab
 		std::unique_lock lock(m_Mutex);
 		for (auto& entry : job.m_Entries)
 		{
-			const ShaderKey key{ .m_KeyDigest = entry.m_Recipe.m_RecipeId.m_DurableDigest };
-			if (m_KeyIdMap.contains(key))
+			if (m_ProgramIdMap.contains(entry.m_ProgramRef))
 			{
 				continue;
 			}
+			const ShaderProgramBindStatus bindStatus =
+				m_ProgramRegistry.Bind(entry.m_ProgramRef, entry.m_ArtifactRef);
+			if (bindStatus == ShaderProgramBindStatus::InvalidProgram ||
+				bindStatus == ShaderProgramBindStatus::InvalidArtifact ||
+				bindStatus == ShaderProgramBindStatus::Failed)
+			{
+				return false;
+			}
 
-			auto shader = std::make_unique<Shader>(entry.m_Desc);
-			shader->SetCompileArtifact(std::move(entry.m_Artifact), entry.m_Hash, true);
+			auto shader = std::make_unique<Shader>(
+				entry.m_ProgramRef, entry.m_Recipe.m_Request.m_Entry);
+			shader->SetRuntimeArtifact(
+				std::move(entry.m_Artifact), entry.m_ArtifactRef, entry.m_Hash, true);
 			const ShaderID id{ static_cast<uint32_t>(m_Shaders.size()) };
 			m_Shaders.push_back(std::move(shader));
-			m_KeyIdMap.emplace(key, id);
+			m_ProgramIdMap.emplace(entry.m_ProgramRef, id);
 		}
 		return true;
 	}
@@ -357,8 +420,9 @@ namespace gglab
 				}
 				else
 				{
+					const ShaderProgramRef& program = shader->GetProgramRef();
 					GGLAB_LOG_GRAPHICS_ERROR("RefreshChanged: recompile failed: {}",
-						shader->GetDesc().m_SourcePath.string());
+						std::format("{}::{}", program.m_ProgramId, program.m_VariantId));
 				}
 			}
 		}
@@ -418,10 +482,8 @@ namespace gglab
 			return {};
 		}
 
-		const ShaderDesc& desc = m_Shaders[shaderId.Value()]->GetDesc();
-		const std::string source = desc.m_SourcePath.filename().string();
-		const std::string entry = utils::ToString(desc.m_Entry);
-		return entry.empty() ? source : std::format("{}::{}", source, entry);
+		const ShaderProgramRef& program = m_Shaders[shaderId.Value()]->GetProgramRef();
+		return std::format("{}::{}", program.m_ProgramId, program.m_VariantId);
 	}
 
 	uint64_t ShaderManager::GetGeneration(ShaderID shaderId) const noexcept
@@ -437,22 +499,21 @@ namespace gglab
 
 	bool ShaderManager::RefreshShaderInternal(Shader& shader) noexcept
 	{
-		ShaderDesc activeDesc = shader.GetDesc();
-		ApplyActiveBackendTarget(activeDesc, m_ActiveBackend);
-		const ShaderResolvedRecipe recipe = m_Compiler->Resolve(activeDesc);
+		std::optional<ShaderDesc> activeDesc =
+			ResolveTransitionalShaderProgramBuild(shader.GetProgramRef());
+		if (!activeDesc)
+		{
+			return false;
+		}
+		ApplyActiveBackendTarget(*activeDesc, m_ActiveBackend);
+		const ShaderResolvedRecipe recipe = m_BuildState->m_Compiler->Resolve(*activeDesc);
 		if (!recipe.IsSuccess())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::RefreshShaderInternal: Resolve failed: {}",
 				utils::ToString(recipe.m_Diagnostics.m_Message));
 			return false;
 		}
-		return RefreshShaderInternal(shader, recipe);
-	}
-
-	bool ShaderManager::RefreshShaderInternal(
-		Shader& shader, const ShaderResolvedRecipe& recipe) noexcept
-	{
-		const ShaderCompileResult result = m_Compiler->CompileOrLoad(recipe);
+		ShaderCompileResult result = m_BuildState->m_Compiler->CompileOrLoad(recipe);
 		if (!result.IsSuccess() || !result.m_Artifact.m_Binary.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("ShaderManager::RefreshShaderInternal: Compile failed: {}",
@@ -460,35 +521,29 @@ namespace gglab
 			return false;
 		}
 
+		ShaderRuntimeArtifact runtimeArtifact =
+			MakeRuntimeArtifact(std::move(result.m_Artifact));
+		const ShaderArtifactRef artifactRef{
+			.m_ArtifactId = runtimeArtifact.m_Manifest.m_ArtifactId,
+		};
 		const ShaderHash128 hash = ComputeShaderBinaryHash(
-			result.m_Artifact.m_Binary, result.m_Artifact.GetBinaryFormat());
+			runtimeArtifact.m_Binary, runtimeArtifact.m_Manifest.m_BinaryFormat);
 		const auto changed = (shader.GetGeneration() == 0) || (hash != shader.GetHash());
-
-		shader.SetCompileArtifact(result.m_Artifact, hash, changed);
+		const ShaderProgramBindStatus bindStatus =
+			m_ProgramRegistry.Bind(shader.GetProgramRef(), artifactRef);
+		if (bindStatus == ShaderProgramBindStatus::InvalidProgram ||
+			bindStatus == ShaderProgramBindStatus::InvalidArtifact ||
+			bindStatus == ShaderProgramBindStatus::Failed)
+		{
+			return false;
+		}
+		shader.SetRuntimeArtifact(std::move(runtimeArtifact), artifactRef, hash, changed);
 		return changed;
 	}
 
-	void ShaderManager::ApplyActiveBackendTarget(
-		ShaderDesc& desc, RHIBackendType activeBackend) noexcept
+	std::optional<ShaderArtifactRef> ShaderManager::ResolveArtifact(
+		const ShaderProgramRef& programRef) const noexcept
 	{
-		if (activeBackend == RHIBackendType::Unknown)
-		{
-			desc.m_Target.m_BinaryFormat = ShaderBinaryFormat::Unknown;
-			desc.m_Target.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None;
-			desc.m_Target.m_BindingABIRevision = 0;
-			desc.m_Target.m_CoordinateOptions = ShaderCoordinateOptions::None;
-			return;
-		}
-
-		// Profile application: the backend is resolved, so the backend-owned
-		// target fields are force-overwritten from the profile resolver.
-		// Authoring fields (model / HLSL version / flags / optimization) stay
-		// untouched.
-		const ShaderCompileTarget backendTarget =
-			MakeShaderCompileTarget(GetShaderTargetProfile(activeBackend), desc.m_Stage);
-		desc.m_Target.m_BinaryFormat = backendTarget.m_BinaryFormat;
-		desc.m_Target.m_SpirVTargetEnvironment = backendTarget.m_SpirVTargetEnvironment;
-		desc.m_Target.m_BindingABIRevision = backendTarget.m_BindingABIRevision;
-		desc.m_Target.m_CoordinateOptions = backendTarget.m_CoordinateOptions;
+		return m_ProgramRegistry.Resolve(programRef);
 	}
 }

@@ -225,6 +225,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\TextureLoader.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
@@ -521,6 +522,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalogPrivate.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h" />

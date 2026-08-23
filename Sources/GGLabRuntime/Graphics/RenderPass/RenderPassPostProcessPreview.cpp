@@ -7,6 +7,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <cmath>
 #include <cstdint>
@@ -323,14 +324,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassPostProcessPreview.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		shaderDesc.m_Entry = L"VSMain";
-		m_BaseRecipe.m_VSId = shaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		shaderDesc.m_Entry = L"PSMain";
-		m_BaseRecipe.m_PSId = shaderManager->LoadShader(shaderDesc);
+		m_BaseRecipe.m_VSId =
+			shaderManager->LoadProgram(shader_programs::PostProcessPreviewVertex);
+		m_BaseRecipe.m_PSId =
+			shaderManager->LoadProgram(shader_programs::PostProcessPreviewPixel);
 
 		m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;

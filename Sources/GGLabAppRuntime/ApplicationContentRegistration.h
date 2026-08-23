@@ -21,6 +21,7 @@ namespace gglab
 		std::string m_Id;
 		ApplicationDemoFactory m_Factory = nullptr;
 		bool m_ProvidesLabRuntime = false;
+		std::vector<ShaderProgramRef> m_ShaderPrograms;
 	};
 
 	struct ApplicationContentRegistration
@@ -31,7 +32,7 @@ namespace gglab
 		[[nodiscard]] bool IsValid() const noexcept;
 		[[nodiscard]] const ApplicationDemoRegistration* FindDemo(
 			std::string_view id) const noexcept;
-		[[nodiscard]] bool ContainsLab(const LabId& id) const noexcept;
+		[[nodiscard]] const LabRegistration* FindLab(const LabId& id) const noexcept;
 	};
 
 	enum class ApplicationContentSelectionStatus : uint8_t
@@ -48,6 +49,7 @@ namespace gglab
 			ApplicationContentSelectionStatus::InvalidRegistration;
 		const ApplicationDemoRegistration* m_StartupDemo = nullptr;
 		LabId m_StartupLab;
+		const LabRegistration* m_StartupLabRegistration = nullptr;
 
 		[[nodiscard]] bool Succeeded() const noexcept
 		{
@@ -58,4 +60,7 @@ namespace gglab
 	[[nodiscard]] ApplicationContentSelection ResolveApplicationContentSelection(
 		const ApplicationContentRegistration& registration, std::string_view startupDemoId,
 		std::optional<std::string_view> startupLabId) noexcept;
+	[[nodiscard]] bool AppendSelectedContentShaderProgramDemand(
+		const ApplicationContentSelection& selection,
+		ShaderProgramDemandSet& demands) noexcept;
 }

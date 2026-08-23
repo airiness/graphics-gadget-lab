@@ -18,6 +18,7 @@
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <memory>
 #include <span>
@@ -76,9 +77,17 @@ namespace gglab
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create },
 			{ RenderGraphComputeLabSession::GetDescriptor(),
-				&RenderGraphComputeLabSession::Create },
+				&RenderGraphComputeLabSession::Create,
+				{ shader_programs::RenderGraphComputeWrite,
+					shader_programs::RenderGraphComputeReadWrite,
+					shader_programs::RenderGraphComputePreviewVertex,
+					shader_programs::RenderGraphComputePreviewPixel } },
 			{ CoordinateConformanceLabSession::GetDescriptor(),
-				&CoordinateConformanceLabSession::Create },
+				&CoordinateConformanceLabSession::Create,
+				{ shader_programs::CoordinateGeometryVertex,
+					shader_programs::CoordinateFullscreenVertex,
+					shader_programs::CoordinateMarkerPixel,
+					shader_programs::CoordinateConformancePixel } },
 			{ SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create },
 			{ SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create },
 			{ GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create },
@@ -89,7 +98,8 @@ namespace gglab
 			{ AssetPublicationLabSession::GetDescriptor(), &AssetPublicationLabSession::Create },
 			{ AssetResidencyLabSession::GetDescriptor(), &AssetResidencyLabSession::Create },
 			{ EnvironmentAssetLabSession::GetDescriptor(), &EnvironmentAssetLabSession::Create },
-			{ NapaVoxelLabSession::GetDescriptor(), &NapaVoxelLabSession::Create },
+			{ NapaVoxelLabSession::GetDescriptor(), &NapaVoxelLabSession::Create,
+				{ shader_programs::NapaVoxelVertex, shader_programs::NapaVoxelPixel } },
 		};
 		return registration;
 	}

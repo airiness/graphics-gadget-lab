@@ -7,6 +7,8 @@
 
 namespace gglab
 {
+	struct ShaderArtifactManifest;
+
 	inline constexpr uint32_t ShaderRuntimeArtifactIdentitySchemaVersion = 1;
 	inline constexpr uint32_t ShaderRuntimeArtifactManifestSchemaVersion = 1;
 
@@ -66,4 +68,6 @@ namespace gglab
 	// contract. The stored m_ArtifactId field is intentionally excluded.
 	[[nodiscard]] ShaderArtifactId ComputeShaderArtifactId(
 		const ShaderRuntimeArtifactManifest& manifest) noexcept;
+	[[nodiscard]] ShaderRuntimeArtifactManifest BuildShaderRuntimeArtifactManifest(
+		const ShaderArtifactManifest& manifest) noexcept;
 }

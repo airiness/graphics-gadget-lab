@@ -735,6 +735,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.cpp">
       <Filter>Graphics\Shader</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.cpp">
+      <Filter>Graphics\Shader</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -1647,6 +1650,12 @@
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h">
+      <Filter>Graphics\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
+      <Filter>Graphics\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalogPrivate.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h">

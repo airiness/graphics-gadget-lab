@@ -1,5 +1,6 @@
 #pragma once
 #include "Lab/LabTypes.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
 
 #include <memory>
 #include <vector>
@@ -16,6 +17,7 @@ namespace gglab
 	{
 		LabDescriptor m_Descriptor;
 		LabSessionFactory m_Factory = nullptr;
+		std::vector<ShaderProgramRef> m_ShaderPrograms;
 	};
 
 	class LabCatalog

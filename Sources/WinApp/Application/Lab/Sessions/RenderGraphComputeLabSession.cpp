@@ -7,6 +7,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 namespace gglab
 {
@@ -457,20 +458,14 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(shaderManager);
 				m_Renderer = renderer;
 
-				ShaderDesc shaderDesc{};
-				shaderDesc.m_SourcePath = L"Passes/PassRenderGraphComputeSmoke.hlsl";
-				shaderDesc.m_Stage = ShaderStage::Compute;
-				shaderDesc.m_Entry = L"CSWrite";
-				m_ComputeWriteRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
-				shaderDesc.m_Entry = L"CSReadWrite";
-				m_ComputeReadWriteRecipe.m_CSId = shaderManager->LoadShader(shaderDesc);
-
-				shaderDesc.m_Stage = ShaderStage::Vertex;
-				shaderDesc.m_Entry = L"VSMain";
-				m_PreviewRecipe.m_VSId = shaderManager->LoadShader(shaderDesc);
-				shaderDesc.m_Stage = ShaderStage::Pixel;
-				shaderDesc.m_Entry = L"PSMain";
-				m_PreviewRecipe.m_PSId = shaderManager->LoadShader(shaderDesc);
+				m_ComputeWriteRecipe.m_CSId =
+					shaderManager->LoadProgram(shader_programs::RenderGraphComputeWrite);
+				m_ComputeReadWriteRecipe.m_CSId =
+					shaderManager->LoadProgram(shader_programs::RenderGraphComputeReadWrite);
+				m_PreviewRecipe.m_VSId = shaderManager->LoadProgram(
+					shader_programs::RenderGraphComputePreviewVertex);
+				m_PreviewRecipe.m_PSId = shaderManager->LoadProgram(
+					shader_programs::RenderGraphComputePreviewPixel);
 
 				const auto bindingLayout = renderer->GetCommonBindingLayout();
 				m_ComputeWriteRecipe.m_BindingLayout = bindingLayout;

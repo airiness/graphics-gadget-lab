@@ -11,6 +11,7 @@
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/Shader/ShaderPaths.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Targets/VulkanShaderCompileABI.h"
@@ -506,24 +507,23 @@ namespace gglab
 				compiler.GetCompilerIdentity().m_CanonicalIdentity != L"unknown",
 				"Active shader compiler exposes the concrete DXC producer identity");
 
-			ShaderDesc managerDesc{
-				.m_SourcePath = L"Passes/PassForwardCoverage.hlsl",
-				.m_Stage = ShaderStage::Vertex,
-				.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex),
-				.m_Entry = L"VSMain",
-			};
 			ShaderManager dxilManager(
 				RHIBackendType::DX12, shaderSourceRoot, shaderCacheRoot);
-			const ShaderID dxilManagerShader = dxilManager.LoadShader(managerDesc);
-			managerDesc.m_Target = {};
+			const ShaderID dxilManagerShader =
+				dxilManager.LoadProgram(shader_programs::ForwardCoverageVertex);
 			ShaderManager spirVManager(
 				RHIBackendType::Vulkan, shaderSourceRoot, shaderCacheRoot);
-			const ShaderID spirVManagerShader = spirVManager.LoadShader(managerDesc);
+			const ShaderID spirVManagerShader =
+				spirVManager.LoadProgram(shader_programs::ForwardCoverageVertex);
 			context.Check(dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
 				spirVManager.GetActiveBackend() == RHIBackendType::Vulkan &&
 				dxilManagerShader.IsValid() && spirVManagerShader.IsValid() &&
 				dxilManager.GetBytecode(dxilManagerShader).m_Format == ShaderBinaryFormat::Dxil &&
-				spirVManager.GetBytecode(spirVManagerShader).m_Format == ShaderBinaryFormat::SpirV,
+				spirVManager.GetBytecode(spirVManagerShader).m_Format == ShaderBinaryFormat::SpirV &&
+				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
+				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
+				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex) !=
+					spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
 				"ShaderManager derives shader format from its active RHI backend");
 
 			// Recipe identity semantics: the resolved recipe is the authority, and

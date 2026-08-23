@@ -7,6 +7,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 namespace gglab
 {
@@ -215,14 +216,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(services.m_Renderer);
 		GGLAB_ASSERT_NOT_NULL(services.m_ShaderManager);
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		shaderDesc.m_Entry = L"VSMain";
-		const ShaderID vertexShader = services.m_ShaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		shaderDesc.m_Entry = L"PSMain";
-		const ShaderID pixelShader = services.m_ShaderManager->LoadShader(shaderDesc);
+		const ShaderID vertexShader =
+			services.m_ShaderManager->LoadProgram(shader_programs::NapaVoxelVertex);
+		const ShaderID pixelShader =
+			services.m_ShaderManager->LoadProgram(shader_programs::NapaVoxelPixel);
 		if (!vertexShader.IsValid() || !pixelShader.IsValid())
 		{
 			return;

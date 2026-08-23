@@ -1,4 +1,5 @@
 #include "ShaderArtifactRuntime/ShaderRuntimeArtifact.h"
+#include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
 
 #include <span>
 
@@ -25,5 +26,21 @@ namespace gglab
 		}
 
 		return ShaderArtifactId{ .m_DurableDigest = builder.Finish() };
+	}
+
+	ShaderRuntimeArtifactManifest BuildShaderRuntimeArtifactManifest(
+		const ShaderArtifactManifest& manifest) noexcept
+	{
+		ShaderRuntimeArtifactManifest runtimeManifest{
+			.m_TargetProfile = manifest.m_TargetProfile,
+			.m_BinaryFormat = manifest.m_BinaryFormat,
+			.m_SpirVTargetEnvironment = manifest.m_SpirVTargetEnvironment,
+			.m_BindingABIRevision = manifest.m_BindingABIRevision,
+			.m_CoordinateOptions = manifest.m_CoordinateOptions,
+			.m_Stage = manifest.m_Stage,
+			.m_BinaryContentDigest = manifest.m_BinaryContentDigest,
+		};
+		runtimeManifest.m_ArtifactId = ComputeShaderArtifactId(runtimeManifest);
+		return runtimeManifest;
 	}
 }
