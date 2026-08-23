@@ -1275,6 +1275,19 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$applicationRuntimeLifecycleRegex =
+    '\bm_IsSuspended\b|GetRenderer\s*\(\s*\)\s*->\s*On(?:Suspend|Resume|Resize)\s*\('
+foreach ($itemPath in $applicationCoreContractPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $applicationRuntimeLifecycleRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-runtime-lifecycle-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "Windows Application shell duplicates shared runtime lifecycle state or renderer control"
+        })
+    }
+}
+
 $presentationContractChecks = @(
     [pscustomobject]@{
         Path = Join-Path $runtimeSourcesDir "Graphics/RHI/RHIContext.h"

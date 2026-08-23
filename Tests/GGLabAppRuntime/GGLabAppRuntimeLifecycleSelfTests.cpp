@@ -250,19 +250,42 @@ namespace gglab
 					}) == AppRuntimeTickResult::Continue &&
 					uncomposedTooling.m_BeginCount == 0,
 					"A lifecycle-only runtime never opens a production tooling frame");
+				runtime.HandleHostEvent({});
+				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Running,
+					"An empty host event has no lifecycle side effect");
 
-				runtime.HandleHostEvent(AppHostEventType::Suspended);
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::Resized,
+					.m_Width = 1920,
+					.m_Height = 1080,
+					});
+				context.Check(runtime.Tick() == AppRuntimeTickResult::Continue,
+					"A lifecycle-only runtime accepts a host resize without platform access");
+
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::Suspended,
+					});
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::Suspended,
+					});
 				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Suspended &&
 					runtime.Tick() == AppRuntimeTickResult::Suspended,
-					"Suspended host state returns Suspended without blocking");
-				runtime.HandleHostEvent(AppHostEventType::Resumed);
+					"Duplicate suspend events are idempotent and never block inside the runtime");
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::Resumed,
+					});
 				context.Check(runtime.Tick() == AppRuntimeTickResult::Continue,
 					"Resumed host state returns Continue");
-				runtime.HandleHostEvent(AppHostEventType::ExitRequested);
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::ExitRequested,
+					});
+				runtime.HandleHostEvent({
+					.m_Type = AppHostEventType::Resumed,
+					});
 				context.Check(runtime.GetLifecycleState() ==
 					AppRuntimeLifecycleState::ExitRequested &&
 					runtime.Tick() == AppRuntimeTickResult::Exit,
-					"Host exit request produces a non-blocking Exit result");
+					"Host exit request is terminal and produces a non-blocking Exit result");
 
 				runtime.Shutdown();
 				runtime.Shutdown();

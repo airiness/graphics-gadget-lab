@@ -365,6 +365,7 @@ namespace gglab
 		m_Input = nullptr;
 		m_LabHostDemoIndex.reset();
 		m_ServicesInitialized = false;
+		m_ResizePending = false;
 
 		m_ShutdownComplete = true;
 		m_LifecycleState = preserveFailure

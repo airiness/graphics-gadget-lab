@@ -53,9 +53,18 @@ namespace gglab
 
 	enum class AppHostEventType : uint8_t
 	{
+		None,
 		Suspended,
 		Resumed,
+		Resized,
 		ExitRequested,
+	};
+
+	struct AppHostEvent
+	{
+		AppHostEventType m_Type = AppHostEventType::None;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
 	};
 
 	struct GGLabAppRuntimeCreateInfo
@@ -111,8 +120,7 @@ namespace gglab
 		[[nodiscard]] AppRuntimeServiceInitializeResult InitializeServices(
 			AppRuntimeServiceCreateInfo createInfo) noexcept;
 		[[nodiscard]] AppRuntimeTickResult Tick(AppRuntimeTickInfo tickInfo = {}) noexcept;
-		void Resize(uint32_t width, uint32_t height) noexcept;
-		void HandleHostEvent(AppHostEventType eventType) noexcept;
+		void HandleHostEvent(const AppHostEvent& event) noexcept;
 		void Shutdown() noexcept;
 
 		[[nodiscard]] AppRuntimeLifecycleState GetLifecycleState() const noexcept
@@ -162,6 +170,7 @@ namespace gglab
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
 			AppRuntimeServiceInitializeResult result) noexcept;
 		void BeginInitialShaderPreload() noexcept;
+		void Resize(uint32_t width, uint32_t height) noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
@@ -182,6 +191,7 @@ namespace gglab
 		uint32_t m_WindowHeight = 0;
 		AppRuntimeLifecycleState m_LifecycleState = AppRuntimeLifecycleState::Uninitialized;
 		bool m_ServicesInitialized = false;
+		bool m_ResizePending = false;
 		bool m_ShutdownComplete = false;
 	};
 }

@@ -50,11 +50,19 @@ namespace gglab
 				HandlePlatformEvent(event);
 			}
 
-			if (m_PlatformHost->IsQuitRequested() || !Tick())
+			if (m_PlatformHost->IsQuitRequested())
+			{
+				break;
+			}
+			if (!Tick())
 			{
 				return;
 			}
 		}
+
+		m_AppRuntime->HandleHostEvent({
+			.m_Type = AppHostEventType::ExitRequested,
+			});
 	}
 
 	bool Application::Initialize() noexcept
@@ -189,7 +197,7 @@ namespace gglab
 			return true;
 		}
 
-		if (m_IsSuspended)
+		if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
 		{
 			m_PlatformHost->WaitForEvents();
 			return true;
@@ -235,6 +243,7 @@ namespace gglab
 		if (m_AppRuntime)
 		{
 			m_AppRuntime->Shutdown();
+			m_AppRuntime.reset();
 		}
 
 		m_RHIContextFactory.reset();
@@ -259,100 +268,54 @@ namespace gglab
 		switch (event.m_Type)
 		{
 		case PlatformEventType::Activated:
-			OnActive();
+			if (m_InputManager)
+			{
+				m_InputManager->OnActive();
+			}
 			break;
 		case PlatformEventType::Deactivated:
-			OnInactive();
+			if (m_InputManager)
+			{
+				m_InputManager->OnInactive();
+			}
 			break;
 		case PlatformEventType::Suspended:
-			OnSuspend();
+			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Running)
+			{
+				if (m_InputManager)
+				{
+					m_InputManager->OnSuspend();
+				}
+				m_AppRuntime->HandleHostEvent({
+					.m_Type = AppHostEventType::Suspended,
+					});
+			}
 			break;
 		case PlatformEventType::Resumed:
-			OnResume();
+			if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
+			{
+				if (m_InputManager)
+				{
+					m_InputManager->OnResume();
+				}
+				m_AppRuntime->HandleHostEvent({
+					.m_Type = AppHostEventType::Resumed,
+					});
+			}
 			break;
 		case PlatformEventType::Resized:
-			OnResize(event.m_Width, event.m_Height);
+			if (event.m_Width > 0 && event.m_Height > 0 &&
+				(event.m_Width != m_WindowWidth || event.m_Height != m_WindowHeight))
+			{
+				m_WindowWidth = event.m_Width;
+				m_WindowHeight = event.m_Height;
+				m_AppRuntime->HandleHostEvent({
+					.m_Type = AppHostEventType::Resized,
+					.m_Width = event.m_Width,
+					.m_Height = event.m_Height,
+					});
+			}
 			break;
-		}
-	}
-
-	void Application::OnActive() noexcept
-	{
-		if (m_InputManager)
-		{
-			m_InputManager->OnActive();
-		}
-	}
-
-	void Application::OnInactive() noexcept
-	{
-		if (m_InputManager)
-		{
-			m_InputManager->OnInactive();
-		}
-	}
-
-	void Application::OnSuspend() noexcept
-	{
-		if (m_IsSuspended)
-		{
-			return;
-		}
-
-		m_IsSuspended = true;
-		if (m_InputManager)
-		{
-			m_InputManager->OnSuspend();
-		}
-
-		if (m_AppRuntime && m_AppRuntime->GetRenderer())
-		{
-			m_AppRuntime->GetRenderer()->OnSuspend();
-		}
-	}
-
-	void Application::OnResume() noexcept
-	{
-		if (!m_IsSuspended)
-		{
-			return;
-		}
-
-		m_IsSuspended = false;
-		if (m_InputManager)
-		{
-			m_InputManager->OnResume();
-		}
-
-		if (m_AppRuntime && m_AppRuntime->GetRenderer())
-		{
-			m_AppRuntime->GetRenderer()->OnResume();
-		}
-	}
-
-	void Application::OnResize(uint32_t width, uint32_t height) noexcept
-	{
-		if (m_LifecycleState != LifecycleState::Running)
-		{
-			return;
-		}
-
-		if (width == 0 || height == 0)
-		{
-			return;
-		}
-
-		if (width == m_WindowWidth && height == m_WindowHeight)
-		{
-			return;
-		}
-
-		m_WindowWidth = width;
-		m_WindowHeight = height;
-
-		if (m_AppRuntime)
-		{
-			m_AppRuntime->Resize(width, height);
 		}
 	}
 }

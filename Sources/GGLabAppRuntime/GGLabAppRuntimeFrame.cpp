@@ -226,17 +226,4 @@ namespace gglab
 		return AppRuntimeTickResult::Continue;
 	}
 
-	void GGLabAppRuntime::Resize(uint32_t width, uint32_t height) noexcept
-	{
-		if (!m_ServicesInitialized || width == 0 || height == 0 ||
-			(width == m_WindowWidth && height == m_WindowHeight))
-		{
-			return;
-		}
-
-		m_WindowWidth = width;
-		m_WindowHeight = height;
-		m_Renderer->OnResize(width, height);
-		m_DemoManager->OnResize(width, height);
-	}
 }

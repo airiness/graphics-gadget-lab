@@ -66,13 +66,6 @@ namespace gglab
 
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
-		// Platform lifecycle handlers
-		void OnActive() noexcept;
-		void OnInactive() noexcept;
-		void OnSuspend() noexcept;
-		void OnResume() noexcept;
-		void OnResize(uint32_t width, uint32_t height) noexcept;
-
 	private:
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
@@ -92,7 +85,6 @@ namespace gglab
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;
 		bool m_ShutdownComplete = false;
-		bool m_IsSuspended = false;
 		int m_ExitCode = 0;
 	};
 }
