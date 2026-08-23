@@ -35,7 +35,7 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifact.h">
       <Filter>Contracts</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactManifest.h">
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactCacheRecord.h">
       <Filter>Contracts</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTarget.h">

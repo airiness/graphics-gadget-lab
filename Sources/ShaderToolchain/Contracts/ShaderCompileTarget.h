@@ -1,5 +1,6 @@
 #pragma once
 #include "Contracts/ShaderCompileTypes.h"
+#include "ShaderArtifactRuntime/ShaderArtifactTypes.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -8,31 +9,6 @@
 
 namespace gglab
 {
-	// A target profile selects the target environment and consumes a Shader ABI
-	// revision. Profile version and Shader ABI revision are independent
-	// evolution axes; an environment change without an ABI change must not
-	// duplicate the ABI contract.
-	enum class ShaderTargetProfile : uint8_t
-	{
-		GGLabDX12,
-		GGLabVulkan13,
-	};
-
-	// Derives the target profile from the resolved target semantics. Profile
-	// version and Shader ABI revision stay independent axes: this maps the
-	// resolved fields back to the profile vocabulary for manifest/CLI
-	// serialization.
-	[[nodiscard]] constexpr ShaderTargetProfile GetShaderTargetProfile(
-		ShaderBinaryFormat binaryFormat, ShaderSpirVTargetEnvironment environment) noexcept
-	{
-		if (binaryFormat == ShaderBinaryFormat::SpirV &&
-			environment == ShaderSpirVTargetEnvironment::Vulkan1_3)
-		{
-			return ShaderTargetProfile::GGLabVulkan13;
-		}
-		return ShaderTargetProfile::GGLabDX12;
-	}
-
 	// Field ownership boundary:
 	//   backend-owned   - binaryFormat, spirvEnvironment, bindingAbiRevision,
 	//                     coordinateOptions (profile application overwrites them).
@@ -51,26 +27,6 @@ namespace gglab
 		ShaderCoordinateOptions m_CoordinateOptions = ShaderCoordinateOptions::None;
 
 		bool operator==(const ShaderCompileTarget&) const noexcept = default;
-	};
-
-	enum class ShaderCompilerKind : uint8_t
-	{
-		Dxc,
-	};
-
-	// Producer identity ("who produces it"). Keep the single canonical
-	// identity produced by QueryDxcVersion() (major.minor plus commit
-	// count/hash when available); the type split must not introduce new
-	// producer-identity inputs. Identity is an authority of the active
-	// compiler instance and is never written back into ShaderDesc or
-	// ShaderCompileTarget.
-	struct ShaderCompilerIdentity
-	{
-		ShaderCompilerKind m_Kind = ShaderCompilerKind::Dxc;
-		std::wstring m_CanonicalIdentity;
-
-		friend constexpr bool operator==(
-			const ShaderCompilerIdentity&, const ShaderCompilerIdentity&) noexcept = default;
 	};
 
 	enum class ShaderCompileValidationError : uint8_t

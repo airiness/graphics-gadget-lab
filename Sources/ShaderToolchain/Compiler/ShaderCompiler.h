@@ -1,9 +1,10 @@
 #pragma once
 #include "Contracts/ShaderArtifact.h"
-#include "Contracts/ShaderArtifactManifest.h"
+#include "Contracts/ShaderArtifactCacheRecord.h"
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
 
 #include <cstddef>
 #include <filesystem>

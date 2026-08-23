@@ -1,5 +1,5 @@
 #pragma once
-#include "Contracts/ShaderCompileTypes.h"
+#include "ShaderArtifactRuntime/ShaderArtifactTypes.h"
 
 #include <cstddef>
 #include <string_view>

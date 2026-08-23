@@ -414,6 +414,16 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "ShaderArtifactRuntime"
+        ProjectPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj"
+        FiltersPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\ShaderArtifactRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "ShaderCompiler"
         ProjectPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj"
         FiltersPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj.filters"

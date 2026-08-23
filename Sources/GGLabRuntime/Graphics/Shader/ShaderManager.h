@@ -1,4 +1,5 @@
 #pragma once
+#include "Contracts/ShaderArtifact.h"
 #include "Core/Hash/KeyHash.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskTypes.h"

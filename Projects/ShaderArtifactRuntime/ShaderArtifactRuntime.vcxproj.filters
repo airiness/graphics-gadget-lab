@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Private">
+      <UniqueIdentifier>{AB1FE7D8-A471-610B-E8E9-BE6F3FDEC143}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{EE66B9C1-A626-9488-363F-614366BB7E06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\ShaderArtifactRuntime">
+      <UniqueIdentifier>{57813C07-06F8-4EA1-0E35-3DB6BF4B734E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifact.cpp">
+      <Filter>Private</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifact.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactManifest.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

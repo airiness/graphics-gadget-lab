@@ -1,9 +1,8 @@
 #pragma once
-#include "Contracts/ShaderArtifact.h"
 #include "Contracts/ShaderCompileTarget.h"
-#include "Contracts/ShaderCompileTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Shader/ShaderTypes.h"
+#include "ShaderArtifactRuntime/ShaderArtifact.h"
 
 #include <cstdint>
 #include <filesystem>
