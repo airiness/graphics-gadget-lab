@@ -2,6 +2,7 @@
 
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
+#include "ApplicationToolingIntegration.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
@@ -48,7 +49,7 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] std::vector<ShaderDesc> BuildInitialShaderDemandSnapshot()
+		[[nodiscard]] std::vector<ShaderDesc> BuildTransitionalInitialShaderDemandSnapshot()
 		{
 			constexpr size_t initialShaderDemandCount = 30;
 			std::vector<ShaderDesc> shaderDescs;
@@ -266,9 +267,12 @@ namespace gglab
 
 	void GGLabAppRuntime::BeginInitialShaderPreload() noexcept
 	{
-		// Freeze the complete initial runtime demand before starting eager preload.
+		// Freeze the validated transitional desktop baseline before eager preload.
+		// Host/content aggregation waits for Slice 10A's stable artifact identities;
+		// do not expose ShaderDesc authoring data through the AppRuntime contract.
 		// Loading progress observes this same ShaderManager preload operation.
-		std::vector<ShaderDesc> shaderDemandSnapshot = BuildInitialShaderDemandSnapshot();
+		std::vector<ShaderDesc> shaderDemandSnapshot =
+			BuildTransitionalInitialShaderDemandSnapshot();
 		GGLAB_UNUSED(m_ShaderManager->PreloadAsync(
 			*m_TaskSystem, std::move(shaderDemandSnapshot), TaskPriority::Critical));
 	}
@@ -303,7 +307,7 @@ namespace gglab
 		};
 	}
 
-	void GGLabAppRuntime::Shutdown() noexcept
+	void GGLabAppRuntime::Shutdown(AppRuntimeShutdownInfo shutdownInfo) noexcept
 	{
 		if (m_ShutdownComplete || m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown)
 		{
@@ -312,6 +316,15 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
 		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
+		bool applicationToolingPrepared = false;
+		const auto prepareApplicationTooling = [&]() noexcept
+			{
+				if (!applicationToolingPrepared && shutdownInfo.m_ApplicationTooling)
+				{
+					shutdownInfo.m_ApplicationTooling->PrepareForShutdown();
+					applicationToolingPrepared = true;
+				}
+			};
 
 		if (m_AssetManager)
 		{
@@ -335,6 +348,10 @@ namespace gglab
 			{
 				m_Renderer->GetAssetUploadScheduler()->DrainReadyWork();
 				m_Renderer->GetRHIContext()->WaitIdle();
+				// Host-owned tooling may retain backend pipelines, descriptors and user
+				// textures referenced by the last submitted frame. Retire them only at
+				// this quiescent point, while all borrowed runtime services remain alive.
+				prepareApplicationTooling();
 				m_Renderer->GetAssetUploadScheduler()->Finalize();
 
 				m_RenderFrameBuilder.reset();
@@ -350,6 +367,9 @@ namespace gglab
 			m_TaskSystem->Shutdown();
 		}
 
+		// Lifecycle-only and partial-initialization runtimes have no GPU work to
+		// quiesce, but still honor the tooling shutdown contract exactly once.
+		prepareApplicationTooling();
 		m_RenderFrameBuilder.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();

@@ -236,15 +236,19 @@ namespace gglab
 		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
 		m_LifecycleState = LifecycleState::ShuttingDown;
 
-		// Host-owned tooling and concrete Lab lookup must release their references
-		// before the shared runtime destroys Demo/Lab and rendering services.
-		m_ApplicationTooling.reset();
-		m_LabRuntimeLocator.reset();
 		if (m_AppRuntime)
 		{
-			m_AppRuntime->Shutdown();
+			// The runtime owns the GPU-quiescent ordering point, while the host keeps
+			// ownership of the concrete tooling integration.
+			m_AppRuntime->Shutdown({
+				.m_ApplicationTooling = m_ApplicationTooling.get(),
+				});
 			m_AppRuntime.reset();
 		}
+		// PrepareForShutdown has retired all borrowed runtime/GPU resources. The
+		// inactive host objects can now be destroyed without touching dead services.
+		m_ApplicationTooling.reset();
+		m_LabRuntimeLocator.reset();
 
 		m_RHIContextFactory.reset();
 

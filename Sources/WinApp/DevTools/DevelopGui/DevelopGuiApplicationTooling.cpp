@@ -28,6 +28,11 @@ namespace gglab
 				m_System.Finalize();
 			}
 
+			void PrepareForShutdown() noexcept override
+			{
+				m_System.Finalize();
+			}
+
 			[[nodiscard]] bool Initialize(
 				const ApplicationToolingCompositionCreateInfo& createInfo) noexcept
 			{

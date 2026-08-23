@@ -40,6 +40,8 @@ namespace gglab
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
+			void PrepareForShutdown() noexcept override { ++m_PrepareForShutdownCount; }
+
 			ApplicationToolingInputCapture GetPreviousFrameInputCapture()
 				const noexcept override
 			{
@@ -74,6 +76,7 @@ namespace gglab
 
 			bool m_BeginSucceeds = true;
 			bool m_HasOverlay = true;
+			uint32_t m_PrepareForShutdownCount = 0;
 			uint32_t m_BeginCount = 0;
 			uint32_t m_DrawCount = 0;
 			uint32_t m_EndCount = 0;
@@ -287,10 +290,15 @@ namespace gglab
 					runtime.Tick() == AppRuntimeTickResult::Exit,
 					"Host exit request is terminal and produces a non-blocking Exit result");
 
-				runtime.Shutdown();
-				runtime.Shutdown();
-				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped,
-					"Repeated shutdown is idempotent");
+				runtime.Shutdown({
+					.m_ApplicationTooling = &uncomposedTooling,
+					});
+				runtime.Shutdown({
+					.m_ApplicationTooling = &uncomposedTooling,
+					});
+				context.Check(runtime.GetLifecycleState() == AppRuntimeLifecycleState::Stopped &&
+					uncomposedTooling.m_PrepareForShutdownCount == 1,
+					"Repeated shutdown prepares host tooling exactly once");
 			}
 
 			GGLabAppRuntime stoppedRuntime;

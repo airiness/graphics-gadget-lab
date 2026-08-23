@@ -62,6 +62,10 @@ namespace gglab
 	public:
 		virtual ~ApplicationToolingIntegrationBase();
 
+		// Release tooling resources that borrow runtime/GPU services. The runtime
+		// calls this after GPU quiescence and before destroying those services;
+		// the host retains ownership of the integration object.
+		virtual void PrepareForShutdown() noexcept = 0;
 		[[nodiscard]] virtual ApplicationToolingInputCapture GetPreviousFrameInputCapture()
 			const noexcept = 0;
 		virtual void ResolveFrameSettings(const ViewRenderProfile& authoringProfile,

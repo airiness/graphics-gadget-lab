@@ -108,6 +108,11 @@ namespace gglab
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
 	};
 
+	struct AppRuntimeShutdownInfo
+	{
+		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
+	};
+
 	class GGLabAppRuntime final
 	{
 	public:
@@ -121,7 +126,7 @@ namespace gglab
 			AppRuntimeServiceCreateInfo createInfo) noexcept;
 		[[nodiscard]] AppRuntimeTickResult Tick(AppRuntimeTickInfo tickInfo = {}) noexcept;
 		void HandleHostEvent(const AppHostEvent& event) noexcept;
-		void Shutdown() noexcept;
+		void Shutdown(AppRuntimeShutdownInfo shutdownInfo = {}) noexcept;
 
 		[[nodiscard]] AppRuntimeLifecycleState GetLifecycleState() const noexcept
 		{
