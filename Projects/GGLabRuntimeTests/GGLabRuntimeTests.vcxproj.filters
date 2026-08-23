@@ -10,6 +10,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderCompilerCliContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderRuntimeArtifactPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.cpp" />
   </ItemGroup>
@@ -22,6 +23,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderCompilerCliContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderRuntimeArtifactPublicationSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.h" />
   </ItemGroup>

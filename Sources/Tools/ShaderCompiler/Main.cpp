@@ -1,5 +1,6 @@
 #include "ShaderCompilerCommandLine.h"
 #include "ShaderCompilerProcessFactory.h"
+#include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
 #include "Contracts/ShaderCompileTarget.h"
@@ -16,6 +17,7 @@
 #include <format>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -172,7 +174,8 @@ namespace
 
 	int PrintTextResult(const gglab::ShaderCompileResult& result,
 		const gglab::ShaderResolvedRecipe& recipe, const std::filesystem::path& binaryPath,
-		const std::filesystem::path& recordPath, std::wstring_view targetName)
+		const std::filesystem::path& recordPath, std::wstring_view targetName,
+		const std::optional<gglab::ShaderRuntimeArtifactPublicationResult>& publication)
 	{
 		std::wcout << L"Compiled " << recipe.m_LogicalSourcePath.generic_wstring()
 			<< L"::" << recipe.m_Request.m_Entry << L"\n";
@@ -180,6 +183,16 @@ namespace
 		std::wcout << L"Artifact: " << binaryPath.wstring() << L"\n";
 		std::wcout << L"Cache: " << (result.m_FromCache ? L"hit" : L"miss") << L"\n";
 		std::wcout << L"Cache record: " << recordPath.wstring() << L"\n";
+		if (publication.has_value())
+		{
+			std::wcout << L"Runtime Artifact ID: " << gglab::utils::ToWideString(
+				gglab::Sha256DigestToHex(
+					publication->m_ArtifactRef.m_ArtifactId.m_DurableDigest)) << L"\n";
+			std::wcout << L"Runtime binary: " <<
+				publication->m_Paths.m_BinaryPath.wstring() << L"\n";
+			std::wcout << L"Runtime manifest: " <<
+				publication->m_Paths.m_ManifestPath.wstring() << L"\n";
+		}
 		return ExitCodeSuccess;
 	}
 
@@ -239,13 +252,14 @@ namespace
 
 	int PrintJsonResult(const gglab::ShaderCompileResult& result,
 		const gglab::ShaderResolvedRecipe& recipe, const std::filesystem::path& binaryPath,
-		const std::filesystem::path& recordPath, std::wstring_view targetName)
+		const std::filesystem::path& recordPath, std::wstring_view targetName,
+		const std::optional<gglab::ShaderRuntimeArtifactPublicationResult>& publication)
 	{
 		// binaryHash is the content identity of the committed artifact returned
 		// by CompileOrLoad. binaryPath and cacheRecordPath are that artifact's
 		// cache-slot locations, so all three fields describe the same committed
 		// entry for this completed operation on hit and publication paths.
-		return PrintJsonDocument({
+		nlohmann::json document{
 			{ "command", "compile" },
 			{ "success", true },
 			{ "status", "ok" },
@@ -261,7 +275,17 @@ namespace
 			{ "cacheRecordPath", gglab::utils::ToString(recordPath.wstring()) },
 			{ "fromCache", result.m_FromCache },
 			{ "diagnostics", nlohmann::json::array() },
-		}, ExitCodeSuccess);
+		};
+		if (publication.has_value())
+		{
+			document["artifactId"] = gglab::Sha256DigestToHex(
+				publication->m_ArtifactRef.m_ArtifactId.m_DurableDigest);
+			document["runtimeArtifactBinaryPath"] = gglab::utils::ToString(
+				publication->m_Paths.m_BinaryPath.wstring());
+			document["runtimeArtifactManifestPath"] = gglab::utils::ToString(
+				publication->m_Paths.m_ManifestPath.wstring());
+		}
+		return PrintJsonDocument(document, ExitCodeSuccess);
 	}
 
 	int RunCompile(const gglab::ShaderCompilerCommandLine& commandLine)
@@ -312,15 +336,31 @@ namespace
 		{
 			return PrintFailure(result.m_Diagnostics, commandLine.m_JsonRequested);
 		}
+		std::optional<gglab::ShaderRuntimeArtifactPublicationResult> publication;
+		if (!options.m_ArtifactRoot.empty())
+		{
+			publication = gglab::PublishShaderRuntimeArtifact(
+				options.m_ArtifactRoot, result.m_Artifact);
+			if (!publication->IsSuccess())
+			{
+				gglab::ShaderCompilerDiagnostics diagnostics{};
+				diagnostics.m_Status = gglab::ShaderCompileStatus::ArtifactIOFailure;
+				diagnostics.m_Message = L"Failed to publish the Runtime shader artifact";
+				diagnostics.m_SourceIdentity = recipe.m_LogicalSourcePath.generic_wstring();
+				return PrintFailure(diagnostics, commandLine.m_JsonRequested);
+			}
+		}
 
 		const std::filesystem::path binaryPath = compiler->GetCacheBinaryPath(recipe);
 		auto recordPath = binaryPath;
 		recordPath += L".json";
 		if (options.m_ResultFormat == "json")
 		{
-			return PrintJsonResult(result, recipe, binaryPath, recordPath, targetName);
+			return PrintJsonResult(
+				result, recipe, binaryPath, recordPath, targetName, publication);
 		}
-		return PrintTextResult(result, recipe, binaryPath, recordPath, targetName);
+		return PrintTextResult(
+			result, recipe, binaryPath, recordPath, targetName, publication);
 	}
 
 	int RunTargets()

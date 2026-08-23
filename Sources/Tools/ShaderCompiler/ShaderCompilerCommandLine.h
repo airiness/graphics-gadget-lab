@@ -27,6 +27,7 @@ namespace gglab
 		std::vector<std::wstring> m_Defines{};
 		std::vector<std::filesystem::path> m_IncludeDirs{};
 		std::filesystem::path m_CacheRoot{};
+		std::filesystem::path m_ArtifactRoot{};
 		std::string m_ResultFormat{ "text" };
 	};
 

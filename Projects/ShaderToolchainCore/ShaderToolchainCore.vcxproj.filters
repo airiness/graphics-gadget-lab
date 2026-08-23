@@ -21,12 +21,18 @@
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp">
       <Filter>Artifact</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.cpp">
+      <Filter>Artifact</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp">
       <Filter>Compiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h">
+      <Filter>Artifact</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.h">
       <Filter>Artifact</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.h">

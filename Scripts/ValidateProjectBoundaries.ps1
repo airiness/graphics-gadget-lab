@@ -1049,12 +1049,20 @@ if (-not $shaderCompilerProjectReferenceSet.Contains($shaderToolchainProjectPath
         Reason = "missing ProjectReference to ShaderToolchainCore"
     })
 }
+if (-not $shaderCompilerProjectReferenceSet.Contains($shaderArtifactRuntimeProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/ShaderCompiler/ShaderCompiler.vcxproj"
+        Reason = "missing ProjectReference to ShaderArtifactRuntime"
+    })
+}
 foreach ($reference in $shaderCompilerProjectReferenceSet) {
-    if ($reference -ne $shaderToolchainProjectPath) {
+    if ($reference -ne $shaderToolchainProjectPath -and
+        $reference -ne $shaderArtifactRuntimeProjectPath) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-graph"
             Target = "Projects/ShaderCompiler/ShaderCompiler.vcxproj"
-            Reason = "gglab-shaderc may reference only ShaderToolchainCore"
+            Reason = "gglab-shaderc may reference only ShaderToolchainCore and ShaderArtifactRuntime"
         })
     }
 }

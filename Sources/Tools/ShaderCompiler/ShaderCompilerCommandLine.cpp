@@ -57,7 +57,8 @@ namespace gglab
 			L"      --stage <vertex|pixel|hull|domain|geometry|mesh|compute>\n"
 			L"      --entry <name> --target <gglab-dx12|gglab-vulkan13>\n"
 			L"      [--define NAME[=VALUE]]... [--include <path>]...\n"
-			L"      [--cache-root <path>] [--result-format <text|json>]\n"
+			L"      [--cache-root <path>] [--artifact-root <path>]\n"
+			L"      [--result-format <text|json>]\n"
 			L"  gglab-shaderc targets\n"
 			L"  gglab-shaderc --version\n"
 			L"  gglab-shaderc --help";
@@ -180,6 +181,15 @@ namespace gglab
 					return parsed;
 				}
 				options.m_CacheRoot = value;
+			}
+			else if (argument == L"--artifact-root")
+			{
+				if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+					parsed.m_Error) == nullptr)
+				{
+					return parsed;
+				}
+				options.m_ArtifactRoot = value;
 			}
 			else if (argument == L"--result-format")
 			{

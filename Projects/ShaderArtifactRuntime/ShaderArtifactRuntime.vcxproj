@@ -67,10 +67,12 @@
   <ItemGroup>
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifact.cpp" />
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifactStore.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderLooseArtifactIO.cpp" />
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderRuntimeArtifact.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifact.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderLooseArtifactIO.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactManifest.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactStore.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h" />

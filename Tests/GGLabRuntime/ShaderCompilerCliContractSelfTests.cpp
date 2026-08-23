@@ -7,6 +7,8 @@
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "Graphics/Shader/ShaderPaths.h"
+#include "ShaderArtifactRuntime/ShaderArtifactStore.h"
+#include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
@@ -350,6 +352,68 @@ namespace gglab
 					committed->m_Manifest.m_BinaryContentDigest.m_Digest) == binaryHash;
 		}
 
+		[[nodiscard]] bool CliRuntimeArtifactFieldsDescribePublishedEntry(
+			const CliRunResult& result,
+			const std::filesystem::path& artifactRoot) noexcept
+		{
+			const std::string artifactId = ExtractJsonField(result.m_StdOut, "artifactId");
+			const std::filesystem::path runtimeBinaryPath = utils::ToWideString(
+				ExtractJsonField(result.m_StdOut, "runtimeArtifactBinaryPath"));
+			const std::filesystem::path runtimeManifestPath = utils::ToWideString(
+				ExtractJsonField(result.m_StdOut, "runtimeArtifactManifestPath"));
+			const std::filesystem::path cacheBinaryPath = utils::ToWideString(
+				ExtractJsonField(result.m_StdOut, "binaryPath"));
+			if (result.m_ExitCode != 0 || artifactId.empty() ||
+				runtimeBinaryPath.empty() || runtimeManifestPath.empty() ||
+				cacheBinaryPath.empty())
+			{
+				return false;
+			}
+
+			const std::optional<ShaderBinary> serializedManifest =
+				ReadFileBinary(runtimeManifestPath);
+			if (!serializedManifest.has_value())
+			{
+				return false;
+			}
+			const std::optional<ShaderRuntimeArtifactManifest> manifest =
+				DeserializeShaderRuntimeArtifactManifest(std::span(
+					static_cast<const std::byte*>(serializedManifest->Data()),
+					serializedManifest->SizeInBytes()));
+			if (!manifest.has_value() || Sha256DigestToHex(
+				manifest->m_ArtifactId.m_DurableDigest) != artifactId)
+			{
+				return false;
+			}
+
+			const ShaderArtifactRef artifactRef{ .m_ArtifactId = manifest->m_ArtifactId };
+			const ShaderLooseArtifactLocator locator(artifactRoot);
+			const ShaderLooseArtifactPaths expectedPaths = locator.GetPaths(artifactRef);
+			ShaderLooseArtifactReader reader(locator);
+			ShaderArtifactStore store(reader);
+			const ShaderArtifactCompatibilityRequest compatibility{
+				.m_TargetProfile = manifest->m_TargetProfile,
+				.m_BinaryFormat = manifest->m_BinaryFormat,
+				.m_SpirVTargetEnvironment = manifest->m_SpirVTargetEnvironment,
+				.m_BindingABIRevision = manifest->m_BindingABIRevision,
+				.m_CoordinateOptions = manifest->m_CoordinateOptions,
+				.m_Stage = manifest->m_Stage,
+			};
+			const ShaderArtifactLoadResult loaded =
+				store.LoadArtifact(artifactRef, compatibility);
+			const std::optional<ShaderBinary> cacheBinary = ReadFileBinary(cacheBinaryPath);
+			return runtimeBinaryPath.lexically_normal() ==
+					expectedPaths.m_BinaryPath.lexically_normal() &&
+				runtimeManifestPath.lexically_normal() ==
+					expectedPaths.m_ManifestPath.lexically_normal() &&
+				loaded.IsSuccess() && cacheBinary.has_value() &&
+				loaded.m_Artifact.m_Binary.SizeInBytes() == cacheBinary->SizeInBytes() &&
+				std::memcmp(
+					loaded.m_Artifact.m_Binary.Data(),
+					cacheBinary->Data(),
+					cacheBinary->SizeInBytes()) == 0;
+		}
+
 		struct RuntimeCompileEvidence
 		{
 			std::string m_RecipeId;
@@ -426,6 +490,7 @@ namespace gglab
 			};
 
 			bool allParityCasesMatch = true;
+			const std::filesystem::path artifactRoot = tempRoot / L"CliRuntimeArtifacts";
 			for (const ParityCase& parityCase : ParityCases)
 			{
 				const std::filesystem::path runtimeCache = tempRoot / L"RuntimeParityCache";
@@ -448,6 +513,7 @@ namespace gglab
 					L"--target", utils::ToWideString(parityCase.m_TargetName),
 					L"--include", L".",
 					L"--cache-root", cliCache.wstring(),
+					L"--artifact-root", artifactRoot.wstring(),
 					L"--result-format", L"json",
 				});
 				if (cliResult.m_ExitCode != 0)
@@ -466,6 +532,7 @@ namespace gglab
 					buildKey == runtimeEvidence.m_BuildKey &&
 					binaryDigest == runtimeEvidence.m_BinaryDigest &&
 					CliArtifactFieldsDescribeCommittedEntry(cliResult) &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(cliResult, artifactRoot) &&
 					cliBinary.has_value() && cliBinary->SizeInBytes() ==
 						runtimeEvidence.m_Binary.SizeInBytes() &&
 					(cliBinary->SizeInBytes() == 0 ||
@@ -473,7 +540,7 @@ namespace gglab
 							cliBinary->SizeInBytes()) == 0);
 			}
 			context.Check(allParityCasesMatch,
-				"gglab-shaderc produces recipe, build key, digest, and byte-identical artifacts for VS/PS/CS across both targets");
+				"gglab-shaderc and Runtime Store agree on identity, manifest, and exact bytes for VS/PS/CS across both targets");
 		}
 
 		void RunCliBehaviorTests(SelfTestContext& context, const std::filesystem::path& sourceRoot,
@@ -683,6 +750,16 @@ namespace gglab
 			context.Check(fileBlockWritten && ioFailure.m_ExitCode == 5,
 				"CLI maps artifact IO failures to the dedicated exit code");
 
+			const CliRunResult publicationIoFailure = RunCli({
+				L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
+				L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--target",
+				L"gglab-dx12", L"--include", L".", L"--cache-root",
+				(tempRoot / L"PublicationIoFailureCache").wstring(), L"--artifact-root",
+				(fileBlock / L"Artifacts").wstring(),
+			});
+			context.Check(fileBlockWritten && publicationIoFailure.m_ExitCode == 5,
+				"CLI maps runtime artifact publication IO failures to the dedicated exit code");
+
 			// Windows path robustness: source root with spaces and Unicode, plus a
 			// self-contained shader without includes.
 			const std::filesystem::path exoticRoot = tempRoot / L"Sources With Spaces 着色器";
@@ -872,10 +949,12 @@ namespace gglab
 			// cache hit afterwards. Rounds use distinct defines so every round
 			// races a fresh cold slot instead of reusing a previous winner.
 			const std::filesystem::path gateCache = tempRoot / L"CrossProcessGateCache";
+			const std::filesystem::path gateArtifacts = tempRoot / L"CrossProcessArtifacts";
 			constexpr int GateRoundCount = 3;
 			bool allWorkersSucceeded = true;
 			bool allThirdRunsHitCache = true;
 			bool allHashesConverged = true;
+			bool allArtifactIdsConverged = true;
 			bool allArtifactFieldsConsistent = true;
 			std::string workerDiagnostics;
 			for (int round = 0; round < GateRoundCount; ++round)
@@ -884,7 +963,8 @@ namespace gglab
 					L"compile", L"--source-root", sourceRoot.wstring(), L"--source",
 					L"Passes/PassForwardCoverage.hlsl", L"--stage", L"vertex", L"--entry", L"VSMain",
 					L"--target", L"gglab-dx12", L"--include", L".", L"--cache-root",
-					gateCache.wstring(), L"--result-format", L"json", L"--define",
+					gateCache.wstring(), L"--artifact-root", gateArtifacts.wstring(),
+					L"--result-format", L"json", L"--define",
 					std::format(L"GGLAB_CROSS_PROCESS_GATE={}", round),
 				};
 
@@ -899,15 +979,27 @@ namespace gglab
 				const std::string firstHash = ExtractJsonField(first.m_StdOut, "binaryHash");
 				const std::string secondHash = ExtractJsonField(second.m_StdOut, "binaryHash");
 				const std::string thirdHash = ExtractJsonField(thirdRun.m_StdOut, "binaryHash");
+				const std::string firstArtifactId =
+					ExtractJsonField(first.m_StdOut, "artifactId");
+				const std::string secondArtifactId =
+					ExtractJsonField(second.m_StdOut, "artifactId");
+				const std::string thirdArtifactId =
+					ExtractJsonField(thirdRun.m_StdOut, "artifactId");
 				allWorkersSucceeded &= first.m_ExitCode == 0 && second.m_ExitCode == 0;
 				allThirdRunsHitCache &= thirdRun.m_ExitCode == 0 &&
 					thirdRun.m_StdOut.find("\"fromCache\":true") != std::string::npos;
 				allHashesConverged &= !firstHash.empty() && firstHash == secondHash &&
 					secondHash == thirdHash;
+				allArtifactIdsConverged &= !firstArtifactId.empty() &&
+					firstArtifactId == secondArtifactId &&
+					secondArtifactId == thirdArtifactId;
 				allArtifactFieldsConsistent &=
 					CliArtifactFieldsDescribeCommittedEntry(first) &&
 					CliArtifactFieldsDescribeCommittedEntry(second) &&
-					CliArtifactFieldsDescribeCommittedEntry(thirdRun);
+					CliArtifactFieldsDescribeCommittedEntry(thirdRun) &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(first, gateArtifacts) &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(second, gateArtifacts) &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(thirdRun, gateArtifacts);
 				if (first.m_ExitCode != 0 || second.m_ExitCode != 0 || thirdRun.m_ExitCode != 0)
 				{
 					const auto AppendProcessDiagnostics = [&workerDiagnostics](int round,
@@ -938,8 +1030,10 @@ namespace gglab
 				"Post-race reload hits the committed cross-process cache entry");
 			context.Check(allHashesConverged,
 				"Concurrent processes and the post-race reload agree on one committed binary digest");
+			context.Check(allArtifactIdsConverged,
+				"Concurrent CLI publishers converge on one immutable Runtime ArtifactId");
 			context.Check(allArtifactFieldsConsistent,
-				"Concurrent publication and reload CLI fields resolve to their committed cache entries");
+				"Concurrent CLI fields resolve to Store-valid cache and Runtime artifacts");
 		}
 	}
 
