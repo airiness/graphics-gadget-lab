@@ -5,6 +5,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "PublicationAccountingSelfTests.h"
 #include "RenderingContractSelfTests.h"
+#include "ShaderArtifactRuntimeSelfTests.h"
 #include "ShaderCompileContractSelfTests.h"
 #include "ShaderCompilerCliContractSelfTests.h"
 #if GGLAB_ENABLE_VULKAN
@@ -32,6 +33,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "publication-accounting",
 			.m_Run = &gglab::RunPublicationAccountingSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "shader-artifact-runtime",
+			.m_Run = &gglab::RunShaderArtifactRuntimeSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shader-compile-contracts",

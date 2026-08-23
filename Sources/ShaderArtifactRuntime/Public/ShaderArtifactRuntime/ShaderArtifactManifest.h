@@ -58,14 +58,6 @@ namespace gglab
 			const LocalShaderCacheKey&, const LocalShaderCacheKey&) noexcept = default;
 	};
 
-	struct BinaryContentDigest final
-	{
-		Sha256Digest m_Digest{};
-
-		friend constexpr bool operator==(
-			const BinaryContentDigest&, const BinaryContentDigest&) noexcept = default;
-	};
-
 	struct ShaderArtifactDependency
 	{
 		std::filesystem::path m_LogicalPath{};

@@ -15,6 +15,12 @@
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifact.cpp">
       <Filter>Private</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifactStore.cpp">
+      <Filter>Private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderRuntimeArtifact.cpp">
+      <Filter>Private</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifact.h">
@@ -23,7 +29,13 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactManifest.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactStore.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
   </ItemGroup>

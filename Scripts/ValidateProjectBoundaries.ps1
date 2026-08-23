@@ -1125,7 +1125,8 @@ foreach ($reference in $foundationTestsProjectReferenceSet) {
     }
 }
 $directXTexProjectPath = Join-Path $root "Externals/Vender/DirectXTex/DirectXTex/DirectXTex_Desktop_2022_Win10.vcxproj"
-$runtimeTestsRequiredReferences = @($runtimeProjectPath, $foundationProjectPath, $testCoreProjectPath)
+$runtimeTestsRequiredReferences = @($runtimeProjectPath, $shaderArtifactRuntimeProjectPath,
+    $foundationProjectPath, $testCoreProjectPath)
 foreach ($requiredReference in $runtimeTestsRequiredReferences) {
     if (-not $runtimeTestsProjectReferenceSet.Contains($requiredReference)) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -1136,8 +1137,8 @@ foreach ($requiredReference in $runtimeTestsRequiredReferences) {
     }
 }
 $runtimeTestsAllowedReferences = @($runtimeProjectPath, $foundationProjectPath,
-    $testCoreProjectPath, $shaderToolchainProjectPath, $shaderCompilerProjectPath,
-    $directXTexProjectPath)
+    $testCoreProjectPath, $shaderArtifactRuntimeProjectPath, $shaderToolchainProjectPath,
+    $shaderCompilerProjectPath, $directXTexProjectPath)
 $appRuntimeTestsRequiredReferences = @(
     $appRuntimeProjectPath, $runtimeProjectPath, $foundationProjectPath, $testCoreProjectPath)
 foreach ($requiredReference in $appRuntimeTestsRequiredReferences) {
@@ -1179,7 +1180,7 @@ foreach ($reference in $runtimeTestsProjectReferenceSet) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "project-graph"
             Target = "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj"
-            Reason = "may reference only GGLabRuntime, GGLabFoundation and GGLabTestCore, plus the vendored DirectXTex project"
+            Reason = "may reference only Runtime/Test dependencies and the vendored DirectXTex project"
         })
     }
 }

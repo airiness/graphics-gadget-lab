@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/EnumFlags.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -97,6 +98,14 @@ namespace gglab
 
 		auto AsTuple() const noexcept { return std::make_tuple(m_LowBits, m_HighBits); }
 		constexpr bool operator==(const ShaderHash128&) const noexcept = default;
+	};
+
+	struct BinaryContentDigest final
+	{
+		Sha256Digest m_Digest{};
+
+		friend constexpr bool operator==(
+			const BinaryContentDigest&, const BinaryContentDigest&) noexcept = default;
 	};
 
 	// GPU binary byte container shared by the Toolchain producer and the
