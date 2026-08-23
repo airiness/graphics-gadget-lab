@@ -5,7 +5,7 @@ param(
 
 # Project ownership and first-party boundary validation.
 # Enforces the first-party source ownership and dependency direction contracts:
-#   Project graph - Application must reference GGLabRuntime and NapaVoxelCore;
+#   Project graph - WinApp must reference GGLabRuntime and NapaVoxelCore;
 #                   Foundation must remain Tier-0; its tests may reference only
 #                   Foundation; NapaVoxelCore remains an independent sibling.
 #   Source ownership - every first-party source item must live below its owning
@@ -23,7 +23,7 @@ param(
 #   Foundation consumers - ShaderCompiler foundational dependencies must come
 #                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
-#                        DevTools/*, or the Application-owned Core/Input/*.
+#                        DevTools/*, or the WinApp-owned Core/Input/*.
 #   Platform leakage - portable runtime files must not depend on unapproved
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
@@ -49,7 +49,7 @@ function Get-RepoRoot {
 $root = Get-RepoRoot $RootDir
 $repositorySourcesDir = Join-Path $root "Sources"
 $repositoryTestsDir = Join-Path $root "Tests"
-$applicationSourcesDir = Join-Path $root "Sources/Application"
+$winAppSourcesDir = Join-Path $root "Sources/WinApp"
 $appRuntimeSourcesDir = Join-Path $root "Sources/GGLabAppRuntime"
 $appRuntimeTestsDir = Join-Path $root "Tests/GGLabAppRuntime"
 $foundationSourcesDir = Join-Path $root "Sources/GGLabFoundation"
@@ -211,14 +211,14 @@ $runtimeOwnedFiles = @(
         Sort-Object FullPath -Unique
 )
 
-$applicationProjectPath = Join-Path $root "Projects/Application/Application.vcxproj"
-if (-not (Test-Path $applicationProjectPath)) {
-    throw "Application project not found: $applicationProjectPath"
+$winAppProjectPath = Join-Path $root "Projects/WinApp/WinApp.vcxproj"
+if (-not (Test-Path $winAppProjectPath)) {
+    throw "WinApp project not found: $winAppProjectPath"
 }
-$applicationProject = [xml](Get-Content -LiteralPath $applicationProjectPath -Raw -ErrorAction Stop)
-$applicationNamespace = New-Object System.Xml.XmlNamespaceManager($applicationProject.NameTable)
-$applicationNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
-$applicationProjectDir = Split-Path -Parent $applicationProjectPath
+$winAppProject = [xml](Get-Content -LiteralPath $winAppProjectPath -Raw -ErrorAction Stop)
+$winAppNamespace = New-Object System.Xml.XmlNamespaceManager($winAppProject.NameTable)
+$winAppNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$winAppProjectDir = Split-Path -Parent $winAppProjectPath
 
 $appRuntimeProjectPath = Join-Path $root "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj"
 if (-not (Test-Path $appRuntimeProjectPath)) {
@@ -347,8 +347,8 @@ function Get-ProjectItemPaths {
 
 $runtimeCompileFiles = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ClCompile" "Runtime compile item"
-$applicationCompileFiles = Get-ProjectItemPaths $applicationProject $applicationNamespace `
-    $applicationProjectDir "//msb:ClCompile" "Application compile item"
+$winAppCompileFiles = Get-ProjectItemPaths $winAppProject $winAppNamespace `
+    $winAppProjectDir "//msb:ClCompile" "WinApp compile item"
 $appRuntimeCompileFiles = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ClCompile" "GGLabAppRuntime compile item"
 $foundationCompileFiles = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -360,8 +360,8 @@ $napaCompileFiles = Get-ProjectItemPaths $napaProject $napaNamespace $napaProjec
     "//msb:ClCompile" "NapaVoxelCore compile item"
 $runtimeSourceItems = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ClCompile | //msb:ClInclude" "Runtime source item"
-$applicationSourceItems = Get-ProjectItemPaths $applicationProject $applicationNamespace `
-    $applicationProjectDir "//msb:ClCompile | //msb:ClInclude" "Application source item"
+$winAppSourceItems = Get-ProjectItemPaths $winAppProject $winAppNamespace `
+    $winAppProjectDir "//msb:ClCompile | //msb:ClInclude" "WinApp source item"
 $appRuntimeSourceItems = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ClCompile | //msb:ClInclude" "GGLabAppRuntime source item"
 $foundationSourceItems = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -400,8 +400,8 @@ $testCoreProjectReferences = Get-ProjectItemPaths $testCoreProject $testCoreName
     $testCoreProjectDir "//msb:ProjectReference" "GGLabTestCore project reference"
 $runtimeProjectReferences = Get-ProjectItemPaths $runtimeProject $namespace $runtimeProjectDir `
     "//msb:ProjectReference" "Runtime project reference"
-$applicationProjectReferences = Get-ProjectItemPaths $applicationProject $applicationNamespace `
-    $applicationProjectDir "//msb:ProjectReference" "Application project reference"
+$winAppProjectReferences = Get-ProjectItemPaths $winAppProject $winAppNamespace `
+    $winAppProjectDir "//msb:ProjectReference" "WinApp project reference"
 $appRuntimeProjectReferences = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ProjectReference" "GGLabAppRuntime project reference"
 $foundationProjectReferences = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -432,7 +432,7 @@ $shaderCompilerProjectReferences = Get-ProjectItemPaths $shaderCompilerProject `
 
 $runtimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
-$applicationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
+$winAppProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $appRuntimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
@@ -457,8 +457,8 @@ $shaderCompilerProjectReferenceSet = New-Object 'System.Collections.Generic.Hash
 foreach ($path in $runtimeProjectReferences) {
     [void]$runtimeProjectReferenceSet.Add($path)
 }
-foreach ($path in $applicationProjectReferences) {
-    [void]$applicationProjectReferenceSet.Add($path)
+foreach ($path in $winAppProjectReferences) {
+    [void]$winAppProjectReferenceSet.Add($path)
 }
 foreach ($path in $appRuntimeProjectReferences) {
     [void]$appRuntimeProjectReferenceSet.Add($path)
@@ -554,7 +554,7 @@ function Test-ProjectIncludeVisibility {
 }
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
-$applicationIncludeRoot = '$(GGLabRepositoryRoot)Sources\Application'
+$winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
 $appRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabAppRuntime'
 $shaderToolchainIncludeRoot = '$(GGLabRepositoryRoot)Sources\ShaderToolchain'
 $shaderCompilerIncludeRoot = '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler'
@@ -573,12 +573,12 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
     @($runtimeIncludeRoot, $foundationPublicIncludeRoot) `
     @($runtimeIncludeRoot, $foundationPublicIncludeRoot, $shaderToolchainIncludeRoot)
-Test-ProjectIncludeVisibility $applicationProject $applicationNamespace `
-    "Projects/Application/Application.vcxproj" `
-    @($applicationIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
+    "Projects/WinApp/WinApp.vcxproj" `
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
         $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
-    @($applicationIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
         $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot, $repositorySourcesIncludeRoot,
         $shaderToolchainIncludeRoot)
@@ -718,8 +718,8 @@ Test-ProjectPrivateAccessDefinition $foundationTestsProject $foundationTestsName
     "Projects/GGLabFoundationTests/GGLabFoundationTests.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" $false
-Test-ProjectPrivateAccessDefinition $applicationProject $applicationNamespace `
-    "Projects/Application/Application.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $winAppProject $winAppNamespace `
+    "Projects/WinApp/WinApp.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $napaProject $napaNamespace `
@@ -753,9 +753,9 @@ $firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"
 $publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $ownershipSpecifications = @(
     [pscustomobject]@{
-        Name       = "Application"
-        SourceRoot = $applicationSourcesDir
-        ItemPaths  = $applicationSourceItems
+        Name       = "WinApp"
+        SourceRoot = $winAppSourcesDir
+        ItemPaths  = $winAppSourceItems
     }
     [pscustomobject]@{
         Name       = "GGLabAppRuntime"
@@ -899,17 +899,17 @@ foreach ($file in $firstPartySourceFiles) {
     }
 }
 
-if (-not $applicationProjectReferenceSet.Contains($runtimeProjectPath)) {
+if (-not $winAppProjectReferenceSet.Contains($runtimeProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
-        Target = "Projects/Application/Application.vcxproj"
+        Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing ProjectReference to GGLabRuntime"
     })
 }
-if (-not $applicationProjectReferenceSet.Contains($appRuntimeProjectPath)) {
+if (-not $winAppProjectReferenceSet.Contains($appRuntimeProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
-        Target = "Projects/Application/Application.vcxproj"
+        Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing ProjectReference to GGLabAppRuntime"
     })
 }
@@ -948,13 +948,13 @@ if (-not $shaderToolchainProjectReferenceSet.Contains($foundationProjectPath)) {
 }
 if ($shaderToolchainProjectReferenceSet.Contains($runtimeProjectPath) -or
     $shaderToolchainProjectReferenceSet.Contains($appRuntimeProjectPath) -or
-    $shaderToolchainProjectReferenceSet.Contains($applicationProjectPath) -or
+    $shaderToolchainProjectReferenceSet.Contains($winAppProjectPath) -or
     $shaderToolchainProjectReferenceSet.Contains($napaProjectPath) -or
     $shaderToolchainProjectReferenceSet.Contains($shaderCompilerProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
         Target = "Projects/ShaderToolchainCore/ShaderToolchainCore.vcxproj"
-        Reason = "ShaderToolchainCore must not reference GGLabRuntime, GGLabAppRuntime, Application, NapaVoxelCore, or ShaderCompiler"
+        Reason = "ShaderToolchainCore must not reference GGLabRuntime, GGLabAppRuntime, WinApp, NapaVoxelCore, or ShaderCompiler"
     })
 }
 if (-not $shaderCompilerProjectReferenceSet.Contains($shaderToolchainProjectPath)) {
@@ -973,24 +973,24 @@ foreach ($reference in $shaderCompilerProjectReferenceSet) {
         })
     }
 }
-if (-not $applicationProjectReferenceSet.Contains($napaProjectPath)) {
+if (-not $winAppProjectReferenceSet.Contains($napaProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
-        Target = "Projects/Application/Application.vcxproj"
+        Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing ProjectReference to NapaVoxelCore"
     })
 }
-if (-not $applicationProjectReferenceSet.Contains($foundationProjectPath)) {
+if (-not $winAppProjectReferenceSet.Contains($foundationProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
-        Target = "Projects/Application/Application.vcxproj"
+        Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing direct ProjectReference to GGLabFoundation"
     })
 }
-if (-not $applicationProjectReferenceSet.Contains($testCoreProjectPath)) {
+if (-not $winAppProjectReferenceSet.Contains($testCoreProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
-        Target = "Projects/Application/Application.vcxproj"
+        Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing ProjectReference to GGLabTestCore"
     })
 }
@@ -1008,12 +1008,12 @@ if (-not $runtimeProjectReferenceSet.Contains($foundationProjectPath)) {
         Reason = "missing ProjectReference to GGLabFoundation"
     })
 }
-if ($runtimeProjectReferenceSet.Contains($applicationProjectPath) -or
+if ($runtimeProjectReferenceSet.Contains($winAppProjectPath) -or
     $runtimeProjectReferenceSet.Contains($appRuntimeProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
         Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
-        Reason = "must not reference GGLabAppRuntime or Application"
+        Reason = "must not reference GGLabAppRuntime or WinApp"
     })
 }
 if ($foundationProjectReferenceSet.Count -ne 0) {
@@ -1098,7 +1098,7 @@ foreach ($reference in $runtimeTestsProjectReferenceSet) {
         })
     }
 }
-foreach ($forbiddenReference in @($applicationProjectPath, $appRuntimeProjectPath,
+foreach ($forbiddenReference in @($winAppProjectPath, $appRuntimeProjectPath,
         $runtimeProjectPath, $foundationProjectPath)) {
     if ($napaProjectReferenceSet.Contains($forbiddenReference)) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -1202,8 +1202,8 @@ foreach ($itemPath in $appRuntimeSourceItems) {
 }
 
 $applicationCoreContractPaths = @(
-    (Join-Path $applicationSourcesDir "Application/Application.cpp"),
-    (Join-Path $applicationSourcesDir "Application/Application.h")
+    (Join-Path $winAppSourcesDir "Application/Application.cpp"),
+    (Join-Path $winAppSourcesDir "Application/Application.h")
 )
 $applicationCoreHostControlRegex = `
     '\bApplicationLaunchOptions\b|\bm_ListAdapters\b|' +
@@ -1220,8 +1220,8 @@ foreach ($itemPath in $applicationCoreContractPaths) {
 }
 
 $applicationContentFrameworkPaths = @(
-	(Join-Path $applicationSourcesDir "Application/Application.cpp"),
-	(Join-Path $applicationSourcesDir "Application/Demo/DemoLabHost.cpp")
+	(Join-Path $winAppSourcesDir "Application/Application.cpp"),
+	(Join-Path $winAppSourcesDir "Application/Demo/DemoLabHost.cpp")
 )
 $applicationConcreteContentRegex =
 	'#include\s*[<"]Application[\\/]Lab[\\/]Sessions[\\/]'
@@ -1319,12 +1319,12 @@ foreach ($check in $presentationContractChecks) {
 $pathDiscoveryAllowed = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
 foreach ($allowedPath in @(
-        (Join-Path $applicationSourcesDir "Application/Main.cpp"),
-        (Join-Path $applicationSourcesDir "Application/Platform/Windows/Win32PathUtils.cpp"),
-        (Join-Path $applicationSourcesDir "Application/Platform/Windows/Win32PathUtils.h"))) {
+        (Join-Path $winAppSourcesDir "Application/Main.cpp"),
+        (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32PathUtils.cpp"),
+        (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32PathUtils.h"))) {
     [void]$pathDiscoveryAllowed.Add([System.IO.Path]::GetFullPath($allowedPath))
 }
-foreach ($itemPath in $applicationSourceItems) {
+foreach ($itemPath in $winAppSourceItems) {
     $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
     if ($extension -notin $firstPartySourceExtensions) {
         continue
@@ -1377,7 +1377,7 @@ foreach ($privateHeader in $foundationPrivateHeaders) {
     }
 }
 
-$nonFoundationSourceItems = @($applicationSourceItems + $appRuntimeSourceItems +
+$nonFoundationSourceItems = @($winAppSourceItems + $appRuntimeSourceItems +
     $appRuntimeTestsSourceItems + $runtimeSourceItems +
     $foundationTestsSourceItems + $napaSourceItems + $testCoreSourceItems +
     $runtimeTestsSourceItems + $napaTestsSourceItems + $shaderToolchainSourceItems +
@@ -1436,9 +1436,9 @@ Get-ChildItem -LiteralPath $shaderToolchainSourcesDir -Recurse -File |
 
 $logicalIncludeSpecifications = @(
     [pscustomobject]@{
-        Name        = "Application"
-        ScanRoot    = $applicationSourcesDir
-        LogicalRoot = $applicationSourcesDir
+        Name        = "WinApp"
+        ScanRoot    = $winAppSourcesDir
+        LogicalRoot = $winAppSourcesDir
     }
     [pscustomobject]@{
         Name        = "GGLabFoundation"
@@ -1610,19 +1610,19 @@ foreach ($debt in $transitionalDebt) {
 Write-Host "=== Project Ownership and Runtime Boundary Validation ==="
 Write-Host "Root: $root"
 Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party source files"
-Write-Host (("Project items: {0} Application, {1} AppRuntime, {2} AppRuntimeTests, " +
+Write-Host (("Project items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
     "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, {6} NapaVoxelCore, " +
     "{7} TestCore, {8} RuntimeTests, {9} NapaTests") -f `
-        $applicationSourceItems.Count, $appRuntimeSourceItems.Count,
+        $winAppSourceItems.Count, $appRuntimeSourceItems.Count,
         $appRuntimeTestsSourceItems.Count, $foundationSourceItems.Count,
         $foundationTestsSourceItems.Count, $runtimeSourceItems.Count,
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $napaTestsSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
-Write-Host (("Compile items: {0} Application, {1} AppRuntime, {2} AppRuntimeTests, " +
+Write-Host (("Compile items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
     "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, {6} NapaVoxelCore, " +
     "{7} TestCore, {8} RuntimeTests, {9} NapaTests") -f `
-        $applicationCompileFiles.Count, $appRuntimeCompileFiles.Count,
+        $winAppCompileFiles.Count, $appRuntimeCompileFiles.Count,
         $appRuntimeTestsCompileFiles.Count, $foundationCompileFiles.Count,
         $foundationTestsCompileFiles.Count, $runtimeCompileFiles.Count,
         $napaCompileFiles.Count, $testCoreCompileFiles.Count,

@@ -191,8 +191,8 @@ function Add-ShaderItemsToProject {
 
 $root = Get-RepoRoot $RootDir
 $shaderDir = Join-Path $root "Shaders"
-$projectDir = Join-Path $root "Projects\Application"
-$projectPath = Join-Path $projectDir "Application.vcxproj"
+$projectDir = Join-Path $root "Projects\WinApp"
+$projectPath = Join-Path $projectDir "WinApp.vcxproj"
 
 if (-not (Test-Path $shaderDir)) {
     throw "Shader directory not found: $shaderDir"
@@ -229,4 +229,4 @@ if (-not (Test-Path -LiteralPath $filterGeneratorPath)) {
 & $filterGeneratorPath -RootDir $root
 
 Write-Host "Synced $($shaderFiles.Count) shader files to Visual Studio project."
-Write-Host "Application.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"
+Write-Host "WinApp.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"

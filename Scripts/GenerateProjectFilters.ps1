@@ -313,16 +313,16 @@ function Test-BytesEqual {
 $root = Get-RepoRoot $RootDir
 $projectSpecifications = @(
     [pscustomobject]@{
-        Name = "Application"
-        ProjectPath = "Projects\Application\Application.vcxproj"
-        FiltersPath = "Projects\Application\Application.vcxproj.filters"
+        Name = "WinApp"
+        ProjectPath = "Projects\WinApp\WinApp.vcxproj"
+        FiltersPath = "Projects\WinApp\WinApp.vcxproj.filters"
         ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
-            [pscustomobject]@{ Root = "Sources\Application"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Sources\WinApp"; FilterPrefix = "" }
             [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
-            [pscustomobject]@{ Root = "Projects\Application\packages.config"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Projects\WinApp\packages.config"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{
