@@ -1,5 +1,6 @@
 #pragma once
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <cstddef>
 #include <filesystem>
@@ -14,15 +15,30 @@ namespace gglab
 	inline constexpr size_t MaxSerializedShaderRuntimeArtifactManifestSize =
 		SerializedShaderRuntimeArtifactManifestFixedSize + MaxShaderRuntimeEntryPointSize;
 	inline constexpr uintmax_t MaxLooseShaderArtifactBinarySize = 256u * 1024u * 1024u;
+	inline constexpr uint32_t ShaderProgramRegistryArtifactFileFormatVersion = 1;
+	inline constexpr size_t SerializedShaderProgramRegistryArtifactHeaderSize = 52;
+	inline constexpr size_t SerializedShaderProgramRegistryEntryFixedSize = 45;
+	inline constexpr uintmax_t MaxSerializedShaderProgramRegistryArtifactSize =
+		SerializedShaderProgramRegistryArtifactHeaderSize +
+		static_cast<uintmax_t>(MaxShaderProgramRegistryEntryCount) *
+			(SerializedShaderProgramRegistryEntryFixedSize +
+				2u * MaxShaderProgramIdentityComponentSize);
 
 	using SerializedShaderRuntimeArtifactManifest =
 		std::vector<std::byte>;
+	using SerializedShaderProgramRegistryArtifact = std::vector<std::byte>;
 
 	[[nodiscard]] SerializedShaderRuntimeArtifactManifest
 		SerializeShaderRuntimeArtifactManifest(
 			const ShaderRuntimeArtifactManifest& manifest) noexcept;
 	[[nodiscard]] std::optional<ShaderRuntimeArtifactManifest>
 		DeserializeShaderRuntimeArtifactManifest(std::span<const std::byte> bytes) noexcept;
+	[[nodiscard]] SerializedShaderProgramRegistryArtifact
+		SerializeShaderProgramRegistryArtifact(
+			const ShaderProgramRegistryArtifact& artifact) noexcept;
+	[[nodiscard]] std::optional<ShaderProgramRegistryArtifact>
+		DeserializeShaderProgramRegistryArtifact(
+			std::span<const std::byte> bytes) noexcept;
 
 	struct ShaderLooseArtifactPaths final
 	{
@@ -54,5 +70,58 @@ namespace gglab
 
 	private:
 		ShaderLooseArtifactLocator m_Locator;
+	};
+
+	struct ShaderLooseProgramRegistryArtifactPath final
+	{
+		std::filesystem::path m_Path{};
+	};
+
+	class ShaderLooseProgramRegistryArtifactLocator final
+	{
+	public:
+		explicit ShaderLooseProgramRegistryArtifactLocator(std::filesystem::path root);
+
+		[[nodiscard]] const std::filesystem::path& GetRoot() const noexcept;
+		[[nodiscard]] ShaderLooseProgramRegistryArtifactPath GetPath(
+			const ShaderProgramRegistryArtifactRef& registryRef) const;
+
+	private:
+		std::filesystem::path m_Root;
+	};
+
+	enum class ShaderProgramRegistryArtifactReadStatus : uint8_t
+	{
+		Success,
+		NotFound,
+		IOFailure,
+		MalformedArtifact,
+	};
+
+	struct ShaderProgramRegistryArtifactReadResult final
+	{
+		ShaderProgramRegistryArtifactReadStatus m_Status =
+			ShaderProgramRegistryArtifactReadStatus::IOFailure;
+		ShaderProgramRegistryArtifact m_Artifact{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderProgramRegistryArtifactReadStatus::Success;
+		}
+	};
+
+	class ShaderLooseProgramRegistryArtifactReader final
+	{
+	public:
+		explicit ShaderLooseProgramRegistryArtifactReader(
+			ShaderLooseProgramRegistryArtifactLocator locator);
+
+		[[nodiscard]] const ShaderLooseProgramRegistryArtifactLocator&
+			GetLocator() const noexcept;
+		[[nodiscard]] ShaderProgramRegistryArtifactReadResult ReadArtifact(
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
+
+	private:
+		ShaderLooseProgramRegistryArtifactLocator m_Locator;
 	};
 }

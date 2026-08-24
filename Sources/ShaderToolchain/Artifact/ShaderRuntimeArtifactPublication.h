@@ -29,6 +29,28 @@ namespace gglab
 		}
 	};
 
+	enum class ShaderProgramRegistryArtifactPublicationStatus : uint8_t
+	{
+		Published,
+		AlreadyPresent,
+		InvalidArtifact,
+		IOFailure,
+	};
+
+	struct ShaderProgramRegistryArtifactPublicationResult final
+	{
+		ShaderProgramRegistryArtifactPublicationStatus m_Status =
+			ShaderProgramRegistryArtifactPublicationStatus::IOFailure;
+		ShaderProgramRegistryArtifactRef m_RegistryRef{};
+		ShaderLooseProgramRegistryArtifactPath m_Path{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderProgramRegistryArtifactPublicationStatus::Published ||
+				m_Status == ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+		}
+	};
+
 	[[nodiscard]] ShaderRuntimeArtifact BuildShaderRuntimeArtifact(
 		const ShaderArtifact& artifact);
 
@@ -38,4 +60,11 @@ namespace gglab
 	[[nodiscard]] ShaderRuntimeArtifactPublicationResult PublishShaderRuntimeArtifact(
 		const std::filesystem::path& artifactRoot,
 		const ShaderArtifact& artifact) noexcept;
+
+	// Publishes one immutable, content-addressed Program Registry snapshot.
+	// Active-snapshot selection and multi-writer update policy are separate contracts.
+	[[nodiscard]] ShaderProgramRegistryArtifactPublicationResult
+		PublishShaderProgramRegistryArtifact(
+			const std::filesystem::path& artifactRoot,
+			const ShaderProgramRegistryArtifact& artifact) noexcept;
 }

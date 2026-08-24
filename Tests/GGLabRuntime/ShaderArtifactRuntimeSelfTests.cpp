@@ -2,6 +2,7 @@
 
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include "GGLabFoundation/Hash/Sha256.h"
 
@@ -10,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <span>
+#include <utility>
 
 namespace gglab
 {
@@ -204,6 +206,113 @@ namespace gglab
 			context.Check(
 				demands.Add({}) == ShaderProgramDemandAddStatus::InvalidProgram,
 				"Program demand aggregation rejects invalid stable identities");
+		}
+
+		void RunProgramRegistryArtifactTests(SelfTestContext& context) noexcept
+		{
+			ShaderArtifactRef goldenArtifactRef{};
+			for (size_t index = 0;
+				index < goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value.size();
+				++index)
+			{
+				goldenArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[index] =
+					static_cast<std::byte>(index + 1);
+			}
+			const std::array goldenEntries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = {
+						.m_ProgramId = "gglab.shader.golden",
+						.m_VariantId = "vertex.default",
+						.m_Stage = ShaderStage::Vertex,
+					},
+					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+					.m_ArtifactRef = goldenArtifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult goldenBuild =
+				BuildShaderProgramRegistryArtifact(goldenEntries);
+			context.Check(
+				goldenBuild.IsSuccess() &&
+					Sha256DigestToHex(goldenBuild.m_Artifact.m_RegistryId.m_DurableDigest) ==
+						"c7ee18fba789733252c38bd74ff03556fbb9ac3e36e0c96cc2bd089455455905",
+				"Program Registry identity matches its stable golden vector");
+
+			const ShaderProgramRef vertexProgram{
+				.m_ProgramId = "gglab.shader.registry-test",
+				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Vertex,
+			};
+			const ShaderProgramRef pixelProgram{
+				.m_ProgramId = "gglab.shader.registry-test",
+				.m_VariantId = "pixel.default",
+				.m_Stage = ShaderStage::Pixel,
+			};
+			const ShaderArtifactRef dxilRef = MakeRef(MakeDxilArtifact());
+			const ShaderArtifactRef spirVRef = MakeRef(MakeVulkanArtifact());
+			const std::array entries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = pixelProgram,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = dxilRef,
+				},
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = vertexProgram,
+					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+					.m_ArtifactRef = spirVRef,
+				},
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = vertexProgram,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = dxilRef,
+				},
+			};
+
+			const ShaderProgramRegistryArtifactBuildResult build =
+				BuildShaderProgramRegistryArtifact(entries);
+			context.Check(
+				build.IsSuccess() && build.m_Artifact.m_Entries.size() == entries.size() &&
+					ValidateShaderProgramRegistryArtifact(build.m_Artifact) ==
+						ShaderProgramRegistryArtifactValidationStatus::Valid,
+				"Program Registry Artifact canonicalizes a complete valid mapping snapshot");
+			context.Check(
+				ResolveShaderProgramRegistryArtifact(
+					build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) ==
+						dxilRef &&
+					ResolveShaderProgramRegistryArtifact(
+						build.m_Artifact,
+						vertexProgram,
+						ShaderTargetProfile::GGLabVulkan13) == spirVRef &&
+					!ResolveShaderProgramRegistryArtifact(
+						build.m_Artifact,
+						pixelProgram,
+						ShaderTargetProfile::GGLabVulkan13).has_value(),
+				"Program Registry Artifact resolves one logical program per target profile");
+
+			auto changedEntries = entries;
+			changedEntries[2].m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[0] ^=
+				std::byte{ 1 };
+			const ShaderProgramRegistryArtifactBuildResult changedBuild =
+				BuildShaderProgramRegistryArtifact(changedEntries);
+			context.Check(
+				changedBuild.IsSuccess() &&
+					changedBuild.m_Artifact.m_RegistryId != build.m_Artifact.m_RegistryId,
+				"RegistryId changes when one effective Program-to-Artifact binding changes");
+
+			const std::array duplicateEntries{ entries[0], entries[0] };
+			const std::array<ShaderProgramRegistryEntry, 0> emptyEntries{};
+			context.Check(
+				BuildShaderProgramRegistryArtifact(duplicateEntries).m_Status ==
+					ShaderProgramRegistryArtifactBuildStatus::DuplicateBinding &&
+					BuildShaderProgramRegistryArtifact(emptyEntries).m_Status ==
+						ShaderProgramRegistryArtifactBuildStatus::Empty,
+				"Program Registry Artifact rejects duplicate and empty snapshots explicitly");
+
+			ShaderProgramRegistryArtifact nonCanonical = build.m_Artifact;
+			std::swap(nonCanonical.m_Entries[0], nonCanonical.m_Entries[1]);
+			context.Check(
+				ValidateShaderProgramRegistryArtifact(nonCanonical) ==
+					ShaderProgramRegistryArtifactValidationStatus::NonCanonicalOrder,
+				"Program Registry Artifact validation rejects non-canonical entry order");
 		}
 
 		void RunCompatibilityTests(SelfTestContext& context) noexcept
@@ -422,6 +531,7 @@ namespace gglab
 	{
 		RunIdentityTests(context);
 		RunProgramRegistryTests(context);
+		RunProgramRegistryArtifactTests(context);
 		RunCompatibilityTests(context);
 		RunStoreTests(context);
 	}

@@ -24,6 +24,9 @@
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistry.cpp">
       <Filter>Private</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistryArtifact.cpp">
+      <Filter>Private</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderRuntimeArtifact.cpp">
       <Filter>Private</Filter>
     </ClCompile>
@@ -45,6 +48,9 @@
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistry.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistryArtifact.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h">

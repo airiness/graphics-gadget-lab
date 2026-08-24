@@ -339,6 +339,150 @@ namespace gglab
 					MakeCompatibilityRequest(runtimeArtifact.m_Manifest)).IsSuccess(),
 				"Concurrent producers converge on one Store-valid immutable artifact");
 		}
+
+		void RunProgramRegistryArtifactPublicationTests(
+			SelfTestContext& context,
+			const std::filesystem::path& root) noexcept
+		{
+			const ShaderArtifact dxil = MakeDxilArtifact(std::byte{ 3 });
+			const ShaderArtifact spirV = MakeSpirVArtifact();
+			const ShaderRuntimeArtifactPublicationResult dxilPublication =
+				PublishShaderRuntimeArtifact(root, dxil);
+			const ShaderRuntimeArtifactPublicationResult spirVPublication =
+				PublishShaderRuntimeArtifact(root, spirV);
+			const ShaderProgramRef programRef{
+				.m_ProgramId = "gglab.shader.registry-publication",
+				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Vertex,
+			};
+			const std::array entries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+					.m_ArtifactRef = spirVPublication.m_ArtifactRef,
+				},
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = dxilPublication.m_ArtifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult build =
+				BuildShaderProgramRegistryArtifact(entries);
+			context.Check(
+				dxilPublication.IsSuccess() && spirVPublication.IsSuccess() &&
+					build.IsSuccess(),
+				"Toolchain inputs build one backend-specific Program Registry snapshot");
+
+			const SerializedShaderProgramRegistryArtifact serialized =
+				SerializeShaderProgramRegistryArtifact(build.m_Artifact);
+			const std::optional<ShaderProgramRegistryArtifact> roundTrip =
+				DeserializeShaderProgramRegistryArtifact(serialized);
+			context.Check(
+				roundTrip.has_value() &&
+					roundTrip->m_RegistryId == build.m_Artifact.m_RegistryId &&
+					roundTrip->m_Entries == build.m_Artifact.m_Entries &&
+					serialized.size() == SerializedShaderProgramRegistryArtifactHeaderSize +
+						2 * SerializedShaderProgramRegistryEntryFixedSize +
+						2 * (programRef.m_ProgramId.size() + programRef.m_VariantId.size()),
+				"Program Registry canonical codec round-trips the exact immutable snapshot");
+
+			SerializedShaderProgramRegistryArtifact corruptIdentity = serialized;
+			corruptIdentity[16] ^= std::byte{ 1 };
+			SerializedShaderProgramRegistryArtifact unknownVersion = serialized;
+			unknownVersion[8] = std::byte{ 2 };
+			SerializedShaderProgramRegistryArtifact unknownTarget = serialized;
+			const size_t firstTargetOffset = SerializedShaderProgramRegistryArtifactHeaderSize +
+				2 * sizeof(uint32_t) + programRef.m_ProgramId.size() +
+				programRef.m_VariantId.size() + sizeof(uint32_t);
+			unknownTarget[firstTargetOffset] = std::byte{ 0xFF };
+			SerializedShaderProgramRegistryArtifact trailingBytes = serialized;
+			trailingBytes.push_back(std::byte{ 0 });
+			context.Check(
+				!DeserializeShaderProgramRegistryArtifact(corruptIdentity).has_value() &&
+					!DeserializeShaderProgramRegistryArtifact(unknownVersion).has_value() &&
+					!DeserializeShaderProgramRegistryArtifact(unknownTarget).has_value() &&
+					!DeserializeShaderProgramRegistryArtifact(trailingBytes).has_value() &&
+					!DeserializeShaderProgramRegistryArtifact(
+						std::span(serialized).first(serialized.size() - 1)).has_value(),
+				"Program Registry codec rejects corrupt identity, unknown vocabulary/version, truncation and trailing bytes");
+
+			const ShaderProgramRegistryArtifactRef registryRef{
+				.m_RegistryId = build.m_Artifact.m_RegistryId,
+			};
+			const ShaderLooseProgramRegistryArtifactLocator locator(root);
+			const ShaderLooseProgramRegistryArtifactPath path = locator.GetPath(registryRef);
+			const std::string registryId =
+				Sha256DigestToHex(registryRef.m_RegistryId.m_DurableDigest);
+			ShaderLooseProgramRegistryArtifactReader reader(locator);
+			context.Check(
+				path.m_Path.parent_path().filename() == registryId.substr(0, 2) &&
+					path.m_Path.filename() == registryId + ".ggsh.registry" &&
+					reader.ReadArtifact(registryRef).m_Status ==
+						ShaderProgramRegistryArtifactReadStatus::NotFound,
+				"Program Registry locator and reader use only the complete RegistryId");
+
+			const ShaderProgramRegistryArtifactPublicationResult publication =
+				PublishShaderProgramRegistryArtifact(root, build.m_Artifact);
+			const ShaderProgramRegistryArtifactReadResult read = reader.ReadArtifact(registryRef);
+			context.Check(
+				publication.IsSuccess() && read.IsSuccess() &&
+					ResolveShaderProgramRegistryArtifact(
+						read.m_Artifact, programRef, ShaderTargetProfile::GGLabDX12) ==
+							dxilPublication.m_ArtifactRef &&
+					ResolveShaderProgramRegistryArtifact(
+						read.m_Artifact, programRef, ShaderTargetProfile::GGLabVulkan13) ==
+							spirVPublication.m_ArtifactRef,
+				"Published Registry snapshot resolves DX12 and Vulkan ArtifactRefs exactly");
+			context.Check(
+				PublishShaderProgramRegistryArtifact(root, build.m_Artifact).m_Status ==
+					ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent,
+				"Publishing the same RegistryId reuses the validated immutable snapshot");
+
+			const ShaderArtifact changedDxil = MakeDxilArtifact(std::byte{ 4 });
+			const ShaderRuntimeArtifactPublicationResult changedDxilPublication =
+				PublishShaderRuntimeArtifact(root, changedDxil);
+			auto changedEntries = entries;
+			changedEntries[1].m_ArtifactRef = changedDxilPublication.m_ArtifactRef;
+			const ShaderProgramRegistryArtifactBuildResult changedBuild =
+				BuildShaderProgramRegistryArtifact(changedEntries);
+			const ShaderProgramRegistryArtifactPublicationResult changedPublication =
+				PublishShaderProgramRegistryArtifact(root, changedBuild.m_Artifact);
+			context.Check(
+				changedDxilPublication.IsSuccess() && changedBuild.IsSuccess() &&
+					changedPublication.IsSuccess() &&
+					changedPublication.m_RegistryRef != publication.m_RegistryRef &&
+					changedPublication.m_Path.m_Path != publication.m_Path.m_Path &&
+					std::filesystem::is_regular_file(publication.m_Path.m_Path),
+				"Changed Program mapping publishes a new snapshot without mutating the old registry");
+
+			const std::filesystem::path concurrentRoot = root / L"ConcurrentRegistry";
+			constexpr size_t ProducerCount = 8;
+			std::array<ShaderProgramRegistryArtifactPublicationResult, ProducerCount> results{};
+			std::vector<std::thread> producers;
+			producers.reserve(ProducerCount);
+			for (size_t producerIndex = 0; producerIndex < ProducerCount; ++producerIndex)
+			{
+				producers.emplace_back([&, producerIndex]()
+					{
+						results[producerIndex] = PublishShaderProgramRegistryArtifact(
+							concurrentRoot, build.m_Artifact);
+					});
+			}
+			for (std::thread& producer : producers)
+			{
+				producer.join();
+			}
+			const bool allSucceeded = std::ranges::all_of(results,
+				[](const ShaderProgramRegistryArtifactPublicationResult& result)
+				{ return result.IsSuccess(); });
+			ShaderLooseProgramRegistryArtifactReader concurrentReader{
+				ShaderLooseProgramRegistryArtifactLocator(concurrentRoot)
+			};
+			context.Check(
+				allSucceeded && concurrentReader.ReadArtifact(registryRef).IsSuccess(),
+				"Concurrent producers converge on one readable immutable Registry snapshot");
+		}
 	}
 
 	void RunShaderRuntimeArtifactPublicationSelfTests(SelfTestContext& context) noexcept
@@ -361,6 +505,7 @@ namespace gglab
 		RunCodecAndLocatorTests(context, tempRoot / L"Codec", runtimeDxil);
 		RunReaderAndPublicationTests(context, tempRoot / L"Recovery", dxilArtifact);
 		RunContentAddressAndConcurrencyTests(context, tempRoot / L"Identity");
+		RunProgramRegistryArtifactPublicationTests(context, tempRoot / L"Registry");
 
 		const ShaderArtifact spirVArtifact = MakeSpirVArtifact();
 		const ShaderRuntimeArtifact runtimeSpirV = BuildShaderRuntimeArtifact(spirVArtifact);

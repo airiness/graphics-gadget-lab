@@ -26,6 +26,16 @@ namespace gglab
 			std::byte{ 'R' },
 			std::byte{ 'T' },
 		};
+		constexpr std::array<std::byte, 8> ProgramRegistryMagic{
+			std::byte{ 'G' },
+			std::byte{ 'G' },
+			std::byte{ 'S' },
+			std::byte{ 'H' },
+			std::byte{ 'R' },
+			std::byte{ 'E' },
+			std::byte{ 'G' },
+			std::byte{ 0 },
+		};
 
 		void WriteU32LE(
 			SerializedShaderRuntimeArtifactManifest& bytes,
@@ -48,6 +58,25 @@ namespace gglab
 				value |= std::to_integer<uint32_t>(bytes[offset++]) << (byteIndex * 8u);
 			}
 			return value;
+		}
+
+		[[nodiscard]] bool TryReadU32LE(
+			std::span<const std::byte> bytes,
+			size_t& offset,
+			uint32_t& outValue) noexcept
+		{
+			if (offset > bytes.size() || bytes.size() - offset < sizeof(uint32_t))
+			{
+				return false;
+			}
+			outValue = ReadU32LE(bytes, offset);
+			return true;
+		}
+
+		[[nodiscard]] bool CanRead(
+			std::span<const std::byte> bytes, size_t offset, size_t count) noexcept
+		{
+			return offset <= bytes.size() && count <= bytes.size() - offset;
 		}
 
 		enum class FileReadStatus : uint8_t
@@ -213,6 +242,170 @@ namespace gglab
 		return manifest;
 	}
 
+	SerializedShaderProgramRegistryArtifact SerializeShaderProgramRegistryArtifact(
+		const ShaderProgramRegistryArtifact& artifact) noexcept
+	{
+		if (ValidateShaderProgramRegistryArtifact(artifact) !=
+			ShaderProgramRegistryArtifactValidationStatus::Valid)
+		{
+			return {};
+		}
+
+		try
+		{
+			size_t serializedSize = SerializedShaderProgramRegistryArtifactHeaderSize;
+			for (const ShaderProgramRegistryEntry& entry : artifact.m_Entries)
+			{
+				serializedSize += SerializedShaderProgramRegistryEntryFixedSize +
+					entry.m_ProgramRef.m_ProgramId.size() +
+					entry.m_ProgramRef.m_VariantId.size();
+			}
+			SerializedShaderProgramRegistryArtifact bytes(serializedSize);
+			size_t offset = 0;
+			std::ranges::copy(ProgramRegistryMagic, bytes.begin());
+			offset += ProgramRegistryMagic.size();
+			WriteU32LE(bytes, offset, ShaderProgramRegistryArtifactFileFormatVersion);
+			WriteU32LE(bytes, offset, artifact.m_SchemaVersion);
+			std::ranges::copy(
+				artifact.m_RegistryId.m_DurableDigest.m_Value, bytes.begin() + offset);
+			offset += Sha256Digest::Size;
+			WriteU32LE(bytes, offset, static_cast<uint32_t>(artifact.m_Entries.size()));
+
+			for (const ShaderProgramRegistryEntry& entry : artifact.m_Entries)
+			{
+				WriteU32LE(bytes, offset,
+					static_cast<uint32_t>(entry.m_ProgramRef.m_ProgramId.size()));
+				for (const char character : entry.m_ProgramRef.m_ProgramId)
+				{
+					bytes[offset++] = static_cast<std::byte>(
+						static_cast<unsigned char>(character));
+				}
+				WriteU32LE(bytes, offset,
+					static_cast<uint32_t>(entry.m_ProgramRef.m_VariantId.size()));
+				for (const char character : entry.m_ProgramRef.m_VariantId)
+				{
+					bytes[offset++] = static_cast<std::byte>(
+						static_cast<unsigned char>(character));
+				}
+				WriteU32LE(bytes, offset,
+					static_cast<uint32_t>(entry.m_ProgramRef.m_Stage));
+				bytes[offset++] = static_cast<std::byte>(entry.m_TargetProfile);
+				std::ranges::copy(
+					entry.m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value,
+					bytes.begin() + offset);
+				offset += Sha256Digest::Size;
+			}
+			return offset == bytes.size()
+				? bytes
+				: SerializedShaderProgramRegistryArtifact{};
+		}
+		catch (...)
+		{
+			return {};
+		}
+	}
+
+	std::optional<ShaderProgramRegistryArtifact> DeserializeShaderProgramRegistryArtifact(
+		std::span<const std::byte> bytes) noexcept
+	{
+		if (bytes.size() < SerializedShaderProgramRegistryArtifactHeaderSize ||
+			bytes.size() > MaxSerializedShaderProgramRegistryArtifactSize ||
+			!std::ranges::equal(
+				ProgramRegistryMagic, bytes.first(ProgramRegistryMagic.size())))
+		{
+			return std::nullopt;
+		}
+
+		try
+		{
+			size_t offset = ProgramRegistryMagic.size();
+			uint32_t fileVersion = 0;
+			uint32_t schemaVersion = 0;
+			if (!TryReadU32LE(bytes, offset, fileVersion) ||
+				fileVersion != ShaderProgramRegistryArtifactFileFormatVersion ||
+				!TryReadU32LE(bytes, offset, schemaVersion))
+			{
+				return std::nullopt;
+			}
+
+			ShaderProgramRegistryArtifact artifact{};
+			artifact.m_SchemaVersion = schemaVersion;
+			if (!CanRead(bytes, offset, Sha256Digest::Size))
+			{
+				return std::nullopt;
+			}
+			std::ranges::copy_n(
+				bytes.begin() + offset,
+				Sha256Digest::Size,
+				artifact.m_RegistryId.m_DurableDigest.m_Value.begin());
+			offset += Sha256Digest::Size;
+
+			uint32_t entryCount = 0;
+			if (!TryReadU32LE(bytes, offset, entryCount) || entryCount == 0 ||
+				entryCount > MaxShaderProgramRegistryEntryCount)
+			{
+				return std::nullopt;
+			}
+			artifact.m_Entries.reserve(entryCount);
+			for (uint32_t entryIndex = 0; entryIndex < entryCount; ++entryIndex)
+			{
+				ShaderProgramRegistryEntry entry{};
+				uint32_t programIdSize = 0;
+				if (!TryReadU32LE(bytes, offset, programIdSize) || programIdSize == 0 ||
+					programIdSize > MaxShaderProgramIdentityComponentSize ||
+					!CanRead(bytes, offset, programIdSize))
+				{
+					return std::nullopt;
+				}
+				entry.m_ProgramRef.m_ProgramId.assign(
+					reinterpret_cast<const char*>(bytes.data() + offset), programIdSize);
+				offset += programIdSize;
+
+				uint32_t variantIdSize = 0;
+				if (!TryReadU32LE(bytes, offset, variantIdSize) || variantIdSize == 0 ||
+					variantIdSize > MaxShaderProgramIdentityComponentSize ||
+					!CanRead(bytes, offset, variantIdSize))
+				{
+					return std::nullopt;
+				}
+				entry.m_ProgramRef.m_VariantId.assign(
+					reinterpret_cast<const char*>(bytes.data() + offset), variantIdSize);
+				offset += variantIdSize;
+
+				uint32_t stage = 0;
+				if (!TryReadU32LE(bytes, offset, stage) || !CanRead(bytes, offset, 1))
+				{
+					return std::nullopt;
+				}
+				entry.m_ProgramRef.m_Stage = static_cast<ShaderStage>(stage);
+				entry.m_TargetProfile = static_cast<ShaderTargetProfile>(
+					std::to_integer<uint8_t>(bytes[offset++]));
+				if (!CanRead(bytes, offset, Sha256Digest::Size))
+				{
+					return std::nullopt;
+				}
+				std::ranges::copy_n(
+					bytes.begin() + offset,
+					Sha256Digest::Size,
+					entry.m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value.begin());
+				offset += Sha256Digest::Size;
+				artifact.m_Entries.push_back(std::move(entry));
+			}
+
+			if (offset != bytes.size() ||
+				ValidateShaderProgramRegistryArtifact(artifact) !=
+					ShaderProgramRegistryArtifactValidationStatus::Valid)
+			{
+				return std::nullopt;
+			}
+			return artifact;
+		}
+		catch (...)
+		{
+			return std::nullopt;
+		}
+	}
+
 	ShaderLooseArtifactLocator::ShaderLooseArtifactLocator(std::filesystem::path root)
 		: m_Root(std::move(root))
 	{
@@ -317,6 +510,97 @@ namespace gglab
 		catch (...)
 		{
 			return { .m_Status = ShaderArtifactReadStatus::IOFailure };
+		}
+	}
+
+	ShaderLooseProgramRegistryArtifactLocator::ShaderLooseProgramRegistryArtifactLocator(
+		std::filesystem::path root) : m_Root(std::move(root))
+	{
+	}
+
+	const std::filesystem::path& ShaderLooseProgramRegistryArtifactLocator::GetRoot() const noexcept
+	{
+		return m_Root;
+	}
+
+	ShaderLooseProgramRegistryArtifactPath ShaderLooseProgramRegistryArtifactLocator::GetPath(
+		const ShaderProgramRegistryArtifactRef& registryRef) const
+	{
+		if (!registryRef.IsValid())
+		{
+			return {};
+		}
+		const std::string registryId =
+			Sha256DigestToHex(registryRef.m_RegistryId.m_DurableDigest);
+		return {
+			.m_Path = m_Root / "program-registry" / registryId.substr(0, 2) /
+				(registryId + ".ggsh.registry"),
+		};
+	}
+
+	ShaderLooseProgramRegistryArtifactReader::ShaderLooseProgramRegistryArtifactReader(
+		ShaderLooseProgramRegistryArtifactLocator locator) : m_Locator(std::move(locator))
+	{
+	}
+
+	const ShaderLooseProgramRegistryArtifactLocator&
+		ShaderLooseProgramRegistryArtifactReader::GetLocator() const noexcept
+	{
+		return m_Locator;
+	}
+
+	ShaderProgramRegistryArtifactReadResult
+		ShaderLooseProgramRegistryArtifactReader::ReadArtifact(
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept
+	{
+		if (!registryRef.IsValid() || m_Locator.GetRoot().empty())
+		{
+			return {
+				.m_Status = ShaderProgramRegistryArtifactReadStatus::MalformedArtifact,
+			};
+		}
+
+		try
+		{
+			const ShaderLooseProgramRegistryArtifactPath path = m_Locator.GetPath(registryRef);
+			ShaderBinary serializedArtifact;
+			const FileReadStatus readStatus = ReadFile(
+				path.m_Path,
+				MaxSerializedShaderProgramRegistryArtifactSize,
+				serializedArtifact);
+			if (readStatus == FileReadStatus::Missing)
+			{
+				return { .m_Status = ShaderProgramRegistryArtifactReadStatus::NotFound };
+			}
+			if (readStatus == FileReadStatus::Failure)
+			{
+				return { .m_Status = ShaderProgramRegistryArtifactReadStatus::IOFailure };
+			}
+			if (readStatus == FileReadStatus::Malformed)
+			{
+				return {
+					.m_Status = ShaderProgramRegistryArtifactReadStatus::MalformedArtifact,
+				};
+			}
+
+			const std::optional<ShaderProgramRegistryArtifact> artifact =
+				DeserializeShaderProgramRegistryArtifact(std::span(
+					static_cast<const std::byte*>(serializedArtifact.Data()),
+					serializedArtifact.SizeInBytes()));
+			if (!artifact.has_value() || artifact->m_RegistryId != registryRef.m_RegistryId)
+			{
+				return {
+					.m_Status = ShaderProgramRegistryArtifactReadStatus::MalformedArtifact,
+				};
+			}
+			return {
+				.m_Status = ShaderProgramRegistryArtifactReadStatus::Success,
+				.m_Artifact = *artifact,
+			};
+		}
+		catch (...)
+		{
+			return { .m_Status = ShaderProgramRegistryArtifactReadStatus::IOFailure };
 		}
 	}
 }

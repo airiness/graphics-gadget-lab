@@ -113,6 +113,14 @@ namespace gglab
 			ShaderArtifactStore store(reader);
 			return store.LoadArtifact(artifactRef, compatibility).IsSuccess();
 		}
+
+		[[nodiscard]] bool ObservePublishedProgramRegistryArtifact(
+			const ShaderLooseProgramRegistryArtifactLocator& locator,
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept
+		{
+			ShaderLooseProgramRegistryArtifactReader reader(locator);
+			return reader.ReadArtifact(registryRef).IsSuccess();
+		}
 	}
 
 	ShaderRuntimeArtifact BuildShaderRuntimeArtifact(
@@ -219,6 +227,88 @@ namespace gglab
 				// commit record first, then its orphan/corrupt binary, and retry.
 				RemoveFileBestEffort(result.m_Paths.m_ManifestPath);
 				RemoveFileBestEffort(result.m_Paths.m_BinaryPath);
+			}
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
+
+	ShaderProgramRegistryArtifactPublicationResult PublishShaderProgramRegistryArtifact(
+		const std::filesystem::path& artifactRoot,
+		const ShaderProgramRegistryArtifact& artifact) noexcept
+	{
+		ShaderProgramRegistryArtifactPublicationResult result{};
+		try
+		{
+			if (artifactRoot.empty() ||
+				ValidateShaderProgramRegistryArtifact(artifact) !=
+					ShaderProgramRegistryArtifactValidationStatus::Valid)
+			{
+				result.m_Status =
+					ShaderProgramRegistryArtifactPublicationStatus::InvalidArtifact;
+				return result;
+			}
+
+			result.m_RegistryRef = { .m_RegistryId = artifact.m_RegistryId };
+			const ShaderLooseProgramRegistryArtifactLocator locator(artifactRoot);
+			result.m_Path = locator.GetPath(result.m_RegistryRef);
+			if (ObservePublishedProgramRegistryArtifact(locator, result.m_RegistryRef))
+			{
+				result.m_Status =
+					ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+				return result;
+			}
+
+			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path.m_Path))
+			{
+				return result;
+			}
+			const SerializedShaderProgramRegistryArtifact serializedArtifact =
+				SerializeShaderProgramRegistryArtifact(artifact);
+			if (serializedArtifact.empty())
+			{
+				result.m_Status =
+					ShaderProgramRegistryArtifactPublicationStatus::InvalidArtifact;
+				return result;
+			}
+
+			constexpr int MaxPublishAttempts = 2;
+			for (int publishAttempt = 0; publishAttempt < MaxPublishAttempts; ++publishAttempt)
+			{
+				const std::filesystem::path tempPath =
+					MakeUniqueTempPath(result.m_Path.m_Path);
+				if (!utils::WriteFileBinary(tempPath, serializedArtifact) ||
+					!FileEquals(tempPath, serializedArtifact))
+				{
+					RemoveFileBestEffort(tempPath);
+					return result;
+				}
+
+				const bool published = PublishFile(tempPath, result.m_Path.m_Path);
+				RemoveFileBestEffort(tempPath);
+				constexpr int MaxObservationAttempts = 64;
+				for (int observationAttempt = 0;
+					observationAttempt < MaxObservationAttempts;
+					++observationAttempt)
+				{
+					if (ObservePublishedProgramRegistryArtifact(
+						locator, result.m_RegistryRef))
+					{
+						result.m_Status = published
+							? ShaderProgramRegistryArtifactPublicationStatus::Published
+							: ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+						return result;
+					}
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+
+				// R5 snapshots are immutable. Repair of a persistently corrupt slot is
+				// bounded here; active-snapshot and arbitrary multi-writer policy belong
+				// to the development handoff contract.
+				RemoveFileBestEffort(result.m_Path.m_Path);
 			}
 		}
 		catch (...)

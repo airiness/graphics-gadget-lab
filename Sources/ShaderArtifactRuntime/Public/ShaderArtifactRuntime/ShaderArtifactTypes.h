@@ -80,6 +80,13 @@ namespace gglab
 		GGLabVulkan13 = 1,
 	};
 
+	[[nodiscard]] constexpr bool IsKnownShaderTargetProfile(
+		ShaderTargetProfile profile) noexcept
+	{
+		return profile == ShaderTargetProfile::GGLabDX12 ||
+			profile == ShaderTargetProfile::GGLabVulkan13;
+	}
+
 	inline constexpr size_t MaxShaderRuntimeEntryPointSize = 1024;
 
 	[[nodiscard]] constexpr bool IsValidShaderRuntimeEntryPoint(
