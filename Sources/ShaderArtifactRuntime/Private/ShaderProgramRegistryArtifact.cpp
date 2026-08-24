@@ -8,15 +8,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] bool IsValidIdentityComponent(std::string_view value) noexcept
-		{
-			if (value.empty() || value.size() > MaxShaderProgramIdentityComponentSize)
-			{
-				return false;
-			}
-			return std::ranges::find(value, '\0') == value.end();
-		}
-
 		[[nodiscard]] auto MakeBindingKey(
 			const ShaderProgramRegistryEntry& entry) noexcept
 		{
@@ -39,8 +30,6 @@ namespace gglab
 		const ShaderProgramRegistryEntry& entry) noexcept
 	{
 		return entry.m_ProgramRef.IsValid() &&
-			IsValidIdentityComponent(entry.m_ProgramRef.m_ProgramId) &&
-			IsValidIdentityComponent(entry.m_ProgramRef.m_VariantId) &&
 			IsKnownShaderTargetProfile(entry.m_TargetProfile) &&
 			entry.m_ArtifactRef.IsValid();
 	}
@@ -190,6 +179,19 @@ namespace gglab
 		if (!programRef.IsValid() || !IsKnownShaderTargetProfile(targetProfile) ||
 			ValidateShaderProgramRegistryArtifact(artifact) !=
 				ShaderProgramRegistryArtifactValidationStatus::Valid)
+		{
+			return std::nullopt;
+		}
+		return ResolveValidatedShaderProgramRegistryArtifact(
+			artifact, programRef, targetProfile);
+	}
+
+	std::optional<ShaderArtifactRef> ResolveValidatedShaderProgramRegistryArtifact(
+		const ShaderProgramRegistryArtifact& artifact,
+		const ShaderProgramRef& programRef,
+		ShaderTargetProfile targetProfile) noexcept
+	{
+		if (!programRef.IsValid() || !IsKnownShaderTargetProfile(targetProfile))
 		{
 			return std::nullopt;
 		}

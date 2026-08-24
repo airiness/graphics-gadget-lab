@@ -91,7 +91,8 @@ namespace gglab
 		labSubset.m_Labs.front().m_ShaderPrograms.push_back({
 			.m_ProgramId = "gglab.shader.test",
 			.m_VariantId = "compute",
-			});
+			.m_Stage = ShaderStage::Compute,
+		});
 		const ApplicationContentSelection shaderSelection = ResolveApplicationContentSelection(
 			labSubset, "test.demo.lab", "test.lab.supported");
 		ShaderProgramDemandSet selectedDemands;

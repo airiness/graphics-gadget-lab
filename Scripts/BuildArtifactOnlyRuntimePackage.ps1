@@ -162,7 +162,7 @@ function Invoke-PackageSmoke {
             $hasBackendFrame = if ($SelectedBackend -eq "vulkan") {
                 $output -match "Vulkan completed its first production submit/present frame transaction"
             } else {
-                $output -match "Activated lab 'gglab\.lab\.culling'"
+                $output -match "DX12 completed its first production submit/present frame transaction"
             }
             if ($hasArtifactStartup -and $hasPreload -and $hasBackendFrame) {
                 $succeeded = $true
@@ -188,6 +188,34 @@ function Invoke-PackageSmoke {
         (Get-Content -LiteralPath $stderrPath -Raw)
     if ($combinedDiagnostics -match "(?im)\[error\]|assertion failed|failed to prepare development shader artifacts") {
         throw "Packaged runtime smoke reported an error. Inspect '$stdoutPath' and '$stderrPath'."
+    }
+}
+
+function Assert-PackageRuntimeStructure {
+    param(
+        [Parameter(Mandatory)] [string]$PackageRoot,
+        [Parameter(Mandatory)] [string]$WorkingDirectory
+    )
+
+    $executable = Join-Path $PackageRoot "GraphicsGadgetLab.exe"
+    foreach ($selection in @("app-path-composition", "artifact-package-closure")) {
+        $stdoutPath = Join-Path $PackageRoot "$selection.stdout.log"
+        $stderrPath = Join-Path $PackageRoot "$selection.stderr.log"
+        try {
+            $process = Start-Process -FilePath $executable -WorkingDirectory $WorkingDirectory `
+                -ArgumentList @("--self-test", $selection) `
+                -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
+                -WindowStyle Hidden -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+                $diagnostics = (Get-Content -LiteralPath $stdoutPath -Raw) + "`n" +
+                    (Get-Content -LiteralPath $stderrPath -Raw)
+                throw "Artifact-only package structural self-test '$selection' failed:`n$diagnostics"
+            }
+        }
+        finally {
+            Remove-Item -LiteralPath $stdoutPath, $stderrPath `
+                -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -281,6 +309,8 @@ $manifest | ConvertTo-Json | Set-Content -LiteralPath `
 
 Assert-ArtifactOnlyPackage -PackageRoot $packageRoot `
     -IntermediateRoot $artifactIntermediateRoot -TargetProfile $shaderTarget
+Assert-PackageRuntimeStructure -PackageRoot $packageRoot `
+    -WorkingDirectory $repositoryRoot
 Assert-PackageBackendContract -PackageRoot $packageRoot -SelectedBackend $Backend
 if ($RunSmoke) {
     Invoke-PackageSmoke -PackageRoot $packageRoot -SelectedBackend $Backend `

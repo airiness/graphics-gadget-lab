@@ -272,6 +272,20 @@ namespace gglab
 
 		void RunProgramRegistryTests(SelfTestContext& context) noexcept
 		{
+			const ShaderProgramRef utf8ProgramRef{
+				.m_ProgramId = "gglab.shader.\xe6\xb5\x8b\xe8\xaf\x95",
+				.m_VariantId = "\xe5\x8f\x98\xe4\xbd\x93.default",
+				.m_Stage = ShaderStage::Compute,
+			};
+			const ShaderProgramRef invalidUtf8ProgramRef{
+				.m_ProgramId = std::string("gglab.shader.") + "\xc0\xaf",
+				.m_VariantId = "default",
+				.m_Stage = ShaderStage::Compute,
+			};
+			context.Check(!ShaderProgramRef{}.IsValid() && utf8ProgramRef.IsValid() &&
+				!invalidUtf8ProgramRef.IsValid(),
+				"ProgramRef requires an explicit stage and validated UTF-8 durable identifiers");
+
 			const ShaderProgramRef programRef{
 				.m_ProgramId = "gglab.shader.test",
 				.m_VariantId = "vertex.default",
@@ -412,6 +426,10 @@ namespace gglab
 						pixelProgram,
 						ShaderTargetProfile::GGLabVulkan13).has_value(),
 				"Program Registry Artifact resolves one logical program per target profile");
+			context.Check(
+				ResolveValidatedShaderProgramRegistryArtifact(
+					build.m_Artifact, vertexProgram, ShaderTargetProfile::GGLabDX12) == dxilRef,
+				"A previously validated immutable Program Registry supports cheap exact lookup");
 
 			auto changedEntries = entries;
 			changedEntries[2].m_ArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[0] ^=

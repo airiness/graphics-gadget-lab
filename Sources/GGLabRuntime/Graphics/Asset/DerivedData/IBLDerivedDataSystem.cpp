@@ -26,7 +26,7 @@ namespace gglab
 
 		bool AddCommonKeyFields(DerivedDataKeyBuilder& builder, IBLArtifactStage stage,
 			IBLArtifactCompatibility compatibility, std::string_view adapterScopeIdentity,
-			const SourceDigest& shaderDigest) noexcept
+			const IBLStageShaderArtifactIdentity& shaderArtifacts) noexcept
 		{
 			bool succeeded = builder.AddStringUtf8(GetIBLStageArtifactType(stage));
 			succeeded &= builder.AddU32LE(IBLStageArtifactSchemaVersion);
@@ -38,7 +38,12 @@ namespace gglab
 			{
 				succeeded &= builder.AddStringUtf8(adapterScopeIdentity);
 			}
-			succeeded &= builder.AddSourceDigest(shaderDigest);
+			succeeded &= builder.AddU32LE(shaderArtifacts.m_Count);
+			for (size_t index = 0; index < shaderArtifacts.m_Count; ++index)
+			{
+				succeeded &= builder.AddSha256Digest(
+					shaderArtifacts.m_ArtifactRefs[index].m_ArtifactId.m_DurableDigest);
+			}
 			return succeeded;
 		}
 	}
@@ -59,12 +64,12 @@ namespace gglab
 	IBLDerivedDataLookupResult IBLDerivedDataSystem::Lookup(
 		const AssetContentFingerprint& contentFingerprint, EnvironmentTextureSourceType sourceType,
 		const IBLBakeConfig& config,
-		const ShaderProgramRegistryArtifactRef& shaderRegistryRef, bool ignoreCache,
+		const IBLShaderArtifactIdentities& shaderArtifacts, bool ignoreCache,
 		std::stop_token stopToken) noexcept
 	{
 		IBLDerivedDataLookupResult result{};
 		const auto keys =
-			BuildKeys(contentFingerprint, sourceType, config, shaderRegistryRef, stopToken);
+			BuildKeys(contentFingerprint, sourceType, config, shaderArtifacts, stopToken);
 		for (size_t index = 0; index < result.m_Stages.size(); ++index)
 		{
 			const IBLArtifactStage stage = static_cast<IBLArtifactStage>(index);
@@ -169,28 +174,28 @@ namespace gglab
 	std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> IBLDerivedDataSystem::
 		BuildKeys(const AssetContentFingerprint& contentFingerprint,
 			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
-			const ShaderProgramRegistryArtifactRef& shaderRegistryRef,
+			const IBLShaderArtifactIdentities& shaderArtifacts,
 			std::stop_token stopToken) const noexcept
 	{
 		std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> keys{};
-		if (!contentFingerprint.IsValid() || !shaderRegistryRef.IsValid() ||
-			stopToken.stop_requested() ||
+		if (!contentFingerprint.IsValid() || stopToken.stop_requested() ||
 			(m_Compatibility == IBLArtifactCompatibility::AdapterScoped &&
 				m_AdapterScopeIdentity.empty()))
 		{
 			return keys;
 		}
-
-		// The registry is a content-addressed snapshot of every executable shader
-		// artifact used by this runtime. It is a conservative but source-free IBL
-		// producer identity: any activated shader-set change invalidates stale bakes.
-		const SourceDigest shaderArtifactSetDigest{
-			.m_Value = shaderRegistryRef.m_RegistryId.m_DurableDigest.m_Value,
-		};
+		for (const IBLStageShaderArtifactIdentity& identity : shaderArtifacts)
+		{
+			if (!identity.IsValid())
+			{
+				return keys;
+			}
+		}
 
 		DerivedDataKeyBuilder environment;
 		bool succeeded = AddCommonKeyFields(environment, IBLArtifactStage::Environment,
-			m_Compatibility, m_AdapterScopeIdentity, shaderArtifactSetDigest);
+			m_Compatibility, m_AdapterScopeIdentity,
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= environment.AddU64LE(contentFingerprint.m_SourceContentHash);
 		succeeded &= environment.AddU64LE(contentFingerprint.m_ImportSettingsHash);
 		succeeded &= environment.AddU32LE(contentFingerprint.m_DecoderVersion);
@@ -202,7 +207,8 @@ namespace gglab
 
 		DerivedDataKeyBuilder irradiance;
 		succeeded = AddCommonKeyFields(irradiance, IBLArtifactStage::Irradiance, m_Compatibility,
-			m_AdapterScopeIdentity, shaderArtifactSetDigest);
+			m_AdapterScopeIdentity,
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::Irradiance)]);
 		succeeded &=
 			irradiance.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= irradiance.AddU32LE(config.m_IrradianceCubemapSize);
@@ -213,7 +219,8 @@ namespace gglab
 
 		DerivedDataKeyBuilder specular;
 		succeeded = AddCommonKeyFields(specular, IBLArtifactStage::PrefilteredSpecular,
-			m_Compatibility, m_AdapterScopeIdentity, shaderArtifactSetDigest);
+			m_Compatibility, m_AdapterScopeIdentity,
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)]);
 		succeeded &=
 			specular.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= specular.AddU32LE(config.m_PrefilteredSpecularCubemapSize);
@@ -228,7 +235,8 @@ namespace gglab
 
 		DerivedDataKeyBuilder brdf;
 		succeeded = AddCommonKeyFields(brdf, IBLArtifactStage::BrdfLut, m_Compatibility,
-			m_AdapterScopeIdentity, shaderArtifactSetDigest);
+			m_AdapterScopeIdentity,
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::BrdfLut)]);
 		succeeded &= brdf.AddU32LE(config.m_BrdfLutSize);
 		succeeded &= brdf.AddU32LE(static_cast<uint32_t>(config.m_BrdfLutFormat));
 		keys[static_cast<size_t>(IBLArtifactStage::BrdfLut)] =

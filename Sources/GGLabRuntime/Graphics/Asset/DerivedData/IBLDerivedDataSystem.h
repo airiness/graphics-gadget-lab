@@ -14,6 +14,37 @@
 
 namespace gglab
 {
+	inline constexpr size_t MaxIBLStageShaderArtifactCount = 4;
+
+	struct IBLStageShaderArtifactIdentity final
+	{
+		std::array<ShaderArtifactRef, MaxIBLStageShaderArtifactCount> m_ArtifactRefs{};
+		uint32_t m_Count = 0;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept
+		{
+			if (m_Count == 0 || m_Count > m_ArtifactRefs.size())
+			{
+				return false;
+			}
+			for (size_t index = 0; index < m_Count; ++index)
+			{
+				if (!m_ArtifactRefs[index].IsValid())
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		friend constexpr bool operator==(
+			const IBLStageShaderArtifactIdentity&,
+			const IBLStageShaderArtifactIdentity&) noexcept = default;
+	};
+
+	using IBLShaderArtifactIdentities =
+		std::array<IBLStageShaderArtifactIdentity, static_cast<size_t>(IBLArtifactStage::Count)>;
+
 	enum class IBLArtifactCompatibility : uint8_t
 	{
 		Portable,
@@ -69,7 +100,7 @@ namespace gglab
 		[[nodiscard]] IBLDerivedDataLookupResult Lookup(
 			const AssetContentFingerprint& contentFingerprint,
 			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
-			const ShaderProgramRegistryArtifactRef& shaderRegistryRef, bool ignoreCache,
+			const IBLShaderArtifactIdentities& shaderArtifacts, bool ignoreCache,
 			std::stop_token stopToken = {}) noexcept;
 		[[nodiscard]] IBLStageArtifactHandle Admit(
 			const DerivedDataKey& key, IBLStageArtifactHandle artifact) noexcept;
@@ -85,7 +116,7 @@ namespace gglab
 		[[nodiscard]] std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)>
 			BuildKeys(const AssetContentFingerprint& contentFingerprint,
 				EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
-				const ShaderProgramRegistryArtifactRef& shaderRegistryRef,
+				const IBLShaderArtifactIdentities& shaderArtifacts,
 				std::stop_token stopToken) const noexcept;
 
 		IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;

@@ -103,5 +103,6 @@ namespace gglab
 		DX12FrameContext* m_ActiveFrame = nullptr;
 		uint32_t m_NextFrameSlotIndex = 0;
 		bool m_Initialized = false;
+		bool m_CompletedProductionFrame = false;
 	};
 }

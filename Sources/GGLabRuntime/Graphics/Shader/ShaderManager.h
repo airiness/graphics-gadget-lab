@@ -119,6 +119,10 @@ namespace gglab
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
 		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
 			const ShaderProgramRef& programRef) const noexcept;
+		[[nodiscard]] bool CaptureArtifactRefs(
+			std::span<const ShaderProgramRef> programRefs,
+			std::span<ShaderArtifactRef> outArtifactRefs,
+			ShaderProgramRegistryArtifactRef& outRegistryRef) const noexcept;
 		[[nodiscard]] ShaderRegistryActivationResult ActivateRegistry(
 			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
 

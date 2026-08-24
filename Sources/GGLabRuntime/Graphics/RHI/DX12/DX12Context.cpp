@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12Context.h"
+#include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
@@ -282,6 +283,12 @@ namespace gglab
 			m_BackBufferCompletionFences[frame->m_BackBufferIndex] = submittedFence;
 		}
 		const bool presented = m_SwapChain->Present();
+		if (presented && submittedFence.IsValid() && !m_CompletedProductionFrame)
+		{
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+				"DX12 completed its first production submit/present frame transaction.");
+			m_CompletedProductionFrame = true;
+		}
 		FinishFrame(*frame, submittedFence);
 		return presented ? RHIFrameEndResult::Completed(submittedFence)
 			: RHIFrameEndResult::Fatal(submittedFence);

@@ -5,6 +5,7 @@
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/RHI/RHIFence.h"
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <memory>
@@ -115,12 +116,15 @@ namespace gglab
 			EnvironmentTextureSource m_Source{};
 			IBLBakeConfig m_Config{};
 			ShaderProgramRegistryArtifactRef m_ShaderRegistry{};
+			IBLShaderArtifactIdentities m_ShaderArtifacts{};
 			bool m_IgnoreCache = false;
 
 			[[nodiscard]] bool IsValid() const noexcept
 			{
 				return m_Attempt != 0 && m_Generation != 0 && m_Source.IsValid() &&
-					m_ShaderRegistry.IsValid();
+					m_ShaderRegistry.IsValid() && std::ranges::all_of(m_ShaderArtifacts,
+						[](const IBLStageShaderArtifactIdentity& identity) noexcept
+						{ return identity.IsValid(); });
 			}
 		};
 

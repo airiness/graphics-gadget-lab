@@ -387,6 +387,16 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build and validate Release artifact-only runtime package
+        if: matrix.configuration == 'Release' && matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Release -Backend dx12
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run headless self-tests from unrelated CWD (WinApp)
         shell: pwsh
         working-directory: ${{ runner.temp }}

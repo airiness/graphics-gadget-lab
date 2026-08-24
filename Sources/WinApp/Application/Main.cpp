@@ -87,9 +87,12 @@ int main(int argc, char* argv[])
 		std::fputs(gglab::GetApplicationLaunchUsage().data(), stdout);
 		return EXIT_SUCCESS;
 	}
-	if (launchResult.m_Options.m_SelfTestSelection &&
-		*launchResult.m_Options.m_SelfTestSelection !=
-			gglab::ApplicationPathCompositionSelfTestSelection)
+	const bool isPathSensitiveSelfTest = launchResult.m_Options.m_SelfTestSelection &&
+		(*launchResult.m_Options.m_SelfTestSelection ==
+			gglab::ApplicationPathCompositionSelfTestSelection ||
+			*launchResult.m_Options.m_SelfTestSelection ==
+				gglab::ApplicationArtifactPackageClosureSelfTestSelection);
+	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
 	{
 		return gglab::RunApplicationSelfTests(*launchResult.m_Options.m_SelfTestSelection)
 			? EXIT_SUCCESS
@@ -99,12 +102,6 @@ int main(int argc, char* argv[])
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 	const gglab::RuntimePaths runtimePaths =
 		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
-	if (launchResult.m_Options.m_SelfTestSelection)
-	{
-		return gglab::RunApplicationPathCompositionSelfTest(runtimePaths)
-			? EXIT_SUCCESS
-			: EXIT_FAILURE;
-	}
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	const std::optional<gglab::RHIBackendType> packagedBackend =
 		ReadPackagedBackend(runtimePaths.m_RuntimeRoot);
@@ -125,6 +122,16 @@ int main(int argc, char* argv[])
 	}
 	launchResult.m_Options.m_RhiBackend = *packagedBackend;
 #endif
+	if (isPathSensitiveSelfTest)
+	{
+		const bool succeeded = *launchResult.m_Options.m_SelfTestSelection ==
+			gglab::ApplicationPathCompositionSelfTestSelection
+			? gglab::RunApplicationPathCompositionSelfTest(
+				runtimePaths, launchResult.m_Options.m_RhiBackend)
+			: gglab::RunApplicationArtifactPackageClosureSelfTest(
+				runtimePaths, launchResult.m_Options.m_RhiBackend);
+		return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
 	constexpr gglab::AppRuntimeExtent InitialExtent{ 1920, 1080 };
 #if defined(BUILD_DEBUG)
 	constexpr bool RequestRuntimeValidation = true;

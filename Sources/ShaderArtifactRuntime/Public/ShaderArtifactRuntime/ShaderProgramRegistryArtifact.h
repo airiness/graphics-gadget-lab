@@ -12,7 +12,6 @@ namespace gglab
 {
 	inline constexpr uint32_t ShaderProgramRegistryIdentitySchemaVersion = 1;
 	inline constexpr uint32_t ShaderProgramRegistryArtifactSchemaVersion = 1;
-	inline constexpr size_t MaxShaderProgramIdentityComponentSize = 1024;
 	inline constexpr uint32_t MaxShaderProgramRegistryEntryCount = 65536;
 
 	struct ShaderProgramRegistryArtifactId final
@@ -109,4 +108,11 @@ namespace gglab
 		const ShaderProgramRegistryArtifact& artifact,
 		const ShaderProgramRef& programRef,
 		ShaderTargetProfile targetProfile) noexcept;
+	// The caller must have accepted this immutable artifact through the validating
+	// reader or ValidateShaderProgramRegistryArtifact before using this cheap lookup.
+	[[nodiscard]] std::optional<ShaderArtifactRef>
+		ResolveValidatedShaderProgramRegistryArtifact(
+			const ShaderProgramRegistryArtifact& artifact,
+			const ShaderProgramRef& programRef,
+			ShaderTargetProfile targetProfile) noexcept;
 }

@@ -7,52 +7,10 @@
 #include <algorithm>
 #include <mutex>
 #include <shared_mutex>
-#include <span>
 #include <vector>
 
 namespace gglab
 {
-	namespace
-	{
-		[[nodiscard]] constexpr uint64_t MixShaderDependencyWord(
-			uint64_t state, uint64_t value) noexcept
-		{
-			value += 0x9e3779b97f4a7c15ull;
-			value = (value ^ (value >> 30u)) * 0xbf58476d1ce4e5b9ull;
-			value = (value ^ (value >> 27u)) * 0x94d049bb133111ebull;
-			value ^= value >> 31u;
-			return state ^
-				(value + 0x9e3779b97f4a7c15ull + (state << 6u) + (state >> 2u));
-		}
-
-		[[nodiscard]] ShaderHash128 ComputeShaderDependencyFingerprint(
-			std::span<const ShaderPipelineSnapshot> snapshots) noexcept
-		{
-			ShaderHash128 fingerprint{
-				.m_LowBits = 0x243f6a8885a308d3ull,
-				.m_HighBits = 0x13198a2e03707344ull,
-			};
-			for (const ShaderPipelineSnapshot& snapshot : snapshots)
-			{
-				const ShaderPipelineDependencyIdentity& dependency = snapshot.m_Dependency;
-				const uint64_t words[]{
-					dependency.m_ShaderId.Value(),
-					dependency.m_Generation,
-					dependency.m_BinaryHash.m_LowBits,
-					dependency.m_BinaryHash.m_HighBits,
-				};
-				for (uint64_t word : words)
-				{
-					fingerprint.m_LowBits =
-						MixShaderDependencyWord(fingerprint.m_LowBits, word);
-					fingerprint.m_HighBits = MixShaderDependencyWord(
-						fingerprint.m_HighBits, word ^ fingerprint.m_LowBits);
-				}
-			}
-			return fingerprint;
-		}
-	}
-
 	PipelineCache::PipelineCache(const CreateInfo& createInfo) noexcept :
 		m_ShaderManager(createInfo.m_ShaderManager), m_PipelineSystem(createInfo.m_PipelineSystem)
 	{
@@ -73,14 +31,16 @@ namespace gglab
 		};
 		std::array<ShaderPipelineSnapshot, shaderIds.size()> shaderSnapshots{};
 		m_ShaderManager->CapturePipelineSnapshots(shaderIds, shaderSnapshots);
-		const ShaderHash128 shaderDependencyFingerprint =
-			ComputeShaderDependencyFingerprint(shaderSnapshots);
+		std::array<ShaderPipelineDependencyIdentity, shaderIds.size()> shaderDependencies{};
+		std::ranges::transform(shaderSnapshots, shaderDependencies.begin(),
+			&ShaderPipelineSnapshot::m_Dependency);
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
 		const bool canReusePhysicalPipeline =
 			slot.m_Pipeline.IsValid() && m_PipelineSystem->IsAlive(slot.m_Pipeline) &&
 			slot.m_PipelineSystemRevision == pipelineSystemRevision &&
 			slot.m_PhysicalKey == physicalKey &&
-			slot.m_ShaderDependencyFingerprint == shaderDependencyFingerprint;
+			slot.m_ShaderDependencies &&
+			*slot.m_ShaderDependencies == shaderDependencies;
 		if (canReusePhysicalPipeline)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
@@ -96,7 +56,8 @@ namespace gglab
 		createInfo.m_GeometryShader = shaderSnapshots[4].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateGraphicsPipeline(createInfo);
 		slot.m_PhysicalKey = physicalKey;
-		slot.m_ShaderDependencyFingerprint = shaderDependencyFingerprint;
+		slot.m_ShaderDependencies =
+			std::make_shared<const decltype(shaderDependencies)>(shaderDependencies);
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
 		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;
@@ -108,12 +69,12 @@ namespace gglab
 		const std::array shaderIds{ recipe.m_CSId };
 		std::array<ShaderPipelineSnapshot, 1> shaderSnapshots{};
 		m_ShaderManager->CapturePipelineSnapshots(shaderIds, shaderSnapshots);
-		const ShaderHash128 shaderDependencyFingerprint =
-			ComputeShaderDependencyFingerprint(shaderSnapshots);
+		const ShaderPipelineDependencyIdentity shaderDependency =
+			shaderSnapshots[0].m_Dependency;
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
 		if (slot.m_Pipeline.IsValid() && m_PipelineSystem->IsAlive(slot.m_Pipeline) &&
 			slot.m_PipelineSystemRevision == pipelineSystemRevision && slot.m_Recipe == recipe &&
-			slot.m_ShaderDependencyFingerprint == shaderDependencyFingerprint)
+			slot.m_ShaderDependency == shaderDependency)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 			return slot.m_Pipeline;
@@ -127,7 +88,7 @@ namespace gglab
 		createInfo.m_ComputeShader = shaderSnapshots[0].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateComputePipeline(createInfo);
 		slot.m_Recipe = recipe;
-		slot.m_ShaderDependencyFingerprint = shaderDependencyFingerprint;
+		slot.m_ShaderDependency = shaderDependency;
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
 		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;

@@ -306,9 +306,9 @@ namespace gglab
 					std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				}
 
-				// R5 snapshots are immutable. Repair of a persistently corrupt slot is
-				// bounded here; active-snapshot and arbitrary multi-writer policy belong
-				// to the development handoff contract.
+				// Content-addressed registry snapshots are immutable. Repair of a
+				// persistently corrupt destination is bounded here; active-registry and
+				// arbitrary multi-writer policy belong to the development handoff contract.
 				RemoveFileBestEffort(result.m_Path.m_Path);
 			}
 		}

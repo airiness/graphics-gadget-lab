@@ -7,6 +7,7 @@
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
+#include <algorithm>
 #include <format>
 #include <limits>
 #include <memory>
@@ -97,7 +98,7 @@ namespace gglab
 			std::string& error) noexcept
 		{
 			const std::optional<ShaderArtifactRef> resolved =
-				ResolveShaderProgramRegistryArtifact(
+				ResolveValidatedShaderProgramRegistryArtifact(
 					registry, programRef, GetActiveTargetProfile(activeBackend));
 			if (!resolved)
 			{
@@ -450,8 +451,38 @@ namespace gglab
 			return std::nullopt;
 		}
 		std::shared_lock lock(m_Mutex);
-		return ResolveShaderProgramRegistryArtifact(m_RuntimeState->m_Registry,
+		return ResolveValidatedShaderProgramRegistryArtifact(m_RuntimeState->m_Registry,
 			programRef, GetActiveTargetProfile(m_ActiveBackend));
+	}
+
+	bool ShaderManager::CaptureArtifactRefs(
+		std::span<const ShaderProgramRef> programRefs,
+		std::span<ShaderArtifactRef> outArtifactRefs,
+		ShaderProgramRegistryArtifactRef& outRegistryRef) const noexcept
+	{
+		outRegistryRef = {};
+		std::ranges::fill(outArtifactRefs, ShaderArtifactRef{});
+		if (!IsReady() || programRefs.size() != outArtifactRefs.size())
+		{
+			return false;
+		}
+
+		std::shared_lock lock(m_Mutex);
+		const ShaderTargetProfile targetProfile = GetActiveTargetProfile(m_ActiveBackend);
+		for (size_t index = 0; index < programRefs.size(); ++index)
+		{
+			const std::optional<ShaderArtifactRef> artifactRef =
+				ResolveValidatedShaderProgramRegistryArtifact(
+					m_RuntimeState->m_Registry, programRefs[index], targetProfile);
+			if (!artifactRef)
+			{
+				std::ranges::fill(outArtifactRefs, ShaderArtifactRef{});
+				return false;
+			}
+			outArtifactRefs[index] = *artifactRef;
+		}
+		outRegistryRef = m_ActiveRegistryRef;
+		return outRegistryRef.IsValid();
 	}
 
 	ShaderRegistryActivationResult ShaderManager::ActivateRegistry(
@@ -524,7 +555,7 @@ namespace gglab
 			{
 				Shader& shader = *m_Shaders[index];
 				const std::optional<ShaderArtifactRef> resolved =
-					ResolveShaderProgramRegistryArtifact(registryRead.m_Artifact,
+					ResolveValidatedShaderProgramRegistryArtifact(registryRead.m_Artifact,
 						shader.GetProgramRef(), GetActiveTargetProfile(m_ActiveBackend));
 				if (!resolved)
 				{

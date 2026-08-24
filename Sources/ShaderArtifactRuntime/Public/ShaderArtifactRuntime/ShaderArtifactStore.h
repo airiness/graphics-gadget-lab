@@ -46,7 +46,7 @@ namespace gglab
 		const ShaderRuntimeArtifactManifest& manifest,
 		const ShaderArtifactCompatibilityRequest& request) noexcept;
 
-	// Storage-neutral read seam. R3 supplies loose/package implementations.
+	// Storage-neutral read seam for loose and packaged artifact implementations.
 	// Success returns one parsed portable Runtime manifest and the exact binary
 	// bytes read with it; validation remains the Store's authority.
 	enum class ShaderArtifactReadStatus : uint8_t

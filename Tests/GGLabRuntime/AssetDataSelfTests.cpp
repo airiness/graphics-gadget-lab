@@ -3,6 +3,7 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/Asset/AssetPaths.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
@@ -1080,6 +1081,68 @@ namespace gglab
 				"RHI texture upload validation explicitly rejects unsupported multi-plane data");
 		}
 
+		void RunIBLDerivedDataShaderIdentityTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path cacheDirectory =
+				std::filesystem::temp_directory_path() / "gglab-ibl-key-self-test";
+			IBLDerivedDataSystem system({
+				.m_CacheDirectory = cacheDirectory,
+				.m_Compatibility = IBLArtifactCompatibility::Portable,
+			});
+
+			IBLShaderArtifactIdentities identities{};
+			const std::array<uint32_t, static_cast<size_t>(IBLArtifactStage::Count)>
+				artifactCounts{ 4, 2, 2, 2 };
+			uint8_t marker = 1;
+			for (size_t stageIndex = 0; stageIndex < identities.size(); ++stageIndex)
+			{
+				auto& identity = identities[stageIndex];
+				identity.m_Count = artifactCounts[stageIndex];
+				for (size_t artifactIndex = 0; artifactIndex < identity.m_Count; ++artifactIndex)
+				{
+					identity.m_ArtifactRefs[artifactIndex]
+						.m_ArtifactId.m_DurableDigest.m_Value[0] = static_cast<std::byte>(marker++);
+				}
+			}
+
+			const AssetContentFingerprint source{ 1, 2, 3 };
+			const IBLBakeConfig config{};
+			const IBLDerivedDataLookupResult baseline = system.Lookup(source,
+				EnvironmentTextureSourceType::Equirectangular, config, identities, true);
+
+			IBLShaderArtifactIdentities irradianceChanged = identities;
+			irradianceChanged[static_cast<size_t>(IBLArtifactStage::Irradiance)]
+				.m_ArtifactRefs[0].m_ArtifactId.m_DurableDigest.m_Value[1] = std::byte{ 1 };
+			const IBLDerivedDataLookupResult changedIrradiance = system.Lookup(source,
+				EnvironmentTextureSourceType::Equirectangular, config, irradianceChanged, true);
+			context.Check(
+				baseline.Get(IBLArtifactStage::Environment).m_Key ==
+					changedIrradiance.Get(IBLArtifactStage::Environment).m_Key &&
+				baseline.Get(IBLArtifactStage::Irradiance).m_Key !=
+					changedIrradiance.Get(IBLArtifactStage::Irradiance).m_Key &&
+				baseline.Get(IBLArtifactStage::PrefilteredSpecular).m_Key ==
+					changedIrradiance.Get(IBLArtifactStage::PrefilteredSpecular).m_Key &&
+				baseline.Get(IBLArtifactStage::BrdfLut).m_Key ==
+					changedIrradiance.Get(IBLArtifactStage::BrdfLut).m_Key,
+				"An IBL stage shader change invalidates only that stage and its data dependencies");
+
+			IBLShaderArtifactIdentities environmentChanged = identities;
+			environmentChanged[static_cast<size_t>(IBLArtifactStage::Environment)]
+				.m_ArtifactRefs[0].m_ArtifactId.m_DurableDigest.m_Value[1] = std::byte{ 1 };
+			const IBLDerivedDataLookupResult changedEnvironment = system.Lookup(source,
+				EnvironmentTextureSourceType::Equirectangular, config, environmentChanged, true);
+			context.Check(
+				baseline.Get(IBLArtifactStage::Environment).m_Key !=
+					changedEnvironment.Get(IBLArtifactStage::Environment).m_Key &&
+				baseline.Get(IBLArtifactStage::Irradiance).m_Key !=
+					changedEnvironment.Get(IBLArtifactStage::Irradiance).m_Key &&
+				baseline.Get(IBLArtifactStage::PrefilteredSpecular).m_Key !=
+					changedEnvironment.Get(IBLArtifactStage::PrefilteredSpecular).m_Key &&
+				baseline.Get(IBLArtifactStage::BrdfLut).m_Key ==
+					changedEnvironment.Get(IBLArtifactStage::BrdfLut).m_Key,
+				"Environment shader identity propagates only through dependent IBL stage keys");
+		}
+
 		void RunAssetPathTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path assetRoot =
@@ -1110,6 +1173,7 @@ namespace gglab
 		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
 		RunRHITextureValidationTests(context);
+		RunIBLDerivedDataShaderIdentityTests(context);
 		RunAssetPathTests(context);
 	}
 }

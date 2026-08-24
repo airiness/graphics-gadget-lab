@@ -63,6 +63,10 @@ namespace gglab
 		{
 			return key.IsValid() && m_Builder.AddBytes(key.m_Value);
 		}
+		bool AddSha256Digest(const Sha256Digest& digest) noexcept
+		{
+			return digest.IsValid() && m_Builder.AddBytes(digest.m_Value);
+		}
 		[[nodiscard]] DerivedDataKey Finish() noexcept;
 
 	private:
