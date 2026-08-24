@@ -413,6 +413,35 @@ namespace gglab
 		return 0;
 	}
 
+	void ShaderManager::CapturePipelineSnapshots(std::span<const ShaderID> shaderIds,
+		std::span<ShaderPipelineSnapshot> outSnapshots) const noexcept
+	{
+		GGLAB_ASSERT(shaderIds.size() == outSnapshots.size());
+		if (shaderIds.size() != outSnapshots.size())
+		{
+			return;
+		}
+
+		std::shared_lock lock(m_Mutex);
+		for (size_t index = 0; index < shaderIds.size(); ++index)
+		{
+			const ShaderID shaderId = shaderIds[index];
+			ShaderPipelineSnapshot& snapshot = outSnapshots[index];
+			snapshot = {};
+			snapshot.m_Dependency.m_ShaderId = shaderId;
+			if (!shaderId.IsValid() || shaderId.Value() >= m_Shaders.size() ||
+				!m_Shaders[shaderId.Value()])
+			{
+				continue;
+			}
+
+			const Shader& shader = *m_Shaders[shaderId.Value()];
+			snapshot.m_Dependency.m_Generation = shader.GetGeneration();
+			snapshot.m_Dependency.m_BinaryHash = shader.GetHash();
+			snapshot.m_Bytecode = shader.GetBytecode();
+		}
+	}
+
 	std::optional<ShaderArtifactRef> ShaderManager::ResolveArtifact(
 		const ShaderProgramRef& programRef) const noexcept
 	{
@@ -535,10 +564,6 @@ namespace gglab
 			}
 			m_RuntimeState->m_Registry = std::move(registryRead.m_Artifact);
 			m_ActiveRegistryRef = registryRef;
-			if (!staged.empty())
-			{
-				m_Revision.fetch_add(1, std::memory_order_relaxed);
-			}
 			return {
 				.m_Status = ShaderRegistryActivationStatus::Activated,
 				.m_ChangedShaderCount = static_cast<uint32_t>(staged.size()),

@@ -1652,6 +1652,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h">
+      <Filter>Graphics\Shader</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>

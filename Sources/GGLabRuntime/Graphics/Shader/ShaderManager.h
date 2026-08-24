@@ -2,15 +2,16 @@
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
+#include "Graphics/Shader/ShaderPipelineSnapshot.h"
 #include "Graphics/Shader/ShaderTypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
-#include <atomic>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
 #include <shared_mutex>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -125,7 +126,8 @@ namespace gglab
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		std::string GetDebugName(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
-		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
+		void CapturePipelineSnapshots(std::span<const ShaderID> shaderIds,
+			std::span<ShaderPipelineSnapshot> outSnapshots) const noexcept;
 
 	private:
 		struct RuntimeState;
@@ -146,6 +148,5 @@ namespace gglab
 		TaskHandle m_PreloadTask{};
 		TaskStatus m_PreloadStatus = TaskStatus::Invalid;
 		std::string m_PreloadError;
-		std::atomic_uint64_t m_Revision = 1;
 	};
 }

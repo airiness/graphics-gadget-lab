@@ -522,6 +522,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />

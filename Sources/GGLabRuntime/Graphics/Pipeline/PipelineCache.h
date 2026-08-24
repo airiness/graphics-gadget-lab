@@ -4,6 +4,7 @@
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"
+#include "Graphics/Shader/ShaderPipelineSnapshot.h"
 
 #include <shared_mutex>
 #include <optional>
@@ -89,7 +90,7 @@ namespace gglab
 		friend class PipelineCache;
 
 		GraphicsPhysicalPipelineKey m_PhysicalKey{};
-		uint64_t m_ShaderRevision = 0;
+		ShaderHash128 m_ShaderDependencyFingerprint{};
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
 	};
@@ -103,7 +104,7 @@ namespace gglab
 		friend class PipelineCache;
 
 		ComputePipelineRecipe m_Recipe{};
-		uint64_t m_ShaderRevision = 0;
+		ShaderHash128 m_ShaderDependencyFingerprint{};
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
 	};
