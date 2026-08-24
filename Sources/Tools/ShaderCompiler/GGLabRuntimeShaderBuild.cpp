@@ -293,7 +293,7 @@ namespace gglab
 			}
 			const ActiveShaderProgramRegistryPublicationResult activePublication =
 				PublishActiveShaderProgramRegistry(
-					artifactRoot, registryPublication.m_RegistryRef);
+					artifactRoot, targetProfile, registryPublication.m_RegistryRef);
 			if (!activePublication.IsSuccess())
 			{
 				return {

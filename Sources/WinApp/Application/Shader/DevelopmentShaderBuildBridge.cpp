@@ -12,7 +12,9 @@
 #include <cstring>
 #include <format>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -81,6 +83,63 @@ namespace gglab
 				hash ^= bytes[index];
 				hash *= FnvPrime;
 			}
+		}
+
+		[[nodiscard]] std::optional<uint8_t> ParseHexNibble(char character) noexcept
+		{
+			if (character >= '0' && character <= '9')
+			{
+				return static_cast<uint8_t>(character - '0');
+			}
+			if (character >= 'a' && character <= 'f')
+			{
+				return static_cast<uint8_t>(character - 'a' + 10);
+			}
+			if (character >= 'A' && character <= 'F')
+			{
+				return static_cast<uint8_t>(character - 'A' + 10);
+			}
+			return std::nullopt;
+		}
+
+		[[nodiscard]] std::optional<ShaderProgramRegistryArtifactRef>
+			ParseRegistryRefFromBuildOutput(std::string_view output) noexcept
+		{
+			constexpr std::string_view FieldName = "\"registryId\"";
+			const size_t field = output.find(FieldName);
+			if (field == std::string_view::npos)
+			{
+				return std::nullopt;
+			}
+			const size_t colon = output.find(':', field + FieldName.size());
+			const size_t quote = colon == std::string_view::npos
+				? std::string_view::npos
+				: output.find('\"', colon + 1);
+			if (quote == std::string_view::npos ||
+				output.size() - quote - 1 < Sha256Digest::Size * 2)
+			{
+				return std::nullopt;
+			}
+
+			ShaderProgramRegistryArtifactRef registryRef{};
+			for (size_t byteIndex = 0; byteIndex < Sha256Digest::Size; ++byteIndex)
+			{
+				const auto high = ParseHexNibble(output[quote + 1 + byteIndex * 2]);
+				const auto low = ParseHexNibble(output[quote + 2 + byteIndex * 2]);
+				if (!high || !low)
+				{
+					return std::nullopt;
+				}
+				registryRef.m_RegistryId.m_DurableDigest.m_Value[byteIndex] =
+					static_cast<std::byte>((*high << 4u) | *low);
+			}
+			const size_t closingQuote = quote + 1 + Sha256Digest::Size * 2;
+			if (closingQuote >= output.size() || output[closingQuote] != '\"' ||
+				!registryRef.IsValid())
+			{
+				return std::nullopt;
+			}
+			return registryRef;
 		}
 	}
 
@@ -217,20 +276,22 @@ namespace gglab
 				};
 			}
 
-			ShaderLooseActiveProgramRegistryReader activeReader{
-				ShaderLooseActiveProgramRegistryLocator(request.m_ArtifactRoot)
+			const std::optional<ShaderProgramRegistryArtifactRef> registryRef =
+				ParseRegistryRefFromBuildOutput(diagnostics);
+			ShaderLooseProgramRegistryArtifactReader registryReader{
+				ShaderLooseProgramRegistryArtifactLocator(request.m_ArtifactRoot)
 			};
-			const ActiveShaderProgramRegistryReadResult active = activeReader.Read();
-			if (!active.IsSuccess())
+			if (!registryRef || !registryReader.ReadArtifact(*registryRef).IsSuccess())
 			{
 				return {
 					.m_Status = DevelopmentShaderBuildStatus::ActiveRegistryUnavailable,
-					.m_Diagnostics = "Shader build succeeded without a readable active RegistryRef.",
+					.m_Diagnostics =
+						"Shader build succeeded without an exact readable RegistryId result.",
 				};
 			}
 			return {
 				.m_Status = DevelopmentShaderBuildStatus::Succeeded,
-				.m_RegistryRef = active.m_RegistryRef,
+				.m_RegistryRef = *registryRef,
 				.m_Diagnostics = std::move(diagnostics),
 			};
 		}

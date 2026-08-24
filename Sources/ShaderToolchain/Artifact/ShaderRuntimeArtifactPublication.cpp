@@ -321,6 +321,7 @@ namespace gglab
 
 	ActiveShaderProgramRegistryPublicationResult PublishActiveShaderProgramRegistry(
 		const std::filesystem::path& artifactRoot,
+		ShaderTargetProfile targetProfile,
 		const ShaderProgramRegistryArtifactRef& registryRef) noexcept
 	{
 		ActiveShaderProgramRegistryPublicationResult result{
@@ -328,7 +329,8 @@ namespace gglab
 		};
 		try
 		{
-			if (artifactRoot.empty() || !artifactRoot.is_absolute() || !registryRef.IsValid())
+			if (artifactRoot.empty() || !artifactRoot.is_absolute() ||
+				!IsKnownShaderTargetProfile(targetProfile) || !registryRef.IsValid())
 			{
 				result.m_Status =
 					ActiveShaderProgramRegistryPublicationStatus::InvalidRegistry;
@@ -345,7 +347,7 @@ namespace gglab
 				return result;
 			}
 
-			const ShaderLooseActiveProgramRegistryLocator locator(artifactRoot);
+			const ShaderLooseActiveProgramRegistryLocator locator(artifactRoot, targetProfile);
 			result.m_Path = locator.GetPath();
 			ShaderLooseActiveProgramRegistryReader reader(locator);
 			const ActiveShaderProgramRegistryReadResult current = reader.Read();

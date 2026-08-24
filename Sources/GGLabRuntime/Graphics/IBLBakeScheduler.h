@@ -14,6 +14,13 @@ namespace gglab
 {
 	namespace detail
 	{
+		[[nodiscard]] constexpr bool HasIBLBakeShaderRegistryChanged(
+			const ShaderProgramRegistryArtifactRef& bakeRegistry,
+			const ShaderProgramRegistryArtifactRef& activeRegistry) noexcept
+		{
+			return bakeRegistry.IsValid() && bakeRegistry != activeRegistry;
+		}
+
 		struct IBLBakeResourceInitializationState
 		{
 			[[nodiscard]] constexpr bool ResetForRequestedBake() noexcept
@@ -103,14 +110,17 @@ namespace gglab
 	private:
 		struct BakeRequestSnapshot
 		{
+			uint64_t m_Attempt = 0;
 			uint64_t m_Generation = 0;
 			EnvironmentTextureSource m_Source{};
 			IBLBakeConfig m_Config{};
+			ShaderProgramRegistryArtifactRef m_ShaderRegistry{};
 			bool m_IgnoreCache = false;
 
 			[[nodiscard]] bool IsValid() const noexcept
 			{
-				return m_Generation != 0 && m_Source.IsValid();
+				return m_Attempt != 0 && m_Generation != 0 && m_Source.IsValid() &&
+					m_ShaderRegistry.IsValid();
 			}
 		};
 
@@ -207,6 +217,7 @@ namespace gglab
 
 		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;
 		BakeRequestSnapshot m_BakingRequest{};
+		uint64_t m_NextBakeAttempt = 1;
 		IBLBakeStatus m_Status{};
 		RHIFencePoint m_InFlightFence{};
 		IBLBakeStage m_CompletedStage = IBLBakeStage::Idle;
@@ -217,7 +228,9 @@ namespace gglab
 
 		struct CacheLoadWork
 		{
+			uint64_t m_Attempt = 0;
 			uint64_t m_Generation = 0;
+			ShaderProgramRegistryArtifactRef m_ShaderRegistry{};
 			IBLDerivedDataLookupResult m_Result;
 		};
 		TaskHandle m_CacheLookupTask{};

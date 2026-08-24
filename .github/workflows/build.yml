@@ -371,6 +371,22 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build and validate artifact-only runtime packages
+        if: matrix.configuration == 'Debug' && matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Debug -Backend dx12
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Debug -Backend vulkan
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run headless self-tests from unrelated CWD (WinApp)
         shell: pwsh
         working-directory: ${{ runner.temp }}

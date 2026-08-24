@@ -39,6 +39,7 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
@@ -52,6 +53,7 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />

@@ -63,13 +63,15 @@ function Get-MSBuildPath {
 function Assert-ArtifactOnlyPackage {
     param(
         [Parameter(Mandatory)] [string]$PackageRoot,
-        [Parameter(Mandatory)] [string]$IntermediateRoot
+        [Parameter(Mandatory)] [string]$IntermediateRoot,
+        [Parameter(Mandatory)] [string]$TargetProfile
     )
 
     $requiredPaths = @(
         (Join-Path $PackageRoot "GraphicsGadgetLab.exe"),
         (Join-Path $PackageRoot "Assets"),
-        (Join-Path $PackageRoot "ShaderArtifacts\active\program-registry.ggsh.active")
+        (Join-Path $PackageRoot `
+            "ShaderArtifacts\active\$TargetProfile\program-registry.ggsh.active")
     )
     foreach ($requiredPath in $requiredPaths) {
         if (!(Test-Path -LiteralPath $requiredPath)) {
@@ -98,6 +100,14 @@ function Assert-ArtifactOnlyPackage {
         throw "Artifact-only package contains forbidden payload: $($forbiddenFiles.FullName -join ', ')."
     }
 
+    $activeRoot = Join-Path $PackageRoot "ShaderArtifacts\active"
+    $unexpectedActiveTargets = @(Get-ChildItem -LiteralPath $activeRoot -Directory | Where-Object {
+        $_.Name -ne $TargetProfile
+    })
+    if ($unexpectedActiveTargets.Count -ne 0) {
+        throw "Artifact-only package contains an active registry for another target: $($unexpectedActiveTargets.FullName -join ', ')."
+    }
+
     $tlogRoot = Join-Path $IntermediateRoot "WinApp.tlog"
     $compileCommand = Get-Content -LiteralPath (Join-Path $tlogRoot "CL.command.1.tlog") -Raw
     if ($compileCommand -match "Sources\\ShaderToolchain" -or
@@ -122,7 +132,6 @@ function Invoke-PackageSmoke {
     $stdoutPath = Join-Path $PackageRoot "artifact-only-smoke.stdout.log"
     $stderrPath = Join-Path $PackageRoot "artifact-only-smoke.stderr.log"
     $arguments = @(
-        "--rhi", $SelectedBackend,
         "--lab", "gglab.lab.culling",
         "--absolute-mouse",
         "--no-devtools"
@@ -142,8 +151,13 @@ function Invoke-PackageSmoke {
             } else {
                 ""
             }
-            $hasArtifactStartup =
-                $output -match "Artifact-only shader startup selected the packaged active registry"
+            $targetProfile = if ($SelectedBackend -eq "vulkan") {
+                "gglab-vulkan13"
+            } else {
+                "gglab-dx12"
+            }
+            $hasArtifactStartup = $output -match
+                "Artifact-only shader startup selected the packaged $targetProfile active registry"
             $hasPreload = $output -match "Async artifact preload published 30 shaders"
             $hasBackendFrame = if ($SelectedBackend -eq "vulkan") {
                 $output -match "Vulkan completed its first production submit/present frame transaction"
@@ -174,6 +188,36 @@ function Invoke-PackageSmoke {
         (Get-Content -LiteralPath $stderrPath -Raw)
     if ($combinedDiagnostics -match "(?im)\[error\]|assertion failed|failed to prepare development shader artifacts") {
         throw "Packaged runtime smoke reported an error. Inspect '$stdoutPath' and '$stderrPath'."
+    }
+}
+
+function Assert-PackageBackendContract {
+    param(
+        [Parameter(Mandatory)] [string]$PackageRoot,
+        [Parameter(Mandatory)] [string]$SelectedBackend
+    )
+
+    $mismatchedBackend = if ($SelectedBackend -eq "vulkan") { "dx12" } else { "vulkan" }
+    $stdoutPath = Join-Path $PackageRoot "backend-mismatch.stdout.log"
+    $stderrPath = Join-Path $PackageRoot "backend-mismatch.stderr.log"
+    try {
+        $process = Start-Process `
+            -FilePath (Join-Path $PackageRoot "GraphicsGadgetLab.exe") `
+            -WorkingDirectory $PackageRoot -ArgumentList @("--rhi", $mismatchedBackend) `
+            -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
+            -WindowStyle Hidden -Wait -PassThru
+        $diagnostics = if (Test-Path -LiteralPath $stderrPath) {
+            Get-Content -LiteralPath $stderrPath -Raw
+        } else {
+            ""
+        }
+        if ($process.ExitCode -eq 0 -or
+            $diagnostics -notmatch "does not match the artifact-only package backend") {
+            throw "Artifact-only package did not reject explicit backend '$mismatchedBackend'."
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -236,7 +280,8 @@ $manifest | ConvertTo-Json | Set-Content -LiteralPath `
     (Join-Path $packageRoot "artifact-only-package.json") -Encoding utf8
 
 Assert-ArtifactOnlyPackage -PackageRoot $packageRoot `
-    -IntermediateRoot $artifactIntermediateRoot
+    -IntermediateRoot $artifactIntermediateRoot -TargetProfile $shaderTarget
+Assert-PackageBackendContract -PackageRoot $packageRoot -SelectedBackend $Backend
 if ($RunSmoke) {
     Invoke-PackageSmoke -PackageRoot $packageRoot -SelectedBackend $Backend `
         -TimeoutSeconds $SmokeTimeoutSeconds

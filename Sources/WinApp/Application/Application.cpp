@@ -145,8 +145,12 @@ namespace gglab
 			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
 		ShaderProgramRegistryArtifactRef activeShaderRegistry{};
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+		const ShaderTargetProfile activeTargetProfile = activeBackend == RHIBackendType::Vulkan
+			? ShaderTargetProfile::GGLabVulkan13
+			: ShaderTargetProfile::GGLabDX12;
 		ShaderLooseActiveProgramRegistryReader activeRegistryReader{
-			ShaderLooseActiveProgramRegistryLocator(m_RuntimePaths.m_ShaderArtifactRoot)
+			ShaderLooseActiveProgramRegistryLocator(
+				m_RuntimePaths.m_ShaderArtifactRoot, activeTargetProfile)
 		};
 		const ActiveShaderProgramRegistryReadResult activeRegistry = activeRegistryReader.Read();
 		if (!activeRegistry.IsSuccess())
@@ -157,7 +161,10 @@ namespace gglab
 			return FailInitialization();
 		}
 		activeShaderRegistry = activeRegistry.m_RegistryRef;
-		GGLAB_LOG_INFO("Artifact-only shader startup selected the packaged active registry.");
+		GGLAB_LOG_INFO("Artifact-only shader startup selected the packaged {} active registry.",
+			activeTargetProfile == ShaderTargetProfile::GGLabVulkan13
+				? "gglab-vulkan13"
+				: "gglab-dx12");
 #else
 		const DevelopmentShaderBuildRequest shaderBuildRequest{
 			.m_ActiveBackend = activeBackend,

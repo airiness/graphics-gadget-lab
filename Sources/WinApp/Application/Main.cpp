@@ -9,14 +9,62 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+#include <nlohmann/json.hpp>
+#endif
 
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <memory>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+namespace
+{
+	[[nodiscard]] std::optional<gglab::RHIBackendType> ReadPackagedBackend(
+		const std::filesystem::path& runtimeRoot) noexcept
+	{
+		try
+		{
+			std::ifstream input(runtimeRoot / "artifact-only-package.json");
+			if (!input)
+			{
+				return std::nullopt;
+			}
+			const nlohmann::json manifest = nlohmann::json::parse(input, nullptr, false);
+			if (manifest.is_discarded() || !manifest.is_object() ||
+				manifest.value("schemaVersion", 0) != 1 ||
+				manifest.value("packageKind", std::string{}) !=
+					"gglab.artifact-only-runtime")
+			{
+				return std::nullopt;
+			}
+			const std::string backend = manifest.value("backend", std::string{});
+			const std::string shaderTarget =
+				manifest.value("shaderTarget", std::string{});
+			if (backend == "dx12" && shaderTarget == "gglab-dx12")
+			{
+				return gglab::RHIBackendType::DX12;
+			}
+			if (backend == "vulkan" && shaderTarget == "gglab-vulkan13")
+			{
+				return gglab::RHIBackendType::Vulkan;
+			}
+		}
+		catch (...)
+		{
+		}
+		return std::nullopt;
+	}
+}
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -27,7 +75,7 @@ int main(int argc, char* argv[])
 		arguments.emplace_back(argv[index]);
 	}
 
-	const auto launchResult = gglab::ParseApplicationLaunchOptions(arguments);
+	auto launchResult = gglab::ParseApplicationLaunchOptions(arguments);
 	if (!launchResult.IsValid())
 	{
 		std::fprintf(stderr, "Error: %s\n\n%s", launchResult.m_Error.c_str(),
@@ -57,6 +105,26 @@ int main(int argc, char* argv[])
 			? EXIT_SUCCESS
 			: EXIT_FAILURE;
 	}
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+	const std::optional<gglab::RHIBackendType> packagedBackend =
+		ReadPackagedBackend(runtimePaths.m_RuntimeRoot);
+	if (!packagedBackend)
+	{
+		std::fputs(
+			"Error: artifact-only runtime requires a valid package manifest with one matching backend and shader target.\n",
+			stderr);
+		return EXIT_FAILURE;
+	}
+	if (launchResult.m_Options.m_RhiBackendSpecified &&
+		launchResult.m_Options.m_RhiBackend != *packagedBackend)
+	{
+		std::fputs(
+			"Error: explicit RHI backend does not match the artifact-only package backend.\n",
+			stderr);
+		return EXIT_FAILURE;
+	}
+	launchResult.m_Options.m_RhiBackend = *packagedBackend;
+#endif
 	constexpr gglab::AppRuntimeExtent InitialExtent{ 1920, 1080 };
 #if defined(BUILD_DEBUG)
 	constexpr bool RequestRuntimeValidation = true;

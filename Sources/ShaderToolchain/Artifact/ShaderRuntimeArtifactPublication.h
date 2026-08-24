@@ -96,5 +96,6 @@ namespace gglab
 	[[nodiscard]] ActiveShaderProgramRegistryPublicationResult
 		PublishActiveShaderProgramRegistry(
 			const std::filesystem::path& artifactRoot,
+			ShaderTargetProfile targetProfile,
 			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
 }

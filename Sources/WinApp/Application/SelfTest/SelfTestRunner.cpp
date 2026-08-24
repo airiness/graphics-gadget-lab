@@ -132,7 +132,7 @@ namespace gglab
 			"Injected asset root opens packaged content independently of process CWD");
 
 		const std::filesystem::path activeRegistryPath = runtimePaths.m_ShaderArtifactRoot /
-			"active" / "program-registry.ggsh.active";
+			"active" / "gglab-dx12" / "program-registry.ggsh.active";
 		std::ifstream activeRegistryStream(activeRegistryPath, std::ios::binary);
 		context.Check(activeRegistryStream.good(),
 			"Injected artifact root opens the packaged active registry independently of process CWD");

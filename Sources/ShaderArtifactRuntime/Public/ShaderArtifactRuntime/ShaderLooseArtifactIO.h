@@ -140,13 +140,16 @@ namespace gglab
 	class ShaderLooseActiveProgramRegistryLocator final
 	{
 	public:
-		explicit ShaderLooseActiveProgramRegistryLocator(std::filesystem::path root);
+		ShaderLooseActiveProgramRegistryLocator(
+			std::filesystem::path root, ShaderTargetProfile targetProfile);
 
 		[[nodiscard]] const std::filesystem::path& GetRoot() const noexcept;
+		[[nodiscard]] ShaderTargetProfile GetTargetProfile() const noexcept;
 		[[nodiscard]] std::filesystem::path GetPath() const;
 
 	private:
 		std::filesystem::path m_Root;
+		ShaderTargetProfile m_TargetProfile = ShaderTargetProfile::GGLabDX12;
 	};
 
 	enum class ActiveShaderProgramRegistryReadStatus : uint8_t

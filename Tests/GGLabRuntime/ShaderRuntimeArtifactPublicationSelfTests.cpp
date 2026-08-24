@@ -457,25 +457,43 @@ namespace gglab
 				"Changed Program mapping publishes a new snapshot without mutating the old registry");
 
 			ShaderLooseActiveProgramRegistryReader activeReader{
-				ShaderLooseActiveProgramRegistryLocator(root)
+				ShaderLooseActiveProgramRegistryLocator(
+					root, ShaderTargetProfile::GGLabDX12)
 			};
 			const ActiveShaderProgramRegistryPublicationResult initialActivation =
-				PublishActiveShaderProgramRegistry(root, publication.m_RegistryRef);
+				PublishActiveShaderProgramRegistry(
+					root, ShaderTargetProfile::GGLabDX12, publication.m_RegistryRef);
 			const ActiveShaderProgramRegistryReadResult initialActive = activeReader.Read();
+			ShaderLooseActiveProgramRegistryReader vulkanActiveReader{
+				ShaderLooseActiveProgramRegistryLocator(
+					root, ShaderTargetProfile::GGLabVulkan13)
+			};
+			const ActiveShaderProgramRegistryPublicationResult vulkanActivation =
+				PublishActiveShaderProgramRegistry(
+					root, ShaderTargetProfile::GGLabVulkan13, publication.m_RegistryRef);
+			const ActiveShaderProgramRegistryReadResult initialVulkanActive =
+				vulkanActiveReader.Read();
 			context.Check(
 				initialActivation.m_Status ==
 					ActiveShaderProgramRegistryPublicationStatus::Published &&
 					initialActive.IsSuccess() &&
-					initialActive.m_RegistryRef == publication.m_RegistryRef,
-				"Active Registry publication atomically selects a published immutable snapshot");
+					initialActive.m_RegistryRef == publication.m_RegistryRef &&
+					vulkanActivation.IsSuccess() && initialVulkanActive.IsSuccess() &&
+					initialVulkanActive.m_RegistryRef == publication.m_RegistryRef &&
+					initialActivation.m_Path != vulkanActivation.m_Path,
+				"Active Registry publication atomically selects independent target snapshots");
 			context.Check(
-				PublishActiveShaderProgramRegistry(root, publication.m_RegistryRef).m_Status ==
+				PublishActiveShaderProgramRegistry(root, ShaderTargetProfile::GGLabDX12,
+					publication.m_RegistryRef).m_Status ==
 					ActiveShaderProgramRegistryPublicationStatus::AlreadyActive,
 				"Publishing the selected RegistryId preserves the active pointer idempotently");
 
 			const ActiveShaderProgramRegistryPublicationResult changedActivation =
-				PublishActiveShaderProgramRegistry(root, changedPublication.m_RegistryRef);
+				PublishActiveShaderProgramRegistry(
+					root, ShaderTargetProfile::GGLabDX12, changedPublication.m_RegistryRef);
 			const ActiveShaderProgramRegistryReadResult changedActive = activeReader.Read();
+			const ActiveShaderProgramRegistryReadResult preservedVulkanActive =
+				vulkanActiveReader.Read();
 			const ShaderProgramRegistryArtifactRef missingRegistryRef{
 				.m_RegistryId = ShaderProgramRegistryArtifactId{
 					.m_DurableDigest = ComputeSha256(std::span(
@@ -483,13 +501,16 @@ namespace gglab
 				},
 			};
 			const ActiveShaderProgramRegistryPublicationResult rejectedActivation =
-				PublishActiveShaderProgramRegistry(root, missingRegistryRef);
+				PublishActiveShaderProgramRegistry(
+					root, ShaderTargetProfile::GGLabDX12, missingRegistryRef);
 			const ActiveShaderProgramRegistryReadResult preservedActive = activeReader.Read();
 			context.Check(
 				changedActivation.m_Status ==
 					ActiveShaderProgramRegistryPublicationStatus::Published &&
 					changedActive.IsSuccess() &&
 					changedActive.m_RegistryRef == changedPublication.m_RegistryRef &&
+					preservedVulkanActive.IsSuccess() &&
+					preservedVulkanActive.m_RegistryRef == publication.m_RegistryRef &&
 					std::filesystem::is_regular_file(publication.m_Path.m_Path) &&
 					rejectedActivation.m_Status ==
 						ActiveShaderProgramRegistryPublicationStatus::InvalidRegistry &&

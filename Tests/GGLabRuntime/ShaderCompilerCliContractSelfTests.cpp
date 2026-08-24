@@ -1057,7 +1057,8 @@ namespace gglab
 			const CliRunResult first = RunCli(arguments);
 			const std::string firstRegistryId = ExtractJsonField(first.m_StdOut, "registryId");
 			ShaderLooseActiveProgramRegistryReader activeReader{
-				ShaderLooseActiveProgramRegistryLocator(artifactRoot)
+				ShaderLooseActiveProgramRegistryLocator(
+					artifactRoot, ShaderTargetProfile::GGLabDX12)
 			};
 			const ActiveShaderProgramRegistryReadResult firstActive = activeReader.Read();
 			ShaderLooseProgramRegistryArtifactReader registryReader{

@@ -659,7 +659,8 @@ namespace gglab
 	}
 
 	ShaderLooseActiveProgramRegistryLocator::ShaderLooseActiveProgramRegistryLocator(
-		std::filesystem::path root) : m_Root(std::move(root))
+		std::filesystem::path root, ShaderTargetProfile targetProfile) :
+		m_Root(std::move(root)), m_TargetProfile(targetProfile)
 	{
 	}
 
@@ -668,11 +669,22 @@ namespace gglab
 		return m_Root;
 	}
 
+	ShaderTargetProfile ShaderLooseActiveProgramRegistryLocator::GetTargetProfile() const noexcept
+	{
+		return m_TargetProfile;
+	}
+
 	std::filesystem::path ShaderLooseActiveProgramRegistryLocator::GetPath() const
 	{
-		return m_Root.empty()
-			? std::filesystem::path{}
-			: m_Root / "active" / "program-registry.ggsh.active";
+		if (m_Root.empty() || !IsKnownShaderTargetProfile(m_TargetProfile))
+		{
+			return {};
+		}
+		const std::filesystem::path targetDirectory =
+			m_TargetProfile == ShaderTargetProfile::GGLabVulkan13
+			? "gglab-vulkan13"
+			: "gglab-dx12";
+		return m_Root / "active" / targetDirectory / "program-registry.ggsh.active";
 	}
 
 	ShaderLooseActiveProgramRegistryReader::ShaderLooseActiveProgramRegistryReader(
@@ -688,7 +700,8 @@ namespace gglab
 
 	ActiveShaderProgramRegistryReadResult ShaderLooseActiveProgramRegistryReader::Read() noexcept
 	{
-		if (m_Locator.GetRoot().empty())
+		if (m_Locator.GetRoot().empty() ||
+			!IsKnownShaderTargetProfile(m_Locator.GetTargetProfile()))
 		{
 			return { .m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord };
 		}

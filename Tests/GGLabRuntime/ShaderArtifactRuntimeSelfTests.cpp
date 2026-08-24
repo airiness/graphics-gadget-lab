@@ -711,12 +711,16 @@ namespace gglab
 			const std::optional<ShaderProgramRegistryArtifactRef> decodedActive =
 				DeserializeActiveShaderProgramRegistry(serializedActive);
 			const std::filesystem::path activePath =
-				ShaderLooseActiveProgramRegistryLocator(root).GetPath();
+				ShaderLooseActiveProgramRegistryLocator(
+					root, ShaderTargetProfile::GGLabDX12).GetPath();
 			context.Check(decodedActive == registryRef &&
 				WriteBytes(activePath, serializedActive) &&
 				ShaderLooseActiveProgramRegistryReader(
-					ShaderLooseActiveProgramRegistryLocator(root)).Read().m_RegistryRef == registryRef,
-				"Active Program Registry record round-trips one complete immutable RegistryRef");
+					ShaderLooseActiveProgramRegistryLocator(
+						root, ShaderTargetProfile::GGLabDX12)).Read().m_RegistryRef == registryRef &&
+				activePath != ShaderLooseActiveProgramRegistryLocator(
+					root, ShaderTargetProfile::GGLabVulkan13).GetPath(),
+				"Active Program Registry record round-trips one target-scoped immutable RegistryRef");
 
 			auto malformedActive = serializedActive;
 			malformedActive[0] ^= std::byte{ 1 };

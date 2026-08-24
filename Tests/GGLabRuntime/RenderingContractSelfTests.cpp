@@ -636,10 +636,8 @@ namespace gglab
 			context.Check(!createInfo.HasRequiredRuntimePaths(),
 				"Renderer configuration rejects missing host-supplied runtime paths");
 			createInfo.m_IblDerivedDataCacheDirectory = "DerivedDataCache/IBL";
-			context.Check(!createInfo.HasRequiredRuntimePaths(),
-				"Renderer configuration requires the shader source root independently");
 			context.Check(createInfo.HasRequiredRuntimePaths(),
-				"Renderer configuration accepts both required host-supplied runtime paths");
+				"Renderer configuration accepts the required host-supplied IBL cache root");
 
 			Renderer missingFactoryRenderer;
 			context.Check(!missingFactoryRenderer.Initialize(createInfo),
