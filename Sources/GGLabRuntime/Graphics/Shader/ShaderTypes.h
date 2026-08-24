@@ -14,7 +14,7 @@ namespace gglab
 		size_t m_SizeInBytes = 0;
 		ShaderBinaryFormat m_Format = ShaderBinaryFormat::Unknown;
 		ShaderHash128 m_Hash{};
-		std::wstring_view m_EntryPoint{};
+		std::string_view m_EntryPoint{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{

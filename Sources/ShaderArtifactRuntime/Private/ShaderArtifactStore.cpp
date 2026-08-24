@@ -11,22 +11,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] constexpr bool IsKnownStage(ShaderStage stage) noexcept
-		{
-			switch (stage)
-			{
-			case ShaderStage::Vertex:
-			case ShaderStage::Pixel:
-			case ShaderStage::Hull:
-			case ShaderStage::Domain:
-			case ShaderStage::Geometry:
-			case ShaderStage::Mesh:
-			case ShaderStage::Compute:
-				return true;
-			}
-			return false;
-		}
-
 		[[nodiscard]] constexpr bool HasKnownCoordinateOptions(
 			ShaderCoordinateOptions options) noexcept
 		{
@@ -53,7 +37,7 @@ namespace gglab
 				environment == ShaderSpirVTargetEnvironment::None ||
 				environment == ShaderSpirVTargetEnvironment::Vulkan1_3;
 			return knownProfile && knownFormat && knownEnvironment &&
-				HasKnownCoordinateOptions(coordinateOptions) && IsKnownStage(stage);
+				HasKnownCoordinateOptions(coordinateOptions) && IsKnownShaderStage(stage);
 		}
 
 		[[nodiscard]] constexpr bool IsValidTargetContract(
@@ -64,7 +48,7 @@ namespace gglab
 			ShaderCoordinateOptions coordinateOptions,
 			ShaderStage stage) noexcept
 		{
-			if (!IsKnownStage(stage) || !HasKnownCoordinateOptions(coordinateOptions))
+			if (!IsKnownShaderStage(stage) || !HasKnownCoordinateOptions(coordinateOptions))
 			{
 				return false;
 			}
@@ -112,6 +96,10 @@ namespace gglab
 			manifest.m_Stage))
 		{
 			return { .m_Status = ShaderArtifactCompatibilityStatus::InvalidManifestTarget };
+		}
+		if (!IsValidShaderRuntimeEntryPoint(manifest.m_EntryPoint))
+		{
+			return { .m_Status = ShaderArtifactCompatibilityStatus::InvalidEntryPoint };
 		}
 		if (manifest.m_TargetProfile != request.m_TargetProfile)
 		{

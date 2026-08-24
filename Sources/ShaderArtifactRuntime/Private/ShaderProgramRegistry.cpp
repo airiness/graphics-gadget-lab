@@ -11,8 +11,13 @@ namespace gglab
 	{
 		const size_t programHash = std::hash<std::string>{}(programRef.m_ProgramId);
 		const size_t variantHash = std::hash<std::string>{}(programRef.m_VariantId);
-		return programHash ^ (variantHash + static_cast<size_t>(0x9E3779B9u) +
-			(programHash << 6u) + (programHash >> 2u));
+		const size_t identityHash = programHash ^
+			(variantHash + static_cast<size_t>(0x9E3779B9u) +
+				(programHash << 6u) + (programHash >> 2u));
+		const size_t stageHash = std::hash<uint32_t>{}(
+			static_cast<uint32_t>(programRef.m_Stage));
+		return identityHash ^ (stageHash + static_cast<size_t>(0x9E3779B9u) +
+			(identityHash << 6u) + (identityHash >> 2u));
 	}
 
 	ShaderProgramBindStatus ShaderProgramRegistry::Bind(

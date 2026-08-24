@@ -520,11 +520,14 @@ namespace gglab
 				dxilManagerShader.IsValid() && spirVManagerShader.IsValid() &&
 				dxilManager.GetBytecode(dxilManagerShader).m_Format == ShaderBinaryFormat::Dxil &&
 				spirVManager.GetBytecode(spirVManagerShader).m_Format == ShaderBinaryFormat::SpirV &&
+				dxilManager.GetBytecode(dxilManagerShader).m_EntryPoint == "VSMain" &&
+				spirVManager.GetBytecode(spirVManagerShader).m_EntryPoint == "VSMain" &&
+				shader_programs::ForwardCoverageVertex.m_Stage == ShaderStage::Vertex &&
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
 				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex) !=
 					spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
-				"ShaderManager derives shader format from its active RHI backend");
+				"ShaderManager derives backend artifacts with complete execution metadata");
 
 			// Recipe identity semantics: the resolved recipe is the authority, and
 			// producer identity is a separate build-key axis.

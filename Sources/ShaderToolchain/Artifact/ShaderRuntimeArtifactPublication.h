@@ -33,7 +33,7 @@ namespace gglab
 		const ShaderArtifact& artifact);
 
 	// Publishes immutable content-addressed Runtime files. Binary is published
-	// first; the fixed Runtime manifest is published last as the logical commit
+	// first; the versioned Runtime manifest is published last as the logical commit
 	// record. Success is based on final Store validation, never exists alone.
 	[[nodiscard]] ShaderRuntimeArtifactPublicationResult PublishShaderRuntimeArtifact(
 		const std::filesystem::path& artifactRoot,

@@ -92,10 +92,14 @@ namespace gglab
 			{
 				return std::nullopt;
 			}
+			if (iterator->m_Stage != programRef.m_Stage)
+			{
+				return std::nullopt;
+			}
 
 			ShaderDesc desc{
 				.m_SourcePath = iterator->m_SourcePath,
-				.m_Stage = iterator->m_Stage,
+				.m_Stage = programRef.m_Stage,
 				.m_Entry = std::wstring(iterator->m_EntryPoint),
 			};
 			if (programRef == ForwardPBRLegacyGTAOPixel ||

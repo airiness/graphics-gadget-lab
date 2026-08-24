@@ -1,20 +1,22 @@
 #pragma once
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 
-#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace gglab
 {
-	inline constexpr uint32_t ShaderRuntimeArtifactFileFormatVersion = 1;
-	inline constexpr size_t SerializedShaderRuntimeArtifactManifestSize = 92;
+	inline constexpr uint32_t ShaderRuntimeArtifactFileFormatVersion = 2;
+	inline constexpr size_t SerializedShaderRuntimeArtifactManifestFixedSize = 96;
+	inline constexpr size_t MaxSerializedShaderRuntimeArtifactManifestSize =
+		SerializedShaderRuntimeArtifactManifestFixedSize + MaxShaderRuntimeEntryPointSize;
 	inline constexpr uintmax_t MaxLooseShaderArtifactBinarySize = 256u * 1024u * 1024u;
 
 	using SerializedShaderRuntimeArtifactManifest =
-		std::array<std::byte, SerializedShaderRuntimeArtifactManifestSize>;
+		std::vector<std::byte>;
 
 	[[nodiscard]] SerializedShaderRuntimeArtifactManifest
 		SerializeShaderRuntimeArtifactManifest(

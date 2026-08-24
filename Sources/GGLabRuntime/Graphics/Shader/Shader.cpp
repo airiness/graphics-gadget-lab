@@ -5,8 +5,7 @@
 
 namespace gglab
 {
-	Shader::Shader(ShaderProgramRef programRef, std::wstring runtimeEntryPoint) noexcept :
-		m_ProgramRef(std::move(programRef)), m_RuntimeEntryPoint(std::move(runtimeEntryPoint))
+	Shader::Shader(ShaderProgramRef programRef) noexcept : m_ProgramRef(std::move(programRef))
 	{
 	}
 
@@ -18,7 +17,7 @@ namespace gglab
 			.m_SizeInBytes = m_Artifact.m_Binary.SizeInBytes(),
 			.m_Format = m_Artifact.m_Manifest.m_BinaryFormat,
 			.m_Hash = m_Hash,
-			.m_EntryPoint = m_RuntimeEntryPoint,
+			.m_EntryPoint = m_Artifact.m_Manifest.m_EntryPoint,
 		};
 	}
 

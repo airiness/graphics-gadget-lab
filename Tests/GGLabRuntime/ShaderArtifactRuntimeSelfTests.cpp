@@ -72,6 +72,7 @@ namespace gglab
 			artifact.m_Manifest.m_BindingABIRevision = 0;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::None;
 			artifact.m_Manifest.m_Stage = ShaderStage::Vertex;
+			artifact.m_Manifest.m_EntryPoint = "VSMain";
 			artifact.m_Binary = MakeDxilBinary();
 			RefreshArtifactIdentity(artifact);
 			return artifact;
@@ -87,6 +88,7 @@ namespace gglab
 			artifact.m_Manifest.m_BindingABIRevision = 1;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::InvertY;
 			artifact.m_Manifest.m_Stage = ShaderStage::Vertex;
+			artifact.m_Manifest.m_EntryPoint = "VSMain";
 			artifact.m_Binary = MakeSpirVBinary();
 			RefreshArtifactIdentity(artifact);
 			return artifact;
@@ -131,6 +133,14 @@ namespace gglab
 			context.Check(
 				baseline.m_Manifest.m_ArtifactId != changedStage.m_Manifest.m_ArtifactId,
 				"Runtime ArtifactId changes when compatibility semantics change");
+
+			ShaderRuntimeArtifact changedEntryPoint = baseline;
+			changedEntryPoint.m_Manifest.m_EntryPoint = "VSAlternate";
+			RefreshArtifactIdentity(changedEntryPoint);
+			context.Check(
+				baseline.m_Manifest.m_ArtifactId !=
+					changedEntryPoint.m_Manifest.m_ArtifactId,
+				"Runtime ArtifactId covers executable entry-point metadata");
 		}
 
 		void RunProgramRegistryTests(SelfTestContext& context) noexcept
@@ -138,10 +148,17 @@ namespace gglab
 			const ShaderProgramRef programRef{
 				.m_ProgramId = "gglab.shader.test",
 				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Vertex,
 			};
 			const ShaderProgramRef secondProgramRef{
 				.m_ProgramId = "gglab.shader.test",
 				.m_VariantId = "pixel.default",
+				.m_Stage = ShaderStage::Pixel,
+			};
+			const ShaderProgramRef sameNamesDifferentStage{
+				.m_ProgramId = "gglab.shader.test",
+				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Pixel,
 			};
 			const ShaderArtifactRef firstArtifact = MakeRef(MakeDxilArtifact());
 			ShaderRuntimeArtifact changedArtifact = MakeDxilArtifact();
@@ -164,6 +181,12 @@ namespace gglab
 				registry.Bind(programRef, secondArtifact) == ShaderProgramBindStatus::Rebound &&
 					registry.Resolve(programRef) == secondArtifact,
 				"Program registry explicitly replaces a program's active immutable artifact");
+			context.Check(
+				registry.Bind(sameNamesDifferentStage, secondArtifact) ==
+					ShaderProgramBindStatus::Bound &&
+					registry.Resolve(sameNamesDifferentStage) == secondArtifact &&
+					registry.GetMappingCount() == 2,
+				"ProgramRef stage is an explicit part of stable Runtime identity");
 			context.Check(
 				registry.Bind({}, firstArtifact) == ShaderProgramBindStatus::InvalidProgram &&
 					registry.Bind(secondProgramRef, {}) ==
@@ -225,6 +248,13 @@ namespace gglab
 				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
 					ShaderArtifactCompatibilityStatus::ShaderStageMismatch,
 				"Compatibility rejects shader stage mismatches");
+
+			manifest = vulkan.m_Manifest;
+			manifest.m_EntryPoint.clear();
+			context.Check(
+				ValidateShaderArtifactCompatibility(manifest, vulkanRequest).m_Status ==
+					ShaderArtifactCompatibilityStatus::InvalidEntryPoint,
+				"Compatibility rejects incomplete executable shader metadata");
 
 			manifest = vulkan.m_Manifest;
 			manifest.m_TargetProfile = ShaderTargetProfile::GGLabDX12;

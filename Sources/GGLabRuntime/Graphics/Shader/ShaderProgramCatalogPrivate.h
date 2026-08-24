@@ -7,7 +7,7 @@
 namespace gglab
 {
 	// Transitional in-process build adapter. Stable Runtime consumers never see
-	// these authoring fields; R5 removes this resolver with the compiler edge.
+	// these authoring fields. This resolver is removed with the in-process compiler edge.
 	[[nodiscard]] std::optional<ShaderDesc> ResolveTransitionalShaderProgramBuild(
 		const ShaderProgramRef& programRef) noexcept;
 }

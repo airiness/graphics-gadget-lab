@@ -354,7 +354,8 @@ namespace gglab
 
 		[[nodiscard]] bool CliRuntimeArtifactFieldsDescribePublishedEntry(
 			const CliRunResult& result,
-			const std::filesystem::path& artifactRoot) noexcept
+			const std::filesystem::path& artifactRoot,
+			std::wstring_view expectedEntryPoint = L"VSMain") noexcept
 		{
 			const std::string artifactId = ExtractJsonField(result.m_StdOut, "artifactId");
 			const std::filesystem::path runtimeBinaryPath = utils::ToWideString(
@@ -381,7 +382,8 @@ namespace gglab
 					static_cast<const std::byte*>(serializedManifest->Data()),
 					serializedManifest->SizeInBytes()));
 			if (!manifest.has_value() || Sha256DigestToHex(
-				manifest->m_ArtifactId.m_DurableDigest) != artifactId)
+				manifest->m_ArtifactId.m_DurableDigest) != artifactId ||
+				manifest->m_EntryPoint != utils::ToString(expectedEntryPoint))
 			{
 				return false;
 			}
@@ -532,7 +534,8 @@ namespace gglab
 					buildKey == runtimeEvidence.m_BuildKey &&
 					binaryDigest == runtimeEvidence.m_BinaryDigest &&
 					CliArtifactFieldsDescribeCommittedEntry(cliResult) &&
-					CliRuntimeArtifactFieldsDescribePublishedEntry(cliResult, artifactRoot) &&
+					CliRuntimeArtifactFieldsDescribePublishedEntry(
+						cliResult, artifactRoot, parityCase.m_Entry) &&
 					cliBinary.has_value() && cliBinary->SizeInBytes() ==
 						runtimeEvidence.m_Binary.SizeInBytes() &&
 					(cliBinary->SizeInBytes() == 0 ||

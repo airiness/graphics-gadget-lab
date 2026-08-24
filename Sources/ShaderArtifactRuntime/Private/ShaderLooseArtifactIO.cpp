@@ -113,29 +113,50 @@ namespace gglab
 	SerializedShaderRuntimeArtifactManifest SerializeShaderRuntimeArtifactManifest(
 		const ShaderRuntimeArtifactManifest& manifest) noexcept
 	{
-		SerializedShaderRuntimeArtifactManifest bytes{};
-		size_t offset = 0;
-		std::ranges::copy(ManifestMagic, bytes.begin());
-		offset += ManifestMagic.size();
-		WriteU32LE(bytes, offset, ShaderRuntimeArtifactFileFormatVersion);
-		WriteU32LE(bytes, offset, manifest.m_SchemaVersion);
-		std::ranges::copy(manifest.m_ArtifactId.m_DurableDigest.m_Value, bytes.begin() + offset);
-		offset += Sha256Digest::Size;
-		bytes[offset++] = static_cast<std::byte>(manifest.m_TargetProfile);
-		bytes[offset++] = static_cast<std::byte>(manifest.m_BinaryFormat);
-		bytes[offset++] = static_cast<std::byte>(manifest.m_SpirVTargetEnvironment);
-		bytes[offset++] = static_cast<std::byte>(manifest.m_CoordinateOptions);
-		WriteU32LE(bytes, offset, manifest.m_BindingABIRevision);
-		WriteU32LE(bytes, offset, static_cast<uint32_t>(manifest.m_Stage));
-		std::ranges::copy(
-			manifest.m_BinaryContentDigest.m_Digest.m_Value, bytes.begin() + offset);
-		return bytes;
+		if (!IsValidShaderRuntimeEntryPoint(manifest.m_EntryPoint))
+		{
+			return {};
+		}
+
+		try
+		{
+			SerializedShaderRuntimeArtifactManifest bytes(
+				SerializedShaderRuntimeArtifactManifestFixedSize +
+				manifest.m_EntryPoint.size());
+			size_t offset = 0;
+			std::ranges::copy(ManifestMagic, bytes.begin());
+			offset += ManifestMagic.size();
+			WriteU32LE(bytes, offset, ShaderRuntimeArtifactFileFormatVersion);
+			WriteU32LE(bytes, offset, manifest.m_SchemaVersion);
+			std::ranges::copy(
+				manifest.m_ArtifactId.m_DurableDigest.m_Value, bytes.begin() + offset);
+			offset += Sha256Digest::Size;
+			bytes[offset++] = static_cast<std::byte>(manifest.m_TargetProfile);
+			bytes[offset++] = static_cast<std::byte>(manifest.m_BinaryFormat);
+			bytes[offset++] = static_cast<std::byte>(manifest.m_SpirVTargetEnvironment);
+			bytes[offset++] = static_cast<std::byte>(manifest.m_CoordinateOptions);
+			WriteU32LE(bytes, offset, manifest.m_BindingABIRevision);
+			WriteU32LE(bytes, offset, static_cast<uint32_t>(manifest.m_Stage));
+			WriteU32LE(bytes, offset, static_cast<uint32_t>(manifest.m_EntryPoint.size()));
+			for (const char character : manifest.m_EntryPoint)
+			{
+				bytes[offset++] = static_cast<std::byte>(character);
+			}
+			std::ranges::copy(
+				manifest.m_BinaryContentDigest.m_Digest.m_Value, bytes.begin() + offset);
+			return bytes;
+		}
+		catch (...)
+		{
+			return {};
+		}
 	}
 
 	std::optional<ShaderRuntimeArtifactManifest> DeserializeShaderRuntimeArtifactManifest(
 		std::span<const std::byte> bytes) noexcept
 	{
-		if (bytes.size() != SerializedShaderRuntimeArtifactManifestSize ||
+		if (bytes.size() < SerializedShaderRuntimeArtifactManifestFixedSize ||
+			bytes.size() > MaxSerializedShaderRuntimeArtifactManifestSize ||
 			!std::ranges::equal(ManifestMagic, bytes.first(ManifestMagic.size())))
 		{
 			return std::nullopt;
@@ -164,6 +185,27 @@ namespace gglab
 			std::to_integer<uint8_t>(bytes[offset++]));
 		manifest.m_BindingABIRevision = ReadU32LE(bytes, offset);
 		manifest.m_Stage = static_cast<ShaderStage>(ReadU32LE(bytes, offset));
+		const uint32_t entryPointSize = ReadU32LE(bytes, offset);
+		if (entryPointSize == 0 || entryPointSize > MaxShaderRuntimeEntryPointSize ||
+			bytes.size() != SerializedShaderRuntimeArtifactManifestFixedSize +
+				entryPointSize)
+		{
+			return std::nullopt;
+		}
+		try
+		{
+			manifest.m_EntryPoint.assign(
+				reinterpret_cast<const char*>(bytes.data() + offset), entryPointSize);
+		}
+		catch (...)
+		{
+			return std::nullopt;
+		}
+		if (!IsValidShaderRuntimeEntryPoint(manifest.m_EntryPoint))
+		{
+			return std::nullopt;
+		}
+		offset += entryPointSize;
 		std::ranges::copy_n(
 			bytes.begin() + offset,
 			Sha256Digest::Size,
@@ -223,7 +265,7 @@ namespace gglab
 			ShaderBinary serializedManifest;
 			const FileReadStatus manifestRead = ReadFile(
 				paths.m_ManifestPath,
-				SerializedShaderRuntimeArtifactManifestSize,
+				MaxSerializedShaderRuntimeArtifactManifestSize,
 				serializedManifest);
 			if (manifestRead == FileReadStatus::Missing)
 			{
@@ -233,9 +275,7 @@ namespace gglab
 			{
 				return { .m_Status = ShaderArtifactReadStatus::IOFailure };
 			}
-			if (manifestRead == FileReadStatus::Malformed ||
-				serializedManifest.SizeInBytes() !=
-					SerializedShaderRuntimeArtifactManifestSize)
+			if (manifestRead == FileReadStatus::Malformed)
 			{
 				return { .m_Status = ShaderArtifactReadStatus::MalformedArtifact };
 			}

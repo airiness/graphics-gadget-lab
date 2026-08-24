@@ -159,6 +159,13 @@ namespace gglab
 				programRef.m_ProgramId, programRef.m_VariantId);
 			return {};
 		}
+		if (activeDesc->m_Stage != programRef.m_Stage)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"ShaderManager::LoadProgram: stage mismatch for program '{}::{}'.",
+				programRef.m_ProgramId, programRef.m_VariantId);
+			return {};
+		}
 		ApplyActiveBackendTarget(*activeDesc, m_ActiveBackend);
 		const ShaderResolvedRecipe recipe = m_BuildState->m_Compiler->Resolve(*activeDesc);
 		if (!recipe.IsSuccess())
@@ -192,7 +199,7 @@ namespace gglab
 		};
 		const ShaderHash128 hash = ComputeShaderBinaryHash(
 			runtimeArtifact.m_Binary, runtimeArtifact.m_Manifest.m_BinaryFormat);
-		auto shader = std::make_unique<Shader>(programRef, recipe.m_Request.m_Entry);
+		auto shader = std::make_unique<Shader>(programRef);
 		shader->SetRuntimeArtifact(std::move(runtimeArtifact), artifactRef, hash, true);
 
 		{
@@ -287,6 +294,13 @@ namespace gglab
 					{
 						return TaskResult::Failure(std::format(
 							"Unknown shader program: {}::{}",
+							entry.m_ProgramRef.m_ProgramId,
+							entry.m_ProgramRef.m_VariantId));
+					}
+					if (desc->m_Stage != entry.m_ProgramRef.m_Stage)
+					{
+						return TaskResult::Failure(std::format(
+							"Shader stage mismatch: {}::{}",
 							entry.m_ProgramRef.m_ProgramId,
 							entry.m_ProgramRef.m_VariantId));
 					}
@@ -395,8 +409,7 @@ namespace gglab
 				return false;
 			}
 
-			auto shader = std::make_unique<Shader>(
-				entry.m_ProgramRef, entry.m_Recipe.m_Request.m_Entry);
+			auto shader = std::make_unique<Shader>(entry.m_ProgramRef);
 			shader->SetRuntimeArtifact(
 				std::move(entry.m_Artifact), entry.m_ArtifactRef, entry.m_Hash, true);
 			const ShaderID id{ static_cast<uint32_t>(m_Shaders.size()) };
@@ -505,6 +518,10 @@ namespace gglab
 		{
 			return false;
 		}
+		if (activeDesc->m_Stage != shader.GetProgramRef().m_Stage)
+		{
+			return false;
+		}
 		ApplyActiveBackendTarget(*activeDesc, m_ActiveBackend);
 		const ShaderResolvedRecipe recipe = m_BuildState->m_Compiler->Resolve(*activeDesc);
 		if (!recipe.IsSuccess())
@@ -528,7 +545,8 @@ namespace gglab
 		};
 		const ShaderHash128 hash = ComputeShaderBinaryHash(
 			runtimeArtifact.m_Binary, runtimeArtifact.m_Manifest.m_BinaryFormat);
-		const auto changed = (shader.GetGeneration() == 0) || (hash != shader.GetHash());
+		const bool changed = shader.GetGeneration() == 0 ||
+			artifactRef != shader.GetArtifactRef();
 		const ShaderProgramBindStatus bindStatus =
 			m_ProgramRegistry.Bind(shader.GetProgramRef(), artifactRef);
 		if (bindStatus == ShaderProgramBindStatus::InvalidProgram ||

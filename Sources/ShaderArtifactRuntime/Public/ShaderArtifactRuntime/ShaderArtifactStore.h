@@ -22,6 +22,7 @@ namespace gglab
 		InvalidRequest,
 		UnsupportedManifestSchema,
 		InvalidManifestTarget,
+		InvalidEntryPoint,
 		TargetProfileMismatch,
 		BinaryFormatMismatch,
 		TargetEnvironmentMismatch,

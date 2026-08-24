@@ -16,10 +16,12 @@ namespace gglab
 	{
 		std::string m_ProgramId;
 		std::string m_VariantId;
+		ShaderStage m_Stage = ShaderStage::Vertex;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return !m_ProgramId.empty() && !m_VariantId.empty();
+			return !m_ProgramId.empty() && !m_VariantId.empty() &&
+				IsKnownShaderStage(m_Stage);
 		}
 
 		friend bool operator==(
@@ -65,8 +67,8 @@ namespace gglab
 	};
 
 	// Ordered, duplicate-free aggregation used to freeze one preload snapshot.
-	// Demand declaration carries stable Runtime identity only; it never carries
-	// source, entry-point, define, or compiler policy.
+	// Demand declaration carries stable logical identity and expected Runtime stage;
+	// it never carries source, entry-point, define, or compiler policy.
 	class ShaderProgramDemandSet final
 	{
 	public:

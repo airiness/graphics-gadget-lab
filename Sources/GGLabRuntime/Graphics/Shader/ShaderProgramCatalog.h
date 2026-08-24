@@ -5,97 +5,114 @@
 
 namespace gglab::shader_programs
 {
-	inline const ShaderProgramRef ForwardCoverageVertex{ "gglab.shader.forward-coverage", "vertex" };
-	inline const ShaderProgramRef ForwardPBRLegacyPixel{ "gglab.shader.forward-pbr", "pixel.legacy" };
-	inline const ShaderProgramRef ForwardPBRForwardPlusPixel{ "gglab.shader.forward-pbr", "pixel.forward-plus" };
+	inline const ShaderProgramRef ForwardCoverageVertex{
+		"gglab.shader.forward-coverage", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef ForwardPBRLegacyPixel{
+		"gglab.shader.forward-pbr", "pixel.legacy", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRForwardPlusPixel{
+		"gglab.shader.forward-pbr", "pixel.forward-plus", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationPixel{
-		"gglab.shader.forward-pbr", "pixel.forward-plus-validation" };
+		"gglab.shader.forward-pbr", "pixel.forward-plus-validation", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRLegacyGTAOPixel{
-		"gglab.shader.forward-pbr", "pixel.legacy-gtao" };
+		"gglab.shader.forward-pbr", "pixel.legacy-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOPixel{
-		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao" };
+		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationGTAOPixel{
-		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao" };
+		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef DepthPrepassAlphaTestPixel{
-		"gglab.shader.depth-prepass", "pixel.alpha-test" };
+		"gglab.shader.depth-prepass", "pixel.alpha-test", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPlusCullCompute{
-		"gglab.shader.forward-plus-cull", "compute" };
+		"gglab.shader.forward-plus-cull", "compute", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusCullDiagnosticsCompute{
-		"gglab.shader.forward-plus-cull", "compute.diagnostics" };
+		"gglab.shader.forward-plus-cull", "compute.diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusValidationTilesCompute{
-		"gglab.shader.forward-plus-validation", "compute.tiles" };
+		"gglab.shader.forward-plus-validation", "compute.tiles", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusValidationFrameCompute{
-		"gglab.shader.forward-plus-validation", "compute.frame" };
-	inline const ShaderProgramRef GTAOEvaluateCompute{ "gglab.shader.gtao", "compute.evaluate" };
+		"gglab.shader.forward-plus-validation", "compute.frame", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAOEvaluateCompute{
+		"gglab.shader.gtao", "compute.evaluate", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateDiagnosticsCompute{
-		"gglab.shader.gtao", "compute.evaluate-diagnostics" };
-	inline const ShaderProgramRef GTAODenoiseXCompute{ "gglab.shader.gtao", "compute.denoise-x" };
-	inline const ShaderProgramRef GTAODenoiseYCompute{ "gglab.shader.gtao", "compute.denoise-y" };
-	inline const ShaderProgramRef GTAOUpsampleCompute{ "gglab.shader.gtao", "compute.upsample" };
+		"gglab.shader.gtao", "compute.evaluate-diagnostics", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAODenoiseXCompute{
+		"gglab.shader.gtao", "compute.denoise-x", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAODenoiseYCompute{
+		"gglab.shader.gtao", "compute.denoise-y", ShaderStage::Compute };
+	inline const ShaderProgramRef GTAOUpsampleCompute{
+		"gglab.shader.gtao", "compute.upsample", ShaderStage::Compute };
 
 	inline const ShaderProgramRef DirectionalShadowMapVertex{
-		"gglab.shader.directional-shadow-map", "vertex" };
+		"gglab.shader.directional-shadow-map", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef DirectionalShadowMapPixel{
-		"gglab.shader.directional-shadow-map", "pixel.alpha-test" };
+		"gglab.shader.directional-shadow-map", "pixel.alpha-test", ShaderStage::Pixel };
 	inline const ShaderProgramRef ShadowMapPreviewVertex{
-		"gglab.shader.shadow-map-preview", "vertex" };
+		"gglab.shader.shadow-map-preview", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef ShadowMapPreviewPixel{
-		"gglab.shader.shadow-map-preview", "pixel" };
-	inline const ShaderProgramRef FinalColorVertex{ "gglab.shader.final-color", "vertex" };
-	inline const ShaderProgramRef FinalColorPixel{ "gglab.shader.final-color", "pixel" };
-	inline const ShaderProgramRef BloomVertex{ "gglab.shader.bloom", "vertex" };
-	inline const ShaderProgramRef BloomPixel{ "gglab.shader.bloom", "pixel" };
+		"gglab.shader.shadow-map-preview", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef FinalColorVertex{
+		"gglab.shader.final-color", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef FinalColorPixel{
+		"gglab.shader.final-color", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef BloomVertex{
+		"gglab.shader.bloom", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef BloomPixel{
+		"gglab.shader.bloom", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef PostProcessPreviewVertex{
-		"gglab.shader.post-process-preview", "vertex" };
+		"gglab.shader.post-process-preview", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef PostProcessPreviewPixel{
-		"gglab.shader.post-process-preview", "pixel" };
-	inline const ShaderProgramRef DebugDrawVertex{ "gglab.shader.debug-draw", "vertex" };
-	inline const ShaderProgramRef DebugDrawPixel{ "gglab.shader.debug-draw", "pixel" };
-	inline const ShaderProgramRef SkyboxVertex{ "gglab.shader.skybox", "vertex" };
-	inline const ShaderProgramRef SkyboxPixel{ "gglab.shader.skybox", "pixel" };
+		"gglab.shader.post-process-preview", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef DebugDrawVertex{
+		"gglab.shader.debug-draw", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef DebugDrawPixel{
+		"gglab.shader.debug-draw", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef SkyboxVertex{
+		"gglab.shader.skybox", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef SkyboxPixel{
+		"gglab.shader.skybox", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLEnvironmentVertex{
-		"gglab.shader.ibl-environment", "vertex" };
+		"gglab.shader.ibl-environment", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLEnvironmentPixel{
-		"gglab.shader.ibl-environment", "pixel" };
+		"gglab.shader.ibl-environment", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLEnvironmentMipVertex{
-		"gglab.shader.ibl-environment-mip", "vertex" };
+		"gglab.shader.ibl-environment-mip", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLEnvironmentMipPixel{
-		"gglab.shader.ibl-environment-mip", "pixel" };
+		"gglab.shader.ibl-environment-mip", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLIrradianceVertex{
-		"gglab.shader.ibl-irradiance", "vertex" };
+		"gglab.shader.ibl-irradiance", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLIrradiancePixel{
-		"gglab.shader.ibl-irradiance", "pixel" };
+		"gglab.shader.ibl-irradiance", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLPrefilteredSpecularVertex{
-		"gglab.shader.ibl-prefiltered-specular", "vertex" };
+		"gglab.shader.ibl-prefiltered-specular", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLPrefilteredSpecularPixel{
-		"gglab.shader.ibl-prefiltered-specular", "pixel" };
+		"gglab.shader.ibl-prefiltered-specular", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLBrdfLUTVertex{
-		"gglab.shader.ibl-brdf-lut", "vertex" };
+		"gglab.shader.ibl-brdf-lut", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLBrdfLUTPixel{
-		"gglab.shader.ibl-brdf-lut", "pixel" };
+		"gglab.shader.ibl-brdf-lut", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLCubemapPreviewVertex{
-		"gglab.shader.ibl-cubemap-preview", "vertex" };
+		"gglab.shader.ibl-cubemap-preview", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLCubemapPreviewPixel{
-		"gglab.shader.ibl-cubemap-preview", "pixel" };
+		"gglab.shader.ibl-cubemap-preview", "pixel", ShaderStage::Pixel };
 
 	inline const ShaderProgramRef CoordinateGeometryVertex{
-		"gglab.shader.coordinate-conformance", "vertex.geometry" };
+		"gglab.shader.coordinate-conformance", "vertex.geometry", ShaderStage::Vertex };
 	inline const ShaderProgramRef CoordinateFullscreenVertex{
-		"gglab.shader.coordinate-conformance", "vertex.fullscreen" };
+		"gglab.shader.coordinate-conformance", "vertex.fullscreen", ShaderStage::Vertex };
 	inline const ShaderProgramRef CoordinateMarkerPixel{
-		"gglab.shader.coordinate-conformance", "pixel.marker" };
+		"gglab.shader.coordinate-conformance", "pixel.marker", ShaderStage::Pixel };
 	inline const ShaderProgramRef CoordinateConformancePixel{
-		"gglab.shader.coordinate-conformance", "pixel.conformance" };
+		"gglab.shader.coordinate-conformance", "pixel.conformance", ShaderStage::Pixel };
 	inline const ShaderProgramRef RenderGraphComputeWrite{
-		"gglab.shader.render-graph-compute", "compute.write" };
+		"gglab.shader.render-graph-compute", "compute.write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
-		"gglab.shader.render-graph-compute", "compute.read-write" };
+		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputePreviewVertex{
-		"gglab.shader.render-graph-compute", "vertex.preview" };
+		"gglab.shader.render-graph-compute", "vertex.preview", ShaderStage::Vertex };
 	inline const ShaderProgramRef RenderGraphComputePreviewPixel{
-		"gglab.shader.render-graph-compute", "pixel.preview" };
-	inline const ShaderProgramRef NapaVoxelVertex{ "gglab.shader.napa-voxel", "vertex" };
-	inline const ShaderProgramRef NapaVoxelPixel{ "gglab.shader.napa-voxel", "pixel" };
+		"gglab.shader.render-graph-compute", "pixel.preview", ShaderStage::Pixel };
+	inline const ShaderProgramRef NapaVoxelVertex{
+		"gglab.shader.napa-voxel", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef NapaVoxelPixel{
+		"gglab.shader.napa-voxel", "pixel", ShaderStage::Pixel };
 
 	[[nodiscard]] std::span<const ShaderProgramRef>
 		GetRendererInitialShaderProgramDemand() noexcept;

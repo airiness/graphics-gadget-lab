@@ -64,6 +64,7 @@ namespace gglab
 			artifact.m_Manifest.m_BindingABIRevision = 0;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::None;
 			artifact.m_Manifest.m_Stage = ShaderStage::Vertex;
+			artifact.m_Manifest.m_EntryPoint = L"VSMain";
 			artifact.m_Binary = MakeDxilBinary(tail);
 			RefreshDigest(artifact);
 			return artifact;
@@ -79,6 +80,7 @@ namespace gglab
 			artifact.m_Manifest.m_BindingABIRevision = 1;
 			artifact.m_Manifest.m_CoordinateOptions = ShaderCoordinateOptions::InvertY;
 			artifact.m_Manifest.m_Stage = ShaderStage::Vertex;
+			artifact.m_Manifest.m_EntryPoint = L"VSMain";
 			artifact.m_Binary = MakeSpirVBinary();
 			RefreshDigest(artifact);
 			return artifact;
@@ -115,7 +117,32 @@ namespace gglab
 				DeserializeShaderRuntimeArtifactManifest(serialized);
 			context.Check(
 				roundTrip.has_value() && *roundTrip == runtimeArtifact.m_Manifest,
-				"Runtime manifest fixed binary codec round-trips every field");
+				"Runtime manifest binary codec round-trips executable metadata");
+			context.Check(
+				static_cast<uint8_t>(ShaderTargetProfile::GGLabDX12) == 0 &&
+					static_cast<uint8_t>(ShaderTargetProfile::GGLabVulkan13) == 1 &&
+					static_cast<uint8_t>(ShaderBinaryFormat::Dxil) == 1 &&
+					static_cast<uint8_t>(ShaderBinaryFormat::SpirV) == 2 &&
+					static_cast<uint8_t>(ShaderSpirVTargetEnvironment::Vulkan1_3) == 1 &&
+					static_cast<uint32_t>(ShaderStage::Vertex) == 0 &&
+					static_cast<uint32_t>(ShaderStage::Compute) == 6,
+				"Persisted shader vocabulary has pinned wire values");
+			context.Check(
+				serialized.size() == SerializedShaderRuntimeArtifactManifestFixedSize +
+					runtimeArtifact.m_Manifest.m_EntryPoint.size() &&
+					serialized[48] == static_cast<std::byte>(
+						runtimeArtifact.m_Manifest.m_TargetProfile) &&
+					serialized[49] == static_cast<std::byte>(
+						runtimeArtifact.m_Manifest.m_BinaryFormat) &&
+					serialized[50] == static_cast<std::byte>(
+						runtimeArtifact.m_Manifest.m_SpirVTargetEnvironment) &&
+					serialized[51] == static_cast<std::byte>(
+						runtimeArtifact.m_Manifest.m_CoordinateOptions) &&
+					serialized[56] == static_cast<std::byte>(
+						static_cast<uint32_t>(runtimeArtifact.m_Manifest.m_Stage)) &&
+					serialized[64] == static_cast<std::byte>(
+						runtimeArtifact.m_Manifest.m_EntryPoint.front()),
+				"Runtime manifest encoder writes the pinned ABI and entry point explicitly");
 
 			SerializedShaderRuntimeArtifactManifest corruptMagic = serialized;
 			corruptMagic[0] ^= std::byte{ 1 };
@@ -125,8 +152,14 @@ namespace gglab
 						std::span(serialized).first(serialized.size() - 1)).has_value(),
 				"Runtime manifest codec rejects corrupt magic and truncated documents");
 
+			SerializedShaderRuntimeArtifactManifest embeddedNullEntryPoint = serialized;
+			embeddedNullEntryPoint[64] = std::byte{};
+			context.Check(
+				!DeserializeShaderRuntimeArtifactManifest(embeddedNullEntryPoint).has_value(),
+				"Runtime manifest codec rejects invalid executable entry-point metadata");
+
 			SerializedShaderRuntimeArtifactManifest unknownFileVersion = serialized;
-			unknownFileVersion[8] = std::byte{ 2 };
+			unknownFileVersion[8] = std::byte{ 3 };
 			context.Check(
 				!DeserializeShaderRuntimeArtifactManifest(unknownFileVersion).has_value(),
 				"Runtime manifest codec rejects unknown file-format versions");

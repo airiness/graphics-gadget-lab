@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -12,21 +13,37 @@ namespace gglab
 {
 	enum class ShaderBinaryFormat : uint8_t
 	{
-		Unknown,
-		Dxil,
-		SpirV,
+		Unknown = 0,
+		Dxil = 1,
+		SpirV = 2,
 	};
 
 	enum class ShaderStage : uint32_t
 	{
-		Vertex,
-		Pixel,
-		Hull,
-		Domain,
-		Geometry,
-		Mesh,
-		Compute
+		Vertex = 0,
+		Pixel = 1,
+		Hull = 2,
+		Domain = 3,
+		Geometry = 4,
+		Mesh = 5,
+		Compute = 6,
 	};
+
+	[[nodiscard]] constexpr bool IsKnownShaderStage(ShaderStage stage) noexcept
+	{
+		switch (stage)
+		{
+		case ShaderStage::Vertex:
+		case ShaderStage::Pixel:
+		case ShaderStage::Hull:
+		case ShaderStage::Domain:
+		case ShaderStage::Geometry:
+		case ShaderStage::Mesh:
+		case ShaderStage::Compute:
+			return true;
+		}
+		return false;
+	}
 
 	enum class ShaderModel : uint32_t
 	{
@@ -45,8 +62,8 @@ namespace gglab
 
 	enum class ShaderSpirVTargetEnvironment : uint8_t
 	{
-		None,
-		Vulkan1_3,
+		None = 0,
+		Vulkan1_3 = 1,
 	};
 
 	enum class ShaderCoordinateOptions : uint8_t
@@ -59,9 +76,28 @@ namespace gglab
 
 	enum class ShaderTargetProfile : uint8_t
 	{
-		GGLabDX12,
-		GGLabVulkan13,
+		GGLabDX12 = 0,
+		GGLabVulkan13 = 1,
 	};
+
+	inline constexpr size_t MaxShaderRuntimeEntryPointSize = 1024;
+
+	[[nodiscard]] constexpr bool IsValidShaderRuntimeEntryPoint(
+		std::string_view entryPoint) noexcept
+	{
+		if (entryPoint.empty() || entryPoint.size() > MaxShaderRuntimeEntryPointSize)
+		{
+			return false;
+		}
+		for (const unsigned char character : entryPoint)
+		{
+			if (character == 0 || character > 0x7f)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 
 	[[nodiscard]] constexpr ShaderTargetProfile GetShaderTargetProfile(
 		ShaderBinaryFormat binaryFormat, ShaderSpirVTargetEnvironment environment) noexcept

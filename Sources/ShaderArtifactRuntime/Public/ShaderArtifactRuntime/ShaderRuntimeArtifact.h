@@ -4,13 +4,14 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 
 #include <cstdint>
+#include <string>
 
 namespace gglab
 {
 	struct ShaderArtifactManifest;
 
-	inline constexpr uint32_t ShaderRuntimeArtifactIdentitySchemaVersion = 1;
-	inline constexpr uint32_t ShaderRuntimeArtifactManifestSchemaVersion = 1;
+	inline constexpr uint32_t ShaderRuntimeArtifactIdentitySchemaVersion = 2;
+	inline constexpr uint32_t ShaderRuntimeArtifactManifestSchemaVersion = 2;
 
 	struct ShaderArtifactId final
 	{
@@ -51,6 +52,7 @@ namespace gglab
 		uint32_t m_BindingABIRevision = 0;
 		ShaderCoordinateOptions m_CoordinateOptions = ShaderCoordinateOptions::None;
 		ShaderStage m_Stage = ShaderStage::Vertex;
+		std::string m_EntryPoint{};
 		BinaryContentDigest m_BinaryContentDigest{};
 
 		friend constexpr bool operator==(

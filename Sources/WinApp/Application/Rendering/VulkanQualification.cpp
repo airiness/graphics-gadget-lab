@@ -1506,7 +1506,7 @@ namespace gglab
 				.m_Format = compileResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(compileResult.m_Artifact.m_Binary,
 					compileResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"VSMain",
+				.m_EntryPoint = "VSMain",
 			};
 			const VkShaderModule shaderModule =
 				pipelineSystem.CreateShaderModule(spirV, "Qualification.FinalColorVS");
@@ -1663,7 +1663,7 @@ namespace gglab
 				.m_Format = geometryResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(geometryResult.m_Artifact.m_Binary,
 					geometryResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"VSGeometry",
+				.m_EntryPoint = "VSGeometry",
 			};
 			const ShaderBytecode fullscreenShader{
 				.m_Data = fullscreenResult.m_Artifact.m_Binary.Data(),
@@ -1671,7 +1671,7 @@ namespace gglab
 				.m_Format = fullscreenResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(fullscreenResult.m_Artifact.m_Binary,
 					fullscreenResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"VSFullscreen",
+				.m_EntryPoint = "VSFullscreen",
 			};
 			const ShaderBytecode pixelShader{
 				.m_Data = pixelResult.m_Artifact.m_Binary.Data(),
@@ -1679,7 +1679,7 @@ namespace gglab
 				.m_Format = pixelResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(pixelResult.m_Artifact.m_Binary,
 					pixelResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"PSConformance",
+				.m_EntryPoint = "PSConformance",
 			};
 			const ShaderBytecode depthOverrideShader{
 				.m_Data = depthOverrideResult.m_Artifact.m_Binary.Data(),
@@ -1687,7 +1687,7 @@ namespace gglab
 				.m_Format = depthOverrideResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(depthOverrideResult.m_Artifact.m_Binary,
 					depthOverrideResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"PSDepthOverride",
+				.m_EntryPoint = "PSDepthOverride",
 			};
 			const ShaderBytecode computeShader{
 				.m_Data = computeResult.m_Artifact.m_Binary.Data(),
@@ -1695,7 +1695,7 @@ namespace gglab
 				.m_Format = computeResult.m_Artifact.GetBinaryFormat(),
 				.m_Hash = ComputeShaderBinaryHash(computeResult.m_Artifact.m_Binary,
 					computeResult.m_Artifact.GetBinaryFormat()),
-				.m_EntryPoint = L"CSStorageDependency",
+				.m_EntryPoint = "CSStorageDependency",
 			};
 
 			RHIGraphicsPipelineDesc geometryDesc{};
