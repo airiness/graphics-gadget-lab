@@ -5,7 +5,7 @@ namespace gglab
 {
 	// Runtime viewport/front-face policy. The compile-facing coordinate flags
 	// (vertex-producing stage Y inversion, DX Position.W semantics) live in
-	// the shared VulkanShaderCompileABI contract. Runtime lowering must stay
+	// the shared VulkanShaderRuntimeABI contract. Runtime lowering must stay
 	// consistent with that contract: ToVulkanFrontFace assumes vertex stages
 	// compile with Y inversion applied.
 	struct VulkanCoordinatePolicy

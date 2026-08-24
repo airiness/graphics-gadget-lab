@@ -56,5 +56,8 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

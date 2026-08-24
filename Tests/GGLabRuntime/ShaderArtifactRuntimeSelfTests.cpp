@@ -1,15 +1,19 @@
 #include "ShaderArtifactRuntimeSelfTests.h"
 
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
+#include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include "GGLabFoundation/Hash/Sha256.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <span>
 #include <utility>
 
@@ -117,6 +121,23 @@ namespace gglab
 			const ShaderRuntimeArtifact& artifact) noexcept
 		{
 			return { .m_ArtifactId = artifact.m_Manifest.m_ArtifactId };
+		}
+
+		[[nodiscard]] bool WriteBytes(
+			const std::filesystem::path& path, std::span<const std::byte> bytes) noexcept
+		{
+			try
+			{
+				std::filesystem::create_directories(path.parent_path());
+				std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+				stream.write(reinterpret_cast<const char*>(bytes.data()),
+					static_cast<std::streamsize>(bytes.size()));
+				return stream.good();
+			}
+			catch (...)
+			{
+				return false;
+			}
 		}
 
 		void RunIdentityTests(SelfTestContext& context) noexcept
@@ -525,6 +546,86 @@ namespace gglab
 					ShaderArtifactLoadStatus::InvalidBinary,
 				"Store rejects digest-valid bytes that are not the declared binary format");
 		}
+
+		void RunArtifactOnlyShaderManagerTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path root = std::filesystem::temp_directory_path() /
+				"gglab-artifact-only-shader-manager-test";
+			std::error_code errorCode;
+			std::filesystem::remove_all(root, errorCode);
+
+			const ShaderProgramRef programRef{
+				.m_ProgramId = "gglab.shader.artifact-only-test",
+				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Vertex,
+			};
+			const ShaderRuntimeArtifact artifact = MakeDxilArtifact();
+			const ShaderArtifactRef artifactRef = MakeRef(artifact);
+			const std::array entries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = artifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult registryBuild =
+				BuildShaderProgramRegistryArtifact(entries);
+			const ShaderProgramRegistryArtifactRef registryRef{
+				.m_RegistryId = registryBuild.m_Artifact.m_RegistryId,
+			};
+
+			const ShaderLooseArtifactPaths artifactPaths =
+				ShaderLooseArtifactLocator(root).GetPaths(artifactRef);
+			const SerializedShaderRuntimeArtifactManifest serializedManifest =
+				SerializeShaderRuntimeArtifactManifest(artifact.m_Manifest);
+			const auto binaryBytes = std::span(
+				static_cast<const std::byte*>(artifact.m_Binary.Data()),
+				artifact.m_Binary.SizeInBytes());
+			const ShaderLooseProgramRegistryArtifactPath registryPath =
+				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(registryRef);
+			const SerializedShaderProgramRegistryArtifact serializedRegistry =
+				SerializeShaderProgramRegistryArtifact(registryBuild.m_Artifact);
+			const bool fixturesWritten = registryBuild.IsSuccess() &&
+				WriteBytes(artifactPaths.m_BinaryPath, binaryBytes) &&
+				WriteBytes(artifactPaths.m_ManifestPath, serializedManifest) &&
+				WriteBytes(registryPath.m_Path, serializedRegistry);
+
+			ShaderManager manager({
+				.m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = root,
+				.m_ActiveRegistry = registryRef,
+				});
+			const ShaderID shaderId = manager.LoadProgram(programRef);
+			context.Check(fixturesWritten && manager.IsReady() && shaderId.IsValid() &&
+				manager.GetBytecode(shaderId).m_Format == ShaderBinaryFormat::Dxil &&
+				manager.GetBytecode(shaderId).m_EntryPoint == "VSMain" &&
+				manager.ResolveArtifact(programRef) == artifactRef,
+				"ShaderManager loads a program using only an injected registry and artifact root");
+
+			ShaderManager wrongBackendManager({
+				.m_ActiveBackend = RHIBackendType::Vulkan,
+				.m_ArtifactRoot = root,
+				.m_ActiveRegistry = registryRef,
+				});
+			context.Check(wrongBackendManager.IsReady() &&
+				!wrongBackendManager.LoadProgram(programRef).IsValid() &&
+				!wrongBackendManager.ResolveArtifact(programRef).has_value(),
+				"ShaderManager never falls back across backend-specific registry bindings");
+
+			ShaderProgramRegistryArtifactRef missingRegistryRef = registryRef;
+			missingRegistryRef.m_RegistryId.m_DurableDigest.m_Value[0] ^= std::byte{ 1 };
+			ShaderManager missingRegistryManager({
+				.m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = root,
+				.m_ActiveRegistry = missingRegistryRef,
+				});
+			context.Check(!missingRegistryManager.IsReady() &&
+				missingRegistryManager.GetInitializeStatus() ==
+					ShaderManagerInitializeStatus::RegistryNotFound,
+				"ShaderManager reports a missing injected registry without consulting source or compiler state");
+
+			std::filesystem::remove_all(root, errorCode);
+		}
 	}
 
 	void RunShaderArtifactRuntimeSelfTests(SelfTestContext& context) noexcept
@@ -534,5 +635,6 @@ namespace gglab
 		RunProgramRegistryArtifactTests(context);
 		RunCompatibilityTests(context);
 		RunStoreTests(context);
+		RunArtifactOnlyShaderManagerTests(context);
 	}
 }

@@ -11,6 +11,7 @@ namespace gglab
 			&m_AssetRoot,
 			&m_ShaderSourceRoot,
 			&m_ShaderCacheRoot,
+			&m_ShaderArtifactRoot,
 			&m_IblDerivedDataRoot,
 			&m_TextureDerivedDataRoot,
 			&m_EnvironmentAssetRoot,

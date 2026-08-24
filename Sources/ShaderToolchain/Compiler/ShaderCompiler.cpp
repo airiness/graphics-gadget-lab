@@ -9,7 +9,7 @@
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
 #include "Targets/Vulkan13ShaderTarget.h"
-#include "Targets/VulkanShaderCompileABI.h"
+#include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <dxcapi.h>
 
@@ -1067,7 +1067,7 @@ namespace gglab
 					args.emplace_back(option);
 					args.push_back(std::to_wstring(range.m_BindingShift));
 					args.push_back(std::to_wstring(
-						GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace));
+						GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace));
 				};
 			appendRegisterShift(L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer);
 			appendRegisterShift(L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource);
@@ -1075,11 +1075,11 @@ namespace gglab
 			appendRegisterShift(L"-fvk-s-shift", VulkanShaderRegisterClass::Sampler);
 
 			args.emplace_back(L"-fvk-bind-resource-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_ResourceHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet));
 			args.emplace_back(L"-fvk-bind-sampler-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_SamplerHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet));
 
 			if (Test(compileTarget.m_CoordinateOptions, ShaderCoordinateOptions::InvertY))
 			{

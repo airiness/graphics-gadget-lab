@@ -5,6 +5,7 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
+#include "Application/Shader/DevelopmentShaderArtifactBootstrap.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
@@ -138,6 +139,16 @@ namespace gglab
 			AppRuntimeRHIBackend::DX12 ? RHIBackendType::DX12 : RHIBackendType::Vulkan;
 		m_RHIContextFactory =
 			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
+		const DevelopmentShaderArtifactBootstrapResult shaderArtifacts =
+			PrepareDevelopmentShaderArtifacts(activeBackend,
+				m_RuntimePaths.m_ShaderSourceRoot, m_RuntimePaths.m_ShaderCacheRoot,
+				m_RuntimePaths.m_ShaderArtifactRoot);
+		if (!shaderArtifacts.IsSuccess())
+		{
+			GGLAB_LOG_ERROR("Failed to prepare development shader artifacts: {}",
+				shaderArtifacts.m_Error);
+			return FailInitialization();
+		}
 		const AppRuntimeServiceInitializeResult serviceInitializeResult =
 			m_AppRuntime->InitializeServices({
 				.m_RHIContextFactory = m_RHIContextFactory.get(),
@@ -145,6 +156,8 @@ namespace gglab
 				.m_ContentRegistration = std::move(m_ContentRegistration),
 				.m_WindowWidth = m_WindowWidth,
 				.m_WindowHeight = m_WindowHeight,
+				.m_ShaderArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
+				.m_ActiveShaderRegistry = shaderArtifacts.m_RegistryRef,
 				});
 		if (serviceInitializeResult != AppRuntimeServiceInitializeResult::Succeeded)
 		{

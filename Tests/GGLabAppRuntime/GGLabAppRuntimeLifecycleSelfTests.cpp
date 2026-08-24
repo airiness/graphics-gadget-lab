@@ -221,6 +221,7 @@ namespace gglab
 					.m_AssetRoot = runtimeRoot / "Assets",
 					.m_ShaderSourceRoot = runtimeRoot / "Shaders",
 					.m_ShaderCacheRoot = runtimeRoot / "ShaderCache",
+					.m_ShaderArtifactRoot = runtimeRoot / "ShaderArtifacts",
 					.m_IblDerivedDataRoot = runtimeRoot / "DerivedDataCache" / "IBL",
 					.m_TextureDerivedDataRoot =
 						runtimeRoot / "DerivedDataCache" / "Texture",
@@ -361,11 +362,11 @@ namespace gglab
 				.m_ContentRegistration = MakeContentRegistration(),
 				.m_WindowWidth = 640,
 				.m_WindowHeight = 480,
-				}) == AppRuntimeServiceInitializeResult::RendererInitializationFailed &&
+				}) == AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed &&
 				rendererFailureRuntime.GetLifecycleState() ==
 				AppRuntimeLifecycleState::Failed &&
 				!rendererFailureRuntime.AreServicesInitialized(),
-				"Renderer creation failure tears down partially composed runtime services");
+				"Missing host shader artifact inputs fail before renderer composition");
 		}
 	}
 }

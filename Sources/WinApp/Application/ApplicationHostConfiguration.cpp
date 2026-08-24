@@ -66,6 +66,7 @@ namespace gglab
 			.m_AssetRoot = assetRoot,
 			.m_ShaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot),
 			.m_ShaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot),
+			.m_ShaderArtifactRoot = runtimeRoot / "ShaderArtifacts",
 			.m_IblDerivedDataRoot = derivedDataRoot / "IBL",
 			.m_TextureDerivedDataRoot = derivedDataRoot / "Texture",
 			.m_EnvironmentAssetRoot = assetRoot / "Textures" / "Skybox",

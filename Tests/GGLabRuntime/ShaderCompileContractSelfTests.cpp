@@ -3,6 +3,7 @@
 
 #include "SpirVDecorationReader.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
+#include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
@@ -14,7 +15,7 @@
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/Shader/ShaderPaths.h"
 #include "Targets/Vulkan13ShaderTarget.h"
-#include "Targets/VulkanShaderCompileABI.h"
+#include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <windows.h>
 
@@ -304,7 +305,7 @@ namespace gglab
 
 		void RunShaderBindingABITests(SelfTestContext& context) noexcept
 		{
-			context.Check(GGLabVulkanShaderCompileABI.m_Revision == 1,
+			context.Check(GGLabVulkanShaderRuntimeABI.m_Revision == 1,
 				"Vulkan shader binding ABI revision is fixed at 1");
 
 			struct FixedRegisterClassCase
@@ -332,11 +333,11 @@ namespace gglab
 					++registerIndex)
 				{
 					const auto result = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
-						registerIndex, GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
+						registerIndex, GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
 					const uint32_t expectedBinding = range.m_BindingShift + registerIndex;
 					allBindingsUnique &= result.IsSupported() &&
 						result.m_Location.m_DescriptorSet ==
-						GGLabVulkanShaderCompileABI.m_FixedDescriptorSet &&
+						GGLabVulkanShaderRuntimeABI.m_FixedDescriptorSet &&
 						result.m_Location.m_Binding == expectedBinding &&
 						expectedBinding < occupiedBindings.size() && !occupiedBindings[expectedBinding];
 					if (expectedBinding < occupiedBindings.size())
@@ -345,7 +346,7 @@ namespace gglab
 					}
 				}
 				const auto outOfRange = EvaluateVulkanFixedShaderBinding(testCase.m_RegisterClass,
-					range.m_RegisterCount, GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
+					range.m_RegisterCount, GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
 				allOutOfRangeIndicesRejected &= !outOfRange.IsSupported() &&
 					outOfRange.m_RejectionReason ==
 					VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange;
@@ -360,13 +361,13 @@ namespace gglab
 
 			const auto reservedSpace = EvaluateVulkanFixedShaderBinding(
 				VulkanShaderRegisterClass::ShaderResource, 0,
-				GGLabVulkanShaderCompileABI.m_GlobalHeapHlslRegisterSpace);
+				GGLabVulkanShaderRuntimeABI.m_GlobalHeapHlslRegisterSpace);
 			context.Check(!reservedSpace.IsSupported() && reservedSpace.m_RejectionReason ==
 				VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace,
 				"Fixed bindings reject HLSL space1 reserved for global heaps");
 			const auto unsupportedSpace = EvaluateVulkanFixedShaderBinding(
 				VulkanShaderRegisterClass::ShaderResource, 0,
-				GGLabVulkanShaderCompileABI.m_GlobalHeapHlslRegisterSpace + 1);
+				GGLabVulkanShaderRuntimeABI.m_GlobalHeapHlslRegisterSpace + 1);
 			context.Check(!unsupportedSpace.IsSupported() && unsupportedSpace.m_RejectionReason ==
 				VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
@@ -438,8 +439,8 @@ namespace gglab
 				RHIFrontFaceDefinition::AfterViewportTransform &&
 				!GGLabCoordinatePolicy.m_BackendAppliesReversedZ,
 				"RHI front face is post-viewport and reversed-Z is not backend-added");
-			context.Check(GGLabVulkanShaderCompileABI.m_InvertVertexProducingStageY &&
-				GGLabVulkanShaderCompileABI.m_UseDxPositionW &&
+			context.Check(GGLabVulkanShaderRuntimeABI.m_InvertVertexProducingStageY &&
+				GGLabVulkanShaderRuntimeABI.m_UseDxPositionW &&
 				GGLabVulkanCoordinatePolicy.m_UsePositiveViewportHeight &&
 				!GGLabVulkanCoordinatePolicy.m_BackendAppliesAdditionalReversedZ,
 				"Vulkan coordinate lowering applies each required correction exactly once");
@@ -507,15 +508,49 @@ namespace gglab
 				compiler.GetCompilerIdentity().m_CanonicalIdentity != L"unknown",
 				"Active shader compiler exposes the concrete DXC producer identity");
 
-			ShaderManager dxilManager(
-				RHIBackendType::DX12, shaderSourceRoot, shaderCacheRoot);
+			const std::filesystem::path runtimeArtifactRoot =
+				scopedDirectory.GetPath() / "RuntimeArtifacts";
+			const ShaderRuntimeArtifactPublicationResult dxilPublication =
+				PublishShaderRuntimeArtifact(runtimeArtifactRoot, dxilResult.m_Artifact);
+			const ShaderRuntimeArtifactPublicationResult spirVPublication =
+				PublishShaderRuntimeArtifact(runtimeArtifactRoot, spirVResult.m_Artifact);
+			const std::array registryEntries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = shader_programs::ForwardCoverageVertex,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = dxilPublication.m_ArtifactRef,
+				},
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = shader_programs::ForwardCoverageVertex,
+					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+					.m_ArtifactRef = spirVPublication.m_ArtifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult registryBuild =
+				BuildShaderProgramRegistryArtifact(registryEntries);
+			const ShaderProgramRegistryArtifactPublicationResult registryPublication =
+				registryBuild.IsSuccess()
+					? PublishShaderProgramRegistryArtifact(
+						runtimeArtifactRoot, registryBuild.m_Artifact)
+					: ShaderProgramRegistryArtifactPublicationResult{};
+			ShaderManager dxilManager({
+				.m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = runtimeArtifactRoot,
+				.m_ActiveRegistry = registryPublication.m_RegistryRef,
+				});
 			const ShaderID dxilManagerShader =
 				dxilManager.LoadProgram(shader_programs::ForwardCoverageVertex);
-			ShaderManager spirVManager(
-				RHIBackendType::Vulkan, shaderSourceRoot, shaderCacheRoot);
+			ShaderManager spirVManager({
+				.m_ActiveBackend = RHIBackendType::Vulkan,
+				.m_ArtifactRoot = runtimeArtifactRoot,
+				.m_ActiveRegistry = registryPublication.m_RegistryRef,
+				});
 			const ShaderID spirVManagerShader =
 				spirVManager.LoadProgram(shader_programs::ForwardCoverageVertex);
-			context.Check(dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
+			context.Check(dxilPublication.IsSuccess() && spirVPublication.IsSuccess() &&
+				registryPublication.IsSuccess() && dxilManager.IsReady() &&
+				spirVManager.IsReady() &&
+				dxilManager.GetActiveBackend() == RHIBackendType::DX12 &&
 				spirVManager.GetActiveBackend() == RHIBackendType::Vulkan &&
 				dxilManagerShader.IsValid() && spirVManagerShader.IsValid() &&
 				dxilManager.GetBytecode(dxilManagerShader).m_Format == ShaderBinaryFormat::Dxil &&
@@ -527,7 +562,7 @@ namespace gglab
 				spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex).has_value() &&
 				dxilManager.ResolveArtifact(shader_programs::ForwardCoverageVertex) !=
 					spirVManager.ResolveArtifact(shader_programs::ForwardCoverageVertex),
-				"ShaderManager derives backend artifacts with complete execution metadata");
+				"ShaderManager loads backend artifacts from an injected immutable registry");
 
 			// Recipe identity semantics: the resolved recipe is the authority, and
 			// producer identity is a separate build-key axis.
@@ -743,16 +778,16 @@ namespace gglab
 				const VulkanFixedRegisterRange range = GetVulkanFixedRegisterRange(registerClass);
 				const std::wstring shift = std::to_wstring(range.m_BindingShift);
 				const std::wstring hlslSpace =
-					std::to_wstring(GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace);
+					std::to_wstring(GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace);
 				registerShiftsMatch &=
 					ContainsArgumentSequence(vertexArguments, { option, shift, hlslSpace });
 			}
 			const std::wstring resourceBinding =
-				std::to_wstring(GGLabVulkanShaderCompileABI.m_ResourceHeapBinding);
+				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding);
 			const std::wstring samplerBinding =
-				std::to_wstring(GGLabVulkanShaderCompileABI.m_SamplerHeapBinding);
+				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding);
 			const std::wstring descriptorSet =
-				std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet);
+				std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet);
 			context.Check(registerShiftsMatch && ContainsArgumentSequence(vertexArguments,
 				{ L"-fvk-bind-resource-heap", resourceBinding, descriptorSet }) &&
 				ContainsArgumentSequence(vertexArguments,

@@ -158,6 +158,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp" />
@@ -260,6 +261,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.h" />

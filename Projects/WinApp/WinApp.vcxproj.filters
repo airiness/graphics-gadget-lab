@@ -31,6 +31,9 @@
     <Filter Include="Application\SelfTest">
       <UniqueIdentifier>{4CA85ECB-F3BE-96CD-9BFB-56439BEEC692}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Shader">
+      <UniqueIdentifier>{016E2035-49A6-8D4F-DCA5-C1128157399A}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Tooling">
       <UniqueIdentifier>{F5EC7F42-3280-CAC7-E5F1-0CD3A8058F70}</UniqueIdentifier>
     </Filter>
@@ -287,6 +290,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.cpp">
+      <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp">
       <Filter>Core\Input</Filter>
@@ -580,6 +586,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.h">
+      <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">
       <Filter>Application\Tooling</Filter>

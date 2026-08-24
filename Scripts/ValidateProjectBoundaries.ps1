@@ -106,7 +106,6 @@ $transitionalDebt = @()
 # explicit plan; entries whose violation disappears are reported as stale and
 # should be removed from the ledger.
 $knownViolations = @(
-    [pscustomobject]@{ File = "Graphics/Shader/ShaderManager.cpp";                             Kind = "platform";  Reason = "Windows.h/IsDebuggerPresent debug-flag policy; planned: host-injected debug policy seam" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; root identity carries Windows named-mutex name semantics; planned: narrow platform lock leaf" },
     [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
 )
@@ -606,7 +605,7 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     @($runtimeIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot) `
     @($runtimeIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
-        $foundationPublicIncludeRoot, $shaderToolchainIncludeRoot)
+        $foundationPublicIncludeRoot)
 Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
     @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
@@ -996,11 +995,11 @@ foreach ($reference in $appRuntimeProjectReferenceSet) {
         })
     }
 }
-if (-not $runtimeProjectReferenceSet.Contains($shaderToolchainProjectPath)) {
+if ($runtimeProjectReferenceSet.Contains($shaderToolchainProjectPath)) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
         Target = "Projects/GGLabRuntime/GGLabRuntime.vcxproj"
-        Reason = "missing ProjectReference to ShaderToolchainCore"
+        Reason = "artifact-only GGLabRuntime must not reference ShaderToolchainCore"
     })
 }
 if (-not $runtimeProjectReferenceSet.Contains($shaderArtifactRuntimeProjectPath)) {
@@ -1539,8 +1538,7 @@ Get-ChildItem -LiteralPath $shaderToolchainSourcesDir -Recurse -File |
     }
 
 # Runtime-facing shader demand contracts expose stable Program/Artifact identity
-# only. The transitional Program-to-build resolver remains private to
-# GGLabRuntime until the offline artifact pipeline replaces it.
+# only. Build descriptions and compiler policy remain host/toolchain-owned.
 $shaderRuntimeIdentityBoundaryPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Shader/Shader.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderManager.h"),

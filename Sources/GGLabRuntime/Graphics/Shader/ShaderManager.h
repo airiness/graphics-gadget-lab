@@ -3,7 +3,7 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/Shader/ShaderTypes.h"
-#include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <atomic>
 #include <cstdint>
@@ -19,6 +19,29 @@ namespace gglab
 {
 	class Shader;
 	class TaskSystem;
+
+	enum class ShaderManagerInitializeStatus : uint8_t
+	{
+		Ready,
+		InvalidCreateInfo,
+		RegistryNotFound,
+		RegistryReadFailure,
+		MalformedRegistry,
+	};
+
+	struct ShaderManagerCreateInfo final
+	{
+		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
+		std::filesystem::path m_ArtifactRoot;
+		ShaderProgramRegistryArtifactRef m_ActiveRegistry;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_ActiveBackend != RHIBackendType::Unknown &&
+				!m_ArtifactRoot.empty() && m_ArtifactRoot.is_absolute() &&
+				m_ActiveRegistry.IsValid();
+		}
+	};
 
 	struct ShaderPreloadStatus
 	{
@@ -42,12 +65,26 @@ namespace gglab
 	class ShaderManager
 	{
 	public:
-		ShaderManager(RHIBackendType activeBackend, std::filesystem::path shaderSourceRoot,
-			std::filesystem::path shaderCacheRoot) noexcept;
+		explicit ShaderManager(ShaderManagerCreateInfo createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager();
 
-		RHIBackendType GetActiveBackend() const noexcept { return m_ActiveBackend; }
+		[[nodiscard]] bool IsReady() const noexcept
+		{
+			return m_InitializeStatus == ShaderManagerInitializeStatus::Ready;
+		}
+		[[nodiscard]] ShaderManagerInitializeStatus GetInitializeStatus() const noexcept
+		{
+			return m_InitializeStatus;
+		}
+		[[nodiscard]] RHIBackendType GetActiveBackend() const noexcept
+		{
+			return m_ActiveBackend;
+		}
+		[[nodiscard]] ShaderProgramRegistryArtifactRef GetActiveRegistryRef() const noexcept
+		{
+			return m_ActiveRegistryRef;
+		}
 
 		ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
@@ -57,8 +94,6 @@ namespace gglab
 		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
 			const ShaderProgramRef& programRef) const noexcept;
 
-		int32_t RefreshChanged() noexcept;
-		bool RefreshShader(ShaderID shaderId) noexcept;
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		std::string GetDebugName(ShaderID shaderId) const noexcept;
@@ -66,20 +101,20 @@ namespace gglab
 		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
 
 	private:
-		struct BuildState;
+		struct RuntimeState;
 		struct ShaderPreloadJob;
 
-		bool RefreshShaderInternal(Shader& shader) noexcept;
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
 		std::unordered_map<ShaderProgramRef, ShaderID, ShaderProgramRefHash> m_ProgramIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
-		ShaderProgramRegistry m_ProgramRegistry;
-
-		std::unique_ptr<BuildState> m_BuildState;
+		std::unique_ptr<RuntimeState> m_RuntimeState;
 		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
+		ShaderProgramRegistryArtifactRef m_ActiveRegistryRef{};
+		ShaderManagerInitializeStatus m_InitializeStatus =
+			ShaderManagerInitializeStatus::InvalidCreateInfo;
 		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
 		TaskHandle m_PreloadTask{};
 		TaskStatus m_PreloadStatus = TaskStatus::Invalid;

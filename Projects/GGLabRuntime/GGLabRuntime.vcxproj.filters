@@ -1655,9 +1655,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalogPrivate.h">
-      <Filter>Graphics\Shader</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>

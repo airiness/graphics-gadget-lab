@@ -5,6 +5,7 @@
 #include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "RuntimePaths.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <cstdint>
 #include <memory>
@@ -42,6 +43,7 @@ namespace gglab
 		InvalidContentRegistration,
 		StartupContentUnavailable,
 		RendererInitializationFailed,
+		ShaderManagerInitializationFailed,
 	};
 
 	enum class AppRuntimeTickResult : uint8_t
@@ -95,6 +97,8 @@ namespace gglab
 		ApplicationContentRegistration m_ContentRegistration{};
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
+		std::filesystem::path m_ShaderArtifactRoot;
+		ShaderProgramRegistryArtifactRef m_ActiveShaderRegistry;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{

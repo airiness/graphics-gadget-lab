@@ -56,9 +56,6 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h">
       <Filter>Targets</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h">
-      <Filter>Targets</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h">
       <Filter>Testing</Filter>
     </ClInclude>

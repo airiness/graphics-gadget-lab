@@ -52,6 +52,7 @@ namespace gglab
 			"Executable directory deterministically produces explicit content roots");
 		context.Check(paths.m_ShaderSourceRoot == runtimeRoot / "Shaders" &&
 			paths.m_ShaderCacheRoot == runtimeRoot / "ShaderCache" &&
+			paths.m_ShaderArtifactRoot == runtimeRoot / "ShaderArtifacts" &&
 			paths.m_IblDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "IBL" &&
 			paths.m_TextureDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "Texture",
 			"Executable directory preserves the baseline shader and derived-data roots");

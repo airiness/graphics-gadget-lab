@@ -101,8 +101,18 @@ namespace gglab
 		m_TaskSystem = std::make_unique<TaskSystem>(TaskSystem::CreateInfo{
 			.m_WorkerLifecycle = m_HostServices.m_TaskWorkerLifecycle,
 			});
-		m_ShaderManager = std::make_unique<ShaderManager>(
-			activeBackend, m_Paths.m_ShaderSourceRoot, m_Paths.m_ShaderCacheRoot);
+		m_ShaderManager = std::make_unique<ShaderManager>(ShaderManagerCreateInfo{
+			.m_ActiveBackend = activeBackend,
+			.m_ArtifactRoot = std::move(createInfo.m_ShaderArtifactRoot),
+			.m_ActiveRegistry = createInfo.m_ActiveShaderRegistry,
+			});
+		if (!m_ShaderManager->IsReady())
+		{
+			GGLAB_LOG_ERROR("Failed to initialize ShaderManager (status={}).",
+				static_cast<uint32_t>(m_ShaderManager->GetInitializeStatus()));
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed);
+		}
 		if (!BeginInitialShaderPreload(contentSelection))
 		{
 			return FailServiceInitialization(
@@ -211,9 +221,10 @@ namespace gglab
 				? "absolute"
 				: "relative");
 		GGLAB_LOG_INFO(
-			"Runtime paths: assets='{}', shaders='{}', shader_cache='{}', ibl_ddc='{}', texture_ddc='{}'.",
+			"Runtime paths: assets='{}', shaders='{}', shader_cache='{}', shader_artifacts='{}', ibl_ddc='{}', texture_ddc='{}'.",
 			m_Paths.m_AssetRoot.string(), m_Paths.m_ShaderSourceRoot.string(),
-			m_Paths.m_ShaderCacheRoot.string(), m_Paths.m_IblDerivedDataRoot.string(),
+			m_Paths.m_ShaderCacheRoot.string(), m_Paths.m_ShaderArtifactRoot.string(),
+			m_Paths.m_IblDerivedDataRoot.string(),
 			m_Paths.m_TextureDerivedDataRoot.string());
 
 		m_ServicesInitialized = true;

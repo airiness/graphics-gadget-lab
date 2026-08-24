@@ -1640,8 +1640,9 @@ namespace gglab
 				.m_AssetRoot = injectedRoot / "Assets",
 				});
 			Renderer renderer;
-			ShaderManager shaderManager(device.GetBackendType(),
-				injectedRoot / "Shaders", injectedRoot / "ShaderCache");
+			ShaderManager shaderManager({
+				.m_ActiveBackend = device.GetBackendType(),
+				});
 			ApplicationInput input;
 			Time time;
 			NapaVoxelLabSwitchTestState state{
