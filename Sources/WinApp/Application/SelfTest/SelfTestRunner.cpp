@@ -174,11 +174,21 @@ namespace gglab
 		context.Check(assetStream.good(),
 			"Injected asset root opens packaged content independently of process CWD");
 
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+		// A package must already contain its immutable active registry. Development
+		// publication is intentionally deferred until Application initialization,
+		// which this early-exit path-composition proof never performs.
 		const std::filesystem::path activeRegistryPath = runtimePaths.m_ShaderArtifactRoot /
 			"active" / GetTargetProfileName(backend) / "program-registry.ggsh.active";
 		std::ifstream activeRegistryStream(activeRegistryPath, std::ios::binary);
 		context.Check(activeRegistryStream.good(),
 			"Injected artifact root opens the packaged active registry independently of process CWD");
+#else
+		static_cast<void>(backend);
+		context.Check(runtimePaths.m_ShaderArtifactRoot ==
+			runtimePaths.m_RuntimeRoot / "ShaderArtifacts",
+			"Executable discovery composes the development artifact root independently of process CWD");
+#endif
 
 		reporter.OnSuiteFinished(
 			ApplicationPathCompositionSelfTestSelection, context.GetSummary());
