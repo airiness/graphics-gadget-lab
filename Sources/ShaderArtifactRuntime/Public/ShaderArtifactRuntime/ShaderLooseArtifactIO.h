@@ -3,6 +3,7 @@
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <cstddef>
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -23,10 +24,15 @@ namespace gglab
 		static_cast<uintmax_t>(MaxShaderProgramRegistryEntryCount) *
 			(SerializedShaderProgramRegistryEntryFixedSize +
 				2u * MaxShaderProgramIdentityComponentSize);
+	inline constexpr uint32_t ActiveShaderProgramRegistryFileFormatVersion = 1;
+	inline constexpr uint32_t ActiveShaderProgramRegistrySchemaVersion = 1;
+	inline constexpr size_t SerializedActiveShaderProgramRegistrySize = 48;
 
 	using SerializedShaderRuntimeArtifactManifest =
 		std::vector<std::byte>;
 	using SerializedShaderProgramRegistryArtifact = std::vector<std::byte>;
+	using SerializedActiveShaderProgramRegistry =
+		std::array<std::byte, SerializedActiveShaderProgramRegistrySize>;
 
 	[[nodiscard]] SerializedShaderRuntimeArtifactManifest
 		SerializeShaderRuntimeArtifactManifest(
@@ -38,6 +44,12 @@ namespace gglab
 			const ShaderProgramRegistryArtifact& artifact) noexcept;
 	[[nodiscard]] std::optional<ShaderProgramRegistryArtifact>
 		DeserializeShaderProgramRegistryArtifact(
+			std::span<const std::byte> bytes) noexcept;
+	[[nodiscard]] SerializedActiveShaderProgramRegistry
+		SerializeActiveShaderProgramRegistry(
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
+	[[nodiscard]] std::optional<ShaderProgramRegistryArtifactRef>
+		DeserializeActiveShaderProgramRegistry(
 			std::span<const std::byte> bytes) noexcept;
 
 	struct ShaderLooseArtifactPaths final
@@ -123,5 +135,51 @@ namespace gglab
 
 	private:
 		ShaderLooseProgramRegistryArtifactLocator m_Locator;
+	};
+
+	class ShaderLooseActiveProgramRegistryLocator final
+	{
+	public:
+		explicit ShaderLooseActiveProgramRegistryLocator(std::filesystem::path root);
+
+		[[nodiscard]] const std::filesystem::path& GetRoot() const noexcept;
+		[[nodiscard]] std::filesystem::path GetPath() const;
+
+	private:
+		std::filesystem::path m_Root;
+	};
+
+	enum class ActiveShaderProgramRegistryReadStatus : uint8_t
+	{
+		Success,
+		NotFound,
+		IOFailure,
+		MalformedRecord,
+	};
+
+	struct ActiveShaderProgramRegistryReadResult final
+	{
+		ActiveShaderProgramRegistryReadStatus m_Status =
+			ActiveShaderProgramRegistryReadStatus::IOFailure;
+		ShaderProgramRegistryArtifactRef m_RegistryRef{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ActiveShaderProgramRegistryReadStatus::Success;
+		}
+	};
+
+	class ShaderLooseActiveProgramRegistryReader final
+	{
+	public:
+		explicit ShaderLooseActiveProgramRegistryReader(
+			ShaderLooseActiveProgramRegistryLocator locator);
+
+		[[nodiscard]] const ShaderLooseActiveProgramRegistryLocator&
+			GetLocator() const noexcept;
+		[[nodiscard]] ActiveShaderProgramRegistryReadResult Read() noexcept;
+
+	private:
+		ShaderLooseActiveProgramRegistryLocator m_Locator;
 	};
 }

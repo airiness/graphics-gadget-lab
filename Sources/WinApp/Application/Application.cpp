@@ -5,7 +5,7 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
-#include "Application/Shader/DevelopmentShaderArtifactBootstrap.h"
+#include "Application/Shader/DevelopmentShaderBuildBridge.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
@@ -139,14 +139,19 @@ namespace gglab
 			AppRuntimeRHIBackend::DX12 ? RHIBackendType::DX12 : RHIBackendType::Vulkan;
 		m_RHIContextFactory =
 			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
-		const DevelopmentShaderArtifactBootstrapResult shaderArtifacts =
-			PrepareDevelopmentShaderArtifacts(activeBackend,
-				m_RuntimePaths.m_ShaderSourceRoot, m_RuntimePaths.m_ShaderCacheRoot,
-				m_RuntimePaths.m_ShaderArtifactRoot);
+		const DevelopmentShaderBuildRequest shaderBuildRequest{
+			.m_ActiveBackend = activeBackend,
+			.m_ShaderCompilerPath = m_RuntimePaths.m_RuntimeRoot / "gglab-shaderc.exe",
+			.m_ShaderSourceRoot = m_RuntimePaths.m_ShaderSourceRoot,
+			.m_ShaderCacheRoot = m_RuntimePaths.m_ShaderCacheRoot,
+			.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
+		};
+		const DevelopmentShaderBuildResult shaderArtifacts =
+			RunDevelopmentShaderBuild(shaderBuildRequest);
 		if (!shaderArtifacts.IsSuccess())
 		{
 			GGLAB_LOG_ERROR("Failed to prepare development shader artifacts: {}",
-				shaderArtifacts.m_Error);
+				shaderArtifacts.m_Diagnostics);
 			return FailInitialization();
 		}
 		const AppRuntimeServiceInitializeResult serviceInitializeResult =
@@ -168,6 +173,7 @@ namespace gglab
 
 		Renderer* renderer = m_AppRuntime->GetRenderer();
 		TaskSystem* taskSystem = m_AppRuntime->GetTaskSystem();
+		ShaderManager* shaderManager = m_AppRuntime->GetShaderManager();
 		DemoManager* demoManager = m_AppRuntime->GetDemoManager();
 		const std::optional<uint32_t> labHostIndex = m_AppRuntime->GetLabHostDemoIndex();
 		if (labHostIndex)
@@ -177,6 +183,17 @@ namespace gglab
 		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
+			m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
+				DevelopmentShaderHotReloadSystem::CreateInfo{
+					.m_BuildRequest = shaderBuildRequest,
+					.m_TaskSystem = taskSystem,
+					.m_ShaderManager = shaderManager,
+				});
+			if (!m_ShaderHotReload->Initialize())
+			{
+				GGLAB_LOG_WARN("Application will continue without shader hot reload.");
+				m_ShaderHotReload.reset();
+			}
 			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
 				.m_RHIContext = renderer->GetRHIContext(),
@@ -217,6 +234,10 @@ namespace gglab
 		}
 
 		m_InputManager->Update();
+		if (m_ShaderHotReload)
+		{
+			m_ShaderHotReload->Update();
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			});
@@ -248,6 +269,10 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
 		m_LifecycleState = LifecycleState::ShuttingDown;
+		if (m_ShaderHotReload)
+		{
+			m_ShaderHotReload->Shutdown();
+		}
 
 		if (m_AppRuntime)
 		{
@@ -258,6 +283,7 @@ namespace gglab
 				});
 			m_AppRuntime.reset();
 		}
+		m_ShaderHotReload.reset();
 		// PrepareForShutdown has retired all borrowed runtime/GPU resources. The
 		// inactive host objects can now be destroyed without touching dead services.
 		m_ApplicationTooling.reset();

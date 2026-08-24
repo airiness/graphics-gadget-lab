@@ -1561,6 +1561,31 @@ foreach ($boundaryPath in $shaderRuntimeIdentityBoundaryPaths) {
     }
 }
 
+# The WinApp development bridge may coordinate the standalone shader compiler
+# process and consume Artifact Runtime records, but it must not reintroduce the
+# in-process Toolchain APIs removed by the extraction.
+$developmentShaderBridgePaths = @(
+    (Join-Path $winAppSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.h"),
+    (Join-Path $winAppSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.cpp")
+)
+$developmentShaderBridgeToolchainRegex =
+    '#include\s*[<"](?:Artifact|Compiler|Targets)[\/]|' +
+    '\bShaderDesc\b|\bShaderResolvedRecipe\b|\bShaderCompiler\b|' +
+    '\bPublishShaderRuntimeArtifact\b|\bPublishShaderProgramRegistryArtifact\b'
+foreach ($bridgePath in $developmentShaderBridgePaths) {
+    if (-not (Test-Path -LiteralPath $bridgePath -PathType Leaf)) {
+        throw "Development shader process bridge source not found: $bridgePath"
+    }
+    $bridgeContent = Get-Content -LiteralPath $bridgePath -Raw -ErrorAction Stop
+    if ($bridgeContent -match $developmentShaderBridgeToolchainRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "shader-development-process-boundary"
+            Target = ConvertTo-RepoRelativePath $bridgePath
+            Reason = "WinApp development bridge must coordinate gglab-shaderc without consuming in-process Shader Toolchain APIs"
+        })
+    }
+}
+
 $logicalIncludeSpecifications = @(
     [pscustomobject]@{
         Name        = "WinApp"

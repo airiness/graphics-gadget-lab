@@ -4,6 +4,7 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 
 #include <process.h>
+#include <windows.h>
 
 #include <algorithm>
 #include <atomic>
@@ -310,6 +311,73 @@ namespace gglab
 				// to the development handoff contract.
 				RemoveFileBestEffort(result.m_Path.m_Path);
 			}
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
+
+	ActiveShaderProgramRegistryPublicationResult PublishActiveShaderProgramRegistry(
+		const std::filesystem::path& artifactRoot,
+		const ShaderProgramRegistryArtifactRef& registryRef) noexcept
+	{
+		ActiveShaderProgramRegistryPublicationResult result{
+			.m_RegistryRef = registryRef,
+		};
+		try
+		{
+			if (artifactRoot.empty() || !artifactRoot.is_absolute() || !registryRef.IsValid())
+			{
+				result.m_Status =
+					ActiveShaderProgramRegistryPublicationStatus::InvalidRegistry;
+				return result;
+			}
+
+			ShaderLooseProgramRegistryArtifactReader registryReader{
+				ShaderLooseProgramRegistryArtifactLocator(artifactRoot)
+			};
+			if (!registryReader.ReadArtifact(registryRef).IsSuccess())
+			{
+				result.m_Status =
+					ActiveShaderProgramRegistryPublicationStatus::InvalidRegistry;
+				return result;
+			}
+
+			const ShaderLooseActiveProgramRegistryLocator locator(artifactRoot);
+			result.m_Path = locator.GetPath();
+			ShaderLooseActiveProgramRegistryReader reader(locator);
+			const ActiveShaderProgramRegistryReadResult current = reader.Read();
+			if (current.IsSuccess() && current.m_RegistryRef == registryRef)
+			{
+				result.m_Status = ActiveShaderProgramRegistryPublicationStatus::AlreadyActive;
+				return result;
+			}
+
+			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path))
+			{
+				return result;
+			}
+			const SerializedActiveShaderProgramRegistry serialized =
+				SerializeActiveShaderProgramRegistry(registryRef);
+			const std::filesystem::path tempPath = MakeUniqueTempPath(result.m_Path);
+			if (!utils::WriteFileBinary(tempPath, serialized) ||
+				!FileEquals(tempPath, serialized))
+			{
+				RemoveFileBestEffort(tempPath);
+				return result;
+			}
+
+			const BOOL replaced = ::MoveFileExW(
+				tempPath.c_str(), result.m_Path.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+			RemoveFileBestEffort(tempPath);
+			if (replaced == FALSE)
+			{
+				return result;
+			}
+			result.m_Status = ActiveShaderProgramRegistryPublicationStatus::Published;
 		}
 		catch (...)
 		{

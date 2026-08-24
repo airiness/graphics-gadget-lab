@@ -62,6 +62,33 @@ namespace gglab
 		}
 	};
 
+	enum class ShaderRegistryActivationStatus : uint8_t
+	{
+		Activated,
+		AlreadyActive,
+		Busy,
+		InvalidRegistryRef,
+		RegistryNotFound,
+		RegistryReadFailure,
+		MalformedRegistry,
+		MissingProgramBinding,
+		ArtifactLoadFailure,
+		Failed,
+	};
+
+	struct ShaderRegistryActivationResult final
+	{
+		ShaderRegistryActivationStatus m_Status = ShaderRegistryActivationStatus::Failed;
+		uint32_t m_ChangedShaderCount = 0;
+		std::string m_Error{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderRegistryActivationStatus::Activated ||
+				m_Status == ShaderRegistryActivationStatus::AlreadyActive;
+		}
+	};
+
 	class ShaderManager
 	{
 	public:
@@ -81,10 +108,8 @@ namespace gglab
 		{
 			return m_ActiveBackend;
 		}
-		[[nodiscard]] ShaderProgramRegistryArtifactRef GetActiveRegistryRef() const noexcept
-		{
-			return m_ActiveRegistryRef;
-		}
+		[[nodiscard]] ShaderProgramRegistryArtifactRef
+			GetActiveRegistryRef() const noexcept;
 
 		ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
@@ -93,6 +118,8 @@ namespace gglab
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
 		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
 			const ShaderProgramRef& programRef) const noexcept;
+		[[nodiscard]] ShaderRegistryActivationResult ActivateRegistry(
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
 
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;

@@ -602,6 +602,94 @@ namespace gglab
 				manager.ResolveArtifact(programRef) == artifactRef,
 				"ShaderManager loads a program using only an injected registry and artifact root");
 
+			const SerializedActiveShaderProgramRegistry serializedActive =
+				SerializeActiveShaderProgramRegistry(registryRef);
+			const std::optional<ShaderProgramRegistryArtifactRef> decodedActive =
+				DeserializeActiveShaderProgramRegistry(serializedActive);
+			const std::filesystem::path activePath =
+				ShaderLooseActiveProgramRegistryLocator(root).GetPath();
+			context.Check(decodedActive == registryRef &&
+				WriteBytes(activePath, serializedActive) &&
+				ShaderLooseActiveProgramRegistryReader(
+					ShaderLooseActiveProgramRegistryLocator(root)).Read().m_RegistryRef == registryRef,
+				"Active Program Registry record round-trips one complete immutable RegistryRef");
+
+			auto malformedActive = serializedActive;
+			malformedActive[0] ^= std::byte{ 1 };
+			context.Check(!DeserializeActiveShaderProgramRegistry(malformedActive).has_value(),
+				"Active Program Registry record rejects corrupted coordination metadata");
+
+			ShaderRuntimeArtifact changedArtifact = artifact;
+			static_cast<std::byte*>(changedArtifact.m_Binary.Data())[19] = std::byte{ 7 };
+			RefreshArtifactIdentity(changedArtifact);
+			const ShaderArtifactRef changedArtifactRef = MakeRef(changedArtifact);
+			const std::array changedEntries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = changedArtifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult changedRegistryBuild =
+				BuildShaderProgramRegistryArtifact(changedEntries);
+			const ShaderProgramRegistryArtifactRef changedRegistryRef{
+				.m_RegistryId = changedRegistryBuild.m_Artifact.m_RegistryId,
+			};
+			const ShaderLooseArtifactPaths changedArtifactPaths =
+				ShaderLooseArtifactLocator(root).GetPaths(changedArtifactRef);
+			const auto changedBinaryBytes = std::span(
+				static_cast<const std::byte*>(changedArtifact.m_Binary.Data()),
+				changedArtifact.m_Binary.SizeInBytes());
+			const ShaderLooseProgramRegistryArtifactPath changedRegistryPath =
+				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(changedRegistryRef);
+			const bool changedFixturesWritten = changedRegistryBuild.IsSuccess() &&
+				WriteBytes(changedArtifactPaths.m_BinaryPath, changedBinaryBytes) &&
+				WriteBytes(changedArtifactPaths.m_ManifestPath,
+					SerializeShaderRuntimeArtifactManifest(changedArtifact.m_Manifest)) &&
+				WriteBytes(changedRegistryPath.m_Path,
+					SerializeShaderProgramRegistryArtifact(changedRegistryBuild.m_Artifact));
+			const uint64_t generationBeforeActivation = manager.GetGeneration(shaderId);
+			const uint64_t revisionBeforeActivation = manager.GetRevision();
+			const ShaderRegistryActivationResult activation =
+				manager.ActivateRegistry(changedRegistryRef);
+			context.Check(changedFixturesWritten && activation.IsSuccess() &&
+				activation.m_ChangedShaderCount == 1 &&
+				manager.GetActiveRegistryRef() == changedRegistryRef &&
+				manager.ResolveArtifact(programRef) == changedArtifactRef &&
+				manager.GetGeneration(shaderId) == generationBeforeActivation + 1 &&
+				manager.GetRevision() == revisionBeforeActivation + 1,
+				"ShaderManager transactionally activates a new registry and advances only changed shader state");
+
+			ShaderArtifactRef missingArtifactRef = changedArtifactRef;
+			missingArtifactRef.m_ArtifactId.m_DurableDigest.m_Value[0] ^= std::byte{ 1 };
+			const std::array missingArtifactEntries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = missingArtifactRef,
+				},
+			};
+			const ShaderProgramRegistryArtifactBuildResult missingArtifactRegistryBuild =
+				BuildShaderProgramRegistryArtifact(missingArtifactEntries);
+			const ShaderProgramRegistryArtifactRef missingArtifactRegistryRef{
+				.m_RegistryId = missingArtifactRegistryBuild.m_Artifact.m_RegistryId,
+			};
+			const ShaderLooseProgramRegistryArtifactPath missingArtifactRegistryPath =
+				ShaderLooseProgramRegistryArtifactLocator(root).GetPath(missingArtifactRegistryRef);
+			const bool missingRegistryWritten = WriteBytes(missingArtifactRegistryPath.m_Path,
+				SerializeShaderProgramRegistryArtifact(missingArtifactRegistryBuild.m_Artifact));
+			const uint64_t generationBeforeFailure = manager.GetGeneration(shaderId);
+			const uint64_t revisionBeforeFailure = manager.GetRevision();
+			const ShaderRegistryActivationResult rejected =
+				manager.ActivateRegistry(missingArtifactRegistryRef);
+			context.Check(missingRegistryWritten && rejected.m_Status ==
+					ShaderRegistryActivationStatus::ArtifactLoadFailure &&
+				manager.GetActiveRegistryRef() == changedRegistryRef &&
+				manager.ResolveArtifact(programRef) == changedArtifactRef &&
+				manager.GetGeneration(shaderId) == generationBeforeFailure &&
+				manager.GetRevision() == revisionBeforeFailure,
+				"ShaderManager activation failure preserves the complete last-known-good registry and shader state");
+
 			ShaderManager wrongBackendManager({
 				.m_ActiveBackend = RHIBackendType::Vulkan,
 				.m_ArtifactRoot = root,

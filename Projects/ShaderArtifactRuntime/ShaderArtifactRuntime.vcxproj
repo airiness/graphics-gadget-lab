@@ -82,6 +82,7 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h" />
 	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h" />
+	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\GGLabShaderPrograms.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">

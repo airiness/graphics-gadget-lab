@@ -1038,6 +1038,78 @@ namespace gglab
 			context.Check(allArtifactFieldsConsistent,
 				"Concurrent CLI fields resolve to Store-valid cache and Runtime artifacts");
 		}
+
+		void RunRuntimeBuildContractTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			const std::filesystem::path cacheRoot = tempRoot / L"RuntimeBuildCache";
+			const std::filesystem::path artifactRoot = tempRoot / L"RuntimeBuildArtifacts";
+			const std::vector<std::wstring> arguments{
+				L"build-runtime",
+				L"--source-root", sourceRoot.wstring(),
+				L"--target", L"gglab-dx12",
+				L"--cache-root", cacheRoot.wstring(),
+				L"--artifact-root", artifactRoot.wstring(),
+				L"--result-format", L"json",
+			};
+
+			const CliRunResult first = RunCli(arguments);
+			const std::string firstRegistryId = ExtractJsonField(first.m_StdOut, "registryId");
+			ShaderLooseActiveProgramRegistryReader activeReader{
+				ShaderLooseActiveProgramRegistryLocator(artifactRoot)
+			};
+			const ActiveShaderProgramRegistryReadResult firstActive = activeReader.Read();
+			ShaderLooseProgramRegistryArtifactReader registryReader{
+				ShaderLooseProgramRegistryArtifactLocator(artifactRoot)
+			};
+			const ShaderProgramRegistryArtifactReadResult firstRegistry = firstActive.IsSuccess()
+				? registryReader.ReadArtifact(firstActive.m_RegistryRef)
+				: ShaderProgramRegistryArtifactReadResult{};
+			context.Check(
+				first.m_ExitCode == 0 && IsSingleJsonDocument(first) &&
+					first.m_StdOut.find("\"command\":\"build-runtime\"") != std::string::npos &&
+					first.m_StdOut.find("\"success\":true") != std::string::npos &&
+					first.m_StdOut.find("\"programCount\":53") != std::string::npos &&
+					firstRegistryId.size() == 64 && firstActive.IsSuccess() &&
+					Sha256DigestToHex(
+						firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) ==
+							firstRegistryId && firstRegistry.IsSuccess() &&
+					firstRegistry.m_Artifact.m_Entries.size() == 53,
+				"build-runtime publishes the complete immutable catalog and active RegistryId");
+
+			const CliRunResult second = RunCli(arguments);
+			const ActiveShaderProgramRegistryReadResult secondActive = activeReader.Read();
+			context.Check(
+				second.m_ExitCode == 0 && ExtractJsonField(second.m_StdOut, "registryId") ==
+					firstRegistryId && secondActive.IsSuccess() &&
+					secondActive.m_RegistryRef == firstActive.m_RegistryRef,
+				"Repeated build-runtime invocation reuses the same immutable active snapshot");
+
+			const CliRunResult unavailable = RunCli(arguments, true);
+			const ActiveShaderProgramRegistryReadResult afterFailure = activeReader.Read();
+			context.Check(
+				unavailable.m_ExitCode == 4 && IsSingleJsonDocument(unavailable) &&
+					unavailable.m_StdOut.find("\"success\":false") != std::string::npos &&
+					afterFailure.IsSuccess() &&
+					afterFailure.m_RegistryRef == firstActive.m_RegistryRef,
+				"Failed external runtime build preserves the last-known-good active snapshot");
+
+			CliRunResult concurrentFirst{};
+			CliRunResult concurrentSecond{};
+			std::thread firstWorker([&]() noexcept { concurrentFirst = RunCli(arguments); });
+			std::thread secondWorker([&]() noexcept { concurrentSecond = RunCli(arguments); });
+			firstWorker.join();
+			secondWorker.join();
+			const ActiveShaderProgramRegistryReadResult concurrentActive = activeReader.Read();
+			context.Check(
+				concurrentFirst.m_ExitCode == 0 && concurrentSecond.m_ExitCode == 0 &&
+					ExtractJsonField(concurrentFirst.m_StdOut, "registryId") == firstRegistryId &&
+					ExtractJsonField(concurrentSecond.m_StdOut, "registryId") == firstRegistryId &&
+					concurrentActive.IsSuccess() &&
+					concurrentActive.m_RegistryRef == firstActive.m_RegistryRef,
+				"Artifact-root writer lease serializes concurrent complete runtime builds");
+		}
 	}
 
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept
@@ -1065,5 +1137,6 @@ namespace gglab
 		RunCliBehaviorTests(context, sourceRoot, tempRoot);
 		RunJsonProcessContractTests(context, sourceRoot, tempRoot);
 		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
+		RunRuntimeBuildContractTests(context, sourceRoot, tempRoot);
 	}
 }

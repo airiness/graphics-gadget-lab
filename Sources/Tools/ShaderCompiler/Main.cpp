@@ -1,5 +1,6 @@
 #include "ShaderCompilerCommandLine.h"
 #include "ShaderCompilerProcessFactory.h"
+#include "GGLabRuntimeShaderBuild.h"
 #include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
@@ -370,6 +371,74 @@ namespace
 		return ExitCodeSuccess;
 	}
 
+	[[nodiscard]] int ExitCodeForRuntimeBuildStatus(
+		gglab::GGLabRuntimeShaderBuildStatus status) noexcept
+	{
+		switch (status)
+		{
+		case gglab::GGLabRuntimeShaderBuildStatus::Succeeded:
+			return ExitCodeSuccess;
+		case gglab::GGLabRuntimeShaderBuildStatus::InvalidInput:
+			return ExitCodeInvalidShaderRequest;
+		case gglab::GGLabRuntimeShaderBuildStatus::CompilerUnavailable:
+		case gglab::GGLabRuntimeShaderBuildStatus::CompileFailed:
+			return ExitCodeCompileFailed;
+		case gglab::GGLabRuntimeShaderBuildStatus::WriterUnavailable:
+		case gglab::GGLabRuntimeShaderBuildStatus::ArtifactPublicationFailed:
+		case gglab::GGLabRuntimeShaderBuildStatus::RegistryBuildFailed:
+		case gglab::GGLabRuntimeShaderBuildStatus::RegistryPublicationFailed:
+		case gglab::GGLabRuntimeShaderBuildStatus::ActiveRegistryPublicationFailed:
+		case gglab::GGLabRuntimeShaderBuildStatus::Failed:
+			return ExitCodeArtifactIOFailure;
+		}
+		return ExitCodeCompileFailed;
+	}
+
+	int RunBuildRuntime(const gglab::ShaderCompilerCommandLine& commandLine)
+	{
+		const gglab::ShaderBuildRuntimeCommandOptions& options = commandLine.m_BuildRuntime;
+		gglab::ShaderTargetProfile targetProfile{};
+		if (!ParseTarget(options.m_Target, targetProfile))
+		{
+			return PrintCommandLineFailure(L"Unknown target: " +
+				gglab::utils::ToWideString(options.m_Target),
+				commandLine.m_JsonRequested, false);
+		}
+		const gglab::GGLabRuntimeShaderBuildResult result =
+			gglab::BuildGGLabRuntimeShaders(targetProfile, options.m_SourceRoot,
+				options.m_CacheRoot, options.m_ArtifactRoot);
+		const int exitCode = ExitCodeForRuntimeBuildStatus(result.m_Status);
+		if (options.m_ResultFormat == "json")
+		{
+			nlohmann::json document{
+				{ "command", "build-runtime" },
+				{ "success", result.IsSuccess() },
+				{ "status", result.IsSuccess() ? "ok" : "failed" },
+				{ "exitCode", exitCode },
+				{ "programCount", result.m_ProgramCount },
+				{ "diagnostics", result.m_Error.empty()
+					? nlohmann::json::array()
+					: nlohmann::json::array({ { { "message", result.m_Error } } }) },
+			};
+			if (result.m_RegistryRef.IsValid())
+			{
+				document["registryId"] = gglab::Sha256DigestToHex(
+					result.m_RegistryRef.m_RegistryId.m_DurableDigest);
+			}
+			return PrintJsonDocument(document, exitCode);
+		}
+		if (!result.IsSuccess())
+		{
+			std::cerr << result.m_Error << '\n';
+			return exitCode;
+		}
+		std::cout << "Built and activated " << result.m_ProgramCount
+			<< " GGLab shader programs.\nRegistry: "
+			<< gglab::Sha256DigestToHex(
+				result.m_RegistryRef.m_RegistryId.m_DurableDigest) << '\n';
+		return ExitCodeSuccess;
+	}
+
 	int RunVersion()
 	{
 		const gglab::ShaderCompilerIdentity identity = gglab::QueryDxcCompilerIdentity();
@@ -394,6 +463,8 @@ int wmain(int argumentCount, wchar_t* arguments[])
 	{
 	case gglab::ShaderCompilerCommand::Compile:
 		return RunCompile(commandLine);
+	case gglab::ShaderCompilerCommand::BuildRuntime:
+		return RunBuildRuntime(commandLine);
 	case gglab::ShaderCompilerCommand::Targets:
 		return RunTargets();
 	case gglab::ShaderCompilerCommand::Version:

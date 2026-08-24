@@ -291,7 +291,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.cpp">
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp">
@@ -587,7 +587,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderArtifactBootstrap.h">
+    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">

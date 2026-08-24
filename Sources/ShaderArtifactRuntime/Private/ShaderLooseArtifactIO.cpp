@@ -36,9 +36,20 @@ namespace gglab
 			std::byte{ 'G' },
 			std::byte{ 0 },
 		};
+		constexpr std::array<std::byte, 8> ActiveProgramRegistryMagic{
+			std::byte{ 'G' },
+			std::byte{ 'G' },
+			std::byte{ 'S' },
+			std::byte{ 'H' },
+			std::byte{ 'L' },
+			std::byte{ 'I' },
+			std::byte{ 'V' },
+			std::byte{ 'E' },
+		};
 
+		template<class Container>
 		void WriteU32LE(
-			SerializedShaderRuntimeArtifactManifest& bytes,
+			Container& bytes,
 			size_t& offset,
 			uint32_t value) noexcept
 		{
@@ -406,6 +417,49 @@ namespace gglab
 		}
 	}
 
+	SerializedActiveShaderProgramRegistry SerializeActiveShaderProgramRegistry(
+		const ShaderProgramRegistryArtifactRef& registryRef) noexcept
+	{
+		SerializedActiveShaderProgramRegistry bytes{};
+		if (!registryRef.IsValid())
+		{
+			return bytes;
+		}
+		size_t offset = 0;
+		std::ranges::copy(ActiveProgramRegistryMagic, bytes.begin());
+		offset += ActiveProgramRegistryMagic.size();
+		WriteU32LE(bytes, offset, ActiveShaderProgramRegistryFileFormatVersion);
+		WriteU32LE(bytes, offset, ActiveShaderProgramRegistrySchemaVersion);
+		std::ranges::copy(
+			registryRef.m_RegistryId.m_DurableDigest.m_Value, bytes.begin() + offset);
+		return bytes;
+	}
+
+	std::optional<ShaderProgramRegistryArtifactRef> DeserializeActiveShaderProgramRegistry(
+		std::span<const std::byte> bytes) noexcept
+	{
+		if (bytes.size() != SerializedActiveShaderProgramRegistrySize ||
+			!std::ranges::equal(
+				ActiveProgramRegistryMagic, bytes.first(ActiveProgramRegistryMagic.size())))
+		{
+			return std::nullopt;
+		}
+		size_t offset = ActiveProgramRegistryMagic.size();
+		if (ReadU32LE(bytes, offset) != ActiveShaderProgramRegistryFileFormatVersion ||
+			ReadU32LE(bytes, offset) != ActiveShaderProgramRegistrySchemaVersion)
+		{
+			return std::nullopt;
+		}
+		ShaderProgramRegistryArtifactRef registryRef{};
+		std::ranges::copy_n(
+			bytes.begin() + offset,
+			Sha256Digest::Size,
+			registryRef.m_RegistryId.m_DurableDigest.m_Value.begin());
+		return registryRef.IsValid()
+			? std::optional<ShaderProgramRegistryArtifactRef>(registryRef)
+			: std::nullopt;
+	}
+
 	ShaderLooseArtifactLocator::ShaderLooseArtifactLocator(std::filesystem::path root)
 		: m_Root(std::move(root))
 	{
@@ -601,6 +655,76 @@ namespace gglab
 		catch (...)
 		{
 			return { .m_Status = ShaderProgramRegistryArtifactReadStatus::IOFailure };
+		}
+	}
+
+	ShaderLooseActiveProgramRegistryLocator::ShaderLooseActiveProgramRegistryLocator(
+		std::filesystem::path root) : m_Root(std::move(root))
+	{
+	}
+
+	const std::filesystem::path& ShaderLooseActiveProgramRegistryLocator::GetRoot() const noexcept
+	{
+		return m_Root;
+	}
+
+	std::filesystem::path ShaderLooseActiveProgramRegistryLocator::GetPath() const
+	{
+		return m_Root.empty()
+			? std::filesystem::path{}
+			: m_Root / "active" / "program-registry.ggsh.active";
+	}
+
+	ShaderLooseActiveProgramRegistryReader::ShaderLooseActiveProgramRegistryReader(
+		ShaderLooseActiveProgramRegistryLocator locator) : m_Locator(std::move(locator))
+	{
+	}
+
+	const ShaderLooseActiveProgramRegistryLocator&
+		ShaderLooseActiveProgramRegistryReader::GetLocator() const noexcept
+	{
+		return m_Locator;
+	}
+
+	ActiveShaderProgramRegistryReadResult ShaderLooseActiveProgramRegistryReader::Read() noexcept
+	{
+		if (m_Locator.GetRoot().empty())
+		{
+			return { .m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord };
+		}
+		try
+		{
+			ShaderBinary serializedRecord;
+			const FileReadStatus readStatus = ReadFile(
+				m_Locator.GetPath(), SerializedActiveShaderProgramRegistrySize, serializedRecord);
+			if (readStatus == FileReadStatus::Missing)
+			{
+				return { .m_Status = ActiveShaderProgramRegistryReadStatus::NotFound };
+			}
+			if (readStatus == FileReadStatus::Failure)
+			{
+				return { .m_Status = ActiveShaderProgramRegistryReadStatus::IOFailure };
+			}
+			if (readStatus == FileReadStatus::Malformed)
+			{
+				return { .m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord };
+			}
+			const std::optional<ShaderProgramRegistryArtifactRef> registryRef =
+				DeserializeActiveShaderProgramRegistry(std::span(
+					static_cast<const std::byte*>(serializedRecord.Data()),
+					serializedRecord.SizeInBytes()));
+			return registryRef
+				? ActiveShaderProgramRegistryReadResult{
+					.m_Status = ActiveShaderProgramRegistryReadStatus::Success,
+					.m_RegistryRef = *registryRef,
+				}
+				: ActiveShaderProgramRegistryReadResult{
+					.m_Status = ActiveShaderProgramRegistryReadStatus::MalformedRecord,
+				};
+		}
+		catch (...)
+		{
+			return { .m_Status = ActiveShaderProgramRegistryReadStatus::IOFailure };
 		}
 	}
 }

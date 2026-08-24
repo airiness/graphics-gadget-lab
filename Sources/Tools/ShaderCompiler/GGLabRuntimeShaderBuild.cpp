@@ -1,16 +1,19 @@
-#include "Application/Shader/DevelopmentShaderArtifactBootstrap.h"
+#include "GGLabRuntimeShaderBuild.h"
+#include "ShaderCompilerProcessFactory.h"
 #include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
+#include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabFoundation/Platform/Win/Win32NamedMutex.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
-#include <windows.h>
-
 #include <algorithm>
 #include <array>
+#include <cwctype>
 #include <format>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -92,6 +95,10 @@ namespace gglab
 		[[nodiscard]] std::optional<ShaderDesc> MakeBuildDesc(
 			const ShaderProgramBuildRecord& record) noexcept
 		{
+			if (!record.m_ProgramRef)
+			{
+				return std::nullopt;
+			}
 			try
 			{
 				const ShaderProgramRef& programRef = *record.m_ProgramRef;
@@ -154,81 +161,105 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] ShaderCompileTarget MakeActiveTarget(
-			RHIBackendType activeBackend, ShaderStage stage) noexcept
+		[[nodiscard]] ShaderCompileTarget MakeTarget(
+			ShaderTargetProfile profile, ShaderStage stage) noexcept
 		{
-			return activeBackend == RHIBackendType::Vulkan
+			return profile == ShaderTargetProfile::GGLabVulkan13
 				? MakeVulkan13CompileTarget(stage)
 				: MakeDX12CompileTarget(stage);
 		}
+
+		[[nodiscard]] std::wstring MakeWriterMutexName(
+			const std::filesystem::path& artifactRoot) noexcept
+		{
+			std::wstring identity = artifactRoot.lexically_normal().generic_wstring();
+			std::ranges::transform(identity, identity.begin(),
+				[](wchar_t character) noexcept
+				{ return static_cast<wchar_t>(std::towlower(character)); });
+			Sha256Builder builder;
+			if (!builder.AddStringUtf8(utils::ToString(identity)))
+			{
+				return {};
+			}
+			return L"Local\\GGLab.ShaderRegistryWriter." +
+				utils::ToWideString(Sha256DigestToHex(builder.Finish()));
+		}
 	}
 
-	DevelopmentShaderArtifactBootstrapResult PrepareDevelopmentShaderArtifacts(
-		RHIBackendType activeBackend,
-		const std::filesystem::path& shaderSourceRoot,
-		const std::filesystem::path& shaderCacheRoot,
+	GGLabRuntimeShaderBuildResult BuildGGLabRuntimeShaders(
+		ShaderTargetProfile targetProfile,
+		const std::filesystem::path& sourceRoot,
+		const std::filesystem::path& cacheRoot,
 		const std::filesystem::path& artifactRoot) noexcept
 	{
-		if (activeBackend == RHIBackendType::Unknown || shaderSourceRoot.empty() ||
-			shaderCacheRoot.empty() || artifactRoot.empty() ||
-			!shaderSourceRoot.is_absolute() || !shaderCacheRoot.is_absolute() ||
-			!artifactRoot.is_absolute())
+		if (!IsKnownShaderTargetProfile(targetProfile) || sourceRoot.empty() ||
+			cacheRoot.empty() || artifactRoot.empty() || !sourceRoot.is_absolute() ||
+			!cacheRoot.is_absolute() || !artifactRoot.is_absolute())
 		{
 			return {
-				.m_Status = DevelopmentShaderArtifactBootstrapStatus::InvalidInput,
-				.m_Error = "Development shader artifact bootstrap requires absolute roots and a known backend.",
+				.m_Status = GGLabRuntimeShaderBuildStatus::InvalidInput,
+				.m_Error = "Runtime shader build requires a known target and absolute roots.",
 			};
 		}
 
 		try
 		{
-			ShaderCompiler compiler(shaderSourceRoot, shaderCacheRoot);
+			const std::wstring mutexName = MakeWriterMutexName(artifactRoot);
+			win32::NamedMutex writerMutex(mutexName);
+			win32::NamedMutexGuard writerLease = writerMutex.Acquire(120'000);
+			if (!writerLease.IsAcquired())
+			{
+				return {
+					.m_Status = GGLabRuntimeShaderBuildStatus::WriterUnavailable,
+					.m_Error = "Timed out waiting for the artifact-root shader writer lease.",
+				};
+			}
+
+			std::unique_ptr<ShaderCompiler> compiler =
+				CreateShaderCompilerForProcess(sourceRoot, cacheRoot);
 			ShaderDesc defaults{};
-			defaults.m_Target.m_Flags |= IsDebuggerPresent() != FALSE
-				? ShaderCompileFlags::Debug
-				: ShaderCompileFlags::None;
-			defaults.m_IncludeDirs = { shaderSourceRoot };
-			compiler.SetDefaultShaderConfig(defaults);
+			defaults.m_IncludeDirs = { sourceRoot };
+			compiler->SetDefaultShaderConfig(defaults);
 
 			std::vector<ShaderProgramRegistryEntry> entries;
 			entries.reserve(BuildRecords.size());
-			const ShaderTargetProfile targetProfile = activeBackend == RHIBackendType::Vulkan
-				? ShaderTargetProfile::GGLabVulkan13
-				: ShaderTargetProfile::GGLabDX12;
 			for (const ShaderProgramBuildRecord& record : BuildRecords)
 			{
 				std::optional<ShaderDesc> desc = MakeBuildDesc(record);
-				if (!desc || !record.m_ProgramRef)
+				if (!desc)
 				{
 					return {
-						.m_Status = DevelopmentShaderArtifactBootstrapStatus::UnknownProgram,
-						.m_Error = "The desktop shader build catalog contains an invalid program.",
+						.m_Status = GGLabRuntimeShaderBuildStatus::InvalidInput,
+						.m_Error = "The GGLab shader build catalog is invalid.",
 					};
 				}
-				desc->m_Target = MakeActiveTarget(activeBackend, desc->m_Stage);
-				const ShaderResolvedRecipe recipe = compiler.Resolve(*desc);
-				const ShaderCompileResult compiled = compiler.CompileOrLoad(recipe);
-				if (!compiled.IsSuccess() || !compiled.m_Artifact.m_Binary.IsValid())
+				desc->m_Target = MakeTarget(targetProfile, desc->m_Stage);
+				desc->m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const ShaderResolvedRecipe recipe = compiler->Resolve(*desc);
+				const ShaderCompileResult compiled = recipe.IsSuccess()
+					? compiler->CompileOrLoad(recipe)
+					: ShaderCompileResult{
+						.m_Status = recipe.m_Diagnostics.m_Status,
+						.m_Diagnostics = recipe.m_Diagnostics,
+					};
+				if (!compiled.IsSuccess())
 				{
 					return {
-						.m_Status = compiled.m_Status ==
-							ShaderCompileStatus::CompilerUnavailable
-								? DevelopmentShaderArtifactBootstrapStatus::CompilerUnavailable
-								: DevelopmentShaderArtifactBootstrapStatus::CompileFailed,
+						.m_Status = compiled.m_Status == ShaderCompileStatus::CompilerUnavailable
+							? GGLabRuntimeShaderBuildStatus::CompilerUnavailable
+							: GGLabRuntimeShaderBuildStatus::CompileFailed,
 						.m_Error = std::format("Failed to build {}::{}: {}",
 							record.m_ProgramRef->m_ProgramId,
 							record.m_ProgramRef->m_VariantId,
 							utils::ToString(compiled.m_Diagnostics.m_Message)),
 					};
 				}
-
 				const ShaderRuntimeArtifactPublicationResult published =
 					PublishShaderRuntimeArtifact(artifactRoot, compiled.m_Artifact);
 				if (!published.IsSuccess())
 				{
 					return {
-						.m_Status =
-							DevelopmentShaderArtifactBootstrapStatus::ArtifactPublicationFailed,
+						.m_Status = GGLabRuntimeShaderBuildStatus::ArtifactPublicationFailed,
 						.m_Error = std::format("Failed to publish {}::{} (status={}).",
 							record.m_ProgramRef->m_ProgramId,
 							record.m_ProgramRef->m_VariantId,
@@ -247,9 +278,8 @@ namespace gglab
 			if (!registryBuild.IsSuccess())
 			{
 				return {
-					.m_Status = DevelopmentShaderArtifactBootstrapStatus::RegistryBuildFailed,
-					.m_Error = std::format("Failed to build the Program Registry Artifact (status={}).",
-						static_cast<uint32_t>(registryBuild.m_Status)),
+					.m_Status = GGLabRuntimeShaderBuildStatus::RegistryBuildFailed,
+					.m_Error = "Failed to build the GGLab Program Registry Artifact.",
 				};
 			}
 			const ShaderProgramRegistryArtifactPublicationResult registryPublication =
@@ -257,22 +287,31 @@ namespace gglab
 			if (!registryPublication.IsSuccess())
 			{
 				return {
-					.m_Status =
-						DevelopmentShaderArtifactBootstrapStatus::RegistryPublicationFailed,
-					.m_Error = std::format("Failed to publish the Program Registry Artifact (status={}).",
-						static_cast<uint32_t>(registryPublication.m_Status)),
+					.m_Status = GGLabRuntimeShaderBuildStatus::RegistryPublicationFailed,
+					.m_Error = "Failed to publish the GGLab Program Registry Artifact.",
+				};
+			}
+			const ActiveShaderProgramRegistryPublicationResult activePublication =
+				PublishActiveShaderProgramRegistry(
+					artifactRoot, registryPublication.m_RegistryRef);
+			if (!activePublication.IsSuccess())
+			{
+				return {
+					.m_Status = GGLabRuntimeShaderBuildStatus::ActiveRegistryPublicationFailed,
+					.m_Error = "Failed to publish the active Program Registry reference.",
 				};
 			}
 			return {
-				.m_Status = DevelopmentShaderArtifactBootstrapStatus::Succeeded,
-				.m_RegistryRef = registryPublication.m_RegistryRef,
+				.m_Status = GGLabRuntimeShaderBuildStatus::Succeeded,
+				.m_RegistryRef = activePublication.m_RegistryRef,
+				.m_ProgramCount = static_cast<uint32_t>(entries.size()),
 			};
 		}
 		catch (...)
 		{
 			return {
-				.m_Status = DevelopmentShaderArtifactBootstrapStatus::Failed,
-				.m_Error = "Development shader artifact bootstrap failed unexpectedly.",
+				.m_Status = GGLabRuntimeShaderBuildStatus::Failed,
+				.m_Error = "GGLab runtime shader build failed unexpectedly.",
 			};
 		}
 	}

@@ -173,6 +173,12 @@ namespace gglab
 
 	ShaderManager::~ShaderManager() = default;
 
+	ShaderProgramRegistryArtifactRef ShaderManager::GetActiveRegistryRef() const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		return m_ActiveRegistryRef;
+	}
+
 	ShaderID ShaderManager::LoadProgram(const ShaderProgramRef& programRef) noexcept
 	{
 		if (!IsReady() || !programRef.IsValid())
@@ -414,7 +420,136 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+		std::shared_lock lock(m_Mutex);
 		return ResolveShaderProgramRegistryArtifact(m_RuntimeState->m_Registry,
 			programRef, GetActiveTargetProfile(m_ActiveBackend));
+	}
+
+	ShaderRegistryActivationResult ShaderManager::ActivateRegistry(
+		const ShaderProgramRegistryArtifactRef& registryRef) noexcept
+	{
+		if (!IsReady() || !registryRef.IsValid())
+		{
+			return {
+				.m_Status = ShaderRegistryActivationStatus::InvalidRegistryRef,
+				.m_Error = "Shader registry activation requires a valid RegistryRef.",
+			};
+		}
+		if (m_PreloadStatus == TaskStatus::Queued || m_PreloadStatus == TaskStatus::Running)
+		{
+			return {
+				.m_Status = ShaderRegistryActivationStatus::Busy,
+				.m_Error = "Shader registry activation is waiting for preload completion.",
+			};
+		}
+
+		try
+		{
+			{
+				std::shared_lock lock(m_Mutex);
+				if (registryRef == m_ActiveRegistryRef)
+				{
+					return { .m_Status = ShaderRegistryActivationStatus::AlreadyActive };
+				}
+			}
+
+			ShaderLooseProgramRegistryArtifactReader registryReader{
+				ShaderLooseProgramRegistryArtifactLocator(m_RuntimeState->m_ArtifactRoot)
+			};
+			ShaderProgramRegistryArtifactReadResult registryRead =
+				registryReader.ReadArtifact(registryRef);
+			if (!registryRead.IsSuccess())
+			{
+				ShaderRegistryActivationStatus status =
+					ShaderRegistryActivationStatus::RegistryReadFailure;
+				if (registryRead.m_Status == ShaderProgramRegistryArtifactReadStatus::NotFound)
+				{
+					status = ShaderRegistryActivationStatus::RegistryNotFound;
+				}
+				else if (registryRead.m_Status ==
+					ShaderProgramRegistryArtifactReadStatus::MalformedArtifact)
+				{
+					status = ShaderRegistryActivationStatus::MalformedRegistry;
+				}
+				return {
+					.m_Status = status,
+					.m_Error = "The requested Program Registry Artifact could not be read.",
+				};
+			}
+
+			struct StagedShader final
+			{
+				size_t m_Index = 0;
+				ShaderRuntimeArtifact m_Artifact{};
+				ShaderArtifactRef m_ArtifactRef{};
+				ShaderHash128 m_Hash{};
+			};
+			std::vector<StagedShader> staged;
+			std::unique_lock lock(m_Mutex);
+			if (registryRef == m_ActiveRegistryRef)
+			{
+				return { .m_Status = ShaderRegistryActivationStatus::AlreadyActive };
+			}
+			staged.reserve(m_Shaders.size());
+			for (size_t index = 0; index < m_Shaders.size(); ++index)
+			{
+				Shader& shader = *m_Shaders[index];
+				const std::optional<ShaderArtifactRef> resolved =
+					ResolveShaderProgramRegistryArtifact(registryRead.m_Artifact,
+						shader.GetProgramRef(), GetActiveTargetProfile(m_ActiveBackend));
+				if (!resolved)
+				{
+					return {
+						.m_Status = ShaderRegistryActivationStatus::MissingProgramBinding,
+						.m_Error = std::format(
+							"The new registry has no binding for {}::{}.",
+							shader.GetProgramRef().m_ProgramId,
+							shader.GetProgramRef().m_VariantId),
+					};
+				}
+				if (*resolved == shader.GetArtifactRef())
+				{
+					continue;
+				}
+
+				StagedShader replacement{ .m_Index = index };
+				std::string error;
+				if (!LoadProgramArtifact(registryRead.m_Artifact,
+					m_RuntimeState->m_ArtifactStore, m_ActiveBackend,
+					shader.GetProgramRef(), replacement.m_Artifact,
+					replacement.m_ArtifactRef, replacement.m_Hash, error))
+				{
+					return {
+						.m_Status = ShaderRegistryActivationStatus::ArtifactLoadFailure,
+						.m_Error = std::move(error),
+					};
+				}
+				staged.push_back(std::move(replacement));
+			}
+
+			for (StagedShader& replacement : staged)
+			{
+				m_Shaders[replacement.m_Index]->SetRuntimeArtifact(
+					std::move(replacement.m_Artifact), replacement.m_ArtifactRef,
+					replacement.m_Hash, true);
+			}
+			m_RuntimeState->m_Registry = std::move(registryRead.m_Artifact);
+			m_ActiveRegistryRef = registryRef;
+			if (!staged.empty())
+			{
+				m_Revision.fetch_add(1, std::memory_order_relaxed);
+			}
+			return {
+				.m_Status = ShaderRegistryActivationStatus::Activated,
+				.m_ChangedShaderCount = static_cast<uint32_t>(staged.size()),
+			};
+		}
+		catch (...)
+		{
+			return {
+				.m_Status = ShaderRegistryActivationStatus::Failed,
+				.m_Error = "Shader registry activation failed unexpectedly.",
+			};
+		}
 	}
 }

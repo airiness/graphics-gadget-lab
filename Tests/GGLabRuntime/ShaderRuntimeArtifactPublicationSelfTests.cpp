@@ -456,6 +456,47 @@ namespace gglab
 					std::filesystem::is_regular_file(publication.m_Path.m_Path),
 				"Changed Program mapping publishes a new snapshot without mutating the old registry");
 
+			ShaderLooseActiveProgramRegistryReader activeReader{
+				ShaderLooseActiveProgramRegistryLocator(root)
+			};
+			const ActiveShaderProgramRegistryPublicationResult initialActivation =
+				PublishActiveShaderProgramRegistry(root, publication.m_RegistryRef);
+			const ActiveShaderProgramRegistryReadResult initialActive = activeReader.Read();
+			context.Check(
+				initialActivation.m_Status ==
+					ActiveShaderProgramRegistryPublicationStatus::Published &&
+					initialActive.IsSuccess() &&
+					initialActive.m_RegistryRef == publication.m_RegistryRef,
+				"Active Registry publication atomically selects a published immutable snapshot");
+			context.Check(
+				PublishActiveShaderProgramRegistry(root, publication.m_RegistryRef).m_Status ==
+					ActiveShaderProgramRegistryPublicationStatus::AlreadyActive,
+				"Publishing the selected RegistryId preserves the active pointer idempotently");
+
+			const ActiveShaderProgramRegistryPublicationResult changedActivation =
+				PublishActiveShaderProgramRegistry(root, changedPublication.m_RegistryRef);
+			const ActiveShaderProgramRegistryReadResult changedActive = activeReader.Read();
+			const ShaderProgramRegistryArtifactRef missingRegistryRef{
+				.m_RegistryId = ShaderProgramRegistryArtifactId{
+					.m_DurableDigest = ComputeSha256(std::span(
+						reinterpret_cast<const std::byte*>("missing-registry"), 16)),
+				},
+			};
+			const ActiveShaderProgramRegistryPublicationResult rejectedActivation =
+				PublishActiveShaderProgramRegistry(root, missingRegistryRef);
+			const ActiveShaderProgramRegistryReadResult preservedActive = activeReader.Read();
+			context.Check(
+				changedActivation.m_Status ==
+					ActiveShaderProgramRegistryPublicationStatus::Published &&
+					changedActive.IsSuccess() &&
+					changedActive.m_RegistryRef == changedPublication.m_RegistryRef &&
+					std::filesystem::is_regular_file(publication.m_Path.m_Path) &&
+					rejectedActivation.m_Status ==
+						ActiveShaderProgramRegistryPublicationStatus::InvalidRegistry &&
+					preservedActive.IsSuccess() &&
+					preservedActive.m_RegistryRef == changedPublication.m_RegistryRef,
+				"Active Registry commit switches snapshots and preserves LKG when the candidate is invalid");
+
 			const std::filesystem::path concurrentRoot = root / L"ConcurrentRegistry";
 			constexpr size_t ProducerCount = 8;
 			std::array<ShaderProgramRegistryArtifactPublicationResult, ProducerCount> results{};

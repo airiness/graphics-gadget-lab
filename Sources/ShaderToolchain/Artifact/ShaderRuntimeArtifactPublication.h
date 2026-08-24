@@ -51,6 +51,28 @@ namespace gglab
 		}
 	};
 
+	enum class ActiveShaderProgramRegistryPublicationStatus : uint8_t
+	{
+		Published,
+		AlreadyActive,
+		InvalidRegistry,
+		IOFailure,
+	};
+
+	struct ActiveShaderProgramRegistryPublicationResult final
+	{
+		ActiveShaderProgramRegistryPublicationStatus m_Status =
+			ActiveShaderProgramRegistryPublicationStatus::IOFailure;
+		ShaderProgramRegistryArtifactRef m_RegistryRef{};
+		std::filesystem::path m_Path{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ActiveShaderProgramRegistryPublicationStatus::Published ||
+				m_Status == ActiveShaderProgramRegistryPublicationStatus::AlreadyActive;
+		}
+	};
+
 	[[nodiscard]] ShaderRuntimeArtifact BuildShaderRuntimeArtifact(
 		const ShaderArtifact& artifact);
 
@@ -67,4 +89,12 @@ namespace gglab
 		PublishShaderProgramRegistryArtifact(
 			const std::filesystem::path& artifactRoot,
 			const ShaderProgramRegistryArtifact& artifact) noexcept;
+
+	// Atomically selects one already-published immutable Program Registry.
+	// The caller must hold the artifact-root writer lease across the complete
+	// build and this final commit. Readers never take that lease.
+	[[nodiscard]] ActiveShaderProgramRegistryPublicationResult
+		PublishActiveShaderProgramRegistry(
+			const std::filesystem::path& artifactRoot,
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
 }
