@@ -13,7 +13,7 @@
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
-#include "Graphics/Shader/ShaderPaths.h"
+#include "DevelopmentShaderPaths.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 

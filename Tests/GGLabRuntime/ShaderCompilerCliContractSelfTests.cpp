@@ -6,7 +6,7 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/Shader/ShaderPaths.h"
+#include "DevelopmentShaderPaths.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"

@@ -1,7 +1,6 @@
 #include "Application/ApplicationHostConfiguration.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabFoundation/IO/PathUtils.h"
-#include "Graphics/Shader/ShaderPaths.h"
 
 namespace gglab
 {
@@ -64,8 +63,6 @@ namespace gglab
 		return {
 			.m_RuntimeRoot = runtimeRoot,
 			.m_AssetRoot = assetRoot,
-			.m_ShaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot),
-			.m_ShaderCacheRoot = ResolveShaderCacheRoot(runtimeRoot),
 			.m_ShaderArtifactRoot = runtimeRoot / "ShaderArtifacts",
 			.m_IblDerivedDataRoot = derivedDataRoot / "IBL",
 			.m_TextureDerivedDataRoot = derivedDataRoot / "Texture",

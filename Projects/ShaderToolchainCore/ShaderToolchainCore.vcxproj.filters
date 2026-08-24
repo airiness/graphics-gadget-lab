@@ -27,6 +27,7 @@
     <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp">
       <Filter>Compiler</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h">
@@ -50,6 +51,7 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTypes.h">
       <Filter>Contracts</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h">
       <Filter>Targets</Filter>
     </ClInclude>

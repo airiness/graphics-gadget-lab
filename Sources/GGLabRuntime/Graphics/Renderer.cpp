@@ -61,7 +61,7 @@ namespace gglab
 		if (!createInfo.HasRequiredRuntimePaths())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"Renderer initialization requires non-empty IBL cache and shader source roots.");
+				"Renderer initialization requires a non-empty IBL cache root.");
 			return false;
 		}
 
@@ -116,9 +116,9 @@ namespace gglab
 		iblBakeSchedulerCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
 		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
+		iblBakeSchedulerCreateInfo.m_ShaderManager = createInfo.m_ShaderManager;
 		iblBakeSchedulerCreateInfo.m_DerivedDataCacheDirectory =
 			createInfo.m_IblDerivedDataCacheDirectory;
-		iblBakeSchedulerCreateInfo.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot;
 		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();

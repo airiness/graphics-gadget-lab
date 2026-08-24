@@ -48,8 +48,10 @@ namespace gglab
 		qualificationOptions.m_IsHostAbiSupported = sizeof(void*) == 8;
 		qualificationOptions.m_ListAdapters = options.m_ListAdapters;
 		qualificationOptions.m_AdapterSelector = options.m_AdapterSelector;
-		qualificationOptions.m_ShaderSourceRoot = runtimePaths.m_ShaderSourceRoot;
-		qualificationOptions.m_ShaderCacheRoot = runtimePaths.m_ShaderCacheRoot;
+		// Standalone qualification is a development-tool mode and deliberately owns
+		// its authoring paths outside the shared RuntimePaths contract.
+		qualificationOptions.m_ShaderSourceRoot = runtimePaths.m_RuntimeRoot / "Shaders";
+		qualificationOptions.m_ShaderCacheRoot = runtimePaths.m_RuntimeRoot / "ShaderCache";
 		const int exitCode = RunVulkanQualification(qualificationOptions);
 		platformHost.Finalize();
 		return exitCode;

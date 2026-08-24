@@ -3,7 +3,9 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/RenderingStartup.h"
+#endif
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
@@ -64,8 +66,15 @@ int main(int argc, char* argv[])
 	if (launchResult.m_Options.m_ListAdapters ||
 		launchResult.m_Options.m_RunVulkanQualification)
 	{
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+		std::fputs(
+			"Error: adapter listing and standalone Vulkan qualification are development-tool modes omitted from the artifact-only target.\n",
+			stderr);
+		return EXIT_FAILURE;
+#else
 		return gglab::RunRenderingStartupPath(launchResult.m_Options, runtimePaths,
 			hInstance, RequestRuntimeValidation);
+#endif
 	}
 
 	gglab::Application::CreateInfo createInfo{};

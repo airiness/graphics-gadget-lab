@@ -18,7 +18,9 @@ namespace gglab
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
 	class LabRuntimeLocatorBase;
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	class DevelopmentShaderHotReloadSystem;
+#endif
 	struct PlatformEvent;
 	class Application
 	{
@@ -82,7 +84,9 @@ namespace gglab
 		std::unique_ptr<GGLabAppRuntime> m_AppRuntime;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
 		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;
+#endif
 
 		LifecycleState m_LifecycleState = LifecycleState::Uninitialized;
 		bool m_PlatformHostInitializationAttempted = false;

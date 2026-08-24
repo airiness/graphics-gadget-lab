@@ -5,6 +5,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/IBLStageArtifactCache.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <array>
 #include <filesystem>
@@ -56,7 +57,6 @@ namespace gglab
 		struct CreateInfo
 		{
 			std::filesystem::path m_CacheDirectory;
-			std::filesystem::path m_ShaderSourceRoot;
 			IBLStageArtifactCacheConfig m_ArtifactCache{};
 			IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 			std::string m_AdapterScopeIdentity;
@@ -68,7 +68,8 @@ namespace gglab
 
 		[[nodiscard]] IBLDerivedDataLookupResult Lookup(
 			const AssetContentFingerprint& contentFingerprint,
-			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config, bool ignoreCache,
+			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
+			const ShaderProgramRegistryArtifactRef& shaderRegistryRef, bool ignoreCache,
 			std::stop_token stopToken = {}) noexcept;
 		[[nodiscard]] IBLStageArtifactHandle Admit(
 			const DerivedDataKey& key, IBLStageArtifactHandle artifact) noexcept;
@@ -84,13 +85,11 @@ namespace gglab
 		[[nodiscard]] std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)>
 			BuildKeys(const AssetContentFingerprint& contentFingerprint,
 				EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
+				const ShaderProgramRegistryArtifactRef& shaderRegistryRef,
 				std::stop_token stopToken) const noexcept;
-		[[nodiscard]] SourceDigest ComputeShaderDependencyDigest(
-			IBLArtifactStage stage, std::stop_token stopToken) const noexcept;
 
 		IBLArtifactCompatibility m_Compatibility = IBLArtifactCompatibility::AdapterScoped;
 		std::string m_AdapterScopeIdentity;
-		std::filesystem::path m_ShaderSourceRoot;
 		mutable std::mutex m_ArtifactMutex;
 		IBLStageArtifactCache m_ArtifactCache;
 		LocalDerivedDataStore m_Store;

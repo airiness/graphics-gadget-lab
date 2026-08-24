@@ -1543,13 +1543,15 @@ $shaderRuntimeIdentityBoundaryPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Shader/Shader.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderManager.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderProgramCatalog.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"),
+    (Join-Path $appRuntimeSourcesDir "RuntimePaths.h"),
     (Join-Path $appRuntimeSourcesDir "ApplicationContentRegistration.h"),
     (Join-Path $appRuntimeSourcesDir "GGLabAppRuntime.h"),
     (Join-Path $appRuntimeSourcesDir "Lab/LabCatalog.h")
 )
 $shaderRuntimeBuildVocabularyRegex =
     '\bShaderDesc\b|\bShaderResolvedRecipe\b|\bm_SourcePath\b|\bm_Entry\b|' +
-    '\bm_Defines\b|\bm_IncludeDirs\b'
+    '\bm_Defines\b|\bm_IncludeDirs\b|\bm_ShaderSourceRoot\b|\bm_ShaderCacheRoot\b'
 foreach ($boundaryPath in $shaderRuntimeIdentityBoundaryPaths) {
     $boundaryContent = Get-Content -LiteralPath $boundaryPath -Raw -ErrorAction Stop
     if ($boundaryContent -match $shaderRuntimeBuildVocabularyRegex) {

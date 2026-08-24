@@ -11,7 +11,7 @@
 namespace gglab
 {
 	inline constexpr uint32_t IBLStageArtifactSchemaVersion = 1;
-	inline constexpr uint32_t IBLStageProducerCompatibilityVersion = 1;
+	inline constexpr uint32_t IBLStageProducerCompatibilityVersion = 2;
 	inline constexpr uint32_t IBLBakeAlgorithmVersion = 4;
 
 	struct IBLStageArtifact

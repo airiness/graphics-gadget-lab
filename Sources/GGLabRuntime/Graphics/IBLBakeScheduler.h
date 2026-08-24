@@ -95,6 +95,7 @@ namespace gglab
 	class RHIDevice;
 	class RenderResourceRegistry;
 	class TaskSystem;
+	class ShaderManager;
 	class TransferManager;
 
 	class IBLBakeScheduler
@@ -122,8 +123,8 @@ namespace gglab
 			RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			GpuProfiler* m_GpuProfiler = nullptr;
+			ShaderManager* m_ShaderManager = nullptr;
 			std::filesystem::path m_DerivedDataCacheDirectory;
-			std::filesystem::path m_ShaderSourceRoot;
 			IBLStageArtifactCacheConfig m_ArtifactCache{};
 		};
 
@@ -201,6 +202,7 @@ namespace gglab
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		TransferManager* m_TransferManager = nullptr;
 		GpuProfiler* m_GpuProfiler = nullptr;
+		ShaderManager* m_ShaderManager = nullptr;
 		IBLDerivedDataSystem m_DerivedDataSystem;
 
 		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;

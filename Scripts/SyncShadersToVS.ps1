@@ -135,7 +135,7 @@ function Remove-EmptyItemGroups {
         [System.Xml.XmlNamespaceManager]$NamespaceManager
     )
 
-    $nodes = @($Document.SelectNodes("//msb:ItemGroup[not(@*) and not(*)]", $NamespaceManager))
+    $nodes = @($Document.SelectNodes("//msb:ItemGroup[not(*)]", $NamespaceManager))
     foreach ($node in $nodes) {
         [void]$node.ParentNode.RemoveChild($node)
     }
@@ -167,6 +167,9 @@ function Add-ShaderItemsToProject {
 
     $noneGroup = New-MsbuildElement $Document "ItemGroup"
     $fxGroup = New-MsbuildElement $Document "ItemGroup"
+    $artifactOnlyCondition = "'`$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"
+    [void]$noneGroup.SetAttribute("Condition", $artifactOnlyCondition)
+    [void]$fxGroup.SetAttribute("Condition", $artifactOnlyCondition)
 
     foreach ($shader in $ShaderFiles) {
         $itemName = if ($shader.Extension -ieq ".hlsl") { "FxCompile" } else { "None" }

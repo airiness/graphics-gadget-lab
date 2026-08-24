@@ -28,7 +28,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Compiler/ShaderCompiler.h"
-#include "Graphics/Shader/ShaderPaths.h"
+#include "DevelopmentShaderPaths.h"
 #include "Graphics/TransferBatch.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 
@@ -638,7 +638,6 @@ namespace gglab
 			createInfo.m_IblDerivedDataCacheDirectory = "DerivedDataCache/IBL";
 			context.Check(!createInfo.HasRequiredRuntimePaths(),
 				"Renderer configuration requires the shader source root independently");
-			createInfo.m_ShaderSourceRoot = "Shaders";
 			context.Check(createInfo.HasRequiredRuntimePaths(),
 				"Renderer configuration accepts both required host-supplied runtime paths");
 

@@ -50,12 +50,10 @@ namespace gglab
 			paths.m_EnvironmentAssetRoot == runtimeRoot / "Assets" / "Textures" / "Skybox" &&
 			paths.m_SettingsRoot == runtimeRoot,
 			"Executable directory deterministically produces explicit content roots");
-		context.Check(paths.m_ShaderSourceRoot == runtimeRoot / "Shaders" &&
-			paths.m_ShaderCacheRoot == runtimeRoot / "ShaderCache" &&
-			paths.m_ShaderArtifactRoot == runtimeRoot / "ShaderArtifacts" &&
+		context.Check(paths.m_ShaderArtifactRoot == runtimeRoot / "ShaderArtifacts" &&
 			paths.m_IblDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "IBL" &&
 			paths.m_TextureDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "Texture",
-			"Executable directory preserves the baseline shader and derived-data roots");
+			"Executable directory preserves artifact and derived-data roots without authoring paths");
 		context.Check(!BuildRuntimePaths("relative/runtime").IsValid(),
 			"Host path translation rejects a relative executable directory");
 

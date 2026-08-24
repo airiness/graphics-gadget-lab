@@ -80,8 +80,6 @@ namespace gglab
 				.m_RuntimePaths = {
 					.m_RuntimeRoot = runtimeRoot,
 					.m_AssetRoot = runtimeRoot / "Assets",
-					.m_ShaderSourceRoot = runtimeRoot / "Shaders",
-					.m_ShaderCacheRoot = runtimeRoot / "ShaderCache",
 					.m_ShaderArtifactRoot = runtimeRoot / "ShaderArtifacts",
 					.m_IblDerivedDataRoot = runtimeRoot / "DerivedDataCache" / "IBL",
 					.m_TextureDerivedDataRoot =

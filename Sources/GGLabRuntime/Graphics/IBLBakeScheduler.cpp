@@ -1,4 +1,5 @@
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/Shader/ShaderManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -78,9 +79,9 @@ namespace gglab
 		m_EnvironmentLightingSystem(createInfo.m_EnvironmentLightingSystem),
 		m_RenderResourceRegistry(createInfo.m_RenderResourceRegistry),
 		m_TransferManager(createInfo.m_TransferManager), m_GpuProfiler(createInfo.m_GpuProfiler),
+		m_ShaderManager(createInfo.m_ShaderManager),
 		m_DerivedDataSystem({
 			.m_CacheDirectory = createInfo.m_DerivedDataCacheDirectory,
-			.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot,
 			.m_ArtifactCache = createInfo.m_ArtifactCache,
 			.m_Compatibility = IBLArtifactCompatibility::AdapterScoped,
 			.m_AdapterScopeIdentity = std::string(
@@ -93,6 +94,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem);
 		GGLAB_ASSERT_NOT_NULL(m_RenderResourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(m_TransferManager);
+		GGLAB_ASSERT_NOT_NULL(m_ShaderManager);
 	}
 
 	IBLBakeScheduler::~IBLBakeScheduler()
@@ -233,6 +235,8 @@ namespace gglab
 		const EnvironmentTextureSourceType sourceType = m_BakingRequest.m_Source.m_Type;
 		const uint64_t generation = m_Status.m_BakingGeneration;
 		const bool ignoreCache = m_BakingRequest.m_IgnoreCache;
+		const ShaderProgramRegistryArtifactRef shaderRegistryRef =
+			m_ShaderManager->GetActiveRegistryRef();
 		auto work = std::make_shared<CacheLoadWork>();
 		work->m_Generation = generation;
 		SetStage(IBLBakeStage::LoadingCache, 0.0f);
@@ -241,11 +245,11 @@ namespace gglab
 				.m_Name = std::format("IBL.StageCacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config, ignoreCache,
-			work](std::stop_token stopToken) noexcept
+			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config,
+			shaderRegistryRef, ignoreCache, work](std::stop_token stopToken) noexcept
 			{
 				work->m_Result = m_DerivedDataSystem.Lookup(
-					contentFingerprint, sourceType, config, ignoreCache, stopToken);
+					contentFingerprint, sourceType, config, shaderRegistryRef, ignoreCache, stopToken);
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept

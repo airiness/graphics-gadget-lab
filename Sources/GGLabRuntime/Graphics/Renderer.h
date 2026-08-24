@@ -105,7 +105,6 @@ namespace gglab
 			ShaderManager* m_ShaderManager = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
 			std::filesystem::path m_IblDerivedDataCacheDirectory;
-			std::filesystem::path m_ShaderSourceRoot;
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			std::optional<std::string> m_AdapterSelector;
@@ -113,7 +112,7 @@ namespace gglab
 
 			[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
 			{
-				return !m_IblDerivedDataCacheDirectory.empty() && !m_ShaderSourceRoot.empty();
+				return !m_IblDerivedDataCacheDirectory.empty();
 			}
 		};
 

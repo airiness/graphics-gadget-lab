@@ -227,7 +227,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.cpp" />
@@ -524,7 +523,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.h" />

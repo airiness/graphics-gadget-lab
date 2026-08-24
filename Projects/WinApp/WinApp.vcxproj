@@ -17,6 +17,7 @@
     <ProjectGuid>{805c79e6-a919-4d77-9a57-a4b66cdcf3c2}</ProjectGuid>
     <RootNamespace>WinApp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <GGLAB_ARTIFACT_ONLY_RUNTIME Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'==''">0</GGLAB_ARTIFACT_ONLY_RUNTIME>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -38,12 +39,12 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
-    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
-    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
     <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
@@ -51,18 +52,26 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
-    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\EnttImport.props" />
     <Import Project="..\..\PropertySheets\AssetDirectorys.props" />
-    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <Import Project="..\..\PropertySheets\ImGuiImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
     <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
     <GGLAB_USE_PCH Condition="'$(GGLAB_USE_PCH)'==''">1</GGLAB_USE_PCH>
+  </PropertyGroup>
+  <PropertyGroup>
+    <GGLabArtifactOnlyDefine Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'=='1'">GGLAB_ARTIFACT_ONLY_RUNTIME=1;</GGLabArtifactOnlyDefine>
+    <GGLabShaderToolchainCompilerOption Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">/I"$(GGLabRepositoryRoot)Sources\ShaderToolchain" </GGLabShaderToolchainCompilerOption>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'=='1'">
+    <OutDir>$(GGLabRepositoryRoot)Build\ArtifactOnly\Output\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(GGLabRepositoryRoot)Build\ArtifactOnly\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(GGLAB_USE_PCH)'=='0'">
     <IntDir>$(GGLabRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\NoPCH\</IntDir>
@@ -76,9 +85,9 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>$(GGLabShaderToolchainCompilerOption)/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -91,9 +100,9 @@
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>$(GGLabShaderToolchainCompilerOption)/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -157,8 +166,8 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationHostConfiguration.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\ApplicationLaunchOptions.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp" />
@@ -172,10 +181,10 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0' and '$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
@@ -380,7 +389,7 @@
       <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
-    <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj">
+    <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
       <Project>{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
@@ -394,7 +403,7 @@
       <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
     <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli" />
     <None Include="..\..\Shaders\Common\BindlessResources.hlsli" />
     <None Include="..\..\Shaders\Common\BufferLayout.hlsli" />
@@ -420,7 +429,7 @@
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
@@ -449,11 +458,11 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\PropertySheets\LinkAssetDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkAssetDirectory.targets')" />
-    <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
+    <Import Project="..\..\PropertySheets\LinkAssetDirectory.targets" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1' and Exists('..\..\PropertySheets\LinkAssetDirectory.targets')" />
+    <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1' and Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
-    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
+    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1' and Exists('..\..\PropertySheets\DxcImport.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

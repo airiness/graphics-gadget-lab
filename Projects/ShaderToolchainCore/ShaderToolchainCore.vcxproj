@@ -69,11 +69,13 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp" />
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.cpp" />
     <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.h" />

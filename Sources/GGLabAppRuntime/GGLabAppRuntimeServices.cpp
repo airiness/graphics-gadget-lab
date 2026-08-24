@@ -125,7 +125,6 @@ namespace gglab
 		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
 		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
 		rendererCreateInfo.m_IblDerivedDataCacheDirectory = m_Paths.m_IblDerivedDataRoot;
-		rendererCreateInfo.m_ShaderSourceRoot = m_Paths.m_ShaderSourceRoot;
 		rendererCreateInfo.m_Width = m_WindowWidth;
 		rendererCreateInfo.m_Height = m_WindowHeight;
 		rendererCreateInfo.m_AdapterSelector = m_Config.m_AdapterSelector;
@@ -221,9 +220,8 @@ namespace gglab
 				? "absolute"
 				: "relative");
 		GGLAB_LOG_INFO(
-			"Runtime paths: assets='{}', shaders='{}', shader_cache='{}', shader_artifacts='{}', ibl_ddc='{}', texture_ddc='{}'.",
-			m_Paths.m_AssetRoot.string(), m_Paths.m_ShaderSourceRoot.string(),
-			m_Paths.m_ShaderCacheRoot.string(), m_Paths.m_ShaderArtifactRoot.string(),
+			"Runtime paths: assets='{}', shader_artifacts='{}', ibl_ddc='{}', texture_ddc='{}'.",
+			m_Paths.m_AssetRoot.string(), m_Paths.m_ShaderArtifactRoot.string(),
 			m_Paths.m_IblDerivedDataRoot.string(),
 			m_Paths.m_TextureDerivedDataRoot.string());
 

@@ -6,7 +6,9 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/SelfTest/VulkanQualificationSelfTests.h"
+#endif
 #if GGLAB_ENABLE_VULKAN
 #include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
 #endif
@@ -49,10 +51,12 @@ namespace gglab
 				.m_Id = "app-launch-options",
 				.m_Run = &RunLaunchOptionsSelfTests,
 			},
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 			SelfTestSuiteDesc{
 				.m_Id = "app-vulkan-qualification",
 				.m_Run = &RunVulkanQualificationSelfTests,
 			},
+#endif
 			SelfTestSuiteDesc{
 				.m_Id = "napa-voxel",
 				.m_Run = &RunNapaVoxelCoreSelfTests,
@@ -127,11 +131,11 @@ namespace gglab
 		context.Check(assetStream.good(),
 			"Injected asset root opens packaged content independently of process CWD");
 
-		const std::filesystem::path shaderPath =
-			runtimePaths.m_ShaderSourceRoot / "Passes" / "PassSkybox.hlsl";
-		std::ifstream shaderStream(shaderPath, std::ios::binary);
-		context.Check(shaderStream.good(),
-			"Injected shader root opens packaged source independently of process CWD");
+		const std::filesystem::path activeRegistryPath = runtimePaths.m_ShaderArtifactRoot /
+			"active" / "program-registry.ggsh.active";
+		std::ifstream activeRegistryStream(activeRegistryPath, std::ios::binary);
+		context.Check(activeRegistryStream.good(),
+			"Injected artifact root opens the packaged active registry independently of process CWD");
 
 		reporter.OnSuiteFinished(
 			ApplicationPathCompositionSelfTestSelection, context.GetSummary());

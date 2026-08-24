@@ -5,7 +5,11 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/Shader/DevelopmentShaderBuildBridge.h"
+#else
+#include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
+#endif
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
@@ -139,11 +143,27 @@ namespace gglab
 			AppRuntimeRHIBackend::DX12 ? RHIBackendType::DX12 : RHIBackendType::Vulkan;
 		m_RHIContextFactory =
 			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
+		ShaderProgramRegistryArtifactRef activeShaderRegistry{};
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+		ShaderLooseActiveProgramRegistryReader activeRegistryReader{
+			ShaderLooseActiveProgramRegistryLocator(m_RuntimePaths.m_ShaderArtifactRoot)
+		};
+		const ActiveShaderProgramRegistryReadResult activeRegistry = activeRegistryReader.Read();
+		if (!activeRegistry.IsSuccess())
+		{
+			GGLAB_LOG_ERROR(
+				"Artifact-only runtime requires a readable packaged active shader registry (status={}).",
+				static_cast<uint32_t>(activeRegistry.m_Status));
+			return FailInitialization();
+		}
+		activeShaderRegistry = activeRegistry.m_RegistryRef;
+		GGLAB_LOG_INFO("Artifact-only shader startup selected the packaged active registry.");
+#else
 		const DevelopmentShaderBuildRequest shaderBuildRequest{
 			.m_ActiveBackend = activeBackend,
 			.m_ShaderCompilerPath = m_RuntimePaths.m_RuntimeRoot / "gglab-shaderc.exe",
-			.m_ShaderSourceRoot = m_RuntimePaths.m_ShaderSourceRoot,
-			.m_ShaderCacheRoot = m_RuntimePaths.m_ShaderCacheRoot,
+			.m_ShaderSourceRoot = m_RuntimePaths.m_RuntimeRoot / "Shaders",
+			.m_ShaderCacheRoot = m_RuntimePaths.m_RuntimeRoot / "ShaderCache",
 			.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
 		};
 		const DevelopmentShaderBuildResult shaderArtifacts =
@@ -154,6 +174,8 @@ namespace gglab
 				shaderArtifacts.m_Diagnostics);
 			return FailInitialization();
 		}
+		activeShaderRegistry = shaderArtifacts.m_RegistryRef;
+#endif
 		const AppRuntimeServiceInitializeResult serviceInitializeResult =
 			m_AppRuntime->InitializeServices({
 				.m_RHIContextFactory = m_RHIContextFactory.get(),
@@ -162,7 +184,7 @@ namespace gglab
 				.m_WindowWidth = m_WindowWidth,
 				.m_WindowHeight = m_WindowHeight,
 				.m_ShaderArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
-				.m_ActiveShaderRegistry = shaderArtifacts.m_RegistryRef,
+				.m_ActiveShaderRegistry = activeShaderRegistry,
 				});
 		if (serviceInitializeResult != AppRuntimeServiceInitializeResult::Succeeded)
 		{
@@ -183,6 +205,7 @@ namespace gglab
 		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 			m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
 				DevelopmentShaderHotReloadSystem::CreateInfo{
 					.m_BuildRequest = shaderBuildRequest,
@@ -194,6 +217,10 @@ namespace gglab
 				GGLAB_LOG_WARN("Application will continue without shader hot reload.");
 				m_ShaderHotReload.reset();
 			}
+#else
+			GGLAB_LOG_INFO(
+				"Shader authoring and hot reload are omitted from the artifact-only target.");
+#endif
 			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
 				.m_RHIContext = renderer->GetRHIContext(),
@@ -234,10 +261,12 @@ namespace gglab
 		}
 
 		m_InputManager->Update();
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		if (m_ShaderHotReload)
 		{
 			m_ShaderHotReload->Update();
 		}
+#endif
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			});
@@ -269,10 +298,12 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
 		m_LifecycleState = LifecycleState::ShuttingDown;
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		if (m_ShaderHotReload)
 		{
 			m_ShaderHotReload->Shutdown();
 		}
+#endif
 
 		if (m_AppRuntime)
 		{
@@ -283,7 +314,9 @@ namespace gglab
 				});
 			m_AppRuntime.reset();
 		}
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		m_ShaderHotReload.reset();
+#endif
 		// PrepareForShutdown has retired all borrowed runtime/GPU resources. The
 		// inactive host objects can now be destroyed without touching dead services.
 		m_ApplicationTooling.reset();
