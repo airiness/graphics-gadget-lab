@@ -3,20 +3,15 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include "Wire/ShaderWireVersions.h"
 
 namespace gglab
 {
-	inline constexpr const wchar_t* ShaderCompilerToolVersion = L"1.0.0";
+	// (See Wire/ShaderWireVersions.h for the canonical constants:
+	// ShaderCompilerToolVersion and ShaderProcessContractVersion.)
 
-	// Machine describe handshake wire contract. This is a process-level
-	// axis that is deliberately independent of ShaderCompilerToolVersion: it
-	// versions the "document format + status vocabulary + exit-code mapping +
-	// stdout/stderr channel rules" of the whole machine process contract, and
-	// it is the only field (toolVersion, in a different sense) that the
-	// machine wire self-describes. Future contract changes bump this from the
-	// same constant so the value in the describe document and the consumer
-	// support-set gate stay in lockstep.
-	inline constexpr int ShaderProcessContractVersion = 1;
+	// (ShaderProcessContractVersion defined in Wire/ShaderWireVersions.h;
+	// see comment above.)
 
 	enum class ShaderCompilerCommand : uint8_t
 	{

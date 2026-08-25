@@ -386,16 +386,17 @@ namespace
 			result, recipe, binaryPath, recordPath, targetName, publication);
 	}
 
-	[[nodiscard]] std::string_view ProducerKindWireName(gglab::ShaderCompilerKind kind) noexcept
+	// Fail closed: only the kinds we explicitly map to a wire name are
+	// accepted. An unknown kind resolves to std::nullopt and the caller
+	// treats it as a handled internal failure, never a wildcard "dxc".
+	[[nodiscard]] std::optional<std::string_view> ProducerKindWireName(
+		gglab::ShaderCompilerKind kind) noexcept
 	{
-		switch (kind)
+		if (kind == gglab::ShaderCompilerKind::Dxc)
 		{
-		case gglab::ShaderCompilerKind::Dxc:
-		default:
-			// Dxc is the only producer kind today; any future kind maps to a
-			// distinct wire name once it is added.
-			return "dxc";
+			return std::string_view("dxc");
 		}
+		return std::nullopt;
 	}
 
 	int PrintJsonDescribeCompilerUnavailable()
@@ -465,6 +466,13 @@ namespace
 			{
 				return PrintJsonDescribeCompilerUnavailable();
 			}
+			// Fail closed on a producer kind we do not explicitly map to a
+			// wire name; a wildcard "dxc" would silently mislabel an unknown.
+			const auto kindWireName = ProducerKindWireName(identity.m_Kind);
+			if (!kindWireName.has_value())
+			{
+				return PrintJsonDescribeInternalError();
+			}
 
 			nlohmann::json supportedTargets = nlohmann::json::array();
 			for (const std::string& name : gglab::ShaderTargetWire::Names())
@@ -481,7 +489,7 @@ namespace
 				{ "processContractVersion", gglab::ShaderProcessContractVersion },
 				{ "toolIdentity", "gglab-shaderc" },
 				{ "toolVersion", gglab::utils::ToString(gglab::ShaderCompilerToolVersion) },
-				{ "producerKind", std::string(ProducerKindWireName(identity.m_Kind)) },
+				{ "producerKind", std::string(*kindWireName) },
 				{ "producerIdentity", gglab::utils::ToString(identity.m_CanonicalIdentity) },
 				{ "supportedTargets", std::move(supportedTargets) },
 				{ "diagnostics", nlohmann::json::array() },

@@ -1,53 +1,58 @@
 #pragma once
 #include "Contracts/ShaderCompileTarget.h"
 
+#include <array>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace gglab
 {
-	// Single source of truth for the target-profile <-> wire-name mapping.
-	// The CLI accept path (ParseShaderTarget), the describe report path
-	// (ShaderTargetWireNames), and the machine self-description document all
-	// derive from this table so the wire contract facts can never drift
-	// apart: describe.supportedTargets is asserted value-identical to the
-	// ParseTarget acceptance set.
+	// Single table authority for the target-profile <-> wire-name mapping.
+	// Every consumer of the target set derives from this one table: the CLI
+	// accept path (ParseShaderTarget -> Parse), the describe supportedTargets
+	// report, and the --targets enumeration (-> Names). Because Parse and
+	// Names are both derived from kEntries, the accepted set and the reported
+	// set cannot drift apart.
 	namespace ShaderTargetWire
 	{
-		[[nodiscard]] constexpr std::string_view Dx12Name() noexcept
+		struct Entry
 		{
-			return "gglab-dx12";
-		}
+			std::string_view name;
+			ShaderTargetProfile profile;
+		};
 
-		[[nodiscard]] constexpr std::string_view Vulkan13Name() noexcept
-		{
-			return "gglab-vulkan13";
-		}
+		// The one and only table. Order is the stable report order and the
+		// only source of the wire name strings.
+		inline constexpr std::array<Entry, 2> kEntries{
+			Entry{ "gglab-dx12", ShaderTargetProfile::GGLabDX12 },
+			Entry{ "gglab-vulkan13", ShaderTargetProfile::GGLabVulkan13 },
+		};
 
-		// Accept side: parse a wire name into the target profile.
+		// Accept side: parse a wire name into its target profile.
 		[[nodiscard]] constexpr bool Parse(
 			std::string_view name, ShaderTargetProfile& outProfile) noexcept
 		{
-			if (name == Dx12Name())
+			for (const Entry& entry : kEntries)
 			{
-				outProfile = ShaderTargetProfile::GGLabDX12;
-				return true;
-			}
-			if (name == Vulkan13Name())
-			{
-				outProfile = ShaderTargetProfile::GGLabVulkan13;
-				return true;
+				if (name == entry.name)
+				{
+					outProfile = entry.profile;
+					return true;
+				}
 			}
 			return false;
 		}
 
-		// Report side: the stable set of supported wire names.
+		// Report side: the stable set of supported wire names, in table order.
 		[[nodiscard]] std::vector<std::string> Names() noexcept
 		{
 			std::vector<std::string> names;
-			names.push_back(std::string(Dx12Name()));
-			names.push_back(std::string(Vulkan13Name()));
+			names.reserve(kEntries.size());
+			for (const Entry& entry : kEntries)
+			{
+				names.push_back(std::string(entry.name));
+			}
 			return names;
 		}
 	}
