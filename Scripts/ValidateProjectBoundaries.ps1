@@ -90,6 +90,7 @@ $candidateDirs = @("Core", "Scene", "Graphics", "Diagnostics")
 # Permanent leaves are reviewed and need no removal condition.
 $platformLeafPrefixes = @(
     "Core/Platform/Win", # Windows implementation leaves
+    "Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
     "Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
 )
 $platformLeafFiles = @(
@@ -105,10 +106,7 @@ $transitionalDebt = @()
 # (planned owner / removal condition). New entries may only be added with an
 # explicit plan; entries whose violation disappears are reported as stale and
 # should be removed from the ledger.
-$knownViolations = @(
-    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.cpp"; Kind = "platform";  Reason = "Platform mutex implementation in portable cpp; root identity carries Windows named-mutex name semantics; planned: narrow platform lock leaf" },
-    [pscustomobject]@{ File = "Graphics/Asset/DerivedData/LocalDerivedDataStore.cpp";              Kind = "platform";  Reason = "Platform process/lock utilities used by portable cpp; planned: narrow DDC platform leaf" }
-)
+$knownViolations = @()
 
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
 $ownershipSymbolRegex = '\bDevelopGuiSystem\b'

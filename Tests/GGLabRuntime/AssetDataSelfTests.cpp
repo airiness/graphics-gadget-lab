@@ -5,6 +5,7 @@
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
+#include "Graphics/Asset/DerivedData/Platform/Win/Win32LocalDerivedDataPlatform.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -15,14 +16,143 @@
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
+#include <Windows.h>
+
+#include <atomic>
+#include <chrono>
 #include <cwctype>
+#include <deque>
 #include <fstream>
+#include <format>
+#include <memory>
+#include <mutex>
+#include <string>
 #include <thread>
+#include <utility>
 
 namespace gglab
 {
 	namespace
 	{
+		struct FakeLocalDerivedDataPlatformState final
+		{
+			std::mutex m_MaintenanceMutex;
+			std::mutex m_TokenMutex;
+			std::deque<std::string> m_ForcedTokens;
+			std::atomic_bool m_ReportAbandoned = false;
+			std::atomic_uint64_t m_NextToken = 1;
+		};
+
+		class FakeLocalDerivedDataMaintenanceLockGuard final :
+			public LocalDerivedDataMaintenanceLockGuardBase
+		{
+		public:
+			FakeLocalDerivedDataMaintenanceLockGuard(
+				std::mutex& mutex, bool abandoned) noexcept :
+				m_Lock(mutex), m_Abandoned(abandoned)
+			{
+			}
+
+			[[nodiscard]] bool IsAcquired() const noexcept override
+			{
+				return m_Lock.owns_lock();
+			}
+			[[nodiscard]] bool WasAbandoned() const noexcept override
+			{
+				return IsAcquired() && m_Abandoned;
+			}
+
+		private:
+			std::unique_lock<std::mutex> m_Lock;
+			bool m_Abandoned = false;
+		};
+
+		class FakeLocalDerivedDataMaintenanceLock final :
+			public LocalDerivedDataMaintenanceLockBase
+		{
+		public:
+			explicit FakeLocalDerivedDataMaintenanceLock(
+				std::shared_ptr<FakeLocalDerivedDataPlatformState> state) noexcept :
+				m_State(std::move(state))
+			{
+			}
+
+			[[nodiscard]] bool IsValid() const noexcept override
+			{
+				return m_State != nullptr;
+			}
+			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockGuardBase>
+				Acquire() const noexcept override
+			{
+				if (!m_State)
+				{
+					return nullptr;
+				}
+				return std::make_unique<FakeLocalDerivedDataMaintenanceLockGuard>(
+					m_State->m_MaintenanceMutex,
+					m_State->m_ReportAbandoned.exchange(false, std::memory_order_acq_rel));
+			}
+
+		private:
+			std::shared_ptr<FakeLocalDerivedDataPlatformState> m_State;
+		};
+
+		class FakeLocalDerivedDataPlatform final : public LocalDerivedDataPlatformBase
+		{
+		public:
+			explicit FakeLocalDerivedDataPlatform(
+				std::shared_ptr<FakeLocalDerivedDataPlatformState> state) noexcept :
+				m_State(std::move(state))
+			{
+			}
+
+			[[nodiscard]] LocalDerivedDataRootIdentity ResolveRootIdentity(
+				const std::filesystem::path& rootDirectory) const noexcept override
+			{
+				if (rootDirectory.empty())
+				{
+					return {};
+				}
+				std::error_code errorCode;
+				std::filesystem::path canonicalRoot =
+					std::filesystem::absolute(rootDirectory, errorCode);
+				if (errorCode || canonicalRoot.empty())
+				{
+					return {};
+				}
+				canonicalRoot = canonicalRoot.lexically_normal();
+				return {
+					.m_CanonicalRoot = canonicalRoot,
+					.m_PlatformIdentity = canonicalRoot.generic_string(),
+				};
+			}
+
+			[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockBase>
+				CreateMaintenanceLock(
+					const LocalDerivedDataRootIdentity& identity) const noexcept override
+			{
+				return identity.IsValid()
+					? std::make_unique<FakeLocalDerivedDataMaintenanceLock>(m_State)
+					: nullptr;
+			}
+
+			[[nodiscard]] std::string CreateUniquePathToken() noexcept override
+			{
+				std::scoped_lock lock(m_State->m_TokenMutex);
+				if (!m_State->m_ForcedTokens.empty())
+				{
+					std::string token = std::move(m_State->m_ForcedTokens.front());
+					m_State->m_ForcedTokens.pop_front();
+					return token;
+				}
+				return std::format("fake.{}",
+					m_State->m_NextToken.fetch_add(1, std::memory_order_relaxed));
+			}
+
+		private:
+			std::shared_ptr<FakeLocalDerivedDataPlatformState> m_State;
+		};
+
 		[[nodiscard]] bool MatchesHex(
 			std::span<const std::byte> bytes, std::string_view expected) noexcept
 		{
@@ -443,6 +573,18 @@ namespace gglab
 					std::ranges::equal(hit.m_Payload, Payload),
 					"Local DDC bounded read accepts a container within its payload limit");
 
+				ArtifactContentDigest conflictingDigest = artifactDigest;
+				conflictingDigest.m_Value.front() ^= std::byte{ 0xff };
+				const bool conflictRejected = !store.Write(
+					key, ArtifactType, SchemaVersion, conflictingDigest, Payload);
+				const DerivedDataReadResult preserved =
+					store.Read(key, ArtifactType, SchemaVersion);
+				context.Check(conflictRejected &&
+					preserved.m_Disposition == DerivedDataReadDisposition::Hit &&
+					preserved.m_ArtifactContentDigest == artifactDigest &&
+					std::ranges::equal(preserved.m_Payload, Payload),
+					"Portable Local DDC publication rejects a conflicting immutable artifact");
+
 				const DerivedDataReadResult oversized =
 					store.Read(key, ArtifactType, SchemaVersion, { .m_MaxContainerBytes = 1 });
 				context.Check(oversized.m_Disposition == DerivedDataReadDisposition::Corrupt &&
@@ -494,15 +636,39 @@ namespace gglab
 				std::ranges::transform(alternateText, alternateText.begin(),
 					[](wchar_t value) noexcept
 					{ return static_cast<wchar_t>(std::towupper(value)); });
+				std::unique_ptr platform = CreateWin32LocalDerivedDataPlatform();
 				const LocalDerivedDataRootIdentity canonical =
-					ResolveLocalDerivedDataRootIdentity(identityRoot / ".");
+					platform->ResolveRootIdentity(identityRoot / ".");
 				const LocalDerivedDataRootIdentity alternate =
-					ResolveLocalDerivedDataRootIdentity(std::filesystem::path(alternateText));
+					platform->ResolveRootIdentity(std::filesystem::path(alternateText));
+				const std::wstring canonicalMutex =
+					MakeWin32LocalDerivedDataMaintenanceMutexName(canonical);
+				const std::wstring alternateMutex =
+					MakeWin32LocalDerivedDataMaintenanceMutexName(alternate);
 				context.Check(canonical.IsValid() && alternate.IsValid() &&
-					canonical.m_CanonicalUtf8 == alternate.m_CanonicalUtf8 &&
-					canonical.m_MutexName == alternate.m_MutexName &&
-					canonical.m_MutexName.starts_with(L"Local\\gglab.ddc."),
+					canonical.m_PlatformIdentity == alternate.m_PlatformIdentity &&
+					canonicalMutex == alternateMutex &&
+					canonicalMutex.starts_with(L"Local\\gglab.ddc."),
 					"Local DDC root identity normalizes absolute path spelling and case");
+			}
+
+			{
+				const auto state = std::make_shared<FakeLocalDerivedDataPlatformState>();
+				FakeLocalDerivedDataPlatform platform(state);
+				const LocalDerivedDataRootIdentity lower =
+					platform.ResolveRootIdentity(root / "case-sensitive");
+				const LocalDerivedDataRootIdentity upper =
+					platform.ResolveRootIdentity(root / "CASE-SENSITIVE");
+				std::unique_ptr maintenance = platform.CreateMaintenanceLock(lower);
+				std::unique_ptr guard = maintenance->Acquire();
+				const bool acquired = guard && guard->IsAcquired() && !guard->WasAbandoned();
+				guard.reset();
+				state->m_ReportAbandoned.store(true, std::memory_order_release);
+				guard = maintenance->Acquire();
+				context.Check(lower.IsValid() && upper.IsValid() &&
+					lower.m_PlatformIdentity != upper.m_PlatformIdentity && acquired &&
+					guard && guard->IsAcquired() && guard->WasAbandoned(),
+					"Fake Local DDC platform preserves target path semantics and abandoned-lock reporting");
 			}
 
 			{
@@ -658,8 +824,11 @@ namespace gglab
 			{
 				const std::filesystem::path abandonedRoot = root / "abandoned";
 				LocalDerivedDataStore store(abandonedRoot);
+				std::unique_ptr platform = CreateWin32LocalDerivedDataPlatform();
 				const LocalDerivedDataRootIdentity identity =
-					ResolveLocalDerivedDataRootIdentity(abandonedRoot);
+					platform->ResolveRootIdentity(abandonedRoot);
+				const std::wstring mutexName =
+					MakeWin32LocalDerivedDataMaintenanceMutexName(identity);
 				const std::filesystem::path orphanTemporary =
 					abandonedRoot / "orphan.ddc.tmp.crashed";
 				GGLAB_UNUSED(std::filesystem::create_directories(abandonedRoot, errorCode));
@@ -667,7 +836,7 @@ namespace gglab
 					std::ofstream orphanStream(orphanTemporary, std::ios::binary | std::ios::trunc);
 					orphanStream.put('x');
 				}
-				HANDLE rawMutex = ::CreateMutexW(nullptr, FALSE, identity.m_MutexName.c_str());
+				HANDLE rawMutex = ::CreateMutexW(nullptr, FALSE, mutexName.c_str());
 				std::atomic_bool acquired = false;
 				std::jthread abandoningThread(
 					[&]() noexcept
@@ -686,6 +855,67 @@ namespace gglab
 				context.Check(rawMutex && acquired.load(std::memory_order_acquire) && recovered &&
 					!std::filesystem::exists(orphanTemporary),
 					"Local DDC recovers an abandoned mutex and removes orphan temporary files");
+			}
+
+			{
+				const std::filesystem::path fakeRoot = root / "fake-platform";
+				const auto state = std::make_shared<FakeLocalDerivedDataPlatformState>();
+				LocalDerivedDataStore store(
+					fakeRoot, std::make_unique<FakeLocalDerivedDataPlatform>(state));
+				const std::filesystem::path path = entryPath(fakeRoot);
+				GGLAB_UNUSED(std::filesystem::create_directories(path.parent_path(), errorCode));
+				const std::filesystem::path collidingTemporary =
+					std::filesystem::path(path.string() + ".tmp.collision");
+				{
+					std::ofstream collisionStream(
+						collidingTemporary, std::ios::binary | std::ios::trunc);
+					collisionStream.put('x');
+				}
+				{
+					std::scoped_lock tokenLock(state->m_TokenMutex);
+					state->m_ForcedTokens.push_back("collision");
+					state->m_ForcedTokens.push_back("replacement");
+				}
+				const bool wrote =
+					store.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+				const bool collisionPreserved =
+					std::filesystem::exists(collidingTemporary, errorCode);
+
+				const std::filesystem::path orphanTemporary =
+					fakeRoot / "orphan.ddc.tmp.fake-abandoned";
+				{
+					std::ofstream orphanStream(
+						orphanTemporary, std::ios::binary | std::ios::trunc);
+					orphanStream.put('x');
+				}
+				state->m_ReportAbandoned.store(true, std::memory_order_release);
+				const bool recovered =
+					store.Write(key, ArtifactType, SchemaVersion, artifactDigest, Payload);
+
+				const std::filesystem::path collidingTrash = fakeRoot.parent_path() /
+					(fakeRoot.filename().string() + ".trash.trash-collision");
+				GGLAB_UNUSED(std::filesystem::create_directories(collidingTrash, errorCode));
+				{
+					std::ofstream collisionStream(
+						collidingTrash / "entry.ddc", std::ios::binary | std::ios::trunc);
+					collisionStream.put('x');
+				}
+				{
+					std::scoped_lock tokenLock(state->m_TokenMutex);
+					state->m_ForcedTokens.push_back("trash-collision");
+					state->m_ForcedTokens.push_back("trash-replacement");
+				}
+				const bool cleared = store.Clear();
+				for (uint32_t attempt = 0;
+					attempt < 200 && std::filesystem::exists(collidingTrash); ++attempt)
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				}
+				context.Check(wrote && collisionPreserved && recovered &&
+					!std::filesystem::exists(orphanTemporary) && cleared &&
+					std::filesystem::is_directory(fakeRoot) &&
+					!std::filesystem::exists(collidingTrash),
+					"Portable Local DDC workflow retries temporary/trash token collisions and recovers a fake abandoned owner");
 			}
 
 			{

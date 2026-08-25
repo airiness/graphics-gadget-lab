@@ -211,8 +211,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
@@ -467,8 +467,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataPlatform.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h" />

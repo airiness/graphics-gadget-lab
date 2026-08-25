@@ -43,6 +43,12 @@
     <Filter Include="Graphics\Asset\DerivedData">
       <UniqueIdentifier>{6366A420-B1D0-BCEC-4C16-0618DCDF7347}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\Asset\DerivedData\Platform">
+      <UniqueIdentifier>{EB1AE33F-98A8-1FF4-6E1F-52D70B93D382}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\Asset\DerivedData\Platform\Win">
+      <UniqueIdentifier>{4109B204-F142-301F-5937-98B4316A3905}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\Asset\Interest">
       <UniqueIdentifier>{1BB258B9-B03B-EA6D-467B-E3319B75CFBA}</UniqueIdentifier>
     </Filter>
@@ -264,11 +270,11 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.cpp">
+      <Filter>Graphics\Asset\DerivedData\Platform\Win</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
@@ -965,11 +971,14 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataMaintenanceLock.h">
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataPlatform.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h">
+      <Filter>Graphics\Asset\DerivedData\Platform\Win</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
