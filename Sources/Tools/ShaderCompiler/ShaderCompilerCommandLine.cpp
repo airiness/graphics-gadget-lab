@@ -71,6 +71,25 @@ namespace gglab
 		int argumentCount, wchar_t* arguments[]) noexcept
 	{
 		ShaderCompilerCommandLine parsed{};
+
+		// describe is a zero-argument, JSON-implicit machine self-description
+		// command (machine describe handshake contract). It is identified
+		// before the general --result-format pre-scan, which only applies to
+		// compile / build-runtime: describe accepts no options, and any extra
+		// argv is a structured usage error. Forcing m_JsonRequested on that
+		// error makes the failure document emit through the machine channel.
+		if (argumentCount >= 2 &&
+			std::wstring_view(arguments[1]) == L"describe")
+		{
+			parsed.m_Command = ShaderCompilerCommand::Describe;
+			if (argumentCount > 2)
+			{
+				parsed.m_JsonRequested = true;
+				parsed.m_Error = L"describe accepts no arguments";
+			}
+			return parsed;
+		}
+
 		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
 		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
 		if (resultFormat.m_OccurrenceCount > 1)

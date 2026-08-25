@@ -10,10 +10,12 @@
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
+#include "Targets/ShaderTargetWireNames.h"
 
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -30,6 +32,34 @@ namespace
 	constexpr int ExitCodeCompileFailed = 4;
 	constexpr int ExitCodeArtifactIOFailure = 5;
 	constexpr int ExitCodeSourceChanged = 6;
+	// Handled internal failure floor for the describe document; process
+	// crash and CRT abort remain outside its scope. New exit code, not
+	// previously allocated for compile / build-runtime.
+	constexpr int ExitCodeInternalError = 7;
+
+	// Process-only test seam (no user-facing flag): force the describe
+	// handled-internal-failure path so the internal-error / exit 7 wire
+	// outcome can be verified deterministically in the black-box matrix.
+	// Same confinement style as GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE.
+	[[nodiscard]] bool ForceDescribeInternalErrorForTest() noexcept
+	{
+		wchar_t value[2]{};
+		std::size_t length = 0;
+		return _wgetenv_s(&length, value, 2, L"GGLAB_SHADERC_TEST_FORCE_DESCRIBE_INTERNAL_ERROR") == 0 &&
+			length == 2 && value[0] == L'1';
+	}
+
+	// Describe shares the generic "force compiler unavailable" test seam so its
+	// producer-unavailable / exit 4 path is deterministic in the black-box
+	// matrix. Same env variable name as the compile / build-runtime forced-
+	// unavailable seam; no user-facing flag.
+	[[nodiscard]] bool ForceDescribeCompilerUnavailableForTest() noexcept
+	{
+		wchar_t value[2]{};
+		std::size_t length = 0;
+		return _wgetenv_s(&length, value, 2, L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE") == 0 &&
+			length == 2 && value[0] == L'1';
+	}
 
 	class NullLogSink final : public gglab::LogSink
 	{
@@ -114,17 +144,9 @@ namespace
 	[[nodiscard]] bool ParseTarget(
 		std::string_view text, gglab::ShaderTargetProfile& outProfile) noexcept
 	{
-		if (text == "gglab-dx12")
-		{
-			outProfile = gglab::ShaderTargetProfile::GGLabDX12;
-			return true;
-		}
-		if (text == "gglab-vulkan13")
-		{
-			outProfile = gglab::ShaderTargetProfile::GGLabVulkan13;
-			return true;
-		}
-		return false;
+		// Accept side of the target wire-name single source of truth; the
+		// describe supportedTargets and this accept set are asserted identical.
+		return gglab::ShaderTargetWire::Parse(text, outProfile);
 	}
 
 	[[nodiscard]] gglab::ShaderCompileTarget MakeCompileTarget(
@@ -364,10 +386,125 @@ namespace
 			result, recipe, binaryPath, recordPath, targetName, publication);
 	}
 
+	[[nodiscard]] std::string_view ProducerKindWireName(gglab::ShaderCompilerKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case gglab::ShaderCompilerKind::Dxc:
+		default:
+			// Dxc is the only producer kind today; any future kind maps to a
+			// distinct wire name once it is added.
+			return "dxc";
+		}
+	}
+
+	int PrintJsonDescribeCompilerUnavailable()
+	{
+		// Reuses the existing CLI status/exit membership (compiler-unavailable
+		// / 4); no business payload, processContractVersion present.
+		return PrintJsonDocument({
+			{ "command", "describe" },
+			{ "success", false },
+			{ "status", "compiler-unavailable" },
+			{ "exitCode", ExitCodeCompileFailed },
+			{ "processContractVersion", gglab::ShaderProcessContractVersion },
+			{ "diagnostics", nlohmann::json::array({ {
+				{ "message", "DXC producer runtime could not be resolved" },
+			} }) },
+		}, ExitCodeCompileFailed);
+	}
+
+	int PrintJsonDescribeInternalError()
+	{
+		// Handled internal error floor (exit 7), describe-only.
+		return PrintJsonDocument({
+			{ "command", "describe" },
+			{ "success", false },
+			{ "status", "internal-error" },
+			{ "exitCode", ExitCodeInternalError },
+			{ "processContractVersion", gglab::ShaderProcessContractVersion },
+			{ "diagnostics", nlohmann::json::array({ {
+				{ "message", "describe internal failure" },
+			} }) },
+		}, ExitCodeInternalError);
+	}
+
+	int PrintJsonDescribeUsageFailure(std::wstring_view message)
+	{
+		return PrintJsonDocument({
+			{ "command", "describe" },
+			{ "success", false },
+			{ "status", "usage-error" },
+			{ "exitCode", ExitCodeInvalidCommandLine },
+			{ "processContractVersion", gglab::ShaderProcessContractVersion },
+			{ "diagnostics", nlohmann::json::array({ {
+				{ "message", gglab::utils::ToString(message) },
+			} }) },
+		}, ExitCodeInvalidCommandLine);
+	}
+
+	int RunDescribe()
+	{
+		if (ForceDescribeInternalErrorForTest())
+		{
+			return PrintJsonDescribeInternalError();
+		}
+		if (ForceDescribeCompilerUnavailableForTest())
+		{
+			return PrintJsonDescribeCompilerUnavailable();
+		}
+
+		try
+		{
+			const gglab::ShaderCompilerIdentity identity = gglab::QueryDxcCompilerIdentity();
+			// An unresolvable producer (empty sentinel or the
+			// "unknown" parse-failure sentinel) is a structured failure, never
+			// success plus an "unknown" wire value.
+			if (identity.m_CanonicalIdentity.empty() ||
+				identity.m_CanonicalIdentity == L"unknown")
+			{
+				return PrintJsonDescribeCompilerUnavailable();
+			}
+
+			nlohmann::json supportedTargets = nlohmann::json::array();
+			for (const std::string& name : gglab::ShaderTargetWire::Names())
+			{
+				supportedTargets.push_back(name);
+			}
+			// Field order is contract-stable; every field derives
+			// from an existing authority value rather than a CLI-local fact.
+			const nlohmann::json document{
+				{ "command", "describe" },
+				{ "success", true },
+				{ "status", "ok" },
+				{ "exitCode", ExitCodeSuccess },
+				{ "processContractVersion", gglab::ShaderProcessContractVersion },
+				{ "toolIdentity", "gglab-shaderc" },
+				{ "toolVersion", gglab::utils::ToString(gglab::ShaderCompilerToolVersion) },
+				{ "producerKind", std::string(ProducerKindWireName(identity.m_Kind)) },
+				{ "producerIdentity", gglab::utils::ToString(identity.m_CanonicalIdentity) },
+				{ "supportedTargets", std::move(supportedTargets) },
+				{ "diagnostics", nlohmann::json::array() },
+			};
+			return PrintJsonDocument(document, ExitCodeSuccess);
+		}
+		catch (...)
+		{
+			// Handled internal failure floor: emit the structured document
+			// instead of unwinding an allocation/serialization exception to a
+			// process abort. Process crash / CRT abort are outside the contract.
+			return PrintJsonDescribeInternalError();
+		}
+	}
+
 	int RunTargets()
 	{
-		std::wcout << L"gglab-dx12\n";
-		std::wcout << L"gglab-vulkan13\n";
+		// Report side of the target wire-name single source of truth; kept
+		// human-facing only (consumers must not parse this surface).
+		for (const std::string& name : gglab::ShaderTargetWire::Names())
+		{
+			std::wcout << gglab::utils::ToWideString(name) << L"\n";
+		}
 		return ExitCodeSuccess;
 	}
 
@@ -443,7 +580,17 @@ namespace
 	{
 		const gglab::ShaderCompilerIdentity identity = gglab::QueryDxcCompilerIdentity();
 		std::wcout << L"gglab-shaderc " << gglab::ShaderCompilerToolVersion << L"\n";
-		std::wcout << L"Producer: dxc " << identity.m_CanonicalIdentity << L"\n";
+		if (identity.m_CanonicalIdentity.empty() ||
+			identity.m_CanonicalIdentity == L"unknown")
+		{
+			// Human-facing distinction for an unresolvable producer; the wire
+			// (machine) contract is unchanged by this.
+			std::wcout << L"Producer: unavailable\n";
+		}
+		else
+		{
+			std::wcout << L"Producer: dxc " << identity.m_CanonicalIdentity << L"\n";
+		}
 		return ExitCodeSuccess;
 	}
 }
@@ -452,11 +599,19 @@ int wmain(int argumentCount, wchar_t* arguments[])
 {
 	const gglab::ShaderCompilerCommandLine commandLine =
 		gglab::ParseShaderCompilerCommandLine(argumentCount, arguments);
-	ConfigureProcessOutput(commandLine.m_JsonRequested);
+	// describe is JSON-implicit: its machine channel (exactly one stdout
+	// document, empty stderr) is owned by the command itself, not by
+	// --result-format (which it does not accept).
+	const bool jsonRequested = commandLine.m_JsonRequested ||
+		commandLine.m_Command == gglab::ShaderCompilerCommand::Describe;
+	ConfigureProcessOutput(jsonRequested);
 	if (!commandLine.IsValid())
 	{
-		return PrintCommandLineFailure(commandLine.m_Error,
-			commandLine.m_JsonRequested, true);
+		if (commandLine.m_Command == gglab::ShaderCompilerCommand::Describe)
+		{
+			return PrintJsonDescribeUsageFailure(commandLine.m_Error);
+		}
+		return PrintCommandLineFailure(commandLine.m_Error, jsonRequested, true);
 	}
 
 	switch (commandLine.m_Command)
@@ -469,6 +624,8 @@ int wmain(int argumentCount, wchar_t* arguments[])
 		return RunTargets();
 	case gglab::ShaderCompilerCommand::Version:
 		return RunVersion();
+	case gglab::ShaderCompilerCommand::Describe:
+		return RunDescribe();
 	case gglab::ShaderCompilerCommand::Help:
 	case gglab::ShaderCompilerCommand::None:
 		std::wcout << gglab::ShaderCompilerCommandLineUsage() << L"\n";

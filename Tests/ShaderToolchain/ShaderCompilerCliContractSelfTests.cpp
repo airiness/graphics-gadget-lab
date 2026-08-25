@@ -11,6 +11,7 @@
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
+#include "Targets/ShaderTargetWireNames.h"
 
 #include <windows.h>
 
@@ -107,7 +108,8 @@ namespace gglab
 		};
 
 		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments,
-			bool forceCompilerUnavailable = false) noexcept
+			bool forceCompilerUnavailable = false,
+			bool forceDescribeInternalError = false) noexcept
 		{
 			CliRunResult result{};
 			std::optional<ScopedEnvironmentVariable> compilerUnavailableEnvironment;
@@ -116,6 +118,16 @@ namespace gglab
 				compilerUnavailableEnvironment.emplace(
 					L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE", L"1");
 				if (!compilerUnavailableEnvironment->IsSet())
+				{
+					return result;
+				}
+			}
+			std::optional<ScopedEnvironmentVariable> describeInternalErrorEnvironment;
+			if (forceDescribeInternalError)
+			{
+				describeInternalErrorEnvironment.emplace(
+					L"GGLAB_SHADERC_TEST_FORCE_DESCRIBE_INTERNAL_ERROR", L"1");
+				if (!describeInternalErrorEnvironment->IsSet())
 				{
 					return result;
 				}
@@ -159,6 +171,7 @@ namespace gglab
 				commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
 				nullptr, win32::GetExecutableDirectory().c_str(), &startupInfo, &processInfo);
 			compilerUnavailableEnvironment.reset();
+			describeInternalErrorEnvironment.reset();
 			CloseHandle(outWrite);
 			CloseHandle(errWrite);
 			if (!created)
@@ -216,6 +229,34 @@ namespace gglab
 			return document.size() >= 2 && document.front() == '{' && document.back() == '}' &&
 				document.find('\n') == std::string_view::npos &&
 				document.find('\r') == std::string_view::npos;
+		}
+
+		// Minimal semver (MAJOR.MINOR.PATCH, non-negative integers) shape check
+		// for the describe toolVersion wire fact.
+		[[nodiscard]] bool IsSemver(std::string_view text) noexcept
+		{
+			if (text.empty() || text.front() < '0' || text.front() > '9')
+			{
+				return false;
+			}
+			std::size_t dots = 0;
+			bool inDigitRun = false;
+			for (const char character : text)
+			{
+				if (character >= '0' && character <= '9')
+				{
+					inDigitRun = true;
+					continue;
+				}
+				if (character == '.' && inDigitRun)
+				{
+					++dots;
+					inDigitRun = false;
+					continue;
+				}
+				return false;
+			}
+			return inDigitRun && dots == 2;
 		}
 
 		[[nodiscard]] bool HasJsonEnvelope(const CliRunResult& result,
@@ -280,6 +321,191 @@ namespace gglab
 				}
 			}
 			return decoded;
+		}
+
+		void RunDescribeHandshakeTests(SelfTestContext& context) noexcept
+		{
+			// Machine describe handshake contract — wire verification. These
+			// protocol self-tests go only through describe (per the consumer
+			// discipline): targets / --version stay state-behavior checks and are
+			// not consumer-facing contract verdicts.
+
+			// Exact success document, byte stability, empty stderr.
+			{
+				const CliRunResult first = RunCli({ L"describe" });
+				const CliRunResult second = RunCli({ L"describe" });
+				context.Check(
+					first.m_ExitCode == 0 && second.m_ExitCode == 0 &&
+						IsSingleJsonDocument(first) && IsSingleJsonDocument(second) &&
+						first.m_StdOut == second.m_StdOut &&
+						first.m_StdErr.empty() && second.m_StdErr.empty() &&
+						first.m_StdOut.find("\"command\":\"describe\"") != std::string::npos &&
+						first.m_StdOut.find("\"success\":true") != std::string::npos &&
+						first.m_StdOut.find("\"status\":\"ok\"") != std::string::npos &&
+						first.m_StdOut.find("\"exitCode\":0") != std::string::npos &&
+						first.m_StdOut.find("\"processContractVersion\":1") != std::string::npos &&
+						first.m_StdOut.find("\"diagnostics\":[]") != std::string::npos,
+					"describe emits a byte-stable success document and no stderr");
+			}
+
+			// Canonical tool identity.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				context.Check(
+					ExtractJsonField(result.m_StdOut, "toolIdentity") == "gglab-shaderc",
+					"describe.toolIdentity is the canonical wire identity gglab-shaderc");
+			}
+
+			// toolVersion matches the documented tool version and is
+			// semver-shaped (the version-comparison discipline is the consumer's).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const std::string wireVersion = ExtractJsonField(result.m_StdOut, "toolVersion");
+				context.Check(
+					wireVersion == "1.0.0" && IsSemver(wireVersion),
+					"describe.toolVersion matches the tool version and is semver-shaped");
+			}
+
+			// processContractVersion stability (the current wire value is 1).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				context.Check(
+					result.m_StdOut.find("\"processContractVersion\":1") != std::string::npos,
+					"describe processContractVersion equals the current wire value (ShaderProcessContractVersion)");
+			}
+
+			// Producer identity parity with the in-process
+			// QueryDxcCompilerIdentity() (multi-process parity), not "unknown".
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const std::string wireKind = ExtractJsonField(result.m_StdOut, "producerKind");
+				const std::string wireIdentity = ExtractJsonField(result.m_StdOut, "producerIdentity");
+				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
+				context.Check(
+					wireKind == "dxc" &&
+						wireIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
+						wireIdentity != "unknown" && !wireIdentity.empty(),
+					"describe producer identity has in-process parity with QueryDxcCompilerIdentity()");
+			}
+
+			// supportedTargets is exactly the supported set and matches the
+			// target wire-name single source of truth (accept + report agree).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const std::vector<std::string> wireNames = ShaderTargetWire::Names();
+				ShaderTargetProfile parsedProfile = ShaderTargetProfile::GGLabDX12;
+				const bool parseDx12 = ShaderTargetWire::Parse("gglab-dx12", parsedProfile) &&
+					parsedProfile == ShaderTargetProfile::GGLabDX12;
+				const bool parseVulkan = ShaderTargetWire::Parse("gglab-vulkan13", parsedProfile) &&
+					parsedProfile == ShaderTargetProfile::GGLabVulkan13;
+				context.Check(
+					wireNames.size() == 2 &&
+						wireNames[0] == "gglab-dx12" &&
+						wireNames[1] == "gglab-vulkan13" &&
+						parseDx12 && parseVulkan,
+					"target wire-name single source of truth enumerates and accepts the supported set");
+				context.Check(
+					IsSingleJsonDocument(result) &&
+						result.m_StdOut.find("\"supportedTargets\"") != std::string::npos &&
+						result.m_StdOut.find("\"gglab-dx12\"") != std::string::npos &&
+						result.m_StdOut.find("\"gglab-vulkan13\"") != std::string::npos &&
+						result.m_StdOut.find("gglab-dx11") == std::string::npos &&
+						result.m_StdOut.find("gglab-ps5") == std::string::npos,
+					"describe wire carries exactly the supported targets (no extras)");
+			}
+
+			// No caller build context appears in the describe result.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				context.Check(
+					result.m_StdOut.find("sourceRoot") == std::string::npos &&
+						result.m_StdOut.find("source-root") == std::string::npos &&
+						result.m_StdOut.find("sourcePath") == std::string::npos &&
+						result.m_StdOut.find("cacheRoot") == std::string::npos &&
+						result.m_StdOut.find("cache-root") == std::string::npos &&
+						result.m_StdOut.find("artifactRoot") == std::string::npos &&
+						result.m_StdOut.find("artifact-root") == std::string::npos &&
+						result.m_StdOut.find("binaryPath") == std::string::npos &&
+						result.m_StdOut.find("cacheRecordPath") == std::string::npos &&
+						result.m_StdOut.find("cwd") == std::string::npos,
+					"describe result carries no caller build context (source/cache/artifact/cwd)");
+			}
+
+			// stdout purity (one JSON document, empty stderr).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				context.Check(
+					IsSingleJsonDocument(result) && result.m_StdErr.empty(),
+					"describe success is a single stdout JSON document with empty stderr");
+			}
+
+			// usage errors are structured (three variants), no business payload.
+			{
+				const CliRunResult positional = RunCli({ L"describe", L"extra" });
+				const CliRunResult resultFormat = RunCli({ L"describe", L"--result-format", L"json" });
+				const CliRunResult bogusFlag = RunCli({ L"describe", L"--bogus" });
+				auto CheckDescribeUsageError = [&context](
+					const CliRunResult& run, const char* label) noexcept
+				{
+					const std::string checkName =
+						std::string("describe usage-error structured (") + label + ")";
+					context.Check(
+						run.m_ExitCode == 2 &&
+							IsSingleJsonDocument(run) &&
+							run.m_StdOut.find("\"command\":\"describe\"") != std::string::npos &&
+							run.m_StdOut.find("\"success\":false") != std::string::npos &&
+							run.m_StdOut.find("\"status\":\"usage-error\"") != std::string::npos &&
+							run.m_StdOut.find("\"exitCode\":2") != std::string::npos &&
+							run.m_StdOut.find("\"processContractVersion\":1") != std::string::npos &&
+							run.m_StdOut.find("\"diagnostics\":[") != std::string::npos &&
+							run.m_StdOut.find("\"diagnostics\":[]") == std::string::npos &&
+							run.m_StdErr.empty() &&
+							// no success business fields leak into the usage error
+							run.m_StdOut.find("\"toolIdentity\"") == std::string::npos &&
+							run.m_StdOut.find("\"toolVersion\"") == std::string::npos &&
+							run.m_StdOut.find("\"producerKind\"") == std::string::npos &&
+							run.m_StdOut.find("\"producerIdentity\"") == std::string::npos &&
+							run.m_StdOut.find("\"supportedTargets\"") == std::string::npos,
+						checkName.c_str());
+				};
+				CheckDescribeUsageError(positional, "extra positional argument");
+				CheckDescribeUsageError(resultFormat, "--result-format json");
+				CheckDescribeUsageError(bogusFlag, "unknown flag");
+			}
+
+			// Producer unavailable via the existing forced-unavailable seam.
+			{
+				const CliRunResult result =
+					RunCli({ L"describe" }, /*forceCompilerUnavailable*/ true);
+				context.Check(
+					result.m_ExitCode == 4 &&
+						IsSingleJsonDocument(result) &&
+						result.m_StdOut.find("\"command\":\"describe\"") != std::string::npos &&
+						result.m_StdOut.find("\"success\":false") != std::string::npos &&
+						result.m_StdOut.find("\"status\":\"compiler-unavailable\"") != std::string::npos &&
+						result.m_StdOut.find("\"exitCode\":4") != std::string::npos &&
+						result.m_StdOut.find("\"processContractVersion\":1") != std::string::npos &&
+						result.m_StdOut.find("\"producerIdentity\"") == std::string::npos &&
+						result.m_StdErr.empty(),
+					"describe reports compiler-unavailable (exit 4) when the producer is unavailable");
+			}
+
+			// Internal error floor via the describe internal-error seam.
+			{
+				const CliRunResult result = RunCli(
+					{ L"describe" }, /*forceCompilerUnavailable*/ false,
+					/*forceDescribeInternalError*/ true);
+				context.Check(
+					result.m_ExitCode == 7 &&
+						IsSingleJsonDocument(result) &&
+						result.m_StdOut.find("\"command\":\"describe\"") != std::string::npos &&
+						result.m_StdOut.find("\"success\":false") != std::string::npos &&
+						result.m_StdOut.find("\"status\":\"internal-error\"") != std::string::npos &&
+						result.m_StdOut.find("\"exitCode\":7") != std::string::npos &&
+						result.m_StdOut.find("\"processContractVersion\":1") != std::string::npos &&
+						result.m_StdErr.empty(),
+					"describe reports internal-error (exit 7) on a forced handled failure");
+			}
 		}
 
 		[[nodiscard]] bool WriteTextFile(
@@ -1139,5 +1365,9 @@ namespace gglab
 		RunJsonProcessContractTests(context, sourceRoot, tempRoot);
 		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
 		RunRuntimeBuildContractTests(context, sourceRoot, tempRoot);
+		// Machine describe handshake contract self-tests. The remaining
+		// structural no-regression invariants are asserted by the
+		// compile/build-runtime matrix and legacy-grammar checks above.
+		RunDescribeHandshakeTests(context);
 	}
 }
