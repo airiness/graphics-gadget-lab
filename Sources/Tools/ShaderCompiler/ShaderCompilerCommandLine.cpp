@@ -57,7 +57,11 @@ namespace gglab
 			L"      --stage <vertex|pixel|hull|domain|geometry|mesh|compute>\n"
 			L"      --entry <name> --target <gglab-dx12|gglab-vulkan13>\n"
 			L"      [--define NAME[=VALUE]]... [--include <path>]...\n"
-			L"      [--cache-root <path>] [--result-format <text|json>]\n"
+			L"      [--cache-root <path>] [--artifact-root <path>]\n"
+			L"      [--result-format <text|json>]\n"
+			L"  gglab-shaderc build-runtime --source-root <path>\n"
+			L"      --target <gglab-dx12|gglab-vulkan13> --cache-root <path>\n"
+			L"      --artifact-root <path> [--result-format <text|json>]\n"
 			L"  gglab-shaderc targets\n"
 			L"  gglab-shaderc --version\n"
 			L"  gglab-shaderc --help";
@@ -95,6 +99,79 @@ namespace gglab
 		if (first == L"--help" || first == L"help")
 		{
 			parsed.m_Command = ShaderCompilerCommand::Help;
+			return parsed;
+		}
+		if (first == L"build-runtime")
+		{
+			parsed.m_Command = ShaderCompilerCommand::BuildRuntime;
+			ShaderBuildRuntimeCommandOptions& options = parsed.m_BuildRuntime;
+			for (int index = 2; index < argumentCount; ++index)
+			{
+				const std::wstring_view argument = arguments[index];
+				std::wstring value;
+				if (argument == L"--source-root")
+				{
+					if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+						parsed.m_Error) == nullptr)
+					{
+						return parsed;
+					}
+					options.m_SourceRoot = value;
+				}
+				else if (argument == L"--target")
+				{
+					if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+						parsed.m_Error) == nullptr)
+					{
+						return parsed;
+					}
+					options.m_Target = ToString(value);
+				}
+				else if (argument == L"--cache-root")
+				{
+					if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+						parsed.m_Error) == nullptr)
+					{
+						return parsed;
+					}
+					options.m_CacheRoot = value;
+				}
+				else if (argument == L"--artifact-root")
+				{
+					if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+						parsed.m_Error) == nullptr)
+					{
+						return parsed;
+					}
+					options.m_ArtifactRoot = value;
+				}
+				else if (argument == L"--result-format")
+				{
+					if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+						parsed.m_Error) == nullptr)
+					{
+						return parsed;
+					}
+					options.m_ResultFormat = ToString(value);
+				}
+				else
+				{
+					parsed.m_Error = L"Unknown argument: " + std::wstring(argument);
+					return parsed;
+				}
+			}
+			if (options.m_SourceRoot.empty() || options.m_Target.empty() ||
+				options.m_CacheRoot.empty() || options.m_ArtifactRoot.empty())
+			{
+				parsed.m_Error = L"build-runtime requires --source-root, --target, "
+					L"--cache-root, and --artifact-root";
+				return parsed;
+			}
+			if (options.m_ResultFormat != "text" && options.m_ResultFormat != "json")
+			{
+				parsed.m_Error = L"Invalid --result-format value: " +
+					utils::ToWideString(options.m_ResultFormat);
+			}
 			return parsed;
 		}
 		if (first != L"compile")
@@ -180,6 +257,15 @@ namespace gglab
 					return parsed;
 				}
 				options.m_CacheRoot = value;
+			}
+			else if (argument == L"--artifact-root")
+			{
+				if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+					parsed.m_Error) == nullptr)
+				{
+					return parsed;
+				}
+				options.m_ArtifactRoot = value;
 			}
 			else if (argument == L"--result-format")
 			{

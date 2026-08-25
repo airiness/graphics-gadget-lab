@@ -1,4 +1,6 @@
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -14,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <stop_token>
 #include <string>
@@ -40,7 +43,52 @@ namespace gglab
 				TextureIndex::IBL_IrradianceCubemap,
 				TextureIndex::IBL_PrefilteredSpecularCubemap,
 				TextureIndex::IBL_BrdfLut,
+			};
+
+		const std::array<ShaderProgramRef, 10> IBLProducerPrograms = {
+			shader_programs::IBLEnvironmentVertex,
+			shader_programs::IBLEnvironmentPixel,
+			shader_programs::IBLEnvironmentMipVertex,
+			shader_programs::IBLEnvironmentMipPixel,
+			shader_programs::IBLIrradianceVertex,
+			shader_programs::IBLIrradiancePixel,
+			shader_programs::IBLPrefilteredSpecularVertex,
+			shader_programs::IBLPrefilteredSpecularPixel,
+			shader_programs::IBLBrdfLUTVertex,
+			shader_programs::IBLBrdfLUTPixel,
 		};
+
+		[[nodiscard]] bool CaptureIBLProducerArtifacts(ShaderManager& shaderManager,
+			IBLShaderArtifactIdentities& outIdentities,
+			ShaderProgramRegistryArtifactRef& outRegistryRef) noexcept
+		{
+			std::array<ShaderArtifactRef, IBLProducerPrograms.size()> artifacts{};
+			if (!shaderManager.CaptureArtifactRefs(
+				IBLProducerPrograms, artifacts, outRegistryRef))
+			{
+				return false;
+			}
+
+			auto assignStage = [&outIdentities, &artifacts](IBLArtifactStage stage,
+				std::initializer_list<size_t> indices) noexcept
+			{
+				auto& identity = outIdentities[static_cast<size_t>(stage)];
+				identity.m_Count = static_cast<uint32_t>(indices.size());
+				size_t destination = 0;
+				for (const size_t index : indices)
+				{
+					identity.m_ArtifactRefs[destination++] = artifacts[index];
+				}
+			};
+
+			assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
+			assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
+			assignStage(IBLArtifactStage::PrefilteredSpecular, { 6, 7 });
+			assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
+			return std::ranges::all_of(outIdentities,
+				[](const IBLStageShaderArtifactIdentity& identity) noexcept
+				{ return identity.IsValid(); });
+		}
 
 		[[nodiscard]] consteval bool ValidateResourceInitializationAbortSupersede() noexcept
 		{
@@ -71,6 +119,20 @@ namespace gglab
 
 		static_assert(ValidateResourceInitializationAbortSupersede(),
 			"IBL resource initialization must not survive an abort and superseding generation.");
+
+		[[nodiscard]] consteval bool ValidateShaderRegistryChangeDetection() noexcept
+		{
+			ShaderProgramRegistryArtifactRef first{};
+			first.m_RegistryId.m_DurableDigest.m_Value[0] = std::byte{ 1 };
+			ShaderProgramRegistryArtifactRef second{};
+			second.m_RegistryId.m_DurableDigest.m_Value[0] = std::byte{ 2 };
+			return !detail::HasIBLBakeShaderRegistryChanged({}, first) &&
+				!detail::HasIBLBakeShaderRegistryChanged(first, first) &&
+				detail::HasIBLBakeShaderRegistryChanged(first, second);
+		}
+
+		static_assert(ValidateShaderRegistryChangeDetection(),
+			"IBL bake provenance must restart when the active shader registry changes.");
 	}
 
 	IBLBakeScheduler::IBLBakeScheduler(const CreateInfo& createInfo) noexcept :
@@ -78,9 +140,9 @@ namespace gglab
 		m_EnvironmentLightingSystem(createInfo.m_EnvironmentLightingSystem),
 		m_RenderResourceRegistry(createInfo.m_RenderResourceRegistry),
 		m_TransferManager(createInfo.m_TransferManager), m_GpuProfiler(createInfo.m_GpuProfiler),
+		m_ShaderManager(createInfo.m_ShaderManager),
 		m_DerivedDataSystem({
 			.m_CacheDirectory = createInfo.m_DerivedDataCacheDirectory,
-			.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot,
 			.m_ArtifactCache = createInfo.m_ArtifactCache,
 			.m_Compatibility = IBLArtifactCompatibility::AdapterScoped,
 			.m_AdapterScopeIdentity = std::string(
@@ -93,6 +155,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem);
 		GGLAB_ASSERT_NOT_NULL(m_RenderResourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(m_TransferManager);
+		GGLAB_ASSERT_NOT_NULL(m_ShaderManager);
 	}
 
 	IBLBakeScheduler::~IBLBakeScheduler()
@@ -123,8 +186,19 @@ namespace gglab
 	void IBLBakeScheduler::Tick(const RHIFencePoint& lastSubmittedFence) noexcept
 	{
 		m_Status.m_RequestedGeneration = m_EnvironmentLightingSystem->GetBakeRequestGeneration();
+		const bool shaderRegistryChanged = detail::HasIBLBakeShaderRegistryChanged(
+			m_BakingRequest.m_ShaderRegistry, m_ShaderManager->GetActiveRegistryRef());
+		if (shaderRegistryChanged)
+		{
+			if (m_CacheLookupTask.IsValid())
+			{
+				GGLAB_UNUSED(m_TaskSystem->Cancel(m_CacheLookupTask));
+			}
+			m_CompletedCacheLookup.reset();
+			m_CurrentCacheLoad.reset();
+		}
 
-		if (m_CompletedCacheLookup)
+		if (!shaderRegistryChanged && m_CompletedCacheLookup)
 		{
 			auto work = std::move(m_CompletedCacheLookup);
 			BeginBakeResourceInitialization(lastSubmittedFence, work);
@@ -138,13 +212,25 @@ namespace gglab
 			}
 
 			m_InFlightFence = {};
-			if (m_BakeResourceInitialization.IsInFlight())
+			if (shaderRegistryChanged)
+			{
+				if (m_BakeResourceInitialization.IsInFlight())
+				{
+					GGLAB_UNUSED(m_BakeResourceInitialization.Complete());
+				}
+				m_CacheReadbackInFlight = false;
+				m_CacheUploadInFlight = false;
+				m_ReadbackWork.reset();
+				m_CompletedStage = IBLBakeStage::Idle;
+				m_ExecutedStage = IBLBakeStage::Idle;
+			}
+			else if (m_BakeResourceInitialization.IsInFlight())
 			{
 				const uint64_t generation = m_BakeResourceInitialization.Complete();
 				ContinueRequestedBakeAfterInitialization(generation);
 				return;
 			}
-			if (m_CacheReadbackInFlight)
+			else if (m_CacheReadbackInFlight)
 			{
 				m_CacheReadbackInFlight = false;
 				StartCacheWrite();
@@ -171,6 +257,15 @@ namespace gglab
 				}
 				m_CompletedStage = IBLBakeStage::Idle;
 			}
+		}
+
+		if (shaderRegistryChanged)
+		{
+			GGLAB_LOG_GRAPHICS_INFO(
+				"IBL bake generation {} is restarting for a new shader registry snapshot.",
+				m_Status.m_BakingGeneration);
+			StartRequestedBake(lastSubmittedFence);
+			return;
 		}
 
 		if (m_Status.m_RequestedGeneration != m_Status.m_BakingGeneration &&
@@ -211,10 +306,22 @@ namespace gglab
 		m_Status.m_CacheWritePending = m_CacheReadbackInFlight || !m_PendingCacheWrites.empty();
 		m_Status.m_GpuMilliseconds = 0.0;
 		m_Status.m_GpuTimingAvailable = false;
+		const uint64_t bakeAttempt = m_NextBakeAttempt++;
+		ShaderProgramRegistryArtifactRef shaderRegistryRef{};
+		IBLShaderArtifactIdentities shaderArtifacts{};
+		if (!CaptureIBLProducerArtifacts(
+			*m_ShaderManager, shaderArtifacts, shaderRegistryRef))
+		{
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
 		m_BakingRequest = {
+			.m_Attempt = bakeAttempt,
 			.m_Generation = m_Status.m_BakingGeneration,
 			.m_Source = m_EnvironmentLightingSystem->GetBakeSource(),
 			.m_Config = m_EnvironmentLightingSystem->GetBakeConfig(),
+			.m_ShaderRegistry = shaderRegistryRef,
+			.m_ShaderArtifacts = shaderArtifacts,
 			.m_IgnoreCache =
 				m_EnvironmentLightingSystem->ShouldIgnoreCache(m_Status.m_BakingGeneration),
 		};
@@ -234,18 +341,20 @@ namespace gglab
 		const uint64_t generation = m_Status.m_BakingGeneration;
 		const bool ignoreCache = m_BakingRequest.m_IgnoreCache;
 		auto work = std::make_shared<CacheLoadWork>();
+		work->m_Attempt = bakeAttempt;
 		work->m_Generation = generation;
+		work->m_ShaderRegistry = shaderRegistryRef;
 		SetStage(IBLBakeStage::LoadingCache, 0.0f);
 		m_CacheLookupTask = m_TaskSystem->Submit(
 			{
 				.m_Name = std::format("IBL.StageCacheRead: generation {}", generation),
 				.m_Priority = TaskPriority::High,
 			},
-			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config, ignoreCache,
-			work](std::stop_token stopToken) noexcept
+			[this, contentFingerprint, sourceType, config = m_BakingRequest.m_Config,
+			shaderArtifacts, ignoreCache, work](std::stop_token stopToken) noexcept
 			{
 				work->m_Result = m_DerivedDataSystem.Lookup(
-					contentFingerprint, sourceType, config, ignoreCache, stopToken);
+					contentFingerprint, sourceType, config, shaderArtifacts, ignoreCache, stopToken);
 				return TaskResult::Success();
 			},
 			[this, work](const TaskCompletionInfo& completion) noexcept
@@ -264,8 +373,10 @@ namespace gglab
 		{
 			m_CacheLookupTask = {};
 		}
-		if (work->m_Generation != m_Status.m_BakingGeneration ||
-			work->m_Generation != m_Status.m_RequestedGeneration)
+		if (work->m_Attempt != m_BakingRequest.m_Attempt ||
+			work->m_Generation != m_Status.m_BakingGeneration ||
+			work->m_Generation != m_Status.m_RequestedGeneration ||
+			work->m_ShaderRegistry != m_BakingRequest.m_ShaderRegistry)
 		{
 			return;
 		}
@@ -485,7 +596,11 @@ namespace gglab
 
 	IBLBakeStage IBLBakeScheduler::GetStageForRecording() const noexcept
 	{
-		return !m_InFlightFence.IsValid() && IsGpuStage(m_Status.m_Stage) ? m_Status.m_Stage
+		const bool shaderRegistryChanged = detail::HasIBLBakeShaderRegistryChanged(
+			m_BakingRequest.m_ShaderRegistry, m_ShaderManager->GetActiveRegistryRef());
+		return !shaderRegistryChanged && !m_InFlightFence.IsValid() &&
+			IsGpuStage(m_Status.m_Stage)
+			? m_Status.m_Stage
 			: IBLBakeStage::Idle;
 	}
 

@@ -43,6 +43,7 @@ namespace gglab
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 			AssetStateEventQueue* m_StateEvents = nullptr;
 			TextureArtifactCache* m_ArtifactCache = nullptr;
+			std::filesystem::path m_AssetRoot;
 		};
 
 		struct TextureLoadRequest
@@ -184,6 +185,7 @@ namespace gglab
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		AssetStateEventQueue* m_StateEvents = nullptr;
 		TextureArtifactCache* m_ArtifactCache = nullptr;
+		std::filesystem::path m_AssetRoot;
 
 		TextureIDCounter m_TextureIdCounter{ ReservedTextureCount };
 		TextureStore m_Store;

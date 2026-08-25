@@ -4,6 +4,7 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
+#include "Graphics/Asset/AssetPaths.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
@@ -105,7 +106,8 @@ namespace gglab
 		m_Device(createInfo.m_Device), m_LoadCoordinator(createInfo.m_LoadCoordinator),
 		m_TransferManager(createInfo.m_TransferManager),
 		m_AssetUploadScheduler(createInfo.m_AssetUploadScheduler),
-		m_StateEvents(createInfo.m_StateEvents), m_ArtifactCache(createInfo.m_ArtifactCache)
+		m_StateEvents(createInfo.m_StateEvents), m_ArtifactCache(createInfo.m_ArtifactCache),
+		m_AssetRoot(createInfo.m_AssetRoot)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice is null!");
 		GGLAB_ASSERT_MSG(m_LoadCoordinator != nullptr, "AssetLoadCoordinator is null!");
@@ -113,6 +115,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_AssetUploadScheduler != nullptr, "AssetUploadScheduler is null!");
 		GGLAB_ASSERT_MSG(m_StateEvents != nullptr, "AssetStateEventQueue is null!");
 		GGLAB_ASSERT_MSG(m_ArtifactCache != nullptr, "TextureArtifactCache is null!");
+		GGLAB_ASSERT_MSG(!m_AssetRoot.empty() && m_AssetRoot.is_absolute(),
+			"TextureAssetSystem requires an absolute asset root.");
 	}
 
 	void TextureAssetSystem::SetTextureState(Texture& texture, AssetState state,
@@ -188,7 +192,7 @@ namespace gglab
 			std::string_view name,
 			const std::filesystem::path& path) noexcept
 			{
-				const auto canonicalPath = utils::Canonical(path);
+				const auto canonicalPath = ResolveAssetPath(m_AssetRoot, path);
 				const TextureID textureId = ToTextureId(idIndex);
 				const TextureImportSettings importSettings =
 					MakeTextureImportSettings(TextureSemantic::UVTest);
@@ -231,7 +235,7 @@ namespace gglab
 			return {};
 		}
 
-		const auto canonicalPath = utils::Canonical(path);
+		const auto canonicalPath = ResolveAssetPath(m_AssetRoot, path);
 		std::error_code errorCode;
 		if (!std::filesystem::exists(canonicalPath, errorCode) ||
 			!std::filesystem::is_regular_file(canonicalPath, errorCode))

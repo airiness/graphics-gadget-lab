@@ -21,12 +21,19 @@
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp">
       <Filter>Artifact</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.cpp">
+      <Filter>Artifact</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp">
       <Filter>Compiler</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h">
+      <Filter>Artifact</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.h">
       <Filter>Artifact</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.h">
@@ -35,7 +42,7 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifact.h">
       <Filter>Contracts</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactManifest.h">
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactCacheRecord.h">
       <Filter>Contracts</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTarget.h">
@@ -44,13 +51,11 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTypes.h">
       <Filter>Contracts</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h">
       <Filter>Targets</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h">
-      <Filter>Targets</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h">
       <Filter>Targets</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h">

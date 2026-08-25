@@ -20,27 +20,6 @@ namespace gglab
 			return !bytecode.IsValid() || bytecode.m_Format == ShaderBinaryFormat::SpirV;
 		}
 
-		[[nodiscard]] bool TryEncodeVulkanEntryPoint(
-			std::wstring_view source, std::string& outEntryPoint) noexcept
-		{
-			// GGLab shader entry points are HLSL identifiers and therefore use
-			// portable ASCII. Avoid routing backend-core pipeline creation through
-			// a platform-specific conversion utility merely because the compiler-facing
-			// shader description stores wide strings.
-			outEntryPoint.clear();
-			outEntryPoint.reserve(source.size());
-			for (const wchar_t character : source)
-			{
-				if (character <= 0 || character > 0x7f)
-				{
-					outEntryPoint.clear();
-					return false;
-				}
-				outEntryPoint.push_back(static_cast<char>(character));
-			}
-			return !outEntryPoint.empty();
-		}
-
 		[[nodiscard]] bool AreVertexInputsEqual(
 			const RHIVertexInputLayoutDesc& left, const RHIVertexInputLayoutDesc& right) noexcept
 		{
@@ -382,15 +361,16 @@ namespace gglab
 
 		std::string vertexEntry;
 		std::string pixelEntry;
-		if (!TryEncodeVulkanEntryPoint(
-			createInfo.m_VertexShader.m_EntryPoint, vertexEntry) ||
-			(hasPixelShader && !TryEncodeVulkanEntryPoint(
-				createInfo.m_PixelShader.m_EntryPoint, pixelEntry)))
+		if (!IsValidShaderRuntimeEntryPoint(createInfo.m_VertexShader.m_EntryPoint) ||
+			(hasPixelShader && !IsValidShaderRuntimeEntryPoint(
+				createInfo.m_PixelShader.m_EntryPoint)))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Vulkan pipeline entry points must be non-empty ASCII HLSL identifiers.");
 			return {};
 		}
+		vertexEntry = createInfo.m_VertexShader.m_EntryPoint;
+		pixelEntry = createInfo.m_PixelShader.m_EntryPoint;
 
 		const std::array shaderHashes{
 			createInfo.m_VertexShader.m_Hash,
@@ -473,12 +453,13 @@ namespace gglab
 			return {};
 		}
 		std::string entryPoint;
-		if (!TryEncodeVulkanEntryPoint(createInfo.m_ComputeShader.m_EntryPoint, entryPoint))
+		if (!IsValidShaderRuntimeEntryPoint(createInfo.m_ComputeShader.m_EntryPoint))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Vulkan pipeline entry points must be non-empty ASCII HLSL identifiers.");
 			return {};
 		}
+		entryPoint = createInfo.m_ComputeShader.m_EntryPoint;
 
 		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
 		{

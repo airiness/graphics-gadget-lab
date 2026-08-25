@@ -143,7 +143,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: packages
-          key: ${{ runner.os }}-${{ runner.arch }}-nuget-6.14.3-${{ hashFiles('Projects/Application/packages.config') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-nuget-6.14.3-${{ hashFiles('Projects/WinApp/packages.config') }}
 
       - name: Restore NuGet packages
         shell: pwsh
@@ -169,7 +169,7 @@ jobs:
         shell: pwsh
         run: |
           $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\Application\Application\ApplicationPch.cpp").Path
+            (Resolve-Path -LiteralPath "Sources\WinApp\Application\ApplicationPch.cpp").Path
           $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
           $unexpectedIncludes = @(
             Get-ChildItem -LiteralPath Sources -Recurse -File |
@@ -273,13 +273,105 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Build Application standalone
+      - name: Build GGLabRuntimeTests standalone without toolchain dependencies
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $runtimeTestsBuildArguments = @(
+            "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @runtimeTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabAppRuntime standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $appRuntimeBuildArguments = @(
+            "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @appRuntimeBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabAppRuntimeTests standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $appRuntimeTestsBuildArguments = @(
+            "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-app-runtime-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @appRuntimeTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build ShaderToolchainTests standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $shaderToolchainTestsBuildArguments = @(
+            "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\shader-toolchain-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @shaderToolchainTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build WinApp standalone
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force Build\Logs | Out-Null
 
           $applicationBuildArguments = @(
-            "Projects\Application\Application.vcxproj"
+            "Projects\WinApp\WinApp.vcxproj"
             "/m"
             "/t:Build"
             "/p:Configuration=${{ matrix.configuration }}"
@@ -325,11 +417,50 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests (Application)
+      - name: Build and validate artifact-only runtime packages
+        if: matrix.configuration == 'Debug' && matrix.pch == 'enabled'
         shell: pwsh
-        working-directory: Build/Output/x64/${{ matrix.configuration }}
         run: |
-          & .\GraphicsGadgetLab.exe --self-test all
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Debug -Backend dx12
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Debug -Backend vulkan
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build and validate Release artifact-only runtime package
+        if: matrix.configuration == 'Release' && matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          ./Scripts/BuildArtifactOnlyRuntimePackage.ps1 `
+            -Configuration Release -Backend dx12
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests from unrelated CWD (WinApp)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $application = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
+          & $application --self-test all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Prove runtime path composition from unrelated CWD
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $application = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
+          & $application --self-test app-path-composition
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -343,11 +474,36 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests (GGLabRuntimeTests)
+      - name: Run headless self-tests from unrelated CWD (GGLabRuntimeTests)
         shell: pwsh
-        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        working-directory: ${{ runner.temp }}
         run: |
-          & .\GGLabRuntimeTests.exe --suite all
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabRuntimeTests.exe"
+          & $tests --suite all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests from unrelated CWD (GGLabAppRuntimeTests)
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabAppRuntimeTests.exe"
+          & $tests
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests from unrelated CWD (ShaderToolchainTests)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabShaderToolchainTests.exe"
+          & $tests --suite all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -372,5 +528,9 @@ jobs:
             Build/Logs/gglab-foundation-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-foundation-tests-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-app-runtime-tests-${{ matrix.log_name }}.binlog
+            Build/Logs/shader-toolchain-tests-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7

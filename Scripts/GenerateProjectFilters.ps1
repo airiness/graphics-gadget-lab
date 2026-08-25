@@ -313,16 +313,36 @@ function Test-BytesEqual {
 $root = Get-RepoRoot $RootDir
 $projectSpecifications = @(
     [pscustomobject]@{
-        Name = "Application"
-        ProjectPath = "Projects\Application\Application.vcxproj"
-        FiltersPath = "Projects\Application\Application.vcxproj.filters"
+        Name = "WinApp"
+        ProjectPath = "Projects\WinApp\WinApp.vcxproj"
+        FiltersPath = "Projects\WinApp\WinApp.vcxproj.filters"
         ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
-            [pscustomobject]@{ Root = "Sources\Application"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Sources\WinApp"; FilterPrefix = "" }
             [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
-            [pscustomobject]@{ Root = "Projects\Application\packages.config"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Projects\WinApp\packages.config"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "GGLabAppRuntime"
+        ProjectPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
+        FiltersPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\GGLabAppRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "GGLabAppRuntimeTests"
+        ProjectPath = "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj"
+        FiltersPath = "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\GGLabAppRuntime"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{
@@ -353,6 +373,16 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Tests\GGLabRuntime"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "ShaderToolchainTests"
+        ProjectPath = "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+        FiltersPath = "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\ShaderToolchain"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{
@@ -391,6 +421,16 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\ShaderToolchain"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "ShaderArtifactRuntime"
+        ProjectPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj"
+        FiltersPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\ShaderArtifactRuntime"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{

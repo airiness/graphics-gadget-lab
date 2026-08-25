@@ -11,6 +11,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <cstdint>
@@ -202,15 +203,8 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassSkybox.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		shaderDesc.m_Entry = L"VSMain";
-		const auto vsId = shaderManager->LoadShader(shaderDesc);
-
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		shaderDesc.m_Entry = L"PSMain";
-		const auto psId = shaderManager->LoadShader(shaderDesc);
+		const auto vsId = shaderManager->LoadProgram(shader_programs::SkyboxVertex);
+		const auto psId = shaderManager->LoadProgram(shader_programs::SkyboxPixel);
 
 		m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;

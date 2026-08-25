@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</ProjectGuid>
+    <RootNamespace>ShaderArtifactRuntime</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\GGLabBuildBaseline.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\GGLabBuildBaseline.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TargetName>ShaderArtifactRuntime</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifact.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifactStore.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderLooseArtifactIO.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistryArtifact.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderRuntimeArtifact.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifact.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderLooseArtifactIO.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistry.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderProgramRegistryArtifact.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactManifest.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactStore.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h" />
+	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h" />
+	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\GGLabShaderPrograms.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

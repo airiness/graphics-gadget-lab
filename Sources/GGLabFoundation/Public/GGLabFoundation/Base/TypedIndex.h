@@ -76,26 +76,26 @@ namespace gglab
 		Rep m_Next = 0;
 	};
 
-#define GGLAB_DEFINE_TYPED_INDEX(name, repType)             \
-	struct name##Tag {};                                      \
-	using name = ::gglab::TypedIndex<name##Tag, repType>;     \
+#define GGLAB_DEFINE_TYPED_INDEX(name, repType)							\
+	struct name##Tag {};												\
+	using name = ::gglab::TypedIndex<name##Tag, repType>;				\
 	inline constexpr name Invalid##name = name::Invalid();
 
-#define GGLAB_DEFINE_NESTED_TYPED_INDEX(name, repType)      \
-	struct name##Tag {};                                      \
-	using name = ::gglab::TypedIndex<name##Tag, repType>;     \
+#define GGLAB_DEFINE_NESTED_TYPED_INDEX(name, repType)					\
+	struct name##Tag {};												\
+	using name = ::gglab::TypedIndex<name##Tag, repType>;				\
 	inline static constexpr name Invalid##name = name::Invalid();
 
-#define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)    \
-	struct name##Tag {};                                          \
-	using name = ::gglab::TypedIndex<name##Tag, repType>;         \
-	inline constexpr name Invalid##name = name::Invalid();        \
+#define GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(name, repType)			\
+	struct name##Tag {};												\
+	using name = ::gglab::TypedIndex<name##Tag, repType>;				\
+	inline constexpr name Invalid##name = name::Invalid();				\
 	using name##Counter = ::gglab::IndexCounter<name>;
 
-#define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)   \
-	struct name##Tag {};                                               \
-	using name = ::gglab::TypedIndex<name##Tag, repType>;              \
-	inline static constexpr name Invalid##name = name::Invalid();      \
+#define GGLAB_DEFINE_NESTED_TYPED_INDEX_WITH_COUNTER(name, repType)		\
+	struct name##Tag {};												\
+	using name = ::gglab::TypedIndex<name##Tag, repType>;				\
+	inline static constexpr name Invalid##name = name::Invalid();		\
 	using name##Counter = ::gglab::IndexCounter<name>;
 }
 

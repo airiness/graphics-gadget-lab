@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35913.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Application", "Projects\Application\Application.vcxproj", "{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinApp", "Projects\WinApp\WinApp.vcxproj", "{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabAppRuntime", "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj", "{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundation", "Projects\GGLabFoundation\GGLabFoundation.vcxproj", "{5C275408-928E-43C7-A2B5-7099FEA072D4}"
 EndProject
@@ -12,6 +14,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntime", "Projects\GGLabRuntime\GGLabRuntime.vcxproj", "{F382CFE9-9912-487D-B999-E649C340125D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderToolchainCore", "Projects\ShaderToolchainCore\ShaderToolchainCore.vcxproj", "{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderArtifactRuntime", "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj", "{922A26B8-7CC4-4344-AC03-7A40845F09FE}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderCompiler", "Projects\ShaderCompiler\ShaderCompiler.vcxproj", "{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}"
 EndProject
@@ -22,6 +26,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabFoundationTests", "Projects\GGLabFoundationTests\GGLabFoundationTests.vcxproj", "{B276486A-987A-424E-9878-91057B05DAAD}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabRuntimeTests", "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj", "{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShaderToolchainTests", "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj", "{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GGLabAppRuntimeTests", "Projects\GGLabAppRuntimeTests\GGLabAppRuntimeTests.vcxproj", "{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NapaVoxelCoreTests", "Projects\NapaVoxelCoreTests\NapaVoxelCoreTests.vcxproj", "{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}"
 EndProject
@@ -39,6 +47,10 @@ Global
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Debug|x64.Build.0 = Debug|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Release|x64.ActiveCfg = Release|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Release|x64.Build.0 = Release|x64
+		{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}.Debug|x64.ActiveCfg = Debug|x64
+		{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}.Debug|x64.Build.0 = Debug|x64
+		{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}.Release|x64.ActiveCfg = Release|x64
+		{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}.Release|x64.Build.0 = Release|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Debug|x64.ActiveCfg = Debug|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Debug|x64.Build.0 = Debug|x64
 		{5C275408-928E-43C7-A2B5-7099FEA072D4}.Release|x64.ActiveCfg = Release|x64
@@ -55,6 +67,10 @@ Global
 		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Debug|x64.Build.0 = Debug|x64
 		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Release|x64.ActiveCfg = Release|x64
 		{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}.Release|x64.Build.0 = Release|x64
+		{922A26B8-7CC4-4344-AC03-7A40845F09FE}.Debug|x64.ActiveCfg = Debug|x64
+		{922A26B8-7CC4-4344-AC03-7A40845F09FE}.Debug|x64.Build.0 = Debug|x64
+		{922A26B8-7CC4-4344-AC03-7A40845F09FE}.Release|x64.ActiveCfg = Release|x64
+		{922A26B8-7CC4-4344-AC03-7A40845F09FE}.Release|x64.Build.0 = Release|x64
 		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Debug|x64.ActiveCfg = Debug|x64
 		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Debug|x64.Build.0 = Debug|x64
 		{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}.Release|x64.ActiveCfg = Release|x64
@@ -71,6 +87,14 @@ Global
 		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Debug|x64.Build.0 = Debug|x64
 		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.ActiveCfg = Release|x64
 		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60}.Release|x64.Build.0 = Release|x64
+		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}.Debug|x64.ActiveCfg = Debug|x64
+		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}.Debug|x64.Build.0 = Debug|x64
+		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}.Release|x64.ActiveCfg = Release|x64
+		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}.Release|x64.Build.0 = Release|x64
+		{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148}.Debug|x64.ActiveCfg = Debug|x64
+		{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148}.Debug|x64.Build.0 = Debug|x64
+		{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148}.Release|x64.ActiveCfg = Release|x64
+		{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148}.Release|x64.Build.0 = Release|x64
 		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Debug|x64.ActiveCfg = Debug|x64
 		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Debug|x64.Build.0 = Debug|x64
 		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43}.Release|x64.ActiveCfg = Release|x64
@@ -86,6 +110,8 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{B276486A-987A-424E-9878-91057B05DAAD} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
+		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
+		{C2D9A4F7-6E1B-48C3-AB05-7F2E9D6A3148} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{A3F6C2E8-4D5B-4E7A-9B1C-8E2D5F7A6C43} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{371B9FA9-4C90-4AC6-A123-ACED756D6C77} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection

@@ -3,7 +3,7 @@
 #include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
-#include "Graphics/Asset/DerivedData/LocalDerivedDataMaintenanceLock.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataPlatform.h"
 
 #include <atomic>
 #include <filesystem>
@@ -66,6 +66,8 @@ namespace gglab
 	{
 	public:
 		explicit LocalDerivedDataStore(std::filesystem::path rootDirectory = {}) noexcept;
+		LocalDerivedDataStore(std::filesystem::path rootDirectory,
+			std::unique_ptr<LocalDerivedDataPlatformBase> platform) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(LocalDerivedDataStore);
 		~LocalDerivedDataStore() = default;
 
@@ -92,19 +94,21 @@ namespace gglab
 
 	private:
 		[[nodiscard]] std::filesystem::path EntryPath(const DerivedDataKey& key) const;
-		[[nodiscard]] LocalDerivedDataMaintenanceLockGuard AcquireMaintenanceLock() noexcept;
+		[[nodiscard]] std::unique_ptr<LocalDerivedDataMaintenanceLockGuardBase>
+			AcquireMaintenanceLock() noexcept;
 		void CleanupOrphanTemporaryFilesLocked() noexcept;
 		[[nodiscard]] std::vector<std::filesystem::path> CollectTrashPathsLocked() const noexcept;
+		[[nodiscard]] std::filesystem::path MakeUniqueSiblingPath(
+			const std::filesystem::path& basePath, std::string_view marker) noexcept;
 		[[nodiscard]] std::filesystem::path MakeTrashPath() noexcept;
 		static void ScheduleTrashCleanup(std::vector<std::filesystem::path> trashPaths) noexcept;
 
+		std::unique_ptr<LocalDerivedDataPlatformBase> m_Platform;
 		LocalDerivedDataRootIdentity m_RootIdentity;
 		std::filesystem::path m_RootDirectory;
 		LocalDerivedDataCatalog m_Catalog;
-		LocalDerivedDataMaintenanceLock m_MaintenanceLock;
+		std::unique_ptr<LocalDerivedDataMaintenanceLockBase> m_MaintenanceLock;
 		mutable std::mutex m_Mutex;
-		std::atomic_uint64_t m_TemporarySerial = 1;
-		std::atomic_uint64_t m_TrashSerial = 1;
 		std::atomic_uint64_t m_HitCount = 0;
 		std::atomic_uint64_t m_MissCount = 0;
 		std::atomic_uint64_t m_CorruptionCount = 0;

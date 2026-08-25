@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12Context.h"
+#include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
@@ -51,9 +52,9 @@ namespace gglab
 		return m_Context->AcquireComputeContext(*this);
 	}
 
-	DX12Context::DX12Context(const RHIContextDesc& desc) noexcept
+	DX12Context::DX12Context(const RHIContextDesc& desc, HWND window) noexcept
 	{
-		GGLAB_ASSERT_MSG(desc.m_WindowHandle != nullptr, "DX12Context requires a window handle.");
+		GGLAB_ASSERT_MSG(window != nullptr, "DX12Context requires a window handle.");
 		GGLAB_ASSERT_MSG(
 			desc.m_Width > 0 && desc.m_Height > 0, "DX12Context requires a valid extent.");
 		GGLAB_ASSERT_MSG(desc.m_FrameSlotCount >= 2,
@@ -93,7 +94,7 @@ namespace gglab
 		DX12SwapChain::CreateInfo swapChainInfo{};
 		swapChainInfo.m_DX12Device = m_Device.get();
 		swapChainInfo.m_PresentQueue = &m_QueueSystem->GetQueue(DX12QueueType::Graphics);
-		swapChainInfo.m_Hwnd = static_cast<HWND>(desc.m_WindowHandle);
+		swapChainInfo.m_Hwnd = window;
 		swapChainInfo.m_Width = desc.m_Width;
 		swapChainInfo.m_Height = desc.m_Height;
 		swapChainInfo.m_Format = ToDXGIFormat(desc.m_BackBufferFormat);
@@ -282,6 +283,12 @@ namespace gglab
 			m_BackBufferCompletionFences[frame->m_BackBufferIndex] = submittedFence;
 		}
 		const bool presented = m_SwapChain->Present();
+		if (presented && submittedFence.IsValid() && !m_CompletedProductionFrame)
+		{
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(
+				"DX12 completed its first production submit/present frame transaction.");
+			m_CompletedProductionFrame = true;
+		}
 		FinishFrame(*frame, submittedFence);
 		return presented ? RHIFrameEndResult::Completed(submittedFence)
 			: RHIFrameEndResult::Fatal(submittedFence);

@@ -1,26 +1,48 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
-#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
-#include "Graphics/Shader/Shader.h"
+#include "Graphics/Shader/ShaderPipelineSnapshot.h"
+#include "Graphics/Shader/ShaderTypes.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
-#include <array>
-#include <atomic>
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace gglab
 {
-	class ShaderCompiler;
+	class Shader;
 	class TaskSystem;
+
+	enum class ShaderManagerInitializeStatus : uint8_t
+	{
+		Ready,
+		InvalidCreateInfo,
+		RegistryNotFound,
+		RegistryReadFailure,
+		MalformedRegistry,
+	};
+
+	struct ShaderManagerCreateInfo final
+	{
+		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
+		std::filesystem::path m_ArtifactRoot;
+		ShaderProgramRegistryArtifactRef m_ActiveRegistry;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_ActiveBackend != RHIBackendType::Unknown &&
+				!m_ArtifactRoot.empty() && m_ArtifactRoot.is_absolute() &&
+				m_ActiveRegistry.IsValid();
+		}
+	};
 
 	struct ShaderPreloadStatus
 	{
@@ -41,66 +63,94 @@ namespace gglab
 		}
 	};
 
-	struct ShaderKey
+	enum class ShaderRegistryActivationStatus : uint8_t
 	{
-		// Full durable recipe identity. The KeyHash fast path only selects the
-		// bucket; equality always compares the complete digest.
-		Sha256Digest m_KeyDigest;
-		auto AsTuple() const noexcept
-		{
-			std::array<uint64_t, 4> words{};
-			std::memcpy(words.data(), m_KeyDigest.m_Value.data(), sizeof(words));
-			return std::make_tuple(words[0], words[1], words[2], words[3]);
-		}
-		constexpr bool operator==(const ShaderKey&) const noexcept = default;
+		Activated,
+		AlreadyActive,
+		Busy,
+		InvalidRegistryRef,
+		RegistryNotFound,
+		RegistryReadFailure,
+		MalformedRegistry,
+		MissingProgramBinding,
+		ArtifactLoadFailure,
+		Failed,
 	};
-	using ShaderKeyHash = KeyHash<ShaderKey>;
+
+	struct ShaderRegistryActivationResult final
+	{
+		ShaderRegistryActivationStatus m_Status = ShaderRegistryActivationStatus::Failed;
+		uint32_t m_ChangedShaderCount = 0;
+		std::string m_Error{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderRegistryActivationStatus::Activated ||
+				m_Status == ShaderRegistryActivationStatus::AlreadyActive;
+		}
+	};
 
 	class ShaderManager
 	{
 	public:
-		ShaderManager(RHIBackendType activeBackend, std::filesystem::path shaderSourceRoot,
-			std::filesystem::path shaderCacheRoot) noexcept;
+		explicit ShaderManager(ShaderManagerCreateInfo createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(ShaderManager);
 		~ShaderManager();
 
-		void SetDefaultShaderConfig(const ShaderDesc& defaultDesc) noexcept;
-		RHIBackendType GetActiveBackend() const noexcept { return m_ActiveBackend; }
+		[[nodiscard]] bool IsReady() const noexcept
+		{
+			return m_InitializeStatus == ShaderManagerInitializeStatus::Ready;
+		}
+		[[nodiscard]] ShaderManagerInitializeStatus GetInitializeStatus() const noexcept
+		{
+			return m_InitializeStatus;
+		}
+		[[nodiscard]] RHIBackendType GetActiveBackend() const noexcept
+		{
+			return m_ActiveBackend;
+		}
+		[[nodiscard]] ShaderProgramRegistryArtifactRef
+			GetActiveRegistryRef() const noexcept;
 
-		ShaderID LoadShader(const ShaderDesc& desc) noexcept;
+		ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept;
 		[[nodiscard]] TaskHandle PreloadAsync(TaskSystem& taskSystem,
-			std::vector<ShaderDesc> descList, TaskPriority priority = TaskPriority::High) noexcept;
+			std::vector<ShaderProgramRef> programRefs,
+			TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
+		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
+			const ShaderProgramRef& programRef) const noexcept;
+		[[nodiscard]] bool CaptureArtifactRefs(
+			std::span<const ShaderProgramRef> programRefs,
+			std::span<ShaderArtifactRef> outArtifactRefs,
+			ShaderProgramRegistryArtifactRef& outRegistryRef) const noexcept;
+		[[nodiscard]] ShaderRegistryActivationResult ActivateRegistry(
+			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
 
-		int32_t RefreshChanged() noexcept;
-		bool RefreshShader(ShaderID shaderId) noexcept;
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		std::string GetDebugName(ShaderID shaderId) const noexcept;
 		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
-		uint64_t GetRevision() const noexcept { return m_Revision.load(std::memory_order_relaxed); }
+		void CapturePipelineSnapshots(std::span<const ShaderID> shaderIds,
+			std::span<ShaderPipelineSnapshot> outSnapshots) const noexcept;
 
 	private:
+		struct RuntimeState;
 		struct ShaderPreloadJob;
 
-		bool RefreshShaderInternal(Shader& shader) noexcept;
-		bool RefreshShaderInternal(Shader& shader, const ShaderResolvedRecipe& recipe) noexcept;
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
-		static void ApplyActiveBackendTarget(
-			ShaderDesc& desc, RHIBackendType activeBackend) noexcept;
 
 	private:
 		mutable std::shared_mutex m_Mutex;
-		std::unordered_map<ShaderKey, ShaderID, ShaderKeyHash> m_KeyIdMap;
+		std::unordered_map<ShaderProgramRef, ShaderID, ShaderProgramRefHash> m_ProgramIdMap;
 		std::vector<std::unique_ptr<Shader>> m_Shaders;
-
-		std::unique_ptr<ShaderCompiler> m_Compiler;
+		std::unique_ptr<RuntimeState> m_RuntimeState;
 		RHIBackendType m_ActiveBackend = RHIBackendType::Unknown;
-		ShaderDesc m_DefaultShaderConfig{};
+		ShaderProgramRegistryArtifactRef m_ActiveRegistryRef{};
+		ShaderManagerInitializeStatus m_InitializeStatus =
+			ShaderManagerInitializeStatus::InvalidCreateInfo;
 		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
 		TaskHandle m_PreloadTask{};
 		TaskStatus m_PreloadStatus = TaskStatus::Invalid;
 		std::string m_PreloadError;
-		std::atomic_uint64_t m_Revision = 1;
 	};
 }

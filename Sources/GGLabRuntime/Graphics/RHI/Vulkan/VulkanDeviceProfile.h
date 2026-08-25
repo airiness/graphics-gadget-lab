@@ -38,10 +38,7 @@ namespace gglab
 	enum class VulkanDeviceProfileRejectionReason : uint8_t
 	{
 		None,
-		UnsupportedPlatform,
-		VulkanLoaderUnavailable,
 		ApiVersionTooLow,
-		Win32SurfaceExtensionUnavailable,
 		SwapchainExtensionUnavailable,
 		GraphicsPresentQueueUnavailable,
 		DynamicRenderingUnavailable,
@@ -114,10 +111,7 @@ namespace gglab
 
 	struct VulkanDeviceProfileCapabilities
 	{
-		bool m_IsWindowsX64 = false;
-		bool m_HasVulkanLoader = false;
 		VulkanApiVersion m_ApiVersion{};
-		bool m_HasWin32SurfaceExtension = false;
 		bool m_HasSwapchainExtension = false;
 		bool m_HasGraphicsPresentQueue = false;
 
@@ -195,15 +189,9 @@ namespace gglab
 				}
 			};
 
-		require(capabilities.m_IsWindowsX64,
-			VulkanDeviceProfileRejectionReason::UnsupportedPlatform);
-		require(capabilities.m_HasVulkanLoader,
-			VulkanDeviceProfileRejectionReason::VulkanLoaderUnavailable);
 		require(IsVulkanApiVersionAtLeast(
 			capabilities.m_ApiVersion, GGLabVulkanDeviceProfile.m_MinimumApiVersion),
 			VulkanDeviceProfileRejectionReason::ApiVersionTooLow);
-		require(capabilities.m_HasWin32SurfaceExtension,
-			VulkanDeviceProfileRejectionReason::Win32SurfaceExtensionUnavailable);
 		require(capabilities.m_HasSwapchainExtension,
 			VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable);
 		require(capabilities.m_HasGraphicsPresentQueue,
@@ -278,14 +266,8 @@ namespace gglab
 		{
 		case VulkanDeviceProfileRejectionReason::None:
 			return "none";
-		case VulkanDeviceProfileRejectionReason::UnsupportedPlatform:
-			return "the Vulkan backend is limited to Windows x64";
-		case VulkanDeviceProfileRejectionReason::VulkanLoaderUnavailable:
-			return "Vulkan loader is unavailable";
 		case VulkanDeviceProfileRejectionReason::ApiVersionTooLow:
 			return "Vulkan API version 1.3 is unavailable";
-		case VulkanDeviceProfileRejectionReason::Win32SurfaceExtensionUnavailable:
-			return "VK_KHR_win32_surface is unavailable";
 		case VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable:
 			return "VK_KHR_swapchain is unavailable";
 		case VulkanDeviceProfileRejectionReason::GraphicsPresentQueueUnavailable:

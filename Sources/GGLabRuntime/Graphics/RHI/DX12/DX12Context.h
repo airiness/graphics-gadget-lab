@@ -2,6 +2,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/RHIContext.h"
 
+#include <Windows.h>
+
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -48,7 +50,7 @@ namespace gglab
 	class DX12Context final : public RHIContext
 	{
 	public:
-		explicit DX12Context(const RHIContextDesc& desc) noexcept;
+		DX12Context(const RHIContextDesc& desc, HWND window) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12Context);
 		~DX12Context() override;
 
@@ -101,5 +103,6 @@ namespace gglab
 		DX12FrameContext* m_ActiveFrame = nullptr;
 		uint32_t m_NextFrameSlotIndex = 0;
 		bool m_Initialized = false;
+		bool m_CompletedProductionFrame = false;
 	};
 }

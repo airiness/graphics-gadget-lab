@@ -3,6 +3,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/SamplerRegistry.h"
@@ -196,15 +197,10 @@ namespace gglab
 
 		if (!m_IsInitialized)
 		{
-			ShaderDesc shaderDesc{};
-			shaderDesc.m_SourcePath = L"Passes/PassIBLCubemapPreview.hlsl";
-			shaderDesc.m_Stage = ShaderStage::Vertex;
-			shaderDesc.m_Entry = L"VSMain";
-			const auto vsId = shaderManager->LoadShader(shaderDesc);
-
-			shaderDesc.m_Stage = ShaderStage::Pixel;
-			shaderDesc.m_Entry = L"PSMain";
-			const auto psId = shaderManager->LoadShader(shaderDesc);
+			const auto vsId =
+				shaderManager->LoadProgram(shader_programs::IBLCubemapPreviewVertex);
+			const auto psId =
+				shaderManager->LoadProgram(shader_programs::IBLCubemapPreviewPixel);
 
 			m_CubemapPreviewRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 			m_CubemapPreviewRecipe.m_InputLayoutId = InputLayoutID::None;

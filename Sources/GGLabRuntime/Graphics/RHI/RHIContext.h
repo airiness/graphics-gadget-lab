@@ -16,8 +16,6 @@ namespace gglab
 
 	struct RHIContextDesc
 	{
-		RHIBackendType m_Backend = RHIBackendType::DX12;
-		void* m_WindowHandle = nullptr;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		RHIFormat m_BackBufferFormat = RHIFormat::R8G8B8A8Unorm;
@@ -165,5 +163,14 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetFrameSlotCount() const noexcept = 0;
 	};
 
-	[[nodiscard]] std::unique_ptr<RHIContext> CreateRHIContext(const RHIContextDesc& desc) noexcept;
+	// Host-owned composition seam for one selected backend/platform pair. Renderer
+	// borrows the factory only while CreateContext runs and owns the returned context.
+	class RHIContextFactoryBase
+	{
+	public:
+		virtual ~RHIContextFactoryBase();
+
+		[[nodiscard]] virtual std::unique_ptr<RHIContext> CreateContext(
+			const RHIContextDesc& desc) const noexcept = 0;
+	};
 }

@@ -4,9 +4,12 @@
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"
+#include "Graphics/Shader/ShaderPipelineSnapshot.h"
 
-#include <shared_mutex>
+#include <array>
+#include <memory>
 #include <optional>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -89,7 +92,8 @@ namespace gglab
 		friend class PipelineCache;
 
 		GraphicsPhysicalPipelineKey m_PhysicalKey{};
-		uint64_t m_ShaderRevision = 0;
+		std::shared_ptr<const std::array<ShaderPipelineDependencyIdentity, 5>>
+			m_ShaderDependencies;
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
 	};
@@ -103,7 +107,7 @@ namespace gglab
 		friend class PipelineCache;
 
 		ComputePipelineRecipe m_Recipe{};
-		uint64_t m_ShaderRevision = 0;
+		ShaderPipelineDependencyIdentity m_ShaderDependency{};
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
 	};

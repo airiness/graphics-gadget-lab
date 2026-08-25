@@ -5,17 +5,10 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <memory>
 #include <mutex>
-#include <set>
-#include <span>
 #include <stop_token>
-#include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -31,75 +24,9 @@ namespace gglab
 				"gglab.ibl.brdf_lut",
 			};
 
-		constexpr std::array<std::array<std::string_view, 2>,
-			static_cast<size_t>(IBLArtifactStage::Count)>
-			BakeShaderPaths = { {
-				{{"Passes/PassIBLEnvironment.hlsl", "Passes/PassIBLEnvironmentMip.hlsl"}},
-				{{"Passes/PassIBLIrradiance.hlsl", {}}},
-				{{"Passes/PassIBLPrefilteredSpecular.hlsl", {}}},
-				{{"Passes/PassIBLBrdfLUT.hlsl", {}}},
-			} };
-
-		bool AddShaderDependency(Sha256Builder& builder, const std::filesystem::path& shaderRoot,
-			const std::filesystem::path& path, std::set<std::filesystem::path>& visited,
-			std::stop_token stopToken) noexcept
-		{
-			if (stopToken.stop_requested())
-			{
-				return false;
-			}
-			std::error_code errorCode;
-			const std::filesystem::path normalized =
-				std::filesystem::weakly_canonical(path, errorCode);
-			const std::filesystem::path key = errorCode ? path.lexically_normal() : normalized;
-			if (!visited.insert(key).second)
-			{
-				return true;
-			}
-
-			std::error_code relativeError;
-			const std::filesystem::path canonicalRoot =
-				std::filesystem::weakly_canonical(shaderRoot, relativeError);
-			const std::filesystem::path relativePath =
-				relativeError ? key : std::filesystem::relative(key, canonicalRoot, relativeError);
-			const std::string pathText = (relativeError ? key : relativePath).generic_string();
-			bool succeeded = builder.AddU64LE(static_cast<uint64_t>(pathText.size()));
-			succeeded &= builder.AddStringUtf8(pathText);
-
-			std::ifstream stream(key, std::ios::binary);
-			if (!stream)
-			{
-				succeeded &= builder.AddStringUtf8("missing-shader-dependency");
-				return succeeded;
-			}
-			std::string source(
-				(std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-			succeeded &= builder.AddU64LE(static_cast<uint64_t>(source.size()));
-			succeeded &= builder.AddBytes(std::as_bytes(std::span(source)));
-
-			size_t cursor = 0;
-			while ((cursor = source.find("#include", cursor)) != std::string::npos)
-			{
-				const size_t delimiter = source.find_first_of("\"<", cursor + 8);
-				if (delimiter == std::string::npos)
-					break;
-				const char closing = source[delimiter] == '<' ? '>' : '\"';
-				const size_t end = source.find(closing, delimiter + 1);
-				if (end == std::string::npos)
-					break;
-				const std::filesystem::path include =
-					source.substr(delimiter + 1, end - delimiter - 1);
-				succeeded &= AddShaderDependency(builder, shaderRoot,
-					source[delimiter] == '<' ? shaderRoot / include : key.parent_path() / include,
-					visited, stopToken);
-				cursor = end + 1;
-			}
-			return succeeded;
-		}
-
 		bool AddCommonKeyFields(DerivedDataKeyBuilder& builder, IBLArtifactStage stage,
 			IBLArtifactCompatibility compatibility, std::string_view adapterScopeIdentity,
-			const SourceDigest& shaderDigest) noexcept
+			const IBLStageShaderArtifactIdentity& shaderArtifacts) noexcept
 		{
 			bool succeeded = builder.AddStringUtf8(GetIBLStageArtifactType(stage));
 			succeeded &= builder.AddU32LE(IBLStageArtifactSchemaVersion);
@@ -111,7 +38,12 @@ namespace gglab
 			{
 				succeeded &= builder.AddStringUtf8(adapterScopeIdentity);
 			}
-			succeeded &= builder.AddSourceDigest(shaderDigest);
+			succeeded &= builder.AddU32LE(shaderArtifacts.m_Count);
+			for (size_t index = 0; index < shaderArtifacts.m_Count; ++index)
+			{
+				succeeded &= builder.AddSha256Digest(
+					shaderArtifacts.m_ArtifactRefs[index].m_ArtifactId.m_DurableDigest);
+			}
 			return succeeded;
 		}
 	}
@@ -125,17 +57,19 @@ namespace gglab
 	IBLDerivedDataSystem::IBLDerivedDataSystem(const CreateInfo& createInfo) noexcept :
 		m_Compatibility(createInfo.m_Compatibility),
 		m_AdapterScopeIdentity(createInfo.m_AdapterScopeIdentity),
-		m_ShaderSourceRoot(createInfo.m_ShaderSourceRoot),
 		m_ArtifactCache(createInfo.m_ArtifactCache), m_Store(createInfo.m_CacheDirectory)
 	{
 	}
 
 	IBLDerivedDataLookupResult IBLDerivedDataSystem::Lookup(
 		const AssetContentFingerprint& contentFingerprint, EnvironmentTextureSourceType sourceType,
-		const IBLBakeConfig& config, bool ignoreCache, std::stop_token stopToken) noexcept
+		const IBLBakeConfig& config,
+		const IBLShaderArtifactIdentities& shaderArtifacts, bool ignoreCache,
+		std::stop_token stopToken) noexcept
 	{
 		IBLDerivedDataLookupResult result{};
-		const auto keys = BuildKeys(contentFingerprint, sourceType, config, stopToken);
+		const auto keys =
+			BuildKeys(contentFingerprint, sourceType, config, shaderArtifacts, stopToken);
 		for (size_t index = 0; index < result.m_Stages.size(); ++index)
 		{
 			const IBLArtifactStage stage = static_cast<IBLArtifactStage>(index);
@@ -240,6 +174,7 @@ namespace gglab
 	std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> IBLDerivedDataSystem::
 		BuildKeys(const AssetContentFingerprint& contentFingerprint,
 			EnvironmentTextureSourceType sourceType, const IBLBakeConfig& config,
+			const IBLShaderArtifactIdentities& shaderArtifacts,
 			std::stop_token stopToken) const noexcept
 	{
 		std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)> keys{};
@@ -249,22 +184,18 @@ namespace gglab
 		{
 			return keys;
 		}
-
-		std::array<SourceDigest, static_cast<size_t>(IBLArtifactStage::Count)> shaderDigests{};
-		for (size_t index = 0; index < shaderDigests.size(); ++index)
+		for (const IBLStageShaderArtifactIdentity& identity : shaderArtifacts)
 		{
-			shaderDigests[index] =
-				ComputeShaderDependencyDigest(static_cast<IBLArtifactStage>(index), stopToken);
-			if (!shaderDigests[index].IsValid())
+			if (!identity.IsValid())
 			{
-				return {};
+				return keys;
 			}
 		}
 
 		DerivedDataKeyBuilder environment;
 		bool succeeded = AddCommonKeyFields(environment, IBLArtifactStage::Environment,
 			m_Compatibility, m_AdapterScopeIdentity,
-			shaderDigests[static_cast<size_t>(IBLArtifactStage::Environment)]);
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= environment.AddU64LE(contentFingerprint.m_SourceContentHash);
 		succeeded &= environment.AddU64LE(contentFingerprint.m_ImportSettingsHash);
 		succeeded &= environment.AddU32LE(contentFingerprint.m_DecoderVersion);
@@ -277,7 +208,7 @@ namespace gglab
 		DerivedDataKeyBuilder irradiance;
 		succeeded = AddCommonKeyFields(irradiance, IBLArtifactStage::Irradiance, m_Compatibility,
 			m_AdapterScopeIdentity,
-			shaderDigests[static_cast<size_t>(IBLArtifactStage::Irradiance)]);
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::Irradiance)]);
 		succeeded &=
 			irradiance.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= irradiance.AddU32LE(config.m_IrradianceCubemapSize);
@@ -289,7 +220,7 @@ namespace gglab
 		DerivedDataKeyBuilder specular;
 		succeeded = AddCommonKeyFields(specular, IBLArtifactStage::PrefilteredSpecular,
 			m_Compatibility, m_AdapterScopeIdentity,
-			shaderDigests[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)]);
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)]);
 		succeeded &=
 			specular.AddDerivedDataKey(keys[static_cast<size_t>(IBLArtifactStage::Environment)]);
 		succeeded &= specular.AddU32LE(config.m_PrefilteredSpecularCubemapSize);
@@ -304,7 +235,8 @@ namespace gglab
 
 		DerivedDataKeyBuilder brdf;
 		succeeded = AddCommonKeyFields(brdf, IBLArtifactStage::BrdfLut, m_Compatibility,
-			m_AdapterScopeIdentity, shaderDigests[static_cast<size_t>(IBLArtifactStage::BrdfLut)]);
+			m_AdapterScopeIdentity,
+			shaderArtifacts[static_cast<size_t>(IBLArtifactStage::BrdfLut)]);
 		succeeded &= brdf.AddU32LE(config.m_BrdfLutSize);
 		succeeded &= brdf.AddU32LE(static_cast<uint32_t>(config.m_BrdfLutFormat));
 		keys[static_cast<size_t>(IBLArtifactStage::BrdfLut)] =
@@ -312,32 +244,4 @@ namespace gglab
 		return keys;
 	}
 
-	SourceDigest IBLDerivedDataSystem::ComputeShaderDependencyDigest(
-		IBLArtifactStage stage, std::stop_token stopToken) const noexcept
-	{
-		if (stage >= IBLArtifactStage::Count)
-		{
-			return {};
-		}
-		Sha256Builder builder;
-		bool succeeded = builder.IsValid();
-		const std::filesystem::path& shaderRoot = m_ShaderSourceRoot;
-		std::set<std::filesystem::path> visited;
-		for (std::string_view shaderPath : BakeShaderPaths[static_cast<size_t>(stage)])
-		{
-			if (shaderPath.empty())
-			{
-				continue;
-			}
-			succeeded &= AddShaderDependency(
-				builder, shaderRoot, shaderRoot / shaderPath, visited, stopToken);
-		}
-		if (!succeeded || stopToken.stop_requested())
-		{
-			return {};
-		}
-		SourceDigest digest{};
-		digest.m_Value = builder.Finish().m_Value;
-		return digest;
-	}
 }

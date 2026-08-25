@@ -22,12 +22,25 @@ namespace gglab
 		const GraphicsPhysicalPipelineKey& physicalKey,
 		const RenderPassInfo& renderPassInfo) noexcept
 	{
-		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
+		const std::array shaderIds{
+			physicalKey.m_VSId,
+			physicalKey.m_PSId,
+			physicalKey.m_DSId,
+			physicalKey.m_HSId,
+			physicalKey.m_GSId,
+		};
+		std::array<ShaderPipelineSnapshot, shaderIds.size()> shaderSnapshots{};
+		m_ShaderManager->CapturePipelineSnapshots(shaderIds, shaderSnapshots);
+		std::array<ShaderPipelineDependencyIdentity, shaderIds.size()> shaderDependencies{};
+		std::ranges::transform(shaderSnapshots, shaderDependencies.begin(),
+			&ShaderPipelineSnapshot::m_Dependency);
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
 		const bool canReusePhysicalPipeline =
 			slot.m_Pipeline.IsValid() && m_PipelineSystem->IsAlive(slot.m_Pipeline) &&
 			slot.m_PipelineSystemRevision == pipelineSystemRevision &&
-			slot.m_PhysicalKey == physicalKey && slot.m_ShaderRevision == shaderRevision;
+			slot.m_PhysicalKey == physicalKey &&
+			slot.m_ShaderDependencies &&
+			*slot.m_ShaderDependencies == shaderDependencies;
 		if (canReusePhysicalPipeline)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
@@ -36,22 +49,15 @@ namespace gglab
 
 		RHIGraphicsPipelineCreateInfo createInfo{};
 		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(physicalKey);
-		createInfo.m_VertexShader = m_ShaderManager->GetBytecode(physicalKey.m_VSId);
-		createInfo.m_PixelShader = physicalKey.m_PSId.IsValid()
-			? m_ShaderManager->GetBytecode(physicalKey.m_PSId)
-			: ShaderBytecode{};
-		createInfo.m_DomainShader = physicalKey.m_DSId.IsValid()
-			? m_ShaderManager->GetBytecode(physicalKey.m_DSId)
-			: ShaderBytecode{};
-		createInfo.m_HullShader = physicalKey.m_HSId.IsValid()
-			? m_ShaderManager->GetBytecode(physicalKey.m_HSId)
-			: ShaderBytecode{};
-		createInfo.m_GeometryShader = physicalKey.m_GSId.IsValid()
-			? m_ShaderManager->GetBytecode(physicalKey.m_GSId)
-			: ShaderBytecode{};
+		createInfo.m_VertexShader = shaderSnapshots[0].m_Bytecode;
+		createInfo.m_PixelShader = shaderSnapshots[1].m_Bytecode;
+		createInfo.m_DomainShader = shaderSnapshots[2].m_Bytecode;
+		createInfo.m_HullShader = shaderSnapshots[3].m_Bytecode;
+		createInfo.m_GeometryShader = shaderSnapshots[4].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateGraphicsPipeline(createInfo);
 		slot.m_PhysicalKey = physicalKey;
-		slot.m_ShaderRevision = shaderRevision;
+		slot.m_ShaderDependencies =
+			std::make_shared<const decltype(shaderDependencies)>(shaderDependencies);
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
 		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;
@@ -60,11 +66,15 @@ namespace gglab
 	RHIPipelineHandle PipelineCache::Resolve(ComputePipelineSlot& slot,
 		const ComputePipelineRecipe& recipe, const RenderPassInfo& renderPassInfo) noexcept
 	{
-		const uint64_t shaderRevision = m_ShaderManager->GetRevision();
+		const std::array shaderIds{ recipe.m_CSId };
+		std::array<ShaderPipelineSnapshot, 1> shaderSnapshots{};
+		m_ShaderManager->CapturePipelineSnapshots(shaderIds, shaderSnapshots);
+		const ShaderPipelineDependencyIdentity shaderDependency =
+			shaderSnapshots[0].m_Dependency;
 		const uint64_t pipelineSystemRevision = m_PipelineSystem->GetRevision();
 		if (slot.m_Pipeline.IsValid() && m_PipelineSystem->IsAlive(slot.m_Pipeline) &&
 			slot.m_PipelineSystemRevision == pipelineSystemRevision && slot.m_Recipe == recipe &&
-			slot.m_ShaderRevision == shaderRevision)
+			slot.m_ShaderDependency == shaderDependency)
 		{
 			RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 			return slot.m_Pipeline;
@@ -75,10 +85,10 @@ namespace gglab
 		createInfo.m_Desc.m_ComputeShader = recipe.m_CSId.IsValid()
 			? RHIShaderHandle{ recipe.m_CSId.Value(), 1u }
 		: RHIShaderHandle{};
-		createInfo.m_ComputeShader = m_ShaderManager->GetBytecode(recipe.m_CSId);
+		createInfo.m_ComputeShader = shaderSnapshots[0].m_Bytecode;
 		slot.m_Pipeline = m_PipelineSystem->CreateComputePipeline(createInfo);
 		slot.m_Recipe = recipe;
-		slot.m_ShaderRevision = shaderRevision;
+		slot.m_ShaderDependency = shaderDependency;
 		slot.m_PipelineSystemRevision = pipelineSystemRevision;
 		RecordPipelineUsage(slot.m_Pipeline, renderPassInfo);
 		return slot.m_Pipeline;

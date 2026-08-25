@@ -30,6 +30,8 @@ namespace gglab
 
 		[[nodiscard]] virtual RHIBindingLayoutHandle CreateBindingLayout(
 			const RHIBindingLayoutDesc& desc) noexcept = 0;
+		// Pipeline creation is synchronous. Implementations must consume every
+		// borrowed ShaderBytecode view before returning and must not retain it.
 		[[nodiscard]] virtual RHIPipelineHandle CreateGraphicsPipeline(
 			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept = 0;
 		[[nodiscard]] virtual RHIPipelineHandle CreateComputePipeline(

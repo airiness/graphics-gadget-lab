@@ -1,6 +1,5 @@
 #pragma once
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
-#include "Targets/VulkanShaderCompileABI.h"
 
 #include <vulkan/vulkan.h>
 
@@ -65,13 +64,13 @@ namespace gglab
 
 			m_Bindings = {
 				VkDescriptorSetLayoutBinding{
-					.binding = GGLabVulkanShaderCompileABI.m_ResourceHeapBinding,
+					.binding = GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding,
 					.descriptorType = ToVkDescriptorType(abi.m_ResourceHeapDescriptorType),
 					.descriptorCount = abi.m_DescriptorCapacity.m_ResourceDescriptorCount,
 					.stageFlags = VK_SHADER_STAGE_ALL,
 				},
 				VkDescriptorSetLayoutBinding{
-					.binding = GGLabVulkanShaderCompileABI.m_SamplerHeapBinding,
+					.binding = GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding,
 					.descriptorType = ToVkDescriptorType(abi.m_SamplerHeapDescriptorType),
 					.descriptorCount = abi.m_DescriptorCapacity.m_SamplerDescriptorCount,
 					.stageFlags = VK_SHADER_STAGE_ALL,

@@ -12,9 +12,19 @@ namespace gglab
 	{
 		None,
 		Compile,
+		BuildRuntime,
 		Targets,
 		Version,
 		Help,
+	};
+
+	struct ShaderBuildRuntimeCommandOptions
+	{
+		std::filesystem::path m_SourceRoot{};
+		std::string m_Target{};
+		std::filesystem::path m_CacheRoot{};
+		std::filesystem::path m_ArtifactRoot{};
+		std::string m_ResultFormat{ "text" };
 	};
 
 	struct ShaderCompileCommandOptions
@@ -27,6 +37,7 @@ namespace gglab
 		std::vector<std::wstring> m_Defines{};
 		std::vector<std::filesystem::path> m_IncludeDirs{};
 		std::filesystem::path m_CacheRoot{};
+		std::filesystem::path m_ArtifactRoot{};
 		std::string m_ResultFormat{ "text" };
 	};
 
@@ -34,6 +45,7 @@ namespace gglab
 	{
 		ShaderCompilerCommand m_Command = ShaderCompilerCommand::None;
 		ShaderCompileCommandOptions m_Compile{};
+		ShaderBuildRuntimeCommandOptions m_BuildRuntime{};
 		// Pre-scanned before normal parsing so every compile usage failure can
 		// honor a caller's JSON transport request, including duplicate options.
 		bool m_JsonRequested = false;

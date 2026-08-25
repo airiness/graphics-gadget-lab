@@ -52,21 +52,25 @@ namespace gglab
 
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
+		if (createInfo.m_RHIContextFactory == nullptr)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Renderer initialization requires a host-supplied RHI context factory.");
+			return false;
+		}
 		if (!createInfo.HasRequiredRuntimePaths())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-				"Renderer initialization requires non-empty IBL cache and shader source roots.");
+				"Renderer initialization requires a non-empty IBL cache root.");
 			return false;
 		}
 
 		RHIContextDesc contextDesc{};
-		contextDesc.m_Backend = createInfo.m_Backend;
-		contextDesc.m_WindowHandle = createInfo.m_NativeWindowHandle;
 		contextDesc.m_Width = createInfo.m_Width;
 		contextDesc.m_Height = createInfo.m_Height;
 		contextDesc.m_AdapterSelector = createInfo.m_AdapterSelector;
 		contextDesc.m_EnableDebugValidation = createInfo.m_EnableDebugValidation;
-		m_RHIContext = CreateRHIContext(contextDesc);
+		m_RHIContext = createInfo.m_RHIContextFactory->CreateContext(contextDesc);
 		if (!m_RHIContext)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
@@ -112,9 +116,9 @@ namespace gglab
 		iblBakeSchedulerCreateInfo.m_RenderResourceRegistry = m_RenderResRegistry.get();
 		iblBakeSchedulerCreateInfo.m_TransferManager = GetTransferManager();
 		iblBakeSchedulerCreateInfo.m_GpuProfiler = GetGpuProfiler();
+		iblBakeSchedulerCreateInfo.m_ShaderManager = createInfo.m_ShaderManager;
 		iblBakeSchedulerCreateInfo.m_DerivedDataCacheDirectory =
 			createInfo.m_IblDerivedDataCacheDirectory;
-		iblBakeSchedulerCreateInfo.m_ShaderSourceRoot = createInfo.m_ShaderSourceRoot;
 		m_IBLBakeScheduler = std::make_unique<IBLBakeScheduler>(iblBakeSchedulerCreateInfo);
 
 		CreateCommonBindingLayout();

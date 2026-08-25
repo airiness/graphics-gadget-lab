@@ -1,7 +1,7 @@
 #pragma once
-#include "Contracts/ShaderArtifactManifest.h"
 #include "Contracts/ShaderCompileTarget.h"
 #include "Contracts/ShaderCompileTypes.h"
+#include "ShaderArtifactRuntime/ShaderArtifact.h"
 
 #include <filesystem>
 #include <string>
@@ -9,26 +9,6 @@
 
 namespace gglab
 {
-	// Toolchain output / Runtime input. The manifest carries the authoritative
-	// identity and validation fields; the binary holds the exact bytes of the
-	// committed artifact returned by this operation (cache hit, own publication,
-	// or an equivalent committed winner).
-	struct ShaderArtifact
-	{
-		ShaderArtifactManifest m_Manifest{};
-		ShaderBinary m_Binary{};
-
-		[[nodiscard]] ShaderBinaryFormat GetBinaryFormat() const noexcept
-		{
-			return m_Manifest.m_BinaryFormat;
-		}
-
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Binary.IsValid() && m_Manifest.m_BinaryContentDigest.m_Digest.IsValid();
-		}
-	};
-
 	enum class ShaderCompileStatus : uint8_t
 	{
 		Success,
@@ -103,12 +83,4 @@ namespace gglab
 			return m_Status == ShaderCompileStatus::Success;
 		}
 	};
-
-	// Binary content utilities. The 128-bit hash is runtime convenience
-	// identity (pipeline-facing change detection); durable identity is the
-	// manifest BinaryContentDigest.
-	[[nodiscard]] bool IsShaderBinaryFormat(
-		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept;
-	[[nodiscard]] ShaderHash128 ComputeShaderBinaryHash(
-		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept;
 }

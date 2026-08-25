@@ -6,6 +6,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Main.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Testing\ShaderCompilerCliTestAccess.cpp">
@@ -13,6 +14,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.h" />
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.h" />
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerProcessFactory.h" />
   </ItemGroup>

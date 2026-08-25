@@ -11,6 +11,7 @@
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <cstdint>
 #include <string_view>
@@ -211,30 +212,26 @@ namespace gglab
 			return;
 		}
 
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassGTAO.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Compute;
-		shaderDesc.m_Entry = L"CSMain";
-		const auto loadVariant = [renderer, shaderManager, &shaderDesc, this](
-			PipelineVariant variant, std::vector<ShaderDefine> defines) noexcept
+		const auto loadVariant = [renderer, shaderManager, this](
+			PipelineVariant variant, const ShaderProgramRef& programRef) noexcept
 			{
-				shaderDesc.m_Defines = std::move(defines);
 				auto& recipe = m_PipelineRecipes[static_cast<size_t>(variant)];
-				recipe.m_CSId = shaderManager->LoadShader(shaderDesc);
+				recipe.m_CSId = shaderManager->LoadProgram(programRef);
 				recipe.m_BindingLayout = renderer->GetCommonBindingLayout();
 				return recipe.m_CSId.IsValid() && recipe.m_BindingLayout.IsValid();
 			};
 
-		const bool evaluateReady = loadVariant(PipelineVariant::Evaluate, {});
+		const bool evaluateReady =
+			loadVariant(PipelineVariant::Evaluate, shader_programs::GTAOEvaluateCompute);
 		m_DiagnosticPipelineAvailable = m_Capabilities.AreDiagnosticOutputsAvailable() &&
 			loadVariant(PipelineVariant::EvaluateDiagnostics,
-				{ {.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"} });
+				shader_programs::GTAOEvaluateDiagnosticsCompute);
 		const bool denoiseXReady = loadVariant(PipelineVariant::DenoiseX,
-			{ {.m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1"} });
+			shader_programs::GTAODenoiseXCompute);
 		const bool denoiseYReady = loadVariant(PipelineVariant::DenoiseY,
-			{ {.m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1"} });
+			shader_programs::GTAODenoiseYCompute);
 		const bool upsampleReady = loadVariant(PipelineVariant::Upsample,
-			{ {.m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1"} });
+			shader_programs::GTAOUpsampleCompute);
 		m_IsAvailable = evaluateReady && denoiseXReady && denoiseYReady && upsampleReady;
 		if (!m_IsAvailable)
 		{

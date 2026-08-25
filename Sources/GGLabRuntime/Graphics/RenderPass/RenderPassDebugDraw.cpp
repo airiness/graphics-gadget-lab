@@ -5,6 +5,7 @@
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -195,14 +196,10 @@ namespace gglab
 		{
 			return;
 		}
-		ShaderDesc shaderDesc{};
-		shaderDesc.m_SourcePath = L"Passes/PassDebugDraw.hlsl";
-		shaderDesc.m_Stage = ShaderStage::Vertex;
-		shaderDesc.m_Entry = L"VSMain";
-		const ShaderID vs = services.m_ShaderManager->LoadShader(shaderDesc);
-		shaderDesc.m_Stage = ShaderStage::Pixel;
-		shaderDesc.m_Entry = L"PSMain";
-		const ShaderID ps = services.m_ShaderManager->LoadShader(shaderDesc);
+		const ShaderID vs =
+			services.m_ShaderManager->LoadProgram(shader_programs::DebugDrawVertex);
+		const ShaderID ps =
+			services.m_ShaderManager->LoadProgram(shader_programs::DebugDrawPixel);
 
 		for (uint32_t index = 0; index < m_Recipes.size(); ++index)
 		{

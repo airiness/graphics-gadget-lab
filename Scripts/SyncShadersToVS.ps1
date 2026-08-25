@@ -135,7 +135,7 @@ function Remove-EmptyItemGroups {
         [System.Xml.XmlNamespaceManager]$NamespaceManager
     )
 
-    $nodes = @($Document.SelectNodes("//msb:ItemGroup[not(@*) and not(*)]", $NamespaceManager))
+    $nodes = @($Document.SelectNodes("//msb:ItemGroup[not(*)]", $NamespaceManager))
     foreach ($node in $nodes) {
         [void]$node.ParentNode.RemoveChild($node)
     }
@@ -167,6 +167,9 @@ function Add-ShaderItemsToProject {
 
     $noneGroup = New-MsbuildElement $Document "ItemGroup"
     $fxGroup = New-MsbuildElement $Document "ItemGroup"
+    $artifactOnlyCondition = "'`$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"
+    [void]$noneGroup.SetAttribute("Condition", $artifactOnlyCondition)
+    [void]$fxGroup.SetAttribute("Condition", $artifactOnlyCondition)
 
     foreach ($shader in $ShaderFiles) {
         $itemName = if ($shader.Extension -ieq ".hlsl") { "FxCompile" } else { "None" }
@@ -191,8 +194,8 @@ function Add-ShaderItemsToProject {
 
 $root = Get-RepoRoot $RootDir
 $shaderDir = Join-Path $root "Shaders"
-$projectDir = Join-Path $root "Projects\Application"
-$projectPath = Join-Path $projectDir "Application.vcxproj"
+$projectDir = Join-Path $root "Projects\WinApp"
+$projectPath = Join-Path $projectDir "WinApp.vcxproj"
 
 if (-not (Test-Path $shaderDir)) {
     throw "Shader directory not found: $shaderDir"
@@ -229,4 +232,4 @@ if (-not (Test-Path -LiteralPath $filterGeneratorPath)) {
 & $filterGeneratorPath -RootDir $root
 
 Write-Host "Synced $($shaderFiles.Count) shader files to Visual Studio project."
-Write-Host "Application.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"
+Write-Host "WinApp.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"

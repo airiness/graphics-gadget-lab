@@ -52,7 +52,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -63,28 +63,34 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.cpp" />
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.cpp" />
     <ClCompile Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h" />
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderRuntimeArtifactPublication.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Compiler\ShaderCompiler.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifact.h" />
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactManifest.h" />
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderArtifactCacheRecord.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTarget.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Contracts\ShaderCompileTypes.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h" />
-    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\VulkanShaderCompileABI.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">
+      <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
       <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
     </ProjectReference>

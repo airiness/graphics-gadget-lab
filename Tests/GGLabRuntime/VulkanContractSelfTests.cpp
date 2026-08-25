@@ -55,10 +55,7 @@ namespace gglab
 				GGLabDescriptorCapacityContract.m_SamplerDescriptorCount;
 			const uint32_t combinedCount = resourceCount + samplerCount;
 			return {
-				.m_IsWindowsX64 = true,
-				.m_HasVulkanLoader = true,
 				.m_ApiVersion = { 1, 3 },
-				.m_HasWin32SurfaceExtension = true,
 				.m_HasSwapchainExtension = true,
 				.m_HasGraphicsPresentQueue = true,
 				.m_DynamicRendering = true,
@@ -157,15 +154,6 @@ namespace gglab
 				std::string_view m_CheckName;
 			};
 			constexpr std::array RequiredBooleanCases{
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_IsWindowsX64,
-					VulkanDeviceProfileRejectionReason::UnsupportedPlatform,
-					"Vulkan profile reports unsupported platform" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasVulkanLoader,
-					VulkanDeviceProfileRejectionReason::VulkanLoaderUnavailable,
-					"Vulkan profile reports a missing loader" },
-				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasWin32SurfaceExtension,
-					VulkanDeviceProfileRejectionReason::Win32SurfaceExtensionUnavailable,
-					"Vulkan profile reports a missing Win32 surface extension" },
 				RequiredBooleanCase{ &VulkanDeviceProfileCapabilities::m_HasSwapchainExtension,
 					VulkanDeviceProfileRejectionReason::SwapchainExtensionUnavailable,
 					"Vulkan profile reports a missing swapchain extension" },
@@ -516,13 +504,34 @@ namespace gglab
 
 
 #if GGLAB_ENABLE_VULKAN
+		class NonWin32SurfaceFactory final : public VulkanSurfaceFactoryBase
+		{
+		public:
+			std::span<const std::string_view> RequiredInstanceExtensionNames() const noexcept override
+			{
+				++m_ExtensionQueryCount;
+				return RequiredExtensions;
+			}
+
+			Result Create(VkInstance) const noexcept override
+			{
+				++m_CreateCount;
+				return {};
+			}
+
+			mutable uint32_t m_ExtensionQueryCount = 0;
+			mutable uint32_t m_CreateCount = 0;
+
+		private:
+			static constexpr std::array<std::string_view, 1> RequiredExtensions{
+				"VK_GGLAB_non_win32_surface",
+			};
+		};
+
 		[[nodiscard]] VulkanDeviceProfileCapabilities MakeSatisfiedProfileCapabilities() noexcept
 		{
 			VulkanDeviceProfileCapabilities caps{};
-			caps.m_IsWindowsX64 = true;
-			caps.m_HasVulkanLoader = true;
 			caps.m_ApiVersion = { 1, 3 };
-			caps.m_HasWin32SurfaceExtension = true;
 			caps.m_HasSwapchainExtension = true;
 			caps.m_HasGraphicsPresentQueue = true;
 			caps.m_DynamicRendering = true;
@@ -579,6 +588,31 @@ namespace gglab
 
 		void RunVulkanBootstrapSelectionTests(SelfTestContext& context) noexcept
 		{
+			{
+				NonWin32SurfaceFactory surfaceFactory;
+				VulkanBootstrapReport report;
+				const int result = RunVulkanBootstrap({
+					.m_SurfaceFactory = &surfaceFactory,
+					.m_IsHostAbiSupported = false,
+					},
+					report);
+				context.Check(result != 0 && surfaceFactory.m_ExtensionQueryCount == 0 &&
+					surfaceFactory.m_CreateCount == 0,
+					"Unsupported host ABI fails before Vulkan WSI metadata or API consumption");
+			}
+			{
+				NonWin32SurfaceFactory surfaceFactory;
+				VulkanBootstrapReport report;
+				const int result = RunVulkanBootstrap({
+					.m_SurfaceFactory = &surfaceFactory,
+					.m_IsHostAbiSupported = true,
+					},
+					report);
+				context.Check(result != 0 && surfaceFactory.m_ExtensionQueryCount == 1 &&
+					surfaceFactory.m_CreateCount == 0,
+					"A non-Win32 factory reaches common WSI extension validation without hidden selection");
+			}
+
 			const VulkanDeviceProfileCapabilities satisfied = MakeSatisfiedProfileCapabilities();
 
 			// Default selection prefers a discrete accepted adapter.

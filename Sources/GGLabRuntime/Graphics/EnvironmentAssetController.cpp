@@ -1,4 +1,5 @@
 #include "Graphics/EnvironmentAssetController.h"
+#include "Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
@@ -15,10 +16,13 @@ namespace gglab
 {
 	EnvironmentAssetController::EnvironmentAssetController(const CreateInfo& createInfo) noexcept :
 		m_AssetManager(createInfo.m_AssetManager),
-		m_EnvironmentLighting(createInfo.m_EnvironmentLighting)
+		m_EnvironmentLighting(createInfo.m_EnvironmentLighting),
+		m_AssetRoot(createInfo.m_AssetRoot)
 	{
 		GGLAB_ASSERT_NOT_NULL(m_AssetManager);
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLighting);
+		GGLAB_ASSERT_MSG(!m_AssetRoot.empty() && m_AssetRoot.is_absolute(),
+			"EnvironmentAssetController requires an absolute asset root.");
 	}
 
 	EnvironmentAssetController::~EnvironmentAssetController()
@@ -30,18 +34,19 @@ namespace gglab
 	{
 		Reset();
 		m_Entries.clear();
+		const std::filesystem::path resolvedRoot = ResolveAssetPath(m_AssetRoot, rootDirectory);
 
 		std::error_code errorCode;
-		const bool directoryAvailable = std::filesystem::is_directory(rootDirectory, errorCode);
+		const bool directoryAvailable = std::filesystem::is_directory(resolvedRoot, errorCode);
 		if (!directoryAvailable)
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"EnvironmentAssetController: environment directory '{}' is unavailable; using procedural fallback.",
-				rootDirectory.string());
+				resolvedRoot.string());
 			return;
 		}
 
-		for (std::filesystem::directory_iterator iterator(rootDirectory, errorCode), end;
+		for (std::filesystem::directory_iterator iterator(resolvedRoot, errorCode), end;
 			iterator != end && !errorCode; iterator.increment(errorCode))
 		{
 			const auto& entry = *iterator;
@@ -59,7 +64,7 @@ namespace gglab
 		if (errorCode)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("EnvironmentAssetController: failed while scanning '{}': {}.",
-				rootDirectory.string(), errorCode.message());
+				resolvedRoot.string(), errorCode.message());
 		}
 		std::ranges::sort(m_Entries,
 			[](const EnvironmentMapEntry& lhs, const EnvironmentMapEntry& rhs) noexcept
@@ -69,7 +74,7 @@ namespace gglab
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"EnvironmentAssetController: no valid HDR environment was found in '{}'; using procedural fallback.",
-				rootDirectory.string());
+				resolvedRoot.string());
 			return;
 		}
 		GGLAB_UNUSED(SelectDefaultEnvironment());
@@ -213,14 +218,22 @@ namespace gglab
 	bool EnvironmentAssetController::SelectEnvironmentFile(
 		const std::filesystem::path& path, std::string_view displayName) noexcept
 	{
-		const auto existing = std::ranges::find(m_Entries, path, &EnvironmentMapEntry::m_Path);
+		const std::filesystem::path resolvedPath = ResolveAssetPath(m_AssetRoot, path);
+		if (resolvedPath.empty())
+		{
+			return false;
+		}
+		const auto existing =
+			std::ranges::find(m_Entries, resolvedPath, &EnvironmentMapEntry::m_Path);
 		if (existing != m_Entries.end())
 		{
 			return SelectEnvironment(static_cast<size_t>(existing - m_Entries.begin()));
 		}
 		m_Entries.push_back({
-			.m_Path = path,
-			.m_DisplayName = displayName.empty() ? path.stem().string() : std::string(displayName),
+			.m_Path = resolvedPath,
+			.m_DisplayName = displayName.empty()
+				? resolvedPath.stem().string()
+				: std::string(displayName),
 			});
 		return SelectEnvironment(m_Entries.size() - 1);
 	}

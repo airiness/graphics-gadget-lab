@@ -1,6 +1,5 @@
 #include "Compiler/ShaderCompiler.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
-#include "Contracts/ShaderArtifactManifest.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
@@ -8,8 +7,9 @@
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
 #include "Targets/Vulkan13ShaderTarget.h"
-#include "Targets/VulkanShaderCompileABI.h"
+#include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <dxcapi.h>
 
@@ -262,89 +262,6 @@ namespace gglab
 #else
 #define GGLAB_LOG_SHADER_COMPILER(level, ...)
 #endif
-
-	bool IsShaderBinaryFormat(
-		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept
-	{
-		if (!binary.IsValid())
-		{
-			return false;
-		}
-
-		const auto* data = static_cast<const uint8_t*>(binary.Data());
-		const size_t size = binary.SizeInBytes();
-		switch (format)
-		{
-		case ShaderBinaryFormat::Dxil:
-			return size >= 20 && std::memcmp(data, "DXBC", 4) == 0;
-		case ShaderBinaryFormat::SpirV:
-		{
-			if (size < 5 * sizeof(uint32_t) || size % sizeof(uint32_t) != 0)
-			{
-				return false;
-			}
-			uint32_t magic = 0;
-			std::memcpy(&magic, data, sizeof(magic));
-			return magic == 0x07230203u;
-		}
-		case ShaderBinaryFormat::Unknown:
-			break;
-		}
-		return false;
-	}
-
-	namespace
-	{
-		[[nodiscard]] bool GetContainerHash(
-			const void* data, size_t size, ShaderHash128& outHash) noexcept
-		{
-			constexpr size_t MinDxilSize = 20;
-			if (data == nullptr || size < MinDxilSize)
-			{
-				return false;
-			}
-
-			// magic number for DirectX Container
-			static const unsigned char DXBCMagicNumber[] = { 'D', 'X', 'B', 'C' };
-			if (std::memcmp(data, DXBCMagicNumber, 4) != 0)
-			{
-				return false;
-			}
-			const unsigned char* ptr = static_cast<const unsigned char*>(data);
-			std::memcpy(&outHash.m_LowBits, ptr + 4, sizeof(uint64_t));
-			std::memcpy(&outHash.m_HighBits, ptr + 12, sizeof(uint64_t));
-
-			return true;
-		}
-	}
-
-	ShaderHash128 ComputeShaderBinaryHash(
-		const ShaderBinary& binary, ShaderBinaryFormat format) noexcept
-	{
-		ShaderHash128 hash{};
-		if (!binary.IsValid())
-		{
-			GGLAB_LOG_SHADER_COMPILER(LogLevel::Warning,
-				"ComputeShaderBinaryHash: binary is empty.");
-			return hash;
-		}
-
-		const auto* ptr = static_cast<const uint8_t*>(binary.Data());
-		const auto size = binary.SizeInBytes();
-
-		if (format == ShaderBinaryFormat::Dxil && GetContainerHash(ptr, size, hash))
-		{
-			return hash;
-		}
-
-		if (format == ShaderBinaryFormat::Dxil)
-		{
-			GGLAB_LOG_SHADER_COMPILER(LogLevel::Warning,
-				"ComputeShaderBinaryHash: Failed to get DXIL container hash, fallback to SHA-256.");
-		}
-		return ShaderDigestFastHash(ComputeSha256(
-			std::span(reinterpret_cast<const std::byte*>(ptr), size)));
-	}
 
 	ShaderCompiler::ShaderCompiler(
 		std::filesystem::path sourceRoot, std::filesystem::path cacheRoot) noexcept
@@ -1150,7 +1067,7 @@ namespace gglab
 					args.emplace_back(option);
 					args.push_back(std::to_wstring(range.m_BindingShift));
 					args.push_back(std::to_wstring(
-						GGLabVulkanShaderCompileABI.m_FixedHlslRegisterSpace));
+						GGLabVulkanShaderRuntimeABI.m_FixedHlslRegisterSpace));
 				};
 			appendRegisterShift(L"-fvk-b-shift", VulkanShaderRegisterClass::ConstantBuffer);
 			appendRegisterShift(L"-fvk-t-shift", VulkanShaderRegisterClass::ShaderResource);
@@ -1158,11 +1075,11 @@ namespace gglab
 			appendRegisterShift(L"-fvk-s-shift", VulkanShaderRegisterClass::Sampler);
 
 			args.emplace_back(L"-fvk-bind-resource-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_ResourceHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet));
 			args.emplace_back(L"-fvk-bind-sampler-heap");
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_SamplerHeapBinding));
-			args.push_back(std::to_wstring(GGLabVulkanShaderCompileABI.m_GlobalDescriptorSet));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding));
+			args.push_back(std::to_wstring(GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet));
 
 			if (Test(compileTarget.m_CoordinateOptions, ShaderCoordinateOptions::InvertY))
 			{

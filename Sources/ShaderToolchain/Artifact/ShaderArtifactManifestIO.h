@@ -1,5 +1,6 @@
 #pragma once
-#include "Contracts/ShaderArtifactManifest.h"
+#include "Contracts/ShaderArtifactCacheRecord.h"
+#include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
 
 #include <filesystem>
 #include <optional>

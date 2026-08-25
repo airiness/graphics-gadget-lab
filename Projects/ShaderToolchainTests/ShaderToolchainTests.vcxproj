@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83}</ProjectGuid>
+    <RootNamespace>ShaderToolchainTests</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TargetName>GGLabShaderToolchainTests</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderToolchainTestsMain.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">
+      <Project>{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
+      <Project>{F382CFE9-9912-487D-B999-E649C340125D}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">
+      <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj">
+      <Project>{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderCompiler\ShaderCompiler.vcxproj">
+      <Project>{C8A5E3D7-9B2F-4A1E-8F6C-3D9B7A5C2E41}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
+      <Project>{371B9FA9-4C90-4AC6-A123-ACED756D6C77}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
+    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
+  </ImportGroup>
+</Project>

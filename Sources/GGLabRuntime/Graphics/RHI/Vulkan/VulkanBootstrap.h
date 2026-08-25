@@ -70,6 +70,8 @@ namespace gglab
 		// Borrowed for the duration of RunVulkanBootstrap or
 		// CreateVulkanBootstrapRuntime.
 		const VulkanSurfaceFactoryBase* m_SurfaceFactory = nullptr;
+		// Declared by the concrete host composition and checked before any Vulkan API call.
+		bool m_IsHostAbiSupported = false;
 		bool m_RequestValidation = false;
 		VulkanAdapterSelectionRequest m_SelectionRequest{};
 	};

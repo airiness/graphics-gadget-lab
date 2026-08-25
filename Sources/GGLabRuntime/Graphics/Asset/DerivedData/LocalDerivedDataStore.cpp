@@ -2,18 +2,15 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Core/Log/LogMacros.h"
-#include "GGLabFoundation/Platform/Win/Win32ProcessUtils.h"
 #include "GGLabFoundation/IO/PathUtils.h"
-
-#include <Windows.h>
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <limits>
 #include <mutex>
@@ -176,6 +173,26 @@ namespace gglab
 			}
 			return result;
 		}
+
+		[[nodiscard]] bool RenameDirectoryForClear(const std::filesystem::path& source,
+			const std::filesystem::path& destination, std::error_code& errorCode) noexcept
+		{
+			constexpr uint32_t MaxAttempts = 8;
+			for (uint32_t attempt = 0; attempt < MaxAttempts; ++attempt)
+			{
+				errorCode.clear();
+				std::filesystem::rename(source, destination, errorCode);
+				if (!errorCode)
+				{
+					return true;
+				}
+				if (attempt + 1 < MaxAttempts)
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+			}
+			return false;
+		}
 	}
 
 	uint64_t ComputeLocalDerivedDataContainerByteLimit(
@@ -193,9 +210,20 @@ namespace gglab
 	}
 
 	LocalDerivedDataStore::LocalDerivedDataStore(std::filesystem::path rootDirectory) noexcept :
-		m_RootIdentity(ResolveLocalDerivedDataRootIdentity(rootDirectory)),
+		LocalDerivedDataStore(
+			std::move(rootDirectory), CreateDefaultLocalDerivedDataPlatform())
+	{
+	}
+
+	LocalDerivedDataStore::LocalDerivedDataStore(std::filesystem::path rootDirectory,
+		std::unique_ptr<LocalDerivedDataPlatformBase> platform) noexcept :
+		m_Platform(std::move(platform)),
+		m_RootIdentity(m_Platform ? m_Platform->ResolveRootIdentity(rootDirectory)
+			: LocalDerivedDataRootIdentity{}),
 		m_RootDirectory(m_RootIdentity.m_CanonicalRoot), m_Catalog(m_RootDirectory),
-		m_MaintenanceLock(m_RootIdentity)
+		m_MaintenanceLock(m_Platform && m_RootIdentity.IsValid()
+			? m_Platform->CreateMaintenanceLock(m_RootIdentity)
+			: nullptr)
 	{
 		if (IsEnabled())
 		{
@@ -203,8 +231,8 @@ namespace gglab
 				return;
 			std::vector<std::filesystem::path> trashPaths;
 			{
-				LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
-				if (maintenance.IsAcquired())
+				std::unique_ptr maintenance = AcquireMaintenanceLock();
+				if (maintenance && maintenance->IsAcquired())
 				{
 					CleanupOrphanTemporaryFilesLocked();
 					trashPaths = CollectTrashPathsLocked();
@@ -246,8 +274,8 @@ namespace gglab
 			return result;
 		}
 		std::scoped_lock lock(m_Mutex);
-		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
-		if (!maintenance.IsAcquired())
+		std::unique_ptr maintenance = AcquireMaintenanceLock();
+		if (!maintenance || !maintenance->IsAcquired())
 		{
 			m_CorruptionCount.fetch_add(1, std::memory_order_relaxed);
 			return result;
@@ -301,8 +329,8 @@ namespace gglab
 		header.AddBytes(std::as_bytes(std::span{ artifactType.data(), artifactType.size() }));
 
 		std::scoped_lock lock(m_Mutex);
-		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
-		if (!maintenance.IsAcquired())
+		std::unique_ptr maintenance = AcquireMaintenanceLock();
+		if (!maintenance || !maintenance->IsAcquired())
 		{
 			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
 			return false;
@@ -313,9 +341,12 @@ namespace gglab
 			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}
-		const std::filesystem::path temporary =
-			path.string() + std::format(".tmp.{}.{}.{}", win32::GetCurrentProcessId(),
-				reinterpret_cast<uintptr_t>(this), m_TemporarySerial.fetch_add(1));
+		const std::filesystem::path temporary = MakeUniqueSiblingPath(path, ".tmp.");
+		if (temporary.empty())
+		{
+			m_WriteFailureCount.fetch_add(1, std::memory_order_relaxed);
+			return false;
+		}
 		std::ofstream stream(temporary, std::ios::binary | std::ios::trunc);
 		if (stream)
 		{
@@ -339,14 +370,6 @@ namespace gglab
 		constexpr uint32_t MaxPublishAttempts = 3;
 		for (uint32_t attempt = 0; attempt < MaxPublishAttempts; ++attempt)
 		{
-			if (MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_WRITE_THROUGH))
-			{
-				m_Catalog.RecordEntry(path, totalBytes);
-				m_WriteCount.fetch_add(1, std::memory_order_relaxed);
-				m_WrittenBytes.fetch_add(payload.size(), std::memory_order_relaxed);
-				return true;
-			}
-
 			DerivedDataReadResult existing = ReadEntry(path, key, artifactType, schemaVersion, {});
 			if (existing.m_Disposition == DerivedDataReadDisposition::Hit)
 			{
@@ -384,7 +407,16 @@ namespace gglab
 					continue;
 				}
 			}
-			break;
+
+			errorCode.clear();
+			std::filesystem::rename(temporary, path, errorCode);
+			if (!errorCode)
+			{
+				m_Catalog.RecordEntry(path, totalBytes);
+				m_WriteCount.fetch_add(1, std::memory_order_relaxed);
+				m_WrittenBytes.fetch_add(payload.size(), std::memory_order_relaxed);
+				return true;
+			}
 		}
 
 		std::filesystem::remove(temporary, errorCode);
@@ -421,8 +453,8 @@ namespace gglab
 			return;
 		}
 		std::scoped_lock lock(m_Mutex);
-		LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
-		if (!maintenance.IsAcquired())
+		std::unique_ptr maintenance = AcquireMaintenanceLock();
+		if (!maintenance || !maintenance->IsAcquired())
 			return;
 		const std::filesystem::path path = EntryPath(key);
 		const DerivedDataReadResult current =
@@ -450,8 +482,8 @@ namespace gglab
 		bool cleared = false;
 		{
 			std::scoped_lock lock(m_Mutex);
-			LocalDerivedDataMaintenanceLockGuard maintenance = AcquireMaintenanceLock();
-			if (!maintenance.IsAcquired())
+			std::unique_ptr maintenance = AcquireMaintenanceLock();
+			if (!maintenance || !maintenance->IsAcquired())
 				return false;
 			trashPaths = CollectTrashPathsLocked();
 
@@ -468,8 +500,7 @@ namespace gglab
 			else
 			{
 				const std::filesystem::path trashPath = MakeTrashPath();
-				std::filesystem::rename(m_RootDirectory, trashPath, errorCode);
-				if (errorCode)
+				if (!RenameDirectoryForClear(m_RootDirectory, trashPath, errorCode))
 				{
 					GGLAB_LOG_GRAPHICS_WARN(
 						"Local DDC clear could not rename '{}' to '{}': {}.",
@@ -529,10 +560,12 @@ namespace gglab
 		return m_RootDirectory / text.substr(0, 2) / (text + ".ddc");
 	}
 
-	LocalDerivedDataMaintenanceLockGuard LocalDerivedDataStore::AcquireMaintenanceLock() noexcept
+	std::unique_ptr<LocalDerivedDataMaintenanceLockGuardBase>
+		LocalDerivedDataStore::AcquireMaintenanceLock() noexcept
 	{
-		LocalDerivedDataMaintenanceLockGuard maintenance = m_MaintenanceLock.Acquire();
-		if (!maintenance.WasAbandoned())
+		std::unique_ptr maintenance =
+			m_MaintenanceLock ? m_MaintenanceLock->Acquire() : nullptr;
+		if (!maintenance || !maintenance->WasAbandoned())
 			return maintenance;
 		GGLAB_LOG_GRAPHICS_WARN("Recovered an abandoned local DDC maintenance lock for '{}'.",
 			m_RootDirectory.string());
@@ -584,12 +617,38 @@ namespace gglab
 		return trashPaths;
 	}
 
+	std::filesystem::path LocalDerivedDataStore::MakeUniqueSiblingPath(
+		const std::filesystem::path& basePath, std::string_view marker) noexcept
+	{
+		if (!m_Platform || basePath.empty() || marker.empty())
+		{
+			return {};
+		}
+		constexpr uint32_t MaxIdentityAttempts = 32;
+		for (uint32_t attempt = 0; attempt < MaxIdentityAttempts; ++attempt)
+		{
+			const std::string token = m_Platform->CreateUniquePathToken();
+			if (token.empty())
+			{
+				continue;
+			}
+			std::filesystem::path filename = basePath.filename();
+			filename += marker;
+			filename += token;
+			const std::filesystem::path candidate = basePath.parent_path() / filename;
+			std::error_code errorCode;
+			const bool exists = std::filesystem::exists(candidate, errorCode);
+			if (!errorCode && !exists)
+			{
+				return candidate;
+			}
+		}
+		return {};
+	}
+
 	std::filesystem::path LocalDerivedDataStore::MakeTrashPath() noexcept
 	{
-		return m_RootDirectory.parent_path() /
-			std::format(L"{}.trash.{}.{}.{}", m_RootDirectory.filename().wstring(),
-				win32::GetCurrentProcessId(), win32::GetTickCount64(),
-				m_TrashSerial.fetch_add(1, std::memory_order_relaxed));
+		return MakeUniqueSiblingPath(m_RootDirectory, ".trash.");
 	}
 
 	void LocalDerivedDataStore::ScheduleTrashCleanup(
