@@ -159,7 +159,8 @@ namespace gglab
 
 		void DrawFrustumPlanes(const RenderView& view) noexcept
 		{
-			const math::Frustum frustum = math::CreateFrustumFromViewProjection(view.m_ViewProj);
+			const math::Frustum frustum =
+				math::CreateFrustumFromViewProjection(view.m_UnjitteredViewProj);
 			if (!ImGui::BeginTable("FrustumPlanes", 3,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_SizingStretchProp))
@@ -433,11 +434,19 @@ namespace gglab
 			if (state.m_ShowMatrices)
 			{
 				devtools::DrawMatrix4x4Tree("View", view->m_View);
-				devtools::DrawMatrix4x4Tree("Projection", view->m_Proj);
-				devtools::DrawMatrix4x4Tree("ViewProjection", view->m_ViewProj);
+				devtools::DrawMatrix4x4Tree("UnjitteredProjection", view->m_UnjitteredProj);
+				devtools::DrawMatrix4x4Tree(
+					"UnjitteredViewProjection", view->m_UnjitteredViewProj);
+				devtools::DrawMatrix4x4Tree("RasterProjection", view->m_RasterProj);
+				devtools::DrawMatrix4x4Tree("RasterViewProjection", view->m_RasterViewProj);
 				devtools::DrawMatrix4x4Tree("InvView", view->m_InvView);
-				devtools::DrawMatrix4x4Tree("InvProjection", view->m_InvProj);
-				devtools::DrawMatrix4x4Tree("InvViewProjection", view->m_InvViewProj);
+				devtools::DrawMatrix4x4Tree(
+					"InvUnjitteredProjection", view->m_InvUnjitteredProj);
+				devtools::DrawMatrix4x4Tree(
+					"InvUnjitteredViewProjection", view->m_InvUnjitteredViewProj);
+				devtools::DrawMatrix4x4Tree("InvRasterProjection", view->m_InvRasterProj);
+				devtools::DrawMatrix4x4Tree(
+					"InvRasterViewProjection", view->m_InvRasterViewProj);
 			}
 			if (state.m_ShowFrustumPlanes && view->m_IsValid)
 			{

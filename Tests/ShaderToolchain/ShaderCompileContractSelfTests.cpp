@@ -2168,8 +2168,11 @@ namespace gglab
 				.m_IncludeDirs = {L"."},
 			};
 			const ShaderCompileResult artifact = compiler.Compile(desc);
-			context.Check(artifact.IsSuccess(),
-				"Production DXC compiles screen-space and depth reconstruction helpers");
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const ShaderCompileResult spirVArtifact = compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(artifact.IsSuccess() && spirVArtifact.IsSuccess(),
+				"Production DXC compiles screen-space, depth, and temporal helpers to DXIL and SPIR-V");
 
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

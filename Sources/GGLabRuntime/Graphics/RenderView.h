@@ -4,6 +4,7 @@
 #include "Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/ShadowSettings.h"
 
@@ -20,11 +21,25 @@ namespace gglab
 	struct RenderView
 	{
 		Matrix m_View = Matrix::Identity;
-		Matrix m_Proj = Matrix::Identity;
-		Matrix m_ViewProj = Matrix::Identity;
 		Matrix m_InvView = Matrix::Identity;
-		Matrix m_InvProj = Matrix::Identity;
-		Matrix m_InvViewProj = Matrix::Identity;
+
+		Matrix m_UnjitteredProj = Matrix::Identity;
+		Matrix m_UnjitteredViewProj = Matrix::Identity;
+		Matrix m_InvUnjitteredProj = Matrix::Identity;
+		Matrix m_InvUnjitteredViewProj = Matrix::Identity;
+
+		Matrix m_RasterProj = Matrix::Identity;
+		Matrix m_RasterViewProj = Matrix::Identity;
+		Matrix m_InvRasterProj = Matrix::Identity;
+		Matrix m_InvRasterViewProj = Matrix::Identity;
+
+		Matrix m_PreviousView = Matrix::Identity;
+		Matrix m_PreviousRasterViewProj = Matrix::Identity;
+		Vector4 m_DepthReconstructionParams = Vector4::Zero;
+		Vector4 m_PreviousDepthReconstructionParams = Vector4::Zero;
+		Vector2 m_JitterPixels = Vector2::Zero;
+		Vector2 m_JitterUV = Vector2::Zero;
+		Vector2 m_PreviousJitterUV = Vector2::Zero;
 
 		Vector3 m_CameraPosition = Vector3::Zero;
 		float m_Near = 0.1f;
@@ -36,10 +51,14 @@ namespace gglab
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		uint64_t m_TemporalResetIdentity = 0;
+		uint64_t m_TemporalSessionIdentity = 0;
 
 		DepthConvention m_DepthConvention = DepthConvention::Standard;
+		DepthConvention m_PreviousDepthConvention = DepthConvention::Standard;
 		RenderViewID m_ViewId = RenderViewID::Unknown;
 		StringID m_Name{};
+		bool m_HasPreviousTemporalState = false;
 		bool m_IsValid = false;
 	};
 
@@ -47,7 +66,8 @@ namespace gglab
 	{
 	public:
 		RenderView BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
-			const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
+			const ResolvedViewRenderSettings& renderSettings,
+			const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
 			StringID name) const noexcept;
 
 		template <RenderViewID ViewId>
@@ -61,6 +81,7 @@ namespace gglab
 	{
 		const Camera& m_Camera;
 		const ResolvedViewRenderSettings& m_RenderSettings;
+		const ResolvedTemporalFramePlan& m_TemporalFramePlan;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		StringID m_Name = StringID("MainView");

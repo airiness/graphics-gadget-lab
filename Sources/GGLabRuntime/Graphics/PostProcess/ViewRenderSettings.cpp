@@ -28,6 +28,7 @@ namespace gglab
 		gtao.m_DenoiseRadius = std::clamp(gtao.m_DenoiseRadius, 1u, GTAOMaxDenoiseRadius);
 
 		return {
+			.m_TemporalAA = profile.m_TemporalAA,
 			.m_Exposure =
 				{
 					.m_CompensationEV = camera.GetExposureCompensationEV(),

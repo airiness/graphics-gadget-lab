@@ -243,8 +243,9 @@ namespace gglab
 			if (state.m_ShowMatrices)
 			{
 				devtools::DrawMatrix4x4Tree("View", shadowView->m_View);
-				devtools::DrawMatrix4x4Tree("Projection", shadowView->m_Proj);
-				devtools::DrawMatrix4x4Tree("ViewProjection", shadowView->m_ViewProj);
+				devtools::DrawMatrix4x4Tree("UnjitteredProjection", shadowView->m_UnjitteredProj);
+				devtools::DrawMatrix4x4Tree(
+					"UnjitteredViewProjection", shadowView->m_UnjitteredViewProj);
 			}
 		}
 

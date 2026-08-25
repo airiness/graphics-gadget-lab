@@ -1588,6 +1588,31 @@ namespace gglab
 					firstRegistry.m_Artifact.m_Entries.size() == 53,
 				"build-runtime publishes the complete immutable catalog and active RegistryId");
 
+			std::vector<std::wstring> vulkanArguments = arguments;
+			const auto targetArgument = std::ranges::find(vulkanArguments, L"gglab-dx12");
+			if (targetArgument != vulkanArguments.end())
+			{
+				*targetArgument = L"gglab-vulkan13";
+			}
+			const CliRunResult vulkanBuild = RunCli(vulkanArguments);
+			ShaderLooseActiveProgramRegistryReader vulkanActiveReader{
+				ShaderLooseActiveProgramRegistryLocator(
+					artifactRoot, ShaderTargetProfile::GGLabVulkan13)
+			};
+			const ActiveShaderProgramRegistryReadResult vulkanActive =
+				vulkanActiveReader.Read();
+			const ShaderProgramRegistryArtifactReadResult vulkanRegistry =
+				vulkanActive.IsSuccess()
+				? registryReader.ReadArtifact(vulkanActive.m_RegistryRef)
+				: ShaderProgramRegistryArtifactReadResult{};
+			context.Check(targetArgument != vulkanArguments.end() &&
+				vulkanBuild.m_ExitCode == 0 && IsSingleJsonDocument(vulkanBuild) &&
+				vulkanBuild.m_StdOut.find("\"success\":true") != std::string::npos &&
+				vulkanBuild.m_StdOut.find("\"programCount\":53") != std::string::npos &&
+				vulkanActive.IsSuccess() && vulkanRegistry.IsSuccess() &&
+				vulkanRegistry.m_Artifact.m_Entries.size() == 53,
+				"build-runtime publishes the complete Vulkan 1.3 immutable catalog");
+
 			const CliRunResult second = RunCli(arguments);
 			const ActiveShaderProgramRegistryReadResult secondActive = activeReader.Read();
 			context.Check(

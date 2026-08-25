@@ -40,11 +40,29 @@ namespace gglab
 		};
 	}
 
+	ResolvedTemporalFramePlan RenderPipelineForwardPBR::ResolveTemporalFramePlan(
+		TemporalFramePlanResolveInfo info) const noexcept
+	{
+		info.m_DepthVelocityPathAvailable = false;
+		const SceneExtensionTemporalParticipation participation = m_SceneExtension
+			? m_SceneExtension->GetTemporalParticipation()
+			: SceneExtensionTemporalParticipation::PostTAA;
+		// TemporalIntegrated remains reserved until the extension API can provide matching
+		// color, depth, motion, and submitted-frame transaction participation.
+		info.m_SceneExtensionParticipation =
+			participation == SceneExtensionTemporalParticipation::TemporalIntegrated
+			? SceneExtensionTemporalParticipation::TemporalUnsupported
+			: participation;
+		return gglab::ResolveTemporalFramePlan(info);
+	}
+
 	void RenderPipelineForwardPBR::BuildRenderGraph(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
+		GGLAB_ASSERT_MSG(!context.GetTemporalFramePlan().m_Active,
+			"ForwardPBR has no temporal resolve path for an active frame plan.");
 
 		auto* renderer = services.m_Renderer;
 		auto* swapChain = renderer->GetSwapChain();

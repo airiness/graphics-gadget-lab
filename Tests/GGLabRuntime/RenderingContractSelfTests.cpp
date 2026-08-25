@@ -7,6 +7,8 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -144,6 +146,20 @@ namespace gglab
 
 		private:
 			uint32_t& m_AddPassCount;
+		};
+
+		class IntegratedTemporalSceneExtension final : public RenderPipelineSceneExtensionBase
+		{
+		public:
+			SceneExtensionTemporalParticipation GetTemporalParticipation() const noexcept override
+			{
+				return SceneExtensionTemporalParticipation::TemporalIntegrated;
+			}
+
+			void AddOpaqueScenePasses(
+				RenderGraph&, const RenderFrameContext&, const RenderServices&) noexcept override
+			{
+			}
 		};
 
 		class RecordingDevice final : public RHIDevice
@@ -488,6 +504,9 @@ namespace gglab
 			auto extension = std::make_unique<RecordingOpaqueSceneExtension>(
 				scenePhaseBuffer, addPassCount, destructionCount);
 			RecordingOpaqueSceneExtension* extensionPtr = extension.get();
+			context.Check(extensionPtr->GetTemporalParticipation() ==
+				SceneExtensionTemporalParticipation::PostTAA,
+				"Scene extensions default to post-TAA participation until they declare a temporal contract");
 
 			RenderGraph graph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
@@ -1030,6 +1049,10 @@ namespace gglab
 				standardSample.m_UV, standardSample.m_RawDepth, math::Inverse(standardProjection));
 			const Vector3 reconstructedReversed = screen_space::ReconstructViewPosition(
 				reversedSample.m_UV, reversedSample.m_RawDepth, math::Inverse(reversedProjection));
+			const Vector4 standardDepthParams =
+				screen_space::MakeDepthReconstructionParams(standardProjection);
+			const Vector4 reversedDepthParams =
+				screen_space::MakeDepthReconstructionParams(reversedProjection);
 
 			context.Check(NearlyEqual(reconstructedStandard, positionVS),
 				"Standard-Z reconstructs a mid-depth view position");
@@ -1045,6 +1068,13 @@ namespace gglab
 					standardSample.m_RawDepth, math::Inverse(standardProjection)),
 					positionVS.m_Z, PositionTolerance),
 				"Standard-Z raw depth reconstructs positive left-handed view Z");
+			context.Check(NearlyEqual(screen_space::RawDepthToPositiveViewZ(
+				standardSample.m_RawDepth, standardDepthParams, DepthConvention::Standard),
+				positionVS.m_Z, PositionTolerance) &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(
+					reversedSample.m_RawDepth, reversedDepthParams, DepthConvention::Reversed),
+					positionVS.m_Z, PositionTolerance),
+				"Compact depth reconstruction matches Standard-Z and Reversed-Z projection contracts");
 
 			const Matrix view = math::CreateLookAtLH(
 				Vector3(3.0f, 2.0f, -4.0f), Vector3(0.0f, 1.0f, 5.0f), Vector3::UnitY);
@@ -1087,10 +1117,14 @@ namespace gglab
 		{
 			Camera camera(Camera::CreateInfo{});
 			const ResolvedViewRenderSettings settings{};
+			const ResolvedTemporalFramePlan temporalFramePlan{
+				.m_DisplayViewId = RenderViewID::Main,
+			};
 			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>(
 				RenderViewBuildInfo<RenderViewID::Main>{
-				.m_Camera = camera,
+					.m_Camera = camera,
 					.m_RenderSettings = settings,
+					.m_TemporalFramePlan = temporalFramePlan,
 					.m_Width = 1280,
 					.m_Height = 720,
 			});
@@ -1101,9 +1135,11 @@ namespace gglab
 			});
 
 			const float mainNear =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near), mainView.m_Proj).m_RawDepth;
+				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near),
+					mainView.m_RasterProj).m_RawDepth;
 			const float mainFar =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far), mainView.m_Proj).m_RawDepth;
+				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far),
+					mainView.m_RasterProj).m_RawDepth;
 			context.Check(mainView.m_DepthConvention == DepthConvention::Reversed &&
 				NearlyEqual(mainNear, 1.0f) && NearlyEqual(mainFar, 0.0f),
 				"Main view records and projects with its Reversed-Z contract");
@@ -3985,8 +4021,184 @@ namespace gglab
 			}
 		}
 
-		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
+		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext& context) noexcept
 		{
+			static_assert(sizeof(ViewGPU) == 480);
+			static_assert(offsetof(ViewGPU, PreviousViewMat) == 256);
+			static_assert(offsetof(ViewGPU, PreviousDepthReconstructionParams) == 400);
+			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
+			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
+
+			context.Check(IsTemporalColorCompatible(
+				TemporalColorAbi::LinearRec709SceneReferredV1,
+				PostProcessColorState::SceneLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::SceneLinearRec709, 0.5f),
+				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
+
+			ViewRenderProfile profile{};
+			const Camera camera(Camera::CreateInfo{});
+			const ResolvedViewRenderSettings defaultSettings =
+				ResolveViewRenderSettings(profile, camera);
+			profile.m_TemporalAA.m_Enabled = true;
+			const ResolvedViewRenderSettings enabledSettings =
+				ResolveViewRenderSettings(profile, camera);
+			context.Check(!defaultSettings.m_TemporalAA.m_Enabled &&
+				enabledSettings.m_TemporalAA.m_Enabled,
+				"Temporal AA authoring defaults off and resolves immutably for one frame");
+
+			const TemporalAACapabilityStatus fullCapabilities{
+				.m_MotionRenderTarget = true,
+				.m_MotionShaderResource = true,
+				.m_ResolvedColorRenderTarget = true,
+				.m_ResolvedColorShaderResource = true,
+				.m_ResolvedColorTypedUavStore = true,
+				.m_HistoryColorShaderResource = true,
+				.m_HistoryColorTypedUavStore = true,
+				.m_HistoryDepthShaderResource = true,
+				.m_HistoryDepthTypedUavStore = true,
+				.m_VelocityProgramsAvailable = true,
+				.m_ResolveProgramAvailable = true,
+				.m_BindingLayoutAvailable = true,
+			};
+			context.Check(fullCapabilities.IsCoreAvailable() &&
+				!TemporalAACapabilityStatus{}.IsCoreAvailable(),
+				"Temporal AA core capability requires the complete texture, program, and binding closure");
+
+			TemporalFramePlanResolveInfo resolveInfo{
+				.m_Settings = {.m_Enabled = true},
+				.m_Capabilities = fullCapabilities,
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::PostTAA,
+				.m_ResetIdentity = 17,
+				.m_SessionIdentity = 23,
+				.m_DisplayViewEligible = true,
+				.m_DepthVelocityPathAvailable = true,
+			};
+			const ResolvedTemporalFramePlan activePlan = ResolveTemporalFramePlan(resolveInfo);
+			TemporalFramePlanResolveInfo disabledInfo = resolveInfo;
+			disabledInfo.m_Settings.m_Enabled = false;
+			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledInfo);
+			TemporalFramePlanResolveInfo missingCoreInfo = resolveInfo;
+			missingCoreInfo.m_Capabilities = {};
+			const ResolvedTemporalFramePlan missingCorePlan =
+				ResolveTemporalFramePlan(missingCoreInfo);
+			TemporalFramePlanResolveInfo ineligibleInfo = resolveInfo;
+			ineligibleInfo.m_DisplayViewEligible = false;
+			const ResolvedTemporalFramePlan ineligiblePlan =
+				ResolveTemporalFramePlan(ineligibleInfo);
+			TemporalFramePlanResolveInfo missingDepthVelocityInfo = resolveInfo;
+			missingDepthVelocityInfo.m_DepthVelocityPathAvailable = false;
+			const ResolvedTemporalFramePlan missingDepthVelocityPlan =
+				ResolveTemporalFramePlan(missingDepthVelocityInfo);
+			TemporalFramePlanResolveInfo unsupportedExtensionInfo = resolveInfo;
+			unsupportedExtensionInfo.m_SceneExtensionParticipation =
+				SceneExtensionTemporalParticipation::TemporalUnsupported;
+			const ResolvedTemporalFramePlan unsupportedExtensionPlan =
+				ResolveTemporalFramePlan(unsupportedExtensionInfo);
+			TemporalFramePlanResolveInfo internalInfo = missingCoreInfo;
+			internalInfo.m_InternalContractMode = true;
+			const ResolvedTemporalFramePlan internalPlan = ResolveTemporalFramePlan(internalInfo);
+			context.Check(activePlan.m_Active && activePlan.m_CoreAvailable &&
+				activePlan.m_Status == TemporalAAFrameStatus::Active &&
+				activePlan.m_DisableReason == TemporalAADisableReason::None &&
+				activePlan.m_ResetIdentity == 17 && activePlan.m_SessionIdentity == 23 &&
+				!disabledPlan.m_Active &&
+				disabledPlan.m_Status == TemporalAAFrameStatus::Disabled &&
+				disabledPlan.m_DisableReason == TemporalAADisableReason::NotRequested &&
+				missingCorePlan.m_DisableReason ==
+					TemporalAADisableReason::CoreCapabilityUnavailable &&
+				ineligiblePlan.m_DisableReason == TemporalAADisableReason::DisplayViewIneligible &&
+				missingDepthVelocityPlan.m_DisableReason ==
+					TemporalAADisableReason::DepthVelocityPathUnavailable &&
+				unsupportedExtensionPlan.m_DisableReason ==
+					TemporalAADisableReason::SceneExtensionUnsupported &&
+				internalPlan.m_Active && !internalPlan.m_CoreAvailable &&
+				internalPlan.m_InternalContractMode,
+				"Temporal frame plan resolves one atomic active state and preserves every disable cause");
+
+			context.Check(IsTemporalAADisplayViewEligible(RenderViewID::Main, 1920, 1080) &&
+				IsTemporalAADisplayViewEligible(RenderViewID::DebugCamera0, 1, 1) &&
+				!IsTemporalAADisplayViewEligible(RenderViewID::DirectionalShadow, 1920, 1080) &&
+				!IsTemporalAADisplayViewEligible(RenderViewID::Main, 0, 1080),
+				"Temporal AA eligibility is restricted to non-empty perspective display views");
+
+			RenderPipelineForwardPBR forwardPipeline;
+			const ResolvedTemporalFramePlan forwardPlan =
+				forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
+			RenderPipelineForwardPBR integratedExtensionPipeline({
+				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
+			});
+			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
+			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
+			const ResolvedTemporalFramePlan integratedExtensionPlan =
+				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
+			context.Check(!forwardPlan.m_Active &&
+				forwardPlan.m_SceneExtensionParticipation ==
+					SceneExtensionTemporalParticipation::PostTAA &&
+				forwardPlan.m_DisableReason ==
+					TemporalAADisableReason::DepthVelocityPathUnavailable &&
+				!integratedExtensionPlan.m_Active &&
+				integratedExtensionPlan.m_SceneExtensionParticipation ==
+					SceneExtensionTemporalParticipation::TemporalUnsupported,
+				"ForwardPBR is the sole frame-plan resolver and rejects unavailable production paths");
+
+			Renderer renderer;
+			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),
+				"Renderer publishes temporal core capability as unavailable before pipeline closure");
+
+			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
+				.m_Settings = defaultSettings.m_TemporalAA,
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::PostTAA,
+				.m_DisplayViewEligible = true,
+			});
+			RenderViewBuilder viewBuilder;
+			const RenderView view = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = defaultSettings,
+				.m_TemporalFramePlan = viewPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			const float nearRawDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
+			const float farRawDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
+			context.Check(view.m_UnjitteredProj.ToArray() == view.m_RasterProj.ToArray() &&
+				view.m_UnjitteredViewProj.ToArray() == view.m_RasterViewProj.ToArray() &&
+				view.m_JitterPixels.m_X == 0.0f && view.m_JitterPixels.m_Y == 0.0f &&
+				view.m_JitterUV.m_X == 0.0f && view.m_JitterUV.m_Y == 0.0f &&
+				!view.m_HasPreviousTemporalState &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(nearRawDepth,
+					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Near) &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(farRawDepth,
+					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Far,
+					PositionTolerance * view.m_Far),
+				"Inactive temporal views preserve unjittered raster output and compact depth reconstruction");
+
+			const Vector2 jitterPixels(0.5f, -0.25f);
+			const Vector2 jitterUV = temporal::JitterPixelsToUV(jitterPixels, 100, 50);
+			const Vector2 jitterNDC = temporal::JitterPixelsToNDC(jitterPixels, 100, 50);
+			const Vector4 jitteredClip = temporal::ApplyJitterToClipPosition(
+				Vector4(1.0f, 2.0f, 3.0f, 2.0f), jitterNDC);
+			context.Check(NearlyEqual(jitterUV, Vector2(0.005f, -0.005f)) &&
+				NearlyEqual(jitterNDC, Vector2(0.01f, 0.01f)) &&
+				NearlyEqual(jitteredClip.m_X, 1.02f) &&
+				NearlyEqual(jitteredClip.m_Y, 2.02f) &&
+				NearlyEqual(temporal::ReprojectToPreviousUV(Vector2(0.5f, 0.5f),
+					Vector2(0.1f, -0.2f)), Vector2(0.4f, 0.7f)),
+				"CPU temporal math fixes pixel, NDC, clip, and motion reprojection signs");
+
+			RenderFrameBuilder::BuildResult frameResult{};
+			frameResult.m_TemporalFramePlan = activePlan;
+			const RenderFrameContext frameContext = frameResult.MakeRenderFrameContext();
+			context.Check(frameContext.GetTemporalFramePlan() == activePlan,
+				"RenderFrameContext preserves the single pre-frame temporal plan without re-resolution");
 		}
 	}
 

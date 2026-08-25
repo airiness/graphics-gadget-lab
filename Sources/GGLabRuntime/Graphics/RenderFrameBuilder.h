@@ -24,6 +24,7 @@ namespace gglab
 			AssetManager& m_AssetManager;
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
 			const ViewRenderProfile& m_ViewRenderProfile;
+			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
 			uint32_t m_FrameSlotIndex = 0;
@@ -37,6 +38,7 @@ namespace gglab
 			std::vector<RenderView> m_RenderViews;
 			std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)>
 				m_ViewRenderSettings{};
+			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};

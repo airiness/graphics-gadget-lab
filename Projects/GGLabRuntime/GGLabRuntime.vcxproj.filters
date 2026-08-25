@@ -1151,6 +1151,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
+      <Filter>Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessColor.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>

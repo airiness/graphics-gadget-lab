@@ -13,7 +13,8 @@ namespace gglab
 	namespace
 	{
 		RenderView BuildPerspectiveCameraView(RenderViewID viewId, const Camera& camera,
-			const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
+			const ResolvedViewRenderSettings& renderSettings,
+			const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
 			StringID name) noexcept
 		{
 			RenderView view{};
@@ -23,12 +24,28 @@ namespace gglab
 			view.m_DepthConvention = DepthConvention::Reversed;
 
 			view.m_View = camera.GetViewMatrix();
-			view.m_Proj = math::CreatePerspectiveFieldOfViewLHReversedZ(math::ToRadians(camera.GetFov()),
-				camera.GetAspect(), camera.GetNear(), camera.GetFar());
-			view.m_ViewProj = view.m_View * view.m_Proj;
 			view.m_InvView = math::Inverse(view.m_View);
-			view.m_InvProj = math::Inverse(view.m_Proj);
-			view.m_InvViewProj = math::Inverse(view.m_ViewProj);
+			view.m_UnjitteredProj = math::CreatePerspectiveFieldOfViewLHReversedZ(math::ToRadians(camera.GetFov()),
+				camera.GetAspect(), camera.GetNear(), camera.GetFar());
+			view.m_UnjitteredViewProj = view.m_View * view.m_UnjitteredProj;
+			view.m_InvUnjitteredProj = math::Inverse(view.m_UnjitteredProj);
+			view.m_InvUnjitteredViewProj = math::Inverse(view.m_UnjitteredViewProj);
+			view.m_RasterProj = view.m_UnjitteredProj;
+			view.m_RasterViewProj = view.m_UnjitteredViewProj;
+			view.m_InvRasterProj = view.m_InvUnjitteredProj;
+			view.m_InvRasterViewProj = view.m_InvUnjitteredViewProj;
+			view.m_DepthReconstructionParams =
+				screen_space::MakeDepthReconstructionParams(view.m_RasterProj);
+			view.m_PreviousView = view.m_View;
+			view.m_PreviousRasterViewProj = view.m_RasterViewProj;
+			view.m_PreviousDepthReconstructionParams = view.m_DepthReconstructionParams;
+			view.m_PreviousDepthConvention = view.m_DepthConvention;
+
+			if (viewId == temporalFramePlan.m_DisplayViewId)
+			{
+				view.m_TemporalResetIdentity = temporalFramePlan.m_ResetIdentity;
+				view.m_TemporalSessionIdentity = temporalFramePlan.m_SessionIdentity;
+			}
 
 			view.m_CameraPosition = camera.GetPosition();
 			view.m_Near = camera.GetNear();
@@ -46,18 +63,20 @@ namespace gglab
 	}
 
 	RenderView RenderViewBuilder::BuildDebugCameraView(RenderViewID viewId, const Camera& camera,
-		const ResolvedViewRenderSettings& renderSettings, uint32_t width, uint32_t height,
+		const ResolvedViewRenderSettings& renderSettings,
+		const ResolvedTemporalFramePlan& temporalFramePlan, uint32_t width, uint32_t height,
 		StringID name) const noexcept
 	{
 		GGLAB_ASSERT(IsDebugCameraRenderViewID(viewId));
-		return BuildPerspectiveCameraView(viewId, camera, renderSettings, width, height, name);
+		return BuildPerspectiveCameraView(
+			viewId, camera, renderSettings, temporalFramePlan, width, height, name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::Main>::Build(
 		const RenderViewBuildInfo<RenderViewID::Main>& info) noexcept
 	{
 		return BuildPerspectiveCameraView(RenderViewID::Main, info.m_Camera, info.m_RenderSettings,
-			info.m_Width, info.m_Height, info.m_Name);
+			info.m_TemporalFramePlan, info.m_Width, info.m_Height, info.m_Name);
 	}
 
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(
@@ -174,12 +193,22 @@ namespace gglab
 		view.m_IsValid = true;
 		view.m_DepthConvention = DepthConvention::Standard;
 		view.m_View = math::CreateLookAtLH(lightEye, lightTarget, lightUp);
-		view.m_Proj = math::CreateOrthographicOffCenterLH(
-			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
-		view.m_ViewProj = view.m_View * view.m_Proj;
 		view.m_InvView = math::Inverse(view.m_View);
-		view.m_InvProj = math::Inverse(view.m_Proj);
-		view.m_InvViewProj = math::Inverse(view.m_ViewProj);
+		view.m_UnjitteredProj = math::CreateOrthographicOffCenterLH(
+			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
+		view.m_UnjitteredViewProj = view.m_View * view.m_UnjitteredProj;
+		view.m_InvUnjitteredProj = math::Inverse(view.m_UnjitteredProj);
+		view.m_InvUnjitteredViewProj = math::Inverse(view.m_UnjitteredViewProj);
+		view.m_RasterProj = view.m_UnjitteredProj;
+		view.m_RasterViewProj = view.m_UnjitteredViewProj;
+		view.m_InvRasterProj = view.m_InvUnjitteredProj;
+		view.m_InvRasterViewProj = view.m_InvUnjitteredViewProj;
+		view.m_DepthReconstructionParams =
+			screen_space::MakeDepthReconstructionParams(view.m_RasterProj);
+		view.m_PreviousView = view.m_View;
+		view.m_PreviousRasterViewProj = view.m_RasterViewProj;
+		view.m_PreviousDepthReconstructionParams = view.m_DepthReconstructionParams;
+		view.m_PreviousDepthConvention = view.m_DepthConvention;
 		view.m_CameraPosition = lightEye;
 		view.m_Near = ShadowNear;
 		view.m_Far = shadowFar;

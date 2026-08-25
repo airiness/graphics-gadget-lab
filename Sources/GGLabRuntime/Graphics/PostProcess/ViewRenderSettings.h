@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Graphics/Pipeline/TemporalAA.h"
+
 #include <cstdint>
 
 namespace gglab
@@ -74,6 +76,7 @@ namespace gglab
 	// Authoring settings owned above the renderer by the active Demo or Lab.
 	struct ViewRenderProfile
 	{
+		TemporalAASettings m_TemporalAA{};
 		LightingProfile m_Lighting{};
 		PostProcessProfile m_PostProcess{};
 	};
@@ -99,6 +102,7 @@ namespace gglab
 	// Immutable settings resolved for one RenderView and one frame.
 	struct ResolvedViewRenderSettings
 	{
+		TemporalAASettings m_TemporalAA{};
 		ResolvedExposureSettings m_Exposure{};
 		ResolvedLightingSettings m_Lighting{};
 		ResolvedPostProcessSettings m_PostProcess{};

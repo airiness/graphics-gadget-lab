@@ -282,18 +282,26 @@ namespace gglab
 		{
 			ViewGPU viewGpu{};
 			viewGpu.ViewMat = renderView.m_View;
-			viewGpu.ProjMat = renderView.m_Proj;
+			viewGpu.ProjMat = renderView.m_RasterProj;
 			viewGpu.InvViewMat = renderView.m_InvView;
-			viewGpu.InvProjMat = renderView.m_InvProj;
+			viewGpu.InvProjMat = renderView.m_InvRasterProj;
+			viewGpu.PreviousViewMat = renderView.m_PreviousView;
+			viewGpu.PreviousRasterViewProj = renderView.m_PreviousRasterViewProj;
 			viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
+			viewGpu.PreviousDepthReconstructionParams =
+				renderView.m_PreviousDepthReconstructionParams;
 			viewGpu.Near = renderView.m_Near;
 			viewGpu.Far = renderView.m_Far;
 			viewGpu.FovRadians = renderView.m_FovRadians;
 			viewGpu.Aspect = renderView.m_Aspect;
+			viewGpu.CurrentJitterUV = renderView.m_JitterUV;
+			viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
+			viewGpu.PreviousDepthConvention =
+				static_cast<uint32_t>(renderView.m_PreviousDepthConvention);
 			viewData.push_back(viewGpu);
 		}
 

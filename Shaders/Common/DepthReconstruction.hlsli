@@ -49,3 +49,22 @@ float RawDepthToPositiveViewZ(float2 uv, float rawDepth, float4x4 inverseProject
 {
 	return max(ReconstructViewPosition(uv, rawDepth, inverseProjection).z, 0.0);
 }
+
+float RawDepthToPositiveViewZ(
+	float rawDepth, float4 reconstructionParams, uint convention)
+{
+	if (convention != DEPTH_CONVENTION_REVERSED &&
+		convention != DEPTH_CONVENTION_STANDARD)
+	{
+		return 0.0;
+	}
+
+	const float denominator = rawDepth * reconstructionParams.y - reconstructionParams.x;
+	const float numerator = reconstructionParams.z - rawDepth * reconstructionParams.w;
+	if (!isfinite(numerator) || !isfinite(denominator) || abs(denominator) <= 1.0e-8)
+	{
+		return 0.0;
+	}
+
+	return max(numerator / denominator, 0.0);
+}

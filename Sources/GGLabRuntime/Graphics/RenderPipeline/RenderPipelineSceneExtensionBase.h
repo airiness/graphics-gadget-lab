@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Graphics/Pipeline/TemporalAA.h"
+
 namespace gglab
 {
 	class RenderGraph;
@@ -15,6 +17,11 @@ namespace gglab
 		RenderPipelineSceneExtensionBase(RenderPipelineSceneExtensionBase&&) = delete;
 		RenderPipelineSceneExtensionBase& operator=(RenderPipelineSceneExtensionBase&&) = delete;
 		virtual ~RenderPipelineSceneExtensionBase() = default;
+
+		virtual SceneExtensionTemporalParticipation GetTemporalParticipation() const noexcept
+		{
+			return SceneExtensionTemporalParticipation::PostTAA;
+		}
 
 		virtual void AddOpaqueScenePasses(RenderGraph& renderGraph,
 			const RenderFrameContext& frameContext, const RenderServices& services) noexcept = 0;

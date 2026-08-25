@@ -903,6 +903,9 @@
     <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\Temporal.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\VertexInput.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>

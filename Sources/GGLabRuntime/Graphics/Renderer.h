@@ -5,6 +5,7 @@
 #include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/GPUStructures.h"
+#include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
@@ -170,6 +171,10 @@ namespace gglab
 		{
 			return m_BackBufferClearColor;
 		}
+		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept
+		{
+			return m_TemporalAACapabilityStatus;
+		}
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept
 		{
@@ -279,6 +284,7 @@ namespace gglab
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
+		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 

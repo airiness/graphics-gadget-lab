@@ -5,6 +5,7 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/ShadowSettings.h"
 
 #include <cstdint>
@@ -23,6 +24,7 @@ namespace gglab
 	{
 		std::span<RenderView> m_RenderViews;
 		std::span<const ResolvedViewRenderSettings> m_ViewRenderSettings;
+		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
@@ -70,6 +72,11 @@ namespace gglab
 		const ResolvedViewRenderSettings& GetDisplayViewRenderSettings() const noexcept
 		{
 			return GetViewRenderSettings(m_DisplayViewId);
+		}
+
+		const ResolvedTemporalFramePlan& GetTemporalFramePlan() const noexcept
+		{
+			return m_TemporalFramePlan;
 		}
 
 		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept
