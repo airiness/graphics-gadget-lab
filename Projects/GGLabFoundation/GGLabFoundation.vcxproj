@@ -70,6 +70,8 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256PortableBackend.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Win32Sha256Backend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp" />
@@ -84,6 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256Backend.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h" />

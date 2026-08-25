@@ -140,9 +140,12 @@ namespace gglab
 		{
 			ImGui::TextDisabled("%s", snapshot->m_DriverInfo.c_str());
 		}
-		ImGui::Text("Graphics/present queue: family %u, count %u",
+		ImGui::Text("Queue family %u: %u available",
 			snapshot->m_GraphicsPresentQueueFamilyIndex,
 			snapshot->m_GraphicsPresentQueueCount);
+		ImGui::Text("Graphics queue %u | transfer queue %u (%s)",
+			snapshot->m_GraphicsQueueIndex, snapshot->m_TransferQueueIndex,
+			snapshot->m_IndependentTransferQueue ? "independent" : "shared");
 
 		ImGui::SeparatorText("Profile and validation");
 		ImGui::Text("Device profile: %s", snapshot->m_ProfileAccepted ? "accepted" : "rejected");
@@ -220,6 +223,17 @@ namespace gglab
 		{
 			ImGui::Text("Graphics timeline: submitted %llu, completed unavailable",
 				static_cast<unsigned long long>(snapshot->m_SubmittedTimeline));
+		}
+		if (snapshot->m_HasCompletedTransferTimeline)
+		{
+			ImGui::Text("Transfer timeline: submitted %llu, completed %llu",
+				static_cast<unsigned long long>(snapshot->m_TransferSubmittedTimeline),
+				static_cast<unsigned long long>(snapshot->m_TransferCompletedTimeline));
+		}
+		else
+		{
+			ImGui::Text("Transfer timeline: submitted %llu, completed unavailable",
+				static_cast<unsigned long long>(snapshot->m_TransferSubmittedTimeline));
 		}
 		ImGui::Text("Runtime health: %s%s",
 			snapshot->m_RuntimeFatal ? "fatal" : "healthy",

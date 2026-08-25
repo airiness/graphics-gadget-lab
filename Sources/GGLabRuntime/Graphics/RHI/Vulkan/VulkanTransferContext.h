@@ -12,9 +12,11 @@ namespace gglab
 {
 	class VulkanDevice;
 
-	// Vulkan transfer encoder. It aliases the graphics native queue and
-	// timeline, so every queue operation is serialized by the device owner
-	// thread. One transient command pool is retained per in-flight batch;
+	// Vulkan transfer encoder. It uses a second queue from the graphics/present
+	// family when available and falls back to the graphics queue otherwise. The
+	// transfer logical queue always owns a distinct timeline. All queue access
+	// remains serialized by the device owner thread. One transient command pool
+	// is retained per in-flight batch;
 	// staging buffers and pools retire together after the submitted timeline
 	// point completes.
 	class VulkanTransferContext final : public RHITransferContext

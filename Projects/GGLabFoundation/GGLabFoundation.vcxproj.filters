@@ -72,6 +72,12 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp">
       <Filter>Private\Hash</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256PortableBackend.cpp">
+      <Filter>Private\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Win32Sha256Backend.cpp">
+      <Filter>Private\Hash</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp">
       <Filter>Private\IO</Filter>
     </ClCompile>
@@ -109,6 +115,9 @@
   <ItemGroup>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h">
       <Filter>Private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256Backend.h">
+      <Filter>Private\Hash</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h">
       <Filter>Public\GGLabFoundation\Async</Filter>

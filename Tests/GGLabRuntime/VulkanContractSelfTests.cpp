@@ -12,6 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
+#include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
@@ -317,6 +318,25 @@ namespace gglab
 				availability.m_SamplerDescriptorCount == samplerCount &&
 				availability.m_CombinedDescriptorCount == combinedCount - 3,
 				"Vulkan descriptor capacity is the minimum across every relevant native limit");
+		}
+
+		void RunVulkanQueueSelectionTests(SelfTestContext& context) noexcept
+		{
+			const VulkanQueueSelection unavailable = SelectVulkanQueues(0);
+			context.Check(!unavailable.IsValid(),
+				"Vulkan queue selection rejects a family with no queues");
+
+			const VulkanQueueSelection shared = SelectVulkanQueues(1);
+			context.Check(shared.IsValid() && shared.m_RequestedQueueCount == 1 &&
+				shared.m_GraphicsQueueIndex == 0 && shared.m_TransferQueueIndex == 0 &&
+				!shared.HasIndependentTransferQueue(),
+				"Vulkan queue selection preserves the single-queue fallback");
+
+			const VulkanQueueSelection independent = SelectVulkanQueues(16);
+			context.Check(independent.IsValid() && independent.m_RequestedQueueCount == 2 &&
+				independent.m_GraphicsQueueIndex == 0 && independent.m_TransferQueueIndex == 1 &&
+				independent.HasIndependentTransferQueue(),
+				"Vulkan queue selection uses a second same-family queue for transfer");
 		}
 
 		void RunVulkanBarrierContractTests(SelfTestContext& context) noexcept
@@ -1849,6 +1869,7 @@ namespace gglab
 	{
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
+		RunVulkanQueueSelectionTests(context);
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunVulkanFormatContractTests(context);

@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -47,6 +48,7 @@ namespace gglab
 	public:
 		Sha256Builder() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Sha256Builder);
+		~Sha256Builder();
 
 		[[nodiscard]] bool IsValid() const noexcept;
 		bool AddBytes(std::span<const std::byte> bytes) noexcept;
@@ -60,14 +62,8 @@ namespace gglab
 		[[nodiscard]] Sha256Digest Finish() noexcept;
 
 	private:
-		void TransformBlock(std::span<const std::byte, 64> block) noexcept;
-
-		std::array<std::uint32_t, 8> m_State{};
-		std::array<std::byte, 64> m_Buffer{};
-		std::uint64_t m_TotalBytes = 0;
-		std::size_t m_BufferSize = 0;
-		bool m_Finished = false;
-		bool m_Failed = false;
+		struct Implementation;
+		std::unique_ptr<Implementation> m_Implementation;
 	};
 
 	[[nodiscard]] Sha256Digest ComputeSha256(std::span<const std::byte> bytes) noexcept;
