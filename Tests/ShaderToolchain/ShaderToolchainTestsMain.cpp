@@ -1,14 +1,8 @@
-#include "ArtifactCacheSelfTests.h"
-#include "AssetDataSelfTests.h"
-#include "AssetUploadSchedulerSelfTests.h"
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "PublicationAccountingSelfTests.h"
-#include "RenderingContractSelfTests.h"
-#include "ShaderArtifactRuntimeSelfTests.h"
-#if GGLAB_ENABLE_VULKAN
-#include "VulkanContractSelfTests.h"
-#endif
+#include "ShaderCompileContractSelfTests.h"
+#include "ShaderCompilerCliContractSelfTests.h"
+#include "ShaderRuntimeArtifactPublicationSelfTests.h"
 
 #include <algorithm>
 #include <string_view>
@@ -17,35 +11,17 @@ namespace
 {
 	constexpr gglab::SelfTestSuiteDesc RegisteredSuites[]{
 		gglab::SelfTestSuiteDesc{
-			.m_Id = "artifact-cache",
-			.m_Run = &gglab::RunArtifactCacheSelfTests,
+			.m_Id = "shader-compile-contracts",
+			.m_Run = &gglab::RunShaderCompileContractSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
-			.m_Id = "asset-data",
-			.m_Run = &gglab::RunAssetDataSelfTests,
+			.m_Id = "shaderc-cli-contracts",
+			.m_Run = &gglab::RunShaderCompilerCliContractSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
-			.m_Id = "asset-upload-scheduler",
-			.m_Run = &gglab::RunAssetUploadSchedulerSelfTests,
+			.m_Id = "shader-artifact-publication",
+			.m_Run = &gglab::RunShaderRuntimeArtifactPublicationSelfTests,
 		},
-		gglab::SelfTestSuiteDesc{
-			.m_Id = "publication-accounting",
-			.m_Run = &gglab::RunPublicationAccountingSelfTests,
-		},
-		gglab::SelfTestSuiteDesc{
-			.m_Id = "shader-artifact-runtime",
-			.m_Run = &gglab::RunShaderArtifactRuntimeSelfTests,
-		},
-		gglab::SelfTestSuiteDesc{
-			.m_Id = "rendering-contracts",
-			.m_Run = &gglab::RunRenderingContractSelfTests,
-		},
-#if GGLAB_ENABLE_VULKAN
-		gglab::SelfTestSuiteDesc{
-			.m_Id = "vulkan-contracts",
-			.m_Run = &gglab::RunVulkanContractSelfTests,
-		},
-#endif
 	};
 
 	[[nodiscard]] const gglab::SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept

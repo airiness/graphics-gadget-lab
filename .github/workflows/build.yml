@@ -273,6 +273,29 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build GGLabRuntimeTests standalone without toolchain dependencies
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $runtimeTestsBuildArguments = @(
+            "Projects\GGLabRuntimeTests\GGLabRuntimeTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @runtimeTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Build GGLabAppRuntime standalone
         if: matrix.pch == 'enabled'
         shell: pwsh
@@ -314,6 +337,29 @@ jobs:
           )
 
           msbuild @appRuntimeTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build ShaderToolchainTests standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $shaderToolchainTestsBuildArguments = @(
+            "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\shader-toolchain-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @shaderToolchainTestsBuildArguments
 
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -428,21 +474,36 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests (GGLabRuntimeTests)
+      - name: Run headless self-tests from unrelated CWD (GGLabRuntimeTests)
         shell: pwsh
-        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        working-directory: ${{ runner.temp }}
         run: |
-          & .\GGLabRuntimeTests.exe --suite all
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabRuntimeTests.exe"
+          & $tests --suite all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests (GGLabAppRuntimeTests)
+      - name: Run headless self-tests from unrelated CWD (GGLabAppRuntimeTests)
         if: matrix.pch == 'enabled'
         shell: pwsh
-        working-directory: Build/Output/x64/${{ matrix.configuration }}
+        working-directory: ${{ runner.temp }}
         run: |
-          & .\GGLabAppRuntimeTests.exe
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabAppRuntimeTests.exe"
+          & $tests
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run headless self-tests from unrelated CWD (ShaderToolchainTests)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabShaderToolchainTests.exe"
+          & $tests --suite all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -467,7 +528,9 @@ jobs:
             Build/Logs/gglab-foundation-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-foundation-tests-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-runtime-standalone-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-runtime-tests-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-app-runtime-tests-${{ matrix.log_name }}.binlog
+            Build/Logs/shader-toolchain-tests-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7

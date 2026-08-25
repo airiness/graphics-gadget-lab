@@ -376,6 +376,16 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "ShaderToolchainTests"
+        ProjectPath = "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj"
+        FiltersPath = "Projects\ShaderToolchainTests\ShaderToolchainTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\ShaderToolchain"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabTestCore"
         ProjectPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj"
         FiltersPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj.filters"

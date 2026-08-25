@@ -1,6 +1,5 @@
 #include "RenderingContractSelfTests.h"
 #include "Core/Math/MathFunctions.h"
-#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
@@ -27,10 +26,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
-#include "Compiler/ShaderCompiler.h"
-#include "DevelopmentShaderPaths.h"
 #include "Graphics/TransferBatch.h"
-#include "Targets/Vulkan13ShaderTarget.h"
 
 #include <filesystem>
 #include <type_traits>
@@ -1432,221 +1428,6 @@ namespace gglab
 				"RenderGraph preserves the depth-write to sample to read-only-depth access chain");
 		}
 
-		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
-		{
-			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
-			ShaderCompiler compiler(
-				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
-			ShaderDesc desc{
-				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
-				.m_Stage = ShaderStage::Compute,
-				.m_Target = {
-					.m_Model = ShaderModel::SM_6_7,
-					.m_HlslVersion = L"2021",
-				},
-				.m_Entry = L"CSMain",
-				.m_IncludeDirs = {L"."},
-			};
-			const ShaderCompileResult artifact = compiler.Compile(desc);
-			context.Check(artifact.IsSuccess(),
-				"Production DXC compiles screen-space and depth reconstruction helpers");
-
-			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			desc.m_Entry = L"VSMain";
-			const ShaderCompileResult coverageVertexArtifact =
-				compiler.Compile(desc);
-			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSAlphaTest";
-			const ShaderCompileResult depthAlphaArtifact =
-				compiler.Compile(desc);
-			context.Check(
-				coverageVertexArtifact.IsSuccess() && depthAlphaArtifact.IsSuccess(),
-				"Production DXC compiles the shared coverage vertex shader and alpha-tested prepass");
-
-			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			const ShaderCompileResult legacyForwardPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
-					.m_Value = L"1",
-				},
-			};
-			const ShaderCompileResult legacyGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_FORWARD_PLUS",
-					.m_Value = L"1",
-				},
-			};
-			const ShaderCompileResult forwardPlusPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines.push_back({
-				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
-				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines.pop_back();
-			desc.m_Defines.push_back({
-				.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION",
-				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusValidationPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines.push_back({
-				.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",
-				.m_Value = L"1",
-				});
-			const ShaderCompileResult forwardPlusValidationGTAOContributionPixelArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines.clear();
-			desc.m_SourcePath = L"Passes/PassSkybox.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			desc.m_Entry = L"VSMain";
-			const ShaderCompileResult skyboxVertexArtifact =
-				compiler.Compile(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			const ShaderCompileResult skyboxPixelArtifact =
-				compiler.Compile(desc);
-			context.Check(legacyForwardPixelArtifact.IsSuccess() &&
-				legacyGTAOContributionPixelArtifact.IsSuccess() &&
-				forwardPlusPixelArtifact.IsSuccess() &&
-				forwardPlusGTAOContributionPixelArtifact.IsSuccess() &&
-				forwardPlusValidationPixelArtifact.IsSuccess() &&
-				forwardPlusValidationGTAOContributionPixelArtifact.IsSuccess() &&
-				skyboxVertexArtifact.IsSuccess() &&
-				skyboxPixelArtifact.IsSuccess(),
-				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
-
-			desc.m_SourcePath = L"Tests/SurfaceContractCompile.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			const ShaderCompileResult surfaceContractArtifact =
-				compiler.Compile(desc);
-			context.Check(surfaceContractArtifact.IsSuccess(),
-				"Production DXC compiles the gglab.surface surface evaluation "
-				"seam contract (profile shape and the runtime MaterialData input)");
-
-			desc.m_SourcePath = L"Tests/SurfaceTextureContractCompile.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			desc.m_Target = {};
-			const ShaderCompileResult surfaceTextureContractArtifact =
-				compiler.Compile(desc);
-			context.Check(surfaceTextureContractArtifact.IsSuccess() &&
-				surfaceTextureContractArtifact.m_Artifact.GetBinaryFormat() ==
-					ShaderBinaryFormat::Dxil,
-				"Production DXC compiles the gglab.surface texture signature "
-				"contract for the DX12 target (generated texture parameter form, "
-				"bindless sample expression, and the profile output shape) to DXIL");
-
-			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-			const ShaderCompileResult surfaceTextureContractSpirVArtifact =
-				compiler.Compile(desc);
-			desc.m_Target = {};
-			context.Check(surfaceTextureContractSpirVArtifact.IsSuccess() &&
-				surfaceTextureContractSpirVArtifact.m_Artifact.GetBinaryFormat() ==
-					ShaderBinaryFormat::SpirV,
-				"Production DXC compiles the gglab.surface texture signature "
-				"contract for the Vulkan 1.3 target through the toolchain "
-				"bindless-heap binding arguments to SPIR-V");
-
-			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
-			desc.m_Stage = ShaderStage::Compute;
-			desc.m_Entry = L"CSMain";
-			const ShaderCompileResult forwardPlusArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_FORWARD_PLUS_DIAGNOSTICS",
-					.m_Value = L"1",
-				},
-			};
-			const ShaderCompileResult forwardPlusDiagnosticsArtifact =
-				compiler.Compile(desc);
-			context.Check(forwardPlusArtifact.IsSuccess() &&
-				forwardPlusDiagnosticsArtifact.IsSuccess(),
-				"Production DXC compiles fixed-stride Forward+ cull and diagnostics variants");
-
-			desc.m_SourcePath = L"Passes/PassForwardPlusValidation.hlsl";
-			desc.m_Entry = L"CSReduceTiles";
-			desc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_TILES",
-					.m_Value = L"1",
-				},
-			};
-			const ShaderCompileResult hdrDiffTileArtifact =
-				compiler.Compile(desc);
-			desc.m_Entry = L"CSReduceFrame";
-			desc.m_Defines = {
-				{
-					.m_Name = L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME",
-					.m_Value = L"1",
-				},
-			};
-			const ShaderCompileResult hdrDiffFrameArtifact =
-				compiler.Compile(desc);
-			context.Check(hdrDiffTileArtifact.IsSuccess() &&
-				hdrDiffFrameArtifact.IsSuccess(),
-				"Production DXC compiles deterministic Forward+ HDR diff reduction shaders");
-
-			desc.m_SourcePath = L"Passes/PassGTAO.hlsl";
-			desc.m_Entry = L"CSMain";
-			desc.m_Defines.clear();
-			const ShaderCompileResult gtaoArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DIAGNOSTICS", .m_Value = L"1"},
-			};
-			const ShaderCompileResult gtaoDiagnosticsArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DENOISE_X", .m_Value = L"1"},
-			};
-			const ShaderCompileResult gtaoDenoiseXArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_DENOISE_Y", .m_Value = L"1"},
-			};
-			const ShaderCompileResult gtaoDenoiseYArtifact =
-				compiler.Compile(desc);
-			desc.m_Defines = {
-				{.m_Name = L"GGLAB_GTAO_UPSAMPLE", .m_Value = L"1"},
-			};
-			const ShaderCompileResult gtaoUpsampleArtifact =
-				compiler.Compile(desc);
-			context.Check(gtaoArtifact.IsSuccess() &&
-				gtaoDiagnosticsArtifact.IsSuccess() &&
-				gtaoDenoiseXArtifact.IsSuccess() &&
-				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
-				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
-
-			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
-			desc.m_Stage = ShaderStage::Vertex;
-			desc.m_Entry = L"VSMain";
-			desc.m_Defines.clear();
-			const ShaderCompileResult napaVoxelVertexArtifact =
-				compiler.Compile(desc);
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			const ShaderCompileResult napaVoxelPixelArtifact =
-				compiler.Compile(desc);
-			context.Check(napaVoxelVertexArtifact.IsSuccess() &&
-				napaVoxelPixelArtifact.IsSuccess(),
-				"Production DXC compiles the Napa voxel static mesh shader");
-		}
-
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
 			ForwardPlusSettings legacySettings{};
@@ -2380,7 +2161,6 @@ namespace gglab
 				resolvedGTAO.m_StepCount == GTAOMaxStepCount &&
 				resolvedGTAO.m_DenoiseRadius == GTAOMaxDenoiseRadius,
 				"GTAO authoring inputs resolve to bounded deterministic spatial settings");
-			RunShaderCompileContractTests(context);
 		}
 
 		void RunTextureFormatCapabilityTests(SelfTestContext& context) noexcept

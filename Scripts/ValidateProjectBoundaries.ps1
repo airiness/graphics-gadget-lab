@@ -58,6 +58,7 @@ $foundationPrivateDir = Join-Path $foundationSourcesDir "Private"
 $testCoreSourcesDir = Join-Path $root "Sources/GGLabTestCore"
 $foundationTestsDir = Join-Path $root "Tests/GGLabFoundation"
 $runtimeTestsDir = Join-Path $root "Tests/GGLabRuntime"
+$shaderToolchainTestsDir = Join-Path $root "Tests/ShaderToolchain"
 $napaTestsDir = Join-Path $root "Tests/NapaVoxelCore"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
 $shaderArtifactRuntimeSourcesDir = Join-Path $root "Sources/ShaderArtifactRuntime"
@@ -257,6 +258,19 @@ $runtimeTestsNamespace = New-Object System.Xml.XmlNamespaceManager($runtimeTests
 $runtimeTestsNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
 $runtimeTestsProjectDir = Split-Path -Parent $runtimeTestsProjectPath
 
+$shaderToolchainTestsProjectPath = Join-Path $root `
+    "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj"
+if (-not (Test-Path $shaderToolchainTestsProjectPath)) {
+    throw "ShaderToolchainTests project not found: $shaderToolchainTestsProjectPath"
+}
+$shaderToolchainTestsProject = [xml](
+    Get-Content -LiteralPath $shaderToolchainTestsProjectPath -Raw -ErrorAction Stop)
+$shaderToolchainTestsNamespace = New-Object `
+    System.Xml.XmlNamespaceManager($shaderToolchainTestsProject.NameTable)
+$shaderToolchainTestsNamespace.AddNamespace(
+    "msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$shaderToolchainTestsProjectDir = Split-Path -Parent $shaderToolchainTestsProjectPath
+
 $appRuntimeTestsProjectPath = Join-Path $root `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj"
 if (-not (Test-Path $appRuntimeTestsProjectPath)) {
@@ -392,6 +406,17 @@ $runtimeTestsSourceItems = Get-ProjectItemPaths $runtimeTestsProject $runtimeTes
     $runtimeTestsProjectDir "//msb:ClCompile | //msb:ClInclude" "GGLabRuntimeTests source item"
 $runtimeTestsProjectReferences = Get-ProjectItemPaths $runtimeTestsProject `
     $runtimeTestsNamespace $runtimeTestsProjectDir "//msb:ProjectReference" "GGLabRuntimeTests project reference"
+$shaderToolchainTestsCompileFiles = Get-ProjectItemPaths `
+    $shaderToolchainTestsProject $shaderToolchainTestsNamespace `
+    $shaderToolchainTestsProjectDir "//msb:ClCompile" "ShaderToolchainTests compile item"
+$shaderToolchainTestsSourceItems = Get-ProjectItemPaths `
+    $shaderToolchainTestsProject $shaderToolchainTestsNamespace `
+    $shaderToolchainTestsProjectDir "//msb:ClCompile | //msb:ClInclude" `
+    "ShaderToolchainTests source item"
+$shaderToolchainTestsProjectReferences = Get-ProjectItemPaths `
+    $shaderToolchainTestsProject $shaderToolchainTestsNamespace `
+    $shaderToolchainTestsProjectDir "//msb:ProjectReference" `
+    "ShaderToolchainTests project reference"
 $appRuntimeTestsCompileFiles = Get-ProjectItemPaths `
     $appRuntimeTestsProject $appRuntimeTestsNamespace $appRuntimeTestsProjectDir `
     "//msb:ClCompile" "GGLabAppRuntimeTests compile item"
@@ -467,6 +492,9 @@ $testCoreProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[st
     ([System.StringComparer]::OrdinalIgnoreCase)
 $runtimeTestsProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
+$shaderToolchainTestsProjectReferenceSet = New-Object `
+    'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
 $appRuntimeTestsProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $napaTestsProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
@@ -501,6 +529,9 @@ foreach ($path in $testCoreProjectReferences) {
 }
 foreach ($path in $runtimeTestsProjectReferences) {
     [void]$runtimeTestsProjectReferenceSet.Add($path)
+}
+foreach ($path in $shaderToolchainTestsProjectReferences) {
+    [void]$shaderToolchainTestsProjectReferenceSet.Add($path)
 }
 foreach ($path in $appRuntimeTestsProjectReferences) {
     [void]$appRuntimeTestsProjectReferenceSet.Add($path)
@@ -595,6 +626,7 @@ $foundationPrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\P
 $testCorePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public'
 $testCorePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabTestCore\Private'
 $runtimeTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\GGLabRuntime'
+$shaderToolchainTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\ShaderToolchain'
 $appRuntimeTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\GGLabAppRuntime'
 $napaTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\NapaVoxelCore'
 $napaIncludeRoot = '$(GGLabRepositoryRoot)Sources'
@@ -637,7 +669,16 @@ Test-ProjectIncludeVisibility $runtimeTestsProject $runtimeTestsNamespace `
         $testCorePublicIncludeRoot) `
     @($runtimeTestsIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $shaderToolchainIncludeRoot)
+        $testCorePublicIncludeRoot)
+Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
+    $shaderToolchainTestsNamespace `
+    "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj" `
+    @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
+    @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
@@ -776,6 +817,9 @@ Test-ProjectPrivateAccessDefinition $testCoreProject $testCoreNamespace `
     "Projects/GGLabTestCore/GGLabTestCore.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $runtimeTestsProject $runtimeTestsNamespace `
     "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $shaderToolchainTestsProject `
+    $shaderToolchainTestsNamespace `
+    "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" $false
 
@@ -859,6 +903,11 @@ $ownershipSpecifications = @(
         Name       = "GGLabRuntimeTests"
         SourceRoot = $runtimeTestsDir
         ItemPaths  = $runtimeTestsSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "ShaderToolchainTests"
+        SourceRoot = $shaderToolchainTestsDir
+        ItemPaths  = $shaderToolchainTestsSourceItems
     }
     [pscustomobject]@{
         Name       = "NapaVoxelCoreTests"
@@ -1151,8 +1200,29 @@ foreach ($requiredReference in $runtimeTestsRequiredReferences) {
     }
 }
 $runtimeTestsAllowedReferences = @($runtimeProjectPath, $foundationProjectPath,
-    $testCoreProjectPath, $shaderArtifactRuntimeProjectPath, $shaderToolchainProjectPath,
-    $shaderCompilerProjectPath, $directXTexProjectPath)
+    $testCoreProjectPath, $shaderArtifactRuntimeProjectPath, $directXTexProjectPath)
+$shaderToolchainTestsRequiredReferences = @(
+    $runtimeProjectPath, $shaderToolchainProjectPath, $shaderArtifactRuntimeProjectPath,
+    $shaderCompilerProjectPath, $foundationProjectPath, $testCoreProjectPath,
+    $directXTexProjectPath)
+foreach ($requiredReference in $shaderToolchainTestsRequiredReferences) {
+    if (-not $shaderToolchainTestsProjectReferenceSet.Contains($requiredReference)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj"
+            Reason = "missing ProjectReference to " + (Split-Path -Leaf $requiredReference)
+        })
+    }
+}
+foreach ($reference in $shaderToolchainTestsProjectReferenceSet) {
+    if (-not $shaderToolchainTestsRequiredReferences.Contains($reference)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj"
+            Reason = "toolchain tests may reference only their declared runtime, toolchain, test, and DirectXTex dependencies"
+        })
+    }
+}
 $appRuntimeTestsRequiredReferences = @(
     $appRuntimeProjectPath, $runtimeProjectPath, $shaderArtifactRuntimeProjectPath,
     $foundationProjectPath, $testCoreProjectPath)
@@ -1214,7 +1284,10 @@ $foundationForbiddenIncludeRegex = `
     '#include\s*[<"](?:\.\.|Sources[\\/]|Application[\\/]|DevTools[\\/]|Core[\\/]|' +
     'GGLabRuntime[\\/]|Scene[\\/]|Graphics[\\/]|Diagnostics[\\/]|Shader[\\/]|' +
     'ShaderToolchain[\\/]|Tools[\\/]|NapaVoxelCore[\\/])'
-$runtimeTestsForbiddenIncludeRegex = '#include\s*[<"](?:Application[\\/]|DevTools[\\/])'
+$runtimeTestsForbiddenIncludeRegex = `
+    '#include\s*[<"](?:Application[\\/]|DevTools[\\/]|Artifact[\\/]|Compiler[\\/]|Targets[\\/]|DevelopmentShaderPaths\.h)'
+$runtimeTestsForbiddenToolProcessRegex = `
+    '\b(?:gglab-shaderc(?:\.exe)?|CreateProcess[AW]?|_w?spawn[a-z0-9_]*)\b'
 $appRuntimeTestsForbiddenIncludeRegex = `
     '#include\s*[<"](?:Application[\\/]|DevTools[\\/]|NapaVoxelCore[\\/]|' +
     'ShaderToolchain[\\/]|Compiler[\\/])'
@@ -1253,7 +1326,14 @@ foreach ($itemPath in $runtimeTestsSourceItems) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-tests-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
-            Reason = "GGLabRuntimeTests source includes an Application-owned header"
+            Reason = "GGLabRuntimeTests source includes a host- or toolchain-owned header"
+        })
+    }
+    if ($content -match $runtimeTestsForbiddenToolProcessRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-tests-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "artifact-only GGLabRuntimeTests must not invoke a tool process"
         })
     }
 }
@@ -1765,24 +1845,26 @@ Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party sour
 Write-Host (("Project items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
     "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, " +
     "{6} ShaderArtifactRuntime, {7} NapaVoxelCore, {8} TestCore, " +
-    "{9} RuntimeTests, {10} NapaTests") -f `
+    "{9} RuntimeTests, {10} ShaderToolchainTests, {11} NapaTests") -f `
         $winAppSourceItems.Count, $appRuntimeSourceItems.Count,
         $appRuntimeTestsSourceItems.Count, $foundationSourceItems.Count,
         $foundationTestsSourceItems.Count, $runtimeSourceItems.Count,
         $shaderArtifactRuntimeSourceItems.Count, $napaSourceItems.Count,
         $testCoreSourceItems.Count,
-        $runtimeTestsSourceItems.Count, $napaTestsSourceItems.Count)
+        $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
+        $napaTestsSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
 Write-Host (("Compile items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
     "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, " +
     "{6} ShaderArtifactRuntime, {7} NapaVoxelCore, {8} TestCore, " +
-    "{9} RuntimeTests, {10} NapaTests") -f `
+    "{9} RuntimeTests, {10} ShaderToolchainTests, {11} NapaTests") -f `
         $winAppCompileFiles.Count, $appRuntimeCompileFiles.Count,
         $appRuntimeTestsCompileFiles.Count, $foundationCompileFiles.Count,
         $foundationTestsCompileFiles.Count, $runtimeCompileFiles.Count,
         $shaderArtifactRuntimeCompileFiles.Count, $napaCompileFiles.Count,
         $testCoreCompileFiles.Count,
-        $runtimeTestsCompileFiles.Count, $napaTestsCompileFiles.Count)
+        $runtimeTestsCompileFiles.Count, $shaderToolchainTestsCompileFiles.Count,
+        $napaTestsCompileFiles.Count)
 Write-Host ""
 
 Write-Host "PROJECT CONTRACT violations: $($projectContractFindings.Count)"
