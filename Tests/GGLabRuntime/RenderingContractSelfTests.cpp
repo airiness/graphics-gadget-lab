@@ -10,6 +10,7 @@
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -4069,6 +4070,19 @@ namespace gglab
 				fallbackDisplayView.m_ViewId == RenderViewID::Main,
 				"CameraRig resolves the effective display view and fallback exactly once");
 
+			const uint64_t initialResetSerial = rigCamera.GetTemporalResetSerial();
+			rigCamera.SetPosition(Vector3(1.0f, 2.0f, 3.0f));
+			rigCamera.SetFov(55.0f);
+			const bool continuousChangesPreserveSerial =
+				rigCamera.GetTemporalResetSerial() == initialResetSerial;
+			rigCamera.RequestTemporalReset();
+			const uint64_t explicitResetSerial = rigCamera.GetTemporalResetSerial();
+			rigCamera.LookAt(Vector3(2.0f, 3.0f, 4.0f), Vector3::Zero);
+			context.Check(continuousChangesPreserveSerial &&
+				explicitResetSerial == initialResetSerial + 1 &&
+				rigCamera.GetTemporalResetSerial() == explicitResetSerial + 1,
+				"Camera temporal reset serial changes only for explicit discontinuities and cuts");
+
 			ViewRenderProfile profile{};
 			const Camera camera(Camera::CreateInfo{});
 			const ResolvedViewRenderSettings defaultSettings =
@@ -4224,6 +4238,121 @@ namespace gglab
 				NearlyEqual(temporal::ReprojectToPreviousUV(Vector2(0.5f, 0.5f),
 					Vector2(0.1f, -0.2f)), Vector2(0.4f, 0.7f)),
 				"CPU temporal math fixes pixel, NDC, clip, and motion reprojection signs");
+
+			constexpr std::array<Vector2, temporal::JitterSampleCount> expectedJitterSamples = {
+				Vector2(0.0f, -1.0f / 6.0f),
+				Vector2(-1.0f / 4.0f, 1.0f / 6.0f),
+				Vector2(1.0f / 4.0f, -7.0f / 18.0f),
+				Vector2(-3.0f / 8.0f, -1.0f / 18.0f),
+				Vector2(1.0f / 8.0f, 5.0f / 18.0f),
+				Vector2(-1.0f / 8.0f, -5.0f / 18.0f),
+				Vector2(3.0f / 8.0f, 1.0f / 18.0f),
+				Vector2(-7.0f / 16.0f, 7.0f / 18.0f),
+			};
+			bool jitterGoldenTableMatches = true;
+			for (uint32_t index = 0; index < temporal::JitterSampleCount; ++index)
+			{
+				jitterGoldenTableMatches = jitterGoldenTableMatches &&
+					NearlyEqual(temporal::GetJitterSamplePixels(index),
+						expectedJitterSamples[index]);
+			}
+			context.Check(jitterGoldenTableMatches,
+				"Temporal jitter sequence matches the exact Halton(2,3) eight-sample table");
+
+			TemporalViewHistory temporalViewHistory{};
+			TemporalFrameTransaction abortedTransaction;
+			abortedTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			RenderView abortedView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			abortedTransaction.PrepareDisplayView(abortedView);
+			const Vector4 unjitteredClip = math::Transform(
+				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_UnjitteredProj);
+			const Vector4 rasterClip = math::Transform(
+				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_RasterProj);
+			const Vector4 expectedRasterClip = temporal::ApplyJitterToClipPosition(
+				unjitteredClip,
+				temporal::JitterPixelsToNDC(abortedTransaction.GetJitterPixels(), 1920, 1080));
+			abortedTransaction.Abort();
+
+			TemporalFrameTransaction committedTransaction;
+			committedTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			RenderView committedView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			committedTransaction.PrepareDisplayView(committedView);
+			committedTransaction.MarkResolveParticipated();
+			committedTransaction.CommitCompleted();
+
+			TemporalFrameTransaction noResolveTransaction;
+			noResolveTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			RenderView noResolveView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			noResolveTransaction.PrepareDisplayView(noResolveView);
+			noResolveTransaction.CommitCompleted();
+
+			ResolvedTemporalFramePlan changedSessionPlan = activePlan;
+			++changedSessionPlan.m_SessionIdentity;
+			TemporalFrameTransaction changedSessionTransaction;
+			changedSessionTransaction.Begin(
+				temporalViewHistory, changedSessionPlan, 1920, 1080);
+			RenderView changedSessionView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = changedSessionPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			changedSessionTransaction.PrepareDisplayView(changedSessionView);
+			changedSessionTransaction.Abort();
+			const RenderView temporalShadowView =
+				viewBuilder.Build<RenderViewID::DirectionalShadow>({
+					.m_MainView = noResolveView,
+				});
+
+			TemporalFrameTransaction fatalTransaction;
+			fatalTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			RenderView fatalView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			fatalTransaction.PrepareDisplayView(fatalView);
+			fatalTransaction.MarkResolveParticipated();
+			fatalTransaction.InvalidateAfterFatal();
+			context.Check(abortedTransaction.GetJitterIndex() == 0 &&
+				committedTransaction.GetJitterIndex() == 0 &&
+				noResolveTransaction.GetJitterIndex() == 1 &&
+				noResolveView.m_HasPreviousTemporalState &&
+				noResolveView.m_PreviousJitterUV.m_X == committedView.m_JitterUV.m_X &&
+				noResolveView.m_PreviousJitterUV.m_Y == committedView.m_JitterUV.m_Y &&
+				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				changedSessionTransaction.GetJitterIndex() == 0 &&
+				!changedSessionView.m_HasPreviousTemporalState &&
+				temporalShadowView.m_RasterProj.ToArray() ==
+					temporalShadowView.m_UnjitteredProj.ToArray() &&
+				fatalTransaction.GetState() == TemporalFrameTransactionState::Invalidated &&
+				!temporalViewHistory.m_Valid && temporalViewHistory.m_NextJitterIndex == 0 &&
+				NearlyEqual(rasterClip.m_X, expectedRasterClip.m_X) &&
+				NearlyEqual(rasterClip.m_Y, expectedRasterClip.m_Y) &&
+				NearlyEqual(rasterClip.m_Z, expectedRasterClip.m_Z) &&
+				NearlyEqual(rasterClip.m_W, expectedRasterClip.m_W),
+				"Temporal frame transaction advances only on committed resolve and invalidates on fatal");
 
 			RenderFrameBuilder::BuildResult frameResult{};
 			frameResult.m_TemporalFramePlan = activePlan;

@@ -27,6 +27,7 @@ namespace gglab
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 		[[nodiscard]] std::optional<LoadingProgress> GetLoadingProgress() const noexcept;
 		uint32_t GetActiveIndex() const noexcept { return m_ActiveDemoIndex; }
+		uint32_t GetTemporalSessionSerial() const noexcept { return m_TemporalSessionSerial; }
 		uint32_t GetPendingActiveIndex() const noexcept;
 		bool HasPendingActiveDemo() const noexcept
 		{
@@ -76,5 +77,6 @@ namespace gglab
 		bool m_IsPreparedForAssetShutdown = false;
 		uint32_t m_WindowWidth = 0;
 		uint32_t m_WindowHeight = 0;
+		uint32_t m_TemporalSessionSerial = 0;
 	};
 }

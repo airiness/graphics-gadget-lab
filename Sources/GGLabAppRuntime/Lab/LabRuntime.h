@@ -60,6 +60,7 @@ namespace gglab
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
 		const LabSessionBase* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
+		uint32_t GetTemporalSessionSerial() const noexcept { return m_TemporalSessionSerial; }
 
 		World& GetWorld() noexcept;
 		Camera& GetCamera() noexcept;
@@ -97,5 +98,6 @@ namespace gglab
 		DemoFrameFeedback m_LastFrameFeedback{};
 		bool m_HasFrameFeedback = false;
 		bool m_IsEntered = false;
+		uint32_t m_TemporalSessionSerial = 0;
 	};
 }

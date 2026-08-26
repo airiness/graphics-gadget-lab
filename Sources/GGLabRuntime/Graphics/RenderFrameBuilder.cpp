@@ -207,6 +207,9 @@ namespace gglab
 			"The pre-resolved effective display view must have been built.");
 		GGLAB_ASSERT_MSG(result.m_DisplayViewId == info.m_TemporalFramePlan.m_DisplayViewId,
 			"Temporal frame plan display view must match the built display view.");
+		GGLAB_ASSERT_NOT_NULL(info.m_TemporalFrameTransaction);
+		info.m_TemporalFrameTransaction->PrepareDisplayView(
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
 		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==
 			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
 				.m_TemporalAA.m_Enabled,

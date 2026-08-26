@@ -4,6 +4,7 @@
 #include "Graphics/GraphicsTypes.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 namespace gglab
@@ -160,6 +161,22 @@ namespace gglab
 
 	namespace temporal
 	{
+		inline constexpr uint32_t JitterSampleCount = 8;
+		inline constexpr std::array<Vector2, JitterSampleCount> JitterSamplesPixels = {
+			Vector2(0.0f, -1.0f / 6.0f),
+			Vector2(-1.0f / 4.0f, 1.0f / 6.0f),
+			Vector2(1.0f / 4.0f, -7.0f / 18.0f),
+			Vector2(-3.0f / 8.0f, -1.0f / 18.0f),
+			Vector2(1.0f / 8.0f, 5.0f / 18.0f),
+			Vector2(-1.0f / 8.0f, -5.0f / 18.0f),
+			Vector2(3.0f / 8.0f, 1.0f / 18.0f),
+			Vector2(-7.0f / 16.0f, 7.0f / 18.0f),
+		};
+		[[nodiscard]] constexpr Vector2 GetJitterSamplePixels(uint32_t sequenceIndex) noexcept
+		{
+			return JitterSamplesPixels[sequenceIndex % JitterSampleCount];
+		}
+
 		[[nodiscard]] inline Vector2 JitterPixelsToUV(
 			const Vector2& jitterPixels, uint32_t width, uint32_t height) noexcept
 		{

@@ -127,15 +127,22 @@ namespace gglab
 		const ResolvedViewRenderSettings displayViewSettings =
 			ResolveViewRenderSettings(
 				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		const uint64_t temporalSessionIdentity =
+			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
+			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,
 				.m_Capabilities = m_Renderer->GetTemporalAACapabilityStatus(),
 				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
+				.m_ResetIdentity = displayCameraSlot->m_Camera->GetTemporalResetSerial(),
+				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 			});
+		TemporalFrameTransaction& temporalFrameTransaction = m_Renderer->BeginTemporalFrame(
+			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight);
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -144,6 +151,7 @@ namespace gglab
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_TemporalFramePlan = temporalFramePlan,
+			.m_TemporalFrameTransaction = &temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,

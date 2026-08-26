@@ -6,6 +6,7 @@
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
@@ -98,6 +99,7 @@ namespace gglab
 			RHIFencePoint m_UploadFencePoint = {};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
+			TemporalFrameTransaction m_TemporalTransaction{};
 		};
 
 		struct CreateInfo
@@ -127,6 +129,8 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		[[nodiscard]] Frame BeginFrame() noexcept;
+		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;
@@ -285,6 +289,7 @@ namespace gglab
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
+		TemporalViewHistory m_TemporalViewHistory{};
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 

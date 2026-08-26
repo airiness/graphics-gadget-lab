@@ -113,6 +113,9 @@ namespace gglab
 		m_ActiveInstance = std::move(demo);
 		m_ActiveDemo = m_ActiveInstance.get();
 		m_ActiveDemoIndex = InvalidDemoIndex;
+		++m_TemporalSessionSerial;
+		GGLAB_ASSERT_MSG(m_TemporalSessionSerial != 0,
+			"Demo temporal session serial overflowed its valid range.");
 		m_ActiveDemo->OnEnter();
 		if (m_WindowWidth > 0 && m_WindowHeight > 0)
 		{
@@ -260,6 +263,9 @@ namespace gglab
 		m_ActiveInstance = std::move(m_PendingDemo);
 		m_ActiveDemo = m_ActiveInstance.get();
 		m_ActiveDemoIndex = std::exchange(m_PendingDemoIndex, InvalidDemoIndex);
+		++m_TemporalSessionSerial;
+		GGLAB_ASSERT_MSG(m_TemporalSessionSerial != 0,
+			"Demo temporal session serial overflowed its valid range.");
 		m_LastActiveFrame = {};
 		m_HasLastActiveFrame = false;
 		m_ActiveDemo->OnEnter();

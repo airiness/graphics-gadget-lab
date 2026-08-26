@@ -4,6 +4,7 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/RenderWorldExtractor.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab
@@ -25,6 +26,7 @@ namespace gglab
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
 			const ViewRenderProfile& m_ViewRenderProfile;
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
+			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;

@@ -159,6 +159,7 @@ namespace gglab
 		m_MaterialSB.reset();
 		m_LightSB.reset();
 		m_ViewSB.reset();
+		m_TemporalViewHistory.Invalidate();
 
 		m_RHIContext.reset();
 
@@ -190,6 +191,15 @@ namespace gglab
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
 		return Frame(this, rhiFrame, frameSerial);
+	}
+
+	TemporalFrameTransaction& Renderer::BeginTemporalFrame(Frame& frame,
+		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Temporal frame planning requires the active begun Renderer::Frame.");
+		frame.m_TemporalTransaction.Begin(m_TemporalViewHistory, plan, width, height);
+		return frame.m_TemporalTransaction;
 	}
 
 	void Renderer::Render(
@@ -257,6 +267,15 @@ namespace gglab
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*frame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
+		if (result.IsCompleted() && submittedFence.IsValid())
+		{
+			frame.m_TemporalTransaction.CommitCompleted();
+		}
+		else
+		{
+			frame.m_TemporalTransaction.InvalidateAfterFatal();
+			m_TemporalViewHistory.Invalidate();
+		}
 		if (submittedFence.IsValid())
 		{
 			m_LastSubmittedFencePoint = submittedFence;
@@ -289,6 +308,7 @@ namespace gglab
 		{
 			m_IBLBakeScheduler->OnFrameAborted();
 		}
+		frame.m_TemporalTransaction.Abort();
 
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
@@ -428,6 +448,7 @@ namespace gglab
 
 	void Renderer::OnResume() noexcept
 	{
+		m_TemporalViewHistory.Invalidate();
 		m_IsSuspended.store(false, std::memory_order_relaxed);
 	}
 
