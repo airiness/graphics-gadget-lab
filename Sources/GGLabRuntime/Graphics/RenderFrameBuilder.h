@@ -25,6 +25,7 @@ namespace gglab
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
 			const ViewRenderProfile& m_ViewRenderProfile;
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
+			RenderViewID m_DisplayViewId = RenderViewID::Main;
 			uint32_t m_WindowWidth = 0;
 			uint32_t m_WindowHeight = 0;
 			uint32_t m_FrameSlotIndex = 0;

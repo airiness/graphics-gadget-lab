@@ -7,8 +7,10 @@
 #include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "Graphics/GPUStructures.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
@@ -20,12 +22,14 @@
 #include "Wire/ShaderWireNames.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
+#include <dxcapi.h>
 #include <windows.h>
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -107,6 +111,74 @@ namespace gglab
 					return descriptor.m_DescriptorSet == descriptorSet &&
 						descriptor.m_Binding == binding;
 				});
+		}
+
+		[[nodiscard]] bool DisassembleDxil(
+			const ShaderBinary& binary, std::string& outDisassembly) noexcept
+		{
+			outDisassembly.clear();
+			if (!binary.IsValid())
+			{
+				return false;
+			}
+
+			ComPtr<IDxcCompiler3> compiler;
+			if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
+			{
+				return false;
+			}
+			const DxcBuffer buffer{
+				.Ptr = binary.Data(),
+				.Size = binary.SizeInBytes(),
+				.Encoding = DXC_CP_ACP,
+			};
+			ComPtr<IDxcResult> result;
+			if (FAILED(compiler->Disassemble(&buffer, IID_PPV_ARGS(&result))))
+			{
+				return false;
+			}
+			HRESULT status = E_FAIL;
+			if (FAILED(result->GetStatus(&status)) || FAILED(status))
+			{
+				return false;
+			}
+			ComPtr<IDxcBlobUtf8> text;
+			if (FAILED(result->GetOutput(
+				DXC_OUT_DISASSEMBLY, IID_PPV_ARGS(&text), nullptr)) || !text)
+			{
+				return false;
+			}
+			outDisassembly.assign(text->GetStringPointer(), text->GetStringLength());
+			return true;
+		}
+
+		[[nodiscard]] std::optional<size_t> ParseUnsignedAfter(
+			std::string_view text, std::string_view marker, size_t searchOffset = 0) noexcept
+		{
+			const size_t markerOffset = text.find(marker, searchOffset);
+			if (markerOffset == std::string_view::npos)
+			{
+				return std::nullopt;
+			}
+			const char* begin = text.data() + markerOffset + marker.size();
+			const char* end = text.data() + text.size();
+			while (begin != end && (*begin == ' ' || *begin == '\t'))
+			{
+				++begin;
+			}
+			size_t value = 0;
+			const auto result = std::from_chars(begin, end, value);
+			return result.ec == std::errc{} ? std::optional<size_t>(value) : std::nullopt;
+		}
+
+		[[nodiscard]] std::optional<size_t> FindDxilViewMemberOffset(
+			std::string_view disassembly, std::string_view memberName) noexcept
+		{
+			const std::string memberToken = std::format(" {};", memberName);
+			const size_t memberOffset = disassembly.find(memberToken);
+			return memberOffset == std::string_view::npos
+				? std::nullopt
+				: ParseUnsignedAfter(disassembly, "Offset:", memberOffset);
 		}
 
 		[[nodiscard]] ShaderBinary MakeExecutionModelModule(uint32_t executionModel) noexcept
@@ -2173,6 +2245,67 @@ namespace gglab
 			desc.m_Target = {};
 			context.Check(artifact.IsSuccess() && spirVArtifact.IsSuccess(),
 				"Production DXC compiles screen-space, depth, and temporal helpers to DXIL and SPIR-V");
+
+			desc.m_SourcePath = L"Tests/TemporalViewLayoutContractCompile.hlsl";
+			desc.m_Target = {
+				.m_Model = ShaderModel::SM_6_7,
+				.m_HlslVersion = L"2021",
+				.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization,
+			};
+			const ShaderCompileResult viewLayoutDxil = compiler.Compile(desc);
+			std::string viewLayoutDisassembly;
+			bool dxilLayoutMatches = viewLayoutDxil.IsSuccess() &&
+				DisassembleDxil(viewLayoutDxil.m_Artifact.m_Binary, viewLayoutDisassembly);
+			const size_t dxilViewDataOffset =
+				viewLayoutDisassembly.find("struct hostlayout.struct.ViewData");
+			const size_t dxilViewDataEnd =
+				viewLayoutDisassembly.find("} $Element;", dxilViewDataOffset);
+			const size_t dxilViewDataLineEnd =
+				viewLayoutDisassembly.find('\n', dxilViewDataEnd);
+			const std::string_view dxilViewDataLayout =
+				dxilViewDataOffset != std::string::npos &&
+				dxilViewDataEnd != std::string::npos && dxilViewDataLineEnd != std::string::npos
+				? std::string_view(viewLayoutDisassembly).substr(
+					dxilViewDataOffset, dxilViewDataLineEnd - dxilViewDataOffset)
+				: std::string_view{};
+			for (const GPUAbiMember& member : ViewGPUAbiMembers)
+			{
+				dxilLayoutMatches = dxilLayoutMatches &&
+					FindDxilViewMemberOffset(dxilViewDataLayout, member.m_Name) == member.m_Offset;
+			}
+			dxilLayoutMatches = dxilLayoutMatches && !dxilViewDataLayout.empty() &&
+				ParseUnsignedAfter(dxilViewDataLayout, "Size:") == ViewGPUAbiStride;
+			context.Check(dxilLayoutMatches,
+				"DXIL ViewData member offsets and structured-buffer stride match ViewGPU exactly");
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult viewLayoutSpirV = compiler.Compile(desc);
+			SpirVDecorationReflection viewLayoutReflection;
+			const bool reflectedViewLayout = viewLayoutSpirV.IsSuccess() &&
+				ReadSpirVDecorations(viewLayoutSpirV.m_Artifact.m_Binary, viewLayoutReflection);
+			const SpirVStructLayoutReflection* spirVViewData = reflectedViewLayout
+				? viewLayoutReflection.FindStructLayout("ViewData")
+				: nullptr;
+			bool spirVLayoutMatches = spirVViewData &&
+				spirVViewData->m_Members.size() == ViewGPUAbiMembers.size() &&
+				spirVViewData->m_ArrayStride == ViewGPUAbiStride;
+			if (spirVLayoutMatches)
+			{
+				for (size_t index = 0; index < ViewGPUAbiMembers.size(); ++index)
+				{
+					spirVLayoutMatches =
+						spirVViewData->m_Members[index].m_Name == ViewGPUAbiMembers[index].m_Name &&
+						spirVViewData->m_Members[index].m_Offset == ViewGPUAbiMembers[index].m_Offset;
+					if (!spirVLayoutMatches)
+					{
+						break;
+					}
+				}
+			}
+			context.Check(spirVLayoutMatches,
+				"SPIR-V ViewData member offsets and ArrayStride match ViewGPU exactly");
 
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

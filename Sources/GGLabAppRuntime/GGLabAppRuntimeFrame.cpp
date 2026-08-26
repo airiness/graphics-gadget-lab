@@ -118,26 +118,23 @@ namespace gglab
 				shadowVisualizationSettings, effectiveViewRenderProfile);
 		}
 		CameraRig& cameraRig = demo->GetCameraRig();
-		RenderViewID displayViewId = cameraRig.GetDisplayViewId();
-		const CameraRig::CameraSlot* displayCameraSlot = cameraRig.FindRenderViewSlot(displayViewId);
-		if (!displayCameraSlot || !displayCameraSlot->m_Camera ||
-			!displayCameraSlot->m_EnableRenderView)
-		{
-			displayViewId = RenderViewID::Main;
-			displayCameraSlot = cameraRig.GetMainCameraSlot();
-		}
-		GGLAB_ASSERT_NOT_NULL(displayCameraSlot);
-		GGLAB_ASSERT_NOT_NULL(displayCameraSlot->m_Camera);
-		const ResolvedViewRenderSettings displayViewSettings = ResolveViewRenderSettings(
-			effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		const CameraRig::EffectiveDisplayView effectiveDisplayView =
+			cameraRig.ResolveEffectiveDisplayView();
+		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
+			"CameraRig must resolve one effective display view before "
+			"frame planning.");
+		const CameraRig::CameraSlot* displayCameraSlot = effectiveDisplayView.m_CameraSlot;
+		const ResolvedViewRenderSettings displayViewSettings =
+			ResolveViewRenderSettings(
+				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,
 				.m_Capabilities = m_Renderer->GetTemporalAACapabilityStatus(),
-				.m_DisplayViewId = displayViewId,
+				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
-					displayViewId, m_WindowWidth, m_WindowHeight),
+					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 			});
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
@@ -147,6 +144,7 @@ namespace gglab
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_TemporalFramePlan = temporalFramePlan,
+			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_FrameSlotIndex = frameSlotIndex,

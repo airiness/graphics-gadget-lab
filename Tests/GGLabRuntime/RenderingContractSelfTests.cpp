@@ -2,6 +2,8 @@
 #include "Core/Math/MathFunctions.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
+#include "Graphics/CameraController.h"
+#include "Graphics/CameraRig.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
@@ -4037,6 +4039,35 @@ namespace gglab
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
 					PostProcessColorState::SceneLinearRec709, 0.5f),
 				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
+
+			Camera rigCamera(Camera::CreateInfo{});
+			CameraController rigController(CameraController::CreateInfo{});
+			CameraRig cameraRig;
+			cameraRig.AttachMainCamera(rigCamera, rigController);
+			const CameraRig::EffectiveDisplayView mainDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			const size_t debugCameraIndex = cameraRig.AddDebugCameraFromActive();
+			const CameraRig::CameraSlot* debugCameraSlot =
+				cameraRig.GetCameraSlot(debugCameraIndex);
+			const bool selectedDebugView =
+				debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
+			const CameraRig::EffectiveDisplayView debugDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			CameraRig::CameraSlot* mutableDebugCameraSlot =
+				cameraRig.GetCameraSlot(debugCameraIndex);
+			if (mutableDebugCameraSlot)
+			{
+				mutableDebugCameraSlot->m_EnableRenderView = false;
+			}
+			const CameraRig::EffectiveDisplayView fallbackDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			context.Check(mainDisplayView.IsValid() &&
+				mainDisplayView.m_ViewId == RenderViewID::Main && selectedDebugView &&
+				debugDisplayView.IsValid() &&
+				IsDebugCameraRenderViewID(debugDisplayView.m_ViewId) &&
+				fallbackDisplayView.IsValid() &&
+				fallbackDisplayView.m_ViewId == RenderViewID::Main,
+				"CameraRig resolves the effective display view and fallback exactly once");
 
 			ViewRenderProfile profile{};
 			const Camera camera(Camera::CreateInfo{});

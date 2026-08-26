@@ -9,7 +9,10 @@ namespace gglab
 	namespace
 	{
 		constexpr uint32_t SpirVMagic = 0x07230203u;
+		constexpr uint16_t OpName = 5;
+		constexpr uint16_t OpMemberName = 6;
 		constexpr uint16_t OpEntryPoint = 15;
+		constexpr uint16_t OpTypeRuntimeArray = 29;
 		constexpr uint16_t OpTypeStruct = 30;
 		constexpr uint16_t OpTypePointer = 32;
 		constexpr uint16_t OpVariable = 59;
@@ -17,9 +20,11 @@ namespace gglab
 		constexpr uint16_t OpMemberDecorate = 72;
 
 		constexpr uint32_t DecorationBuiltIn = 11;
+		constexpr uint32_t DecorationArrayStride = 6;
 		constexpr uint32_t DecorationLocation = 30;
 		constexpr uint32_t DecorationBinding = 33;
 		constexpr uint32_t DecorationDescriptorSet = 34;
+		constexpr uint32_t DecorationOffset = 35;
 		constexpr uint32_t StorageClassInput = 1;
 		constexpr uint32_t StorageClassOutput = 3;
 
@@ -28,6 +33,8 @@ namespace gglab
 			std::optional<uint32_t> m_DescriptorSet;
 			std::optional<uint32_t> m_Binding;
 			std::optional<uint32_t> m_Location;
+			std::optional<uint32_t> m_ArrayStride;
+			std::optional<uint32_t> m_Offset;
 			bool m_BuiltIn = false;
 		};
 
@@ -91,6 +98,9 @@ namespace gglab
 			case DecorationBuiltIn:
 				destination.m_BuiltIn = true;
 				break;
+			case DecorationArrayStride:
+				destination.m_ArrayStride = value;
+				break;
 			case DecorationLocation:
 				destination.m_Location = value;
 				break;
@@ -99,6 +109,9 @@ namespace gglab
 				break;
 			case DecorationDescriptorSet:
 				destination.m_DescriptorSet = value;
+				break;
+			case DecorationOffset:
+				destination.m_Offset = value;
 				break;
 			default:
 				break;
@@ -141,6 +154,14 @@ namespace gglab
 		return iterator != m_EntryPoints.end() ? &*iterator : nullptr;
 	}
 
+	const SpirVStructLayoutReflection* SpirVDecorationReflection::FindStructLayout(
+		std::string_view name) const noexcept
+	{
+		const auto iterator =
+			std::ranges::find(m_StructLayouts, name, &SpirVStructLayoutReflection::m_Name);
+		return iterator != m_StructLayouts.end() ? &*iterator : nullptr;
+	}
+
 	bool ReadSpirVDecorations(
 		const ShaderBinary& binary, SpirVDecorationReflection& outReflection) noexcept
 	{
@@ -164,7 +185,10 @@ namespace gglab
 		std::unordered_map<uint64_t, DecorationInfo> memberDecorations;
 		std::unordered_map<uint32_t, PointerTypeInfo> pointerTypes;
 		std::unordered_map<uint32_t, std::vector<uint32_t>> structTypes;
+		std::unordered_map<uint32_t, uint32_t> runtimeArrayElementTypes;
 		std::unordered_map<uint32_t, VariableInfo> variables;
+		std::unordered_map<uint32_t, std::string> names;
+		std::unordered_map<uint64_t, std::string> memberNames;
 		std::vector<RawEntryPoint> rawEntryPoints;
 
 		for (size_t offset = 5; offset < words.size();)
@@ -181,6 +205,29 @@ namespace gglab
 
 			switch (opcode)
 			{
+			case OpName:
+				if (wordCount >= 3)
+				{
+					uint16_t nextWord = 0;
+					if (!ReadLiteralString(operands, wordCount, 2, names[operands[1]], nextWord))
+					{
+						outReflection.m_Error = "SPIR-V object name is not terminated";
+						return false;
+					}
+				}
+				break;
+			case OpMemberName:
+				if (wordCount >= 4)
+				{
+					uint16_t nextWord = 0;
+					if (!ReadLiteralString(operands, wordCount, 3,
+							memberNames[MemberKey(operands[1], operands[2])], nextWord))
+					{
+						outReflection.m_Error = "SPIR-V member name is not terminated";
+						return false;
+					}
+				}
+				break;
 			case OpEntryPoint:
 				if (wordCount >= 4)
 				{
@@ -219,6 +266,12 @@ namespace gglab
 				{
 					structTypes[operands[1]] =
 						std::vector<uint32_t>(operands + 2, operands + wordCount);
+				}
+				break;
+			case OpTypeRuntimeArray:
+				if (wordCount == 3)
+				{
+					runtimeArrayElementTypes[operands[1]] = operands[2];
 				}
 				break;
 			case OpTypePointer:
@@ -261,6 +314,57 @@ namespace gglab
 			{
 				return std::tie(lhs.m_DescriptorSet, lhs.m_Binding, lhs.m_TargetId) <
 					std::tie(rhs.m_DescriptorSet, rhs.m_Binding, rhs.m_TargetId);
+			});
+
+		for (const auto& [structId, memberTypes] : structTypes)
+		{
+			const auto nameIterator = names.find(structId);
+			if (nameIterator == names.end())
+			{
+				continue;
+			}
+			SpirVStructLayoutReflection layout{
+				.m_TypeId = structId,
+				.m_Name = nameIterator->second,
+			};
+			layout.m_Members.reserve(memberTypes.size());
+			for (uint32_t member = 0; member < memberTypes.size(); ++member)
+			{
+				const uint64_t key = MemberKey(structId, member);
+				const auto decorationIterator = memberDecorations.find(key);
+				const auto memberNameIterator = memberNames.find(key);
+				if (decorationIterator == memberDecorations.end() ||
+					!decorationIterator->second.m_Offset || memberNameIterator == memberNames.end())
+				{
+					layout.m_Members.clear();
+					break;
+				}
+				layout.m_Members.push_back({
+					.m_Name = memberNameIterator->second,
+					.m_Offset = *decorationIterator->second.m_Offset,
+				});
+			}
+			for (const auto& [arrayTypeId, elementTypeId] : runtimeArrayElementTypes)
+			{
+				if (elementTypeId != structId)
+				{
+					continue;
+				}
+				const auto decorationIterator = decorations.find(arrayTypeId);
+				if (decorationIterator != decorations.end())
+				{
+					layout.m_ArrayStride = decorationIterator->second.m_ArrayStride;
+				}
+				break;
+			}
+			if (!layout.m_Members.empty())
+			{
+				outReflection.m_StructLayouts.push_back(std::move(layout));
+			}
+		}
+		std::ranges::sort(
+			outReflection.m_StructLayouts, [](const auto& lhs, const auto& rhs) noexcept {
+				return std::tie(lhs.m_Name, lhs.m_TypeId) < std::tie(rhs.m_Name, rhs.m_TypeId);
 			});
 
 		for (const RawEntryPoint& rawEntry : rawEntryPoints)
