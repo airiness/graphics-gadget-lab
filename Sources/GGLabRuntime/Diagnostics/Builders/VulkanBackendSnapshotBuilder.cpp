@@ -119,7 +119,7 @@ namespace gglab
 		outSnapshot.m_GraphicsPresentQueueCount = adapter.m_GraphicsPresentQueueCount;
 		outSnapshot.m_GraphicsQueueIndex = device.GetGraphicsQueueIndex();
 		outSnapshot.m_TransferQueueIndex = device.GetTransferQueueIndex();
-		outSnapshot.m_IndependentTransferQueue = device.HasIndependentTransferQueue();
+		outSnapshot.m_SeparateTransferQueue = device.HasSeparateTransferQueue();
 		outSnapshot.m_ProfileAccepted = adapter.m_ProfileEvaluation.IsAccepted();
 		outSnapshot.m_DynamicRendering = capabilities.m_DynamicRendering;
 		outSnapshot.m_Synchronization2 = capabilities.m_Synchronization2;

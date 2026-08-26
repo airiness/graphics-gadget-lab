@@ -274,7 +274,7 @@ namespace gglab
 		// Registers a deferred-retirement probe on a reserved-but-unsubmitted
 		// timeline value. The gate is deterministically incomplete here; later
 		// frames submit past it. The probe slot must stay occupied until
-		// RunVulkanDeferredRetirementRelease runs after WaitIdle.
+		// RunVulkanDeferredRetirementRelease runs after WaitGraphicsIdle.
 		struct VulkanDeferredRetirementProbeState
 		{
 			uint32_t m_TextureSlot = UINT32_MAX;
@@ -1237,11 +1237,12 @@ namespace gglab
 			scheduler.DrainReadyWork();
 			const bool publicationWithheld = privateDescriptor.IsValid() &&
 				!publishedDescriptor.IsValid();
-			if (runtime.WaitIdle() != VK_SUCCESS)
+			if (runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{
 				scheduler.ClearGpuCompletionHold();
 				scheduler.Finalize();
-				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS("qualify transfer: WaitIdle failed after scheduler upload.");
+				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+					"qualify transfer: WaitGraphicsIdle failed after scheduler upload.");
 				return 1;
 			}
 			scheduler.ClearGpuCompletionHold();
@@ -1330,7 +1331,7 @@ namespace gglab
 				runtime.EndFrame({ 0.08f, 0.12f, 0.18f, 1.0f });
 			if (pendingSubmittedState != VulkanDescriptorPublicationState::Live ||
 				pendingSubmittedDiagnostics.m_RetirementRequestedCount == 0 ||
-				!submittedFrame.m_Submitted || runtime.WaitIdle() != VK_SUCCESS)
+				!submittedFrame.m_Submitted || runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify descriptors: submitted sampler retirement was not fence-gated.");
@@ -2419,7 +2420,8 @@ namespace gglab
 				!pipelineSystem.IsAlive(depthWithoutPixelPipeline) &&
 				!pipelineSystem.IsAlive(depthOverridePipeline) &&
 				!pipelineSystem.IsAlive(computePipeline);
-			if (!uniformFrameEnded || !pipelineCacheCleared || runtime.WaitIdle() != VK_SUCCESS)
+			if (!uniformFrameEnded || !pipelineCacheCleared ||
+				runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify graphics: completion, pipeline invalidation or uniform retirement failed.");
@@ -2707,10 +2709,10 @@ namespace gglab
 				}
 			}
 
-			if (runtime.WaitIdle() != VK_SUCCESS)
+			if (runtime.WaitGraphicsIdle() != VK_SUCCESS)
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"qualify WaitIdle failed before the final summary; the runtime may have "
+					"qualify WaitGraphicsIdle failed before the final summary; the runtime may have "
 					"entered the fatal state.");
 				return 1;
 			}

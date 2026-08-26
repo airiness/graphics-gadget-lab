@@ -160,7 +160,7 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
 				"  selected queues: graphics={}, transfer={} ({})",
 				queueSelection.m_GraphicsQueueIndex, queueSelection.m_TransferQueueIndex,
-				queueSelection.HasIndependentTransferQueue() ? "independent" : "shared"));
+				queueSelection.HasSeparateTransferQueue() ? "separate" : "shared"));
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format("  enabled device extensions: {}, {}",
 				VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME));
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(

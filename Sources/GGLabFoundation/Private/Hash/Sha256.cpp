@@ -58,16 +58,9 @@ namespace gglab
 	Sha256Builder::Sha256Builder() noexcept :
 		m_Implementation(new (std::nothrow) Implementation)
 	{
-		if (!m_Implementation)
+		if (m_Implementation)
 		{
-			return;
-		}
-#if defined(_WIN32)
-		m_Implementation->m_Backend = foundation::detail::CreateWin32Sha256Backend();
-#endif
-		if (!m_Implementation->m_Backend)
-		{
-			m_Implementation->m_Backend = foundation::detail::CreatePortableSha256Backend();
+			m_Implementation->m_Backend = foundation::detail::CreateSha256Backend();
 		}
 	}
 

@@ -7,6 +7,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Logging/Log.h"
+#include "GGLabFoundation/Platform/PlatformDefines.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
@@ -201,7 +202,7 @@ namespace gglab::foundation::tests
 			return false;
 		}
 
-#if defined(_WIN32)
+#if GGLAB_PLATFORM_WINDOWS
 		// This is intentionally a very loose regression guard, not a benchmark.
 		// BCrypt completes this payload in a few milliseconds on supported Windows
 		// hardware; the unoptimized scalar implementation takes well over the limit.

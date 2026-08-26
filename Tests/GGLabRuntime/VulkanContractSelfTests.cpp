@@ -329,13 +329,13 @@ namespace gglab
 			const VulkanQueueSelection shared = SelectVulkanQueues(1);
 			context.Check(shared.IsValid() && shared.m_RequestedQueueCount == 1 &&
 				shared.m_GraphicsQueueIndex == 0 && shared.m_TransferQueueIndex == 0 &&
-				!shared.HasIndependentTransferQueue(),
+				!shared.HasSeparateTransferQueue(),
 				"Vulkan queue selection preserves the single-queue fallback");
 
-			const VulkanQueueSelection independent = SelectVulkanQueues(16);
-			context.Check(independent.IsValid() && independent.m_RequestedQueueCount == 2 &&
-				independent.m_GraphicsQueueIndex == 0 && independent.m_TransferQueueIndex == 1 &&
-				independent.HasIndependentTransferQueue(),
+			const VulkanQueueSelection separate = SelectVulkanQueues(16);
+			context.Check(separate.IsValid() && separate.m_RequestedQueueCount == 2 &&
+				separate.m_GraphicsQueueIndex == 0 && separate.m_TransferQueueIndex == 1 &&
+				separate.HasSeparateTransferQueue(),
 				"Vulkan queue selection uses a second same-family queue for transfer");
 		}
 
@@ -1039,6 +1039,25 @@ namespace gglab
 					"failed submit never advances the reuse gate");
 				context.Check(UpdateSlotReuseGate(0, VK_ERROR_INITIALIZATION_FAILED, 1) == 0,
 					"a never-submitted value can never become a wait target");
+			}
+
+			// Cross-queue waits targeting one timeline coalesce to its greatest
+			// value. A different fence identity must be rejected rather than lost.
+			{
+				const RHIFenceHandle transferFence{ 7, 1 };
+				RHIFencePoint pendingWait{};
+				context.Check(MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ transferFence, 3 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 3 },
+					"the first transfer timeline wait is retained for graphics submission");
+				context.Check(MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ transferFence, 9 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 9 },
+					"graphics submission waits on the greatest transfer timeline value");
+				context.Check(!MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ RHIFenceHandle{ 8, 1 }, 10 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 9 },
+					"a foreign timeline wait is rejected without replacing the dependency");
 			}
 
 			// Present-mode policy: VSync on always selects FIFO; VSync off

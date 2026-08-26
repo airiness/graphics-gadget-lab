@@ -76,7 +76,7 @@ namespace gglab
 		uint32_t m_GraphicsPresentQueueCount = 0;
 		uint32_t m_GraphicsQueueIndex = 0;
 		uint32_t m_TransferQueueIndex = 0;
-		bool m_IndependentTransferQueue = false;
+		bool m_SeparateTransferQueue = false;
 		bool m_ProfileAccepted = false;
 		bool m_DynamicRendering = false;
 		bool m_Synchronization2 = false;

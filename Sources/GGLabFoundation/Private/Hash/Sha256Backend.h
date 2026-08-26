@@ -18,9 +18,6 @@ namespace gglab::foundation::detail
 		[[nodiscard]] virtual Sha256Digest Finish() noexcept = 0;
 	};
 
+	[[nodiscard]] std::unique_ptr<Sha256Backend> CreateSha256Backend() noexcept;
 	[[nodiscard]] std::unique_ptr<Sha256Backend> CreatePortableSha256Backend() noexcept;
-
-#if defined(_WIN32)
-	[[nodiscard]] std::unique_ptr<Sha256Backend> CreateWin32Sha256Backend() noexcept;
-#endif
 }

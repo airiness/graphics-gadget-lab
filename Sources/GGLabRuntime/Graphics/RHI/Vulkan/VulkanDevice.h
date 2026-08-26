@@ -26,7 +26,7 @@ namespace gglab
 		{
 			return m_RequestedQueueCount > 0;
 		}
-		[[nodiscard]] constexpr bool HasIndependentTransferQueue() const noexcept
+		[[nodiscard]] constexpr bool HasSeparateTransferQueue() const noexcept
 		{
 			return IsValid() && m_TransferQueueIndex != m_GraphicsQueueIndex;
 		}
@@ -141,9 +141,9 @@ namespace gglab
 		{
 			return m_QueueSelection.m_TransferQueueIndex;
 		}
-		[[nodiscard]] bool HasIndependentTransferQueue() const noexcept
+		[[nodiscard]] bool HasSeparateTransferQueue() const noexcept
 		{
-			return m_QueueSelection.HasIndependentTransferQueue();
+			return m_QueueSelection.HasSeparateTransferQueue();
 		}
 		[[nodiscard]] const VkPhysicalDeviceLimits& GetPhysicalDeviceLimits() const noexcept
 		{

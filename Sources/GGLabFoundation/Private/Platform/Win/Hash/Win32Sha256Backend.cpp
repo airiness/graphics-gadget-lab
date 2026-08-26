@@ -1,4 +1,4 @@
-#include "Hash/Sha256Backend.h"
+#include "Platform/Win/Hash/Win32Sha256Backend.h"
 
 #include <Windows.h>
 #include <bcrypt.h>

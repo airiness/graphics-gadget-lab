@@ -145,7 +145,7 @@ namespace gglab
 			snapshot->m_GraphicsPresentQueueCount);
 		ImGui::Text("Graphics queue %u | transfer queue %u (%s)",
 			snapshot->m_GraphicsQueueIndex, snapshot->m_TransferQueueIndex,
-			snapshot->m_IndependentTransferQueue ? "independent" : "shared");
+			snapshot->m_SeparateTransferQueue ? "separate" : "shared");
 
 		ImGui::SeparatorText("Profile and validation");
 		ImGui::Text("Device profile: %s", snapshot->m_ProfileAccepted ? "accepted" : "rejected");
