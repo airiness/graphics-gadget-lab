@@ -63,7 +63,7 @@ namespace gglab
 			L"      --target <gglab-dx12|gglab-vulkan13> --cache-root <path>\n"
 			L"      --artifact-root <path> [--result-format <text|json>]\n"
 			L"  gglab-shaderc targets\n"
-		L"  gglab-shaderc describe\n"
+			L"  gglab-shaderc describe\n"
 			L"  gglab-shaderc --version\n"
 			L"  gglab-shaderc --help";
 	}

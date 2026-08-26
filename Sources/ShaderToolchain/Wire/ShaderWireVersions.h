@@ -1,7 +1,12 @@
 #pragma once
+#include <string_view>
 
 namespace gglab
 {
+	// The canonical machine identity of the gglab-shaderc tool. Stable by
+	// contract: an identity consumers gate against, distinct from the tool
+	// version.
+	inline constexpr std::string_view ShaderCompilerToolIdentity = "gglab-shaderc";
 	// The gglab-shaderc tool version, carried on the describe wire and emitted
 	// by --version. Bumped when the tool's user-visible behavior changes:
 	// describe wire facts, compile/build-runtime behavior, target set, exit

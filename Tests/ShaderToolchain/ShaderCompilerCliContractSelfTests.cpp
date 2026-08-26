@@ -112,7 +112,8 @@ namespace gglab
 
 		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments,
 			bool forceCompilerUnavailable = false,
-			bool forceDescribeInternalError = false) noexcept
+			bool forceDescribeInternalError = false,
+			const std::wstring& workingDirectory = std::wstring()) noexcept
 		{
 			CliRunResult result{};
 			std::optional<ScopedEnvironmentVariable> compilerUnavailableEnvironment;
@@ -169,10 +170,14 @@ namespace gglab
 				.hStdError = errWrite,
 			};
 			PROCESS_INFORMATION processInfo{};
+			const std::wstring exePath = (win32::GetExecutableDirectory() / L"gglab-shaderc.exe").wstring();
+			const std::wstring exeDirectory = win32::GetExecutableDirectory().wstring();
+			const std::wstring& currentDirectory =
+				workingDirectory.empty() ? exeDirectory : workingDirectory;
 			const BOOL created = CreateProcessW(
-				(win32::GetExecutableDirectory() / L"gglab-shaderc.exe").c_str(),
+				exePath.c_str(),
 				commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
-				nullptr, win32::GetExecutableDirectory().c_str(), &startupInfo, &processInfo);
+				nullptr, currentDirectory.c_str(), &startupInfo, &processInfo);
 			compilerUnavailableEnvironment.reset();
 			describeInternalErrorEnvironment.reset();
 			CloseHandle(outWrite);
@@ -284,6 +289,55 @@ namespace gglab
 			}
 		}
 
+		// Safe typed reads for the describe wire: a missing key or a type
+		// mismatch is a failed read, never an exception. A malformed document
+		// must fail the check that reads it, not terminate the test process.
+		[[nodiscard]] bool ReadWireString(std::optional<nlohmann::json> doc,
+			std::string_view key, std::string& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_string())
+			{
+				return false;
+			}
+			out = doc->at(key).get<std::string>();
+			return true;
+		}
+
+		[[nodiscard]] bool ReadWireInteger(std::optional<nlohmann::json> doc,
+			std::string_view key, std::int64_t& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) ||
+				!doc->at(key).is_number_integer())
+			{
+				return false;
+			}
+			out = doc->at(key).get<std::int64_t>();
+			return true;
+		}
+
+		[[nodiscard]] bool ReadWireBoolean(std::optional<nlohmann::json> doc,
+			std::string_view key, bool& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_boolean())
+			{
+				return false;
+			}
+			out = doc->at(key).get<bool>();
+			return true;
+		}
+
+		[[nodiscard]] bool WireDiagnosticsCount(std::optional<nlohmann::json> doc,
+			std::size_t& count) noexcept
+		{
+			if (!doc.has_value() || !doc->contains("diagnostics") ||
+				!doc->at("diagnostics").is_array())
+			{
+				return false;
+			}
+			count = doc->at("diagnostics").size();
+			return true;
+		}
+
 		[[nodiscard]] bool HasJsonEnvelope(const CliRunResult& result,
 			std::string_view status, int exitCode, bool success) noexcept
 		{
@@ -348,7 +402,8 @@ namespace gglab
 			return decoded;
 		}
 
-		void RunDescribeHandshakeTests(SelfTestContext& context) noexcept
+		void RunDescribeHandshakeTests(SelfTestContext& context,
+			const std::filesystem::path& tempRoot) noexcept
 		{
 			// Machine describe handshake contract — wire verification. These
 			// protocol self-tests go only through describe (per the consumer
@@ -368,29 +423,43 @@ namespace gglab
 						firstDoc.has_value() && secondDoc.has_value() &&
 						*firstDoc == *secondDoc,
 					"describe emits a byte-stable parsed JSON object document and no stderr");
+				std::string command;
+				std::string status;
+				bool success = false;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
+				std::size_t diagnosticsCount = 0;
 				context.Check(
-					firstDoc.has_value() &&
-						firstDoc->at("command") == "describe" &&
-						firstDoc->at("success") == true &&
-						firstDoc->at("status") == "ok" &&
-						firstDoc->at("exitCode") == 0 &&
-						firstDoc->at("processContractVersion") ==
-							static_cast<std::int64_t>(gglab::ShaderProcessContractVersion) &&
-						firstDoc->at("diagnostics").is_array() &&
-						firstDoc->at("diagnostics").empty(),
+					ReadWireString(firstDoc, "command", command) &&
+						command == "describe" &&
+						ReadWireBoolean(firstDoc, "success", success) && success &&
+						ReadWireString(firstDoc, "status", status) && status == "ok" &&
+						ReadWireInteger(firstDoc, "exitCode", exitCode) && exitCode == 0 &&
+						ReadWireInteger(firstDoc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						WireDiagnosticsCount(firstDoc, diagnosticsCount) &&
+							diagnosticsCount == 0,
 					"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
 			}
 
-			// Canonical tool identity: parsed JSON, exact value and string type.
+			// Identity chain: the wire identity equals the canonical tool
+			// identity, and the descriptor identity equals the in-process
+			// canonical producer identity (never the "unknown" sentinel).
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
+				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
+				std::string wireToolIdentity;
+				std::string wireProducerIdentity;
+				const bool toolChain = ReadWireString(doc, "toolIdentity", wireToolIdentity) &&
+					wireToolIdentity == std::string(ShaderCompilerToolIdentity);
+				const bool descriptorChain = ReadWireString(
+						doc, "producerIdentity", wireProducerIdentity) &&
+					wireProducerIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
+					!wireProducerIdentity.empty() && wireProducerIdentity != "unknown";
 				context.Check(
-					doc.has_value() &&
-						doc->contains("toolIdentity") &&
-						doc->at("toolIdentity").is_string() &&
-						doc->at("toolIdentity") == "gglab-shaderc",
-					"describe.toolIdentity is the canonical wire identity gglab-shaderc");
+					toolChain && descriptorChain,
+					"describe identity chain: wire identity and descriptor identity agree with the canonical identities");
 			}
 
 			// toolVersion matches the current tool-version constant (not a
@@ -400,13 +469,10 @@ namespace gglab
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
-				const std::string wireVersion =
-					doc.has_value() && doc->contains("toolVersion") &&
-						doc->at("toolVersion").is_string()
-						? doc->at("toolVersion").get<std::string>()
-						: std::string{};
+				std::string wireVersion;
+				const bool versionRead = ReadWireString(doc, "toolVersion", wireVersion);
 				context.Check(
-					doc.has_value() &&
+					versionRead &&
 						wireVersion == utils::ToString(ShaderCompilerToolVersion) &&
 						IsSemver(wireVersion),
 					"describe.toolVersion matches the tool-version constant and is semver-shaped");
@@ -417,41 +483,27 @@ namespace gglab
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::int64_t contractVersion = -1;
+				const bool versionRead = ReadWireInteger(
+					doc, "processContractVersion", contractVersion);
 				context.Check(
-					doc.has_value() &&
-						doc->contains("processContractVersion") &&
-						doc->at("processContractVersion").is_number_integer() &&
-						doc->at("processContractVersion") ==
-							static_cast<std::int64_t>(gglab::ShaderProcessContractVersion),
+					versionRead &&
+						contractVersion == gglab::ShaderProcessContractVersion,
 					"describe.processContractVersion equals the declared process contract value");
 			}
 
-			// Producer identity has in-process parity with the in-process
-			// QueryDxcCompilerIdentity() (multi-process parity), and is
-			// never the "unknown" sentinel.
+			// Producer kind parity: the in-process descriptor kind maps to
+			// exactly its wire name (dxc), never a fallback.
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
-				const std::string expectedIdentity = utils::ToString(inProcess.m_CanonicalIdentity);
-				// Dxc is the only producer kind available, so its wire name
-				// is "dxc" on the wire we assert here (no sentinel fallback).
-				const std::string expectedKind = "dxc";
-				const bool kindMatches = doc
-					? doc->contains("producerKind") &&
-						doc->at("producerKind").is_string() &&
-						doc->at("producerKind").get<std::string>() == expectedKind
-					: false;
-				const bool identityMatches = doc
-					? doc->contains("producerIdentity") &&
-						doc->at("producerIdentity").is_string() &&
-						doc->at("producerIdentity").get<std::string>() == expectedIdentity
-					: false;
+				std::string wireKind;
+				const bool kindRead = ReadWireString(doc, "producerKind", wireKind);
 				context.Check(
-					kindMatches &&
-						identityMatches &&
-						expectedIdentity != "unknown" && !expectedIdentity.empty(),
-					"describe producer kind/identity parity with in-process QueryDxcCompilerIdentity()");
+					inProcess.m_Kind == ShaderCompilerKind::Dxc &&
+						kindRead && wireKind == "dxc",
+					"describe producer kind parity with the in-process descriptor kind (dxc)");
 			}
 
 			// supportedTargets is exactly the supported set as declared by the
@@ -479,10 +531,25 @@ namespace gglab
 					"describe.supportedTargets exactly equals the single-table authority (no extras)");
 			}
 
-			// No caller build context appears in the describe result.
+			// No caller build context appears in the describe result, and the
+			// result is byte-identical even when run from a foreign working
+			// directory (a real cwd change, not a field-absence assumption).
 			{
-				const CliRunResult result = RunCli({ L"describe" });
-				const auto doc = ParseWireDocument(result.m_StdOut);
+				const std::filesystem::path decoyRoot = tempRoot / L"DescribeCwd";
+				std::error_code errorCode;
+				std::filesystem::create_directories(decoyRoot, errorCode);
+				// A decoy that would surface in the wire if the working
+				// directory leaked into the describe document.
+				bool decoyWritten = false;
+				{
+					std::ofstream output(decoyRoot / L"source-root.hlsl", std::ios::binary);
+					output << "// decoy";
+					decoyWritten = output.good();
+				}
+				const CliRunResult reference = RunCli({ L"describe" });
+				const CliRunResult fromDecoy = RunCli(
+					{ L"describe" }, false, false, decoyRoot.wstring());
+				const auto doc = ParseWireDocument(fromDecoy.m_StdOut);
 				const char* const callerContextFields[] = {
 					"sourceRoot", "source-root", "sourcePath", "cacheRoot", "cache-root",
 					"artifactRoot", "artifact-root", "binaryPath", "cacheRecordPath", "cwd",
@@ -493,17 +560,22 @@ namespace gglab
 					absent = absent && !doc->contains(field);
 				}
 				context.Check(
-					absent,
-					"describe result carries no caller build context (source/cache/artifact/cwd)");
+					!errorCode && decoyWritten &&
+						reference.m_ExitCode == 0 && fromDecoy.m_ExitCode == 0 &&
+						reference.m_StdErr.empty() && fromDecoy.m_StdErr.empty() &&
+						reference.m_StdOut == fromDecoy.m_StdOut &&
+						absent,
+					"describe carries no caller build context and is byte-identical from a foreign cwd");
 			}
 
-			// stdout purity: one valid JSON object on stdout and empty stderr.
+			// stdout purity: the channel framing holds (one single-line JSON
+			// object on stdout, empty stderr) and the document parses.
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				context.Check(
-					doc.has_value() && result.m_StdErr.empty(),
-					"describe success is a single stdout JSON object with empty stderr");
+					IsSingleJsonDocument(result) && doc.has_value(),
+					"describe success keeps one-JSON-on-stdout channel framing and parses");
 			}
 
 			// usage errors are structured (three variants), no business payload.
@@ -522,14 +594,24 @@ namespace gglab
 					const std::string checkName =
 						std::string("describe usage-error structured (") + label + ")";
 					const auto doc = ParseWireDocument(run.m_StdOut);
-					const bool structuredFailure = doc.has_value() &&
-						doc->at("command") == "describe" &&
-						doc->at("success") == false &&
-						doc->at("status") == "usage-error" &&
-						doc->at("exitCode") == 2 &&
-						doc->at("processContractVersion") ==
-							static_cast<std::int64_t>(gglab::ShaderProcessContractVersion) &&
-						doc->at("diagnostics").is_array() && !doc->at("diagnostics").empty();
+					std::string command;
+					std::string status;
+					bool success = true;
+					std::int64_t exitCode = -1;
+					std::int64_t contractVersion = -1;
+					std::size_t diagnosticsCount = 0;
+					const bool structuredFailure =
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+							ReadWireBoolean(doc, "success", success) && !success &&
+							ReadWireString(doc, "status", status) &&
+								status == "usage-error" &&
+							ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 2 &&
+							ReadWireInteger(
+								doc, "processContractVersion", contractVersion) &&
+								contractVersion == gglab::ShaderProcessContractVersion &&
+							WireDiagnosticsCount(doc, diagnosticsCount) &&
+								diagnosticsCount > 0;
 					const bool noBusinessLeak = doc.has_value() &&
 						!doc->contains("toolIdentity") &&
 						!doc->contains("toolVersion") &&
@@ -552,17 +634,24 @@ namespace gglab
 				const CliRunResult result =
 					RunCli({ L"describe" }, /*forceCompilerUnavailable*/ true);
 				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::string command;
+				std::string status;
+				bool success = true;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
 				context.Check(
 					result.m_ExitCode == 4 &&
 						result.m_StdErr.empty() &&
-						doc.has_value() &&
-						doc->at("command") == "describe" &&
-						doc->at("success") == false &&
-						doc->at("status") == "compiler-unavailable" &&
-						doc->at("exitCode") == 4 &&
-						doc->at("processContractVersion") ==
-							static_cast<std::int64_t>(gglab::ShaderProcessContractVersion) &&
-						!doc->contains("producerIdentity"),
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+						ReadWireBoolean(doc, "success", success) && !success &&
+						ReadWireString(doc, "status", status) &&
+							status == "compiler-unavailable" &&
+						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 4 &&
+						ReadWireInteger(
+							doc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						doc.has_value() && !doc->contains("producerIdentity"),
 					"describe reports compiler-unavailable (exit 4) when the producer is unavailable");
 			}
 
@@ -572,17 +661,26 @@ namespace gglab
 					{ L"describe" }, /*forceCompilerUnavailable*/ false,
 					/*forceDescribeInternalError*/ true);
 				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::string command;
+				std::string status;
+				bool success = true;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
+				std::size_t diagnosticsCount = 0;
 				context.Check(
 					result.m_ExitCode == 7 &&
 						result.m_StdErr.empty() &&
-						doc.has_value() &&
-						doc->at("command") == "describe" &&
-						doc->at("success") == false &&
-						doc->at("status") == "internal-error" &&
-						doc->at("exitCode") == 7 &&
-						doc->at("processContractVersion") ==
-							static_cast<std::int64_t>(gglab::ShaderProcessContractVersion) &&
-						doc->at("diagnostics").is_array() && !doc->at("diagnostics").empty(),
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+						ReadWireBoolean(doc, "success", success) && !success &&
+						ReadWireString(doc, "status", status) &&
+							status == "internal-error" &&
+						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 7 &&
+						ReadWireInteger(
+							doc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						WireDiagnosticsCount(doc, diagnosticsCount) &&
+							diagnosticsCount > 0,
 					"describe reports internal-error (exit 7) on a forced handled failure");
 			}
 		}
@@ -1447,6 +1545,6 @@ namespace gglab
 		// Machine describe handshake contract self-tests. The remaining
 		// structural no-regression invariants are asserted by the
 		// compile/build-runtime matrix and legacy-grammar checks above.
-		RunDescribeHandshakeTests(context);
+		RunDescribeHandshakeTests(context, tempRoot);
 	}
 }

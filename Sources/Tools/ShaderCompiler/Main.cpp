@@ -15,7 +15,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstdint>
-#include <cstdlib>
+#include <cstddef>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -36,30 +36,6 @@ namespace
 	// crash and CRT abort remain outside its scope. New exit code, not
 	// previously allocated for compile / build-runtime.
 	constexpr int ExitCodeInternalError = 7;
-
-	// Process-only test seam (no user-facing flag): force the describe
-	// handled-internal-failure path so the internal-error / exit 7 wire
-	// outcome can be verified deterministically in the black-box matrix.
-	// Same confinement style as GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE.
-	[[nodiscard]] bool ForceDescribeInternalErrorForTest() noexcept
-	{
-		wchar_t value[2]{};
-		std::size_t length = 0;
-		return _wgetenv_s(&length, value, 2, L"GGLAB_SHADERC_TEST_FORCE_DESCRIBE_INTERNAL_ERROR") == 0 &&
-			length == 2 && value[0] == L'1';
-	}
-
-	// Describe shares the generic "force compiler unavailable" test seam so its
-	// producer-unavailable / exit 4 path is deterministic in the black-box
-	// matrix. Same env variable name as the compile / build-runtime forced-
-	// unavailable seam; no user-facing flag.
-	[[nodiscard]] bool ForceDescribeCompilerUnavailableForTest() noexcept
-	{
-		wchar_t value[2]{};
-		std::size_t length = 0;
-		return _wgetenv_s(&length, value, 2, L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE") == 0 &&
-			length == 2 && value[0] == L'1';
-	}
 
 	class NullLogSink final : public gglab::LogSink
 	{
@@ -446,18 +422,18 @@ namespace
 
 	int RunDescribe()
 	{
-		if (ForceDescribeInternalErrorForTest())
+		if (gglab::ShouldForceDescribeInternalErrorForTest())
 		{
 			return PrintJsonDescribeInternalError();
-		}
-		if (ForceDescribeCompilerUnavailableForTest())
-		{
-			return PrintJsonDescribeCompilerUnavailable();
 		}
 
 		try
 		{
-			const gglab::ShaderCompilerIdentity identity = gglab::QueryDxcCompilerIdentity();
+			// The producer identity as observed at this process boundary (the
+			// composition seam may observe it as unresolvable); the normal
+			// unresolvable-identity judgment below then maps that observation
+			// to the structured compiler-unavailable failure.
+			const gglab::ShaderCompilerIdentity identity = gglab::QueryShaderCompilerIdentityForProcess();
 			// An unresolvable producer (empty sentinel or the
 			// "unknown" parse-failure sentinel) is a structured failure, never
 			// success plus an "unknown" wire value.
@@ -487,7 +463,7 @@ namespace
 				{ "status", "ok" },
 				{ "exitCode", ExitCodeSuccess },
 				{ "processContractVersion", gglab::ShaderProcessContractVersion },
-				{ "toolIdentity", "gglab-shaderc" },
+				{ "toolIdentity", std::string(gglab::ShaderCompilerToolIdentity) },
 				{ "toolVersion", gglab::utils::ToString(gglab::ShaderCompilerToolVersion) },
 				{ "producerKind", std::string(*kindWireName) },
 				{ "producerIdentity", gglab::utils::ToString(identity.m_CanonicalIdentity) },
@@ -586,19 +562,11 @@ namespace
 
 	int RunVersion()
 	{
-		const gglab::ShaderCompilerIdentity identity = gglab::QueryDxcCompilerIdentity();
+		// The producer fact observed at this process boundary. Human-facing
+		// report only: this line is not the machine contract, describe is.
+		const gglab::ShaderCompilerIdentity identity = gglab::QueryShaderCompilerIdentityForProcess();
 		std::wcout << L"gglab-shaderc " << gglab::ShaderCompilerToolVersion << L"\n";
-		if (identity.m_CanonicalIdentity.empty() ||
-			identity.m_CanonicalIdentity == L"unknown")
-		{
-			// Human-facing distinction for an unresolvable producer; the wire
-			// (machine) contract is unchanged by this.
-			std::wcout << L"Producer: unavailable\n";
-		}
-		else
-		{
-			std::wcout << L"Producer: dxc " << identity.m_CanonicalIdentity << L"\n";
-		}
+		std::wcout << L"Producer: dxc " << identity.m_CanonicalIdentity << L"\n";
 		return ExitCodeSuccess;
 	}
 }
