@@ -12,6 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDynamicUniformBuffer.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Targets/Vulkan13ShaderTarget.h"
@@ -1237,12 +1238,16 @@ namespace gglab
 			scheduler.DrainReadyWork();
 			const bool publicationWithheld = privateDescriptor.IsValid() &&
 				!publishedDescriptor.IsValid();
-			if (runtime.WaitGraphicsIdle() != VK_SUCCESS)
+			VulkanTimelineFence* transferTimeline = device.GetTransferTimeline();
+			const VkResult transferWaitResult = transferTimeline
+				? transferTimeline->Wait(transferTimeline->GetCurrentSignalValue())
+				: VK_ERROR_INITIALIZATION_FAILED;
+			if (transferWaitResult != VK_SUCCESS)
 			{
 				scheduler.ClearGpuCompletionHold();
 				scheduler.Finalize();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
-					"qualify transfer: WaitGraphicsIdle failed after scheduler upload.");
+					"qualify transfer: transfer timeline wait failed after scheduler upload.");
 				return 1;
 			}
 			scheduler.ClearGpuCompletionHold();

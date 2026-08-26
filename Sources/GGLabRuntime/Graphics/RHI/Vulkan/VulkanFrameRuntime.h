@@ -340,7 +340,8 @@ namespace gglab
 		// buffer.
 		[[nodiscard]] VulkanSubmitPresentResult AbortFrame() noexcept;
 
-		// Safe-point swapchain recreation (requires no active frame).
+		// Safe-point swapchain recreation (requires no active frame). This
+		// convenience path waits for graphics idle before rebuilding.
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height,
 			bool vsync, std::string& outError) noexcept;
 		void SetVsync(bool vsync) noexcept { m_Vsync = vsync; }
@@ -408,6 +409,14 @@ namespace gglab
 		[[nodiscard]] VkSemaphore GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept;
 
 	private:
+		friend class VulkanContext;
+
+		// Production context two-phase recreation: release imported RHI
+		// backbuffers after the sole graphics wait and before rebuilding their
+		// native swapchain images.
+		[[nodiscard]] bool PrepareSwapChainRecreation(std::string& outError) noexcept;
+		[[nodiscard]] bool RecreateSwapChainAtGraphicsIdle(uint32_t width, uint32_t height,
+			bool vsync, std::string& outError) noexcept;
 		void RecordAbortFrame(VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept;
 		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
 			uint32_t frameSlotIndex, uint32_t backBufferIndex,

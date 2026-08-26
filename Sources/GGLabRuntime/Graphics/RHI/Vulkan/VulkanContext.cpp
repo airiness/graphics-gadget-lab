@@ -564,11 +564,17 @@ namespace gglab
 		{
 			return false;
 		}
-		WaitIdle();
+		auto& runtime = *m_Bootstrap->m_FrameRuntime;
+		std::string error;
+		if (!runtime.PrepareSwapChainRecreation(error))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+				"Vulkan swapchain recreation preparation failed: {}", error));
+			return false;
+		}
 		m_SwapChain->ReleaseBackBuffers();
 		m_Bootstrap->m_Device->RetireCompletedWork();
-		std::string error;
-		if (!m_Bootstrap->m_FrameRuntime->RecreateSwapChain(width, height, m_Vsync, error))
+		if (!runtime.RecreateSwapChainAtGraphicsIdle(width, height, m_Vsync, error))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"Vulkan swapchain recreation failed: {}", error));

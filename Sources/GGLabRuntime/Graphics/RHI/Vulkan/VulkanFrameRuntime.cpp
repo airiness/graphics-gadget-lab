@@ -733,16 +733,25 @@ namespace gglab
 	bool VulkanFrameRuntime::RecreateSwapChain(uint32_t width, uint32_t height,
 		bool vsync, std::string& outError) noexcept
 	{
+		if (width == 0 || height == 0)
+		{
+			outError = "Recreate requires a nonzero extent.";
+			return false;
+		}
+		if (!PrepareSwapChainRecreation(outError))
+		{
+			return false;
+		}
+		return RecreateSwapChainAtGraphicsIdle(width, height, vsync, outError);
+	}
+
+	bool VulkanFrameRuntime::PrepareSwapChainRecreation(std::string& outError) noexcept
+	{
 		if (m_Fatal || m_SwapChain == nullptr)
 		{
 			outError = m_Fatal
 				? "Cannot recreate the swapchain after a fatal runtime error."
 				: "No swapchain to recreate.";
-			return false;
-		}
-		if (width == 0 || height == 0)
-		{
-			outError = "Recreate requires a nonzero extent.";
 			return false;
 		}
 		// Swapchain recreation is a safe point: no frame may be active and no
@@ -758,6 +767,29 @@ namespace gglab
 			MarkFatal(idleResult, "VulkanFrameRuntime::WaitGraphicsIdle(swapchain recreate)");
 			outError = std::format("WaitGraphicsIdle before swapchain recreate failed with {}.",
 				ToString(idleResult));
+			return false;
+		}
+		return true;
+	}
+
+	bool VulkanFrameRuntime::RecreateSwapChainAtGraphicsIdle(uint32_t width, uint32_t height,
+		bool vsync, std::string& outError) noexcept
+	{
+		if (m_Fatal || m_SwapChain == nullptr)
+		{
+			outError = m_Fatal
+				? "Cannot recreate the swapchain after a fatal runtime error."
+				: "No swapchain to recreate.";
+			return false;
+		}
+		if (width == 0 || height == 0)
+		{
+			outError = "Recreate requires a nonzero extent.";
+			return false;
+		}
+		if (m_ActiveFrame.has_value())
+		{
+			outError = "Cannot recreate the swapchain while a frame is active.";
 			return false;
 		}
 		const bool recreated = m_SwapChain->Recreate(width, height, vsync, outError);
