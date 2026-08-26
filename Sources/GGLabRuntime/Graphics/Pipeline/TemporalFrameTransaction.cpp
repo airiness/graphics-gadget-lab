@@ -13,23 +13,48 @@ namespace gglab
 		m_Valid = false;
 	}
 
-	void TemporalFrameTransaction::Begin(TemporalViewHistory& history,
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
+	void TemporalObjectHistory::Invalidate() noexcept
+	{
+		m_Committed.clear();
+		m_LastCommittedFrame = 0;
+	}
+
+	const TemporalCommittedObjectState* TemporalObjectHistory::Find(
+		const RenderObjectHistoryKey& key) const noexcept
+	{
+		const auto iterator = m_Committed.find(key);
+		return iterator != m_Committed.end() ? &iterator->second : nullptr;
+	}
+
+	TemporalObjectHistoryDiagnostics TemporalObjectHistory::GetDiagnostics() const noexcept
+	{
+		return {
+			.m_EntryCount = static_cast<uint32_t>(m_Committed.size()),
+			.m_Capacity = MaxObjectCapacity,
+			.m_LastCommittedFrame = m_LastCommittedFrame,
+		};
+	}
+
+	void TemporalFrameTransaction::Begin(TemporalViewHistory& viewHistory,
+		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
+		uint32_t width, uint32_t height) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State != TemporalFrameTransactionState::Pending,
 			"A pending temporal frame transaction must be ended before "
 			"it can be reused.");
-		m_History = &history;
+		m_ViewHistory = &viewHistory;
+		m_ObjectHistory = &objectHistory;
 		m_Plan = plan;
 		m_PendingView = {};
 		m_State = TemporalFrameTransactionState::Pending;
 		m_Width = width;
 		m_Height = height;
-		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(history);
-		m_JitterIndex = m_HasCompatiblePreviousView ? history.m_NextJitterIndex : 0;
+		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(viewHistory);
+		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_JitterPixels =
 			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
 		m_HasPendingView = false;
+		m_PendingObjects.clear();
 		m_ParticipatedInResolve = false;
 	}
 
@@ -62,7 +87,7 @@ namespace gglab
 
 		if (m_HasCompatiblePreviousView)
 		{
-			const TemporalCommittedViewState& previous = m_History->m_Committed;
+			const TemporalCommittedViewState& previous = m_ViewHistory->m_Committed;
 			view.m_PreviousView = previous.m_View;
 			view.m_PreviousRasterViewProj = previous.m_RasterViewProj;
 			view.m_PreviousDepthReconstructionParams = previous.m_DepthReconstructionParams;
@@ -95,6 +120,47 @@ namespace gglab
 		m_HasPendingView = true;
 	}
 
+	Matrix TemporalFrameTransaction::ResolvePreviousObjectModel(
+		const RenderObjectHistoryKey& key, const Matrix& currentModel) const noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending,
+			"Object history lookup requires a pending temporal frame transaction.");
+		if (!m_Plan.m_Active || !key.IsValid() ||
+			key.m_SessionIdentity != m_Plan.m_SessionIdentity || !m_ObjectHistory)
+		{
+			return currentModel;
+		}
+		const TemporalCommittedObjectState* previous = m_ObjectHistory->Find(key);
+		return previous ? previous->m_Model : currentModel;
+	}
+
+	bool TemporalFrameTransaction::StageSubmittedObject(
+		const RenderObjectHistoryKey& key, const Matrix& currentModel) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending,
+			"Object history staging requires a pending temporal frame transaction.");
+		if (!m_Plan.m_Active)
+		{
+			return true;
+		}
+		if (!key.IsValid() || key.m_SessionIdentity != m_Plan.m_SessionIdentity)
+		{
+			return false;
+		}
+		const auto pending = m_PendingObjects.find(key);
+		if (pending != m_PendingObjects.end())
+		{
+			pending->second = currentModel;
+			return true;
+		}
+		if (m_PendingObjects.size() >= MaxObjectCapacity)
+		{
+			return false;
+		}
+		m_PendingObjects.emplace(key, currentModel);
+		return true;
+	}
+
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
@@ -108,10 +174,12 @@ namespace gglab
 		{
 			return;
 		}
-		GGLAB_ASSERT_NOT_NULL(m_History);
+		GGLAB_ASSERT_NOT_NULL(m_ViewHistory);
+		GGLAB_ASSERT_NOT_NULL(m_ObjectHistory);
 		if (!m_Plan.m_Active)
 		{
-			m_History->Invalidate();
+			m_ViewHistory->Invalidate();
+			m_ObjectHistory->Invalidate();
 			m_State = TemporalFrameTransactionState::Committed;
 			return;
 		}
@@ -121,9 +189,11 @@ namespace gglab
 			return;
 		}
 
-		m_History->m_Committed = m_PendingView;
-		m_History->m_NextJitterIndex = (m_JitterIndex + 1) % temporal::JitterSampleCount;
-		m_History->m_Valid = true;
+		m_ViewHistory->m_Committed = m_PendingView;
+		m_ViewHistory->m_NextJitterIndex =
+			(m_JitterIndex + 1) % temporal::JitterSampleCount;
+		m_ViewHistory->m_Valid = true;
+		CommitObjectHistory();
 		m_State = TemporalFrameTransactionState::Committed;
 	}
 
@@ -137,9 +207,10 @@ namespace gglab
 
 	void TemporalFrameTransaction::InvalidateAfterFatal() noexcept
 	{
-		if (m_State == TemporalFrameTransactionState::Pending && m_History)
+		if (m_State == TemporalFrameTransactionState::Pending && m_ViewHistory && m_ObjectHistory)
 		{
-			m_History->Invalidate();
+			m_ViewHistory->Invalidate();
+			m_ObjectHistory->Invalidate();
 			m_State = TemporalFrameTransactionState::Invalidated;
 		}
 	}
@@ -151,5 +222,34 @@ namespace gglab
 			   committed.m_ResetIdentity == m_Plan.m_ResetIdentity &&
 			   committed.m_SessionIdentity == m_Plan.m_SessionIdentity &&
 			   committed.m_Width == m_Width && committed.m_Height == m_Height;
+	}
+
+	void TemporalFrameTransaction::CommitObjectHistory() noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ObjectHistory);
+		const uint64_t committedFrame = ++m_ObjectHistory->m_LastCommittedFrame;
+		GGLAB_ASSERT_MSG(committedFrame != 0,
+			"Temporal object history committed-frame serial overflowed its valid range.");
+		for (const auto& [key, model] : m_PendingObjects)
+		{
+			m_ObjectHistory->m_Committed[key] = {
+				.m_Model = model,
+				.m_LastSeenCommittedFrame = committedFrame,
+			};
+		}
+		for (auto iterator = m_ObjectHistory->m_Committed.begin();
+			iterator != m_ObjectHistory->m_Committed.end();)
+		{
+			if (iterator->second.m_LastSeenCommittedFrame != committedFrame)
+			{
+				iterator = m_ObjectHistory->m_Committed.erase(iterator);
+			}
+			else
+			{
+				++iterator;
+			}
+		}
+		GGLAB_ASSERT_MSG(m_ObjectHistory->m_Committed.size() <= MaxObjectCapacity,
+			"Temporal object history exceeded the bounded GPU object capacity.");
 	}
 }

@@ -160,6 +160,7 @@ namespace gglab
 		m_LightSB.reset();
 		m_ViewSB.reset();
 		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
 
 		m_RHIContext.reset();
 
@@ -198,7 +199,8 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
 			"Temporal frame planning requires the active begun Renderer::Frame.");
-		frame.m_TemporalTransaction.Begin(m_TemporalViewHistory, plan, width, height);
+		frame.m_TemporalTransaction.Begin(
+			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height);
 		return frame.m_TemporalTransaction;
 	}
 
@@ -275,6 +277,7 @@ namespace gglab
 		{
 			frame.m_TemporalTransaction.InvalidateAfterFatal();
 			m_TemporalViewHistory.Invalidate();
+			m_TemporalObjectHistory.Invalidate();
 		}
 		if (submittedFence.IsValid())
 		{
@@ -449,6 +452,7 @@ namespace gglab
 	void Renderer::OnResume() noexcept
 	{
 		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
 		m_IsSuspended.store(false, std::memory_order_relaxed);
 	}
 

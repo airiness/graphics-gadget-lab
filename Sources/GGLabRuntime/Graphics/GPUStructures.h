@@ -68,6 +68,7 @@ namespace gglab
 	struct ObjectGPU
 	{
 		Matrix ModelMat;
+		Matrix PreviousModelMat;
 		Matrix NormalMat;
 		uint32_t MaterialIndex;
 		uint32_t ViewIndex;
@@ -135,6 +136,23 @@ namespace gglab
 		std::string_view m_Name;
 		size_t m_Offset = 0;
 	};
+	inline constexpr std::array ObjectGPUAbiMembers = {
+		GPUAbiMember{ "ModelMat", offsetof(ObjectGPU, ModelMat) },
+		GPUAbiMember{ "PreviousModelMat", offsetof(ObjectGPU, PreviousModelMat) },
+		GPUAbiMember{ "NormalMat", offsetof(ObjectGPU, NormalMat) },
+		GPUAbiMember{ "MaterialIndex", offsetof(ObjectGPU, MaterialIndex) },
+		GPUAbiMember{ "ViewIndex", offsetof(ObjectGPU, ViewIndex) },
+		GPUAbiMember{ "Padding", offsetof(ObjectGPU, Padding) },
+	};
+	inline constexpr size_t ObjectGPUAbiStride = sizeof(ObjectGPU);
+	static_assert(std::is_standard_layout_v<ObjectGPU>);
+	static_assert(offsetof(ObjectGPU, ModelMat) == 0);
+	static_assert(offsetof(ObjectGPU, PreviousModelMat) == 64);
+	static_assert(offsetof(ObjectGPU, NormalMat) == 128);
+	static_assert(offsetof(ObjectGPU, MaterialIndex) == 192);
+	static_assert(offsetof(ObjectGPU, ViewIndex) == 196);
+	static_assert(offsetof(ObjectGPU, Padding) == 200);
+	static_assert(sizeof(ObjectGPU) == 208);
 	inline constexpr std::array ViewGPUAbiMembers = {
 		GPUAbiMember{ "ViewMat", offsetof(ViewGPU, ViewMat) },
 		GPUAbiMember{ "ProjMat", offsetof(ViewGPU, ProjMat) },

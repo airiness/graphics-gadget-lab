@@ -290,6 +290,7 @@ namespace gglab
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
 		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
 		TemporalViewHistory m_TemporalViewHistory{};
+		TemporalObjectHistory m_TemporalObjectHistory{};
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 

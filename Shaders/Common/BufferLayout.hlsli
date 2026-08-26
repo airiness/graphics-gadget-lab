@@ -51,6 +51,7 @@ struct SceneData
 struct ObjectData
 {
 	matrix ModelMat;
+	matrix PreviousModelMat;
 	matrix NormalMat;
 	uint MaterialIndex;
 	uint ViewIndex;

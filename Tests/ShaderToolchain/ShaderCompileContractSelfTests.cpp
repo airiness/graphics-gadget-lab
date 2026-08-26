@@ -171,7 +171,7 @@ namespace gglab
 			return result.ec == std::errc{} ? std::optional<size_t>(value) : std::nullopt;
 		}
 
-		[[nodiscard]] std::optional<size_t> FindDxilViewMemberOffset(
+		[[nodiscard]] std::optional<size_t> FindDxilMemberOffset(
 			std::string_view disassembly, std::string_view memberName) noexcept
 		{
 			const std::string memberToken = std::format(" {};", memberName);
@@ -2271,7 +2271,7 @@ namespace gglab
 			for (const GPUAbiMember& member : ViewGPUAbiMembers)
 			{
 				dxilLayoutMatches = dxilLayoutMatches &&
-					FindDxilViewMemberOffset(dxilViewDataLayout, member.m_Name) == member.m_Offset;
+					FindDxilMemberOffset(dxilViewDataLayout, member.m_Name) == member.m_Offset;
 			}
 			dxilLayoutMatches = dxilLayoutMatches && !dxilViewDataLayout.empty() &&
 				ParseUnsignedAfter(dxilViewDataLayout, "Size:") == ViewGPUAbiStride;
@@ -2306,6 +2306,72 @@ namespace gglab
 			}
 			context.Check(spirVLayoutMatches,
 				"SPIR-V ViewData member offsets and ArrayStride match ViewGPU exactly");
+
+			desc.m_SourcePath = L"Tests/TemporalObjectLayoutContractCompile.hlsl";
+			desc.m_Target = {
+				.m_Model = ShaderModel::SM_6_7,
+				.m_HlslVersion = L"2021",
+				.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization,
+			};
+			const ShaderCompileResult objectLayoutDxil = compiler.Compile(desc);
+			std::string objectLayoutDisassembly;
+			bool dxilObjectLayoutMatches = objectLayoutDxil.IsSuccess() &&
+				DisassembleDxil(objectLayoutDxil.m_Artifact.m_Binary, objectLayoutDisassembly);
+			const size_t dxilObjectDataOffset =
+				objectLayoutDisassembly.find("struct hostlayout.struct.ObjectData");
+			const size_t dxilObjectDataEnd =
+				objectLayoutDisassembly.find("} $Element;", dxilObjectDataOffset);
+			const size_t dxilObjectDataLineEnd =
+				objectLayoutDisassembly.find('\n', dxilObjectDataEnd);
+			const std::string_view dxilObjectDataLayout =
+				dxilObjectDataOffset != std::string::npos &&
+				dxilObjectDataEnd != std::string::npos &&
+				dxilObjectDataLineEnd != std::string::npos
+				? std::string_view(objectLayoutDisassembly).substr(
+					dxilObjectDataOffset, dxilObjectDataLineEnd - dxilObjectDataOffset)
+				: std::string_view{};
+			for (const GPUAbiMember& member : ObjectGPUAbiMembers)
+			{
+				dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
+					FindDxilMemberOffset(dxilObjectDataLayout, member.m_Name) == member.m_Offset;
+			}
+			dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
+				!dxilObjectDataLayout.empty() &&
+				ParseUnsignedAfter(dxilObjectDataLayout, "Size:") == ObjectGPUAbiStride;
+			context.Check(dxilObjectLayoutMatches,
+				"DXIL ObjectData member offsets and structured-buffer stride match ObjectGPU exactly");
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult objectLayoutSpirV = compiler.Compile(desc);
+			SpirVDecorationReflection objectLayoutReflection;
+			const bool reflectedObjectLayout = objectLayoutSpirV.IsSuccess() &&
+				ReadSpirVDecorations(objectLayoutSpirV.m_Artifact.m_Binary,
+					objectLayoutReflection);
+			const SpirVStructLayoutReflection* spirVObjectData = reflectedObjectLayout
+				? objectLayoutReflection.FindStructLayout("ObjectData")
+				: nullptr;
+			bool spirVObjectLayoutMatches = spirVObjectData &&
+				spirVObjectData->m_Members.size() == ObjectGPUAbiMembers.size() &&
+				spirVObjectData->m_ArrayStride == ObjectGPUAbiStride;
+			if (spirVObjectLayoutMatches)
+			{
+				for (size_t index = 0; index < ObjectGPUAbiMembers.size(); ++index)
+				{
+					spirVObjectLayoutMatches =
+						spirVObjectData->m_Members[index].m_Name ==
+							ObjectGPUAbiMembers[index].m_Name &&
+						spirVObjectData->m_Members[index].m_Offset ==
+							ObjectGPUAbiMembers[index].m_Offset;
+					if (!spirVObjectLayoutMatches)
+					{
+						break;
+					}
+				}
+			}
+			context.Check(spirVObjectLayoutMatches,
+				"SPIR-V ObjectData member offsets and ArrayStride match ObjectGPU exactly");
 
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

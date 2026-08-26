@@ -4260,8 +4260,10 @@ namespace gglab
 				"Temporal jitter sequence matches the exact Halton(2,3) eight-sample table");
 
 			TemporalViewHistory temporalViewHistory{};
+			TemporalObjectHistory temporalObjectHistory{};
 			TemporalFrameTransaction abortedTransaction;
-			abortedTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			abortedTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
 			RenderView abortedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -4280,7 +4282,8 @@ namespace gglab
 			abortedTransaction.Abort();
 
 			TemporalFrameTransaction committedTransaction;
-			committedTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			committedTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
 			RenderView committedView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -4293,7 +4296,8 @@ namespace gglab
 			committedTransaction.CommitCompleted();
 
 			TemporalFrameTransaction noResolveTransaction;
-			noResolveTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			noResolveTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
 			RenderView noResolveView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -4308,7 +4312,7 @@ namespace gglab
 			++changedSessionPlan.m_SessionIdentity;
 			TemporalFrameTransaction changedSessionTransaction;
 			changedSessionTransaction.Begin(
-				temporalViewHistory, changedSessionPlan, 1920, 1080);
+				temporalViewHistory, temporalObjectHistory, changedSessionPlan, 1920, 1080);
 			RenderView changedSessionView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -4324,7 +4328,8 @@ namespace gglab
 				});
 
 			TemporalFrameTransaction fatalTransaction;
-			fatalTransaction.Begin(temporalViewHistory, activePlan, 1920, 1080);
+			fatalTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
 			RenderView fatalView = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = enabledSettings,
@@ -4353,6 +4358,182 @@ namespace gglab
 				NearlyEqual(rasterClip.m_Z, expectedRasterClip.m_Z) &&
 				NearlyEqual(rasterClip.m_W, expectedRasterClip.m_W),
 				"Temporal frame transaction advances only on committed resolve and invalidates on fatal");
+
+			TemporalViewHistory submittedViewHistory{};
+			TemporalObjectHistory submittedObjectHistory{};
+			const auto buildSubmittedHistoryView = [&]() noexcept
+			{
+				return viewBuilder.Build<RenderViewID::Main>({
+					.m_Camera = camera,
+					.m_RenderSettings = enabledSettings,
+					.m_TemporalFramePlan = activePlan,
+					.m_Width = 1920,
+					.m_Height = 1080,
+				});
+			};
+			const RenderObjectHistoryKey objectHistoryKey{
+				.m_EntityIdentity = 7,
+				.m_ModelId = ModelID{ 11 },
+				.m_ModelContentGeneration = 3,
+				.m_ModelMeshIndex = 2,
+				.m_MeshId = MeshID{ 13 },
+				.m_MeshContentGeneration = 5,
+				.m_SessionIdentity = activePlan.m_SessionIdentity,
+			};
+			const Matrix initialObjectModel =
+				math::CreateTranslation(Vector3(1.0f, 2.0f, 3.0f));
+			const Matrix movedObjectModel =
+				math::CreateTranslation(Vector3(4.0f, 5.0f, 6.0f));
+
+			TemporalFrameTransaction initialObjectTransaction;
+			initialObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView initialObjectView = buildSubmittedHistoryView();
+			initialObjectTransaction.PrepareDisplayView(initialObjectView);
+			const Matrix initialPreviousModel =
+				initialObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, initialObjectModel);
+			const bool initialObjectStaged =
+				initialObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, initialObjectModel);
+			initialObjectTransaction.MarkResolveParticipated();
+			initialObjectTransaction.CommitCompleted();
+			const TemporalCommittedObjectState* initialCommittedObject =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool initialObjectCommitted = initialCommittedObject &&
+				initialCommittedObject->m_Model.ToArray() == initialObjectModel.ToArray() &&
+				initialCommittedObject->m_LastSeenCommittedFrame == 1;
+
+			TemporalFrameTransaction abortedObjectTransaction;
+			abortedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView abortedObjectView = buildSubmittedHistoryView();
+			abortedObjectTransaction.PrepareDisplayView(abortedObjectView);
+			const Matrix abortedPreviousModel =
+				abortedObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, movedObjectModel);
+			const bool abortedObjectStaged =
+				abortedObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, movedObjectModel);
+			abortedObjectTransaction.CommitCompleted();
+			const TemporalCommittedObjectState* committedAfterAbort =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool objectAbortPreserved = committedAfterAbort &&
+				committedAfterAbort->m_Model.ToArray() == initialObjectModel.ToArray() &&
+				committedAfterAbort->m_LastSeenCommittedFrame == 1;
+
+			TemporalFrameTransaction movedObjectTransaction;
+			movedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView movedObjectView = buildSubmittedHistoryView();
+			movedObjectTransaction.PrepareDisplayView(movedObjectView);
+			const Matrix movedPreviousModel =
+				movedObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, movedObjectModel);
+			const bool movedObjectStaged =
+				movedObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, movedObjectModel);
+			movedObjectTransaction.MarkResolveParticipated();
+			movedObjectTransaction.CommitCompleted();
+
+			TemporalFrameTransaction abortedDisappearanceTransaction;
+			abortedDisappearanceTransaction.Begin(submittedViewHistory,
+				submittedObjectHistory, activePlan, 1920, 1080);
+			RenderView abortedDisappearanceView = buildSubmittedHistoryView();
+			abortedDisappearanceTransaction.PrepareDisplayView(abortedDisappearanceView);
+			abortedDisappearanceTransaction.Abort();
+			const TemporalCommittedObjectState* committedAfterAbortedDisappearance =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool abortedDisappearancePreserved =
+				committedAfterAbortedDisappearance &&
+				committedAfterAbortedDisappearance->m_Model.ToArray() ==
+					movedObjectModel.ToArray() &&
+				committedAfterAbortedDisappearance->m_LastSeenCommittedFrame == 2;
+
+			RenderObjectHistoryKey replacementKey = objectHistoryKey;
+			replacementKey.m_ModelId = ModelID{ 12 };
+			replacementKey.m_ModelContentGeneration = 1;
+			RenderObjectHistoryKey republishedGeometryKey = objectHistoryKey;
+			++republishedGeometryKey.m_MeshContentGeneration;
+			const Matrix replacementModel =
+				math::CreateTranslation(Vector3(8.0f, 9.0f, 10.0f));
+			RenderObjectHistoryKey reusedEntityKey = objectHistoryKey;
+			++reusedEntityKey.m_EntityIdentity;
+			TemporalFrameTransaction replacementTransaction;
+			replacementTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView replacementView = buildSubmittedHistoryView();
+			replacementTransaction.PrepareDisplayView(replacementView);
+			const Matrix replacementPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					replacementKey, replacementModel);
+			const Matrix reusedEntityPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					reusedEntityKey, replacementModel);
+			const Matrix republishedGeometryPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					republishedGeometryKey, replacementModel);
+			const bool replacementStaged = replacementTransaction.StageSubmittedObject(
+				replacementKey, replacementModel);
+			replacementTransaction.MarkResolveParticipated();
+			replacementTransaction.CommitCompleted();
+			const TemporalObjectHistoryDiagnostics replacementDiagnostics =
+				submittedObjectHistory.GetDiagnostics();
+			const TemporalCommittedObjectState* committedReplacement =
+				submittedObjectHistory.Find(replacementKey);
+			const bool replacementRetiredOldIdentity =
+				!submittedObjectHistory.Find(objectHistoryKey) && committedReplacement &&
+				committedReplacement->m_Model.ToArray() == replacementModel.ToArray();
+
+			ResolvedTemporalFramePlan replacementSessionPlan = activePlan;
+			++replacementSessionPlan.m_SessionIdentity;
+			RenderObjectHistoryKey replacementSessionKey = replacementKey;
+			replacementSessionKey.m_SessionIdentity = replacementSessionPlan.m_SessionIdentity;
+			TemporalFrameTransaction replacementSessionTransaction;
+			replacementSessionTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				replacementSessionPlan, 1920, 1080);
+			RenderView replacementSessionView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = replacementSessionPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			replacementSessionTransaction.PrepareDisplayView(replacementSessionView);
+			const Matrix replacementSessionPrevious =
+				replacementSessionTransaction.ResolvePreviousObjectModel(
+					replacementSessionKey, initialObjectModel);
+			replacementSessionTransaction.Abort();
+
+			TemporalFrameTransaction fatalObjectTransaction;
+			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView fatalObjectView = buildSubmittedHistoryView();
+			fatalObjectTransaction.PrepareDisplayView(fatalObjectView);
+			fatalObjectTransaction.InvalidateAfterFatal();
+			const TemporalObjectHistoryDiagnostics fatalObjectDiagnostics =
+				submittedObjectHistory.GetDiagnostics();
+			context.Check(objectHistoryKey.IsValid() && initialObjectStaged &&
+				abortedObjectStaged && movedObjectStaged && replacementStaged &&
+				abortedObjectTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				initialPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				initialObjectCommitted &&
+				abortedPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				objectAbortPreserved &&
+				movedPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				abortedDisappearancePreserved &&
+				replacementPreviousModel.ToArray() == replacementModel.ToArray() &&
+				reusedEntityPreviousModel.ToArray() == replacementModel.ToArray() &&
+				republishedGeometryPreviousModel.ToArray() == replacementModel.ToArray() &&
+				replacementRetiredOldIdentity &&
+				replacementDiagnostics.m_EntryCount == 1 &&
+				replacementDiagnostics.m_Capacity == MaxObjectCapacity &&
+				replacementDiagnostics.m_LastCommittedFrame == 3 &&
+				replacementSessionPrevious.ToArray() == initialObjectModel.ToArray() &&
+				fatalObjectDiagnostics.m_EntryCount == 0 &&
+				fatalObjectDiagnostics.m_LastCommittedFrame == 0,
+				"Submitted object history commits atomically, rejects stale identities, and "
+				"retires only on committed disappearance");
 
 			RenderFrameBuilder::BuildResult frameResult{};
 			frameResult.m_TemporalFramePlan = activePlan;

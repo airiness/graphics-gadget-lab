@@ -859,6 +859,9 @@
     <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>

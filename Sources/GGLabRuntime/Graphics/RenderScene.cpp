@@ -7,6 +7,7 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/TransferManager.h"
@@ -166,6 +167,28 @@ namespace gglab
 
 					ObjectGPU objectGpu{};
 					objectGpu.ModelMat = world;
+					RenderObjectHistoryKey objectHistoryKey{};
+					if (info.m_TemporalFrameTransaction)
+					{
+						objectHistoryKey = {
+							.m_EntityIdentity =
+								static_cast<uint32_t>(entt::to_integral(entity)),
+							.m_ModelId = modelComp.m_ModelId,
+							.m_ModelContentGeneration = model->m_ContentGeneration,
+							.m_ModelMeshIndex = modelMeshIndex,
+							.m_MeshId = modelMesh.m_MeshId,
+							.m_MeshContentGeneration = mesh->m_ContentGeneration,
+							.m_SessionIdentity =
+								info.m_TemporalFrameTransaction->GetSessionIdentity(),
+						};
+						objectGpu.PreviousModelMat =
+							info.m_TemporalFrameTransaction->ResolvePreviousObjectModel(
+								objectHistoryKey, world);
+					}
+					else
+					{
+						objectGpu.PreviousModelMat = world;
+					}
 					objectGpu.NormalMat = normalMat;
 					objectGpu.MaterialIndex = iter->second.m_Index;
 
@@ -175,6 +198,13 @@ namespace gglab
 					if (objectOffset == ObjectTable::InvalidSlot)
 					{
 						continue;
+					}
+					if (info.m_TemporalFrameTransaction)
+					{
+						GGLAB_ASSERT_MSG(
+							info.m_TemporalFrameTransaction->StageSubmittedObject(
+								objectHistoryKey, world),
+							"Submitted object history must fit the bounded GPU object capacity.");
 					}
 
 					Vector3 worldCenter = transformComp.m_Position;
