@@ -1,4 +1,5 @@
 #include "ShaderCompilerCliContractSelfTests.h"
+#include "ShaderCompilerProcessContract.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
@@ -11,8 +12,11 @@
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
+#include "Targets/ShaderTargetWireNames.h"
 
 #include <windows.h>
+
+#include <nlohmann/json.hpp>
 
 #include <array>
 #include <cstdint>
@@ -106,8 +110,16 @@ namespace gglab
 			bool m_Set = false;
 		};
 
+		[[nodiscard]] std::filesystem::path ShaderCompilerExecutablePath() noexcept
+		{
+			return win32::GetExecutableDirectory() /
+				(utils::ToWideString(ShaderCompilerToolIdentity) + L".exe");
+		}
+
 		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments,
-			bool forceCompilerUnavailable = false) noexcept
+			bool forceCompilerUnavailable = false,
+			bool forceDescribeInternalError = false,
+			const std::wstring& workingDirectory = std::wstring()) noexcept
 		{
 			CliRunResult result{};
 			std::optional<ScopedEnvironmentVariable> compilerUnavailableEnvironment;
@@ -116,6 +128,16 @@ namespace gglab
 				compilerUnavailableEnvironment.emplace(
 					L"GGLAB_SHADERC_TEST_FORCE_COMPILER_UNAVAILABLE", L"1");
 				if (!compilerUnavailableEnvironment->IsSet())
+				{
+					return result;
+				}
+			}
+			std::optional<ScopedEnvironmentVariable> describeInternalErrorEnvironment;
+			if (forceDescribeInternalError)
+			{
+				describeInternalErrorEnvironment.emplace(
+					L"GGLAB_SHADERC_TEST_FORCE_DESCRIBE_INTERNAL_ERROR", L"1");
+				if (!describeInternalErrorEnvironment->IsSet())
 				{
 					return result;
 				}
@@ -138,7 +160,7 @@ namespace gglab
 
 			std::wstring commandLine;
 			commandLine += L"\"";
-			commandLine += (win32::GetExecutableDirectory() / L"gglab-shaderc.exe").wstring();
+			commandLine += ShaderCompilerExecutablePath().wstring();
 			commandLine += L"\"";
 			for (const std::wstring& argument : arguments)
 			{
@@ -154,11 +176,16 @@ namespace gglab
 				.hStdError = errWrite,
 			};
 			PROCESS_INFORMATION processInfo{};
+			const std::wstring exePath = ShaderCompilerExecutablePath().wstring();
+			const std::wstring exeDirectory = win32::GetExecutableDirectory().wstring();
+			const std::wstring& currentDirectory =
+				workingDirectory.empty() ? exeDirectory : workingDirectory;
 			const BOOL created = CreateProcessW(
-				(win32::GetExecutableDirectory() / L"gglab-shaderc.exe").c_str(),
+				exePath.c_str(),
 				commandLine.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW,
-				nullptr, win32::GetExecutableDirectory().c_str(), &startupInfo, &processInfo);
+				nullptr, currentDirectory.c_str(), &startupInfo, &processInfo);
 			compilerUnavailableEnvironment.reset();
+			describeInternalErrorEnvironment.reset();
 			CloseHandle(outWrite);
 			CloseHandle(errWrite);
 			if (!created)
@@ -218,11 +245,112 @@ namespace gglab
 				document.find('\r') == std::string_view::npos;
 		}
 
+		// Minimal semver (MAJOR.MINOR.PATCH, non-negative integers) shape check
+		// for the describe toolVersion wire fact.
+		[[nodiscard]] bool IsSemver(std::string_view text) noexcept
+		{
+			if (text.empty() || text.front() < '0' || text.front() > '9')
+			{
+				return false;
+			}
+			std::size_t dots = 0;
+			bool inDigitRun = false;
+			for (const char character : text)
+			{
+				if (character >= '0' && character <= '9')
+				{
+					inDigitRun = true;
+					continue;
+				}
+				if (character == '.' && inDigitRun)
+				{
+					++dots;
+					inDigitRun = false;
+					continue;
+				}
+				return false;
+			}
+			return inDigitRun && dots == 2;
+		}
+
+		// Parse the describe wire output as JSON. Returns std::nullopt when the
+		// text is not a valid JSON object, so a caller can distinguish an
+		// unparsable document from a well-formed document with the wrong fields.
+		[[nodiscard]] std::optional<nlohmann::json> ParseWireDocument(
+			std::string_view text) noexcept
+		{
+			try
+			{
+				const nlohmann::json document =
+					nlohmann::json::parse(text, nullptr, /*allow_exceptions=*/false);
+				if (document.is_discarded() || !document.is_object())
+				{
+					return std::nullopt;
+				}
+				return document;
+			}
+			catch (...)
+			{
+				return std::nullopt;
+			}
+		}
+
+		// Safe typed reads for the describe wire: a missing key or a type
+		// mismatch is a failed read, never an exception. A malformed document
+		// must fail the check that reads it, not terminate the test process.
+		[[nodiscard]] bool ReadWireString(std::optional<nlohmann::json> doc,
+			std::string_view key, std::string& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_string())
+			{
+				return false;
+			}
+			out = doc->at(key).get<std::string>();
+			return true;
+		}
+
+		[[nodiscard]] bool ReadWireInteger(std::optional<nlohmann::json> doc,
+			std::string_view key, std::int64_t& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) ||
+				!doc->at(key).is_number_integer())
+			{
+				return false;
+			}
+			out = doc->at(key).get<std::int64_t>();
+			return true;
+		}
+
+		[[nodiscard]] bool ReadWireBoolean(std::optional<nlohmann::json> doc,
+			std::string_view key, bool& out) noexcept
+		{
+			if (!doc.has_value() || !doc->contains(key) || !doc->at(key).is_boolean())
+			{
+				return false;
+			}
+			out = doc->at(key).get<bool>();
+			return true;
+		}
+
+		[[nodiscard]] bool WireDiagnosticsCount(std::optional<nlohmann::json> doc,
+			std::size_t& count) noexcept
+		{
+			if (!doc.has_value() || !doc->contains("diagnostics") ||
+				!doc->at("diagnostics").is_array())
+			{
+				return false;
+			}
+			count = doc->at("diagnostics").size();
+			return true;
+		}
+
 		[[nodiscard]] bool HasJsonEnvelope(const CliRunResult& result,
-			std::string_view status, int exitCode, bool success) noexcept
+			std::string_view status, int exitCode, bool success,
+			std::string_view command = "compile") noexcept
 		{
 			return result.m_ExitCode == exitCode && IsSingleJsonDocument(result) &&
-				result.m_StdOut.find("\"command\":\"compile\"") != std::string::npos &&
+				result.m_StdOut.find(std::format("\"command\":\"{}\"", command)) !=
+					std::string::npos &&
 				result.m_StdOut.find(success ? "\"success\":true" : "\"success\":false") !=
 					std::string::npos &&
 				result.m_StdOut.find(std::format("\"status\":\"{}\"", status)) !=
@@ -230,6 +358,65 @@ namespace gglab
 				result.m_StdOut.find(std::format("\"exitCode\":{}", exitCode)) !=
 					std::string::npos &&
 				result.m_StdOut.find("\"diagnostics\":[") != std::string::npos;
+		}
+
+		[[nodiscard]] bool SurfaceDescriptorToolIdentitiesMatch(
+			const std::filesystem::path& sourceRoot,
+			std::string_view expectedIdentity) noexcept
+		{
+			bool foundDescriptor = false;
+			const std::filesystem::path surfaceProfilesRoot =
+				sourceRoot / L"Profiles" / L"GGLab.Surface";
+			std::error_code errorCode;
+			std::filesystem::recursive_directory_iterator iterator(
+				surfaceProfilesRoot,
+				std::filesystem::directory_options::skip_permission_denied, errorCode);
+			const std::filesystem::recursive_directory_iterator end;
+			if (errorCode)
+			{
+				return false;
+			}
+
+			for (; iterator != end; iterator.increment(errorCode))
+			{
+				if (errorCode)
+				{
+					return false;
+				}
+				if (!iterator->is_regular_file(errorCode) || errorCode ||
+					iterator->path().filename() != L"descriptor.json")
+				{
+					if (errorCode)
+					{
+						return false;
+					}
+					continue;
+				}
+
+				std::ifstream input(iterator->path(), std::ios::binary);
+				const nlohmann::json descriptor =
+					nlohmann::json::parse(input, nullptr, /*allow_exceptions=*/false);
+				if (!input || descriptor.is_discarded() || !descriptor.is_object() ||
+					!descriptor.contains("processContract") ||
+					!descriptor.at("processContract").is_object())
+				{
+					return false;
+				}
+				const nlohmann::json& processContract = descriptor.at("processContract");
+				if (!processContract.contains("tool") ||
+					!processContract.at("tool").is_object())
+				{
+					return false;
+				}
+				const nlohmann::json& tool = processContract.at("tool");
+				if (!tool.contains("identity") || !tool.at("identity").is_string() ||
+					tool.at("identity").get<std::string>() != expectedIdentity)
+				{
+					return false;
+				}
+				foundDescriptor = true;
+			}
+			return foundDescriptor;
 		}
 
 		[[nodiscard]] std::string ExtractJsonField(
@@ -280,6 +467,292 @@ namespace gglab
 				}
 			}
 			return decoded;
+		}
+
+		void RunDescribeHandshakeTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			// Machine describe handshake contract — wire verification. These
+			// protocol self-tests go only through describe (per the consumer
+			// discipline): targets / --version stay state-behavior checks and are
+			// not consumer-facing contract verdicts.
+
+			// Byte stability, a parsed JSON object document, and exact wire fields.
+			{
+				const CliRunResult first = RunCli({ L"describe" });
+				const CliRunResult second = RunCli({ L"describe" });
+				const auto firstDoc = ParseWireDocument(first.m_StdOut);
+				const auto secondDoc = ParseWireDocument(second.m_StdOut);
+				context.Check(
+					first.m_ExitCode == 0 && second.m_ExitCode == 0 &&
+						first.m_StdOut == second.m_StdOut &&
+						first.m_StdErr.empty() && second.m_StdErr.empty() &&
+						firstDoc.has_value() && secondDoc.has_value() &&
+						*firstDoc == *secondDoc,
+					"describe emits a byte-stable parsed JSON object document and no stderr");
+				std::string command;
+				std::string status;
+				bool success = false;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
+				std::size_t diagnosticsCount = 0;
+				context.Check(
+					ReadWireString(firstDoc, "command", command) &&
+						command == "describe" &&
+						ReadWireBoolean(firstDoc, "success", success) && success &&
+						ReadWireString(firstDoc, "status", status) && status == "ok" &&
+						ReadWireInteger(firstDoc, "exitCode", exitCode) && exitCode == 0 &&
+						ReadWireInteger(firstDoc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						WireDiagnosticsCount(firstDoc, diagnosticsCount) &&
+							diagnosticsCount == 0,
+					"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
+			}
+
+			// Identity chains: the wire tool identity equals every published
+			// Surface descriptor requirement, while producer identity equals the
+			// in-process canonical DXC identity (never the "unknown" sentinel).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
+				std::string wireToolIdentity;
+				std::string wireProducerIdentity;
+				const bool toolChain = ReadWireString(doc, "toolIdentity", wireToolIdentity) &&
+					wireToolIdentity == std::string(ShaderCompilerToolIdentity) &&
+					SurfaceDescriptorToolIdentitiesMatch(
+						sourceRoot, wireToolIdentity);
+				const bool producerChain = ReadWireString(
+						doc, "producerIdentity", wireProducerIdentity) &&
+					wireProducerIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
+					!wireProducerIdentity.empty() && wireProducerIdentity != "unknown";
+				context.Check(
+					toolChain && producerChain,
+					"describe tool identity matches every Surface descriptor and producer identity matches the canonical DXC identity");
+			}
+
+			// toolVersion matches the current tool-version constant (not a
+			// hard-coded value) and is semver-shaped; the concrete
+			// version-comparison rule is the consumer's discipline, not this
+			// wire's.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::string wireVersion;
+				const bool versionRead = ReadWireString(doc, "toolVersion", wireVersion);
+				context.Check(
+					versionRead &&
+						wireVersion == utils::ToString(ShaderCompilerToolVersion) &&
+						IsSemver(wireVersion),
+					"describe.toolVersion matches the tool-version constant and is semver-shaped");
+			}
+
+			// processContractVersion carries the declared process contract
+			// value, compared to the constant (never a hard-coded wire).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::int64_t contractVersion = -1;
+				const bool versionRead = ReadWireInteger(
+					doc, "processContractVersion", contractVersion);
+				context.Check(
+					versionRead &&
+						contractVersion == gglab::ShaderProcessContractVersion,
+					"describe.processContractVersion equals the declared process contract value");
+			}
+
+			// Producer kind parity: the in-process descriptor kind maps to
+			// exactly its wire name (dxc), never a fallback.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
+				std::string wireKind;
+				const bool kindRead = ReadWireString(doc, "producerKind", wireKind);
+				context.Check(
+					inProcess.m_Kind == ShaderCompilerKind::Dxc &&
+						kindRead && wireKind == "dxc",
+					"describe producer kind parity with the in-process descriptor kind (dxc)");
+			}
+
+			// supportedTargets is exactly the supported set as declared by the
+			// single-table authority (accept + report both derived from kEntries).
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				const std::vector<std::string> wireNames = ShaderTargetWire::Names();
+				ShaderTargetProfile parsedProfile = ShaderTargetProfile::GGLabDX12;
+				const bool parseDx12 = ShaderTargetWire::Parse("gglab-dx12", parsedProfile) &&
+					parsedProfile == ShaderTargetProfile::GGLabDX12;
+				const bool parseVulkan = ShaderTargetWire::Parse("gglab-vulkan13", parsedProfile) &&
+					parsedProfile == ShaderTargetProfile::GGLabVulkan13;
+				context.Check(
+					wireNames.size() == 2 &&
+						parseDx12 && parseVulkan,
+					"target wire-name single-table authority enumerates and accepts the supported set");
+				const bool targetsMatches = doc
+					? doc->contains("supportedTargets") &&
+						doc->at("supportedTargets").is_array() &&
+						doc->at("supportedTargets") == nlohmann::json(wireNames)
+					: false;
+				context.Check(
+					targetsMatches,
+					"describe.supportedTargets exactly equals the single-table authority (no extras)");
+			}
+
+			// No caller build context appears in the describe result, and the
+			// result is byte-identical even when run from a foreign working
+			// directory (a real cwd change, not a field-absence assumption).
+			{
+				const std::filesystem::path decoyRoot = tempRoot / L"DescribeCwd";
+				std::error_code errorCode;
+				std::filesystem::create_directories(decoyRoot, errorCode);
+				// A decoy that would surface in the wire if the working
+				// directory leaked into the describe document.
+				bool decoyWritten = false;
+				{
+					std::ofstream output(decoyRoot / L"source-root.hlsl", std::ios::binary);
+					output << "// decoy";
+					decoyWritten = output.good();
+				}
+				const CliRunResult reference = RunCli({ L"describe" });
+				const CliRunResult fromDecoy = RunCli(
+					{ L"describe" }, false, false, decoyRoot.wstring());
+				const auto doc = ParseWireDocument(fromDecoy.m_StdOut);
+				const char* const callerContextFields[] = {
+					"sourceRoot", "source-root", "sourcePath", "cacheRoot", "cache-root",
+					"artifactRoot", "artifact-root", "binaryPath", "cacheRecordPath", "cwd",
+				};
+				bool absent = doc.has_value();
+				for (const char* const field : callerContextFields)
+				{
+					absent = absent && !doc->contains(field);
+				}
+				context.Check(
+					!errorCode && decoyWritten &&
+						reference.m_ExitCode == 0 && fromDecoy.m_ExitCode == 0 &&
+						reference.m_StdErr.empty() && fromDecoy.m_StdErr.empty() &&
+						reference.m_StdOut == fromDecoy.m_StdOut &&
+						absent,
+					"describe carries no caller build context and is byte-identical from a foreign cwd");
+			}
+
+			// stdout purity: the channel framing holds (one single-line JSON
+			// object on stdout, empty stderr) and the document parses.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				context.Check(
+					IsSingleJsonDocument(result) && doc.has_value(),
+					"describe success keeps one-JSON-on-stdout channel framing and parses");
+			}
+
+			// usage errors are structured (three variants), no business payload.
+			{
+				const CliRunResult positional = RunCli({ L"describe", L"extra" });
+				const CliRunResult resultFormat = RunCli({ L"describe", L"--result-format", L"json" });
+				const CliRunResult bogusFlag = RunCli({ L"describe", L"--bogus" });
+				// (The original substring-based lambda was replaced by the
+				// parse-based CheckDescribeUsageError below.)
+				
+				// Each usage-error response must be a fully parsed describe document
+				// with the failure wire shape and no business-payload fields.
+				auto CheckDescribeUsageError = [&](
+					const CliRunResult& run, const char* label) noexcept
+				{
+					const std::string checkName =
+						std::string("describe usage-error structured (") + label + ")";
+					const auto doc = ParseWireDocument(run.m_StdOut);
+					std::string command;
+					std::string status;
+					bool success = true;
+					std::int64_t exitCode = -1;
+					std::int64_t contractVersion = -1;
+					std::size_t diagnosticsCount = 0;
+					const bool structuredFailure =
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+							ReadWireBoolean(doc, "success", success) && !success &&
+							ReadWireString(doc, "status", status) &&
+								status == "usage-error" &&
+							ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 2 &&
+							ReadWireInteger(
+								doc, "processContractVersion", contractVersion) &&
+								contractVersion == gglab::ShaderProcessContractVersion &&
+							WireDiagnosticsCount(doc, diagnosticsCount) &&
+								diagnosticsCount > 0;
+					const bool noBusinessLeak = doc.has_value() &&
+						!doc->contains("toolIdentity") &&
+						!doc->contains("toolVersion") &&
+						!doc->contains("producerKind") &&
+						!doc->contains("producerIdentity") &&
+						!doc->contains("supportedTargets");
+					context.Check(
+						run.m_ExitCode == 2 &&
+							run.m_StdErr.empty() &&
+							structuredFailure && noBusinessLeak,
+						checkName.c_str());
+				};
+				CheckDescribeUsageError(positional, "extra positional argument");
+				CheckDescribeUsageError(resultFormat, "--result-format json");
+				CheckDescribeUsageError(bogusFlag, "unknown flag");
+			}
+
+			// Producer unavailable via the existing forced-unavailable seam.
+			{
+				const CliRunResult result =
+					RunCli({ L"describe" }, /*forceCompilerUnavailable*/ true);
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::string command;
+				std::string status;
+				bool success = true;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
+				context.Check(
+					result.m_ExitCode == 4 &&
+						result.m_StdErr.empty() &&
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+						ReadWireBoolean(doc, "success", success) && !success &&
+						ReadWireString(doc, "status", status) &&
+							status == "compiler-unavailable" &&
+						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 4 &&
+						ReadWireInteger(
+							doc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						doc.has_value() && !doc->contains("producerIdentity"),
+					"describe reports compiler-unavailable (exit 4) when the producer is unavailable");
+			}
+
+			// Internal error floor via the describe internal-error seam.
+			{
+				const CliRunResult result = RunCli(
+					{ L"describe" }, /*forceCompilerUnavailable*/ false,
+					/*forceDescribeInternalError*/ true);
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::string command;
+				std::string status;
+				bool success = true;
+				std::int64_t exitCode = -1;
+				std::int64_t contractVersion = -1;
+				std::size_t diagnosticsCount = 0;
+				context.Check(
+					result.m_ExitCode == 7 &&
+						result.m_StdErr.empty() &&
+						ReadWireString(doc, "command", command) &&
+							command == "describe" &&
+						ReadWireBoolean(doc, "success", success) && !success &&
+						ReadWireString(doc, "status", status) &&
+							status == "internal-error" &&
+						ReadWireInteger(doc, "exitCode", exitCode) && exitCode == 7 &&
+						ReadWireInteger(
+							doc, "processContractVersion", contractVersion) &&
+							contractVersion == gglab::ShaderProcessContractVersion &&
+						WireDiagnosticsCount(doc, diagnosticsCount) &&
+							diagnosticsCount > 0,
+					"describe reports internal-error (exit 7) on a forced handled failure");
+			}
 		}
 
 		[[nodiscard]] bool WriteTextFile(
@@ -1043,6 +1516,25 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
+			const CliRunResult missingRequiredOption = RunCli({
+				L"build-runtime", L"--result-format", L"json",
+			});
+			const CliRunResult unknownOption = RunCli({
+				L"build-runtime", L"--bogus", L"--result-format", L"json",
+			});
+			const CliRunResult duplicateResultFormat = RunCli({
+				L"build-runtime", L"--result-format", L"json",
+				L"--result-format", L"json",
+			});
+			context.Check(
+				HasJsonEnvelope(missingRequiredOption, "usage-error", 2, false,
+					"build-runtime") &&
+				HasJsonEnvelope(unknownOption, "usage-error", 2, false,
+					"build-runtime") &&
+				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false,
+					"build-runtime"),
+				"build-runtime JSON usage errors truthfully identify their command");
+
 			const std::filesystem::path cacheRoot = tempRoot / L"RuntimeBuildCache";
 			const std::filesystem::path artifactRoot = tempRoot / L"RuntimeBuildArtifacts";
 			const std::vector<std::wstring> arguments{
@@ -1116,11 +1608,12 @@ namespace gglab
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept
 	{
 		const std::filesystem::path executableDirectory = win32::GetExecutableDirectory();
-		const std::filesystem::path cliPath = executableDirectory / L"gglab-shaderc.exe";
+		const std::filesystem::path cliPath = ShaderCompilerExecutablePath();
 		std::error_code errorCode;
 		if (!std::filesystem::exists(cliPath, errorCode))
 		{
-			context.Check(false, "gglab-shaderc.exe must be built next to the test executable");
+			context.Check(false,
+				"Shader compiler TargetName must match the canonical tool identity");
 			return;
 		}
 
@@ -1139,5 +1632,9 @@ namespace gglab
 		RunJsonProcessContractTests(context, sourceRoot, tempRoot);
 		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
 		RunRuntimeBuildContractTests(context, sourceRoot, tempRoot);
+		// Machine describe handshake contract self-tests. The remaining
+		// structural no-regression invariants are asserted by the
+		// compile/build-runtime matrix and legacy-grammar checks above.
+		RunDescribeHandshakeTests(context, sourceRoot, tempRoot);
 	}
 }

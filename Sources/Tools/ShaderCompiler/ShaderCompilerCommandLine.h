@@ -2,12 +2,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
 {
-	inline constexpr const wchar_t* ShaderCompilerToolVersion = L"1.0.0";
-
 	enum class ShaderCompilerCommand : uint8_t
 	{
 		None,
@@ -16,7 +15,13 @@ namespace gglab
 		Targets,
 		Version,
 		Help,
+		Describe,
 	};
+
+	// Canonical machine vocabulary for commands that own JSON envelopes.
+	// Human-only commands deliberately have no wire name.
+	[[nodiscard]] std::string_view ShaderCompilerCommandWireName(
+		ShaderCompilerCommand command) noexcept;
 
 	struct ShaderBuildRuntimeCommandOptions
 	{

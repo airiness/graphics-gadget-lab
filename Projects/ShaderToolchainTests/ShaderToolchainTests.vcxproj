@@ -36,16 +36,20 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" />
     <Import Project="..\..\PropertySheets\AssimpImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
@@ -55,7 +59,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler\Wire;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -71,7 +75,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler\Wire;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -126,5 +130,6 @@
     <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
     <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
+    <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
   </ImportGroup>
 </Project>

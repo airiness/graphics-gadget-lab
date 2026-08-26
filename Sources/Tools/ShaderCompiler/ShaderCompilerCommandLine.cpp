@@ -63,22 +63,54 @@ namespace gglab
 			L"      --target <gglab-dx12|gglab-vulkan13> --cache-root <path>\n"
 			L"      --artifact-root <path> [--result-format <text|json>]\n"
 			L"  gglab-shaderc targets\n"
+			L"  gglab-shaderc describe\n"
 			L"  gglab-shaderc --version\n"
 			L"  gglab-shaderc --help";
+	}
+
+	std::string_view ShaderCompilerCommandWireName(
+		ShaderCompilerCommand command) noexcept
+	{
+		switch (command)
+		{
+		case ShaderCompilerCommand::Compile:
+			return "compile";
+		case ShaderCompilerCommand::BuildRuntime:
+			return "build-runtime";
+		case ShaderCompilerCommand::Describe:
+			return "describe";
+		case ShaderCompilerCommand::None:
+		case ShaderCompilerCommand::Targets:
+		case ShaderCompilerCommand::Version:
+		case ShaderCompilerCommand::Help:
+			return {};
+		}
+		return {};
 	}
 
 	ShaderCompilerCommandLine ParseShaderCompilerCommandLine(
 		int argumentCount, wchar_t* arguments[]) noexcept
 	{
 		ShaderCompilerCommandLine parsed{};
-		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
-		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
-		if (resultFormat.m_OccurrenceCount > 1)
+
+		// describe is a zero-argument, JSON-implicit machine self-description
+		// command (machine describe handshake contract). It is identified
+		// before the general --result-format pre-scan, which only applies to
+		// compile / build-runtime: describe accepts no options, and any extra
+		// argv is a structured usage error. Forcing m_JsonRequested on that
+		// error makes the failure document emit through the machine channel.
+		if (argumentCount >= 2 &&
+			std::wstring_view(arguments[1]) == L"describe")
 		{
-			parsed.m_Command = ShaderCompilerCommand::Compile;
-			parsed.m_Error = L"--result-format specified multiple times";
+			parsed.m_Command = ShaderCompilerCommand::Describe;
+			if (argumentCount > 2)
+			{
+				parsed.m_JsonRequested = true;
+				parsed.m_Error = L"describe accepts no arguments";
+			}
 			return parsed;
 		}
+
 		if (argumentCount <= 1)
 		{
 			parsed.m_Command = ShaderCompilerCommand::Help;
@@ -86,6 +118,16 @@ namespace gglab
 		}
 
 		const std::wstring_view first = arguments[1];
+		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
+		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
+		if (resultFormat.m_OccurrenceCount > 1)
+		{
+			parsed.m_Command = first == L"build-runtime"
+				? ShaderCompilerCommand::BuildRuntime
+				: ShaderCompilerCommand::Compile;
+			parsed.m_Error = L"--result-format specified multiple times";
+			return parsed;
+		}
 		if (first == L"--version")
 		{
 			parsed.m_Command = ShaderCompilerCommand::Version;

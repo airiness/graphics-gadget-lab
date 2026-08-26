@@ -55,6 +55,9 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\DX12ShaderTarget.h">
       <Filter>Targets</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\ShaderTargetWireNames.h">
+      <Filter>Targets</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h">
       <Filter>Targets</Filter>
     </ClInclude>
