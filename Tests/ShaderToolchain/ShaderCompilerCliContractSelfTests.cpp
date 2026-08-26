@@ -361,10 +361,10 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool SurfaceDescriptorToolIdentitiesMatch(
-			const std::filesystem::path& sourceRoot, std::string_view expectedIdentity,
-			std::size_t& outDescriptorCount) noexcept
+			const std::filesystem::path& sourceRoot,
+			std::string_view expectedIdentity) noexcept
 		{
-			outDescriptorCount = 0;
+			bool foundDescriptor = false;
 			const std::filesystem::path surfaceProfilesRoot =
 				sourceRoot / L"Profiles" / L"GGLab.Surface";
 			std::error_code errorCode;
@@ -414,9 +414,9 @@ namespace gglab
 				{
 					return false;
 				}
-				++outDescriptorCount;
+				foundDescriptor = true;
 			}
-			return outDescriptorCount > 0;
+			return foundDescriptor;
 		}
 
 		[[nodiscard]] std::string ExtractJsonField(
@@ -519,11 +519,10 @@ namespace gglab
 				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
 				std::string wireToolIdentity;
 				std::string wireProducerIdentity;
-				std::size_t descriptorCount = 0;
 				const bool toolChain = ReadWireString(doc, "toolIdentity", wireToolIdentity) &&
 					wireToolIdentity == std::string(ShaderCompilerToolIdentity) &&
 					SurfaceDescriptorToolIdentitiesMatch(
-						sourceRoot, wireToolIdentity, descriptorCount) && descriptorCount == 2;
+						sourceRoot, wireToolIdentity);
 				const bool producerChain = ReadWireString(
 						doc, "producerIdentity", wireProducerIdentity) &&
 					wireProducerIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
