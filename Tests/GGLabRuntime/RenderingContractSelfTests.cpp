@@ -11,6 +11,7 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -18,6 +19,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RHI/RHICommandContext.h"
@@ -187,9 +189,13 @@ namespace gglab
 				return {};
 			}
 			RHITextureSupportResult QueryTextureViewSupport(
-				const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
+				const RHITextureDesc& textureDesc,
+				const RHITextureViewDesc& viewDesc) const noexcept override
 			{
-				return {};
+				m_LastTextureViewQueryTextureDesc = textureDesc;
+				m_LastTextureViewQueryDesc = viewDesc;
+				++m_TextureViewQueryCount;
+				return { .m_Supported = m_TextureViewsSupported };
 			}
 			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
 				const RHIResourceDebugIdentityDesc&) noexcept override
@@ -271,6 +277,11 @@ namespace gglab
 				return {};
 			}
 			void RetireCompletedWork() noexcept override {}
+
+			bool m_TextureViewsSupported = false;
+			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
+			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
+			mutable uint32_t m_TextureViewQueryCount = 0;
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
@@ -4032,6 +4043,151 @@ namespace gglab
 			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
 			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
 
+			const Vector2 staticMotion = ComputeTemporalMotionUV(
+				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 cameraMotion = ComputeTemporalMotionUV(
+				Vector4(-0.2f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 objectMotion = ComputeTemporalMotionUV(
+				Vector4(0.4f, 0.2f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const TemporalMotionReadbackSample objectMotionReadback =
+				ResolveTemporalMotionReadbackSample(objectMotion, 100, 50);
+			context.Check(NearlyEqual(staticMotion, Vector2::Zero) &&
+				NearlyEqual(cameraMotion, Vector2(-0.1f, 0.0f)) &&
+				NearlyEqual(objectMotion, Vector2(0.2f, -0.1f)) &&
+				objectMotionReadback.m_Valid &&
+				NearlyEqual(objectMotionReadback.m_MotionPixels, Vector2(20.0f, -5.0f)) &&
+				NearlyEqual(objectMotionReadback.m_MagnitudePixels, std::sqrt(425.0f)) &&
+				!ResolveTemporalMotionReadbackSample(objectMotion, 0, 50).m_Valid,
+				"Temporal motion uses current-minus-previous top-left UV delta and deterministic pixel magnitude");
+
+			RecordingDevice motionCapabilityDevice;
+			motionCapabilityDevice.m_TextureViewsSupported = true;
+			const TemporalMotionFormatSupport motionSupport =
+				QueryTemporalMotionFormatSupport(motionCapabilityDevice);
+			const RHITextureDesc motionDesc = MakeTemporalMotionTextureDesc(1280, 720);
+			context.Check(motionSupport.IsSupported() &&
+				motionCapabilityDevice.m_TextureViewQueryCount == 2 &&
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
+					TemporalMotionFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::RenderTarget) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::Sampled) && motionDesc.m_Usage == RHITextureUsage::None &&
+				motionDesc.m_Extent.m_Width == 1280 &&
+				motionDesc.m_Extent.m_Height == 720 && motionDesc.m_ClearValue &&
+				motionDesc.m_ClearValue->m_Color[0] == 0.0f &&
+				motionDesc.m_ClearValue->m_Color[1] == 0.0f,
+				"Temporal motion capability requires the combined R16G16Float render-target and SRV contract");
+
+			GraphicsPhysicalPipelineKey depthOnlyMotionCoverage{};
+			depthOnlyMotionCoverage.m_BindingLayout = RHIBindingLayoutHandle{ 1, 1 };
+			depthOnlyMotionCoverage.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			depthOnlyMotionCoverage.m_VSId = ShaderID{ 3 };
+			depthOnlyMotionCoverage.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			depthOnlyMotionCoverage.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			depthOnlyMotionCoverage.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+			depthOnlyMotionCoverage.m_DepthPreset = DepthPreset::ReversedZWrite;
+			depthOnlyMotionCoverage.m_BlendPreset = BlendPreset::ColorWriteDisable;
+			GraphicsPhysicalPipelineKey velocityMotionCoverage = depthOnlyMotionCoverage;
+			velocityMotionCoverage.m_PSId = ShaderID{ 4 };
+			velocityMotionCoverage.m_Formats.m_RenderTargetCount = 1;
+			velocityMotionCoverage.m_Formats.m_RenderTargetFormats[0] = TemporalMotionFormat;
+			velocityMotionCoverage.m_BlendPreset = BlendPreset::Default;
+			const uint64_t opaqueMotionVariant =
+				RenderQueueBuilder::EncodeVariantBits(RenderBucket::Opaque, false);
+			const uint64_t alphaMotionVariant =
+				RenderQueueBuilder::EncodeVariantBits(RenderBucket::AlphaTest, false);
+			context.Check(
+				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, opaqueMotionVariant) ==
+					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+						velocityMotionCoverage, opaqueMotionVariant) &&
+				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, alphaMotionVariant) ==
+					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+						velocityMotionCoverage, alphaMotionVariant),
+				"Velocity MRT preserves opaque and alpha-test depth coverage signatures");
+
+			struct TemporalMotionFixturePassData
+			{
+				RGTextureId m_Motion{};
+			};
+			RenderGraph motionGraph({
+				.m_Device = &motionCapabilityDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+			});
+			motionGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.TemporalMotionSetup",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					resources.m_MotionVectors = builder.CreateTexture(
+						"Temporal.MotionVectors", MakeTemporalMotionTextureDesc(1280, 720));
+					resources.m_MotionSrvDesc =
+						MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					resources.m_Width = 1280;
+					resources.m_Height = 720;
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"View.ClearMotionVectors",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.WriteInPlace(resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"Geometry.DepthPrepass.Velocity",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.ReadWriteInPlace(
+						resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.TemporalMotionDebugTap",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					data.m_Motion = builder.Read(
+						resources.m_MotionVectors, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			const bool motionGraphCompiled = motionGraph.Compile();
+			RGSnapshot motionSnapshot;
+			if (motionGraphCompiled)
+			{
+				BuildRenderGraphSnapshot(motionGraph, motionSnapshot);
+			}
+			const auto motionResource = std::ranges::find(
+				motionSnapshot.m_Resources, "Temporal.MotionVectors", &RGSnapshotResourceInfo::m_Name);
+			context.Check(motionGraphCompiled && motionSnapshot.m_Passes.size() == 4 &&
+				motionSnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
+				motionSnapshot.m_Passes[1].m_ExecutionOrder <
+					motionSnapshot.m_Passes[2].m_ExecutionOrder &&
+				motionSnapshot.m_Passes[2].m_ExecutionOrder <
+					motionSnapshot.m_Passes[3].m_ExecutionOrder &&
+				motionResource != motionSnapshot.m_Resources.end() &&
+				motionResource->m_TextureFormat == TemporalMotionFormat &&
+				motionResource->m_TextureExtent.m_Width == 1280 &&
+				motionResource->m_TextureExtent.m_Height == 720 &&
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
+					RHITextureUsage::RenderTarget) &&
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
+					RHITextureUsage::Sampled),
+				"Active temporal geometry clears motion before velocity coverage and exposes an explicit sampled debug tap");
+
 			context.Check(IsTemporalColorCompatible(
 				TemporalColorAbi::LinearRec709SceneReferredV1,
 				PostProcessColorState::SceneLinearRec709, 1.0f) &&
@@ -4181,15 +4337,14 @@ namespace gglab
 			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
 			const ResolvedTemporalFramePlan integratedExtensionPlan =
 				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
-			context.Check(!forwardPlan.m_Active &&
+			context.Check(forwardPlan.m_Active && forwardPlan.m_DepthVelocityPathAvailable &&
 				forwardPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::PostTAA &&
-				forwardPlan.m_DisableReason ==
-					TemporalAADisableReason::DepthVelocityPathUnavailable &&
+				forwardPlan.m_DisableReason == TemporalAADisableReason::None &&
 				!integratedExtensionPlan.m_Active &&
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
-				"ForwardPBR is the sole frame-plan resolver and rejects unavailable production paths");
+				"ForwardPBR exposes its velocity path and rejects unsupported integrated extensions");
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),

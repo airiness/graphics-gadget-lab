@@ -425,6 +425,7 @@
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli" />
     <None Include="..\..\Shaders\Common\Temporal.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalMotion.hlsli" />
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />

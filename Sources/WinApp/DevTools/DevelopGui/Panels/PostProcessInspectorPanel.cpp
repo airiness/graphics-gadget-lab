@@ -46,6 +46,10 @@ namespace gglab
 				return "GTAO / Final AO";
 			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
 				return "GTAO / AO-only Lighting Contribution";
+			case PostProcessDebugTap::TemporalMotionDirection:
+				return "Temporal / Motion Direction";
+			case PostProcessDebugTap::TemporalMotionMagnitude:
+				return "Temporal / Motion Magnitude";
 			default:
 				return "Unknown";
 			}
@@ -71,6 +75,8 @@ namespace gglab
 					PostProcessDebugTap::GTAODenoiseY,
 					PostProcessDebugTap::GTAOFinalAO,
 					PostProcessDebugTap::GTAOAOOnlyLightingContribution,
+					PostProcessDebugTap::TemporalMotionDirection,
+					PostProcessDebugTap::TemporalMotionMagnitude,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -205,6 +211,9 @@ namespace gglab
 			selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
 			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
 			selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+		const bool temporalMotionSelection =
+			selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
+			selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
@@ -215,6 +224,11 @@ namespace gglab
 		else if (gtaoSelection)
 		{
 			ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
+		}
+		else if (temporalMotionSelection)
+		{
+			ImGui::TextDisabled(
+				"Source: active transient R16G16Float motion vectors in UV delta units.");
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{

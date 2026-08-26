@@ -3,8 +3,10 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RHI/RHICommandContext.h"
 
+#include <array>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -26,10 +28,13 @@ namespace gglab
 		{
 			RGTextureId m_Depth{};
 			RGTextureViewId m_Dsv{};
+			RGTextureId m_Motion{};
+			RGTextureViewId m_MotionRtv{};
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
 			float m_ClearDepth = 0.0f;
 			bool m_DrawCoverage = false;
+			bool m_OutputMotion = false;
 		};
 	}
 
@@ -63,6 +68,19 @@ namespace gglab
 				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
 				data.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
 				data.m_DrawCoverage = framePlan.UsesDepthPrepassEqual();
+				data.m_OutputMotion = contextPtr->GetTemporalFramePlan().m_Active;
+				if (data.m_OutputMotion)
+				{
+					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(
+						TemporalGeometryResourcesName);
+					GGLAB_ASSERT_MSG(temporalGeometry.IsValid(),
+						"Active temporal depth coverage requires a valid motion-vector resource.");
+					builder.ReadWriteInPlace(
+						temporalGeometry.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = temporalGeometry.m_MotionVectors;
+					data.m_MotionRtv = builder.CreateView<RHITextureViewType::RenderTarget>(
+						data.m_Motion);
+				}
 
 				GGLAB_ASSERT_MSG(
 					framePlan.UsesDepthPrepassEqual() ||
@@ -86,6 +104,14 @@ namespace gglab
 					"Depth prepass raster and resource depth conventions must match.");
 				GGLAB_ASSERT_MSG(IsDepthCoverageTargetExtentCompatible(rasterDomain, depthDesc),
 					"Depth prepass target extent must match its coverage raster domain.");
+				if (data.m_OutputMotion)
+				{
+					const auto& motionDesc = builder.GetTextureDesc(data.m_Motion);
+					GGLAB_ASSERT_MSG(motionDesc.m_Format == TemporalMotionFormat &&
+						AreDepthCoverageTargetExtentsCompatible(
+							rasterDomain, motionDesc, depthDesc),
+						"Depth and motion targets must share the active coverage raster domain.");
+				}
 			},
 			[this, contextPtr, servicesPtr, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
@@ -94,7 +120,18 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
+				std::array<RHIRenderingAttachment, 1> colorAttachments{};
+				std::span<const RHIRenderingAttachment> activeColorAttachments;
+				if (data.m_OutputMotion)
+				{
+					colorAttachments[0] = {
+						.m_View = executeContext.GetViewHandle(data.m_MotionRtv),
+						.m_LoadOp = RHIContentLoadOp::Load,
+					};
+					activeColorAttachments = colorAttachments;
+				}
 				graphicsContext->BeginRendering({
+					.m_ColorAttachments = activeColorAttachments,
 					.m_DepthAttachment = RHIRenderingAttachment{
 						.m_View = dsv,
 						.m_LoadOp = RHIContentLoadOp::DontCare,
@@ -138,7 +175,8 @@ namespace gglab
 				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(renderer);
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*renderer, renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
+					*renderer, renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
+					data.m_OutputMotion));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
@@ -171,7 +209,8 @@ namespace gglab
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId);
+				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId,
+					data.m_OutputMotion);
 			});
 	}
 
@@ -192,6 +231,8 @@ namespace gglab
 			return;
 		}
 		m_AlphaTestPixelShader = shaderSet.m_AlphaTestPixelShader;
+		m_VelocityOpaquePixelShader = shaderSet.m_VelocityOpaquePixelShader;
+		m_VelocityAlphaTestPixelShader = shaderSet.m_VelocityAlphaTestPixelShader;
 
 		m_BasePhysicalKey.m_BindingLayout = renderer->GetCommonBindingLayout();
 		m_BasePhysicalKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
@@ -211,19 +252,20 @@ namespace gglab
 
 	void RenderPassDepthPrepass::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services,
-		RenderViewID viewId) noexcept
+		RenderViewID viewId, bool outputMotion) noexcept
 	{
 		const auto& renderQueue = context.GetRenderQueue(viewId);
 		const auto& ranges = renderQueue.m_BucketDrawRanges;
 		DrawRange(
-			graphicsContext, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)]);
+			graphicsContext, services, renderQueue, ranges[utils::ToIndex(RenderBucket::Opaque)],
+			outputMotion);
 		DrawRange(graphicsContext, services, renderQueue,
-			ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
+			ranges[utils::ToIndex(RenderBucket::AlphaTest)], outputMotion);
 	}
 
 	void RenderPassDepthPrepass::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services, const RenderQueue& renderQueue,
-		const DrawItemsRange& range) noexcept
+		const DrawItemsRange& range, bool outputMotion) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -246,7 +288,8 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				graphicsContext->SetPipeline(
-					GetOrCreatePSOForVariant(*services.m_Renderer, drawItem.m_VariantBits));
+					GetOrCreatePSOForVariant(
+						*services.m_Renderer, drawItem.m_VariantBits, outputMotion));
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 
@@ -272,14 +315,15 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDepthPrepass::GetOrCreatePSOForVariant(
-		const Renderer& renderer, uint64_t variantBits) noexcept
+		const Renderer& renderer, uint64_t variantBits, bool outputMotion) noexcept
 	{
-		const GraphicsPipelineDescription description = DescribePipelineVariant(variantBits);
+		const GraphicsPipelineDescription description =
+			DescribePipelineVariant(variantBits, outputMotion);
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto* pipelineCache = renderer.GetPipelineCache();
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(
-			m_PipelineSlots[slotIndex], description.m_PhysicalKey, GetInfo());
+			m_PipelineSlots[outputMotion ? 1 : 0][slotIndex], description.m_PhysicalKey, GetInfo());
 	}
 
 	std::optional<DepthCoveragePipelineSignature> RenderPassDepthPrepass::
@@ -316,7 +360,7 @@ namespace gglab
 	}
 
 	GraphicsPipelineDescription RenderPassDepthPrepass::DescribePipelineVariant(
-		uint64_t variantBits) const noexcept
+		uint64_t variantBits, bool outputMotion) const noexcept
 	{
 		GGLAB_ASSERT(m_IsInitialized);
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -327,7 +371,16 @@ namespace gglab
 		physicalKey.m_RasterizerPreset = RenderQueueBuilder::DecodeVariantDoubleSided(variantBits)
 			? RasterizerPreset::TwoSided
 			: RasterizerPreset::Default;
-		if (bucket == RenderBucket::AlphaTest)
+		if (outputMotion)
+		{
+			physicalKey.m_Formats.m_RenderTargetCount = 1;
+			physicalKey.m_Formats.m_RenderTargetFormats[0] = TemporalMotionFormat;
+			physicalKey.m_BlendPreset = BlendPreset::Default;
+			physicalKey.m_PSId = bucket == RenderBucket::AlphaTest
+				? m_VelocityAlphaTestPixelShader
+				: m_VelocityOpaquePixelShader;
+		}
+		else if (bucket == RenderBucket::AlphaTest)
 		{
 			physicalKey.m_PSId = m_AlphaTestPixelShader;
 		}

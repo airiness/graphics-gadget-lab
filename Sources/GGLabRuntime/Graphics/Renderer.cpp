@@ -5,9 +5,12 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/TransferManager.h"
 
 #include <atomic>
@@ -124,6 +127,26 @@ namespace gglab
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
 
+		const TemporalMotionFormatSupport motionSupport =
+			QueryTemporalMotionFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_MotionRenderTarget =
+			motionSupport.m_RenderTarget.IsSupported();
+		m_TemporalAACapabilityStatus.m_MotionShaderResource =
+			motionSupport.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_BindingLayoutAvailable =
+			m_CommonBindingLayout.IsValid();
+		if (createInfo.m_ShaderManager)
+		{
+			const ShaderID coverageVertex =
+				createInfo.m_ShaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
+			const ShaderID velocityOpaque = createInfo.m_ShaderManager->LoadProgram(
+				shader_programs::DepthPrepassVelocityOpaquePixel);
+			const ShaderID velocityAlphaTest = createInfo.m_ShaderManager->LoadProgram(
+				shader_programs::DepthPrepassVelocityAlphaTestPixel);
+			m_TemporalAACapabilityStatus.m_VelocityProgramsAvailable =
+				coverageVertex.IsValid() && velocityOpaque.IsValid() && velocityAlphaTest.IsValid();
+		}
+
 		m_IsInitialized = true;
 		return true;
 	}
@@ -161,6 +184,7 @@ namespace gglab
 		m_ViewSB.reset();
 		m_TemporalViewHistory.Invalidate();
 		m_TemporalObjectHistory.Invalidate();
+		m_TemporalAACapabilityStatus = {};
 
 		m_RHIContext.reset();
 

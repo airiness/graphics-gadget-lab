@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
+#include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
@@ -9,12 +10,14 @@
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <span>
 
@@ -27,6 +30,11 @@ namespace gglab
 		};
 		struct ShadowSetupPassData
 		{
+		};
+		struct ClearMotionVectorsPassData
+		{
+			RGTextureId m_Motion{};
+			RGTextureViewId m_Rtv{};
 		};
 
 		struct PrepareBackBufferPassData
@@ -43,7 +51,7 @@ namespace gglab
 	ResolvedTemporalFramePlan RenderPipelineForwardPBR::ResolveTemporalFramePlan(
 		TemporalFramePlanResolveInfo info) const noexcept
 	{
-		info.m_DepthVelocityPathAvailable = false;
+		info.m_DepthVelocityPathAvailable = info.m_Capabilities.m_VelocityProgramsAvailable;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;
@@ -61,8 +69,9 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
-		GGLAB_ASSERT_MSG(!context.GetTemporalFramePlan().m_Active,
-			"ForwardPBR has no temporal resolve path for an active frame plan.");
+		GGLAB_ASSERT_MSG(!context.GetTemporalFramePlan().m_Active ||
+			context.GetTemporalFramePlan().m_InternalContractMode,
+			"Only internal contract mode may exercise motion before the production temporal resolve exists.");
 
 		auto* renderer = services.m_Renderer;
 		auto* swapChain = renderer->GetSwapChain();
@@ -125,6 +134,11 @@ namespace gglab
 			rg.GetBlackboard().Create<RGForwardPlusResources>(ForwardPlusResourcesName);
 		auto& gtaoResources =
 			rg.GetBlackboard().Create<RGGTAOResources>(GTAOResourcesName);
+		if (context.GetTemporalFramePlan().m_Active)
+		{
+			rg.GetBlackboard().Create<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+		}
 		gtaoResources.m_Status = gtaoStatus;
 		gtaoResources.m_Capabilities = m_GTAOPass.GetCapabilityStatus();
 		gtaoResources.m_ResolvedSettings = gtaoSettings;
@@ -159,7 +173,8 @@ namespace gglab
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
-			depthCoverageFramePlan](RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
+			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active](
+				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
 				builder.SideEffect();
 
@@ -222,7 +237,51 @@ namespace gglab
 				sceneDepth.m_SrvDesc =
 					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
 				sceneDepth.m_Convention = displayDepthConvention;
+
+				if (temporalActive)
+				{
+					auto& temporalGeometry = blackboard.Get<RGTemporalGeometryResources>(
+						TemporalGeometryResourcesName);
+					const RHITextureDesc motionDesc = MakeTemporalMotionTextureDesc(width, height);
+					temporalGeometry.m_MotionVectors =
+						builder.CreateTexture("Temporal.MotionVectors", motionDesc);
+					temporalGeometry.m_MotionSrvDesc =
+						MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					temporalGeometry.m_Width = width;
+					temporalGeometry.m_Height = height;
+				}
 			});
+
+		if (context.GetTemporalFramePlan().m_Active)
+		{
+			rg.AddPass<ClearMotionVectorsPassData>(
+				"View.ClearMotionVectors",
+				[](RenderGraph::RGBuilder& builder, ClearMotionVectorsPassData& data)
+				{
+					builder.SideEffect();
+					auto& temporalGeometry = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					GGLAB_ASSERT_MSG(temporalGeometry.IsValid(),
+						"Motion clear requires active temporal geometry resources.");
+					builder.WriteInPlace(
+						temporalGeometry.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = temporalGeometry.m_MotionVectors;
+					data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(
+						data.m_Motion);
+				},
+				[](RGExecuteContext& executeContext, ClearMotionVectorsPassData& data)
+				{
+					auto* commandContext = executeContext.GetGraphicsCommandContext();
+					GGLAB_ASSERT_NOT_NULL(commandContext);
+					const RHIRenderingAttachment motionAttachment{
+						.m_View = executeContext.GetViewHandle(data.m_Rtv),
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					commandContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&motionAttachment, 1) });
+					commandContext->ClearColorAttachment(0, TemporalMotionClearColor);
+				});
+		}
 
 		// Shadow Setup
 		rg.AddPass<ShadowSetupPassData>("ShadowMap.Setup",
@@ -422,6 +481,10 @@ namespace gglab
 					shader_programs::ForwardPBRForwardPlusValidationGTAOPixel);
 			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
 				shaderManager->LoadProgram(shader_programs::DepthPrepassAlphaTestPixel);
+			m_ForwardPBRShaderSet.m_VelocityOpaquePixelShader =
+				shaderManager->LoadProgram(shader_programs::DepthPrepassVelocityOpaquePixel);
+			m_ForwardPBRShaderSet.m_VelocityAlphaTestPixelShader =
+				shaderManager->LoadProgram(shader_programs::DepthPrepassVelocityAlphaTestPixel);
 		}
 
 		if (!m_ForwardPBRShaderSet.IsValid())

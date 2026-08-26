@@ -10,4 +10,6 @@ struct ForwardCoverageVSOutput
 	float4 TangentWS : TEXCOORD4;
 
 	nointerpolation uint MaterialIndex : TEXCOORD5;
+	float4 CurrentPositionCS : TEXCOORD6;
+	float4 PreviousPositionCS : TEXCOORD7;
 };

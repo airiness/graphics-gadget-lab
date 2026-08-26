@@ -81,6 +81,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusGTAODefines },
 			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationGTAODefines },
 			ShaderProgramBuildRecord{ &DepthPrepassAlphaTestPixel, L"Passes/PassDepthPrepass.hlsl", L"PSAlphaTest" },
+			ShaderProgramBuildRecord{ &DepthPrepassVelocityOpaquePixel, L"Passes/PassDepthPrepass.hlsl", L"PSVelocityOpaque" },
+			ShaderProgramBuildRecord{ &DepthPrepassVelocityAlphaTestPixel, L"Passes/PassDepthPrepass.hlsl", L"PSVelocityAlphaTest" },
 			ShaderProgramBuildRecord{ &ForwardPlusCullCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &ForwardPlusCullDiagnosticsCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain", ForwardPlusDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &ForwardPlusValidationTilesCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceTiles", ValidationReduceTilesDefines },

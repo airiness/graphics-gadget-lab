@@ -17,6 +17,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "DevelopmentShaderPaths.h"
+#include "Targets/DX12ShaderTarget.h"
 #include "Targets/ShaderTargetWireNames.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Wire/ShaderWireNames.h"
@@ -2376,16 +2377,37 @@ namespace gglab
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileResult coverageVertexArtifact =
-				compiler.Compile(desc);
+			desc.m_Defines.clear();
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Vertex);
+			const ShaderCompileResult coverageVertexDxil = compiler.Compile(desc);
 			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSAlphaTest";
-			const ShaderCompileResult depthAlphaArtifact =
-				compiler.Compile(desc);
-			context.Check(
-				coverageVertexArtifact.IsSuccess() && depthAlphaArtifact.IsSuccess(),
-				"Production DXC compiles the shared coverage vertex shader and alpha-tested prepass");
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult depthAlphaDxil = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityOpaque";
+			const ShaderCompileResult velocityOpaqueDxil = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityAlphaTest";
+			const ShaderCompileResult velocityAlphaDxil = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex);
+			const ShaderCompileResult coverageVertexSpirV = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			desc.m_Entry = L"PSAlphaTest";
+			const ShaderCompileResult depthAlphaSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityOpaque";
+			const ShaderCompileResult velocityOpaqueSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityAlphaTest";
+			const ShaderCompileResult velocityAlphaSpirV = compiler.Compile(desc);
+			context.Check(coverageVertexDxil.IsSuccess() && depthAlphaDxil.IsSuccess() &&
+				velocityOpaqueDxil.IsSuccess() && velocityAlphaDxil.IsSuccess() &&
+				coverageVertexSpirV.IsSuccess() && depthAlphaSpirV.IsSuccess() &&
+				velocityOpaqueSpirV.IsSuccess() && velocityAlphaSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile one shared coverage vertex program and matching opaque/alpha velocity pixels");
 
 			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
