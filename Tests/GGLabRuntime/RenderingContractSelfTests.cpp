@@ -4505,6 +4505,24 @@ namespace gglab
 					replacementSessionKey, initialObjectModel);
 			replacementSessionTransaction.Abort();
 
+			ResolvedTemporalFramePlan resetObjectPlan = activePlan;
+			++resetObjectPlan.m_ResetIdentity;
+			TemporalFrameTransaction resetObjectTransaction;
+			resetObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				resetObjectPlan, 1920, 1080);
+			RenderView resetObjectView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = resetObjectPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			resetObjectTransaction.PrepareDisplayView(resetObjectView);
+			const Matrix resetPreviousModel =
+				resetObjectTransaction.ResolvePreviousObjectModel(
+					replacementKey, initialObjectModel);
+			resetObjectTransaction.Abort();
+
 			TemporalFrameTransaction fatalObjectTransaction;
 			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
 				activePlan, 1920, 1080);
@@ -4530,6 +4548,7 @@ namespace gglab
 				replacementDiagnostics.m_Capacity == MaxObjectCapacity &&
 				replacementDiagnostics.m_LastCommittedFrame == 3 &&
 				replacementSessionPrevious.ToArray() == initialObjectModel.ToArray() &&
+				resetPreviousModel.ToArray() == initialObjectModel.ToArray() &&
 				fatalObjectDiagnostics.m_EntryCount == 0 &&
 				fatalObjectDiagnostics.m_LastCommittedFrame == 0,
 				"Submitted object history commits atomically, rejects stale identities, and "

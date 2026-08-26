@@ -125,7 +125,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending,
 			"Object history lookup requires a pending temporal frame transaction.");
-		if (!m_Plan.m_Active || !key.IsValid() ||
+		if (!m_HasCompatiblePreviousView || !key.IsValid() ||
 			key.m_SessionIdentity != m_Plan.m_SessionIdentity || !m_ObjectHistory)
 		{
 			return currentModel;
