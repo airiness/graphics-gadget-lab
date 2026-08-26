@@ -194,6 +194,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp" />
@@ -449,6 +450,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ShadowSettings.h" />

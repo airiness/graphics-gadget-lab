@@ -89,6 +89,7 @@ namespace gglab
 				});
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
+		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -171,6 +172,7 @@ namespace gglab
 		m_RenderResRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
+		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
 
@@ -209,6 +211,7 @@ namespace gglab
 		m_ViewSB->Tick();
 
 		m_TransientResourcePool->Tick();
+		m_PersistentTexturePool->Tick();
 		m_AssetUploadScheduler->Tick();
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 

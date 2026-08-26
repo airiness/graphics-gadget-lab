@@ -8,6 +8,7 @@
 #include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
 #include "Graphics/RenderParameters.h"
@@ -166,6 +167,10 @@ namespace gglab
 		{
 			return m_TransientResourcePool.get();
 		}
+		PersistentTexturePool* GetPersistentTexturePool() const noexcept
+		{
+			return m_PersistentTexturePool.get();
+		}
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
@@ -281,6 +286,7 @@ namespace gglab
 		std::unique_ptr<RHIContext> m_RHIContext;
 		std::unique_ptr<AssetUploadScheduler> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
+		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;

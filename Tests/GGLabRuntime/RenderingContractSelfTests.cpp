@@ -21,6 +21,7 @@
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderQueue.h"
+#include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
@@ -35,6 +36,7 @@
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/TransferBatch.h"
 
+#include <array>
 #include <filesystem>
 #include <type_traits>
 
@@ -200,6 +202,7 @@ namespace gglab
 			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
 				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				++m_CreateTextureCount;
 				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
 			RHIBufferHandle CreateBuffer(
@@ -218,7 +221,10 @@ namespace gglab
 				return {};
 			}
 			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
-			void DestroyTexture(RHITextureHandle) noexcept override {}
+			void DestroyTexture(RHITextureHandle) noexcept override
+			{
+				++m_DestroyTextureCount;
+			}
 			void DestroyBuffer(RHIBufferHandle) noexcept override {}
 			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
@@ -257,11 +263,17 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
-			bool IsFencePointCompleted(const RHIFencePoint&) const noexcept override
+			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				return true;
+				return !m_UseControlledFenceCompletion ||
+					(fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue);
 			}
-			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
+			void RecordTextureUse(
+				RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
+			{
+				++m_RecordTextureUseCount;
+				m_LastRecordedFencePoint = fencePoint;
+			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
 				RHITextureViewHandle) const noexcept override
@@ -282,6 +294,12 @@ namespace gglab
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
+			bool m_UseControlledFenceCompletion = false;
+			uint64_t m_CompletedFenceValue = 0;
+			uint32_t m_CreateTextureCount = 0;
+			uint32_t m_DestroyTextureCount = 0;
+			uint32_t m_RecordTextureUseCount = 0;
+			RHIFencePoint m_LastRecordedFencePoint{};
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
@@ -3126,6 +3144,139 @@ namespace gglab
 			}
 		}
 
+		void RunPersistentTexturePoolContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(!std::is_copy_constructible_v<PersistentTextureAllocation>);
+			static_assert(!std::is_copy_assignable_v<PersistentTextureAllocation>);
+			static_assert(std::is_nothrow_move_constructible_v<PersistentTextureAllocation>);
+			static_assert(std::is_nothrow_move_assignable_v<PersistentTextureAllocation>);
+
+			RecordingDevice device;
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool pool(&device);
+
+			auto makeCreateInfo = [](RHIFormat format, uint32_t width, uint32_t height) noexcept
+			{
+				return RHIOwnedTextureCreateInfo{
+					.m_Desc = {
+						.m_Format = format,
+						.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
+						.m_Extent = { width, height, 1 },
+					},
+				};
+			};
+			auto acquireHistorySet = [&](uint32_t width, uint32_t height)
+			{
+				const RHIOwnedTextureCreateInfo colorInfo =
+					makeCreateInfo(RHIFormat::R16G16B16A16Float, width, height);
+				const RHIOwnedTextureCreateInfo depthInfo =
+					makeCreateInfo(RHIFormat::R32Float, width, height);
+				return std::array<PersistentTextureAllocation, 4>{
+					pool.AcquireTexture(colorInfo, "TAA.HistoryColor0"),
+					pool.AcquireTexture(colorInfo, "TAA.HistoryColor1"),
+					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth0"),
+					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth1"),
+				};
+			};
+			auto releaseHistorySet = [&](auto& allocations, const RHIFencePoint& fencePoint)
+			{
+				bool released = true;
+				for (PersistentTextureAllocation& allocation : allocations)
+				{
+					released = pool.ReleaseTexture(std::move(allocation), fencePoint) && released;
+				}
+				return released;
+			};
+			auto allPendingAtFence = [](const PersistentTexturePoolDiagnostics& diagnostics,
+				uint64_t fenceValue) noexcept
+			{
+				return std::ranges::all_of(diagnostics.m_PendingRetirements,
+					[fenceValue](const PersistentTexturePendingRetirementDiagnostics& pending)
+					{
+						return pending.m_Texture.IsValid() &&
+							pending.m_FencePoint.m_Value == fenceValue &&
+							!pending.m_LogicalName.empty();
+					});
+			};
+
+			const auto invalidAllocation = pool.AcquireTexture({}, "Invalid");
+			auto firstGeneration = acquireHistorySet(1920, 1080);
+			const uint64_t fullSizeBytes =
+				2 * EstimatePersistentTextureBytes(firstGeneration[0].GetCreateInfo().m_Desc) +
+				2 * EstimatePersistentTextureBytes(firstGeneration[2].GetCreateInfo().m_Desc);
+			PersistentTextureAllocation movedAllocation = std::move(firstGeneration[0]);
+			const bool moveTransferredOwnership =
+				!firstGeneration[0].IsValid() && movedAllocation.IsValid();
+			firstGeneration[0] = std::move(movedAllocation);
+			const PersistentTexturePoolDiagnostics initialDiagnostics = pool.GetDiagnostics();
+			context.Check(!invalidAllocation.IsValid() && moveTransferredOwnership &&
+				firstGeneration[0].IsValid() && !movedAllocation.IsValid() &&
+				initialDiagnostics.m_ActiveTextureCount == 4 &&
+				initialDiagnostics.m_PendingRetirementTextureCount == 0 &&
+				initialDiagnostics.m_EstimatedActiveBytes == fullSizeBytes &&
+				device.m_CreateTextureCount == 4,
+				"Persistent texture allocations are explicit, move-only, and byte-accounted");
+
+			const bool invalidFenceRejected =
+				!pool.ReleaseTexture(std::move(firstGeneration[0]), {});
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
+			const bool firstReleased = releaseHistorySet(firstGeneration, firstFence);
+			const PersistentTexturePoolDiagnostics firstPending = pool.GetDiagnostics();
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics beforeFirstCompletion = pool.GetDiagnostics();
+			context.Check(invalidFenceRejected && firstReleased &&
+				firstPending.m_ActiveTextureCount == 0 &&
+				firstPending.m_PendingRetirementTextureCount == 4 &&
+				firstPending.m_EstimatedPendingRetirementBytes == fullSizeBytes &&
+				allPendingAtFence(firstPending, 10) &&
+				beforeFirstCompletion.m_PendingRetirementTextureCount == 4 &&
+				device.m_DestroyTextureCount == 0 && device.m_RecordTextureUseCount == 4,
+				"Persistent texture release is logical immediately and physical only after its fence");
+
+			auto resizedGeneration = acquireHistorySet(1280, 720);
+			const uint64_t resizedBytes =
+				2 * EstimatePersistentTextureBytes(resizedGeneration[0].GetCreateInfo().m_Desc) +
+				2 * EstimatePersistentTextureBytes(resizedGeneration[2].GetCreateInfo().m_Desc);
+			const PersistentTexturePoolDiagnostics resizePressure = pool.GetDiagnostics();
+			const RHIFencePoint resizeFence{ RHIFenceHandle{ 1, 1 }, 20 };
+			const bool resizedReleased = releaseHistorySet(resizedGeneration, resizeFence);
+			auto reenabledGeneration = acquireHistorySet(1920, 1080);
+			const PersistentTexturePoolDiagnostics togglePressure = pool.GetDiagnostics();
+			context.Check(resizePressure.m_ActiveTextureCount == 4 &&
+				resizePressure.m_PendingRetirementTextureCount == 4 &&
+				resizePressure.m_EstimatedActiveBytes == resizedBytes &&
+				resizePressure.m_EstimatedPendingRetirementBytes == fullSizeBytes &&
+				resizedReleased && togglePressure.m_ActiveTextureCount == 4 &&
+				togglePressure.m_PendingRetirementTextureCount == 8 &&
+				togglePressure.m_TotalAcquireCount == 12 && device.m_CreateTextureCount == 12,
+				"Resize and toggle pressure create fresh persistent textures while old generations retire");
+
+			device.m_CompletedFenceValue = 10;
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics partiallyRetired = pool.GetDiagnostics();
+			const uint32_t partiallyDestroyedTextureCount = device.m_DestroyTextureCount;
+			const RHIFencePoint reenabledFence{ RHIFenceHandle{ 1, 1 }, 30 };
+			const bool reenabledReleased = releaseHistorySet(reenabledGeneration, reenabledFence);
+			const bool doubleReleaseRejected =
+				!pool.ReleaseTexture(std::move(reenabledGeneration[0]), reenabledFence);
+			device.m_CompletedFenceValue = 30;
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics fullyRetired = pool.GetDiagnostics();
+			context.Check(partiallyRetired.m_ActiveTextureCount == 4 &&
+				partiallyRetired.m_PendingRetirementTextureCount == 4 &&
+				partiallyRetired.m_CompletedRetirementCount == 4 &&
+				partiallyDestroyedTextureCount == 4 && reenabledReleased &&
+				doubleReleaseRejected && fullyRetired.m_ActiveTextureCount == 0 &&
+				fullyRetired.m_PendingRetirementTextureCount == 0 &&
+				fullyRetired.m_TotalReleaseCount == 12 &&
+				fullyRetired.m_CompletedRetirementCount == 12 &&
+				fullyRetired.m_RejectedReleaseCount == 2 &&
+				device.m_DestroyTextureCount == 12 &&
+				device.m_RecordTextureUseCount == 12 &&
+				device.m_LastRecordedFencePoint == reenabledFence,
+				"Fence retirement drains only completed generations and rejects duplicate release");
+		}
+
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
 		{
 			const RGPersistentTextureImportContract pendingTexture =
@@ -4728,6 +4879,7 @@ namespace gglab
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
+		RunPersistentTexturePoolContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);

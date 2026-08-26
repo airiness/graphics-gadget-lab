@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -80,6 +81,14 @@ namespace gglab::foundation::tests
 	static_assert(utils::AlignDown(std::uint32_t{ 7 }, std::uint32_t{ 4 }) == 4);
 	static_assert(utils::IsPow2(std::uint32_t{ 8 }));
 	static_assert(utils::AlignUpPow2(std::uint32_t{ 9 }, std::uint32_t{ 8 }) == 16);
+	static_assert(utils::SaturatingAdd(std::uint8_t{ 3 }, std::uint8_t{ 4 }) == 7);
+	static_assert(utils::SaturatingAdd(std::numeric_limits<std::uint8_t>::max(),
+		std::uint8_t{ 1 }) == std::numeric_limits<std::uint8_t>::max());
+	static_assert(utils::SaturatingMultiply(std::uint32_t{ 6 }, std::uint32_t{ 7 }) == 42);
+	static_assert(utils::SaturatingMultiply(std::uint64_t{ 0 },
+		std::numeric_limits<std::uint64_t>::max()) == 0);
+	static_assert(utils::SaturatingMultiply(std::numeric_limits<std::uint64_t>::max(),
+		std::uint64_t{ 2 }) == std::numeric_limits<std::uint64_t>::max());
 	static_assert(TestIndex{ 7 }.Value() == 7);
 
 	[[nodiscard]] bool RunPrimitiveTests() noexcept
