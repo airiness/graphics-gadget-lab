@@ -2,17 +2,11 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
-#include "Wire/ShaderWireVersions.h"
 
 namespace gglab
 {
-	// (See Wire/ShaderWireVersions.h for the canonical constants:
-	// ShaderCompilerToolVersion and ShaderProcessContractVersion.)
-
-	// (ShaderProcessContractVersion defined in Wire/ShaderWireVersions.h;
-	// see comment above.)
-
 	enum class ShaderCompilerCommand : uint8_t
 	{
 		None,
@@ -23,6 +17,11 @@ namespace gglab
 		Help,
 		Describe,
 	};
+
+	// Canonical machine vocabulary for commands that own JSON envelopes.
+	// Human-only commands deliberately have no wire name.
+	[[nodiscard]] std::string_view ShaderCompilerCommandWireName(
+		ShaderCompilerCommand command) noexcept;
 
 	struct ShaderBuildRuntimeCommandOptions
 	{

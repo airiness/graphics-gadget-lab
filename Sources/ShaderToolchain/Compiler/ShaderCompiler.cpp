@@ -254,6 +254,46 @@ namespace gglab
 			}
 			return {};
 		}
+		[[nodiscard]] ShaderCompilerIdentity QueryDxcCompilerIdentityFrom(
+			const ComPtr<IDxcCompiler3>& compiler) noexcept
+		{
+			ShaderCompilerIdentity identity{};
+			ComPtr<IDxcVersionInfo> versionInfo;
+			if (FAILED(compiler.As(&versionInfo)))
+			{
+				identity.m_CanonicalIdentity = L"unknown";
+				return identity;
+			}
+
+			UINT32 major = 0;
+			UINT32 minor = 0;
+			if (FAILED(versionInfo->GetVersion(&major, &minor)))
+			{
+				identity.m_CanonicalIdentity = L"unknown";
+				return identity;
+			}
+
+			ComPtr<IDxcVersionInfo2> versionInfo2;
+			if (FAILED(compiler.As(&versionInfo2)))
+			{
+				identity.m_CanonicalIdentity = std::format(L"{}.{}", major, minor);
+				return identity;
+			}
+
+			UINT32 commitCount = 0;
+			char* commitHash = nullptr;
+			if (FAILED(versionInfo2->GetCommitInfo(&commitCount, &commitHash)))
+			{
+				identity.m_CanonicalIdentity = std::format(L"{}.{}", major, minor);
+				return identity;
+			}
+			const std::wstring commit =
+				commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
+			CoTaskMemFree(commitHash);
+			identity.m_CanonicalIdentity =
+				std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
+			return identity;
+		}
 	}
 
 #if defined(BUILD_DEBUG)
@@ -275,7 +315,7 @@ namespace gglab
 			m_Impl = std::make_unique<Impl>();
 			m_Impl->m_Utils = utils;
 			m_Impl->m_Compiler = compiler;
-			m_CompilerIdentity.m_CanonicalIdentity = QueryDxcVersion();
+			m_CompilerIdentity = QueryDxcCompilerIdentityFrom(m_Impl->m_Compiler);
 		}
 		else
 		{
@@ -1277,81 +1317,6 @@ namespace gglab
 		return target;
 	}
 
-	std::wstring ShaderCompiler::QueryDxcVersion() const noexcept
-	{
-		if (m_Impl == nullptr)
-		{
-			return L"unknown";
-		}
-
-		ComPtr<IDxcVersionInfo> versionInfo;
-		if (FAILED(m_Impl->m_Compiler.As(&versionInfo)))
-		{
-			return L"unknown";
-		}
-
-		UINT32 major = 0;
-		UINT32 minor = 0;
-		if (FAILED(versionInfo->GetVersion(&major, &minor)))
-		{
-			return L"unknown";
-		}
-
-		ComPtr<IDxcVersionInfo2> versionInfo2;
-		if (FAILED(m_Impl->m_Compiler.As(&versionInfo2)))
-		{
-			return std::format(L"{}.{}", major, minor);
-		}
-
-		UINT32 commitCount = 0;
-		char* commitHash = nullptr;
-		if (FAILED(versionInfo2->GetCommitInfo(&commitCount, &commitHash)))
-		{
-			return std::format(L"{}.{}", major, minor);
-		}
-		const std::wstring commit =
-			commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
-		CoTaskMemFree(commitHash);
-		return std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
-	}
-
-	namespace
-	{
-		[[nodiscard]] std::wstring QueryDxcVersionFrom(
-			const ComPtr<IDxcCompiler3>& compiler) noexcept
-		{
-			ComPtr<IDxcVersionInfo> versionInfo;
-			if (FAILED(compiler.As(&versionInfo)))
-			{
-				return L"unknown";
-			}
-
-			UINT32 major = 0;
-			UINT32 minor = 0;
-			if (FAILED(versionInfo->GetVersion(&major, &minor)))
-			{
-				return L"unknown";
-			}
-
-			ComPtr<IDxcVersionInfo2> versionInfo2;
-			if (FAILED(compiler.As(&versionInfo2)))
-			{
-				return std::format(L"{}.{}", major, minor);
-			}
-
-			UINT32 commitCount = 0;
-			char* commitHash = nullptr;
-			if (FAILED(versionInfo2->GetCommitInfo(&commitCount, &commitHash)))
-			{
-				return std::format(L"{}.{}", major, minor);
-			}
-			const std::wstring commit =
-				commitHash ? utils::ToWideString(commitHash) : std::wstring(L"unknown");
-			CoTaskMemFree(commitHash);
-			return std::format(L"{}.{}+{}.{}", major, minor, commitCount, commit);
-		}
-	}
-
 	ShaderCompilerIdentity QueryDxcCompilerIdentity() noexcept
 	{
 		ShaderCompilerIdentity identity{};
@@ -1361,8 +1326,7 @@ namespace gglab
 			identity.m_CanonicalIdentity = L"unknown";
 			return identity;
 		}
-		identity.m_CanonicalIdentity = QueryDxcVersionFrom(compiler);
-		return identity;
+		return QueryDxcCompilerIdentityFrom(compiler);
 	}
 }
 

@@ -114,8 +114,6 @@ namespace gglab
 			const std::filesystem::path& logicalSourcePath,
 			const std::vector<std::filesystem::path>& logicalIncludeDirs,
 			const ShaderDesc& mergedDesc) noexcept;
-		std::wstring QueryDxcVersion() const noexcept;
-
 	private:
 		std::unique_ptr<Impl> m_Impl;
 		std::filesystem::path m_SourceRootDir;

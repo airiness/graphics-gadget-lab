@@ -11,6 +11,7 @@
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Targets/ShaderTargetWireNames.h"
+#include "Wire/ShaderCompilerProcessContract.h"
 
 #include <nlohmann/json.hpp>
 
@@ -144,10 +145,19 @@ namespace
 		return exitCode;
 	}
 
-	int PrintJsonUsageFailure(std::wstring_view message)
+	int PrintJsonUsageFailure(gglab::ShaderCompilerCommand command,
+		std::wstring_view message)
 	{
+		std::string_view commandWireName = gglab::ShaderCompilerCommandWireName(command);
+		if (commandWireName.empty())
+		{
+			// Preserve the established compile grammar for an unrecognized command
+			// that nevertheless requested JSON transport.
+			commandWireName = gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Compile);
+		}
 		return PrintJsonDocument({
-			{ "command", "compile" },
+			{ "command", std::string(commandWireName) },
 			{ "success", false },
 			{ "status", "usage-error" },
 			{ "exitCode", ExitCodeInvalidCommandLine },
@@ -157,11 +167,12 @@ namespace
 		}, ExitCodeInvalidCommandLine);
 	}
 
-	int PrintCommandLineFailure(std::wstring_view message, bool jsonMode, bool printUsage)
+	int PrintCommandLineFailure(gglab::ShaderCompilerCommand command,
+		std::wstring_view message, bool jsonMode, bool printUsage)
 	{
 		if (jsonMode)
 		{
-			return PrintJsonUsageFailure(message);
+			return PrintJsonUsageFailure(command, message);
 		}
 		std::wcerr << message << L"\n";
 		if (printUsage)
@@ -229,7 +240,8 @@ namespace
 		}
 		const int exitCode = ExitCodeForStatus(diagnostics.m_Status);
 		return PrintJsonDocument({
-			{ "command", "compile" },
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Compile)) },
 			{ "success", false },
 			{ "status", CompileStatusText(diagnostics.m_Status) },
 			{ "exitCode", exitCode },
@@ -259,7 +271,8 @@ namespace
 		// cache-slot locations, so all three fields describe the same committed
 		// entry for this completed operation on hit and publication paths.
 		nlohmann::json document{
-			{ "command", "compile" },
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Compile)) },
 			{ "success", true },
 			{ "status", "ok" },
 			{ "exitCode", ExitCodeSuccess },
@@ -293,14 +306,14 @@ namespace
 		gglab::ShaderStage stage{};
 		if (!ParseShaderStage(options.m_Stage, stage))
 		{
-			return PrintCommandLineFailure(L"Unknown stage: " +
+			return PrintCommandLineFailure(commandLine.m_Command, L"Unknown stage: " +
 				gglab::utils::ToWideString(options.m_Stage),
 				commandLine.m_JsonRequested, false);
 		}
 		gglab::ShaderTargetProfile profile{};
 		if (!ParseTarget(options.m_Target, profile))
 		{
-			return PrintCommandLineFailure(L"Unknown target: " +
+			return PrintCommandLineFailure(commandLine.m_Command, L"Unknown target: " +
 				gglab::utils::ToWideString(options.m_Target),
 				commandLine.m_JsonRequested, false);
 		}
@@ -380,7 +393,8 @@ namespace
 		// Reuses the existing CLI status/exit membership (compiler-unavailable
 		// / 4); no business payload, processContractVersion present.
 		return PrintJsonDocument({
-			{ "command", "describe" },
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Describe)) },
 			{ "success", false },
 			{ "status", "compiler-unavailable" },
 			{ "exitCode", ExitCodeCompileFailed },
@@ -395,7 +409,8 @@ namespace
 	{
 		// Handled internal error floor (exit 7), describe-only.
 		return PrintJsonDocument({
-			{ "command", "describe" },
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Describe)) },
 			{ "success", false },
 			{ "status", "internal-error" },
 			{ "exitCode", ExitCodeInternalError },
@@ -409,7 +424,8 @@ namespace
 	int PrintJsonDescribeUsageFailure(std::wstring_view message)
 	{
 		return PrintJsonDocument({
-			{ "command", "describe" },
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::Describe)) },
 			{ "success", false },
 			{ "status", "usage-error" },
 			{ "exitCode", ExitCodeInvalidCommandLine },
@@ -458,7 +474,8 @@ namespace
 			// Field order is contract-stable; every field derives
 			// from an existing authority value rather than a CLI-local fact.
 			const nlohmann::json document{
-				{ "command", "describe" },
+				{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+					gglab::ShaderCompilerCommand::Describe)) },
 				{ "success", true },
 				{ "status", "ok" },
 				{ "exitCode", ExitCodeSuccess },
@@ -521,7 +538,7 @@ namespace
 		gglab::ShaderTargetProfile targetProfile{};
 		if (!ParseTarget(options.m_Target, targetProfile))
 		{
-			return PrintCommandLineFailure(L"Unknown target: " +
+			return PrintCommandLineFailure(commandLine.m_Command, L"Unknown target: " +
 				gglab::utils::ToWideString(options.m_Target),
 				commandLine.m_JsonRequested, false);
 		}
@@ -532,7 +549,8 @@ namespace
 		if (options.m_ResultFormat == "json")
 		{
 			nlohmann::json document{
-				{ "command", "build-runtime" },
+				{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+					gglab::ShaderCompilerCommand::BuildRuntime)) },
 				{ "success", result.IsSuccess() },
 				{ "status", result.IsSuccess() ? "ok" : "failed" },
 				{ "exitCode", exitCode },
@@ -587,7 +605,8 @@ int wmain(int argumentCount, wchar_t* arguments[])
 		{
 			return PrintJsonDescribeUsageFailure(commandLine.m_Error);
 		}
-		return PrintCommandLineFailure(commandLine.m_Error, jsonRequested, true);
+		return PrintCommandLineFailure(commandLine.m_Command,
+			commandLine.m_Error, jsonRequested, true);
 	}
 
 	switch (commandLine.m_Command)

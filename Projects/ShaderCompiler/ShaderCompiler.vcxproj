@@ -85,8 +85,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.h" />
-	<ClInclude Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.h" />
+    <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.h" />
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerProcessFactory.h" />
+    <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\Wire\ShaderCompilerProcessContract.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">

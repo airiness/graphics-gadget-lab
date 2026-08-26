@@ -68,6 +68,26 @@ namespace gglab
 			L"  gglab-shaderc --help";
 	}
 
+	std::string_view ShaderCompilerCommandWireName(
+		ShaderCompilerCommand command) noexcept
+	{
+		switch (command)
+		{
+		case ShaderCompilerCommand::Compile:
+			return "compile";
+		case ShaderCompilerCommand::BuildRuntime:
+			return "build-runtime";
+		case ShaderCompilerCommand::Describe:
+			return "describe";
+		case ShaderCompilerCommand::None:
+		case ShaderCompilerCommand::Targets:
+		case ShaderCompilerCommand::Version:
+		case ShaderCompilerCommand::Help:
+			return {};
+		}
+		return {};
+	}
+
 	ShaderCompilerCommandLine ParseShaderCompilerCommandLine(
 		int argumentCount, wchar_t* arguments[]) noexcept
 	{
@@ -91,14 +111,6 @@ namespace gglab
 			return parsed;
 		}
 
-		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
-		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
-		if (resultFormat.m_OccurrenceCount > 1)
-		{
-			parsed.m_Command = ShaderCompilerCommand::Compile;
-			parsed.m_Error = L"--result-format specified multiple times";
-			return parsed;
-		}
 		if (argumentCount <= 1)
 		{
 			parsed.m_Command = ShaderCompilerCommand::Help;
@@ -106,6 +118,16 @@ namespace gglab
 		}
 
 		const std::wstring_view first = arguments[1];
+		const ResultFormatScan resultFormat = ScanResultFormat(argumentCount, arguments);
+		parsed.m_JsonRequested = resultFormat.m_JsonRequested;
+		if (resultFormat.m_OccurrenceCount > 1)
+		{
+			parsed.m_Command = first == L"build-runtime"
+				? ShaderCompilerCommand::BuildRuntime
+				: ShaderCompilerCommand::Compile;
+			parsed.m_Error = L"--result-format specified multiple times";
+			return parsed;
+		}
 		if (first == L"--version")
 		{
 			parsed.m_Command = ShaderCompilerCommand::Version;

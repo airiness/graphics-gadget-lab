@@ -1,5 +1,5 @@
 #include "ShaderCompilerCliContractSelfTests.h"
-#include "Wire/ShaderWireVersions.h"
+#include "ShaderCompilerProcessContract.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
@@ -110,6 +110,12 @@ namespace gglab
 			bool m_Set = false;
 		};
 
+		[[nodiscard]] std::filesystem::path ShaderCompilerExecutablePath() noexcept
+		{
+			return win32::GetExecutableDirectory() /
+				(utils::ToWideString(ShaderCompilerToolIdentity) + L".exe");
+		}
+
 		[[nodiscard]] CliRunResult RunCli(const std::vector<std::wstring>& arguments,
 			bool forceCompilerUnavailable = false,
 			bool forceDescribeInternalError = false,
@@ -154,7 +160,7 @@ namespace gglab
 
 			std::wstring commandLine;
 			commandLine += L"\"";
-			commandLine += (win32::GetExecutableDirectory() / L"gglab-shaderc.exe").wstring();
+			commandLine += ShaderCompilerExecutablePath().wstring();
 			commandLine += L"\"";
 			for (const std::wstring& argument : arguments)
 			{
@@ -170,7 +176,7 @@ namespace gglab
 				.hStdError = errWrite,
 			};
 			PROCESS_INFORMATION processInfo{};
-			const std::wstring exePath = (win32::GetExecutableDirectory() / L"gglab-shaderc.exe").wstring();
+			const std::wstring exePath = ShaderCompilerExecutablePath().wstring();
 			const std::wstring exeDirectory = win32::GetExecutableDirectory().wstring();
 			const std::wstring& currentDirectory =
 				workingDirectory.empty() ? exeDirectory : workingDirectory;
@@ -339,10 +345,12 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool HasJsonEnvelope(const CliRunResult& result,
-			std::string_view status, int exitCode, bool success) noexcept
+			std::string_view status, int exitCode, bool success,
+			std::string_view command = "compile") noexcept
 		{
 			return result.m_ExitCode == exitCode && IsSingleJsonDocument(result) &&
-				result.m_StdOut.find("\"command\":\"compile\"") != std::string::npos &&
+				result.m_StdOut.find(std::format("\"command\":\"{}\"", command)) !=
+					std::string::npos &&
 				result.m_StdOut.find(success ? "\"success\":true" : "\"success\":false") !=
 					std::string::npos &&
 				result.m_StdOut.find(std::format("\"status\":\"{}\"", status)) !=
@@ -350,6 +358,65 @@ namespace gglab
 				result.m_StdOut.find(std::format("\"exitCode\":{}", exitCode)) !=
 					std::string::npos &&
 				result.m_StdOut.find("\"diagnostics\":[") != std::string::npos;
+		}
+
+		[[nodiscard]] bool SurfaceDescriptorToolIdentitiesMatch(
+			const std::filesystem::path& sourceRoot, std::string_view expectedIdentity,
+			std::size_t& outDescriptorCount) noexcept
+		{
+			outDescriptorCount = 0;
+			const std::filesystem::path surfaceProfilesRoot =
+				sourceRoot / L"Profiles" / L"GGLab.Surface";
+			std::error_code errorCode;
+			std::filesystem::recursive_directory_iterator iterator(
+				surfaceProfilesRoot,
+				std::filesystem::directory_options::skip_permission_denied, errorCode);
+			const std::filesystem::recursive_directory_iterator end;
+			if (errorCode)
+			{
+				return false;
+			}
+
+			for (; iterator != end; iterator.increment(errorCode))
+			{
+				if (errorCode)
+				{
+					return false;
+				}
+				if (!iterator->is_regular_file(errorCode) || errorCode ||
+					iterator->path().filename() != L"descriptor.json")
+				{
+					if (errorCode)
+					{
+						return false;
+					}
+					continue;
+				}
+
+				std::ifstream input(iterator->path(), std::ios::binary);
+				const nlohmann::json descriptor =
+					nlohmann::json::parse(input, nullptr, /*allow_exceptions=*/false);
+				if (!input || descriptor.is_discarded() || !descriptor.is_object() ||
+					!descriptor.contains("processContract") ||
+					!descriptor.at("processContract").is_object())
+				{
+					return false;
+				}
+				const nlohmann::json& processContract = descriptor.at("processContract");
+				if (!processContract.contains("tool") ||
+					!processContract.at("tool").is_object())
+				{
+					return false;
+				}
+				const nlohmann::json& tool = processContract.at("tool");
+				if (!tool.contains("identity") || !tool.at("identity").is_string() ||
+					tool.at("identity").get<std::string>() != expectedIdentity)
+				{
+					return false;
+				}
+				++outDescriptorCount;
+			}
+			return outDescriptorCount > 0;
 		}
 
 		[[nodiscard]] std::string ExtractJsonField(
@@ -403,6 +470,7 @@ namespace gglab
 		}
 
 		void RunDescribeHandshakeTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
 			// Machine describe handshake contract — wire verification. These
@@ -442,24 +510,27 @@ namespace gglab
 					"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
 			}
 
-			// Identity chain: the wire identity equals the canonical tool
-			// identity, and the descriptor identity equals the in-process
-			// canonical producer identity (never the "unknown" sentinel).
+			// Identity chains: the wire tool identity equals every published
+			// Surface descriptor requirement, while producer identity equals the
+			// in-process canonical DXC identity (never the "unknown" sentinel).
 			{
 				const CliRunResult result = RunCli({ L"describe" });
 				const auto doc = ParseWireDocument(result.m_StdOut);
 				const ShaderCompilerIdentity inProcess = QueryDxcCompilerIdentity();
 				std::string wireToolIdentity;
 				std::string wireProducerIdentity;
+				std::size_t descriptorCount = 0;
 				const bool toolChain = ReadWireString(doc, "toolIdentity", wireToolIdentity) &&
-					wireToolIdentity == std::string(ShaderCompilerToolIdentity);
-				const bool descriptorChain = ReadWireString(
+					wireToolIdentity == std::string(ShaderCompilerToolIdentity) &&
+					SurfaceDescriptorToolIdentitiesMatch(
+						sourceRoot, wireToolIdentity, descriptorCount) && descriptorCount == 2;
+				const bool producerChain = ReadWireString(
 						doc, "producerIdentity", wireProducerIdentity) &&
 					wireProducerIdentity == utils::ToString(inProcess.m_CanonicalIdentity) &&
 					!wireProducerIdentity.empty() && wireProducerIdentity != "unknown";
 				context.Check(
-					toolChain && descriptorChain,
-					"describe identity chain: wire identity and descriptor identity agree with the canonical identities");
+					toolChain && producerChain,
+					"describe tool identity matches every Surface descriptor and producer identity matches the canonical DXC identity");
 			}
 
 			// toolVersion matches the current tool-version constant (not a
@@ -1446,6 +1517,25 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
+			const CliRunResult missingRequiredOption = RunCli({
+				L"build-runtime", L"--result-format", L"json",
+			});
+			const CliRunResult unknownOption = RunCli({
+				L"build-runtime", L"--bogus", L"--result-format", L"json",
+			});
+			const CliRunResult duplicateResultFormat = RunCli({
+				L"build-runtime", L"--result-format", L"json",
+				L"--result-format", L"json",
+			});
+			context.Check(
+				HasJsonEnvelope(missingRequiredOption, "usage-error", 2, false,
+					"build-runtime") &&
+				HasJsonEnvelope(unknownOption, "usage-error", 2, false,
+					"build-runtime") &&
+				HasJsonEnvelope(duplicateResultFormat, "usage-error", 2, false,
+					"build-runtime"),
+				"build-runtime JSON usage errors truthfully identify their command");
+
 			const std::filesystem::path cacheRoot = tempRoot / L"RuntimeBuildCache";
 			const std::filesystem::path artifactRoot = tempRoot / L"RuntimeBuildArtifacts";
 			const std::vector<std::wstring> arguments{
@@ -1519,11 +1609,12 @@ namespace gglab
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept
 	{
 		const std::filesystem::path executableDirectory = win32::GetExecutableDirectory();
-		const std::filesystem::path cliPath = executableDirectory / L"gglab-shaderc.exe";
+		const std::filesystem::path cliPath = ShaderCompilerExecutablePath();
 		std::error_code errorCode;
 		if (!std::filesystem::exists(cliPath, errorCode))
 		{
-			context.Check(false, "gglab-shaderc.exe must be built next to the test executable");
+			context.Check(false,
+				"Shader compiler TargetName must match the canonical tool identity");
 			return;
 		}
 
@@ -1545,6 +1636,6 @@ namespace gglab
 		// Machine describe handshake contract self-tests. The remaining
 		// structural no-regression invariants are asserted by the
 		// compile/build-runtime matrix and legacy-grammar checks above.
-		RunDescribeHandshakeTests(context, tempRoot);
+		RunDescribeHandshakeTests(context, sourceRoot, tempRoot);
 	}
 }

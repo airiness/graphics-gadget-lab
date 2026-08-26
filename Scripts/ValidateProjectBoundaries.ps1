@@ -618,6 +618,8 @@ $shaderArtifactRuntimePublicIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public'
 $shaderToolchainIncludeRoot = '$(GGLabRepositoryRoot)Sources\ShaderToolchain'
 $shaderCompilerIncludeRoot = '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler'
+$shaderCompilerWireIncludeRoot = `
+    '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler\Wire'
 # Allowed, but deliberately not required: the current NapaVoxelCore/... layout
 # still needs this broad root. Foundation Private access is compiler-gated below.
 $repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
@@ -674,10 +676,12 @@ Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
     $shaderToolchainTestsNamespace `
     "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj" `
     @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
-        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderCompilerWireIncludeRoot,
+        $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
     @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
-        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderCompilerWireIncludeRoot,
+        $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
