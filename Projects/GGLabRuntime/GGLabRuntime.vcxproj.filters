@@ -504,6 +504,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.cpp">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClCompile>
@@ -1331,10 +1334,16 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h">
+      <Filter>Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h">

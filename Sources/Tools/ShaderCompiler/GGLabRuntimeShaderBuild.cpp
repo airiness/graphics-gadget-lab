@@ -92,6 +92,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseYCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseYDefines },
 			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOUpsampleDefines },
+			ShaderProgramBuildRecord{ &TemporalAAReprojectionCompute, L"Passes/PassTemporalAA.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapVertex, L"Passes/PassDirectionalShadowMap.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapPixel, L"Passes/PassDirectionalShadowMap.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &ShadowMapPreviewVertex, L"Passes/PassShadowMapPreview.hlsl", L"VSMain" },

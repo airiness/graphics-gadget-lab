@@ -94,6 +94,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBL.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLClear.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
@@ -406,6 +407,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPBRShaderSet.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardOpaque.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
@@ -418,6 +420,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlusDebugReadback.h" />

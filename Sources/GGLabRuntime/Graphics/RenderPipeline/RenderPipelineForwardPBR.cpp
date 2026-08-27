@@ -159,6 +159,10 @@ namespace gglab
 		{
 			m_ForwardPlusValidationPass.Prepare(services);
 		}
+		if (context.GetTemporalFramePlan().m_Active)
+		{
+			m_TemporalAAPass.Prepare(services);
+		}
 		if (depthCoverageFramePlan.UsesForwardDepthWrite())
 		{
 			GGLAB_LOG_GRAPHICS_WARN("Depth coverage frame uses Forward-write fallback: {}",
@@ -398,8 +402,14 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
-		// Opaque extensions contribute to the main HDR color and depth before
-		// transparent and post-processing consumers.
+		// T07 exercises the resolve only through the internal contract path. T09 will
+		// publish production capability and make this ordering generally available.
+		if (context.GetTemporalFramePlan().m_Active)
+		{
+			m_TemporalAAPass.AddPass(rg, context, services);
+		}
+
+		// Scene extensions are post-TAA participants in the current temporal contract.
 		if (m_SceneExtension)
 		{
 			m_SceneExtension->AddOpaqueScenePasses(rg, context, services);

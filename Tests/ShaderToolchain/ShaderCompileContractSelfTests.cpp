@@ -2600,6 +2600,19 @@ namespace gglab
 				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
 				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
 
+			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const ShaderCompileResult temporalAADxilArtifact = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const ShaderCompileResult temporalAASpirVArtifact = compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(temporalAADxilArtifact.IsSuccess() &&
+				temporalAASpirVArtifact.IsSuccess(),
+				"Production DXC compiles TAA reprojection, previous-view depth rejection, and sky rotation reprojection for DX12 and Vulkan 1.3");
+
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";

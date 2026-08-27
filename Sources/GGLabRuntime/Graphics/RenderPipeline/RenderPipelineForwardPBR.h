@@ -14,6 +14,7 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
 #include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 
@@ -73,6 +74,7 @@ namespace gglab
 		RenderPassForwardOpaque m_ForwardOpaquePass;
 		RenderPassForwardTransparent m_ForwardTransparentPass;
 		RenderPassGTAO m_GTAOPass;
+		RenderPassTemporalAA m_TemporalAAPass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;
 		RenderPassIBL m_IBLPass;

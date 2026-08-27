@@ -42,6 +42,7 @@ namespace gglab
 			std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)>
 				m_ViewRenderSettings{};
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
+			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};

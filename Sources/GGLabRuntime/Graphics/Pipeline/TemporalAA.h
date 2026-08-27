@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace gglab
@@ -15,6 +16,37 @@ namespace gglab
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
+
+	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
+	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
+	inline constexpr float TemporalAARestrictedHistoryWeight = 0.125f;
+
+	enum class TemporalAAHistoryRejectionReason : uint32_t
+	{
+		None,
+		HistoryUnavailable,
+		PreviousUVOutOfBounds,
+		NonFinite,
+		DepthMismatch,
+	};
+
+	[[nodiscard]] inline bool IsTemporalHistoryDepthCompatible(float expectedPreviousViewZ,
+		float storedPreviousViewZ,
+		float absoluteThreshold = TemporalAADepthAbsoluteThreshold,
+		float relativeThreshold = TemporalAADepthRelativeThreshold) noexcept
+	{
+		if (!std::isfinite(expectedPreviousViewZ) || !std::isfinite(storedPreviousViewZ) ||
+			expectedPreviousViewZ <= 0.0f || storedPreviousViewZ <= 0.0f ||
+			!std::isfinite(absoluteThreshold) || !std::isfinite(relativeThreshold) ||
+			absoluteThreshold < 0.0f || relativeThreshold < 0.0f)
+		{
+			return false;
+		}
+
+		const float tolerance =
+			std::max(absoluteThreshold, relativeThreshold * expectedPreviousViewZ);
+		return std::abs(expectedPreviousViewZ - storedPreviousViewZ) <= tolerance;
+	}
 
 	enum class SceneExtensionTemporalParticipation : uint8_t
 	{

@@ -18,6 +18,7 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;
+	class TemporalFrameTransaction;
 	class RenderPipelineOverlayExtensionBase;
 
 	struct RenderFrameContext
@@ -25,6 +26,7 @@ namespace gglab
 		std::span<RenderView> m_RenderViews;
 		std::span<const ResolvedViewRenderSettings> m_ViewRenderSettings;
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
+		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;

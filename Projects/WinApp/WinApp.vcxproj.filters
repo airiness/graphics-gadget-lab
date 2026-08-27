@@ -844,6 +844,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -910,6 +913,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\Temporal.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\TemporalMotion.hlsli">

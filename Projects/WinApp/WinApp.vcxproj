@@ -425,6 +425,7 @@
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli" />
     <None Include="..\..\Shaders\Common\Temporal.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli" />
     <None Include="..\..\Shaders\Common\TemporalMotion.hlsli" />
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
@@ -464,6 +465,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />

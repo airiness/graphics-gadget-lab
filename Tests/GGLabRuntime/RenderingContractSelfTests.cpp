@@ -38,6 +38,7 @@
 
 #include <array>
 #include <filesystem>
+#include <limits>
 #include <type_traits>
 
 namespace gglab
@@ -4537,6 +4538,17 @@ namespace gglab
 				NearlyEqual(objectMotionReadback.m_MagnitudePixels, std::sqrt(425.0f)) &&
 				!ResolveTemporalMotionReadbackSample(objectMotion, 0, 50).m_Valid,
 				"Temporal motion uses current-minus-previous top-left UV delta and deterministic pixel magnitude");
+
+			context.Check(IsTemporalHistoryDepthCompatible(10.0f, 10.04f) &&
+				IsTemporalHistoryDepthCompatible(100.0f, 101.9f) &&
+				!IsTemporalHistoryDepthCompatible(10.0f, 10.21f) &&
+				!IsTemporalHistoryDepthCompatible(100.0f, 102.1f) &&
+				!IsTemporalHistoryDepthCompatible(0.0f, 0.0f) &&
+				!IsTemporalHistoryDepthCompatible(
+					std::numeric_limits<float>::quiet_NaN(), 1.0f) &&
+				TemporalAARestrictedHistoryWeight > 0.0f &&
+				TemporalAARestrictedHistoryWeight < 0.5f,
+				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance and a restricted T07 history weight");
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;

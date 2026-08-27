@@ -125,6 +125,7 @@ namespace gglab
 			.m_ViewRenderSettings =
 				std::span<const ResolvedViewRenderSettings>(m_ViewRenderSettings),
 			.m_TemporalFramePlan = m_TemporalFramePlan,
+			.m_TemporalFrameTransaction = m_TemporalFrameTransaction,
 			.m_DisplayViewId = m_DisplayViewId,
 			.m_RenderScene = m_RenderScene,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
@@ -147,6 +148,7 @@ namespace gglab
 		result.m_BackBufferIndex = info.m_BackBufferIndex;
 		result.m_FrameSerial = info.m_FrameSerial;
 		result.m_TemporalFramePlan = info.m_TemporalFramePlan;
+		result.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
 
