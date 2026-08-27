@@ -14,7 +14,6 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
-#include <cmath>
 #include <cstdint>
 
 namespace gglab
@@ -23,17 +22,6 @@ namespace gglab
 	{
 		inline constexpr uint32_t TemporalAAThreadGroupSize = 8;
 		inline constexpr uint32_t TemporalAAHistoryValidBit = 0x80000000u;
-		inline constexpr float TemporalAAUnitRangeQuantizationScale = 65'535.0f;
-
-		[[nodiscard]] uint32_t PackTemporalAAUnitRangePair(float low, float high) noexcept
-		{
-			GGLAB_ASSERT(low >= 0.0f && low <= 1.0f && high >= 0.0f && high <= 1.0f);
-			const uint32_t lowBits = static_cast<uint32_t>(
-				std::lround(low * TemporalAAUnitRangeQuantizationScale));
-			const uint32_t highBits = static_cast<uint32_t>(
-				std::lround(high * TemporalAAUnitRangeQuantizationScale));
-			return lowBits | (highBits << 16u);
-		}
 
 		struct TemporalAAPassParameters
 		{
@@ -124,6 +112,8 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const TemporalAASettings temporalAASettings =
 			context.GetDisplayViewRenderSettings().m_TemporalAA;
+		const bool previousHistoryCompatible =
+			transaction->HasCompatiblePreviousHistory();
 		const auto* samplerRegistry = renderer->GetSamplerRegistry();
 		GGLAB_ASSERT_NOT_NULL(samplerRegistry);
 		if (!samplerRegistry)
@@ -134,6 +124,7 @@ namespace gglab
 		rg.AddPass<TemporalAAPassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
 			[transaction, displayViewId, viewIndex, temporalAASettings,
+			previousHistoryCompatible,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -172,7 +163,10 @@ namespace gglab
 				data.m_CurrentDepthSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					currentDepth, sceneDepth.m_SrvDesc);
 
-				if (resources.m_History.m_PreviousValid)
+				GGLAB_ASSERT_MSG(!previousHistoryCompatible ||
+					resources.m_History.m_PreviousValid,
+					"Compatible temporal history requires defined imported history resources.");
+				if (previousHistoryCompatible)
 				{
 					resources.m_History.m_PreviousColor = builder.Read(
 						resources.m_History.m_PreviousColor, RGTextureAccess::Sample,
@@ -234,7 +228,7 @@ namespace gglab
 					.m_LinearClampSamplerIndex = linearClampSamplerIndex,
 					.m_PointClampSamplerIndex = pointClampSamplerIndex,
 					.m_ViewIndexAndHistoryValid = viewIndex |
-						(resources.m_History.m_PreviousValid ? TemporalAAHistoryValidBit : 0u),
+						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),

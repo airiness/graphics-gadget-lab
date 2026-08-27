@@ -21,6 +21,33 @@ namespace gglab
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
 	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
+	inline constexpr uint32_t TemporalAAUnitRangePairMask = 0xffffu;
+	inline constexpr float TemporalAAUnitRangeQuantizationScale =
+		static_cast<float>(TemporalAAUnitRangePairMask);
+
+	[[nodiscard]] constexpr uint32_t QuantizeTemporalAAUnitRange(float value) noexcept
+	{
+		return static_cast<uint32_t>(
+			std::clamp(value, 0.0f, 1.0f) * TemporalAAUnitRangeQuantizationScale + 0.5f);
+	}
+
+	[[nodiscard]] constexpr uint32_t PackTemporalAAUnitRangePair(
+		float low, float high) noexcept
+	{
+		return QuantizeTemporalAAUnitRange(low) |
+			(QuantizeTemporalAAUnitRange(high) << 16u);
+	}
+
+	[[nodiscard]] constexpr std::array<float, 2> UnpackTemporalAAUnitRangePair(
+		uint32_t packedValues) noexcept
+	{
+		return {
+			static_cast<float>(packedValues & TemporalAAUnitRangePairMask) /
+				TemporalAAUnitRangeQuantizationScale,
+			static_cast<float>(packedValues >> 16u) /
+				TemporalAAUnitRangeQuantizationScale,
+		};
+	}
 
 	struct TemporalAASettings
 	{

@@ -3474,6 +3474,22 @@ namespace gglab
 				device.m_CreateTextureCount == 4,
 				"Temporal history cold start imports four persistent textures and commits one write pair");
 
+			TemporalViewHistory incompatibleViewHistory = viewHistory;
+			incompatibleViewHistory.Invalidate();
+			TemporalObjectHistory incompatibleObjectHistory;
+			TemporalFrameTransaction incompatibleViewTransaction;
+			incompatibleViewTransaction.Begin(incompatibleViewHistory,
+				incompatibleObjectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView incompatibleView = prepareDisplayView(incompatibleViewTransaction);
+			const bool managerHistoryStillValid =
+				buildHistoryGraph(incompatibleViewTransaction, true, false);
+			const bool finalHistoryCompatibility =
+				incompatibleViewTransaction.HasCompatiblePreviousHistory();
+			incompatibleViewTransaction.Abort();
+			context.Check(managerHistoryStillValid && !finalHistoryCompatibility &&
+				!incompatibleView.m_HasPreviousTemporalState,
+				"Temporal resolve gates imported history with the transaction's final view-and-history compatibility");
+
 			TemporalFrameTransaction abortedTransaction;
 			abortedTransaction.Begin(
 				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
@@ -4556,6 +4572,20 @@ namespace gglab
 				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
 
 			const TemporalAASettings defaultTemporalAA{};
+			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);
+			static_assert(PackTemporalAAUnitRangePair(1.0f, 0.0f) == 0x0000ffffu);
+			static_assert(PackTemporalAAUnitRangePair(0.5f, 0.25f) == 0x40008000u);
+			static_assert(PackTemporalAAUnitRangePair(
+				TemporalAADepthAbsoluteThreshold,
+				TemporalAADepthRelativeThreshold) == 0x051f0ccdu);
+			static_assert(PackTemporalAAUnitRangePair(
+				TemporalAADefaultHistoryWeight,
+				TemporalAADefaultNeighborhoodClampExpansion) == 0x0000e666u);
+			constexpr std::array<float, 2> packingGolden =
+				UnpackTemporalAAUnitRangePair(0x40008000u);
+			context.Check(NearlyEqual(packingGolden[0], 32768.0f / 65535.0f) &&
+				NearlyEqual(packingGolden[1], 16384.0f / 65535.0f),
+				"Temporal AA CPU packing matches the HLSL low/high UNORM16 golden ABI");
 			const float staticHistoryWeight =
 				ResolveTemporalAAHistoryWeight(0.0f, 1.0f, 1.0f, defaultTemporalAA);
 			const float movingHistoryWeight =
