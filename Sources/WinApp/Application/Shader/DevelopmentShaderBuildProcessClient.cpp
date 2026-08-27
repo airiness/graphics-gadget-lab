@@ -442,6 +442,7 @@ namespace gglab
 			ParseJsonDocumentStrict(serializedDocument);
 		if (!document || !HasExactFields(*document, {
 			"command", "success", "status", "exitCode", "processContractVersion",
+			"compilePolicyRevision",
 			"toolIdentity", "toolVersion", "producerKind", "producerIdentity",
 			"supportedTargets", "diagnostics" }))
 		{
@@ -458,6 +459,7 @@ namespace gglab
 		bool success = false;
 		int64_t exitCode = -1;
 		int64_t contractVersion = -1;
+		int64_t compilePolicyRevision = -1;
 		std::string diagnostics;
 		size_t diagnosticsCount = 0;
 		const auto supportedTargets = document->find("supportedTargets");
@@ -484,6 +486,8 @@ namespace gglab
 			!ReadInteger(*document, "exitCode", exitCode) || exitCode != 0 ||
 			!ReadInteger(*document, "processContractVersion", contractVersion) ||
 			contractVersion != ShaderProcessContractVersion ||
+			!ReadInteger(*document, "compilePolicyRevision", compilePolicyRevision) ||
+			compilePolicyRevision != ShaderCompilePolicyRevision ||
 			!ReadString(*document, "toolIdentity", toolIdentity) ||
 			toolIdentity != ShaderCompilerToolIdentity ||
 			!ReadString(*document, "toolVersion", toolVersion) || toolVersion.empty() ||
@@ -495,7 +499,7 @@ namespace gglab
 			diagnosticsCount != 0)
 		{
 			result.m_Diagnostics =
-				"describe identity, process contract, producer, or target support is incompatible.";
+				"describe process contract, compile policy, producer, or target support is incompatible.";
 			return result;
 		}
 

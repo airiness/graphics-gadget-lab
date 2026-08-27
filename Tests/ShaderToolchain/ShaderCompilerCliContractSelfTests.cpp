@@ -496,6 +496,7 @@ namespace gglab
 				bool success = false;
 				std::int64_t exitCode = -1;
 				std::int64_t contractVersion = -1;
+				std::int64_t compilePolicyRevision = -1;
 				std::size_t diagnosticsCount = 0;
 				context.Check(
 					ReadWireString(firstDoc, "command", command) &&
@@ -505,9 +506,25 @@ namespace gglab
 						ReadWireInteger(firstDoc, "exitCode", exitCode) && exitCode == 0 &&
 						ReadWireInteger(firstDoc, "processContractVersion", contractVersion) &&
 							contractVersion == gglab::ShaderProcessContractVersion &&
+						ReadWireInteger(firstDoc, "compilePolicyRevision", compilePolicyRevision) &&
+							compilePolicyRevision == gglab::ShaderCompilePolicyRevision &&
 						WireDiagnosticsCount(firstDoc, diagnosticsCount) &&
 							diagnosticsCount == 0,
 					"describe.success carries exact command/success/status/exitCode and an empty diagnostics array");
+			}
+
+			// compilePolicyRevision is the cross-process counterpart of the cache
+			// BuildKey axis and must come from the same authority constant.
+			{
+				const CliRunResult result = RunCli({ L"describe" });
+				const auto doc = ParseWireDocument(result.m_StdOut);
+				std::int64_t compilePolicyRevision = -1;
+				const bool revisionRead = ReadWireInteger(
+					doc, "compilePolicyRevision", compilePolicyRevision);
+				context.Check(
+					revisionRead &&
+						compilePolicyRevision == gglab::ShaderCompilePolicyRevision,
+					"describe.compilePolicyRevision equals the BuildKey policy authority");
 			}
 
 			// Identity chains: the wire tool identity equals every published

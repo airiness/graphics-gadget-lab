@@ -5,6 +5,7 @@
 #include "Contracts/ShaderCompileTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
+#include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 
 #include <cstddef>
 #include <filesystem>
@@ -14,12 +15,6 @@
 
 namespace gglab
 {
-	// Independent cache-compatibility axis for compiler-owned policy. Bump this
-	// whenever argument generation, lowering, or another producer policy can
-	// change emitted binaries without changing the normalized recipe or DXC
-	// identity.
-	inline constexpr uint32_t ShaderCompilePolicyRevision = 1;
-
 	// Producer identity of the active DXC installation, independent of any
 	// compiler instance (used by CLI --version and CI diagnostics).
 	[[nodiscard]] ShaderCompilerIdentity QueryDxcCompilerIdentity() noexcept;

@@ -440,6 +440,7 @@ namespace
 				{ "status", "ok" },
 				{ "exitCode", ExitCodeSuccess },
 				{ "processContractVersion", gglab::ShaderProcessContractVersion },
+				{ "compilePolicyRevision", gglab::ShaderCompilePolicyRevision },
 				{ "toolIdentity", std::string(gglab::ShaderCompilerToolIdentity) },
 				{ "toolVersion", gglab::utils::ToString(gglab::ShaderCompilerToolVersion) },
 				{ "producerKind", std::string(*kindWireName) },

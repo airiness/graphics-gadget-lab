@@ -11,23 +11,27 @@ namespace gglab
 		SelfTestContext& context) noexcept
 	{
 		const std::string describe = std::format(
-			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"toolIdentity":"gglab-shaderc","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12","gglab-vulkan13"],"diagnostics":[]}})",
-			ShaderProcessContractVersion);
+			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"compilePolicyRevision":{},"toolIdentity":"gglab-shaderc","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12","gglab-vulkan13"],"diagnostics":[]}})",
+			ShaderProcessContractVersion, ShaderCompilePolicyRevision);
 		context.Check(
 			ValidateShaderCompilerDescribeDocument(describe, "gglab-vulkan13").m_Compatible,
 			"Development shader client accepts a compatible describe handshake");
 
 		const std::string wrongContract = std::format(
-			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"toolIdentity":"gglab-shaderc","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12"],"diagnostics":[]}})",
-			ShaderProcessContractVersion + 1);
+			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"compilePolicyRevision":{},"toolIdentity":"gglab-shaderc","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12"],"diagnostics":[]}})",
+			ShaderProcessContractVersion + 1, ShaderCompilePolicyRevision);
+		const std::string wrongCompilePolicy = std::format(
+			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"compilePolicyRevision":{},"toolIdentity":"gglab-shaderc","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12"],"diagnostics":[]}})",
+			ShaderProcessContractVersion, ShaderCompilePolicyRevision + 1);
 		const std::string duplicateIdentity = std::format(
-			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"toolIdentity":"gglab-shaderc","toolIdentity":"other","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12"],"diagnostics":[]}})",
-			ShaderProcessContractVersion);
+			R"({{"command":"describe","success":true,"status":"ok","exitCode":0,"processContractVersion":{},"compilePolicyRevision":{},"toolIdentity":"gglab-shaderc","toolIdentity":"other","toolVersion":"1.1.0","producerKind":"dxc","producerIdentity":"dxc-test","supportedTargets":["gglab-dx12"],"diagnostics":[]}})",
+			ShaderProcessContractVersion, ShaderCompilePolicyRevision);
 		context.Check(
 			!ValidateShaderCompilerDescribeDocument(wrongContract, "gglab-dx12").m_Compatible &&
+			!ValidateShaderCompilerDescribeDocument(wrongCompilePolicy, "gglab-dx12").m_Compatible &&
 			!ValidateShaderCompilerDescribeDocument(duplicateIdentity, "gglab-dx12").m_Compatible &&
 			!ValidateShaderCompilerDescribeDocument(describe + "trailing", "gglab-dx12").m_Compatible,
-			"Development shader client rejects incompatible, duplicate-key, and contaminated handshakes");
+			"Development shader client rejects incompatible policy, duplicate-key, and contaminated handshakes");
 
 		const std::string registryId(64, 'a');
 		const std::string build = std::format(
