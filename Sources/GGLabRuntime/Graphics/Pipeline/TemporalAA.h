@@ -2,6 +2,7 @@
 
 #include "Core/Math/Vector.h"
 #include "Graphics/GraphicsTypes.h"
+#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <algorithm>
 #include <array>
@@ -28,7 +29,15 @@ namespace gglab
 		PreviousUVOutOfBounds,
 		NonFinite,
 		DepthMismatch,
+		BackgroundMismatch,
 	};
+
+	[[nodiscard]] inline bool IsTemporalSkyHistoryCompatible(
+		float previousRawDepth, DepthConvention previousDepthConvention) noexcept
+	{
+		return std::isfinite(previousRawDepth) &&
+			screen_space::IsDepthBackground(previousRawDepth, previousDepthConvention);
+	}
 
 	[[nodiscard]] inline bool IsTemporalHistoryDepthCompatible(float expectedPreviousViewZ,
 		float storedPreviousViewZ,

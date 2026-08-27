@@ -4549,6 +4549,13 @@ namespace gglab
 				TemporalAARestrictedHistoryWeight > 0.0f &&
 				TemporalAARestrictedHistoryWeight < 0.5f,
 				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance and a restricted T07 history weight");
+			context.Check(IsTemporalSkyHistoryCompatible(0.0f, DepthConvention::Reversed) &&
+				IsTemporalSkyHistoryCompatible(1.0f, DepthConvention::Standard) &&
+				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Reversed) &&
+				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Standard) &&
+				!IsTemporalSkyHistoryCompatible(
+					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
+				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;

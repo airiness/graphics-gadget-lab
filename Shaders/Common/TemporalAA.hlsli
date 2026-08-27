@@ -9,6 +9,7 @@ static const uint TAA_REJECTION_HISTORY_UNAVAILABLE = 1;
 static const uint TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS = 2;
 static const uint TAA_REJECTION_NON_FINITE = 3;
 static const uint TAA_REJECTION_DEPTH_MISMATCH = 4;
+static const uint TAA_REJECTION_BACKGROUND_MISMATCH = 5;
 
 bool IsTemporalUVInBounds(float2 uv)
 {

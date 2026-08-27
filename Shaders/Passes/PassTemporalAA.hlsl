@@ -93,8 +93,24 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			}
 			else if (IsDepthBackground(currentRawDepth, viewData.DepthConvention))
 			{
-				accepted = true;
-				rejectionReason = TAA_REJECTION_NONE;
+				Texture2D<float> previousDepthTexture =
+					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
+				SamplerState pointClampSampler =
+					GetSamplerState(g_Pass.PointClampSamplerIndex);
+				const float previousRawDepth = previousDepthTexture.SampleLevel(
+					pointClampSampler, previousUV, 0.0);
+				if (!isfinite(previousRawDepth))
+				{
+					rejectionReason = TAA_REJECTION_NON_FINITE;
+				}
+				else
+				{
+					accepted = IsDepthBackground(
+						previousRawDepth, viewData.PreviousDepthConvention);
+					rejectionReason = accepted
+						? TAA_REJECTION_NONE
+						: TAA_REJECTION_BACKGROUND_MISMATCH;
+				}
 			}
 			else
 			{
