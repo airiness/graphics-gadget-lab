@@ -1,5 +1,5 @@
 #include "ShaderCompilerCliContractSelfTests.h"
-#include "ShaderCompilerProcessContract.h"
+#include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"

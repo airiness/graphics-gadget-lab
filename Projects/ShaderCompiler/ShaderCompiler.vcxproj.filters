@@ -4,9 +4,6 @@
     <Filter Include="Testing">
       <UniqueIdentifier>{0430FB53-BF01-33D3-EE35-AED89299677A}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Wire">
-      <UniqueIdentifier>{B71DBCE3-0594-D905-3A9A-D66AE5718FB8}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.cpp" />
@@ -20,8 +17,5 @@
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.h" />
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.h" />
     <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerProcessFactory.h" />
-    <ClInclude Include="..\..\Sources\Tools\ShaderCompiler\Wire\ShaderCompilerProcessContract.h">
-      <Filter>Wire</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

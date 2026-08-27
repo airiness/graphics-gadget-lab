@@ -7,6 +7,7 @@
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+#include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
 #include "Application/SelfTest/VulkanQualificationSelfTests.h"
 #endif
 #if GGLAB_ENABLE_VULKAN
@@ -55,6 +56,10 @@ namespace gglab
 				.m_Run = &RunLaunchOptionsSelfTests,
 			},
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+			SelfTestSuiteDesc{
+				.m_Id = "app-development-shader-process-client",
+				.m_Run = &RunDevelopmentShaderBuildProcessClientSelfTests,
+			},
 			SelfTestSuiteDesc{
 				.m_Id = "app-vulkan-qualification",
 				.m_Run = &RunVulkanQualificationSelfTests,

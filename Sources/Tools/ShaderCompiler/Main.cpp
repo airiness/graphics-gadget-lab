@@ -8,10 +8,11 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Targets/ShaderTargetWireNames.h"
-#include "Wire/ShaderCompilerProcessContract.h"
+#include "Wire/ShaderWireNames.h"
 
 #include <nlohmann/json.hpp>
 
@@ -75,47 +76,6 @@ namespace
 			return ExitCodeSourceChanged;
 		}
 		return ExitCodeCompileFailed;
-	}
-
-	[[nodiscard]] bool ParseShaderStage(
-		std::string_view text, gglab::ShaderStage& outStage) noexcept
-	{
-		if (text == "vertex")
-		{
-			outStage = gglab::ShaderStage::Vertex;
-			return true;
-		}
-		if (text == "pixel")
-		{
-			outStage = gglab::ShaderStage::Pixel;
-			return true;
-		}
-		if (text == "hull")
-		{
-			outStage = gglab::ShaderStage::Hull;
-			return true;
-		}
-		if (text == "domain")
-		{
-			outStage = gglab::ShaderStage::Domain;
-			return true;
-		}
-		if (text == "geometry")
-		{
-			outStage = gglab::ShaderStage::Geometry;
-			return true;
-		}
-		if (text == "mesh")
-		{
-			outStage = gglab::ShaderStage::Mesh;
-			return true;
-		}
-		if (text == "compute")
-		{
-			outStage = gglab::ShaderStage::Compute;
-			return true;
-		}
-		return false;
 	}
 
 	[[nodiscard]] bool ParseTarget(
@@ -280,8 +240,8 @@ namespace
 			{ "buildKey", gglab::Sha256DigestToHex(recipe.m_BuildKey.m_DurableDigest) },
 			{ "binaryHash", gglab::Sha256DigestToHex(
 				result.m_Artifact.m_Manifest.m_BinaryContentDigest.m_Digest) },
-			{ "binaryFormat", result.m_Artifact.GetBinaryFormat() ==
-				gglab::ShaderBinaryFormat::SpirV ? "spirv" : "dxil" },
+			{ "binaryFormat", gglab::ShaderBinaryFormatWire::Name(
+				result.m_Artifact.GetBinaryFormat()) },
 			{ "target", gglab::utils::ToString(targetName) },
 			{ "binaryPath", gglab::utils::ToString(binaryPath.wstring()) },
 			{ "cacheRecordPath", gglab::utils::ToString(recordPath.wstring()) },
@@ -304,7 +264,7 @@ namespace
 	{
 		const gglab::ShaderCompileCommandOptions& options = commandLine.m_Compile;
 		gglab::ShaderStage stage{};
-		if (!ParseShaderStage(options.m_Stage, stage))
+		if (!gglab::ShaderStageWire::Parse(options.m_Stage, stage))
 		{
 			return PrintCommandLineFailure(commandLine.m_Command, L"Unknown stage: " +
 				gglab::utils::ToWideString(options.m_Stage),

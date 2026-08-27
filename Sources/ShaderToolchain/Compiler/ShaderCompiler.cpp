@@ -825,9 +825,14 @@ namespace gglab
 		manifest.m_RecipeId = recipe.m_RecipeId;
 		manifest.m_BuildKey = recipe.m_BuildKey;
 		manifest.m_CompilerIdentity = recipe.m_CompilerIdentity;
-		manifest.m_TargetProfile = GetShaderTargetProfile(
+		const std::optional<ShaderTargetProfile> targetProfile = TryGetShaderTargetProfile(
 			recipe.m_Request.m_Target.m_BinaryFormat,
 			recipe.m_Request.m_Target.m_SpirVTargetEnvironment);
+		if (!targetProfile)
+		{
+			return {};
+		}
+		manifest.m_TargetProfile = *targetProfile;
 		manifest.m_BinaryFormat = recipe.m_Request.m_Target.m_BinaryFormat;
 		manifest.m_SpirVTargetEnvironment = recipe.m_Request.m_Target.m_SpirVTargetEnvironment;
 		manifest.m_BindingABIRevision = recipe.m_Request.m_Target.m_BindingABIRevision;
@@ -874,14 +879,17 @@ namespace gglab
 		{
 			return false;
 		}
-		if (manifest.m_BinaryFormat != recipe.m_Request.m_Target.m_BinaryFormat ||
+		const std::optional<ShaderTargetProfile> expectedTargetProfile =
+			TryGetShaderTargetProfile(
+				recipe.m_Request.m_Target.m_BinaryFormat,
+				recipe.m_Request.m_Target.m_SpirVTargetEnvironment);
+		if (!expectedTargetProfile ||
+			manifest.m_BinaryFormat != recipe.m_Request.m_Target.m_BinaryFormat ||
 			manifest.m_SpirVTargetEnvironment !=
 			recipe.m_Request.m_Target.m_SpirVTargetEnvironment ||
 			manifest.m_BindingABIRevision != recipe.m_Request.m_Target.m_BindingABIRevision ||
 			manifest.m_CoordinateOptions != recipe.m_Request.m_Target.m_CoordinateOptions ||
-			manifest.m_TargetProfile != GetShaderTargetProfile(
-				recipe.m_Request.m_Target.m_BinaryFormat,
-				recipe.m_Request.m_Target.m_SpirVTargetEnvironment))
+			manifest.m_TargetProfile != *expectedTargetProfile)
 		{
 			return false;
 		}
@@ -1231,11 +1239,13 @@ namespace gglab
 	}
 
 	LocalShaderCacheKey ShaderCompiler::ComputeBuildKey(
-		const ShaderRecipeId& recipeId, const ShaderCompilerIdentity& compilerIdentity) noexcept
+		const ShaderRecipeId& recipeId, const ShaderCompilerIdentity& compilerIdentity,
+		uint32_t compilePolicyRevision) noexcept
 	{
 		Sha256Builder builder;
 		bool succeeded = builder.AddStringUtf8("gglab.shader.buildkey") &&
 			builder.AddU32LE(ShaderRecipeHashSchema) &&
+			builder.AddU32LE(compilePolicyRevision) &&
 			builder.AddBytes(std::span(recipeId.m_DurableDigest.m_Value)) &&
 			builder.AddStringUtf8(utils::ToString(compilerIdentity.m_CanonicalIdentity));
 

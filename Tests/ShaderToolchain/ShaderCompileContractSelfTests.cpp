@@ -14,7 +14,9 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "DevelopmentShaderPaths.h"
+#include "Targets/ShaderTargetWireNames.h"
 #include "Targets/Vulkan13ShaderTarget.h"
+#include "Wire/ShaderWireNames.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <windows.h>
@@ -585,8 +587,66 @@ namespace gglab
 			context.Check(ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity) ==
 				spirVRecipe.m_BuildKey &&
 				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, differentIdentity) !=
-				spirVRecipe.m_BuildKey,
-				"Producer identity participates in the build key, not the recipe identity");
+				spirVRecipe.m_BuildKey &&
+				ShaderCompiler::ComputeBuildKey(spirVRecipe.m_RecipeId, compilerIdentity,
+					ShaderCompilePolicyRevision + 1) != spirVRecipe.m_BuildKey,
+				"Producer identity and compile-policy revision independently participate in the build key");
+
+			context.Check(
+				TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil,
+					ShaderSpirVTargetEnvironment::None) == ShaderTargetProfile::GGLabDX12 &&
+				TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV,
+					ShaderSpirVTargetEnvironment::Vulkan1_3) ==
+						ShaderTargetProfile::GGLabVulkan13 &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::Unknown,
+					ShaderSpirVTargetEnvironment::None) &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::Dxil,
+					ShaderSpirVTargetEnvironment::Vulkan1_3) &&
+				!TryGetShaderTargetProfile(ShaderBinaryFormat::SpirV,
+					ShaderSpirVTargetEnvironment::None),
+				"Target-profile inference accepts only the two declared format/environment pairs");
+
+			bool wireVocabularyRoundTrips = true;
+			for (const ShaderBinaryFormatWire::Entry& entry : ShaderBinaryFormatWire::Entries)
+			{
+				ShaderBinaryFormat parsed = ShaderBinaryFormat::Unknown;
+				wireVocabularyRoundTrips &= ShaderBinaryFormatWire::Parse(entry.m_Name, parsed) &&
+					parsed == entry.m_Value && ShaderBinaryFormatWire::Name(parsed) == entry.m_Name;
+			}
+			for (const ShaderSpirVTargetEnvironmentWire::Entry& entry :
+				ShaderSpirVTargetEnvironmentWire::Entries)
+			{
+				ShaderSpirVTargetEnvironment parsed = ShaderSpirVTargetEnvironment::None;
+				wireVocabularyRoundTrips &=
+					ShaderSpirVTargetEnvironmentWire::Parse(entry.m_Name, parsed) &&
+					parsed == entry.m_Value &&
+					ShaderSpirVTargetEnvironmentWire::Name(parsed) == entry.m_Name;
+			}
+			for (const ShaderStageWire::Entry& entry : ShaderStageWire::Entries)
+			{
+				ShaderStage parsed = ShaderStage::Vertex;
+				wireVocabularyRoundTrips &= ShaderStageWire::Parse(entry.m_Name, parsed) &&
+					parsed == entry.m_Value && ShaderStageWire::Name(parsed) == entry.m_Name;
+			}
+			for (const ShaderModelWire::Entry& entry : ShaderModelWire::Entries)
+			{
+				ShaderModel parsed = ShaderModel::SM_6_6;
+				wireVocabularyRoundTrips &= ShaderModelWire::Parse(entry.m_Name, parsed) &&
+					parsed == entry.m_Value && ShaderModelWire::Name(parsed) == entry.m_Name;
+			}
+			for (const ShaderTargetWire::Entry& entry : ShaderTargetWire::kEntries)
+			{
+				ShaderTargetProfile parsed = ShaderTargetProfile::GGLabDX12;
+				wireVocabularyRoundTrips &= ShaderTargetWire::Parse(entry.name, parsed) &&
+					parsed == entry.profile && ShaderTargetWire::Name(parsed) == entry.name;
+			}
+			ShaderStage unknownStage = ShaderStage::Vertex;
+			ShaderModel unknownModel = ShaderModel::SM_6_6;
+			wireVocabularyRoundTrips &=
+				!ShaderStageWire::Parse("raygen", unknownStage) &&
+				!ShaderModelWire::Parse("9_9", unknownModel);
+			context.Check(wireVocabularyRoundTrips,
+				"Shared shader wire-name authorities round-trip every supported value and reject unknown names");
 
 			// Logical source identity: absolute paths are rejected, and the
 			// recipe identity is the logical path, not the physical checkout path.

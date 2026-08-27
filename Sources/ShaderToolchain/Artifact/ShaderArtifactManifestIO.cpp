@@ -3,6 +3,8 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "Targets/ShaderTargetWireNames.h"
+#include "Wire/ShaderWireNames.h"
 
 #include <nlohmann/json.hpp>
 
@@ -29,193 +31,6 @@ namespace gglab
 {
 	namespace
 	{
-		[[nodiscard]] constexpr std::string_view ShaderBinaryFormatText(
-			ShaderBinaryFormat format) noexcept
-		{
-			switch (format)
-			{
-			case ShaderBinaryFormat::Dxil:
-				return "dxil";
-			case ShaderBinaryFormat::SpirV:
-				return "spirv";
-			case ShaderBinaryFormat::Unknown:
-				break;
-			}
-			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool ParseShaderBinaryFormat(
-			std::string_view text, ShaderBinaryFormat& outFormat) noexcept
-		{
-			if (text == "dxil")
-			{
-				outFormat = ShaderBinaryFormat::Dxil;
-				return true;
-			}
-			if (text == "spirv")
-			{
-				outFormat = ShaderBinaryFormat::SpirV;
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] constexpr std::string_view SpirVTargetEnvironmentText(
-			ShaderSpirVTargetEnvironment environment) noexcept
-		{
-			switch (environment)
-			{
-			case ShaderSpirVTargetEnvironment::None:
-				return "none";
-			case ShaderSpirVTargetEnvironment::Vulkan1_3:
-				return "vulkan1.3";
-			}
-			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool ParseSpirVTargetEnvironment(
-			std::string_view text, ShaderSpirVTargetEnvironment& outEnvironment) noexcept
-		{
-			if (text == "none")
-			{
-				outEnvironment = ShaderSpirVTargetEnvironment::None;
-				return true;
-			}
-			if (text == "vulkan1.3")
-			{
-				outEnvironment = ShaderSpirVTargetEnvironment::Vulkan1_3;
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] constexpr std::string_view ShaderStageText(ShaderStage stage) noexcept
-		{
-			switch (stage)
-			{
-			case ShaderStage::Vertex:
-				return "vertex";
-			case ShaderStage::Pixel:
-				return "pixel";
-			case ShaderStage::Hull:
-				return "hull";
-			case ShaderStage::Domain:
-				return "domain";
-			case ShaderStage::Geometry:
-				return "geometry";
-			case ShaderStage::Mesh:
-				return "mesh";
-			case ShaderStage::Compute:
-				return "compute";
-			}
-			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool ParseShaderStage(
-			std::string_view text, ShaderStage& outStage) noexcept
-		{
-			if (text == "vertex")
-			{
-				outStage = ShaderStage::Vertex;
-				return true;
-			}
-			if (text == "pixel")
-			{
-				outStage = ShaderStage::Pixel;
-				return true;
-			}
-			if (text == "hull")
-			{
-				outStage = ShaderStage::Hull;
-				return true;
-			}
-			if (text == "domain")
-			{
-				outStage = ShaderStage::Domain;
-				return true;
-			}
-			if (text == "geometry")
-			{
-				outStage = ShaderStage::Geometry;
-				return true;
-			}
-			if (text == "mesh")
-			{
-				outStage = ShaderStage::Mesh;
-				return true;
-			}
-			if (text == "compute")
-			{
-				outStage = ShaderStage::Compute;
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] constexpr std::string_view ShaderModelText(ShaderModel model) noexcept
-		{
-			switch (model)
-			{
-			case ShaderModel::SM_6_6:
-				return "6_6";
-			case ShaderModel::SM_6_7:
-				return "6_7";
-			case ShaderModel::SM_6_8:
-				return "6_8";
-			}
-			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool ParseShaderModel(
-			std::string_view text, ShaderModel& outModel) noexcept
-		{
-			if (text == "6_6")
-			{
-				outModel = ShaderModel::SM_6_6;
-				return true;
-			}
-			if (text == "6_7")
-			{
-				outModel = ShaderModel::SM_6_7;
-				return true;
-			}
-			if (text == "6_8")
-			{
-				outModel = ShaderModel::SM_6_8;
-				return true;
-			}
-			return false;
-		}
-
-		[[nodiscard]] constexpr std::string_view ShaderTargetProfileText(
-			ShaderTargetProfile profile) noexcept
-		{
-			switch (profile)
-			{
-			case ShaderTargetProfile::GGLabDX12:
-				return "gglab-dx12";
-			case ShaderTargetProfile::GGLabVulkan13:
-				return "gglab-vulkan13";
-			}
-			return "unknown";
-		}
-
-		[[nodiscard]] constexpr bool ParseShaderTargetProfile(
-			std::string_view text, ShaderTargetProfile& outProfile) noexcept
-		{
-			if (text == "gglab-dx12")
-			{
-				outProfile = ShaderTargetProfile::GGLabDX12;
-				return true;
-			}
-			if (text == "gglab-vulkan13")
-			{
-				outProfile = ShaderTargetProfile::GGLabVulkan13;
-				return true;
-			}
-			return false;
-		}
-
 		[[nodiscard]] constexpr int HexDigitValue(char value) noexcept
 		{
 			if (value >= '0' && value <= '9')
@@ -371,16 +186,16 @@ namespace gglab
 			compiler["kind"] = "dxc";
 			compiler["identity"] = utils::ToString(manifest.m_CompilerIdentity.m_CanonicalIdentity);
 			document["compiler"] = std::move(compiler);
-			document["targetProfile"] = ShaderTargetProfileText(manifest.m_TargetProfile);
-			document["binaryFormat"] = ShaderBinaryFormatText(manifest.m_BinaryFormat);
+			document["targetProfile"] = ShaderTargetWire::Name(manifest.m_TargetProfile);
+			document["binaryFormat"] = ShaderBinaryFormatWire::Name(manifest.m_BinaryFormat);
 			document["spirvTargetEnvironment"] =
-				SpirVTargetEnvironmentText(manifest.m_SpirVTargetEnvironment);
+				ShaderSpirVTargetEnvironmentWire::Name(manifest.m_SpirVTargetEnvironment);
 			document["bindingAbiRevision"] =
 				static_cast<std::int64_t>(manifest.m_BindingABIRevision);
 			document["coordinateOptions"] =
 				static_cast<std::int64_t>(manifest.m_CoordinateOptions);
-			document["stage"] = ShaderStageText(manifest.m_Stage);
-			document["shaderModel"] = ShaderModelText(manifest.m_ShaderModel);
+			document["stage"] = ShaderStageWire::Name(manifest.m_Stage);
+			document["shaderModel"] = ShaderModelWire::Name(manifest.m_ShaderModel);
 			document["hlslVersion"] = utils::ToString(manifest.m_HlslVersion);
 			document["compileFlags"] = static_cast<std::int64_t>(manifest.m_CompileFlags);
 			document["optimizationLevel"] = utils::ToString(manifest.m_OptimizationLevel);
@@ -811,19 +626,20 @@ namespace gglab
 				seenMask |= 1u << 4;
 
 				if (!ParseRequiredString(object, "targetProfile", text) ||
-					!ParseShaderTargetProfile(text, manifest.m_TargetProfile))
+					!ShaderTargetWire::Parse(text, manifest.m_TargetProfile))
 				{
 					return false;
 				}
 				seenMask |= 1u << 5;
 				if (!ParseRequiredString(object, "binaryFormat", text) ||
-					!ParseShaderBinaryFormat(text, manifest.m_BinaryFormat))
+					!ShaderBinaryFormatWire::Parse(text, manifest.m_BinaryFormat))
 				{
 					return false;
 				}
 				seenMask |= 1u << 6;
 				if (!ParseRequiredString(object, "spirvTargetEnvironment", text) ||
-					!ParseSpirVTargetEnvironment(text, manifest.m_SpirVTargetEnvironment))
+					!ShaderSpirVTargetEnvironmentWire::Parse(
+						text, manifest.m_SpirVTargetEnvironment))
 				{
 					return false;
 				}
@@ -844,13 +660,13 @@ namespace gglab
 					static_cast<ShaderCoordinateOptions>(integer);
 				seenMask |= 1u << 9;
 				if (!ParseRequiredString(object, "stage", text) ||
-					!ParseShaderStage(text, manifest.m_Stage))
+					!ShaderStageWire::Parse(text, manifest.m_Stage))
 				{
 					return false;
 				}
 				seenMask |= 1u << 10;
 				if (!ParseRequiredString(object, "shaderModel", text) ||
-					!ParseShaderModel(text, manifest.m_ShaderModel))
+					!ShaderModelWire::Parse(text, manifest.m_ShaderModel))
 				{
 					return false;
 				}
