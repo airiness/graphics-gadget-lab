@@ -106,14 +106,17 @@ namespace gglab
 		}
 		if (!m_ActiveHistory)
 		{
-			if (resetReason == TemporalHistoryResetReason::None)
-			{
-				RecordReset(TemporalHistoryResetReason::ColdStart);
-			}
+			const bool recordColdStart = !m_HasEstablishedHistory &&
+				m_LastResetReason == TemporalHistoryResetReason::None;
 			if (!CreateHistorySet(compatibility))
 			{
 				RecordReset(TemporalHistoryResetReason::AllocationFailure);
 				return {};
+			}
+			m_HasEstablishedHistory = true;
+			if (recordColdStart)
+			{
+				RecordReset(TemporalHistoryResetReason::ColdStart);
 			}
 		}
 
@@ -183,6 +186,11 @@ namespace gglab
 			frame.m_RenderGraphExported || !resources.IsValid() ||
 			resources.m_ReadIndex != frame.m_ReadIndex ||
 			resources.m_WriteIndex != frame.m_WriteIndex)
+		{
+			return false;
+		}
+		if (!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextColor) ||
+			!builder.IsTextureFullyWrittenByCurrentPass(resources.m_NextDepth))
 		{
 			return false;
 		}

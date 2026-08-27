@@ -184,6 +184,13 @@ namespace gglab
 			{
 				return m_RG.GetTextureDesc(textureId);
 			}
+			// Inherited Defined contents do not count; the current pass's declared write
+			// ranges must cover the complete current texture version.
+			[[nodiscard]] bool IsTextureFullyWrittenByCurrentPass(
+				RGTextureId textureId) const noexcept
+			{
+				return m_RG.IsTextureFullyWrittenByPass(m_PassNodeIndex, textureId);
+			}
 
 			RGBufferId CreateBuffer(const char* name, const RHIBufferDesc& desc = {}) noexcept
 			{
@@ -462,6 +469,8 @@ namespace gglab
 			RGTextureId textureId, std::optional<RHITextureViewDesc> desc) noexcept;
 
 		RGVirtualResourceBase* GetVirtualResource(RGResourceHandle handle) const noexcept;
+		[[nodiscard]] bool IsTextureFullyWrittenByPass(
+			RGPassNodeIndex passNodeIndex, RGTextureId textureId) const noexcept;
 
 		// Texture subresource-level content validity helpers. A nullopt range
 		// represents the complete texture; ranges are normalized with

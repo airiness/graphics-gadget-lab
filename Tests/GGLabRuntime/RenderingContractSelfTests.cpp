@@ -3284,6 +3284,39 @@ namespace gglab
 
 		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
 		{
+			RecordingDevice writeProofDevice;
+			RHITextureDesc writeProofDesc{};
+			writeProofDesc.m_Dimension = RHITextureDimension::Texture2D;
+			writeProofDesc.m_Format = TemporalHistoryColorFormat;
+			writeProofDesc.m_Usage =
+				RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess;
+			writeProofDesc.m_Extent = { 8, 8, 1 };
+			const RHITextureHandle writeProofTexture = writeProofDevice.CreateTexture(
+				RHIOwnedTextureCreateInfo{ .m_Desc = writeProofDesc }, {});
+			RenderGraph writeProofGraph({
+				.m_Device = &writeProofDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			bool initiallyDefinedCountsAsCurrentWrite = true;
+			bool fullCurrentWriteRecognized = false;
+			writeProofGraph.AddPass<RGTextureId>("TemporalHistory.WriteProof",
+				[&](RenderGraph::RGBuilder& builder, RGTextureId& texture)
+				{
+					texture = builder.ImportTexture("TemporalHistory.WriteProof.Texture",
+						writeProofTexture, writeProofDesc, CommonRHIResourceState(),
+						RGContentValidity::Defined);
+					initiallyDefinedCountsAsCurrentWrite =
+						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite);
+					fullCurrentWriteRecognized =
+						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					builder.Export(texture, RGTextureAccess::None);
+				});
+			context.Check(!initiallyDefinedCountsAsCurrentWrite && fullCurrentWriteRecognized &&
+				writeProofGraph.Compile(),
+				"RenderGraph distinguishes prior Defined contents from a full current-pass write");
+
 			RecordingDevice device;
 			device.m_TextureViewsSupported = true;
 			const TemporalHistoryFormatSupport formatSupport =
@@ -3388,6 +3421,38 @@ namespace gglab
 				return imported && exported && previousMatched && compiled &&
 					previousExportsCommon && importedFour && nextExportsCommon;
 			};
+			auto buildNoWriteHistoryGraph = [&](TemporalFrameTransaction& transaction)
+			{
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				bool imported = false;
+				bool exported = true;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.NoWrite",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						imported = transaction.ImportHistoryResources(builder, data.m_History);
+						exported = transaction.ExportHistoryResources(builder, data.m_History);
+					});
+				return imported && !exported && !transaction.ParticipatedInResolve() &&
+					graph.Compile();
+			};
+
+			TemporalFrameTransaction noWriteTransaction;
+			noWriteTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(noWriteTransaction));
+			const bool noWriteGraphValid = buildNoWriteHistoryGraph(noWriteTransaction);
+			noWriteTransaction.CommitCompleted(RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 5 });
+			const TemporalHistoryManagerDiagnostics afterNoWrite =
+				historyManager.GetDiagnostics();
+			context.Check(noWriteGraphValid &&
+				noWriteTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				!afterNoWrite.m_HistoryValid && afterNoWrite.m_ReadIndex == 0 &&
+				!viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 0,
+				"Export without full current-frame history writes cannot participate or commit");
 
 			TemporalFrameTransaction firstTransaction;
 			firstTransaction.Begin(
@@ -3486,6 +3551,9 @@ namespace gglab
 				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
 			const TemporalHistoryManagerDiagnostics reenabled = historyManager.GetDiagnostics();
 			reenabledTransaction.Abort();
+			context.Check(
+				reenabled.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
+				"Fresh history allocation preserves its explicit reset cause instead of ColdStart");
 			ResolvedTemporalFramePlan disabledPlan = activePlan;
 			disabledPlan.m_Status = TemporalAAFrameStatus::Disabled;
 			disabledPlan.m_DisableReason = TemporalAADisableReason::NotRequested;

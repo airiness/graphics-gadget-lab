@@ -179,6 +179,7 @@ namespace gglab
 		TemporalHistoryResetReason m_LastResetReason = TemporalHistoryResetReason::None;
 		uint64_t m_NextAllocationGeneration = 1;
 		uint64_t m_ResetCount = 0;
+		bool m_HasEstablishedHistory = false;
 		bool m_Shutdown = false;
 	};
 }
