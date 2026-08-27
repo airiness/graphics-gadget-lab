@@ -11,16 +11,82 @@
 
 namespace gglab
 {
+	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
+	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
+	inline constexpr float TemporalAADefaultHistoryWeight = 0.9f;
+	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.05f;
+	inline constexpr float TemporalAADefaultLuminanceWeightScale = 4.0f;
+	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
+	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
+	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
+	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
+	inline constexpr float TemporalAAMaxNeighborhoodClampExpansion = 1.0f;
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
+		float m_DepthAbsoluteThreshold = TemporalAADepthAbsoluteThreshold;
+		float m_DepthRelativeThreshold = TemporalAADepthRelativeThreshold;
+		float m_HistoryWeight = TemporalAADefaultHistoryWeight;
+		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
+		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
+		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
 
 		bool operator==(const TemporalAASettings&) const noexcept = default;
 	};
 
-	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
-	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
-	inline constexpr float TemporalAARestrictedHistoryWeight = 0.125f;
+	[[nodiscard]] inline TemporalAASettings ResolveTemporalAASettings(
+		TemporalAASettings settings) noexcept
+	{
+		const TemporalAASettings defaults{};
+		settings.m_DepthAbsoluteThreshold = std::isfinite(settings.m_DepthAbsoluteThreshold)
+			? std::clamp(settings.m_DepthAbsoluteThreshold, 0.0f,
+				TemporalAAMaxDepthThreshold)
+			: defaults.m_DepthAbsoluteThreshold;
+		settings.m_DepthRelativeThreshold = std::isfinite(settings.m_DepthRelativeThreshold)
+			? std::clamp(settings.m_DepthRelativeThreshold, 0.0f,
+				TemporalAAMaxDepthThreshold)
+			: defaults.m_DepthRelativeThreshold;
+		settings.m_HistoryWeight = std::isfinite(settings.m_HistoryWeight)
+			? std::clamp(settings.m_HistoryWeight, 0.0f, 1.0f)
+			: defaults.m_HistoryWeight;
+		settings.m_VelocityWeightScale = std::isfinite(settings.m_VelocityWeightScale)
+			? std::clamp(settings.m_VelocityWeightScale, 0.0f,
+				TemporalAAMaxVelocityWeightScale)
+			: defaults.m_VelocityWeightScale;
+		settings.m_LuminanceWeightScale = std::isfinite(settings.m_LuminanceWeightScale)
+			? std::clamp(settings.m_LuminanceWeightScale, 0.0f,
+				TemporalAAMaxLuminanceWeightScale)
+			: defaults.m_LuminanceWeightScale;
+		settings.m_NeighborhoodClampExpansion =
+			std::isfinite(settings.m_NeighborhoodClampExpansion)
+			? std::clamp(settings.m_NeighborhoodClampExpansion, 0.0f,
+				TemporalAAMaxNeighborhoodClampExpansion)
+			: defaults.m_NeighborhoodClampExpansion;
+		return settings;
+	}
+
+	[[nodiscard]] inline float ResolveTemporalAAHistoryWeight(float motionMagnitudePixels,
+		float currentLuminance, float historyLuminance,
+		const TemporalAASettings& settings) noexcept
+	{
+		if (!std::isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0f ||
+			!std::isfinite(currentLuminance) || !std::isfinite(historyLuminance))
+		{
+			return 0.0f;
+		}
+
+		const TemporalAASettings resolved = ResolveTemporalAASettings(settings);
+		const float velocityConfidence = 1.0f - std::clamp(
+			motionMagnitudePixels * resolved.m_VelocityWeightScale, 0.0f, 1.0f);
+		const float luminanceDenominator =
+			std::max({ std::abs(currentLuminance), std::abs(historyLuminance), 1.0e-4f });
+		const float relativeLuminanceDifference =
+			std::abs(currentLuminance - historyLuminance) / luminanceDenominator;
+		const float luminanceConfidence = 1.0f - std::clamp(
+			relativeLuminanceDifference * resolved.m_LuminanceWeightScale, 0.0f, 1.0f);
+		return resolved.m_HistoryWeight * velocityConfidence * luminanceConfidence;
+	}
 
 	enum class TemporalAAHistoryRejectionReason : uint32_t
 	{

@@ -4545,10 +4545,8 @@ namespace gglab
 				!IsTemporalHistoryDepthCompatible(100.0f, 102.1f) &&
 				!IsTemporalHistoryDepthCompatible(0.0f, 0.0f) &&
 				!IsTemporalHistoryDepthCompatible(
-					std::numeric_limits<float>::quiet_NaN(), 1.0f) &&
-				TemporalAARestrictedHistoryWeight > 0.0f &&
-				TemporalAARestrictedHistoryWeight < 0.5f,
-				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance and a restricted T07 history weight");
+					std::numeric_limits<float>::quiet_NaN(), 1.0f),
+				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance");
 			context.Check(IsTemporalSkyHistoryCompatible(0.0f, DepthConvention::Reversed) &&
 				IsTemporalSkyHistoryCompatible(1.0f, DepthConvention::Standard) &&
 				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Reversed) &&
@@ -4556,6 +4554,21 @@ namespace gglab
 				!IsTemporalSkyHistoryCompatible(
 					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
 				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
+
+			const TemporalAASettings defaultTemporalAA{};
+			const float staticHistoryWeight =
+				ResolveTemporalAAHistoryWeight(0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float movingHistoryWeight =
+				ResolveTemporalAAHistoryWeight(10.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float changedLuminanceHistoryWeight =
+				ResolveTemporalAAHistoryWeight(0.0f, 1.0f, 0.9f, defaultTemporalAA);
+			context.Check(NearlyEqual(staticHistoryWeight, TemporalAADefaultHistoryWeight) &&
+				movingHistoryWeight > 0.0f && movingHistoryWeight < staticHistoryWeight &&
+				changedLuminanceHistoryWeight > 0.0f &&
+				changedLuminanceHistoryWeight < staticHistoryWeight &&
+				ResolveTemporalAAHistoryWeight(std::numeric_limits<float>::quiet_NaN(),
+					1.0f, 1.0f, defaultTemporalAA) == 0.0f,
+				"Temporal blend starts at 0.9 history weight and attenuates for velocity, luminance change, and non-finite inputs");
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;
@@ -4743,9 +4756,38 @@ namespace gglab
 			profile.m_TemporalAA.m_Enabled = true;
 			const ResolvedViewRenderSettings enabledSettings =
 				ResolveViewRenderSettings(profile, camera);
+			profile.m_TemporalAA.m_DepthAbsoluteThreshold = -1.0f;
+			profile.m_TemporalAA.m_DepthRelativeThreshold = 2.0f;
+			profile.m_TemporalAA.m_HistoryWeight = 2.0f;
+			profile.m_TemporalAA.m_VelocityWeightScale = -1.0f;
+			profile.m_TemporalAA.m_LuminanceWeightScale = 32.0f;
+			profile.m_TemporalAA.m_NeighborhoodClampExpansion =
+				std::numeric_limits<float>::quiet_NaN();
+			const ResolvedViewRenderSettings clampedSettings =
+				ResolveViewRenderSettings(profile, camera);
 			context.Check(!defaultSettings.m_TemporalAA.m_Enabled &&
-				enabledSettings.m_TemporalAA.m_Enabled,
-				"Temporal AA authoring defaults off and resolves immutably for one frame");
+				enabledSettings.m_TemporalAA.m_Enabled &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthAbsoluteThreshold,
+					TemporalAADepthAbsoluteThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthRelativeThreshold,
+					TemporalAADepthRelativeThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_HistoryWeight,
+					TemporalAADefaultHistoryWeight) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_VelocityWeightScale,
+					TemporalAADefaultVelocityWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_LuminanceWeightScale,
+					TemporalAADefaultLuminanceWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_NeighborhoodClampExpansion,
+					TemporalAADefaultNeighborhoodClampExpansion) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthAbsoluteThreshold, 0.0f) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthRelativeThreshold,
+					TemporalAAMaxDepthThreshold) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_HistoryWeight, 1.0f) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_VelocityWeightScale, 0.0f) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_LuminanceWeightScale,
+					TemporalAAMaxLuminanceWeightScale) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_NeighborhoodClampExpansion, 0.0f),
+				"Temporal AA authoring defaults off and quality controls resolve to finite bounded frame settings");
 
 			const TemporalAACapabilityStatus fullCapabilities{
 				.m_MotionRenderTarget = true,

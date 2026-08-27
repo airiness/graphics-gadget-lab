@@ -14,6 +14,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
+#include <cmath>
 #include <cstdint>
 
 namespace gglab
@@ -21,6 +22,18 @@ namespace gglab
 	namespace
 	{
 		inline constexpr uint32_t TemporalAAThreadGroupSize = 8;
+		inline constexpr uint32_t TemporalAAHistoryValidBit = 0x80000000u;
+		inline constexpr float TemporalAAUnitRangeQuantizationScale = 65'535.0f;
+
+		[[nodiscard]] uint32_t PackTemporalAAUnitRangePair(float low, float high) noexcept
+		{
+			GGLAB_ASSERT(low >= 0.0f && low <= 1.0f && high >= 0.0f && high <= 1.0f);
+			const uint32_t lowBits = static_cast<uint32_t>(
+				std::lround(low * TemporalAAUnitRangeQuantizationScale));
+			const uint32_t highBits = static_cast<uint32_t>(
+				std::lround(high * TemporalAAUnitRangeQuantizationScale));
+			return lowBits | (highBits << 16u);
+		}
 
 		struct TemporalAAPassParameters
 		{
@@ -35,11 +48,11 @@ namespace gglab
 			uint32_t m_ReprojectionDiagnosticsUavIndex = 0;
 			uint32_t m_LinearClampSamplerIndex = 0;
 			uint32_t m_PointClampSamplerIndex = 0;
-			uint32_t m_ViewIndex = 0;
-			uint32_t m_PreviousHistoryValid = 0;
-			float m_DepthAbsoluteThreshold = TemporalAADepthAbsoluteThreshold;
-			float m_DepthRelativeThreshold = TemporalAADepthRelativeThreshold;
-			float m_RestrictedHistoryWeight = TemporalAARestrictedHistoryWeight;
+			uint32_t m_ViewIndexAndHistoryValid = 0;
+			uint32_t m_PackedDepthThresholds = 0;
+			uint32_t m_PackedHistoryWeightAndClampExpansion = 0;
+			float m_VelocityWeightScale = 0.0f;
+			float m_LuminanceWeightScale = 0.0f;
 		};
 		static_assert(IsPassRootConstantStruct<TemporalAAPassParameters>);
 		static_assert(sizeof(TemporalAAPassParameters) == 64);
@@ -87,7 +100,7 @@ namespace gglab
 			"Temporal AA must be prepared before graph construction.");
 		GGLAB_ASSERT_MSG(context.GetTemporalFramePlan().m_Active &&
 			context.GetTemporalFramePlan().m_InternalContractMode,
-			"T07 temporal resolve is restricted to the internal contract path until T09 integration.");
+			"T08 temporal resolve is restricted to the internal contract path until T09 integration.");
 		GGLAB_ASSERT_MSG(m_IsAvailable,
 			"Internal temporal resolve requires an available compute artifact and binding layout.");
 		if (!m_IsAvailable || !context.GetTemporalFramePlan().m_Active ||
@@ -106,7 +119,11 @@ namespace gglab
 		}
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
+		GGLAB_ASSERT_MSG((viewIndex & TemporalAAHistoryValidBit) == 0,
+			"Temporal AA view indices must fit below the packed history-valid bit.");
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const TemporalAASettings temporalAASettings =
+			context.GetDisplayViewRenderSettings().m_TemporalAA;
 		const auto* samplerRegistry = renderer->GetSamplerRegistry();
 		GGLAB_ASSERT_NOT_NULL(samplerRegistry);
 		if (!samplerRegistry)
@@ -116,7 +133,7 @@ namespace gglab
 
 		rg.AddPass<TemporalAAPassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
-			[transaction, displayViewId, viewIndex,
+			[transaction, displayViewId, viewIndex, temporalAASettings,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -173,7 +190,7 @@ namespace gglab
 				else
 				{
 					// Bind defined current-frame fallbacks. The shader does not sample them while
-					// PreviousHistoryValid is false, and the undefined previous imports stay unread.
+					// previous-history-valid is false, and the undefined previous imports stay unread.
 					data.m_PreviousColorSrv = data.m_CurrentColorSrv;
 					data.m_PreviousDepthSrv = data.m_CurrentDepthSrv;
 				}
@@ -216,8 +233,16 @@ namespace gglab
 				data.m_Parameters = {
 					.m_LinearClampSamplerIndex = linearClampSamplerIndex,
 					.m_PointClampSamplerIndex = pointClampSamplerIndex,
-					.m_ViewIndex = viewIndex,
-					.m_PreviousHistoryValid = resources.m_History.m_PreviousValid ? 1u : 0u,
+					.m_ViewIndexAndHistoryValid = viewIndex |
+						(resources.m_History.m_PreviousValid ? TemporalAAHistoryValidBit : 0u),
+					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
+						temporalAASettings.m_DepthAbsoluteThreshold,
+						temporalAASettings.m_DepthRelativeThreshold),
+					.m_PackedHistoryWeightAndClampExpansion = PackTemporalAAUnitRangePair(
+						temporalAASettings.m_HistoryWeight,
+						temporalAASettings.m_NeighborhoodClampExpansion),
+					.m_VelocityWeightScale = temporalAASettings.m_VelocityWeightScale,
+					.m_LuminanceWeightScale = temporalAASettings.m_LuminanceWeightScale,
 				};
 				targets.m_SceneColor = resources.m_ResolvedSceneColor;
 				const bool exported =
