@@ -231,6 +231,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -875,6 +878,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -933,6 +939,9 @@
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TaskSystemSnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">

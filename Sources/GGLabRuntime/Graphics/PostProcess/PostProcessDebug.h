@@ -24,8 +24,12 @@ namespace gglab
 		GTAOAOOnlyLightingContribution = 13,
 		TemporalMotionDirection = 14,
 		TemporalMotionMagnitude = 15,
+		TemporalHistoryColor = 16,
+		TemporalReprojectionUV = 17,
+		TemporalRejection = 18,
+		TemporalHistoryWeight = 19,
 
-		Count = 16
+		Count = 20
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -43,7 +47,11 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::GTAOAOOnlyLightingContribution) == 13);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalMotionDirection) == 14);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalMotionMagnitude) == 15);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 16);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryColor) == 16);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 20);
 
 	struct PostProcessDebugSelection
 	{

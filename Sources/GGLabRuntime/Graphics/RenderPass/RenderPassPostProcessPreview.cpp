@@ -4,6 +4,7 @@
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
+#include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
@@ -45,6 +46,10 @@ namespace gglab
 			PostProcessDebugTap::GTAOAOOnlyLightingContribution) == 13);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalMotionDirection) == 14);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalMotionMagnitude) == 15);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryColor) == 16);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalRejection) == 18);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
 
 		struct PassData
 		{
@@ -98,6 +103,14 @@ namespace gglab
 				tap == PostProcessDebugTap::TemporalMotionMagnitude;
 		}
 
+		bool IsTemporalAAPreview(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::TemporalHistoryColor ||
+				tap == PostProcessDebugTap::TemporalReprojectionUV ||
+				tap == PostProcessDebugTap::TemporalRejection ||
+				tap == PostProcessDebugTap::TemporalHistoryWeight;
+		}
+
 		RGTextureId ResolveGTAOPreviewSource(
 			const RGGTAOResources& resources, PostProcessDebugTap tap) noexcept
 		{
@@ -133,6 +146,29 @@ namespace gglab
 		auto* registry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
+		if (IsTemporalAAPreview(selection.m_Tap))
+		{
+			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
+				TemporalAAResourcesName);
+			const bool historyTap =
+				selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor;
+			const RGTextureId source = temporalAA
+				? (historyTap ? temporalAA->m_History.m_PreviousColor
+					: temporalAA->m_ReprojectionDiagnostics)
+				: RGTextureId{};
+			if (!temporalAA || !source.IsValid() ||
+				(historyTap && !temporalAA->m_History.m_PreviousValid))
+			{
+				registry->InvalidatePostProcessPreview(selection);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest())
+			{
+				return;
+			}
+			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection);
+			return;
+		}
 		if (IsTemporalMotionPreview(selection.m_Tap))
 		{
 			const auto* temporalGeometry = rg.GetBlackboard().TryGet<
@@ -257,7 +293,7 @@ namespace gglab
 				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader));
 		const bool pointSampledPreview =
 			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap) ||
-			IsTemporalMotionPreview(selection.m_Tap);
+			IsTemporalMotionPreview(selection.m_Tap) || IsTemporalAAPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 			pointSampledPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());

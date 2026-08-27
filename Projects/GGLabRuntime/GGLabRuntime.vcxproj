@@ -553,7 +553,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
+	<ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\LabSnapshotProvider.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
@@ -575,7 +576,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\LabSnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
@@ -584,7 +586,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />

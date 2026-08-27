@@ -231,6 +231,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Main.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -417,6 +420,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -534,6 +540,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h">
@@ -741,6 +750,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h">

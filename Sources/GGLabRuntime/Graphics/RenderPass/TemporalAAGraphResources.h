@@ -13,7 +13,7 @@ namespace gglab
 	{
 		TemporalHistoryRenderGraphResources m_History{};
 		RGTextureId m_ResolvedSceneColor{};
-		// RGBA = accepted, rejection reason, previous U, previous V.
+		// RGBA = history weight, rejection reason, previous U, previous V.
 		RGTextureId m_ReprojectionDiagnostics{};
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

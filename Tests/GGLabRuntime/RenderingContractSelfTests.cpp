@@ -4787,6 +4787,59 @@ namespace gglab
 					RHITextureUsage::Sampled),
 				"Active temporal geometry clears motion before velocity coverage and exposes an explicit sampled debug tap");
 
+			RenderGraph skyOnlyGraph({
+				.m_Device = &motionCapabilityDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+			});
+			skyOnlyGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.SkyOnlyTemporalSetup",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					resources.m_MotionVectors = builder.CreateTexture(
+						"Temporal.SkyOnly.MotionVectors", MakeTemporalMotionTextureDesc(320, 180));
+					resources.m_MotionSrvDesc = MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					resources.m_Width = 320;
+					resources.m_Height = 180;
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"View.ClearMotionVectors",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.WriteInPlace(resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"PostProcess.TemporalAA",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					data.m_Motion = builder.Read(
+						resources.m_MotionVectors, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			const bool skyOnlyGraphCompiled = skyOnlyGraph.Compile();
+			RGSnapshot skyOnlySnapshot;
+			if (skyOnlyGraphCompiled)
+			{
+				BuildRenderGraphSnapshot(skyOnlyGraph, skyOnlySnapshot);
+			}
+			context.Check(skyOnlyGraphCompiled && skyOnlySnapshot.m_Passes.size() == 3 &&
+				skyOnlySnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
+				!skyOnlySnapshot.m_Passes[1].m_Culled &&
+				skyOnlySnapshot.m_Passes[1].m_ExecutionOrder <
+					skyOnlySnapshot.m_Passes[2].m_ExecutionOrder,
+				"Zero-draw sky-only temporal frames retain motion clear before reprojection resolve");
+
 			context.Check(IsTemporalColorCompatible(
 				TemporalColorAbi::LinearRec709SceneReferredV1,
 				PostProcessColorState::SceneLinearRec709, 1.0f) &&
@@ -4979,25 +5032,41 @@ namespace gglab
 				"Renderer publishes temporal core capability as unavailable before pipeline closure");
 
 			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
-				.m_Settings = defaultSettings.m_TemporalAA,
+				.m_Settings = enabledSettings.m_TemporalAA,
+				.m_Capabilities = {},
 				.m_DisplayViewId = RenderViewID::Main,
 				.m_SceneExtensionParticipation =
 					SceneExtensionTemporalParticipation::PostTAA,
 				.m_DisplayViewEligible = true,
 			});
 			RenderViewBuilder viewBuilder;
-			const RenderView view = viewBuilder.Build<RenderViewID::Main>({
+			RenderView view = viewBuilder.Build<RenderViewID::Main>({
 				.m_Camera = camera,
 				.m_RenderSettings = defaultSettings,
 				.m_TemporalFramePlan = viewPlan,
 				.m_Width = 1920,
 				.m_Height = 1080,
 			});
+			TemporalViewHistory unavailableViewHistory{};
+			TemporalObjectHistory unavailableObjectHistory{};
+			TemporalFrameTransaction unavailableTransaction;
+			unavailableTransaction.Begin(unavailableViewHistory, unavailableObjectHistory,
+				viewPlan, 1920, 1080);
+			unavailableTransaction.PrepareDisplayView(view);
+			unavailableTransaction.CommitCompleted();
 			const float nearRawDepth = ProjectPosition(
 				Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
 			const float farRawDepth = ProjectPosition(
 				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
-			context.Check(view.m_UnjitteredProj.ToArray() == view.m_RasterProj.ToArray() &&
+			context.Check(viewPlan.m_Requested && !viewPlan.m_CoreAvailable &&
+				!viewPlan.m_Active && viewPlan.m_DisableReason ==
+					TemporalAADisableReason::CoreCapabilityUnavailable &&
+				unavailableTransaction.GetState() == TemporalFrameTransactionState::Committed &&
+				NearlyEqual(unavailableTransaction.GetJitterPixels(), Vector2::Zero) &&
+				!unavailableTransaction.ParticipatedInResolve() &&
+				!unavailableViewHistory.m_Valid &&
+				unavailableObjectHistory.GetDiagnostics().m_EntryCount == 0 &&
+				view.m_UnjitteredProj.ToArray() == view.m_RasterProj.ToArray() &&
 				view.m_UnjitteredViewProj.ToArray() == view.m_RasterViewProj.ToArray() &&
 				view.m_JitterPixels.m_X == 0.0f && view.m_JitterPixels.m_Y == 0.0f &&
 				view.m_JitterUV.m_X == 0.0f && view.m_JitterUV.m_Y == 0.0f &&
@@ -5007,7 +5076,7 @@ namespace gglab
 				NearlyEqual(screen_space::RawDepthToPositiveViewZ(farRawDepth,
 					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Far,
 					PositionTolerance * view.m_Far),
-				"Inactive temporal views preserve unjittered raster output and compact depth reconstruction");
+				"Core-unavailable temporal frames disable jitter, history participation, and resolve atomically");
 
 			const Vector2 jitterPixels(0.5f, -0.25f);
 			const Vector2 jitterUV = temporal::JitterPixelsToUV(jitterPixels, 100, 50);

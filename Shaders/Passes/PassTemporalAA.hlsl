@@ -176,5 +176,5 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	nextHistoryColor[pixel] = output;
 	nextHistoryDepth[pixel] = currentRawDepth;
 	reprojectionDiagnostics[pixel] = float4(
-		accepted ? 1.0 : 0.0, float(rejectionReason), previousUV);
+		historyWeight, float(rejectionReason), previousUV);
 }

@@ -231,6 +231,7 @@ namespace gglab
 					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
 				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);

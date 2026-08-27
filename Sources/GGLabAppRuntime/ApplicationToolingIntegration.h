@@ -23,6 +23,7 @@ namespace gglab
 	struct RenderView;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
+	struct ResolvedTemporalFramePlan;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -48,6 +49,7 @@ namespace gglab
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
 	};
 

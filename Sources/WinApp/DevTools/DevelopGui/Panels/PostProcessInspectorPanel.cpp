@@ -50,6 +50,14 @@ namespace gglab
 				return "Temporal / Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude:
 				return "Temporal / Motion Magnitude";
+			case PostProcessDebugTap::TemporalHistoryColor:
+				return "Temporal / Previous History Color";
+			case PostProcessDebugTap::TemporalReprojectionUV:
+				return "Temporal / Reprojection UV";
+			case PostProcessDebugTap::TemporalRejection:
+				return "Temporal / Rejection Reason";
+			case PostProcessDebugTap::TemporalHistoryWeight:
+				return "Temporal / History Weight";
 			default:
 				return "Unknown";
 			}
@@ -77,6 +85,10 @@ namespace gglab
 					PostProcessDebugTap::GTAOAOOnlyLightingContribution,
 					PostProcessDebugTap::TemporalMotionDirection,
 					PostProcessDebugTap::TemporalMotionMagnitude,
+					PostProcessDebugTap::TemporalHistoryColor,
+					PostProcessDebugTap::TemporalReprojectionUV,
+					PostProcessDebugTap::TemporalRejection,
+					PostProcessDebugTap::TemporalHistoryWeight,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -214,6 +226,11 @@ namespace gglab
 		const bool temporalMotionSelection =
 			selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
 			selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
+		const bool temporalAASelection =
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
+			selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
+			selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
@@ -229,6 +246,10 @@ namespace gglab
 		{
 			ImGui::TextDisabled(
 				"Source: active transient R16G16Float motion vectors in UV delta units.");
+		}
+		else if (temporalAASelection)
+		{
+			ImGui::TextDisabled("Source: active TAA history or reprojection diagnostics surface.");
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{

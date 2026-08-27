@@ -21,6 +21,7 @@ namespace gglab
 	class DebugDrawSystem;
 	struct ViewRenderProfile;
 	struct ViewRenderSettingsOverrides;
+	struct ResolvedTemporalFramePlan;
 
 	class DevelopGuiStateStore;
 
@@ -44,6 +45,7 @@ namespace gglab
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 
