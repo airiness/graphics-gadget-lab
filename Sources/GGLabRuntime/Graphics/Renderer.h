@@ -96,8 +96,7 @@ namespace gglab
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
-			RHIFencePoint m_UploadFencePoint = {};
-			RenderSceneGpuAllocations m_SceneGpuAllocations{};
+			RenderFrameGpuResources m_GpuResources{};
 			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
 			TemporalFrameTransaction m_TemporalTransaction{};
 		};
@@ -131,6 +130,8 @@ namespace gglab
 		[[nodiscard]] Frame BeginFrame() noexcept;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
+		void AdoptFrameBuildResources(
+			Frame& frame, const RenderFrameContext& renderContext) noexcept;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;

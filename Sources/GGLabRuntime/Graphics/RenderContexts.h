@@ -20,6 +20,20 @@ namespace gglab
 	class ShaderManager;
 	class TemporalFrameTransaction;
 	class RenderPipelineOverlayExtensionBase;
+	struct RenderFrameContext;
+
+	struct RenderFrameGpuResources
+	{
+		RHIFencePoint m_UploadFencePoint{};
+		RenderSceneGpuAllocations m_SceneGpuAllocations{};
+
+		void AdoptFrom(const RenderFrameContext& context) noexcept;
+		bool IsEmpty() const noexcept
+		{
+			return !m_UploadFencePoint.IsValid() && m_SceneGpuAllocations.IsEmpty();
+		}
+		void Reset() noexcept { *this = {}; }
+	};
 
 	struct RenderFrameContext
 	{
@@ -100,6 +114,30 @@ namespace gglab
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
 	};
+
+	inline void RenderFrameGpuResources::AdoptFrom(const RenderFrameContext& context) noexcept
+	{
+		if (context.m_UploadFencePoint.IsValid())
+		{
+			GGLAB_ASSERT_MSG(!m_UploadFencePoint.IsValid() ||
+				m_UploadFencePoint == context.m_UploadFencePoint,
+				"A render frame cannot adopt resources from different upload submissions.");
+			m_UploadFencePoint = context.m_UploadFencePoint;
+		}
+		if (!context.m_SceneGpuAllocations || context.m_SceneGpuAllocations->IsEmpty())
+		{
+			return;
+		}
+
+		GGLAB_ASSERT_MSG(m_SceneGpuAllocations.IsEmpty(),
+			"A render frame cannot replace scene GPU allocations before retirement.");
+		if (!m_SceneGpuAllocations.IsEmpty())
+		{
+			return;
+		}
+		m_SceneGpuAllocations = *context.m_SceneGpuAllocations;
+		*context.m_SceneGpuAllocations = {};
+	}
 
 	struct RenderServices
 	{

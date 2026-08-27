@@ -255,6 +255,17 @@ namespace gglab
 		return frame.m_TemporalTransaction;
 	}
 
+	void Renderer::AdoptFrameBuildResources(
+		Frame& frame, const RenderFrameContext& renderContext) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Frame-build resource adoption requires the active begun Renderer::Frame.");
+		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == frame.m_FrameSlotIndex);
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
+		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
+		frame.m_GpuResources.AdoptFrom(renderContext);
+	}
+
 	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
@@ -279,12 +290,7 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
 
 		frame.m_RenderGraph = &rg;
-		frame.m_UploadFencePoint = renderContext.m_UploadFencePoint;
-		if (renderContext.m_SceneGpuAllocations)
-		{
-			frame.m_SceneGpuAllocations = *renderContext.m_SceneGpuAllocations;
-			*renderContext.m_SceneGpuAllocations = {};
-		}
+		AdoptFrameBuildResources(frame, renderContext);
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -298,9 +304,10 @@ namespace gglab
 		}
 
 		// Wait Structured Buffer upload
-		if (renderContext.m_UploadFencePoint.IsValid())
+		if (frame.m_GpuResources.m_UploadFencePoint.IsValid())
 		{
-			m_RHIContext->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
 		}
 
 		RGExecuteContext executeContext{ RGBackendExecuteContext{
@@ -357,7 +364,8 @@ namespace gglab
 			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
 		if (retirementFence.IsValid())
 		{
-			RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+			RetireSceneGpuAllocations(
+				&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
 			frame.m_RenderGraph->Retire(retirementFence);
 		}
 
@@ -378,9 +386,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
 
-		if (m_RHIContext && frame.m_UploadFencePoint.IsValid())
+		if (m_RHIContext && frame.m_GpuResources.m_UploadFencePoint.IsValid())
 		{
-			m_RHIContext->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
 		}
 
 		if (m_RHIContext && frame.m_RHIFrame)
@@ -395,7 +404,8 @@ namespace gglab
 			frame.m_TemporalTransaction.Abort(retirementFence);
 			if (retirementFence.IsValid())
 			{
-				RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+				RetireSceneGpuAllocations(
+					&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
 
 				if (frame.m_RenderGraph)
 				{
@@ -416,8 +426,7 @@ namespace gglab
 		frame.m_State = Frame::State::Ended;
 		frame.m_RHIFrame = nullptr;
 		frame.m_RenderGraph = nullptr;
-		frame.m_UploadFencePoint = {};
-		frame.m_SceneGpuAllocations = {};
+		frame.m_GpuResources.Reset();
 		frame.m_Renderer = nullptr;
 		m_HasActiveFrame = false;
 	}

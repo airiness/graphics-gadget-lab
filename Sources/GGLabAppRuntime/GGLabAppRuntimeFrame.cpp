@@ -172,6 +172,7 @@ namespace gglab
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
+		m_Renderer->AdoptFrameBuildResources(rendererFrame, validationContext);
 		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
 		{
 			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);

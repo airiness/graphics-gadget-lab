@@ -912,6 +912,24 @@ namespace gglab
 				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
 				"Frame context preserves independent frame-slot and swapchain-image indices");
 
+			RenderFrameBuilder::BuildResult lateValidationFrame{};
+			lateValidationFrame.m_UploadFencePoint =
+				RHIFencePoint{ RHIFenceHandle{ 9, 1 }, 23 };
+			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes = 64;
+			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			const RenderFrameContext lateValidationContext =
+				lateValidationFrame.MakeRenderFrameContext();
+			RenderFrameGpuResources frameGpuResources{};
+			frameGpuResources.AdoptFrom(lateValidationContext);
+			const uint64_t adoptedSceneConstantOffset =
+				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes;
+			frameGpuResources.AdoptFrom(lateValidationContext);
+			context.Check(lateValidationFrame.m_SceneGpuAllocations.IsEmpty() &&
+				frameGpuResources.m_UploadFencePoint == lateValidationFrame.m_UploadFencePoint &&
+				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
+				adoptedSceneConstantOffset == 64,
+				"Frame-build GPU resources transfer before late validation and remain owned on early return");
+
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
 			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
 			context.Check(bgraUnorm.m_Family == RHIFormatFamily::B8G8R8A8 &&
