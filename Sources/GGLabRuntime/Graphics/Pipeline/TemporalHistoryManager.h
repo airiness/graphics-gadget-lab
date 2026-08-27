@@ -50,6 +50,7 @@ namespace gglab
 		ExtentChanged,
 		FormatChanged,
 		AllocationFailure,
+		AvailabilityChanged,
 		FatalSubmission,
 		Resume,
 		Shutdown,

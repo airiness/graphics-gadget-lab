@@ -5,6 +5,7 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -136,6 +137,14 @@ namespace gglab
 			motionSupport.m_RenderTarget.IsSupported();
 		m_TemporalAACapabilityStatus.m_MotionShaderResource =
 			motionSupport.m_ShaderResource.IsSupported();
+		const TemporalAAResolvedColorFormatSupport resolvedColorSupport =
+			QueryTemporalAAResolvedColorFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_ResolvedColorRenderTarget =
+			resolvedColorSupport.m_RenderTarget.IsSupported();
+		m_TemporalAACapabilityStatus.m_ResolvedColorShaderResource =
+			resolvedColorSupport.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_ResolvedColorTypedUavStore =
+			resolvedColorSupport.m_TypedUavStore.IsSupported();
 		const TemporalHistoryFormatSupport historySupport =
 			QueryTemporalHistoryFormatSupport(*device);
 		m_TemporalAACapabilityStatus.m_HistoryColorShaderResource =
@@ -244,6 +253,17 @@ namespace gglab
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
 			m_TemporalHistoryManager.get());
 		return frame.m_TemporalTransaction;
+	}
+
+	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Late temporal contract invalidation requires the active begun Renderer::Frame.");
+		frame.m_TemporalTransaction.Abort(m_LastSubmittedFencePoint);
+		m_TemporalHistoryManager->Invalidate(
+			TemporalHistoryResetReason::AvailabilityChanged, m_LastSubmittedFencePoint);
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
 	}
 
 	void Renderer::Render(

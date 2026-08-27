@@ -131,6 +131,7 @@ namespace gglab
 		[[nodiscard]] Frame BeginFrame() noexcept;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
+		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;
@@ -186,6 +187,10 @@ namespace gglab
 		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept
 		{
 			return m_TemporalAACapabilityStatus;
+		}
+		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept
+		{
+			m_TemporalAACapabilityStatus.m_ResolveProgramAvailable = available;
 		}
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept

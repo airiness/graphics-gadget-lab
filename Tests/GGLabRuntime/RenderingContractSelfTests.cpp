@@ -10,6 +10,7 @@
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
@@ -559,6 +560,15 @@ namespace gglab
 					builder.WriteInPlace(scenePhaseBuffer, RGBufferAccess::StorageWrite);
 					data.m_ScenePhaseBuffer = scenePhaseBuffer;
 				});
+			graph.AddPass<OpaqueSceneExtensionFixturePassData>(
+				"RenderingContract.TemporalAA",
+				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
+					OpaqueSceneExtensionFixturePassData& data)
+				{
+					builder.ReadWriteInPlace(
+						scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
+					data.m_ScenePhaseBuffer = scenePhaseBuffer;
+				});
 			const RenderScene renderScene{};
 			const RenderFrameContext frameContext{ .m_RenderScene = renderScene };
 			const RenderServices services{};
@@ -594,20 +604,22 @@ namespace gglab
 			{
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(graph, snapshot);
-				context.Check(snapshot.m_Passes.size() == 5 &&
-					snapshot.m_Passes[1].m_Name == "RenderingContract.OpaqueSceneExtension" &&
-					!snapshot.m_Passes[1].m_Culled,
+				context.Check(snapshot.m_Passes.size() == 6 &&
+					snapshot.m_Passes[2].m_Name == "RenderingContract.OpaqueSceneExtension" &&
+					!snapshot.m_Passes[2].m_Culled,
 					"Opaque scene extension passes remain live in the compiled graph");
-				context.Check(snapshot.m_Passes.size() == 5 &&
+				context.Check(snapshot.m_Passes.size() == 6 &&
 					snapshot.m_Passes[0].m_ExecutionOrder <
-					snapshot.m_Passes[1].m_ExecutionOrder &&
+						snapshot.m_Passes[1].m_ExecutionOrder &&
 					snapshot.m_Passes[1].m_ExecutionOrder <
-					snapshot.m_Passes[2].m_ExecutionOrder &&
+						snapshot.m_Passes[2].m_ExecutionOrder &&
 					snapshot.m_Passes[2].m_ExecutionOrder <
-					snapshot.m_Passes[3].m_ExecutionOrder &&
+						snapshot.m_Passes[3].m_ExecutionOrder &&
 					snapshot.m_Passes[3].m_ExecutionOrder <
-					snapshot.m_Passes[4].m_ExecutionOrder,
-					"Opaque scene extensions compose after built-in opaque and before transparent, "
+						snapshot.m_Passes[4].m_ExecutionOrder &&
+					snapshot.m_Passes[4].m_ExecutionOrder <
+						snapshot.m_Passes[5].m_ExecutionOrder,
+					"Forward scene composition orders opaque, TAA, post-TAA extension, transparent, "
 					"scene debug, and post-process consumers");
 			}
 
@@ -3612,6 +3624,20 @@ namespace gglab
 				device.m_CreateTextureCount == 16,
 				"Extent changes retire committed history and allocate a fresh invalid generation");
 
+			ResolvedTemporalFramePlan unavailablePlan = activePlan;
+			unavailablePlan.m_CoreAvailable = false;
+			unavailablePlan.m_Active = false;
+			unavailablePlan.m_Status = TemporalAAFrameStatus::Unavailable;
+			unavailablePlan.m_DisableReason = TemporalAADisableReason::CoreCapabilityUnavailable;
+			TemporalFrameTransaction unavailableTransaction;
+			unavailableTransaction.Begin(
+				viewHistory, objectHistory, unavailablePlan, 128, 72, &historyManager);
+			unavailableTransaction.Abort();
+			const TemporalHistoryManagerDiagnostics unavailable = historyManager.GetDiagnostics();
+			context.Check(!unavailable.m_HasActiveHistory &&
+				unavailable.m_LastResetReason == TemporalHistoryResetReason::AvailabilityChanged,
+				"Requested TAA availability loss retires history separately from an explicit toggle off");
+
 			historyManager.Shutdown();
 			device.m_CompletedFenceValue = 50;
 			texturePool.Tick();
@@ -4618,6 +4644,21 @@ namespace gglab
 				motionDesc.m_ClearValue->m_Color[0] == 0.0f &&
 				motionDesc.m_ClearValue->m_Color[1] == 0.0f,
 				"Temporal motion capability requires the combined R16G16Float render-target and SRV contract");
+
+			motionCapabilityDevice.m_TextureViewQueryCount = 0;
+			const TemporalAAResolvedColorFormatSupport resolvedColorSupport =
+				QueryTemporalAAResolvedColorFormatSupport(motionCapabilityDevice);
+			context.Check(resolvedColorSupport.IsSupported() &&
+				motionCapabilityDevice.m_TextureViewQueryCount == 3 &&
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
+					TemporalAAResolvedColorFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::RenderTarget) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::Sampled) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::UnorderedAccess),
+				"Temporal resolved color capability requires the combined HDR RTV, SRV, and typed-UAV contract");
 
 			GraphicsPhysicalPipelineKey depthOnlyMotionCoverage{};
 			depthOnlyMotionCoverage.m_BindingLayout = RHIBindingLayoutHandle{ 1, 1 };

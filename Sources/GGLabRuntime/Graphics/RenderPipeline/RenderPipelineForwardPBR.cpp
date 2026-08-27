@@ -48,6 +48,16 @@ namespace gglab
 		};
 	}
 
+	void RenderPipelineForwardPBR::PrepareTemporalFramePlanning(
+		const RenderServices& services) noexcept
+	{
+		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+		m_TemporalAAPass.Prepare(services);
+		renderer->PublishTemporalAAResolvePipelineClosure(
+			m_TemporalAAPass.ValidatePipelineClosure(*renderer));
+	}
+
 	ResolvedTemporalFramePlan RenderPipelineForwardPBR::ResolveTemporalFramePlan(
 		TemporalFramePlanResolveInfo info) const noexcept
 	{
@@ -69,9 +79,6 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
-		GGLAB_ASSERT_MSG(!context.GetTemporalFramePlan().m_Active ||
-			context.GetTemporalFramePlan().m_InternalContractMode,
-			"Only internal contract mode may exercise motion before the production temporal resolve exists.");
 
 		auto* renderer = services.m_Renderer;
 		auto* swapChain = renderer->GetSwapChain();
@@ -402,8 +409,6 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
-		// T07 exercises the resolve only through the internal contract path. T09 will
-		// publish production capability and make this ordering generally available.
 		if (context.GetTemporalFramePlan().m_Active)
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);
@@ -464,6 +469,49 @@ namespace gglab
 						.m_Aspects = RHITextureAspect::Color,
 					});
 			});
+	}
+
+	bool RenderPipelineForwardPBR::ValidateRenderFrame(
+		const RenderFrameContext& context, const RenderServices& services) noexcept
+	{
+		if (!context.GetTemporalFramePlan().m_Active)
+		{
+			return true;
+		}
+		if (!context.IsRenderSceneReady())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Active temporal frame rejected after scene GPU preparation failed.");
+			return false;
+		}
+
+		auto* renderer = services.m_Renderer;
+		GGLAB_ASSERT_NOT_NULL(renderer);
+		const auto* swapChain = renderer ? renderer->GetSwapChain() : nullptr;
+		if (!renderer || !swapChain || !swapChain->IsValid())
+		{
+			return false;
+		}
+		PrepareForwardPasses(services);
+		m_TemporalAAPass.Prepare(services);
+		if (!m_TemporalAAPass.ValidatePipelineClosure(*renderer))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Active temporal frame lost its required resolve pipeline closure.");
+			return false;
+		}
+
+		const DepthCoverageFramePlan depthCoverageFramePlan =
+			BuildDepthCoverageFramePlanForFrame(
+				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight());
+		if (!depthCoverageFramePlan.UsesDepthPrepassEqual())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"Active temporal frame rejected its velocity depth-coverage contract: {}",
+				depthCoverageFramePlan.m_Diagnostic);
+			return false;
+		}
+		return true;
 	}
 
 	void RenderPipelineForwardPBR::PrepareForwardPasses(const RenderServices& services) noexcept

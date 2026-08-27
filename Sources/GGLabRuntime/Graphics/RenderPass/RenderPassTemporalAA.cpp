@@ -1,6 +1,7 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
@@ -86,13 +87,11 @@ namespace gglab
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized,
 			"Temporal AA must be prepared before graph construction.");
-		GGLAB_ASSERT_MSG(context.GetTemporalFramePlan().m_Active &&
-			context.GetTemporalFramePlan().m_InternalContractMode,
-			"T08 temporal resolve is restricted to the internal contract path until T09 integration.");
+		GGLAB_ASSERT_MSG(context.GetTemporalFramePlan().m_Active,
+			"Temporal AA resolve requires one active pre-frame temporal plan.");
 		GGLAB_ASSERT_MSG(m_IsAvailable,
-			"Internal temporal resolve requires an available compute artifact and binding layout.");
-		if (!m_IsAvailable || !context.GetTemporalFramePlan().m_Active ||
-			!context.GetTemporalFramePlan().m_InternalContractMode)
+			"Temporal resolve requires an available compute artifact and binding layout.");
+		if (!m_IsAvailable || !context.GetTemporalFramePlan().m_Active)
 		{
 			return;
 		}
@@ -195,7 +194,7 @@ namespace gglab
 				data.m_Width = resources.m_Width;
 				data.m_Height = resources.m_Height;
 				RHITextureDesc outputDesc{};
-				outputDesc.m_Format = TemporalHistoryColorFormat;
+				outputDesc.m_Format = TemporalAAResolvedColorFormat;
 				outputDesc.m_Extent = currentColorDesc.m_Extent;
 				resources.m_ResolvedSceneColor =
 					builder.CreateTexture("TAA.ResolvedSceneColor", outputDesc);
@@ -303,6 +302,11 @@ namespace gglab
 			});
 	}
 
+	bool RenderPassTemporalAA::ValidatePipelineClosure(const Renderer& renderer) noexcept
+	{
+		return m_IsAvailable && GetOrCreatePipeline(renderer).IsValid();
+	}
+
 	RHIPipelineHandle RenderPassTemporalAA::GetOrCreatePipeline(
 		const Renderer& renderer) noexcept
 	{
@@ -310,8 +314,6 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const RHIPipelineHandle pipeline =
 			pipelineCache->Resolve(m_PipelineSlot, m_PipelineRecipe, GetInfo());
-		GGLAB_ASSERT_MSG(pipeline.IsValid(),
-			"Temporal AA pipeline resolution returned an invalid handle.");
 		return pipeline;
 	}
 }

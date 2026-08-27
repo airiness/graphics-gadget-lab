@@ -18,6 +18,7 @@ namespace gglab
 		virtual ~RenderPipelineBase() = default;
 
 		virtual std::string_view GetName() const noexcept = 0;
+		virtual void PrepareTemporalFramePlanning(const RenderServices&) noexcept {}
 
 		virtual ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept
@@ -30,5 +31,10 @@ namespace gglab
 
 		virtual void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept = 0;
+		[[nodiscard]] virtual bool ValidateRenderFrame(
+			const RenderFrameContext&, const RenderServices&) noexcept
+		{
+			return true;
+		}
 	};
 }

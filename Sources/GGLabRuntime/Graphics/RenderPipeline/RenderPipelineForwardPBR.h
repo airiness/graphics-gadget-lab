@@ -51,10 +51,13 @@ namespace gglab
 		~RenderPipelineForwardPBR() override = default;
 
 		std::string_view GetName() const noexcept override { return "ForwardPBR"; }
+		void PrepareTemporalFramePlanning(const RenderServices& services) noexcept override;
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 
 		void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
+		[[nodiscard]] bool ValidateRenderFrame(const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:

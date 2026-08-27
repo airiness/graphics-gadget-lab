@@ -80,7 +80,9 @@ namespace gglab
 
 		if (!plan.m_Active)
 		{
-			Invalidate(TemporalHistoryResetReason::Disabled);
+			Invalidate(plan.m_Requested && plan.m_Status == TemporalAAFrameStatus::Unavailable
+				? TemporalHistoryResetReason::AvailabilityChanged
+				: TemporalHistoryResetReason::Disabled);
 			return {};
 		}
 

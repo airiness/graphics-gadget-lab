@@ -102,6 +102,12 @@ namespace gglab
 				: AppRuntimeTickResult::Exit;
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
+		const RenderServices services{
+			.m_Renderer = m_Renderer.get(),
+			.m_AssetManager = m_AssetManager.get(),
+			.m_ShaderManager = m_ShaderManager.get(),
+			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
+		};
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph renderGraph(m_Renderer->CreateRenderGraphCreateInfo());
@@ -131,6 +137,7 @@ namespace gglab
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
 			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
+		renderPipeline.PrepareTemporalFramePlanning(services);
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,
@@ -164,17 +171,17 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
+		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
+		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
+		{
+			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
+		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
 		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
-
-		const RenderServices services{
-			.m_Renderer = m_Renderer.get(),
-			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get(),
-			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
-		};
 
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Build");
