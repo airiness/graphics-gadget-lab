@@ -1,20 +1,15 @@
 #include "Application/Shader/DevelopmentShaderBuildBridge.h"
+#include "Application/Shader/DevelopmentShaderBuildProcessClient.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 
-#include <windows.h>
-
 #include <algorithm>
-#include <array>
 #include <chrono>
-#include <cstring>
-#include <format>
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -28,46 +23,8 @@ namespace gglab
 
 	namespace
 	{
-		constexpr std::chrono::milliseconds ProcessPollInterval{ 20 };
-		constexpr std::chrono::seconds ProcessTimeout{ 120 };
 		constexpr std::chrono::milliseconds SourceScanInterval{ 250 };
 		constexpr std::chrono::milliseconds SourceChangeDebounce{ 200 };
-		constexpr size_t MaximumCapturedDiagnosticsSize = 64u * 1024u;
-
-		[[nodiscard]] std::wstring QuoteCommandLineArgument(
-			const std::filesystem::path& value)
-		{
-			return L"\"" + value.wstring() + L"\"";
-		}
-
-		void DrainProcessOutput(HANDLE readPipe, std::string& output) noexcept
-		{
-			std::array<char, 4'096> buffer{};
-			for (;;)
-			{
-				DWORD available = 0;
-				if (::PeekNamedPipe(readPipe, nullptr, 0, nullptr, &available, nullptr) == FALSE ||
-					available == 0)
-				{
-					return;
-				}
-				DWORD bytesRead = 0;
-				const DWORD requested = (std::min)(
-					available, static_cast<DWORD>(buffer.size()));
-				if (::ReadFile(readPipe, buffer.data(), requested, &bytesRead, nullptr) == FALSE ||
-					bytesRead == 0)
-				{
-					return;
-				}
-				if (output.size() < MaximumCapturedDiagnosticsSize)
-				{
-					const size_t remaining = MaximumCapturedDiagnosticsSize - output.size();
-					output.append(buffer.data(), (std::min)(remaining,
-						static_cast<size_t>(bytesRead)));
-				}
-			}
-		}
-
 		[[nodiscard]] bool IsShaderSourcePath(const std::filesystem::path& path) noexcept
 		{
 			const std::wstring extension = path.extension().wstring();
@@ -85,67 +42,13 @@ namespace gglab
 			}
 		}
 
-		[[nodiscard]] std::optional<uint8_t> ParseHexNibble(char character) noexcept
-		{
-			if (character >= '0' && character <= '9')
-			{
-				return static_cast<uint8_t>(character - '0');
-			}
-			if (character >= 'a' && character <= 'f')
-			{
-				return static_cast<uint8_t>(character - 'a' + 10);
-			}
-			if (character >= 'A' && character <= 'F')
-			{
-				return static_cast<uint8_t>(character - 'A' + 10);
-			}
-			return std::nullopt;
-		}
-
-		[[nodiscard]] std::optional<ShaderProgramRegistryArtifactRef>
-			ParseRegistryRefFromBuildOutput(std::string_view output) noexcept
-		{
-			constexpr std::string_view FieldName = "\"registryId\"";
-			const size_t field = output.find(FieldName);
-			if (field == std::string_view::npos)
-			{
-				return std::nullopt;
-			}
-			const size_t colon = output.find(':', field + FieldName.size());
-			const size_t quote = colon == std::string_view::npos
-				? std::string_view::npos
-				: output.find('\"', colon + 1);
-			if (quote == std::string_view::npos ||
-				output.size() - quote - 1 < Sha256Digest::Size * 2)
-			{
-				return std::nullopt;
-			}
-
-			ShaderProgramRegistryArtifactRef registryRef{};
-			for (size_t byteIndex = 0; byteIndex < Sha256Digest::Size; ++byteIndex)
-			{
-				const auto high = ParseHexNibble(output[quote + 1 + byteIndex * 2]);
-				const auto low = ParseHexNibble(output[quote + 2 + byteIndex * 2]);
-				if (!high || !low)
-				{
-					return std::nullopt;
-				}
-				registryRef.m_RegistryId.m_DurableDigest.m_Value[byteIndex] =
-					static_cast<std::byte>((*high << 4u) | *low);
-			}
-			const size_t closingQuote = quote + 1 + Sha256Digest::Size * 2;
-			if (closingQuote >= output.size() || output[closingQuote] != '\"' ||
-				!registryRef.IsValid())
-			{
-				return std::nullopt;
-			}
-			return registryRef;
-		}
 	}
 
 	bool DevelopmentShaderBuildRequest::IsValid() const noexcept
 	{
-		return m_ActiveBackend != RHIBackendType::Unknown &&
+		const bool backendSupported = m_ActiveBackend == RHIBackendType::DX12 ||
+			m_ActiveBackend == RHIBackendType::Vulkan;
+		return backendSupported &&
 			!m_ShaderCompilerPath.empty() && m_ShaderCompilerPath.is_absolute() &&
 			!m_ShaderSourceRoot.empty() && m_ShaderSourceRoot.is_absolute() &&
 			!m_ShaderCacheRoot.empty() && m_ShaderCacheRoot.is_absolute() &&
@@ -163,145 +66,33 @@ namespace gglab
 			};
 		}
 
-		try
-		{
-			std::error_code errorCode;
-			if (!std::filesystem::is_regular_file(request.m_ShaderCompilerPath, errorCode))
-			{
-				return {
-					.m_Status = DevelopmentShaderBuildStatus::ToolNotFound,
-					.m_Diagnostics = "gglab-shaderc.exe was not found beside the host executable.",
-				};
-			}
-
-			SECURITY_ATTRIBUTES securityAttributes{
-				.nLength = sizeof(SECURITY_ATTRIBUTES),
-				.bInheritHandle = TRUE,
-			};
-			HANDLE readPipe = nullptr;
-			HANDLE writePipe = nullptr;
-			if (::CreatePipe(&readPipe, &writePipe, &securityAttributes, 0) == FALSE)
-			{
-				return {
-					.m_Status = DevelopmentShaderBuildStatus::ProcessLaunchFailed,
-					.m_Diagnostics = "Failed to create the shader build process output pipe.",
-				};
-			}
-			::SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
-
-			const wchar_t* target = request.m_ActiveBackend == RHIBackendType::Vulkan
-				? L"gglab-vulkan13"
-				: L"gglab-dx12";
-			std::wstring commandLine = QuoteCommandLineArgument(request.m_ShaderCompilerPath) +
-				L" build-runtime --source-root " + QuoteCommandLineArgument(request.m_ShaderSourceRoot) +
-				L" --target \"" + target + L"\" --cache-root " +
-				QuoteCommandLineArgument(request.m_ShaderCacheRoot) +
-				L" --artifact-root " + QuoteCommandLineArgument(request.m_ArtifactRoot) +
-				L" --result-format json";
-			STARTUPINFOW startupInfo{
-				.cb = sizeof(STARTUPINFOW),
-				.dwFlags = STARTF_USESTDHANDLES,
-				.hStdInput = ::GetStdHandle(STD_INPUT_HANDLE),
-				.hStdOutput = writePipe,
-				.hStdError = writePipe,
-			};
-			PROCESS_INFORMATION processInfo{};
-			const BOOL created = ::CreateProcessW(
-				request.m_ShaderCompilerPath.c_str(), commandLine.data(), nullptr, nullptr,
-				TRUE, CREATE_NO_WINDOW, nullptr,
-				request.m_ShaderCompilerPath.parent_path().c_str(),
-				&startupInfo, &processInfo);
-			::CloseHandle(writePipe);
-			if (created == FALSE)
-			{
-				::CloseHandle(readPipe);
-				return {
-					.m_Status = DevelopmentShaderBuildStatus::ProcessLaunchFailed,
-					.m_Diagnostics = "Failed to launch gglab-shaderc.exe.",
-				};
-			}
-
-			std::string diagnostics;
-			const auto deadline = std::chrono::steady_clock::now() + ProcessTimeout;
-			DevelopmentShaderBuildStatus interruptedStatus =
-				DevelopmentShaderBuildStatus::Succeeded;
-			for (;;)
-			{
-				DrainProcessOutput(readPipe, diagnostics);
-				const DWORD waitResult = ::WaitForSingleObject(
-					processInfo.hProcess, static_cast<DWORD>(ProcessPollInterval.count()));
-				if (waitResult == WAIT_OBJECT_0)
-				{
-					break;
-				}
-				if (stopToken.stop_requested())
-				{
-					interruptedStatus = DevelopmentShaderBuildStatus::Cancelled;
-					break;
-				}
-				if (std::chrono::steady_clock::now() >= deadline)
-				{
-					interruptedStatus = DevelopmentShaderBuildStatus::TimedOut;
-					break;
-				}
-			}
-			if (interruptedStatus != DevelopmentShaderBuildStatus::Succeeded)
-			{
-				::TerminateProcess(processInfo.hProcess, ERROR_CANCELLED);
-				::WaitForSingleObject(processInfo.hProcess, INFINITE);
-			}
-			DrainProcessOutput(readPipe, diagnostics);
-			DWORD exitCode = ERROR_GEN_FAILURE;
-			::GetExitCodeProcess(processInfo.hProcess, &exitCode);
-			::CloseHandle(processInfo.hThread);
-			::CloseHandle(processInfo.hProcess);
-			::CloseHandle(readPipe);
-
-			if (interruptedStatus != DevelopmentShaderBuildStatus::Succeeded)
-			{
-				return {
-					.m_Status = interruptedStatus,
-					.m_Diagnostics = interruptedStatus == DevelopmentShaderBuildStatus::TimedOut
-						? "External shader build timed out."
-						: "External shader build was cancelled.",
-				};
-			}
-			if (exitCode != 0)
-			{
-				return {
-					.m_Status = DevelopmentShaderBuildStatus::ProcessFailed,
-					.m_Diagnostics = diagnostics.empty()
-						? std::format("gglab-shaderc failed with exit code {}.", exitCode)
-						: std::move(diagnostics),
-				};
-			}
-
-			const std::optional<ShaderProgramRegistryArtifactRef> registryRef =
-				ParseRegistryRefFromBuildOutput(diagnostics);
-			ShaderLooseProgramRegistryArtifactReader registryReader{
-				ShaderLooseProgramRegistryArtifactLocator(request.m_ArtifactRoot)
-			};
-			if (!registryRef || !registryReader.ReadArtifact(*registryRef).IsSuccess())
-			{
-				return {
-					.m_Status = DevelopmentShaderBuildStatus::ActiveRegistryUnavailable,
-					.m_Diagnostics =
-						"Shader build succeeded without an exact readable RegistryId result.",
-				};
-			}
-			return {
-				.m_Status = DevelopmentShaderBuildStatus::Succeeded,
-				.m_RegistryRef = *registryRef,
-				.m_Diagnostics = std::move(diagnostics),
-			};
-		}
-		catch (...)
+		std::error_code errorCode;
+		if (!std::filesystem::is_regular_file(request.m_ShaderCompilerPath, errorCode))
 		{
 			return {
-				.m_Status = DevelopmentShaderBuildStatus::Failed,
-				.m_Diagnostics = "External shader build failed unexpectedly.",
+				.m_Status = DevelopmentShaderBuildStatus::ToolNotFound,
+				.m_Diagnostics = "gglab-shaderc.exe was not found beside the host executable.",
 			};
 		}
+
+		DevelopmentShaderBuildResult result =
+			RunDevelopmentShaderBuildProcess(request, stopToken);
+		if (!result.IsSuccess())
+		{
+			return result;
+		}
+		ShaderLooseProgramRegistryArtifactReader registryReader{
+			ShaderLooseProgramRegistryArtifactLocator(request.m_ArtifactRoot)
+		};
+		if (!registryReader.ReadArtifact(result.m_RegistryRef).IsSuccess())
+		{
+			return {
+				.m_Status = DevelopmentShaderBuildStatus::ActiveRegistryUnavailable,
+				.m_Diagnostics =
+					"Shader build returned a RegistryId whose immutable artifact is unreadable.",
+			};
+		}
+		return result;
 	}
 
 	DevelopmentShaderHotReloadSystem::DevelopmentShaderHotReloadSystem(

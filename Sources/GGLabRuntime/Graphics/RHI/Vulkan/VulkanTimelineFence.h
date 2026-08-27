@@ -10,7 +10,9 @@
 
 namespace gglab
 {
-	// Graphics-queue timeline semaphore used as the frame-slot reuse gate.
+	// Logical-queue timeline semaphore. The graphics instance is used as the
+	// frame-slot reuse gate; the transfer instance gates upload publication and
+	// staging retirement.
 	// The timeline value is monotonic: every successfully submitted
 	// QueueSubmit2 (normal or abort) signals the next value, and a frame
 	// slot waits on its own last successfully submitted value before it is
@@ -63,7 +65,7 @@ namespace gglab
 		// with a committed value it forms a valid RHIFencePoint.
 		[[nodiscard]] RHIFenceHandle GetRHIHandle() const noexcept { return m_RHIHandle; }
 
-		// Blocks until the graphics timeline reaches the given value. The
+		// Blocks until the timeline reaches the given value. The
 		// caller must only wait on committed values. Returns VK_SUCCESS or
 		// the Vulkan error (e.g. VK_ERROR_DEVICE_LOST); the result is never
 		// swallowed.

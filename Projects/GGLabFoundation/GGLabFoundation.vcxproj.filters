@@ -22,6 +22,9 @@
     <Filter Include="Private\Platform\Win">
       <UniqueIdentifier>{62C17CB6-BC93-D378-4329-92A927852E09}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Platform\Win\Hash">
+      <UniqueIdentifier>{A891DE08-B555-8B1E-9485-DCF7FD29CD51}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\String">
       <UniqueIdentifier>{B2685EC4-A042-948C-9E6E-7580BA00B9E1}</UniqueIdentifier>
     </Filter>
@@ -72,11 +75,20 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp">
       <Filter>Private\Hash</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256BackendFactory.cpp">
+      <Filter>Private\Hash</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256PortableBackend.cpp">
+      <Filter>Private\Hash</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp">
       <Filter>Private\IO</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp">
       <Filter>Private\Logging</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Hash\Win32Sha256Backend.cpp">
+      <Filter>Private\Platform\Win\Hash</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp">
       <Filter>Private\Platform\Win</Filter>
@@ -110,6 +122,12 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h">
       <Filter>Private</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256Backend.h">
+      <Filter>Private\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Hash\Win32Sha256Backend.h">
+      <Filter>Private\Platform\Win\Hash</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h">
       <Filter>Public\GGLabFoundation\Async</Filter>
     </ClInclude>
@@ -136,6 +154,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h">
       <Filter>Public\GGLabFoundation\Logging</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\PlatformDefines.h">
+      <Filter>Public\GGLabFoundation\Platform</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h">
       <Filter>Public\GGLabFoundation\Platform\Win</Filter>

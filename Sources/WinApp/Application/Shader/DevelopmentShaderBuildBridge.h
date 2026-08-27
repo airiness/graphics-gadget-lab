@@ -21,6 +21,7 @@ namespace gglab
 		Succeeded,
 		InvalidInput,
 		ToolNotFound,
+		ToolIncompatible,
 		ProcessLaunchFailed,
 		ProcessFailed,
 		TimedOut,

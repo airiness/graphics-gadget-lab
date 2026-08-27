@@ -108,14 +108,20 @@ namespace gglab
 			capabilities.m_MutableDescriptorType ? VK_TRUE : VK_FALSE;
 		vulkan12Features.pNext = &mutableDescriptorFeatures;
 
-		const float queuePriority = 1.0f;
+		const VulkanQueueSelection queueSelection =
+			SelectVulkanQueues(createInfo.m_GraphicsPresentQueueCount);
+		if (!queueSelection.IsValid())
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "VulkanDevice requires at least one graphics/present queue.";
+			return result;
+		}
+		const std::array<float, 2> queuePriorities{ 1.0f, 1.0f };
 		VkDeviceQueueCreateInfo queueCreateInfo{};
 		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queueCreateInfo.queueFamilyIndex = createInfo.m_GraphicsPresentQueueFamilyIndex;
-		// Exactly one graphics/present queue is requested from the selected
-		// family regardless of the family's total queue count.
-		queueCreateInfo.queueCount = 1;
-		queueCreateInfo.pQueuePriorities = &queuePriority;
+		queueCreateInfo.queueCount = queueSelection.m_RequestedQueueCount;
+		queueCreateInfo.pQueuePriorities = queuePriorities.data();
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -161,8 +167,10 @@ namespace gglab
 			return result;
 		}
 		device->m_QueueFamilyIndex = createInfo.m_GraphicsPresentQueueFamilyIndex;
+		device->m_QueueSelection = queueSelection;
 
-		vkGetDeviceQueue(device->m_Device, createInfo.m_GraphicsPresentQueueFamilyIndex, 0,
+		vkGetDeviceQueue(device->m_Device, createInfo.m_GraphicsPresentQueueFamilyIndex,
+			queueSelection.m_GraphicsQueueIndex,
 			&device->m_GraphicsQueue);
 		if (device->m_GraphicsQueue == VK_NULL_HANDLE)
 		{
@@ -170,6 +178,27 @@ namespace gglab
 			result.m_Error = "vkGetDeviceQueue returned a null graphics queue.";
 			return result;
 		}
+		vkGetDeviceQueue(device->m_Device, createInfo.m_GraphicsPresentQueueFamilyIndex,
+			queueSelection.m_TransferQueueIndex, &device->m_TransferQueue);
+		if (device->m_TransferQueue == VK_NULL_HANDLE)
+		{
+			result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+			result.m_Error = "vkGetDeviceQueue returned a null transfer queue.";
+			return result;
+		}
+
+		VulkanTimelineFence::CreateInfo transferTimelineInfo{};
+		transferTimelineInfo.m_Device = device->m_Device;
+		VulkanTimelineFence::Result transferTimelineResult =
+			VulkanTimelineFence::Create(transferTimelineInfo);
+		if (!transferTimelineResult.Succeeded())
+		{
+			result.m_Result = transferTimelineResult.m_Result;
+			result.m_Error = std::format(
+				"Transfer timeline creation failed: {}", transferTimelineResult.m_Error);
+			return result;
+		}
+		device->m_TransferTimeline = std::move(transferTimelineResult.m_Fence);
 
 		// VMA owns raw memory allocation only; the resource manager owns
 		// every GGLab handle, native object, view and lifetime decision.
@@ -486,14 +515,23 @@ namespace gglab
 		{
 			return true;
 		}
-		if (m_GraphicsTimeline == nullptr ||
-			fencePoint.m_Fence != m_GraphicsTimeline->GetRHIHandle())
+		const VulkanTimelineFence* timeline = nullptr;
+		if (m_GraphicsTimeline && fencePoint.m_Fence == m_GraphicsTimeline->GetRHIHandle())
+		{
+			timeline = m_GraphicsTimeline;
+		}
+		else if (m_TransferTimeline &&
+			fencePoint.m_Fence == m_TransferTimeline->GetRHIHandle())
+		{
+			timeline = m_TransferTimeline.get();
+		}
+		if (!timeline)
 		{
 			// An unknown fence never counts as completed.
 			return false;
 		}
 		uint64_t completedValue = 0;
-		if (m_GraphicsTimeline->GetCompletedValue(completedValue) != VK_SUCCESS)
+		if (timeline->GetCompletedValue(completedValue) != VK_SUCCESS)
 		{
 			return false;
 		}
@@ -514,11 +552,14 @@ namespace gglab
 			m_MemAllocator = VK_NULL_HANDLE;
 		}
 		m_GraphicsTimeline = nullptr;
+		m_TransferTimeline.reset();
 		if (m_Device != VK_NULL_HANDLE)
 		{
 			vkDestroyDevice(m_Device, nullptr);
 			m_Device = VK_NULL_HANDLE;
 		}
 		m_GraphicsQueue = VK_NULL_HANDLE;
+		m_TransferQueue = VK_NULL_HANDLE;
+		m_QueueSelection = {};
 	}
 }

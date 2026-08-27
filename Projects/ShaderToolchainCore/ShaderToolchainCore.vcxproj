@@ -87,6 +87,7 @@
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\Vulkan13ShaderTarget.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Targets\ShaderTargetWireNames.h" />
     <ClInclude Include="..\..\Sources\ShaderToolchain\Testing\ShaderArtifactManifestIOTestAccess.h" />
+	<ClInclude Include="..\..\Sources\ShaderToolchain\Wire\ShaderWireNames.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">

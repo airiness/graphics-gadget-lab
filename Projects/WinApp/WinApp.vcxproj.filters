@@ -264,6 +264,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -292,6 +295,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
+      <Filter>Application\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp">
@@ -569,6 +575,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
@@ -588,6 +597,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
+      <Filter>Application\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">

@@ -5,6 +5,7 @@
 #include "Contracts/ShaderCompileTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "ShaderArtifactRuntime/ShaderArtifactManifest.h"
+#include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 
 #include <cstddef>
 #include <filesystem>
@@ -76,7 +77,8 @@ namespace gglab
 			const ShaderDesc& desc) noexcept;
 		[[nodiscard]] static LocalShaderCacheKey ComputeBuildKey(
 			const ShaderRecipeId& recipeId,
-			const ShaderCompilerIdentity& compilerIdentity) noexcept;
+			const ShaderCompilerIdentity& compilerIdentity,
+			uint32_t compilePolicyRevision = ShaderCompilePolicyRevision) noexcept;
 		[[nodiscard]] std::filesystem::path GetCacheBinaryPath(
 			const ShaderResolvedRecipe& recipe) const noexcept;
 

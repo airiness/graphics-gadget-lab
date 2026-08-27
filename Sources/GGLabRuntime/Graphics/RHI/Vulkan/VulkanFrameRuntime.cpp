@@ -2,6 +2,7 @@
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
+#include <algorithm>
 #include <format>
 
 namespace gglab
@@ -94,6 +95,26 @@ namespace gglab
 		// gate: a failed submission must never leave a future frame waiting
 		// on a value that was never signaled.
 		return submitResult == VK_SUCCESS ? candidateValue : previousGate;
+	}
+
+	bool MergeVulkanTimelineWait(
+		RHIFencePoint& accumulated, const RHIFencePoint& candidate) noexcept
+	{
+		if (!candidate.IsValid())
+		{
+			return true;
+		}
+		if (!accumulated.IsValid())
+		{
+			accumulated = candidate;
+			return true;
+		}
+		if (accumulated.m_Fence != candidate.m_Fence)
+		{
+			return false;
+		}
+		accumulated.m_Value = std::max(accumulated.m_Value, candidate.m_Value);
+		return true;
 	}
 
 	bool IsVulkanDeviceLostError(const VkResult result) noexcept
@@ -273,6 +294,7 @@ namespace gglab
 					m_ActiveFrame->m_FrameSlotIndex);
 				m_ActiveFrame.reset();
 			}
+			m_PendingGraphicsWait.Reset();
 			m_Device->RetireCompletedWork();
 			if (m_Device->GetDescriptorManager().DetachFrameTracking())
 			{
@@ -638,6 +660,7 @@ namespace gglab
 			m_ActiveFrame.reset();
 			m_NormalRecordingOpen = false;
 			m_NormalRecordingReady = false;
+			m_PendingGraphicsWait.Reset();
 			m_PresentTransitionOwnership = VulkanPresentTransitionOwnership::FrameRuntime;
 			return result;
 		}
@@ -684,6 +707,7 @@ namespace gglab
 			(void)m_Device->GetDescriptorManager().AbortFrameSnapshot(
 				active.m_FrameSlotIndex);
 			m_ActiveFrame.reset();
+			m_PendingGraphicsWait.Reset();
 			return result;
 		}
 		// The partially recorded normal command buffer is never submitted;
@@ -709,6 +733,48 @@ namespace gglab
 	bool VulkanFrameRuntime::RecreateSwapChain(uint32_t width, uint32_t height,
 		bool vsync, std::string& outError) noexcept
 	{
+		if (width == 0 || height == 0)
+		{
+			outError = "Recreate requires a nonzero extent.";
+			return false;
+		}
+		if (!PrepareSwapChainRecreation(outError))
+		{
+			return false;
+		}
+		return RecreateSwapChainAtGraphicsIdle(width, height, vsync, outError);
+	}
+
+	bool VulkanFrameRuntime::PrepareSwapChainRecreation(std::string& outError) noexcept
+	{
+		if (m_Fatal || m_SwapChain == nullptr)
+		{
+			outError = m_Fatal
+				? "Cannot recreate the swapchain after a fatal runtime error."
+				: "No swapchain to recreate.";
+			return false;
+		}
+		// Swapchain recreation is a safe point: no frame may be active and no
+		// queued work may reference old swapchain images.
+		if (m_ActiveFrame.has_value())
+		{
+			outError = "Cannot recreate the swapchain while a frame is active.";
+			return false;
+		}
+		const VkResult idleResult = WaitGraphicsIdle();
+		if (idleResult != VK_SUCCESS)
+		{
+			MarkFatal(idleResult, "VulkanFrameRuntime::WaitGraphicsIdle(swapchain recreate)");
+			outError = std::format("WaitGraphicsIdle before swapchain recreate failed with {}.",
+				ToString(idleResult));
+			return false;
+		}
+		return true;
+	}
+
+	bool VulkanFrameRuntime::RecreateSwapChainAtGraphicsIdle(uint32_t width, uint32_t height,
+		bool vsync, std::string& outError) noexcept
+	{
 		if (m_Fatal || m_SwapChain == nullptr)
 		{
 			outError = m_Fatal
@@ -721,19 +787,9 @@ namespace gglab
 			outError = "Recreate requires a nonzero extent.";
 			return false;
 		}
-		// Swapchain recreation is a safe point: no frame may be active and no
-		// queued work may reference old swapchain images.
 		if (m_ActiveFrame.has_value())
 		{
 			outError = "Cannot recreate the swapchain while a frame is active.";
-			return false;
-		}
-		const VkResult idleResult = WaitIdle();
-		if (idleResult != VK_SUCCESS)
-		{
-			MarkFatal(idleResult, "VulkanFrameRuntime::WaitIdle(swapchain recreate)");
-			outError = std::format("WaitIdle before swapchain recreate failed with {}.",
-				ToString(idleResult));
 			return false;
 		}
 		const bool recreated = m_SwapChain->Recreate(width, height, vsync, outError);
@@ -750,7 +806,7 @@ namespace gglab
 		return recreated;
 	}
 
-	VkResult VulkanFrameRuntime::WaitIdle() noexcept
+	VkResult VulkanFrameRuntime::WaitGraphicsIdle() noexcept
 	{
 		if (m_Device == nullptr || m_Timeline == nullptr)
 		{
@@ -762,6 +818,29 @@ namespace gglab
 			return queueResult;
 		}
 		return m_Timeline->Wait(m_Timeline->GetCurrentSignalValue());
+	}
+
+	bool VulkanFrameRuntime::QueueGraphicsWait(const RHIFencePoint& fencePoint) noexcept
+	{
+		if (!fencePoint.IsValid())
+		{
+			return true;
+		}
+		if (!m_ActiveFrame.has_value() || m_Device == nullptr || m_Timeline == nullptr)
+		{
+			return false;
+		}
+		if (fencePoint.m_Fence == m_Timeline->GetRHIHandle())
+		{
+			// Earlier graphics signals are already ordered on the same VkQueue.
+			return true;
+		}
+		const VulkanTimelineFence* transferTimeline = m_Device->GetTransferTimeline();
+		if (!transferTimeline || fencePoint.m_Fence != transferTimeline->GetRHIHandle())
+		{
+			return false;
+		}
+		return MergeVulkanTimelineWait(m_PendingGraphicsWait, fencePoint);
 	}
 
 	void VulkanFrameRuntime::RecordAbortFrame(
@@ -810,10 +889,31 @@ namespace gglab
 		commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
 		commandBufferInfo.commandBuffer = commandBuffer;
 
-		VkSemaphoreSubmitInfo waitInfo{};
-		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-		waitInfo.semaphore = slot.m_ImageAvailable;
-		waitInfo.stageMask = kAllStages;
+		std::array<VkSemaphoreSubmitInfo, 2> waitInfos{};
+		waitInfos[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+		waitInfos[0].semaphore = slot.m_ImageAvailable;
+		waitInfos[0].stageMask = kAllStages;
+		uint32_t waitInfoCount = 1;
+		if (m_PendingGraphicsWait.IsValid())
+		{
+			const VulkanTimelineFence* transferTimeline = m_Device->GetTransferTimeline();
+			if (!transferTimeline ||
+				m_PendingGraphicsWait.m_Fence != transferTimeline->GetRHIHandle())
+			{
+				m_PendingGraphicsWait.Reset();
+				MarkFatal(VK_ERROR_INITIALIZATION_FAILED,
+					"VulkanFrameRuntime::SubmitAndPresent(resolve transfer wait)");
+				result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+				result.m_Fatal = true;
+				return result;
+			}
+			waitInfos[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			waitInfos[1].semaphore = transferTimeline->Get();
+			waitInfos[1].value = m_PendingGraphicsWait.m_Value;
+			waitInfos[1].stageMask = kAllStages;
+			waitInfoCount = 2;
+		}
+		m_PendingGraphicsWait.Reset();
 
 		VkSemaphoreSubmitInfo timelineSignal{};
 		timelineSignal.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
@@ -827,8 +927,8 @@ namespace gglab
 
 		VkSubmitInfo2 submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-		submitInfo.waitSemaphoreInfoCount = 1;
-		submitInfo.pWaitSemaphoreInfos = &waitInfo;
+		submitInfo.waitSemaphoreInfoCount = waitInfoCount;
+		submitInfo.pWaitSemaphoreInfos = waitInfos.data();
 		submitInfo.commandBufferInfoCount = 1;
 		submitInfo.pCommandBufferInfos = &commandBufferInfo;
 		submitInfo.signalSemaphoreInfoCount = 2;

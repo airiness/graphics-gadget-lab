@@ -155,6 +155,12 @@ namespace gglab
 				identity.m_DeviceId));
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format("  queue family {} ({} queues)",
 				snapshot.m_GraphicsPresentQueueFamilyIndex, snapshot.m_GraphicsPresentQueueCount));
+			const VulkanQueueSelection queueSelection =
+				SelectVulkanQueues(snapshot.m_GraphicsPresentQueueCount);
+			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(
+				"  selected queues: graphics={}, transfer={} ({})",
+				queueSelection.m_GraphicsQueueIndex, queueSelection.m_TransferQueueIndex,
+				queueSelection.HasSeparateTransferQueue() ? "separate" : "shared"));
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format("  enabled device extensions: {}, {}",
 				VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME));
 			GGLAB_LOG_GRAPHICS_INFO_ALWAYS(std::format(

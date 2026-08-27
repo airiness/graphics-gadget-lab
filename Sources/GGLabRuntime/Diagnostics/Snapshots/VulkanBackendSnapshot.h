@@ -74,6 +74,9 @@ namespace gglab
 		uint32_t m_DeviceId = 0;
 		uint32_t m_GraphicsPresentQueueFamilyIndex = 0;
 		uint32_t m_GraphicsPresentQueueCount = 0;
+		uint32_t m_GraphicsQueueIndex = 0;
+		uint32_t m_TransferQueueIndex = 0;
+		bool m_SeparateTransferQueue = false;
 		bool m_ProfileAccepted = false;
 		bool m_DynamicRendering = false;
 		bool m_Synchronization2 = false;
@@ -119,6 +122,9 @@ namespace gglab
 		uint64_t m_SubmittedTimeline = 0;
 		bool m_HasCompletedTimeline = false;
 		uint64_t m_CompletedTimeline = 0;
+		uint64_t m_TransferSubmittedTimeline = 0;
+		bool m_HasCompletedTransferTimeline = false;
+		uint64_t m_TransferCompletedTimeline = 0;
 
 		bool m_RuntimeFatal = false;
 		bool m_DeviceLost = false;

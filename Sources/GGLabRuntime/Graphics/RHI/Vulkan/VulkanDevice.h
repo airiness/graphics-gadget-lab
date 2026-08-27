@@ -16,6 +16,36 @@ namespace gglab
 {
 	class VulkanTimelineFence;
 
+	struct VulkanQueueSelection final
+	{
+		uint32_t m_RequestedQueueCount = 0;
+		uint32_t m_GraphicsQueueIndex = 0;
+		uint32_t m_TransferQueueIndex = 0;
+
+		[[nodiscard]] constexpr bool IsValid() const noexcept
+		{
+			return m_RequestedQueueCount > 0;
+		}
+		[[nodiscard]] constexpr bool HasSeparateTransferQueue() const noexcept
+		{
+			return IsValid() && m_TransferQueueIndex != m_GraphicsQueueIndex;
+		}
+	};
+
+	[[nodiscard]] constexpr VulkanQueueSelection SelectVulkanQueues(
+		uint32_t availableQueueCount) noexcept
+	{
+		if (availableQueueCount == 0)
+		{
+			return {};
+		}
+		return {
+			.m_RequestedQueueCount = availableQueueCount >= 2 ? 2u : 1u,
+			.m_GraphicsQueueIndex = 0,
+			.m_TransferQueueIndex = availableQueueCount >= 2 ? 1u : 0u,
+		};
+	}
+
 	// Reduces hardware-available portability capabilities to the set that
 	// is deliberately enabled on the logical device: capabilities the
 	// backend implements and adopts are enabled when available, everything
@@ -40,8 +70,9 @@ namespace gglab
 	}
 
 	// Owns the VkDevice created for a profile-accepted adapter, the VMA
-	// allocator and the resource subsystem. Only the graphics/present queue
-	// is created; frame objects are produced by the frame runtime, which
+	// allocator and the resource subsystem. The graphics/present queue is
+	// always created; a second queue from the same family is used for transfer
+	// when available. Frame objects are produced by the frame runtime, which
 	// borrows the device and registers its graphics timeline here so
 	// resource retirement can resolve RHIFencePoints.
 	class VulkanDevice final : public RHIDevice
@@ -93,9 +124,26 @@ namespace gglab
 			return m_PhysicalDevice;
 		}
 		[[nodiscard]] VkQueue GetGraphicsQueue() const noexcept { return m_GraphicsQueue; }
+		[[nodiscard]] VkQueue GetTransferQueue() const noexcept { return m_TransferQueue; }
 		[[nodiscard]] uint32_t GetGraphicsQueueFamilyIndex() const noexcept
 		{
 			return m_QueueFamilyIndex;
+		}
+		[[nodiscard]] uint32_t GetTransferQueueFamilyIndex() const noexcept
+		{
+			return m_QueueFamilyIndex;
+		}
+		[[nodiscard]] uint32_t GetGraphicsQueueIndex() const noexcept
+		{
+			return m_QueueSelection.m_GraphicsQueueIndex;
+		}
+		[[nodiscard]] uint32_t GetTransferQueueIndex() const noexcept
+		{
+			return m_QueueSelection.m_TransferQueueIndex;
+		}
+		[[nodiscard]] bool HasSeparateTransferQueue() const noexcept
+		{
+			return m_QueueSelection.HasSeparateTransferQueue();
 		}
 		[[nodiscard]] const VkPhysicalDeviceLimits& GetPhysicalDeviceLimits() const noexcept
 		{
@@ -210,6 +258,10 @@ namespace gglab
 		{
 			return m_GraphicsTimeline;
 		}
+		[[nodiscard]] VulkanTimelineFence* GetTransferTimeline() const noexcept
+		{
+			return m_TransferTimeline.get();
+		}
 		[[nodiscard]] bool IsFencePointCompleted(
 			const RHIFencePoint& fencePoint) const noexcept override;
 
@@ -220,12 +272,15 @@ namespace gglab
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		VkDevice m_Device = VK_NULL_HANDLE;
 		VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
+		VkQueue m_TransferQueue = VK_NULL_HANDLE;
 		uint32_t m_QueueFamilyIndex = 0;
+		VulkanQueueSelection m_QueueSelection{};
 		RHIPortabilityCapabilities m_PortabilityCapabilities{};
 		RHIPortabilityCapabilities m_EnabledPortabilityCapabilities{};
 		bool m_ImageCubeArrayEnabled = false;
 		bool m_SamplerMirrorClampToEdgeEnabled = false;
 		VulkanTimelineFence* m_GraphicsTimeline = nullptr;
+		std::unique_ptr<VulkanTimelineFence> m_TransferTimeline;
 		std::thread::id m_OwnerThreadId{};
 		std::string m_AdapterCompatibilityIdentity;
 		RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};

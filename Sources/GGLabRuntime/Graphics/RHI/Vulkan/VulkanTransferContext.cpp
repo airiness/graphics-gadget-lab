@@ -32,7 +32,7 @@ namespace gglab
 		{
 			return;
 		}
-		VulkanTimelineFence* timeline = m_Device->GetGraphicsTimeline();
+		VulkanTimelineFence* timeline = m_Device->GetTransferTimeline();
 		for (const auto& info : m_InFlightInfos)
 		{
 			if (timeline && info->m_FencePoint.IsValid())
@@ -82,7 +82,7 @@ namespace gglab
 		VkCommandPoolCreateInfo poolCreateInfo{};
 		poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-		poolCreateInfo.queueFamilyIndex = m_Device->GetGraphicsQueueFamilyIndex();
+		poolCreateInfo.queueFamilyIndex = m_Device->GetTransferQueueFamilyIndex();
 		VkResult result = vkCreateCommandPool(
 			m_Device->Get(), &poolCreateInfo, nullptr, &m_ExecutingInfo->m_CommandPool);
 		if (result != VK_SUCCESS)
@@ -142,11 +142,11 @@ namespace gglab
 			return {};
 		}
 
-		VulkanTimelineFence* timeline = m_Device->GetGraphicsTimeline();
+		VulkanTimelineFence* timeline = m_Device->GetTransferTimeline();
 		if (!timeline)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"VulkanTransferContext requires the graphics timeline owned by VulkanFrameRuntime.");
+				"VulkanTransferContext requires the device-owned transfer timeline.");
 			Abort();
 			return {};
 		}
@@ -169,7 +169,7 @@ namespace gglab
 			.pSignalSemaphoreInfos = &signalInfo,
 		};
 		const VkResult submitResult =
-			vkQueueSubmit2(m_Device->GetGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+			vkQueueSubmit2(m_Device->GetTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
 		if (submitResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(

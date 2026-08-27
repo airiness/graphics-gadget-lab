@@ -29,6 +29,19 @@ namespace gglab
 			Entry{ "gglab-vulkan13", ShaderTargetProfile::GGLabVulkan13 },
 		};
 
+		[[nodiscard]] constexpr std::string_view Name(
+			ShaderTargetProfile profile) noexcept
+		{
+			for (const Entry& entry : kEntries)
+			{
+				if (profile == entry.profile)
+				{
+					return entry.name;
+				}
+			}
+			return "unknown";
+		}
+
 		// Accept side: parse a wire name into its target profile.
 		[[nodiscard]] constexpr bool Parse(
 			std::string_view name, ShaderTargetProfile& outProfile) noexcept
@@ -45,7 +58,7 @@ namespace gglab
 		}
 
 		// Report side: the stable set of supported wire names, in table order.
-		[[nodiscard]] std::vector<std::string> Names() noexcept
+		[[nodiscard]] inline std::vector<std::string> Names() noexcept
 		{
 			std::vector<std::string> names;
 			names.reserve(kEntries.size());

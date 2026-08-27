@@ -451,10 +451,17 @@ namespace gglab
 	void VulkanContext::WaitForFence(
 		RHIQueueType waitingQueue, const RHIFencePoint& fencePoint) noexcept
 	{
-		GGLAB_UNUSED(waitingQueue);
-		GGLAB_UNUSED(fencePoint);
-		// Graphics, direct compute and transfer submissions alias one VkQueue.
-		// Queue submission order already provides the GPU-side dependency.
+		if (!fencePoint.IsValid())
+		{
+			return;
+		}
+		if (waitingQueue != RHIQueueType::Graphics || !m_Bootstrap ||
+			!m_Bootstrap->m_FrameRuntime ||
+			!m_Bootstrap->m_FrameRuntime->QueueGraphicsWait(fencePoint))
+		{
+			GGLAB_LOG_GRAPHICS_WARN(
+				"VulkanContext::WaitForFence rejected an unsupported queue, fence, or frame state.");
+		}
 	}
 
 	void VulkanContext::Resize(uint32_t width, uint32_t height) noexcept
@@ -470,11 +477,11 @@ namespace gglab
 
 	void VulkanContext::WaitIdle() noexcept
 	{
-		if (!m_Bootstrap || !m_Bootstrap->m_FrameRuntime)
+		if (!m_Bootstrap || !m_Bootstrap->m_Device)
 		{
 			return;
 		}
-		const VkResult result = m_Bootstrap->m_FrameRuntime->WaitIdle();
+		const VkResult result = vkDeviceWaitIdle(m_Bootstrap->m_Device->Get());
 		if (result != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
@@ -557,11 +564,17 @@ namespace gglab
 		{
 			return false;
 		}
-		WaitIdle();
+		auto& runtime = *m_Bootstrap->m_FrameRuntime;
+		std::string error;
+		if (!runtime.PrepareSwapChainRecreation(error))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+				"Vulkan swapchain recreation preparation failed: {}", error));
+			return false;
+		}
 		m_SwapChain->ReleaseBackBuffers();
 		m_Bootstrap->m_Device->RetireCompletedWork();
-		std::string error;
-		if (!m_Bootstrap->m_FrameRuntime->RecreateSwapChain(width, height, m_Vsync, error))
+		if (!runtime.RecreateSwapChainAtGraphicsIdle(width, height, m_Vsync, error))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
 				"Vulkan swapchain recreation failed: {}", error));

@@ -7,6 +7,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Logging/Log.h"
+#include "GGLabFoundation/Platform/PlatformDefines.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32DiagnosticOutput.h"
@@ -200,6 +201,21 @@ namespace gglab::foundation::tests
 		{
 			return false;
 		}
+
+#if GGLAB_PLATFORM_WINDOWS
+		// This is intentionally a very loose regression guard, not a benchmark.
+		// BCrypt completes this payload in a few milliseconds on supported Windows
+		// hardware; the unoptimized scalar implementation takes well over the limit.
+		constexpr std::size_t GuardPayloadBytes = 16ull * 1024ull * 1024ull;
+		const std::vector<std::byte> guardPayload(GuardPayloadBytes, std::byte{ 0x5a });
+		const auto guardBegin = std::chrono::steady_clock::now();
+		const Sha256Digest guardDigest = ComputeSha256(guardPayload);
+		const auto guardElapsed = std::chrono::steady_clock::now() - guardBegin;
+		if (!guardDigest.IsValid() || guardElapsed >= std::chrono::milliseconds(500))
+		{
+			return false;
+		}
+#endif
 
 		return !encoded.IsValid() && !encoded.AddBytes({}) &&
 			!encoded.Finish().IsValid() && Sha256DigestToHex({}).empty();

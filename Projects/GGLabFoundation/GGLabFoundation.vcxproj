@@ -70,9 +70,12 @@
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Async\ProgressChannel.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\FoundationLinkAnchor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256BackendFactory.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256PortableBackend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\IO\PathUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Logging\Log.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\HResult.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Hash\Win32Sha256Backend.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32DiagnosticOutput.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32NamedMutex.cpp" />
     <ClCompile Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Win32PathUtils.cpp" />
@@ -84,6 +87,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Sources\GGLabFoundation\Private\FoundationPrivateAccess.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Hash\Sha256Backend.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Private\Platform\Win\Hash\Win32Sha256Backend.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Async\ProgressChannel.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\CoreMacros.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Base\EnumFlags.h" />
@@ -93,6 +98,7 @@
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Hash\Sha256.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\IO\PathUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Logging\Log.h" />
+    <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\PlatformDefines.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\ComTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\HResult.h" />
     <ClInclude Include="..\..\Sources\GGLabFoundation\Public\GGLabFoundation\Platform\Win\Win32DiagnosticOutput.h" />

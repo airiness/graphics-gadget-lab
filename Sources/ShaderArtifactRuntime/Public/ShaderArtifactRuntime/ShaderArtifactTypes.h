@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -106,15 +107,20 @@ namespace gglab
 		return true;
 	}
 
-	[[nodiscard]] constexpr ShaderTargetProfile GetShaderTargetProfile(
+	[[nodiscard]] constexpr std::optional<ShaderTargetProfile> TryGetShaderTargetProfile(
 		ShaderBinaryFormat binaryFormat, ShaderSpirVTargetEnvironment environment) noexcept
 	{
+		if (binaryFormat == ShaderBinaryFormat::Dxil &&
+			environment == ShaderSpirVTargetEnvironment::None)
+		{
+			return ShaderTargetProfile::GGLabDX12;
+		}
 		if (binaryFormat == ShaderBinaryFormat::SpirV &&
 			environment == ShaderSpirVTargetEnvironment::Vulkan1_3)
 		{
 			return ShaderTargetProfile::GGLabVulkan13;
 		}
-		return ShaderTargetProfile::GGLabDX12;
+		return std::nullopt;
 	}
 
 	enum class ShaderCompilerKind : uint8_t

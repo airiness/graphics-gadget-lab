@@ -12,6 +12,7 @@
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
 #include "Graphics/RHI/Vulkan/VulkanInstance.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"
+#include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
@@ -317,6 +318,25 @@ namespace gglab
 				availability.m_SamplerDescriptorCount == samplerCount &&
 				availability.m_CombinedDescriptorCount == combinedCount - 3,
 				"Vulkan descriptor capacity is the minimum across every relevant native limit");
+		}
+
+		void RunVulkanQueueSelectionTests(SelfTestContext& context) noexcept
+		{
+			const VulkanQueueSelection unavailable = SelectVulkanQueues(0);
+			context.Check(!unavailable.IsValid(),
+				"Vulkan queue selection rejects a family with no queues");
+
+			const VulkanQueueSelection shared = SelectVulkanQueues(1);
+			context.Check(shared.IsValid() && shared.m_RequestedQueueCount == 1 &&
+				shared.m_GraphicsQueueIndex == 0 && shared.m_TransferQueueIndex == 0 &&
+				!shared.HasSeparateTransferQueue(),
+				"Vulkan queue selection preserves the single-queue fallback");
+
+			const VulkanQueueSelection separate = SelectVulkanQueues(16);
+			context.Check(separate.IsValid() && separate.m_RequestedQueueCount == 2 &&
+				separate.m_GraphicsQueueIndex == 0 && separate.m_TransferQueueIndex == 1 &&
+				separate.HasSeparateTransferQueue(),
+				"Vulkan queue selection uses a second same-family queue for transfer");
 		}
 
 		void RunVulkanBarrierContractTests(SelfTestContext& context) noexcept
@@ -1019,6 +1039,25 @@ namespace gglab
 					"failed submit never advances the reuse gate");
 				context.Check(UpdateSlotReuseGate(0, VK_ERROR_INITIALIZATION_FAILED, 1) == 0,
 					"a never-submitted value can never become a wait target");
+			}
+
+			// Cross-queue waits targeting one timeline coalesce to its greatest
+			// value. A different fence identity must be rejected rather than lost.
+			{
+				const RHIFenceHandle transferFence{ 7, 1 };
+				RHIFencePoint pendingWait{};
+				context.Check(MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ transferFence, 3 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 3 },
+					"the first transfer timeline wait is retained for graphics submission");
+				context.Check(MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ transferFence, 9 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 9 },
+					"graphics submission waits on the greatest transfer timeline value");
+				context.Check(!MergeVulkanTimelineWait(
+					pendingWait, RHIFencePoint{ RHIFenceHandle{ 8, 1 }, 10 }) &&
+					pendingWait == RHIFencePoint{ transferFence, 9 },
+					"a foreign timeline wait is rejected without replacing the dependency");
 			}
 
 			// Present-mode policy: VSync on always selects FIFO; VSync off
@@ -1849,6 +1888,7 @@ namespace gglab
 	{
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
+		RunVulkanQueueSelectionTests(context);
 		RunVulkanBarrierContractTests(context);
 		RunVulkanTextureCopyContractTests(context);
 		RunVulkanFormatContractTests(context);

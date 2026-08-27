@@ -15,6 +15,7 @@
 #include <format>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,32 +24,72 @@ namespace gglab
 {
 	namespace
 	{
+		struct ShaderProgramBuildDefine final
+		{
+			std::wstring_view m_Name;
+			std::wstring_view m_Value{};
+		};
+
 		struct ShaderProgramBuildRecord final
 		{
 			const ShaderProgramRef* m_ProgramRef = nullptr;
 			std::wstring_view m_SourcePath;
 			std::wstring_view m_EntryPoint;
+			std::span<const ShaderProgramBuildDefine> m_Defines{};
 		};
+
+		constexpr ShaderProgramBuildDefine GTAOContributionDefine{
+			L"GGLAB_GTAO_CONTRIBUTION_OUTPUT" };
+		constexpr ShaderProgramBuildDefine ForwardPlusDefine{ L"GGLAB_FORWARD_PLUS" };
+		constexpr ShaderProgramBuildDefine ForwardPlusValidationDefine{
+			L"GGLAB_FORWARD_PLUS_VALIDATION" };
+		constexpr ShaderProgramBuildDefine ForwardPlusDiagnosticsDefine{
+			L"GGLAB_FORWARD_PLUS_DIAGNOSTICS" };
+		constexpr ShaderProgramBuildDefine ValidationReduceTilesDefine{
+			L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_TILES" };
+		constexpr ShaderProgramBuildDefine ValidationReduceFrameDefine{
+			L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME" };
+		constexpr ShaderProgramBuildDefine GTAODiagnosticsDefine{
+			L"GGLAB_GTAO_DIAGNOSTICS" };
+		constexpr ShaderProgramBuildDefine GTAODenoiseXDefine{ L"GGLAB_GTAO_DENOISE_X" };
+		constexpr ShaderProgramBuildDefine GTAODenoiseYDefine{ L"GGLAB_GTAO_DENOISE_Y" };
+		constexpr ShaderProgramBuildDefine GTAOUpsampleDefine{ L"GGLAB_GTAO_UPSAMPLE" };
+
+		constexpr std::array LegacyGTAODefines{ GTAOContributionDefine };
+		constexpr std::array ForwardPlusDefines{ ForwardPlusDefine };
+		constexpr std::array ForwardPlusValidationDefines{
+			ForwardPlusDefine, ForwardPlusValidationDefine };
+		constexpr std::array ForwardPlusGTAODefines{
+			GTAOContributionDefine, ForwardPlusDefine };
+		constexpr std::array ForwardPlusValidationGTAODefines{
+			GTAOContributionDefine, ForwardPlusDefine, ForwardPlusValidationDefine };
+		constexpr std::array ForwardPlusDiagnosticsDefines{ ForwardPlusDiagnosticsDefine };
+		constexpr std::array ValidationReduceTilesDefines{ ValidationReduceTilesDefine };
+		constexpr std::array ValidationReduceFrameDefines{ ValidationReduceFrameDefine };
+		constexpr std::array GTAODiagnosticsDefines{ GTAODiagnosticsDefine };
+		constexpr std::array GTAODenoiseXDefines{ GTAODenoiseXDefine };
+		constexpr std::array GTAODenoiseYDefines{ GTAODenoiseYDefine };
+		constexpr std::array GTAOUpsampleDefines{ GTAOUpsampleDefine };
 
 		using namespace shader_programs;
 		const std::array BuildRecords{
 			ShaderProgramBuildRecord{ &ForwardCoverageVertex, L"Passes/PassForwardCoverage.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &ForwardPBRLegacyPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRLegacyGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
-			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusDefines },
+			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationDefines },
+			ShaderProgramBuildRecord{ &ForwardPBRLegacyGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", LegacyGTAODefines },
+			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusGTAODefines },
+			ShaderProgramBuildRecord{ &ForwardPBRForwardPlusValidationGTAOPixel, L"Passes/PassForwardPBR.hlsl", L"PSMain", ForwardPlusValidationGTAODefines },
 			ShaderProgramBuildRecord{ &DepthPrepassAlphaTestPixel, L"Passes/PassDepthPrepass.hlsl", L"PSAlphaTest" },
 			ShaderProgramBuildRecord{ &ForwardPlusCullCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &ForwardPlusCullDiagnosticsCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &ForwardPlusValidationTilesCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceTiles" },
-			ShaderProgramBuildRecord{ &ForwardPlusValidationFrameCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceFrame" },
+			ShaderProgramBuildRecord{ &ForwardPlusCullDiagnosticsCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain", ForwardPlusDiagnosticsDefines },
+			ShaderProgramBuildRecord{ &ForwardPlusValidationTilesCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceTiles", ValidationReduceTilesDefines },
+			ShaderProgramBuildRecord{ &ForwardPlusValidationFrameCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceFrame", ValidationReduceFrameDefines },
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &GTAODenoiseYCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
-			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
+			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },
+			ShaderProgramBuildRecord{ &GTAODenoiseYCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseYDefines },
+			ShaderProgramBuildRecord{ &GTAOUpsampleCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAOUpsampleDefines },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapVertex, L"Passes/PassDirectionalShadowMap.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &DirectionalShadowMapPixel, L"Passes/PassDirectionalShadowMap.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &ShadowMapPreviewVertex, L"Passes/PassShadowMapPreview.hlsl", L"VSMain" },
@@ -87,9 +128,12 @@ namespace gglab
 			ShaderProgramBuildRecord{ &NapaVoxelPixel, L"Passes/PassNapaVoxel.hlsl", L"PSMain" },
 		};
 
-		void AddDefine(ShaderDesc& desc, const wchar_t* name)
+		void AddDefine(ShaderDesc& desc, const ShaderProgramBuildDefine& define)
 		{
-			desc.m_Defines.push_back({ .m_Name = name, .m_Value = L"1" });
+			desc.m_Defines.push_back({
+				.m_Name = std::wstring(define.m_Name),
+				.m_Value = define.m_Value.empty() ? L"1" : std::wstring(define.m_Value),
+			});
 		}
 
 		[[nodiscard]] std::optional<ShaderDesc> MakeBuildDesc(
@@ -107,51 +151,9 @@ namespace gglab
 					.m_Stage = programRef.m_Stage,
 					.m_Entry = std::wstring(record.m_EntryPoint),
 				};
-				if (programRef == ForwardPBRLegacyGTAOPixel ||
-					programRef == ForwardPBRForwardPlusGTAOPixel ||
-					programRef == ForwardPBRForwardPlusValidationGTAOPixel)
+				for (const ShaderProgramBuildDefine& define : record.m_Defines)
 				{
-					AddDefine(desc, L"GGLAB_GTAO_CONTRIBUTION_OUTPUT");
-				}
-				if (programRef == ForwardPBRForwardPlusPixel ||
-					programRef == ForwardPBRForwardPlusValidationPixel ||
-					programRef == ForwardPBRForwardPlusGTAOPixel ||
-					programRef == ForwardPBRForwardPlusValidationGTAOPixel)
-				{
-					AddDefine(desc, L"GGLAB_FORWARD_PLUS");
-				}
-				if (programRef == ForwardPBRForwardPlusValidationPixel ||
-					programRef == ForwardPBRForwardPlusValidationGTAOPixel)
-				{
-					AddDefine(desc, L"GGLAB_FORWARD_PLUS_VALIDATION");
-				}
-				if (programRef == ForwardPlusCullDiagnosticsCompute)
-				{
-					AddDefine(desc, L"GGLAB_FORWARD_PLUS_DIAGNOSTICS");
-				}
-				if (programRef == ForwardPlusValidationTilesCompute)
-				{
-					AddDefine(desc, L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_TILES");
-				}
-				if (programRef == ForwardPlusValidationFrameCompute)
-				{
-					AddDefine(desc, L"GGLAB_FORWARD_PLUS_VALIDATION_REDUCE_FRAME");
-				}
-				if (programRef == GTAOEvaluateDiagnosticsCompute)
-				{
-					AddDefine(desc, L"GGLAB_GTAO_DIAGNOSTICS");
-				}
-				if (programRef == GTAODenoiseXCompute)
-				{
-					AddDefine(desc, L"GGLAB_GTAO_DENOISE_X");
-				}
-				if (programRef == GTAODenoiseYCompute)
-				{
-					AddDefine(desc, L"GGLAB_GTAO_DENOISE_Y");
-				}
-				if (programRef == GTAOUpsampleCompute)
-				{
-					AddDefine(desc, L"GGLAB_GTAO_UPSAMPLE");
+					AddDefine(desc, define);
 				}
 				return desc;
 			}

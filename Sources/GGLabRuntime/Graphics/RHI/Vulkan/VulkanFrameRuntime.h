@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
@@ -71,6 +72,12 @@ namespace gglab
 	// timeline value may become the gate a later frame waits on.
 	[[nodiscard]] uint64_t UpdateSlotReuseGate(uint64_t previousGate,
 		VkResult submitResult, uint64_t candidateValue) noexcept;
+
+	// Accumulates waits targeting one timeline semaphore. Multiple waits on
+	// the same timeline reduce to the greatest value; mixing fence identities
+	// is rejected so a dependency is never silently dropped.
+	[[nodiscard]] bool MergeVulkanTimelineWait(
+		RHIFencePoint& accumulated, const RHIFencePoint& candidate) noexcept;
 
 	// Runtime health distinguishes "the runtime cannot continue" (fatal,
 	// e.g. a surface-lost present or an out-of-memory result) from "the
@@ -333,7 +340,8 @@ namespace gglab
 		// buffer.
 		[[nodiscard]] VulkanSubmitPresentResult AbortFrame() noexcept;
 
-		// Safe-point swapchain recreation (requires no active frame).
+		// Safe-point swapchain recreation (requires no active frame). This
+		// convenience path waits for graphics idle before rebuilding.
 		[[nodiscard]] bool RecreateSwapChain(uint32_t width, uint32_t height,
 			bool vsync, std::string& outError) noexcept;
 		void SetVsync(bool vsync) noexcept { m_Vsync = vsync; }
@@ -346,9 +354,14 @@ namespace gglab
 		// still in flight. Quiesce is skipped only when the VkDevice itself
 		// is lost; an ordinary fatal error still quiesces.
 		void Finalize() noexcept;
-		// Waits for the graphics queue and the last committed timeline
+		// Waits for the graphics queue and the last committed graphics timeline
 		// value. Returns VK_SUCCESS or the first failed wait result.
-		[[nodiscard]] VkResult WaitIdle() noexcept;
+		[[nodiscard]] VkResult WaitGraphicsIdle() noexcept;
+
+		// Queues a GPU-side wait for the next graphics submission. Graphics
+		// timeline points are already ordered by their native queue; transfer
+		// timeline points are merged and lowered into VkSubmitInfo2.
+		[[nodiscard]] bool QueueGraphicsWait(const RHIFencePoint& fencePoint) noexcept;
 
 		[[nodiscard]] bool IsFatal() const noexcept { return m_Fatal; }
 		[[nodiscard]] bool IsDeviceLost() const noexcept { return m_DeviceLost; }
@@ -396,6 +409,14 @@ namespace gglab
 		[[nodiscard]] VkSemaphore GetRenderingFinishedSemaphore(uint32_t backBufferIndex) const noexcept;
 
 	private:
+		friend class VulkanContext;
+
+		// Production context two-phase recreation: release imported RHI
+		// backbuffers after the sole graphics wait and before rebuilding their
+		// native swapchain images.
+		[[nodiscard]] bool PrepareSwapChainRecreation(std::string& outError) noexcept;
+		[[nodiscard]] bool RecreateSwapChainAtGraphicsIdle(uint32_t width, uint32_t height,
+			bool vsync, std::string& outError) noexcept;
 		void RecordAbortFrame(VkCommandBuffer commandBuffer, uint32_t backBufferIndex) noexcept;
 		[[nodiscard]] VulkanSubmitPresentResult SubmitAndPresent(
 			uint32_t frameSlotIndex, uint32_t backBufferIndex,
@@ -417,6 +438,7 @@ namespace gglab
 		VulkanRuntimeFailureDiagnostics m_FailureDiagnostics;
 		bool m_NormalRecordingOpen = false;
 		bool m_NormalRecordingReady = false;
+		RHIFencePoint m_PendingGraphicsWait{};
 		VulkanPresentTransitionOwnership m_PresentTransitionOwnership =
 			VulkanPresentTransitionOwnership::FrameRuntime;
 		bool m_Finalized = false;
