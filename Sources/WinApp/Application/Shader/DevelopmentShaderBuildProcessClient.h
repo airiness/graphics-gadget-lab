@@ -9,8 +9,10 @@
 
 namespace gglab
 {
-	struct ShaderCompilerDescribeValidationResult final
+	struct ShaderCompilerDescribeDocumentResult final
 	{
+		bool m_ProtocolValid = false;
+		bool m_Succeeded = false;
 		bool m_Compatible = false;
 		std::string m_Diagnostics{};
 	};
@@ -23,9 +25,10 @@ namespace gglab
 		std::string m_Diagnostics{};
 	};
 
-	[[nodiscard]] ShaderCompilerDescribeValidationResult
-		ValidateShaderCompilerDescribeDocument(
-			std::string_view document, std::string_view requiredTarget) noexcept;
+	[[nodiscard]] ShaderCompilerDescribeDocumentResult
+		ParseShaderCompilerDescribeDocument(
+			std::string_view document, uint32_t processExitCode,
+			std::string_view requiredTarget) noexcept;
 
 	[[nodiscard]] ShaderCompilerBuildDocumentResult
 		ParseShaderCompilerBuildDocument(

@@ -46,7 +46,9 @@ namespace gglab
 
 	bool DevelopmentShaderBuildRequest::IsValid() const noexcept
 	{
-		return m_ActiveBackend != RHIBackendType::Unknown &&
+		const bool backendSupported = m_ActiveBackend == RHIBackendType::DX12 ||
+			m_ActiveBackend == RHIBackendType::Vulkan;
+		return backendSupported &&
 			!m_ShaderCompilerPath.empty() && m_ShaderCompilerPath.is_absolute() &&
 			!m_ShaderSourceRoot.empty() && m_ShaderSourceRoot.is_absolute() &&
 			!m_ShaderCacheRoot.empty() && m_ShaderCacheRoot.is_absolute() &&

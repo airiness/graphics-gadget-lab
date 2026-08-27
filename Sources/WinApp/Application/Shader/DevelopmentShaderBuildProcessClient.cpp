@@ -434,34 +434,63 @@ namespace gglab
 		}
 	}
 
-	ShaderCompilerDescribeValidationResult ValidateShaderCompilerDescribeDocument(
-		std::string_view serializedDocument, std::string_view requiredTarget) noexcept
+	ShaderCompilerDescribeDocumentResult ParseShaderCompilerDescribeDocument(
+		std::string_view serializedDocument, uint32_t processExitCode,
+		std::string_view requiredTarget) noexcept
 	{
-		ShaderCompilerDescribeValidationResult result{};
+		ShaderCompilerDescribeDocumentResult result{};
 		const std::optional<nlohmann::json> document =
 			ParseJsonDocumentStrict(serializedDocument);
-		if (!document || !HasExactFields(*document, {
-			"command", "success", "status", "exitCode", "processContractVersion",
-			"compilePolicyRevision",
-			"toolIdentity", "toolVersion", "producerKind", "producerIdentity",
-			"supportedTargets", "diagnostics" }))
+		if (!document || !document->is_object())
 		{
-			result.m_Diagnostics = "describe did not return the declared JSON document shape.";
+			result.m_Diagnostics = "describe did not return one complete JSON document.";
 			return result;
 		}
 
+		bool success = false;
 		std::string command;
 		std::string status;
+		int64_t exitCode = -1;
+		int64_t contractVersion = -1;
+		std::string diagnostics;
+		size_t diagnosticsCount = 0;
+		if (!ReadBoolean(*document, "success", success) ||
+			!HasExactFields(*document, success
+				? std::initializer_list<std::string_view>{ "command", "success", "status",
+					"exitCode", "processContractVersion", "compilePolicyRevision",
+					"toolIdentity", "toolVersion", "producerKind", "producerIdentity",
+					"supportedTargets", "diagnostics" }
+				: std::initializer_list<std::string_view>{ "command", "success", "status",
+					"exitCode", "processContractVersion", "diagnostics" }) ||
+			!ReadString(*document, "command", command) || command != "describe" ||
+			!ReadString(*document, "status", status) || status.empty() ||
+			!ReadInteger(*document, "exitCode", exitCode) || exitCode < 0 ||
+			static_cast<uint64_t>(exitCode) != processExitCode ||
+			!ReadInteger(*document, "processContractVersion", contractVersion) ||
+			contractVersion != ShaderProcessContractVersion ||
+			!ReadDiagnostics(*document, diagnostics, diagnosticsCount))
+		{
+			result.m_Diagnostics = "describe JSON fields disagree with the process contract.";
+			return result;
+		}
+
+		if (!success)
+		{
+			if (processExitCode == 0 || status == "ok" || diagnosticsCount == 0)
+			{
+				result.m_Diagnostics = "describe failure envelope is internally inconsistent.";
+				return result;
+			}
+			result.m_ProtocolValid = true;
+			result.m_Diagnostics = std::move(diagnostics);
+			return result;
+		}
+
 		std::string toolIdentity;
 		std::string toolVersion;
 		std::string producerKind;
 		std::string producerIdentity;
-		bool success = false;
-		int64_t exitCode = -1;
-		int64_t contractVersion = -1;
 		int64_t compilePolicyRevision = -1;
-		std::string diagnostics;
-		size_t diagnosticsCount = 0;
 		const auto supportedTargets = document->find("supportedTargets");
 		bool targetsValid = supportedTargets != document->end() &&
 			supportedTargets->is_array() && !supportedTargets->empty();
@@ -480,23 +509,24 @@ namespace gglab
 			}
 		}
 
-		if (!ReadString(*document, "command", command) || command != "describe" ||
-			!ReadBoolean(*document, "success", success) || !success ||
-			!ReadString(*document, "status", status) || status != "ok" ||
-			!ReadInteger(*document, "exitCode", exitCode) || exitCode != 0 ||
-			!ReadInteger(*document, "processContractVersion", contractVersion) ||
-			contractVersion != ShaderProcessContractVersion ||
+		if (processExitCode != 0 || status != "ok" || diagnosticsCount != 0 ||
 			!ReadInteger(*document, "compilePolicyRevision", compilePolicyRevision) ||
-			compilePolicyRevision != ShaderCompilePolicyRevision ||
 			!ReadString(*document, "toolIdentity", toolIdentity) ||
-			toolIdentity != ShaderCompilerToolIdentity ||
-			!ReadString(*document, "toolVersion", toolVersion) || toolVersion.empty() ||
-			!ReadString(*document, "producerKind", producerKind) || producerKind != "dxc" ||
+			!ReadString(*document, "toolVersion", toolVersion) ||
+			!ReadString(*document, "producerKind", producerKind) ||
 			!ReadString(*document, "producerIdentity", producerIdentity) ||
-			producerIdentity.empty() || producerIdentity == "unknown" ||
-			!targetsValid || !targetSupported ||
-			!ReadDiagnostics(*document, diagnostics, diagnosticsCount) ||
-			diagnosticsCount != 0)
+			!targetsValid)
+		{
+			result.m_Diagnostics = "describe success envelope is internally inconsistent.";
+			return result;
+		}
+
+		result.m_ProtocolValid = true;
+		result.m_Succeeded = true;
+		if (compilePolicyRevision != ShaderCompilePolicyRevision ||
+			toolIdentity != ShaderCompilerToolIdentity || toolVersion.empty() ||
+			producerKind != "dxc" || producerIdentity.empty() ||
+			producerIdentity == "unknown" || !targetSupported)
 		{
 			result.m_Diagnostics =
 				"describe process contract, compile policy, producer, or target support is incompatible.";
@@ -577,9 +607,22 @@ namespace gglab
 	{
 		try
 		{
-			const std::string_view target = request.m_ActiveBackend == RHIBackendType::Vulkan
-				? "gglab-vulkan13"
-				: "gglab-dx12";
+			std::string_view target;
+			switch (request.m_ActiveBackend)
+			{
+			case RHIBackendType::DX12:
+				target = "gglab-dx12";
+				break;
+			case RHIBackendType::Vulkan:
+				target = "gglab-vulkan13";
+				break;
+			case RHIBackendType::Unknown:
+			default:
+				return {
+					.m_Status = DevelopmentShaderBuildStatus::InvalidInput,
+					.m_Diagnostics = "External shader build requires a supported backend.",
+				};
+			}
 			const std::wstring executableArgument =
 				QuoteCommandLineArgument(request.m_ShaderCompilerPath);
 			const ProcessExecutionResult describe = ExecuteShaderCompiler(
@@ -593,20 +636,23 @@ namespace gglab
 				return { .m_Status = DevelopmentShaderBuildStatus::ToolIncompatible,
 					.m_Diagnostics = "describe violated the machine stdout/stderr channel contract." };
 			}
-			const ShaderCompilerDescribeValidationResult compatibility =
-				ValidateShaderCompilerDescribeDocument(describe.m_StdOut, target);
-			if (describe.m_ExitCode != 0)
-			{
-				return { .m_Status = DevelopmentShaderBuildStatus::ProcessFailed,
-					.m_Diagnostics = describe.m_StdOut.empty()
-						? std::format("gglab-shaderc describe failed with exit code {}.",
-							describe.m_ExitCode)
-						: describe.m_StdOut };
-			}
-			if (!compatibility.m_Compatible)
+			const ShaderCompilerDescribeDocumentResult parsedDescribe =
+				ParseShaderCompilerDescribeDocument(
+					describe.m_StdOut, describe.m_ExitCode, target);
+			if (!parsedDescribe.m_ProtocolValid)
 			{
 				return { .m_Status = DevelopmentShaderBuildStatus::ToolIncompatible,
-					.m_Diagnostics = compatibility.m_Diagnostics };
+					.m_Diagnostics = parsedDescribe.m_Diagnostics };
+			}
+			if (!parsedDescribe.m_Succeeded)
+			{
+				return { .m_Status = DevelopmentShaderBuildStatus::ProcessFailed,
+					.m_Diagnostics = parsedDescribe.m_Diagnostics };
+			}
+			if (!parsedDescribe.m_Compatible)
+			{
+				return { .m_Status = DevelopmentShaderBuildStatus::ToolIncompatible,
+					.m_Diagnostics = parsedDescribe.m_Diagnostics };
 			}
 
 			const std::wstring wideTarget(target.begin(), target.end());
