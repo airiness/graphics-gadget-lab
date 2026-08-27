@@ -618,8 +618,6 @@ $shaderArtifactRuntimePublicIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public'
 $shaderToolchainIncludeRoot = '$(GGLabRepositoryRoot)Sources\ShaderToolchain'
 $shaderCompilerIncludeRoot = '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler'
-$shaderCompilerWireIncludeRoot = `
-    '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler\Wire'
 # Allowed, but deliberately not required: the current NapaVoxelCore/... layout
 # still needs this broad root. Foundation Private access is compiler-gated below.
 $repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
@@ -676,11 +674,11 @@ Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
     $shaderToolchainTestsNamespace `
     "Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj" `
     @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
-        $shaderToolchainIncludeRoot, $shaderCompilerWireIncludeRoot,
+        $shaderToolchainIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
     @($shaderToolchainTestsIncludeRoot, $runtimeIncludeRoot,
-        $shaderToolchainIncludeRoot, $shaderCompilerWireIncludeRoot,
+        $shaderToolchainIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
@@ -1552,8 +1550,11 @@ $foundationPrivateHeaders = @(Get-ChildItem -LiteralPath $foundationPrivateDir -
     Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions })
 foreach ($privateHeader in $foundationPrivateHeaders) {
     $content = Get-Content -LiteralPath $privateHeader.FullName -Raw -ErrorAction Stop
-    if ($content -notmatch
-        '#if\s+!defined\s*\(\s*GGLAB_FOUNDATION_PRIVATE_ACCESS\s*\)') {
+    $hasInlineAccessGuard = $content -match
+        '#if\s+!defined\s*\(\s*GGLAB_FOUNDATION_PRIVATE_ACCESS\s*\)'
+    $includesSharedAccessGuard = $content -match
+        '#include\s*"FoundationPrivateAccess\.h"'
+    if (-not $hasInlineAccessGuard -and -not $includesSharedAccessGuard) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "foundation-private-access"
             Target = ConvertTo-RepoRelativePath $privateHeader.FullName
