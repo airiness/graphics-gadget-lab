@@ -207,6 +207,35 @@ namespace gglab
 		return true;
 	}
 
+	bool PersistentTexturePool::ReleaseTextureWithoutSubmission(
+		PersistentTextureAllocation&& allocation) noexcept
+	{
+		if (!allocation.IsValid() || allocation.m_Pool != this)
+		{
+			++m_RejectedReleaseCount;
+			GGLAB_LOG_GRAPHICS_WARN(
+				"PersistentTexturePool rejected an invalid unsubmitted texture release.");
+			return false;
+		}
+
+		const auto active = m_ActiveTextures.find(allocation.m_AllocationId);
+		if (active == m_ActiveTextures.end() ||
+			active->second.m_Texture.Get() != allocation.m_Texture)
+		{
+			++m_RejectedReleaseCount;
+			GGLAB_LOG_GRAPHICS_WARN(
+				"PersistentTexturePool rejected a stale or foreign unsubmitted allocation.");
+			return false;
+		}
+
+		ActiveTextureRecord record = std::move(active->second);
+		m_ActiveTextures.erase(active);
+		allocation.Reset();
+		++m_TotalReleaseCount;
+		++m_CompletedRetirementCount;
+		return true;
+	}
+
 	void PersistentTexturePool::Tick() noexcept
 	{
 		std::erase_if(m_PendingRetirements,

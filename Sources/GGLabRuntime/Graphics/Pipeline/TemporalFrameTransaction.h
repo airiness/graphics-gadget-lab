@@ -5,6 +5,7 @@
 #include "Graphics/GPUStructures.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
@@ -109,16 +110,21 @@ namespace gglab
 	{
 	public:
 		void Begin(TemporalViewHistory& viewHistory, TemporalObjectHistory& objectHistory,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			TemporalHistoryManager* historyManager = nullptr) noexcept;
 		void PrepareDisplayView(RenderView& view) noexcept;
 		[[nodiscard]] Matrix ResolvePreviousObjectModel(
 			const RenderObjectHistoryKey& key, const Matrix& currentModel) const noexcept;
 		[[nodiscard]] bool StageSubmittedObject(
 			const RenderObjectHistoryKey& key, const Matrix& currentModel) noexcept;
+		[[nodiscard]] bool ImportHistoryResources(RenderGraph::RGBuilder& builder,
+			TemporalHistoryRenderGraphResources& outResources) noexcept;
+		[[nodiscard]] bool ExportHistoryResources(RenderGraph::RGBuilder& builder,
+			const TemporalHistoryRenderGraphResources& resources) noexcept;
 		void MarkResolveParticipated() noexcept;
-		void CommitCompleted() noexcept;
-		void Abort() noexcept;
-		void InvalidateAfterFatal() noexcept;
+		void CommitCompleted(const RHIFencePoint& submittedFence = {}) noexcept;
+		void Abort(const RHIFencePoint& retirementFence = {}) noexcept;
+		void InvalidateAfterFatal(const RHIFencePoint& submittedFence = {}) noexcept;
 
 		[[nodiscard]] TemporalFrameTransactionState GetState() const noexcept { return m_State; }
 		[[nodiscard]] uint32_t GetJitterIndex() const noexcept { return m_JitterIndex; }
@@ -131,6 +137,10 @@ namespace gglab
 		{
 			return m_ParticipatedInResolve;
 		}
+		[[nodiscard]] bool HasCompatiblePreviousHistory() const noexcept
+		{
+			return m_HasCompatiblePreviousView;
+		}
 		[[nodiscard]] uint64_t GetSessionIdentity() const noexcept
 		{
 			return m_Plan.m_SessionIdentity;
@@ -142,6 +152,8 @@ namespace gglab
 
 		TemporalViewHistory* m_ViewHistory = nullptr;
 		TemporalObjectHistory* m_ObjectHistory = nullptr;
+		TemporalHistoryManager* m_HistoryManager = nullptr;
+		TemporalHistoryFrameState m_HistoryFrame{};
 		ResolvedTemporalFramePlan m_Plan{};
 		TemporalCommittedViewState m_PendingView{};
 		std::unordered_map<RenderObjectHistoryKey, Matrix, RenderObjectHistoryKeyHash>

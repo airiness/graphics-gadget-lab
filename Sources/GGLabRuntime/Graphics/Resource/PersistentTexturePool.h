@@ -86,6 +86,9 @@ namespace gglab
 			std::string_view logicalName = {}) noexcept;
 		[[nodiscard]] bool ReleaseTexture(PersistentTextureAllocation&& allocation,
 			const RHIFencePoint& fencePoint) noexcept;
+		// Only use when the allocation was never submitted to a GPU queue.
+		[[nodiscard]] bool ReleaseTextureWithoutSubmission(
+			PersistentTextureAllocation&& allocation) noexcept;
 		void Tick() noexcept;
 
 		[[nodiscard]] PersistentTexturePoolDiagnostics GetDiagnostics() const;

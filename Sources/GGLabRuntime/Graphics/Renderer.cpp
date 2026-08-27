@@ -90,6 +90,8 @@ namespace gglab
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
+		m_TemporalHistoryManager =
+			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -134,6 +136,16 @@ namespace gglab
 			motionSupport.m_RenderTarget.IsSupported();
 		m_TemporalAACapabilityStatus.m_MotionShaderResource =
 			motionSupport.m_ShaderResource.IsSupported();
+		const TemporalHistoryFormatSupport historySupport =
+			QueryTemporalHistoryFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_HistoryColorShaderResource =
+			historySupport.m_Color.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryColorTypedUavStore =
+			historySupport.m_Color.m_TypedUavStore.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryDepthShaderResource =
+			historySupport.m_Depth.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryDepthTypedUavStore =
+			historySupport.m_Depth.m_TypedUavStore.IsSupported();
 		m_TemporalAACapabilityStatus.m_BindingLayoutAvailable =
 			m_CommonBindingLayout.IsValid();
 		if (createInfo.m_ShaderManager)
@@ -172,6 +184,8 @@ namespace gglab
 		m_RenderResRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
+		m_TemporalHistoryManager->Shutdown();
+		m_TemporalHistoryManager.reset();
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
@@ -227,7 +241,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
 			"Temporal frame planning requires the active begun Renderer::Frame.");
 		frame.m_TemporalTransaction.Begin(
-			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height);
+			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
+			m_TemporalHistoryManager.get());
 		return frame.m_TemporalTransaction;
 	}
 
@@ -298,11 +313,13 @@ namespace gglab
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
 		if (result.IsCompleted() && submittedFence.IsValid())
 		{
-			frame.m_TemporalTransaction.CommitCompleted();
+			frame.m_TemporalTransaction.CommitCompleted(submittedFence);
 		}
 		else
 		{
-			frame.m_TemporalTransaction.InvalidateAfterFatal();
+			frame.m_TemporalTransaction.InvalidateAfterFatal(submittedFence);
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::FatalSubmission, submittedFence);
 			m_TemporalViewHistory.Invalidate();
 			m_TemporalObjectHistory.Invalidate();
 		}
@@ -338,8 +355,6 @@ namespace gglab
 		{
 			m_IBLBakeScheduler->OnFrameAborted();
 		}
-		frame.m_TemporalTransaction.Abort();
-
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
 
@@ -357,6 +372,7 @@ namespace gglab
 			}
 			const RHIFencePoint retirementFence =
 				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
+			frame.m_TemporalTransaction.Abort(retirementFence);
 			if (retirementFence.IsValid())
 			{
 				RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
@@ -370,6 +386,7 @@ namespace gglab
 			return submittedFence;
 		}
 
+		frame.m_TemporalTransaction.Abort();
 		EndFrameLifetime(frame);
 		return {};
 	}
@@ -469,6 +486,8 @@ namespace gglab
 		}
 
 		m_RHIContext->Resize(width, height);
+		m_TemporalHistoryManager->Invalidate(
+			TemporalHistoryResetReason::ExtentChanged, m_LastSubmittedFencePoint);
 	}
 
 	void Renderer::OnSuspend() noexcept
@@ -478,6 +497,11 @@ namespace gglab
 
 	void Renderer::OnResume() noexcept
 	{
+		if (m_TemporalHistoryManager)
+		{
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::Resume, m_LastSubmittedFencePoint);
+		}
 		m_TemporalViewHistory.Invalidate();
 		m_TemporalObjectHistory.Invalidate();
 		m_IsSuspended.store(false, std::memory_order_relaxed);

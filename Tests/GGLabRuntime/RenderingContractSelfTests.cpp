@@ -74,6 +74,11 @@ namespace gglab
 			std::array<RGTextureViewId, 3> m_Views{};
 		};
 
+		struct TemporalHistoryContractPassData
+		{
+			TemporalHistoryRenderGraphResources m_History;
+		};
+
 		struct BarrierBatchingPassData
 		{
 			RGTextureId m_Texture;
@@ -3277,6 +3282,260 @@ namespace gglab
 				"Fence retirement drains only completed generations and rejects duplicate release");
 		}
 
+		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_TextureViewsSupported = true;
+			const TemporalHistoryFormatSupport formatSupport =
+				QueryTemporalHistoryFormatSupport(device);
+			context.Check(formatSupport.IsSupported() &&
+				device.m_TextureViewQueryCount == 4 &&
+				device.m_LastTextureViewQueryTextureDesc.m_Format == TemporalHistoryDepthFormat &&
+				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::Sampled) &&
+				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::UnorderedAccess) &&
+				device.m_LastTextureViewQueryDesc.m_Type == RHITextureViewType::UnorderedAccess,
+				"Temporal history capability requires SRV and typed-UAV support for both fixed formats");
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool texturePool(&device);
+			TemporalHistoryManager historyManager(&texturePool);
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			ResolvedTemporalFramePlan activePlan{
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::TemporalIntegrated,
+				.m_Status = TemporalAAFrameStatus::Active,
+				.m_DisableReason = TemporalAADisableReason::None,
+				.m_ResetIdentity = 7,
+				.m_SessionIdentity = 11,
+				.m_Requested = true,
+				.m_Active = true,
+				.m_InternalContractMode = true,
+				.m_DisplayViewEligible = true,
+				.m_DepthVelocityPathAvailable = true,
+			};
+
+			auto prepareDisplayView = [&](TemporalFrameTransaction& transaction)
+			{
+				RenderView view{};
+				view.m_ViewId = RenderViewID::Main;
+				view.m_Width = 64;
+				view.m_Height = 64;
+				view.m_IsValid = true;
+				transaction.PrepareDisplayView(view);
+				return view;
+			};
+			auto buildHistoryGraph = [&](TemporalFrameTransaction& transaction,
+				bool expectPrevious, bool inspectColdStartContract)
+			{
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				bool imported = false;
+				bool exported = false;
+				bool previousMatched = false;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.Contract",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						imported = transaction.ImportHistoryResources(builder, data.m_History);
+						previousMatched = data.m_History.m_PreviousValid == expectPrevious;
+						if (data.m_History.m_PreviousValid)
+						{
+							data.m_History.m_PreviousColor = builder.Read(
+								data.m_History.m_PreviousColor, RGTextureAccess::Sample);
+							data.m_History.m_PreviousDepth = builder.Read(
+								data.m_History.m_PreviousDepth, RGTextureAccess::Sample);
+						}
+						builder.WriteInPlace(
+							data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(
+							data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						exported =
+							transaction.ExportHistoryResources(builder, data.m_History);
+					});
+				const bool compiled = graph.Compile();
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const bool previousExportsCommon = !expectPrevious ||
+					std::ranges::count_if(snapshot.m_Resources,
+						[](const RGSnapshotResourceInfo& resource) noexcept
+						{
+							return resource.m_Name.starts_with("TAA.History.Previous") &&
+								resource.m_HasFinalBarrierState &&
+								resource.m_FinalBarrierState == CommonRHIResourceState();
+						}) == 2;
+				if (!inspectColdStartContract)
+				{
+					return imported && exported && previousMatched && compiled &&
+						previousExportsCommon;
+				}
+
+				const bool importedFour = snapshot.m_Resources.size() == 4 &&
+					std::ranges::all_of(snapshot.m_Resources,
+						[](const RGSnapshotResourceInfo& resource) noexcept
+						{ return resource.m_Imported; });
+				const bool nextExportsCommon = std::ranges::count_if(snapshot.m_Resources,
+					[](const RGSnapshotResourceInfo& resource) noexcept
+					{
+						return resource.m_Name.starts_with("TAA.History.Next") &&
+							resource.m_InitialBarrierState == UndefinedRHITextureState() &&
+							resource.m_HasFinalBarrierState &&
+							resource.m_FinalBarrierState == CommonRHIResourceState();
+					}) == 2;
+				return imported && exported && previousMatched && compiled &&
+					previousExportsCommon && importedFour && nextExportsCommon;
+			};
+
+			TemporalFrameTransaction firstTransaction;
+			firstTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView firstView = prepareDisplayView(firstTransaction);
+			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
+			firstTransaction.CommitCompleted(firstFence);
+			const TemporalHistoryManagerDiagnostics firstCommitted =
+				historyManager.GetDiagnostics();
+			const uint64_t firstGeneration = firstCommitted.m_AllocationGeneration;
+			context.Check(coldStartGraphValid && !firstView.m_HasPreviousTemporalState &&
+				firstTransaction.GetState() == TemporalFrameTransactionState::Committed &&
+				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
+				firstCommitted.m_ReadIndex == 1 && firstCommitted.m_ActiveBytes > 0 &&
+				firstCommitted.m_LastCommitted.m_JitterIndex == 0 &&
+				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
+				device.m_CreateTextureCount == 4,
+				"Temporal history cold start imports four persistent textures and commits one write pair");
+
+			TemporalFrameTransaction abortedTransaction;
+			abortedTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView abortedView = prepareDisplayView(abortedTransaction);
+			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
+			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
+			abortedTransaction.Abort(vulkanAbortFence);
+			const TemporalHistoryManagerDiagnostics afterAbort = historyManager.GetDiagnostics();
+			context.Check(abortGraphValid && abortedView.m_HasPreviousTemporalState &&
+				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
+				afterAbort.m_AllocationGeneration == firstGeneration &&
+				afterAbort.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 1,
+				"Vulkan abort fences gate lifetime without advancing logical temporal history");
+
+			TemporalFrameTransaction noResolveTransaction;
+			noResolveTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView noResolveView = prepareDisplayView(noResolveTransaction);
+			const RHIFencePoint noResolveFence{ RHIFenceHandle{ 1, 1 }, 30 };
+			noResolveTransaction.CommitCompleted(noResolveFence);
+			const TemporalHistoryManagerDiagnostics afterNoResolve =
+				historyManager.GetDiagnostics();
+			context.Check(noResolveView.m_HasPreviousTemporalState &&
+				noResolveTransaction.GetJitterIndex() == 1 &&
+				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterNoResolve.m_ReadIndex == 1 &&
+				afterNoResolve.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_NextJitterIndex == 1,
+				"A completed frame without temporal resolve advances no temporal participant");
+
+			TemporalFrameTransaction invalidFenceTransaction;
+			invalidFenceTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(invalidFenceTransaction));
+			const bool invalidFenceGraphValid =
+				buildHistoryGraph(invalidFenceTransaction, true, false);
+			invalidFenceTransaction.CommitCompleted();
+			const TemporalHistoryManagerDiagnostics afterInvalidFence =
+				historyManager.GetDiagnostics();
+			context.Check(invalidFenceGraphValid &&
+				invalidFenceTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterInvalidFence.m_HistoryValid && afterInvalidFence.m_ReadIndex == 1 &&
+				afterInvalidFence.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_NextJitterIndex == 1,
+				"A completed transaction without a valid submitted fence cannot commit history");
+
+			TemporalFrameTransaction fatalTransaction;
+			fatalTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(fatalTransaction));
+			const bool fatalGraphValid = buildHistoryGraph(fatalTransaction, true, false);
+			const RHIFencePoint fatalFence{ RHIFenceHandle{ 1, 1 }, 40 };
+			fatalTransaction.InvalidateAfterFatal(fatalFence);
+			const TemporalHistoryManagerDiagnostics afterFatal = historyManager.GetDiagnostics();
+			const bool fatalFencesAreRetirementOnly =
+				!afterFatal.m_PendingRetirementFences.empty() &&
+				std::ranges::all_of(afterFatal.m_PendingRetirementFences,
+					[&](const RHIFencePoint& fence) noexcept { return fence == fatalFence; });
+			device.m_CompletedFenceValue = 39;
+			texturePool.Tick();
+			const uint32_t destroyedBeforeFatalFence = device.m_DestroyTextureCount;
+			device.m_CompletedFenceValue = 40;
+			texturePool.Tick();
+			context.Check(fatalGraphValid &&
+				fatalTransaction.GetState() == TemporalFrameTransactionState::Invalidated &&
+				!viewHistory.m_Valid && !afterFatal.m_HasActiveHistory &&
+				afterFatal.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission &&
+				afterFatal.m_PendingRetirementBytes > 0 && fatalFencesAreRetirementOnly &&
+				destroyedBeforeFatalFence == 0 && device.m_DestroyTextureCount == 4,
+				"Fatal-after-submit invalidates history and uses its fence only for retirement");
+
+			TemporalFrameTransaction reenabledTransaction;
+			reenabledTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const TemporalHistoryManagerDiagnostics reenabled = historyManager.GetDiagnostics();
+			reenabledTransaction.Abort();
+			ResolvedTemporalFramePlan disabledPlan = activePlan;
+			disabledPlan.m_Status = TemporalAAFrameStatus::Disabled;
+			disabledPlan.m_DisableReason = TemporalAADisableReason::NotRequested;
+			disabledPlan.m_Requested = false;
+			disabledPlan.m_Active = false;
+			TemporalFrameTransaction disabledTransaction;
+			disabledTransaction.Begin(
+				viewHistory, objectHistory, disabledPlan, 64, 64, &historyManager);
+			disabledTransaction.Abort();
+			const TemporalHistoryManagerDiagnostics disabled = historyManager.GetDiagnostics();
+			context.Check(reenabled.m_HasActiveHistory && !reenabled.m_HistoryValid &&
+				reenabled.m_AllocationGeneration > firstGeneration &&
+				device.m_CreateTextureCount == 8 && !disabled.m_HasActiveHistory &&
+				disabled.m_LastResetReason == TemporalHistoryResetReason::Disabled &&
+				device.m_DestroyTextureCount == 8,
+				"Disabled history releases immediately and re-enable never revives retired allocations");
+
+			TemporalFrameTransaction preResizeTransaction;
+			preResizeTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(preResizeTransaction));
+			const bool preResizeGraphValid =
+				buildHistoryGraph(preResizeTransaction, false, false);
+			const RHIFencePoint preResizeFence{ RHIFenceHandle{ 1, 1 }, 50 };
+			preResizeTransaction.CommitCompleted(preResizeFence);
+			const uint64_t preResizeGeneration =
+				historyManager.GetDiagnostics().m_AllocationGeneration;
+			TemporalFrameTransaction resizedTransaction;
+			resizedTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 128, 72, &historyManager);
+			const TemporalHistoryManagerDiagnostics resized = historyManager.GetDiagnostics();
+			resizedTransaction.Abort();
+			context.Check(preResizeGraphValid && resized.m_HasActiveHistory &&
+				!resized.m_HistoryValid && resized.m_Compatibility.m_Width == 128 &&
+				resized.m_Compatibility.m_Height == 72 &&
+				resized.m_AllocationGeneration > preResizeGeneration &&
+				resized.m_LastResetReason == TemporalHistoryResetReason::ExtentChanged &&
+				resized.m_PendingRetirementFences.size() == 4 &&
+				device.m_CreateTextureCount == 16,
+				"Extent changes retire committed history and allocate a fresh invalid generation");
+
+			historyManager.Shutdown();
+			device.m_CompletedFenceValue = 50;
+			texturePool.Tick();
+			context.Check(device.m_DestroyTextureCount == 16 &&
+				texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Temporal history shutdown leaves no active or pending persistent allocation");
+		}
+
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
 		{
 			const RGPersistentTextureImportContract pendingTexture =
@@ -4880,6 +5139,7 @@ namespace gglab
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
+		RunTemporalHistoryTransactionContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);

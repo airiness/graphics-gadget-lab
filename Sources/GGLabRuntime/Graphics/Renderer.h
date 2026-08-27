@@ -11,7 +11,6 @@
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
-#include "Graphics/RenderParameters.h"
 #include "Graphics/RenderScene.h"
 
 #include <array>
@@ -171,6 +170,10 @@ namespace gglab
 		{
 			return m_PersistentTexturePool.get();
 		}
+		TemporalHistoryManager* GetTemporalHistoryManager() const noexcept
+		{
+			return m_TemporalHistoryManager.get();
+		}
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
@@ -287,6 +290,7 @@ namespace gglab
 		std::unique_ptr<AssetUploadScheduler> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
+		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;

@@ -37,19 +37,23 @@ namespace gglab
 
 	void TemporalFrameTransaction::Begin(TemporalViewHistory& viewHistory,
 		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
-		uint32_t width, uint32_t height) noexcept
+		uint32_t width, uint32_t height, TemporalHistoryManager* historyManager) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State != TemporalFrameTransactionState::Pending,
 			"A pending temporal frame transaction must be ended before "
 			"it can be reused.");
 		m_ViewHistory = &viewHistory;
 		m_ObjectHistory = &objectHistory;
+		m_HistoryManager = historyManager;
 		m_Plan = plan;
 		m_PendingView = {};
 		m_State = TemporalFrameTransactionState::Pending;
 		m_Width = width;
 		m_Height = height;
-		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(viewHistory);
+		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, width, height)
+										: TemporalHistoryFrameState{};
+		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(viewHistory) &&
+			(!historyManager || m_HistoryFrame.m_PreviousValid);
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_JitterPixels =
 			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
@@ -161,14 +165,44 @@ namespace gglab
 		return true;
 	}
 
+	bool TemporalFrameTransaction::ImportHistoryResources(RenderGraph::RGBuilder& builder,
+		TemporalHistoryRenderGraphResources& outResources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
+			"Only an active pending temporal frame can import history resources.");
+		return m_HistoryManager &&
+			m_HistoryManager->ImportRenderGraphResources(m_HistoryFrame, builder, outResources);
+	}
+
+	bool TemporalFrameTransaction::ExportHistoryResources(RenderGraph::RGBuilder& builder,
+		const TemporalHistoryRenderGraphResources& resources) noexcept
+	{
+		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
+			"Only an active pending temporal frame can export history resources.");
+		if (!m_HistoryManager ||
+			!m_HistoryManager->ExportRenderGraphResources(m_HistoryFrame, builder, resources))
+		{
+			return false;
+		}
+		MarkResolveParticipated();
+		return true;
+	}
+
 	void TemporalFrameTransaction::MarkResolveParticipated() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_State == TemporalFrameTransactionState::Pending && m_Plan.m_Active,
 			"Only an active pending temporal frame may participate in resolve.");
+		GGLAB_ASSERT_MSG(!m_HistoryManager || m_HistoryFrame.m_RenderGraphExported,
+			"Temporal history must be exported before resolve participation is committed.");
+		if (m_HistoryManager && !m_HistoryFrame.m_RenderGraphExported)
+		{
+			return;
+		}
 		m_ParticipatedInResolve = true;
 	}
 
-	void TemporalFrameTransaction::CommitCompleted() noexcept
+	void TemporalFrameTransaction::CommitCompleted(
+		const RHIFencePoint& submittedFence) noexcept
 	{
 		if (m_State != TemporalFrameTransactionState::Pending)
 		{
@@ -178,6 +212,10 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(m_ObjectHistory);
 		if (!m_Plan.m_Active)
 		{
+			if (m_HistoryManager)
+			{
+				m_HistoryManager->AbortFrame(m_HistoryFrame, submittedFence);
+			}
 			m_ViewHistory->Invalidate();
 			m_ObjectHistory->Invalidate();
 			m_State = TemporalFrameTransactionState::Committed;
@@ -185,8 +223,31 @@ namespace gglab
 		}
 		if (!m_HasPendingView || !m_ParticipatedInResolve)
 		{
+			if (m_HistoryManager)
+			{
+				m_HistoryManager->AbortFrame(m_HistoryFrame, submittedFence);
+			}
 			m_State = TemporalFrameTransactionState::Aborted;
 			return;
+		}
+		if (m_HistoryManager)
+		{
+			const bool historyCommitted = m_HistoryManager->CommitFrame(m_HistoryFrame, {
+				.m_Compatibility = {
+					.m_DisplayViewId = m_PendingView.m_DisplayViewId,
+					.m_ResetIdentity = m_PendingView.m_ResetIdentity,
+					.m_SessionIdentity = m_PendingView.m_SessionIdentity,
+					.m_Width = m_PendingView.m_Width,
+					.m_Height = m_PendingView.m_Height,
+				},
+				.m_JitterUV = m_PendingView.m_JitterUV,
+				.m_JitterIndex = m_JitterIndex,
+				}, submittedFence);
+			if (!historyCommitted)
+			{
+				m_State = TemporalFrameTransactionState::Aborted;
+				return;
+			}
 		}
 
 		m_ViewHistory->m_Committed = m_PendingView;
@@ -197,18 +258,27 @@ namespace gglab
 		m_State = TemporalFrameTransactionState::Committed;
 	}
 
-	void TemporalFrameTransaction::Abort() noexcept
+	void TemporalFrameTransaction::Abort(const RHIFencePoint& retirementFence) noexcept
 	{
 		if (m_State == TemporalFrameTransactionState::Pending)
 		{
+			if (m_HistoryManager)
+			{
+				m_HistoryManager->AbortFrame(m_HistoryFrame, retirementFence);
+			}
 			m_State = TemporalFrameTransactionState::Aborted;
 		}
 	}
 
-	void TemporalFrameTransaction::InvalidateAfterFatal() noexcept
+	void TemporalFrameTransaction::InvalidateAfterFatal(
+		const RHIFencePoint& submittedFence) noexcept
 	{
 		if (m_State == TemporalFrameTransactionState::Pending && m_ViewHistory && m_ObjectHistory)
 		{
+			if (m_HistoryManager)
+			{
+				m_HistoryManager->InvalidateAfterFatal(m_HistoryFrame, submittedFence);
+			}
 			m_ViewHistory->Invalidate();
 			m_ObjectHistory->Invalidate();
 			m_State = TemporalFrameTransactionState::Invalidated;
