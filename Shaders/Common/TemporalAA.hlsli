@@ -148,10 +148,39 @@ bool ValidateTemporalGeometryDepth(float2 currentUV, float currentRawDepth,
 		mul(float4(currentPositionVS, 1.0), viewData.InvViewMat).xyz;
 	const float expectedPreviousViewZ =
 		mul(float4(currentPositionWS, 1.0), viewData.PreviousViewMat).z;
-	const float previousRawDepth =
-		previousDepthTexture.SampleLevel(pointClampSampler, previousRasterUV, 0.0);
-	const float storedPreviousViewZ = RawDepthToPositiveViewZ(previousRawDepth,
-		viewData.PreviousDepthReconstructionParams, viewData.PreviousDepthConvention);
-	return IsTemporalDepthCompatible(expectedPreviousViewZ, storedPreviousViewZ,
-		absoluteThreshold, relativeThreshold);
+
+	uint previousDepthWidth;
+	uint previousDepthHeight;
+	previousDepthTexture.GetDimensions(previousDepthWidth, previousDepthHeight);
+	const float2 previousDepthTexelSize =
+		rcp(float2(max(previousDepthWidth, 1u), max(previousDepthHeight, 1u)));
+
+	[unroll]
+	for (int y = -1; y <= 1; ++y)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; ++x)
+		{
+			const float2 sampleUV =
+				previousRasterUV + float2(x, y) * previousDepthTexelSize;
+			const float previousRawDepth =
+				previousDepthTexture.SampleLevel(pointClampSampler, sampleUV, 0.0);
+			if (!isfinite(previousRawDepth) || IsDepthBackground(
+				previousRawDepth, viewData.PreviousDepthConvention))
+			{
+				continue;
+			}
+
+			const float storedPreviousViewZ = RawDepthToPositiveViewZ(previousRawDepth,
+				viewData.PreviousDepthReconstructionParams,
+				viewData.PreviousDepthConvention);
+			if (IsTemporalDepthCompatible(expectedPreviousViewZ, storedPreviousViewZ,
+				absoluteThreshold, relativeThreshold))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }

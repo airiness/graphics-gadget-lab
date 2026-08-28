@@ -171,6 +171,31 @@ namespace gglab
 		return std::abs(expectedPreviousViewZ - storedPreviousViewZ) <= tolerance;
 	}
 
+	struct TemporalAAGeometryDepthSample
+	{
+		float m_StoredPreviousViewZ = 0.0f;
+		bool m_IsGeometry = false;
+	};
+
+	[[nodiscard]] inline bool HasCompatibleTemporalGeometryDepthSample(
+		float expectedPreviousViewZ,
+		const std::array<TemporalAAGeometryDepthSample, 9>& previousDepthNeighborhood,
+		float absoluteThreshold = TemporalAADepthAbsoluteThreshold,
+		float relativeThreshold = TemporalAADepthRelativeThreshold) noexcept
+	{
+		for (const TemporalAAGeometryDepthSample& sample : previousDepthNeighborhood)
+		{
+			if (sample.m_IsGeometry && IsTemporalHistoryDepthCompatible(
+				expectedPreviousViewZ, sample.m_StoredPreviousViewZ,
+				absoluteThreshold, relativeThreshold))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	enum class SceneExtensionTemporalParticipation : uint8_t
 	{
 		TemporalIntegrated,

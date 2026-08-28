@@ -4805,6 +4805,22 @@ namespace gglab
 				!IsTemporalHistoryDepthCompatible(
 					std::numeric_limits<float>::quiet_NaN(), 1.0f),
 				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance");
+
+			std::array<TemporalAAGeometryDepthSample, 9> geometryEdgeNeighborhood{};
+			geometryEdgeNeighborhood[4] = { 10.0f, false };
+			geometryEdgeNeighborhood[5] = { 10.04f, true };
+			std::array<TemporalAAGeometryDepthSample, 9> backgroundOnlyNeighborhood{};
+			backgroundOnlyNeighborhood[4] = { 10.0f, false };
+			std::array<TemporalAAGeometryDepthSample, 9> mismatchedGeometryNeighborhood{};
+			mismatchedGeometryNeighborhood[4] = { 10.21f, true };
+			context.Check(HasCompatibleTemporalGeometryDepthSample(
+					10.0f, geometryEdgeNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(
+					10.0f, backgroundOnlyNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(
+					10.0f, mismatchedGeometryNeighborhood),
+				"TAA geometry depth validation accepts a matching 3x3 geometry neighbor and rejects background or mismatched candidates");
+
 			context.Check(IsTemporalSkyHistoryCompatible(0.0f, DepthConvention::Reversed) &&
 				IsTemporalSkyHistoryCompatible(1.0f, DepthConvention::Standard) &&
 				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Reversed) &&
