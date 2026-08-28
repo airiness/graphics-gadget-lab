@@ -287,6 +287,19 @@ namespace gglab
 		const entt::entity background = createCube("gglab.lab.temporal_aa.disocclusion_background",
 			Vector3(0.0f, 0.0f, 10.5f), Vector3(3.5f, 2.0f, 0.12f),
 			Color(0.15f, 0.65f, 0.3f, 1.0f), 0.7f);
+		const entt::entity distantBoard = createCube("gglab.lab.temporal_aa.distant_board",
+			Vector3(7.0f, 4.5f, 45.0f), Vector3(3.0f, 1.75f, 0.12f),
+			Color(0.08f, 0.72f, 0.95f, 1.0f), 0.35f);
+		components::TransformComponent distantReferenceTransform{};
+		distantReferenceTransform.m_Position = Vector3(0.0f, 5.5f, 45.0f);
+		distantReferenceTransform.m_Scale = Vector3::One * 2.25f;
+		const entt::entity distantReference = primitive::Sphere::Create({
+			.m_AssetManager = m_Services.m_AssetManager,
+			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_World = &m_World, .m_Transform = distantReferenceTransform,
+			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.distant_reference",
+				Color(0.95f, 0.72f, 0.08f, 1.0f), 0.28f, 0.15f),
+			});
 		const entt::entity alphaEdge = registry.create();
 		components::TransformComponent alphaTransform{};
 		alphaTransform.m_Position = Vector3(-4.2f, -0.25f, 6.8f);
@@ -306,7 +319,8 @@ namespace gglab
 				Color(0.7f, 0.12f, 0.5f, 1.0f), 0.22f),
 			});
 		const entt::entity fixtures[] = {
-			floor, thinA, thinB, emissive, specular, background, alphaEdge, m_MovingEntity };
+			floor, thinA, thinB, emissive, specular, background, distantBoard,
+			distantReference, alphaEdge, m_MovingEntity };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{ return registry.valid(entity); });
 		BuildLighting();
@@ -366,7 +380,7 @@ namespace gglab
 			{.m_Name = "Deterministic fixture",
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, and background sky are present."},
+				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, and distant curved/straight silhouette references are present."},
 			{.m_Name = "Temporal history allocation",
 				.m_Status = GetViewRenderProfile().m_TemporalAA.m_Enabled && history.m_HasActiveHistory
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
@@ -380,7 +394,7 @@ namespace gglab
 	{
 		return {
 			.m_Id = GetId(), .m_DisplayName = "Temporal AA", .m_Category = "Rendering",
-			.m_Description = "Exercises temporal stability, motion, disocclusion, camera cuts, resize/toggle pressure, and diagnostic taps.",
+			.m_Description = "Exercises temporal stability across near/far geometry, motion, disocclusion, camera cuts, resize/toggle pressure, and diagnostic taps.",
 			.m_Kind = LabKind::Pipeline, .m_SchemaVersion = 1,
 		};
 	}
