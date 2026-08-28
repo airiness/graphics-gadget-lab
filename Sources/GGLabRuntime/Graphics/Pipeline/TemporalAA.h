@@ -25,6 +25,27 @@ namespace gglab
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
 
+	[[nodiscard]] inline Vector2 ResolveTemporalHistoryMotionUV(
+		const Vector2& rasterMotionUV, const Vector2& currentJitterUV,
+		const Vector2& previousJitterUV) noexcept
+	{
+		return rasterMotionUV - (currentJitterUV - previousJitterUV);
+	}
+
+	[[nodiscard]] inline bool IsTemporalAAUVInBounds(const Vector2& uv) noexcept
+	{
+		return std::isfinite(uv.m_X) && std::isfinite(uv.m_Y) &&
+			uv.m_X >= 0.0f && uv.m_X <= 1.0f &&
+			uv.m_Y >= 0.0f && uv.m_Y <= 1.0f;
+	}
+
+	[[nodiscard]] inline bool AreTemporalAAReprojectionUVsValid(
+		const Vector2& previousHistoryUV, const Vector2& previousRasterUV) noexcept
+	{
+		return IsTemporalAAUVInBounds(previousHistoryUV) &&
+			IsTemporalAAUVInBounds(previousRasterUV);
+	}
+
 	[[nodiscard]] constexpr uint32_t QuantizeTemporalAAUnitRange(float value) noexcept
 	{
 		return static_cast<uint32_t>(

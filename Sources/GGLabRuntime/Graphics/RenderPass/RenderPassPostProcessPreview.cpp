@@ -150,14 +150,10 @@ namespace gglab
 		{
 			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
 				TemporalAAResourcesName);
-			const bool historyTap =
-				selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor;
 			const RGTextureId source = temporalAA
-				? (historyTap ? temporalAA->m_History.m_PreviousColor
-					: temporalAA->m_ReprojectionDiagnostics)
+				? ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap)
 				: RGTextureId{};
-			if (!temporalAA || !source.IsValid() ||
-				(historyTap && !temporalAA->m_History.m_PreviousValid))
+			if (!temporalAA || !source.IsValid())
 			{
 				registry->InvalidatePostProcessPreview(selection);
 				return;

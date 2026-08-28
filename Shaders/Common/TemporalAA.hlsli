@@ -11,6 +11,9 @@ static const uint TAA_REJECTION_NON_FINITE = 3;
 static const uint TAA_REJECTION_DEPTH_MISMATCH = 4;
 static const uint TAA_REJECTION_BACKGROUND_MISMATCH = 5;
 static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
+static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
+static const uint TAA_VIEW_FLAG_MASK =
+	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT;
 
 float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 {
@@ -25,6 +28,18 @@ bool IsTemporalUVInBounds(float2 uv)
 bool IsTemporalColorFinite(float3 color)
 {
 	return all(isfinite(color));
+}
+
+float2 ResolveTemporalHistoryMotionUV(float2 rasterMotionUV,
+	float2 currentJitterUV, float2 previousJitterUV)
+{
+	return rasterMotionUV - (currentJitterUV - previousJitterUV);
+}
+
+bool AreTemporalReprojectionUVsValid(float2 previousHistoryUV, float2 previousRasterUV)
+{
+	return IsTemporalUVInBounds(previousHistoryUV) &&
+		IsTemporalUVInBounds(previousRasterUV);
 }
 
 float3 TemporalRGBToYCoCg(float3 color)
@@ -123,7 +138,8 @@ float2 ReprojectTemporalSkyUV(float2 currentUV, ViewData viewData)
 }
 
 bool ValidateTemporalGeometryDepth(float2 currentUV, float currentRawDepth,
-	float2 previousUV, Texture2D<float> previousDepthTexture, SamplerState pointClampSampler,
+	float2 previousRasterUV, Texture2D<float> previousDepthTexture,
+	SamplerState pointClampSampler,
 	ViewData viewData, float absoluteThreshold, float relativeThreshold)
 {
 	const float3 currentPositionVS = ReconstructViewPosition(
@@ -133,7 +149,7 @@ bool ValidateTemporalGeometryDepth(float2 currentUV, float currentRawDepth,
 	const float expectedPreviousViewZ =
 		mul(float4(currentPositionWS, 1.0), viewData.PreviousViewMat).z;
 	const float previousRawDepth =
-		previousDepthTexture.SampleLevel(pointClampSampler, previousUV, 0.0);
+		previousDepthTexture.SampleLevel(pointClampSampler, previousRasterUV, 0.0);
 	const float storedPreviousViewZ = RawDepthToPositiveViewZ(previousRawDepth,
 		viewData.PreviousDepthReconstructionParams, viewData.PreviousDepthConvention);
 	return IsTemporalDepthCompatible(expectedPreviousViewZ, storedPreviousViewZ,

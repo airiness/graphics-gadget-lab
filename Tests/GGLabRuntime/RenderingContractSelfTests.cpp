@@ -20,6 +20,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
@@ -3013,6 +3014,89 @@ namespace gglab
 					"Read-only stage scopes accumulate until a persistent state transition");
 			}
 
+			RenderGraph temporalResolvedInitializationGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			RGTextureId temporalResolvedColor;
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"TAA.InitializeResolvedColor",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.SideEffect();
+					RHITextureDesc desc{};
+					desc.m_Format = TemporalAAResolvedColorFormat;
+					desc.m_Extent = { 1920, 1080, 1 };
+					temporalResolvedColor =
+						builder.CreateTexture("TAA.ResolvedColorInitialization", desc);
+					builder.WriteInPlace(
+						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					data.m_Texture = temporalResolvedColor;
+				});
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"TAA.ComputeResolve", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					// Production TAA stays live through its exported history writes.
+					builder.SideEffect();
+					builder.WriteInPlace(
+						temporalResolvedColor, RGTextureAccess::StorageWrite);
+					data.m_Texture = temporalResolvedColor;
+				});
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"Forward.TransparentLoad",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.ReadWriteInPlace(
+						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					data.m_Texture = temporalResolvedColor;
+					builder.SideEffect();
+				});
+			const bool temporalResolvedInitializationCompiled =
+				temporalResolvedInitializationGraph.Compile();
+			context.Check(temporalResolvedInitializationCompiled,
+				"TAA resolved-color initialization fixture compiles");
+			if (temporalResolvedInitializationCompiled)
+			{
+				RGSnapshot temporalResolvedSnapshot;
+				BuildRenderGraphSnapshot(
+					temporalResolvedInitializationGraph, temporalResolvedSnapshot);
+				const auto resource = std::ranges::find(temporalResolvedSnapshot.m_Resources,
+					"TAA.ResolvedColorInitialization", &RGSnapshotResourceInfo::m_Name);
+				const auto isTransition = [](const RGSnapshotPassInfo& pass,
+					RHILayout before, RHILayout after) noexcept
+				{
+					return std::ranges::any_of(pass.m_PreBarriers,
+						[before, after](const RGSnapshotBarrierInfo& barrier) noexcept
+						{
+							return barrier.m_ResourceName ==
+								"TAA.ResolvedColorInitialization" &&
+								barrier.m_Kind == RGBarrierKind::Transition &&
+								barrier.m_Before.m_Layout == before &&
+								barrier.m_After.m_Layout == after;
+						});
+				};
+				context.Check(resource != temporalResolvedSnapshot.m_Resources.end() &&
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
+						RHITextureUsage::RenderTarget) &&
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
+						RHITextureUsage::UnorderedAccess),
+					"TAA resolved color preserves its mixed RTV/UAV usage contract");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[0], RHILayout::Undefined,
+						RHILayout::RenderTarget),
+					"TAA resolved color initializes through a first-use render-target transition");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[1], RHILayout::RenderTarget,
+						RHILayout::UnorderedAccess),
+					"TAA resolve transitions initialized color from RTV to UAV");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[2], RHILayout::UnorderedAccess,
+						RHILayout::RenderTarget),
+					"Transparent load transitions resolved color back from UAV to RTV");
+			}
+
 			RecordingGraphicsCommandContext graphicsContext;
 			RecordingComputeCommandContext directComputeContext;
 			uint32_t graphicsExecutions = 0;
@@ -3347,6 +3431,57 @@ namespace gglab
 			context.Check(!initiallyDefinedCountsAsCurrentWrite && fullCurrentWriteRecognized &&
 				writeProofGraph.Compile(),
 				"RenderGraph distinguishes prior Defined contents from a full current-pass write");
+
+			RenderGraph historyColorPreviewGraph({
+				.m_Device = &writeProofDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			RHITextureDesc historyColorPreviewPayloadDesc = writeProofDesc;
+			historyColorPreviewPayloadDesc.m_Usage = RHITextureUsage::None;
+			RGTemporalAAResources historyColorPreviewResources{};
+			bool historyColorPreviewUsesTransientPayload = false;
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"TemporalHistory.ExportPrevious",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					historyColorPreviewResources.m_History.m_PreviousColor =
+						builder.ImportTexture("TAA.Preview.PreviousColor", writeProofTexture,
+							writeProofDesc, CommonRHIResourceState(), RGContentValidity::Defined);
+					historyColorPreviewResources.m_History.m_PreviousColor = builder.Read(
+						historyColorPreviewResources.m_History.m_PreviousColor,
+						RGTextureAccess::Sample);
+					builder.Export(
+						historyColorPreviewResources.m_History.m_PreviousColor,
+						RGTextureAccess::None);
+
+					historyColorPreviewResources.m_ReprojectionDiagnostics =
+						builder.CreateTexture(
+							"TAA.Preview.AccumulatedHistory", historyColorPreviewPayloadDesc);
+					builder.WriteInPlace(
+						historyColorPreviewResources.m_ReprojectionDiagnostics,
+						RGTextureAccess::StorageWrite);
+					data.m_Texture =
+						historyColorPreviewResources.m_ReprojectionDiagnostics;
+				});
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"PostProcess.Preview.HistoryColor",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					const RGTextureId previewSource = ResolveTemporalAAPreviewSource(
+						historyColorPreviewResources,
+						PostProcessDebugTap::TemporalHistoryColor);
+					historyColorPreviewUsesTransientPayload =
+						previewSource ==
+							historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_PreviousColor;
+					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			context.Check(historyColorPreviewUsesTransientPayload &&
+				historyColorPreviewGraph.Compile(),
+				"TAA history-color preview reads its transient accumulated payload after previous history export");
 
 			RecordingDevice device;
 			device.m_TextureViewsSupported = true;
@@ -4598,6 +4733,69 @@ namespace gglab
 				NearlyEqual(objectMotionReadback.m_MagnitudePixels, std::sqrt(425.0f)) &&
 				!ResolveTemporalMotionReadbackSample(objectMotion, 0, 50).m_Valid,
 				"Temporal motion uses current-minus-previous top-left UV delta and deterministic pixel magnitude");
+
+			const Vector2 currentJitterUV =
+				temporal::JitterPixelsToUV(Vector2(0.25f, -0.25f), 100, 50);
+			const Vector2 previousJitterUV =
+				temporal::JitterPixelsToUV(Vector2(-0.25f, 0.25f), 100, 50);
+			const Vector4 staticUnjitteredClip(0.2f, -0.1f, 0.5f, 1.0f);
+			const Vector4 currentRasterClip = temporal::ApplyJitterToClipPosition(
+				staticUnjitteredClip,
+				temporal::JitterPixelsToNDC(Vector2(0.25f, -0.25f), 100, 50));
+			const Vector4 previousRasterClip = temporal::ApplyJitterToClipPosition(
+				staticUnjitteredClip,
+				temporal::JitterPixelsToNDC(Vector2(-0.25f, 0.25f), 100, 50));
+			const Vector2 jitterOnlyRasterMotion =
+				ComputeTemporalMotionUV(currentRasterClip, previousRasterClip);
+			const Vector2 currentUV(0.5f, 0.5f);
+			const Vector2 previousRasterUV =
+				temporal::ReprojectToPreviousUV(currentUV, jitterOnlyRasterMotion);
+			const Vector2 staticHistoryMotion = ResolveTemporalHistoryMotionUV(
+				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 previousAccumulatedUV =
+				temporal::ReprojectToPreviousUV(currentUV, staticHistoryMotion);
+			context.Check(NearlyEqual(jitterOnlyRasterMotion,
+					currentJitterUV - previousJitterUV) &&
+				!NearlyEqual(previousRasterUV, currentUV) &&
+				NearlyEqual(staticHistoryMotion, Vector2::Zero) &&
+				NearlyEqual(previousAccumulatedUV, currentUV),
+				"TAA removes raster jitter displacement when reprojecting accumulated history color");
+
+			const Vector2 unjitteredMotionUV(0.03f, -0.02f);
+			const Vector2 movingRasterMotionUV =
+				unjitteredMotionUV + currentJitterUV - previousJitterUV;
+			const Vector2 movingHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				movingRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 movingPreviousHistoryUV =
+				temporal::ReprojectToPreviousUV(currentUV, movingHistoryMotionUV);
+			context.Check(NearlyEqual(movingHistoryMotionUV, unjitteredMotionUV) &&
+				NearlyEqual(movingPreviousHistoryUV, currentUV - unjitteredMotionUV),
+				"TAA preserves real temporal motion while removing raster jitter displacement");
+
+			const Vector2 currentSkyUV(0.15f, 0.08f);
+			const Vector2 previousSkyRasterUV =
+				temporal::ReprojectToPreviousUV(currentSkyUV, jitterOnlyRasterMotion);
+			const Vector2 skyRasterMotionUV = currentSkyUV - previousSkyRasterUV;
+			const Vector2 skyHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				skyRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 previousSkyHistoryUV =
+				temporal::ReprojectToPreviousUV(currentSkyUV, skyHistoryMotionUV);
+			context.Check(NearlyEqual(skyHistoryMotionUV, Vector2::Zero) &&
+				NearlyEqual(previousSkyHistoryUV, currentSkyUV),
+				"Static sky reprojection removes jitter after resolving its previous raster UV");
+
+			const Vector2 edgeCurrentUV(0.002f, 0.5f);
+			const Vector2 edgePreviousRasterUV =
+				temporal::ReprojectToPreviousUV(edgeCurrentUV, jitterOnlyRasterMotion);
+			const Vector2 edgeHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 edgePreviousHistoryUV =
+				temporal::ReprojectToPreviousUV(edgeCurrentUV, edgeHistoryMotionUV);
+			context.Check(IsTemporalAAUVInBounds(edgePreviousHistoryUV) &&
+				!IsTemporalAAUVInBounds(edgePreviousRasterUV) &&
+				!AreTemporalAAReprojectionUVsValid(
+					edgePreviousHistoryUV, edgePreviousRasterUV),
+				"TAA rejects history when raw-depth raster UV is out of bounds even if accumulated-history UV is valid");
 
 			context.Check(IsTemporalHistoryDepthCompatible(10.0f, 10.04f) &&
 				IsTemporalHistoryDepthCompatible(100.0f, 101.9f) &&

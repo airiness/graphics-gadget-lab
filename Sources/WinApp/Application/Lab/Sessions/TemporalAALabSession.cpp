@@ -144,11 +144,13 @@ namespace gglab
 	{
 		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
-		RequestSelectedPreview();
+		m_IsEntered = true;
+		ApplySelectedPreviewSelection();
 	}
 
 	void TemporalAALabSession::OnExit() noexcept
 	{
+		m_IsEntered = false;
 		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
@@ -191,7 +193,7 @@ namespace gglab
 			GetCamera().SetFov(52.0f + std::sin(m_ElapsedSeconds * 0.5f) * 12.0f);
 			GetCamera().Update();
 		}
-		RequestSelectedPreview();
+		RequestPreviewRefresh();
 	}
 
 	void TemporalAALabSession::ApplyImmediateParameters() noexcept
@@ -201,8 +203,10 @@ namespace gglab
 		taa.m_Enabled = parameters.Get(EnabledId, true);
 		taa.m_HistoryWeight = parameters.Get(
 			HistoryWeightId, TemporalAADefaultHistoryWeight);
-		m_SelectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
+		const PostProcessDebugTap selectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
 			PreviewTapId, int32_t(PostProcessDebugTap::TemporalHistoryWeight)));
+		const bool selectedTapChanged = selectedTap != m_SelectedTap;
+		m_SelectedTap = selectedTap;
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
 		m_AnimateObject = parameters.Get(AnimateObjectId, true);
 		m_OrbitCamera = parameters.Get(OrbitCameraId, false);
@@ -213,7 +217,17 @@ namespace gglab
 			m_LastCameraCutSerial = cutSerial;
 			GetCamera().RequestTemporalReset();
 		}
-		RequestSelectedPreview();
+		if (m_IsEntered)
+		{
+			if (selectedTapChanged)
+			{
+				ApplySelectedPreviewSelection();
+			}
+			else
+			{
+				RequestPreviewRefresh();
+			}
+		}
 	}
 
 	void TemporalAALabSession::RebuildScene() noexcept { BuildScene(); }
@@ -316,11 +330,19 @@ namespace gglab
 		registry.emplace<components::LightComponent>(entity, light);
 	}
 
-	void TemporalAALabSession::RequestSelectedPreview() noexcept
+	void TemporalAALabSession::ApplySelectedPreviewSelection() noexcept
 	{
 		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
 		{
 			registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap });
+			registry->RequestPostProcessPreview();
+		}
+	}
+
+	void TemporalAALabSession::RequestPreviewRefresh() noexcept
+	{
+		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		{
 			registry->RequestPostProcessPreview();
 		}
 	}

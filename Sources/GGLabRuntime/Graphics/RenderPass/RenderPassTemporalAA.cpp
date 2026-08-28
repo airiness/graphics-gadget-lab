@@ -10,12 +10,14 @@
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderParameters.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <cstdint>
+#include <span>
 
 namespace gglab
 {
@@ -23,6 +25,9 @@ namespace gglab
 	{
 		inline constexpr uint32_t TemporalAAThreadGroupSize = 8;
 		inline constexpr uint32_t TemporalAAHistoryValidBit = 0x80000000u;
+		inline constexpr uint32_t TemporalAAHistoryColorPreviewBit = 0x40000000u;
+		inline constexpr uint32_t TemporalAAViewFlagMask =
+			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -60,6 +65,11 @@ namespace gglab
 			TemporalAAPassParameters m_Parameters{};
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
+		};
+
+		struct TemporalAAResolvedColorInitializePassData
+		{
+			RGTextureViewId m_ResolvedColorRtv{};
 		};
 	}
 
@@ -106,24 +116,78 @@ namespace gglab
 		}
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
-		GGLAB_ASSERT_MSG((viewIndex & TemporalAAHistoryValidBit) == 0,
-			"Temporal AA view indices must fit below the packed history-valid bit.");
+		GGLAB_ASSERT_MSG((viewIndex & TemporalAAViewFlagMask) == 0,
+			"Temporal AA view indices must fit below the packed view flag bits.");
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const TemporalAASettings temporalAASettings =
 			context.GetDisplayViewRenderSettings().m_TemporalAA;
 		const bool previousHistoryCompatible =
 			transaction->HasCompatiblePreviousHistory();
+		const auto* resourceRegistry = renderer->GetRenderResourceRegistry();
 		const auto* samplerRegistry = renderer->GetSamplerRegistry();
+		GGLAB_ASSERT_NOT_NULL(resourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(samplerRegistry);
-		if (!samplerRegistry)
+		if (!resourceRegistry || !samplerRegistry)
 		{
 			return;
 		}
+		const PostProcessDebugSelection previewSelection =
+			resourceRegistry->GetPostProcessPreviewSelection();
+		const bool historyColorPreviewRequested =
+			resourceRegistry->IsPostProcessPreviewRequested() &&
+			UsesTemporalAAHistoryColorPreviewPayload(previewSelection.m_Tap);
+
+		rg.AddPass<TemporalAAResolvedColorInitializePassData>(
+			"PostProcess.TemporalAA.InitializeResolvedSceneColor",
+			[displayViewId](RenderGraph::RGBuilder& builder,
+				TemporalAAResolvedColorInitializePassData& data)
+			{
+				// The compute resolve fully overwrites this texture, so its logical write does
+				// not depend on this pass. Keep the physical D3D12 initialization operation
+				// alive explicitly for CREATE_NOT_ZEROED RTV/UAV allocations.
+				builder.SideEffect();
+
+				auto& blackboard = builder.GetBlackboard();
+				const auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
+					.GetViewTargets(displayViewId);
+				const RHITextureDesc& currentColorDesc =
+					builder.GetTextureDesc(targets.m_SceneColor);
+				RHITextureDesc outputDesc{};
+				outputDesc.m_Format = TemporalAAResolvedColorFormat;
+				outputDesc.m_Extent = currentColorDesc.m_Extent;
+
+				auto& resources =
+					blackboard.GetOrCreate<RGTemporalAAResources>(TemporalAAResourcesName);
+				resources.m_ResolvedSceneColor =
+					builder.CreateTexture("TAA.ResolvedSceneColor", outputDesc);
+				builder.WriteInPlace(
+					resources.m_ResolvedSceneColor, RGTextureAccess::RenderTarget);
+				data.m_ResolvedColorRtv =
+					builder.CreateView<RHITextureViewType::RenderTarget>(
+						resources.m_ResolvedSceneColor);
+			},
+			[](RGExecuteContext& executeContext,
+				TemporalAAResolvedColorInitializePassData& data)
+			{
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				GGLAB_ASSERT_NOT_NULL(commandContext);
+				const RHITextureViewHandle resolvedColorRtv =
+					executeContext.GetViewHandle(data.m_ResolvedColorRtv);
+				GGLAB_ASSERT_MSG(resolvedColorRtv.IsValid(),
+					"Temporal AA resolved color must have a live initialization RTV.");
+				const RHIRenderingAttachment colorAttachment{
+					.m_View = resolvedColorRtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				commandContext->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+			});
 
 		rg.AddPass<TemporalAAPassData>(
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
 			[transaction, displayViewId, viewIndex, temporalAASettings,
-			previousHistoryCompatible,
+			previousHistoryCompatible, historyColorPreviewRequested,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -193,11 +257,15 @@ namespace gglab
 				resources.m_Height = currentColorDesc.m_Extent.m_Height;
 				data.m_Width = resources.m_Width;
 				data.m_Height = resources.m_Height;
+				GGLAB_ASSERT_MSG(resources.m_ResolvedSceneColor.IsValid(),
+					"Temporal AA resolved color must be initialized before compute resolve.");
+				if (!resources.m_ResolvedSceneColor.IsValid())
+				{
+					return;
+				}
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = TemporalAAResolvedColorFormat;
 				outputDesc.m_Extent = currentColorDesc.m_Extent;
-				resources.m_ResolvedSceneColor =
-					builder.CreateTexture("TAA.ResolvedSceneColor", outputDesc);
 				resources.m_ReprojectionDiagnostics =
 					builder.CreateTexture("TAA.ReprojectionDiagnostics", outputDesc);
 
@@ -227,7 +295,10 @@ namespace gglab
 					.m_LinearClampSamplerIndex = linearClampSamplerIndex,
 					.m_PointClampSamplerIndex = pointClampSamplerIndex,
 					.m_ViewIndexAndHistoryValid = viewIndex |
-						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u),
+						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u) |
+						(historyColorPreviewRequested
+							? TemporalAAHistoryColorPreviewBit
+							: 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),

@@ -35,7 +35,8 @@ namespace gglab
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		void BuildScene() noexcept;
 		void BuildLighting() noexcept;
-		void RequestSelectedPreview() noexcept;
+		void ApplySelectedPreviewSelection() noexcept;
+		void RequestPreviewRefresh() noexcept;
 
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
@@ -49,5 +50,6 @@ namespace gglab
 		bool m_OrbitCamera = false;
 		bool m_ContinuousFovZoom = false;
 		bool m_FixtureConfigured = false;
+		bool m_IsEntered = false;
 	};
 }

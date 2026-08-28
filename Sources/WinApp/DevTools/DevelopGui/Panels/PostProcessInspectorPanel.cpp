@@ -51,7 +51,7 @@ namespace gglab
 			case PostProcessDebugTap::TemporalMotionMagnitude:
 				return "Temporal / Motion Magnitude";
 			case PostProcessDebugTap::TemporalHistoryColor:
-				return "Temporal / Previous History Color";
+				return "Temporal / Accumulated History Color";
 			case PostProcessDebugTap::TemporalReprojectionUV:
 				return "Temporal / Reprojection UV";
 			case PostProcessDebugTap::TemporalRejection:

@@ -72,7 +72,7 @@ namespace gglab
 		{
 			switch (tap)
 			{
-			case PostProcessDebugTap::TemporalHistoryColor: return "Previous History Color";
+			case PostProcessDebugTap::TemporalHistoryColor: return "Accumulated History Color";
 			case PostProcessDebugTap::TemporalReprojectionUV: return "Reprojection UV";
 			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";

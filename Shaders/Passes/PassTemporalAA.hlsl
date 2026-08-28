@@ -50,9 +50,11 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	const float2 currentUV = (float2(pixel) + 0.5.xx) / float2(width, height);
 	const float currentRawDepth = currentDepthTexture.Load(int3(pixel, 0));
-	const uint viewIndex = g_Pass.ViewIndexAndHistoryValid & ~TAA_HISTORY_VALID_BIT;
+	const uint viewIndex = g_Pass.ViewIndexAndHistoryValid & ~TAA_VIEW_FLAG_MASK;
 	const bool previousHistoryValid =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_VALID_BIT) != 0;
+	const bool writeHistoryColorPreview =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_COLOR_PREVIEW_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
@@ -65,24 +67,31 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	}
 
 	uint rejectionReason = TAA_REJECTION_HISTORY_UNAVAILABLE;
-	float2 previousUV = currentUV;
+	float2 previousHistoryUV = currentUV;
+	float2 previousRasterUV = currentUV;
+	float2 historyMotionUV = 0.0.xx;
 	bool accepted = false;
 	float3 historyColor = currentColor;
 	if (previousHistoryValid)
 	{
 		if (IsDepthBackground(currentRawDepth, viewData.DepthConvention))
 		{
-			previousUV = ReprojectTemporalSkyUV(currentUV, viewData);
+			previousRasterUV = ReprojectTemporalSkyUV(currentUV, viewData);
 		}
 		else
 		{
 			const float2 motionUV = motionTexture.Load(int3(pixel, 0));
-			previousUV = ReprojectTemporalUV(currentUV, motionUV);
+			previousRasterUV = ReprojectTemporalUV(currentUV, motionUV);
 		}
+		const float2 rasterMotionUV = currentUV - previousRasterUV;
+		historyMotionUV = ResolveTemporalHistoryMotionUV(rasterMotionUV,
+			viewData.CurrentJitterUV, viewData.PreviousJitterUV);
+		previousHistoryUV = ReprojectTemporalUV(currentUV, historyMotionUV);
 
-		if (!IsTemporalUVInBounds(previousUV))
+		if (!AreTemporalReprojectionUVsValid(previousHistoryUV, previousRasterUV))
 		{
-			rejectionReason = all(isfinite(previousUV))
+			rejectionReason = all(isfinite(previousHistoryUV)) &&
+				all(isfinite(previousRasterUV))
 				? TAA_REJECTION_PREVIOUS_UV_OUT_OF_BOUNDS
 				: TAA_REJECTION_NON_FINITE;
 		}
@@ -93,7 +102,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			SamplerState linearClampSampler =
 				GetSamplerState(g_Pass.LinearClampSamplerIndex);
 			historyColor = previousColorTexture.SampleLevel(
-				linearClampSampler, previousUV, 0.0).rgb;
+				linearClampSampler, previousHistoryUV, 0.0).rgb;
 			if (!IsTemporalColorFinite(historyColor))
 			{
 				rejectionReason = TAA_REJECTION_NON_FINITE;
@@ -105,7 +114,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				SamplerState pointClampSampler =
 					GetSamplerState(g_Pass.PointClampSamplerIndex);
 				const float previousRawDepth = previousDepthTexture.SampleLevel(
-					pointClampSampler, previousUV, 0.0);
+					pointClampSampler, previousRasterUV, 0.0);
 				if (!isfinite(previousRawDepth))
 				{
 					rejectionReason = TAA_REJECTION_NON_FINITE;
@@ -126,7 +135,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				SamplerState pointClampSampler =
 					GetSamplerState(g_Pass.PointClampSamplerIndex);
 				accepted = ValidateTemporalGeometryDepth(currentUV, currentRawDepth,
-					previousUV, previousDepthTexture, pointClampSampler, viewData,
+					previousRasterUV, previousDepthTexture, pointClampSampler, viewData,
 					depthThresholds.x, depthThresholds.y);
 				rejectionReason = accepted ? TAA_REJECTION_NONE : TAA_REJECTION_DEPTH_MISMATCH;
 			}
@@ -147,8 +156,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 		const float3 currentYCoCg = TemporalRGBToYCoCg(currentColor);
 		const float3 historyYCoCg = TemporalRGBToYCoCg(historyColor);
-		const float motionMagnitudePixels = length(
-			(currentUV - previousUV) * float2(width, height));
+		const float motionMagnitudePixels =
+			length(historyMotionUV * float2(width, height));
 		historyWeight = ComputeTemporalHistoryWeight(motionMagnitudePixels,
 			currentYCoCg.x, historyYCoCg.x, historyWeightAndClampExpansion.x,
 			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
@@ -175,6 +184,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	resolvedColor[pixel] = output;
 	nextHistoryColor[pixel] = output;
 	nextHistoryDepth[pixel] = currentRawDepth;
-	reprojectionDiagnostics[pixel] = float4(
-		historyWeight, float(rejectionReason), previousUV);
+	reprojectionDiagnostics[pixel] = writeHistoryColorPreview
+		? output
+		: float4(historyWeight, float(rejectionReason), previousHistoryUV);
 }
