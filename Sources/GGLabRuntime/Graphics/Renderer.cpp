@@ -277,6 +277,20 @@ namespace gglab
 		m_TemporalObjectHistory.Invalidate();
 	}
 
+	void Renderer::InvalidateTemporalHistoryAfterResolveProgramChange() noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
+			"Temporal resolve program changes must be activated between renderer frames.");
+		if (m_TemporalHistoryManager)
+		{
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::ResolveProgramChanged,
+				m_LastSubmittedFencePoint);
+		}
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
+	}
+
 	void Renderer::Render(
 		Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
 	{

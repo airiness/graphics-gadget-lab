@@ -218,6 +218,7 @@ namespace gglab
 					.m_BuildRequest = shaderBuildRequest,
 					.m_TaskSystem = taskSystem,
 					.m_ShaderManager = shaderManager,
+					.m_Renderer = renderer,
 				});
 			if (!m_ShaderHotReload->Initialize())
 			{

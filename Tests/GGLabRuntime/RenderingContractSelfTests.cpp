@@ -4844,7 +4844,18 @@ namespace gglab
 				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAge) == 2.0f &&
 				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAge) ==
 					TemporalHistoryMaxAge,
-				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at its bounded R16Float-exact maximum");
+				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at its provisional R16Float-exact bound");
+
+			const TemporalAAOutputAlphaContract accumulatedOutputAlphas =
+				ResolveTemporalAAOutputAlphas(37.0f);
+			const TemporalAAOutputAlphaContract resetOutputAlphas =
+				ResolveTemporalAAOutputAlphas(
+					std::numeric_limits<float>::quiet_NaN());
+			context.Check(accumulatedOutputAlphas.m_ResolvedAlpha == 1.0f &&
+				accumulatedOutputAlphas.m_HistoryAlpha == 37.0f &&
+				resetOutputAlphas.m_ResolvedAlpha == 1.0f &&
+				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAge,
+				"TAA output alpha contract keeps resolved color opaque while history carries a finite bounded age");
 
 			const TemporalAASettings defaultTemporalAA{};
 			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);

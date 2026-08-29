@@ -2,7 +2,9 @@
 #include "Application/Shader/DevelopmentShaderBuildProcessClient.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 
 #include <algorithm>
@@ -99,7 +101,8 @@ namespace gglab
 		CreateInfo createInfo) noexcept :
 		m_BuildRequest(std::move(createInfo.m_BuildRequest)),
 		m_TaskSystem(createInfo.m_TaskSystem),
-		m_ShaderManager(createInfo.m_ShaderManager)
+		m_ShaderManager(createInfo.m_ShaderManager),
+		m_Renderer(createInfo.m_Renderer)
 	{
 	}
 
@@ -114,7 +117,13 @@ namespace gglab
 		{
 			return true;
 		}
-		if (!m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager)
+		if (!m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager || !m_Renderer)
+		{
+			return false;
+		}
+		m_TemporalAAResolveShader =
+			m_ShaderManager->LoadProgram(shader_programs::TemporalAAReprojectionCompute);
+		if (!m_TemporalAAResolveShader.IsValid())
 		{
 			return false;
 		}
@@ -274,6 +283,8 @@ namespace gglab
 		{
 			return;
 		}
+		const uint64_t temporalAAGenerationBefore =
+			m_ShaderManager->GetGeneration(m_TemporalAAResolveShader);
 		const ShaderRegistryActivationResult activation =
 			m_ShaderManager->ActivateRegistry(*m_PendingRegistry);
 		if (activation.m_Status == ShaderRegistryActivationStatus::Busy)
@@ -282,6 +293,13 @@ namespace gglab
 		}
 		if (activation.IsSuccess())
 		{
+			const uint64_t temporalAAGenerationAfter =
+				m_ShaderManager->GetGeneration(m_TemporalAAResolveShader);
+			if (activation.m_Status == ShaderRegistryActivationStatus::Activated &&
+				temporalAAGenerationAfter != temporalAAGenerationBefore)
+			{
+				m_Renderer->InvalidateTemporalHistoryAfterResolveProgramChange();
+			}
 			GGLAB_LOG_INFO("Activated development shader registry (changedShaders={}).",
 				activation.m_ChangedShaderCount);
 		}

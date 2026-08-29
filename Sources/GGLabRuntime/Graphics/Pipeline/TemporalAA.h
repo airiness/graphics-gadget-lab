@@ -18,6 +18,7 @@ namespace gglab
 	inline constexpr float TemporalAADefaultLuminanceWeightScale = 4.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
 	inline constexpr float TemporalHistoryInitialAge = 1.0f;
+	// Provisional until feedback tuning freezes the coupled accumulation bound.
 	inline constexpr float TemporalHistoryMaxAge = 255.0f;
 	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
@@ -40,6 +41,23 @@ namespace gglab
 		return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
 			? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAge)
 			: TemporalHistoryInitialAge;
+	}
+
+	struct TemporalAAOutputAlphaContract final
+	{
+		float m_ResolvedAlpha = 1.0f;
+		float m_HistoryAlpha = TemporalHistoryInitialAge;
+	};
+
+	[[nodiscard]] inline TemporalAAOutputAlphaContract ResolveTemporalAAOutputAlphas(
+		float nextHistoryAge) noexcept
+	{
+		return {
+			.m_ResolvedAlpha = 1.0f,
+			.m_HistoryAlpha = IsTemporalHistoryAgeValid(nextHistoryAge)
+				? nextHistoryAge
+				: TemporalHistoryInitialAge,
+		};
 	}
 
 	[[nodiscard]] inline Vector2 ResolveTemporalHistoryMotionUV(

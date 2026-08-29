@@ -61,6 +61,8 @@ namespace gglab
 			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
 			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
 			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
+			case TemporalHistoryResetReason::ResolveProgramChanged:
+				return "Resolve program changed";
 			case TemporalHistoryResetReason::FatalSubmission: return "Fatal submission";
 			case TemporalHistoryResetReason::Resume: return "Resume";
 			case TemporalHistoryResetReason::Shutdown: return "Shutdown";

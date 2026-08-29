@@ -133,6 +133,7 @@ namespace gglab
 		void AdoptFrameBuildResources(
 			Frame& frame, const RenderFrameContext& renderContext) noexcept;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
+		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;

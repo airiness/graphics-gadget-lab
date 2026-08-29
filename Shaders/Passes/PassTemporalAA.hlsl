@@ -184,8 +184,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 
 	const float nextHistoryAge =
 		ResolveTemporalHistoryNextAge(accepted, previousHistoryAge);
-	const float4 resolvedOutput = float4(outputColor, 1.0);
-	const float4 historyOutput = float4(outputColor, nextHistoryAge);
+	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextHistoryAge);
+	const float4 resolvedOutput = float4(outputColor, outputAlphas.x);
+	const float4 historyOutput = float4(outputColor, outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
 	nextHistoryDepth[pixel] = currentRawDepth;
