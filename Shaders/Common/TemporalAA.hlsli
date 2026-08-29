@@ -12,8 +12,10 @@ static const uint TAA_REJECTION_DEPTH_MISMATCH = 4;
 static const uint TAA_REJECTION_BACKGROUND_MISMATCH = 5;
 static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
 static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
+static const uint TAA_HISTORY_AGE_PREVIEW_BIT = 0x20000000u;
 static const uint TAA_VIEW_FLAG_MASK =
-	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT;
+	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT |
+	TAA_HISTORY_AGE_PREVIEW_BIT;
 static const float TAA_HISTORY_INITIAL_AGE = 1.0;
 // Provisional until feedback tuning freezes the coupled accumulation bound.
 static const float TAA_HISTORY_MAX_AGE = 255.0;
@@ -51,6 +53,35 @@ float2 ResolveTemporalAAOutputAlphas(float nextHistoryAge)
 	return float2(1.0, IsTemporalHistoryAgeValid(nextHistoryAge)
 		? nextHistoryAge
 		: TAA_HISTORY_INITIAL_AGE);
+}
+
+float ResolveTemporalAAFeedbackSaturationAge(float maxHistoryFeedback)
+{
+	if (!isfinite(maxHistoryFeedback))
+	{
+		return TAA_HISTORY_INITIAL_AGE;
+	}
+
+	const float maxPackedFeedback = 65534.0 / 65535.0;
+	const float feedback = clamp(maxHistoryFeedback, 0.0, maxPackedFeedback);
+	return max(ceil(feedback / max(1.0 - feedback, 1.0 / 65535.0)),
+		TAA_HISTORY_INITIAL_AGE);
+}
+
+float ResolveTemporalAAHistoryAgePreview(float nextHistoryAge,
+	float maxHistoryFeedback)
+{
+	if (!IsTemporalHistoryAgeValid(nextHistoryAge))
+	{
+		return 0.0;
+	}
+
+	const float feedbackSaturationAge =
+		ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
+	// Feedback uses PreviousAge while this preview displays stored NextAge.
+	// Keep the saturation-age denominator intact; there is intentionally no -1.
+	return saturate((nextHistoryAge - TAA_HISTORY_INITIAL_AGE) /
+		max(feedbackSaturationAge, TAA_HISTORY_INITIAL_AGE));
 }
 
 float2 ResolveTemporalHistoryMotionUV(float2 rasterMotionUV,

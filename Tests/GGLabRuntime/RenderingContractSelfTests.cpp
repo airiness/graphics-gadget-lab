@@ -3408,6 +3408,8 @@ namespace gglab
 			writeProofDesc.m_Extent = { 8, 8, 1 };
 			const RHITextureHandle writeProofTexture = writeProofDevice.CreateTexture(
 				RHIOwnedTextureCreateInfo{ .m_Desc = writeProofDesc }, {});
+			const RHITextureHandle writeProofNextTexture = writeProofDevice.CreateTexture(
+				RHIOwnedTextureCreateInfo{ .m_Desc = writeProofDesc }, {});
 			RenderGraph writeProofGraph({
 				.m_Device = &writeProofDevice,
 				.m_TransientResourcePool =
@@ -3441,6 +3443,7 @@ namespace gglab
 			historyColorPreviewPayloadDesc.m_Usage = RHITextureUsage::None;
 			RGTemporalAAResources historyColorPreviewResources{};
 			bool historyColorPreviewUsesTransientPayload = false;
+			bool historyAgePreviewUsesTransientPayload = false;
 			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
 				"TemporalHistory.ExportPrevious",
 				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
@@ -3453,6 +3456,13 @@ namespace gglab
 						RGTextureAccess::Sample);
 					builder.Export(
 						historyColorPreviewResources.m_History.m_PreviousColor,
+						RGTextureAccess::None);
+					historyColorPreviewResources.m_History.m_NextColor =
+						builder.ImportTexture("TAA.Preview.NextColor", writeProofNextTexture,
+							writeProofDesc, CommonRHIResourceState(), RGContentValidity::Defined);
+					builder.WriteInPlace(historyColorPreviewResources.m_History.m_NextColor,
+						RGTextureAccess::StorageWrite);
+					builder.Export(historyColorPreviewResources.m_History.m_NextColor,
 						RGTextureAccess::None);
 
 					historyColorPreviewResources.m_ReprojectionDiagnostics =
@@ -3475,13 +3485,41 @@ namespace gglab
 						previewSource ==
 							historyColorPreviewResources.m_ReprojectionDiagnostics &&
 						previewSource !=
-							historyColorPreviewResources.m_History.m_PreviousColor;
+							historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_NextColor;
+					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"PostProcess.Preview.HistoryAge",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					const RGTextureId previewSource = ResolveTemporalAAPreviewSource(
+						historyColorPreviewResources,
+						PostProcessDebugTap::TemporalHistoryAge);
+					historyAgePreviewUsesTransientPayload =
+						previewSource ==
+							historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_NextColor;
 					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
 					builder.SideEffect();
 				});
 			context.Check(historyColorPreviewUsesTransientPayload &&
+				historyAgePreviewUsesTransientPayload &&
+				UsesTemporalAAHistoryColorPreviewPayload(
+					PostProcessDebugTap::TemporalHistoryColor) &&
+				!UsesTemporalAAHistoryColorPreviewPayload(
+					PostProcessDebugTap::TemporalHistoryAge) &&
+				UsesTemporalAAHistoryAgePreviewPayload(
+					PostProcessDebugTap::TemporalHistoryAge) &&
+				!UsesTemporalAAHistoryAgePreviewPayload(
+					PostProcessDebugTap::TemporalHistoryColor) &&
 				historyColorPreviewGraph.Compile(),
-				"TAA history-color preview reads its transient accumulated payload after previous history export");
+				"TAA history-color and history-age previews read selected transient payloads instead of exported previous or next history color");
 
 			RecordingDevice device;
 			device.m_TextureViewsSupported = true;
@@ -4856,6 +4894,19 @@ namespace gglab
 				resetOutputAlphas.m_ResolvedAlpha == 1.0f &&
 				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAge,
 				"TAA output alpha contract keeps resolved color opaque while history carries a finite bounded age");
+
+			const float previewFeedbackSaturationAge =
+				ResolveTemporalAAFeedbackSaturationAge(0.75f);
+			context.Check(previewFeedbackSaturationAge == 3.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(0.0f) == 1.0f &&
+				ResolveTemporalAAHistoryAgePreview(1.0f, 0.75f) == 0.0f &&
+				NearlyEqual(ResolveTemporalAAHistoryAgePreview(3.0f, 0.75f),
+					2.0f / 3.0f) &&
+				ResolveTemporalAAHistoryAgePreview(4.0f, 0.75f) == 1.0f &&
+				ResolveTemporalAAHistoryAgePreview(2.0f, 0.0f) == 1.0f &&
+				ResolveTemporalAAHistoryAgePreview(
+					std::numeric_limits<float>::quiet_NaN(), 0.75f) == 0.0f,
+				"TAA history-age preview maps reset NextAge to black and first cap-affected NextAge to white with the intentional off-by-one convention");
 
 			const TemporalAASettings defaultTemporalAA{};
 			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);

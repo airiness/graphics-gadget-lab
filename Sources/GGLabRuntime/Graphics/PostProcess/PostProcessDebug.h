@@ -28,8 +28,9 @@ namespace gglab
 		TemporalReprojectionUV = 17,
 		TemporalRejection = 18,
 		TemporalHistoryWeight = 19,
+		TemporalHistoryAge = 20,
 
-		Count = 20
+		Count = 21
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -51,7 +52,8 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 20);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 21);
 
 	struct PostProcessDebugSelection
 	{

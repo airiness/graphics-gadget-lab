@@ -50,6 +50,7 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalRejection) == 18);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
 
 		struct PassData
 		{
@@ -108,7 +109,8 @@ namespace gglab
 			return tap == PostProcessDebugTap::TemporalHistoryColor ||
 				tap == PostProcessDebugTap::TemporalReprojectionUV ||
 				tap == PostProcessDebugTap::TemporalRejection ||
-				tap == PostProcessDebugTap::TemporalHistoryWeight;
+				tap == PostProcessDebugTap::TemporalHistoryWeight ||
+				tap == PostProcessDebugTap::TemporalHistoryAge;
 		}
 
 		RGTextureId ResolveGTAOPreviewSource(

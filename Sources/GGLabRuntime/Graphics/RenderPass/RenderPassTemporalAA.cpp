@@ -26,8 +26,10 @@ namespace gglab
 		inline constexpr uint32_t TemporalAAThreadGroupSize = 8;
 		inline constexpr uint32_t TemporalAAHistoryValidBit = 0x80000000u;
 		inline constexpr uint32_t TemporalAAHistoryColorPreviewBit = 0x40000000u;
+		inline constexpr uint32_t TemporalAAHistoryAgePreviewBit = 0x20000000u;
 		inline constexpr uint32_t TemporalAAViewFlagMask =
-			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit;
+			TemporalAAHistoryValidBit | TemporalAAHistoryColorPreviewBit |
+			TemporalAAHistoryAgePreviewBit;
 
 		struct TemporalAAPassParameters
 		{
@@ -136,6 +138,9 @@ namespace gglab
 		const bool historyColorPreviewRequested =
 			resourceRegistry->IsPostProcessPreviewRequested() &&
 			UsesTemporalAAHistoryColorPreviewPayload(previewSelection.m_Tap);
+		const bool historyAgePreviewRequested =
+			resourceRegistry->IsPostProcessPreviewRequested() &&
+			UsesTemporalAAHistoryAgePreviewPayload(previewSelection.m_Tap);
 
 		rg.AddPass<TemporalAAResolvedColorInitializePassData>(
 			"PostProcess.TemporalAA.InitializeResolvedSceneColor",
@@ -188,6 +193,7 @@ namespace gglab
 			GetRenderGraphPassName(), RGPassEncoderType::Compute,
 			[transaction, displayViewId, viewIndex, temporalAASettings,
 			previousHistoryCompatible, historyColorPreviewRequested,
+			historyAgePreviewRequested,
 			linearClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::LinearClamp),
 			pointClampSamplerIndex = samplerRegistry->GetSamplerIndex(SamplerPreset::PointClamp)](
 				RenderGraph::RGBuilder& builder, TemporalAAPassData& data)
@@ -298,6 +304,9 @@ namespace gglab
 						(previousHistoryCompatible ? TemporalAAHistoryValidBit : 0u) |
 						(historyColorPreviewRequested
 							? TemporalAAHistoryColorPreviewBit
+							: 0u) |
+						(historyAgePreviewRequested
+							? TemporalAAHistoryAgePreviewBit
 							: 0u),
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,

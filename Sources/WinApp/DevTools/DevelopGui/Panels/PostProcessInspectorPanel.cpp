@@ -58,6 +58,8 @@ namespace gglab
 				return "Temporal / Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight:
 				return "Temporal / History Weight";
+			case PostProcessDebugTap::TemporalHistoryAge:
+				return "Temporal / History Age";
 			default:
 				return "Unknown";
 			}
@@ -89,6 +91,7 @@ namespace gglab
 					PostProcessDebugTap::TemporalReprojectionUV,
 					PostProcessDebugTap::TemporalRejection,
 					PostProcessDebugTap::TemporalHistoryWeight,
+					PostProcessDebugTap::TemporalHistoryAge,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -230,7 +233,8 @@ namespace gglab
 			selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
 			selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
 			selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
-			selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight;
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight ||
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryAge;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",

@@ -121,6 +121,39 @@ namespace gglab
 		};
 	}
 
+	[[nodiscard]] inline float ResolveTemporalAAFeedbackSaturationAge(
+		float maxHistoryFeedback) noexcept
+	{
+		if (!std::isfinite(maxHistoryFeedback))
+		{
+			return TemporalHistoryInitialAge;
+		}
+
+		const float maxPackedFeedback =
+			static_cast<float>(TemporalAAUnitRangePairMask - 1u) /
+			TemporalAAUnitRangeQuantizationScale;
+		const float feedback = std::clamp(maxHistoryFeedback, 0.0f, maxPackedFeedback);
+		return std::max(std::ceil(feedback / std::max(
+			1.0f - feedback, 1.0f / TemporalAAUnitRangeQuantizationScale)),
+			TemporalHistoryInitialAge);
+	}
+
+	[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(
+		float nextHistoryAge, float maxHistoryFeedback) noexcept
+	{
+		if (!IsTemporalHistoryAgeValid(nextHistoryAge))
+		{
+			return 0.0f;
+		}
+
+		const float feedbackSaturationAge =
+			ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
+		// Feedback uses PreviousAge while this preview displays stored NextAge.
+		// Keep the saturation-age denominator intact; there is intentionally no -1.
+		return std::clamp((nextHistoryAge - TemporalHistoryInitialAge) /
+			std::max(feedbackSaturationAge, TemporalHistoryInitialAge), 0.0f, 1.0f);
+	}
+
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;

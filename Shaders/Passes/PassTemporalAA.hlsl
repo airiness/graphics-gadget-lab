@@ -55,6 +55,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_VALID_BIT) != 0;
 	const bool writeHistoryColorPreview =
 		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_COLOR_PREVIEW_BIT) != 0;
+	const bool writeHistoryAgePreview =
+		(g_Pass.ViewIndexAndHistoryValid & TAA_HISTORY_AGE_PREVIEW_BIT) != 0;
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
@@ -191,7 +193,17 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
 	nextHistoryDepth[pixel] = currentRawDepth;
-	reprojectionDiagnostics[pixel] = writeHistoryColorPreview
-		? resolvedOutput
-		: float4(historyWeight, float(rejectionReason), previousHistoryUV);
+	float4 diagnosticsOutput =
+		float4(historyWeight, float(rejectionReason), previousHistoryUV);
+	if (writeHistoryColorPreview)
+	{
+		diagnosticsOutput = resolvedOutput;
+	}
+	else if (writeHistoryAgePreview)
+	{
+		const float normalizedHistoryAge = ResolveTemporalAAHistoryAgePreview(
+			nextHistoryAge, maxHistoryFeedbackAndClampExpansion.x);
+		diagnosticsOutput = float4(normalizedHistoryAge.xxx, 1.0);
+	}
+	reprojectionDiagnostics[pixel] = diagnosticsOutput;
 }

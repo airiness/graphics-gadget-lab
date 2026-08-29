@@ -79,6 +79,7 @@ namespace gglab
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalReprojectionUV), .m_Name = "Reprojection UV"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalRejection), .m_Name = "Rejection"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryWeight), .m_Name = "History Weight"},
+				{.m_Value = int32_t(PostProcessDebugTap::TemporalHistoryAge), .m_Name = "History Age"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionDirection), .m_Name = "Motion Direction"},
 				{.m_Value = int32_t(PostProcessDebugTap::TemporalMotionMagnitude), .m_Name = "Motion Magnitude"},
 			},

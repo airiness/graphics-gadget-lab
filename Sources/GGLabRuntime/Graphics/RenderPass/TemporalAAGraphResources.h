@@ -15,8 +15,8 @@ namespace gglab
 		TemporalHistoryRenderGraphResources m_History{};
 		RGTextureId m_ResolvedSceneColor{};
 		// The selected TAA preview payload. Normally RGBA = history weight,
-		// rejection reason, previous U, previous V. For TemporalHistoryColor it
-		// carries the current accumulated history color instead.
+		// rejection reason, previous U, previous V. TemporalHistoryColor carries
+		// current accumulated color; TemporalHistoryAge carries normalized NextAge.
 		RGTextureId m_ReprojectionDiagnostics{};
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
@@ -34,6 +34,12 @@ namespace gglab
 		return tap == PostProcessDebugTap::TemporalHistoryColor;
 	}
 
+	[[nodiscard]] constexpr bool UsesTemporalAAHistoryAgePreviewPayload(
+		PostProcessDebugTap tap) noexcept
+	{
+		return tap == PostProcessDebugTap::TemporalHistoryAge;
+	}
+
 	[[nodiscard]] inline RGTextureId ResolveTemporalAAPreviewSource(
 		const RGTemporalAAResources& resources, PostProcessDebugTap tap) noexcept
 	{
@@ -43,6 +49,7 @@ namespace gglab
 		case PostProcessDebugTap::TemporalReprojectionUV:
 		case PostProcessDebugTap::TemporalRejection:
 		case PostProcessDebugTap::TemporalHistoryWeight:
+		case PostProcessDebugTap::TemporalHistoryAge:
 			return resources.m_ReprojectionDiagnostics;
 		default:
 			return {};

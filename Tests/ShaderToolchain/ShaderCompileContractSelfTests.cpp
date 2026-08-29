@@ -2608,10 +2608,19 @@ namespace gglab
 			const ShaderCompileResult temporalAADxilArtifact = compiler.Compile(desc);
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
 			const ShaderCompileResult temporalAASpirVArtifact = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassPostProcessPreview.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Target = {};
+			const ShaderCompileResult postProcessPreviewDxilArtifact = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult postProcessPreviewSpirVArtifact = compiler.Compile(desc);
 			desc.m_Target = {};
 			context.Check(temporalAADxilArtifact.IsSuccess() &&
-				temporalAASpirVArtifact.IsSuccess(),
-				"Production DXC compiles TAA reprojection, point-sampled history age, split resolved/history alpha, depth rejection, YCoCg neighborhood clamp, and age-capped temporal blend for DX12 and Vulkan 1.3");
+				temporalAASpirVArtifact.IsSuccess() &&
+				postProcessPreviewDxilArtifact.IsSuccess() &&
+				postProcessPreviewSpirVArtifact.IsSuccess(),
+				"Production DXC compiles TAA reprojection and post-process age preview with point-sampled history age, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and age-capped temporal blend for DX12 and Vulkan 1.3");
 
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

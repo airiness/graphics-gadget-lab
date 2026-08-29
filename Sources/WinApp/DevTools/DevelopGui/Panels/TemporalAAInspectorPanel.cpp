@@ -78,6 +78,7 @@ namespace gglab
 			case PostProcessDebugTap::TemporalReprojectionUV: return "Reprojection UV";
 			case PostProcessDebugTap::TemporalRejection: return "Rejection Reason";
 			case PostProcessDebugTap::TemporalHistoryWeight: return "History Weight";
+			case PostProcessDebugTap::TemporalHistoryAge: return "History Age";
 			case PostProcessDebugTap::TemporalMotionDirection: return "Motion Direction";
 			case PostProcessDebugTap::TemporalMotionMagnitude: return "Motion Magnitude";
 			default: return "Temporal Preview";
@@ -201,6 +202,7 @@ namespace gglab
 				PostProcessDebugTap::TemporalReprojectionUV,
 				PostProcessDebugTap::TemporalRejection,
 				PostProcessDebugTap::TemporalHistoryWeight,
+				PostProcessDebugTap::TemporalHistoryAge,
 				PostProcessDebugTap::TemporalMotionDirection,
 				PostProcessDebugTap::TemporalMotionMagnitude,
 			};
