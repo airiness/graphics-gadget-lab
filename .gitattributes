@@ -13,6 +13,10 @@
 *.hlsl   text eol=crlf
 *.hlsli  text eol=crlf
 
+# Imported ShaderGraphCore emissions are byte-pinned fixtures. Their
+# generatedSourceIdentity is the SHA-256 of the exact LF bytes.
+Shaders/Tests/Generated/*.hlsli text eol=lf
+
 *.sln      text eol=crlf
 *.vcxproj  text eol=crlf
 *.filters  text eol=crlf

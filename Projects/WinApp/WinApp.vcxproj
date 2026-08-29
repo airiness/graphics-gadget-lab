@@ -434,6 +434,10 @@
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli" />
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json" />
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.hlsli" />
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.provenance.json" />
   </ItemGroup>
   <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
@@ -460,6 +464,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV2ContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

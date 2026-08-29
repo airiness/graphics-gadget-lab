@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "profileId": "gglab.surface",
+  "profileVersion": 1,
+  "editorCommit": "6d4307dcccd12bc355a1d79683f5489b6f0c78ae",
+  "fixturePath": "packages/shader-graph-core/tests/hlsl-emitter.test.ts::baseDocument()",
+  "generatedSourceIdentity": "b702b5a5483d97342cdbe5c4bd5aa36d3d16c9f8d42d1b10ca03128ae56db5d3",
+  "byteCount": 689
+}
