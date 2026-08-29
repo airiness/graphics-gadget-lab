@@ -32,7 +32,7 @@ namespace gglab
 		const LabParameterId ContinuousFovZoomId("temporal_aa.camera.continuous_fov_zoom");
 		const LabParameterId CameraCutSerialId("temporal_aa.camera.cut_serial");
 		const LabParameterId AnimateObjectId("temporal_aa.object.animate");
-		const LabParameterId HistoryWeightId("temporal_aa.history_weight");
+		const LabParameterId MaxHistoryFeedbackId("temporal_aa.max_history_feedback");
 
 		components::MaterialInstanceComponent MakeMaterial(std::string_view key,
 			const Color& color, float roughness, float metallic = 0.0f,
@@ -63,10 +63,12 @@ namespace gglab
 			.m_DefaultValue = true,
 			}));
 		GGLAB_UNUSED(parameters.Add({
-			.m_Id = HistoryWeightId, .m_Name = "History Weight", .m_Group = "Temporal AA",
+			.m_Id = MaxHistoryFeedbackId,
+			.m_Name = "Max History Feedback (Provisional)", .m_Group = "Temporal AA",
 			.m_Type = LabParameterType::Float, .m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = TemporalAADefaultHistoryWeight,
-			.m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(1.0f),
+			.m_DefaultValue = TemporalAAProvisionalDefaultMaxHistoryFeedback,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(TemporalAAProvisionalMaxHistoryFeedbackCeiling),
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PreviewTapId, .m_Name = "Preview", .m_Group = "Diagnostics",
@@ -201,8 +203,8 @@ namespace gglab
 		const auto& parameters = GetParameters();
 		auto& taa = GetMutableViewRenderProfile().m_TemporalAA;
 		taa.m_Enabled = parameters.Get(EnabledId, true);
-		taa.m_HistoryWeight = parameters.Get(
-			HistoryWeightId, TemporalAADefaultHistoryWeight);
+		taa.m_MaxHistoryFeedback = parameters.Get(
+			MaxHistoryFeedbackId, TemporalAAProvisionalDefaultMaxHistoryFeedback);
 		const PostProcessDebugTap selectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
 			PreviewTapId, int32_t(PostProcessDebugTap::TemporalHistoryWeight)));
 		const bool selectedTapChanged = selectedTap != m_SelectedTap;
@@ -395,7 +397,8 @@ namespace gglab
 		return {
 			.m_Id = GetId(), .m_DisplayName = "Temporal AA", .m_Category = "Rendering",
 			.m_Description = "Exercises temporal stability across near/far geometry, motion, disocclusion, camera cuts, resize/toggle pressure, and diagnostic taps.",
-			.m_Kind = LabKind::Pipeline, .m_SchemaVersion = 1,
+			// Schema 2 prevents old fixed-weight presets from being reinterpreted as a cap.
+			.m_Kind = LabKind::Pipeline, .m_SchemaVersion = 2,
 		};
 	}
 

@@ -1,5 +1,6 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 
+#include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
@@ -25,7 +26,7 @@ namespace gglab
 		auto& temporalOverride = devTools.GetViewRenderSettingsOverrides().m_TemporalAA;
 		temporalOverride.m_Settings = activeProfile.m_TemporalAA;
 		temporalOverride.m_Settings.m_Enabled = true;
-		temporalOverride.m_Settings.m_HistoryWeight = 0.75f;
+		temporalOverride.m_Settings.m_MaxHistoryFeedback = 0.75f;
 		temporalOverride.m_IsActive = true;
 		const ViewRenderProfile profileWithBothOverrides =
 			devTools.ResolveViewRenderProfile(activeProfile);
@@ -38,8 +39,10 @@ namespace gglab
 			"GTAO DevTools override is explicit and does not mutate the active authoring profile");
 		context.Check(!profileWithOverride.m_TemporalAA.m_Enabled &&
 			profileWithBothOverrides.m_TemporalAA.m_Enabled &&
-			profileWithBothOverrides.m_TemporalAA.m_HistoryWeight == 0.75f &&
+			profileWithBothOverrides.m_TemporalAA.m_MaxHistoryFeedback == 0.75f &&
 			!activeProfile.m_TemporalAA.m_Enabled,
 			"Temporal AA DevTools override is explicit and does not mutate authoring state");
+		context.Check(TemporalAALabSession::GetDescriptor().m_SchemaVersion == 2,
+			"Temporal AA Lab schema rejects presets that used fixed history-weight semantics");
 	}
 }

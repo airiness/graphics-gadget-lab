@@ -44,7 +44,7 @@ namespace gglab
 			uint32_t m_PointClampSamplerIndex = 0;
 			uint32_t m_ViewIndexAndHistoryValid = 0;
 			uint32_t m_PackedDepthThresholds = 0;
-			uint32_t m_PackedHistoryWeightAndClampExpansion = 0;
+			uint32_t m_PackedMaxHistoryFeedbackAndClampExpansion = 0;
 			float m_VelocityWeightScale = 0.0f;
 			float m_LuminanceWeightScale = 0.0f;
 		};
@@ -302,8 +302,9 @@ namespace gglab
 					.m_PackedDepthThresholds = PackTemporalAAUnitRangePair(
 						temporalAASettings.m_DepthAbsoluteThreshold,
 						temporalAASettings.m_DepthRelativeThreshold),
-					.m_PackedHistoryWeightAndClampExpansion = PackTemporalAAUnitRangePair(
-						temporalAASettings.m_HistoryWeight,
+					.m_PackedMaxHistoryFeedbackAndClampExpansion =
+						PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+						temporalAASettings.m_MaxHistoryFeedback,
 						temporalAASettings.m_NeighborhoodClampExpansion),
 					.m_VelocityWeightScale = temporalAASettings.m_VelocityWeightScale,
 					.m_LuminanceWeightScale = temporalAASettings.m_LuminanceWeightScale,

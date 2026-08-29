@@ -17,7 +17,7 @@ struct TemporalAAPassParameters
 	uint PointClampSamplerIndex;
 	uint ViewIndexAndHistoryValid;
 	uint PackedDepthThresholds;
-	uint PackedHistoryWeightAndClampExpansion;
+	uint PackedMaxHistoryFeedbackAndClampExpansion;
 	float VelocityWeightScale;
 	float LuminanceWeightScale;
 };
@@ -58,8 +58,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + viewIndex];
 	const float2 depthThresholds =
 		UnpackTemporalAAUnitRangePair(g_Pass.PackedDepthThresholds);
-	const float2 historyWeightAndClampExpansion =
-		UnpackTemporalAAUnitRangePair(g_Pass.PackedHistoryWeightAndClampExpansion);
+	const float2 maxHistoryFeedbackAndClampExpansion =
+		UnpackTemporalAAUnitRangePair(g_Pass.PackedMaxHistoryFeedbackAndClampExpansion);
 	float3 currentColor = currentColorTexture.Load(int3(pixel, 0)).rgb;
 	if (!IsTemporalColorFinite(currentColor))
 	{
@@ -151,7 +151,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		float3 neighborhoodMax;
 		GetTemporalNeighborhoodRange(currentColorTexture, pixel, uint2(width, height),
 			currentColor, neighborhoodMin, neighborhoodMax);
-		const float clampExpansion = historyWeightAndClampExpansion.y;
+		const float clampExpansion = maxHistoryFeedbackAndClampExpansion.y;
 		const float3 neighborhoodExtent = neighborhoodMax - neighborhoodMin;
 		neighborhoodMin -= neighborhoodExtent * clampExpansion;
 		neighborhoodMax += neighborhoodExtent * clampExpansion;
@@ -160,8 +160,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		const float3 historyYCoCg = TemporalRGBToYCoCg(historyColor);
 		const float motionMagnitudePixels =
 			length(historyMotionUV * float2(width, height));
-		historyWeight = ComputeTemporalHistoryWeight(motionMagnitudePixels,
-			currentYCoCg.x, historyYCoCg.x, historyWeightAndClampExpansion.x,
+		historyWeight = ComputeTemporalHistoryWeight(previousHistoryAge,
+			motionMagnitudePixels, currentYCoCg.x, historyYCoCg.x,
+			maxHistoryFeedbackAndClampExpansion.x,
 			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
 		historyColor = TemporalYCoCgToRGB(
 			clamp(historyYCoCg, neighborhoodMin, neighborhoodMax));

@@ -87,7 +87,9 @@ namespace gglab
 		void DrawSettings(TemporalAASettings& settings) noexcept
 		{
 			ImGui::Checkbox("Enabled##TemporalAA", &settings.m_Enabled);
-			ImGui::SliderFloat("History Weight", &settings.m_HistoryWeight, 0.0f, 1.0f, "%.3f");
+			ImGui::SliderFloat("Max History Feedback (Provisional)",
+				&settings.m_MaxHistoryFeedback, 0.0f,
+				TemporalAAProvisionalMaxHistoryFeedbackCeiling, "%.3f");
 			ImGui::DragFloat("Depth Absolute Threshold", &settings.m_DepthAbsoluteThreshold,
 				0.001f, 0.0f, TemporalAAMaxDepthThreshold, "%.4f");
 			ImGui::DragFloat("Depth Relative Threshold", &settings.m_DepthRelativeThreshold,

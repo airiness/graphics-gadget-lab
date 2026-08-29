@@ -107,16 +107,19 @@ void GetTemporalNeighborhoodRange(Texture2D<float4> currentColorTexture,
 	}
 }
 
-float ComputeTemporalHistoryWeight(float motionMagnitudePixels,
+float ComputeTemporalHistoryWeight(float previousHistoryAge, float motionMagnitudePixels,
 	float currentLuminance, float historyLuminance,
-	float historyWeight, float velocityWeightScale, float luminanceWeightScale)
+	float maxHistoryFeedback, float velocityWeightScale, float luminanceWeightScale)
 {
-	if (!isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0 ||
+	if (!IsTemporalHistoryAgeValid(previousHistoryAge) ||
+		!isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0 ||
 		!isfinite(currentLuminance) || !isfinite(historyLuminance))
 	{
 		return 0.0;
 	}
 
+	const float ageWeight = previousHistoryAge / (previousHistoryAge + 1.0);
+	const float baseHistoryWeight = min(ageWeight, saturate(maxHistoryFeedback));
 	const float velocityConfidence =
 		1.0 - saturate(motionMagnitudePixels * max(velocityWeightScale, 0.0));
 	const float luminanceDenominator = max(
@@ -125,7 +128,7 @@ float ComputeTemporalHistoryWeight(float motionMagnitudePixels,
 		abs(currentLuminance - historyLuminance) / luminanceDenominator;
 	const float luminanceConfidence =
 		1.0 - saturate(relativeLuminanceDifference * max(luminanceWeightScale, 0.0));
-	return saturate(historyWeight) * velocityConfidence * luminanceConfidence;
+	return baseHistoryWeight * velocityConfidence * luminanceConfidence;
 }
 
 bool IsTemporalDepthCompatible(float expectedPreviousViewZ, float storedPreviousViewZ,

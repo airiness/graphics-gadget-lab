@@ -13,13 +13,16 @@ namespace gglab
 {
 	inline constexpr float TemporalAADepthAbsoluteThreshold = 0.05f;
 	inline constexpr float TemporalAADepthRelativeThreshold = 0.02f;
-	inline constexpr float TemporalAADefaultHistoryWeight = 0.9f;
 	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.05f;
-	inline constexpr float TemporalAADefaultLuminanceWeightScale = 4.0f;
+	inline constexpr float TemporalAADefaultLuminanceWeightScale = 0.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
 	inline constexpr float TemporalHistoryInitialAge = 1.0f;
 	// Provisional until feedback tuning freezes the coupled accumulation bound.
 	inline constexpr float TemporalHistoryMaxAge = 255.0f;
+	// These feedback values are branch-test candidates, not production-approved tuning.
+	inline constexpr float TemporalAAProvisionalDefaultMaxHistoryFeedback = 0.9f;
+	inline constexpr float TemporalAAProvisionalMaxHistoryFeedbackCeiling =
+		TemporalHistoryMaxAge / (TemporalHistoryMaxAge + 1.0f);
 	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
@@ -28,6 +31,10 @@ namespace gglab
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
 	static_assert(TemporalHistoryMaxAge <= 2048.0f);
+	static_assert(TemporalAAProvisionalDefaultMaxHistoryFeedback >= 0.0f &&
+		TemporalAAProvisionalDefaultMaxHistoryFeedback <
+			TemporalAAProvisionalMaxHistoryFeedbackCeiling);
+	static_assert(TemporalAAProvisionalMaxHistoryFeedbackCeiling < 1.0f);
 
 	[[nodiscard]] inline bool IsTemporalHistoryAgeValid(float historyAge) noexcept
 	{
@@ -94,6 +101,15 @@ namespace gglab
 			(QuantizeTemporalAAUnitRange(high) << 16u);
 	}
 
+	[[nodiscard]] constexpr uint32_t PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+		float maxHistoryFeedback, float clampExpansion) noexcept
+	{
+		const uint32_t feedback = std::min(
+			QuantizeTemporalAAUnitRange(maxHistoryFeedback),
+			TemporalAAUnitRangePairMask - 1u);
+		return feedback | (QuantizeTemporalAAUnitRange(clampExpansion) << 16u);
+	}
+
 	[[nodiscard]] constexpr std::array<float, 2> UnpackTemporalAAUnitRangePair(
 		uint32_t packedValues) noexcept
 	{
@@ -110,7 +126,7 @@ namespace gglab
 		bool m_Enabled = false;
 		float m_DepthAbsoluteThreshold = TemporalAADepthAbsoluteThreshold;
 		float m_DepthRelativeThreshold = TemporalAADepthRelativeThreshold;
-		float m_HistoryWeight = TemporalAADefaultHistoryWeight;
+		float m_MaxHistoryFeedback = TemporalAAProvisionalDefaultMaxHistoryFeedback;
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
@@ -130,9 +146,10 @@ namespace gglab
 			? std::clamp(settings.m_DepthRelativeThreshold, 0.0f,
 				TemporalAAMaxDepthThreshold)
 			: defaults.m_DepthRelativeThreshold;
-		settings.m_HistoryWeight = std::isfinite(settings.m_HistoryWeight)
-			? std::clamp(settings.m_HistoryWeight, 0.0f, 1.0f)
-			: defaults.m_HistoryWeight;
+		settings.m_MaxHistoryFeedback = std::isfinite(settings.m_MaxHistoryFeedback)
+			? std::clamp(settings.m_MaxHistoryFeedback, 0.0f,
+				TemporalAAProvisionalMaxHistoryFeedbackCeiling)
+			: defaults.m_MaxHistoryFeedback;
 		settings.m_VelocityWeightScale = std::isfinite(settings.m_VelocityWeightScale)
 			? std::clamp(settings.m_VelocityWeightScale, 0.0f,
 				TemporalAAMaxVelocityWeightScale)
@@ -149,17 +166,21 @@ namespace gglab
 		return settings;
 	}
 
-	[[nodiscard]] inline float ResolveTemporalAAHistoryWeight(float motionMagnitudePixels,
-		float currentLuminance, float historyLuminance,
+	[[nodiscard]] inline float ResolveTemporalAAHistoryWeight(float previousHistoryAge,
+		float motionMagnitudePixels, float currentLuminance, float historyLuminance,
 		const TemporalAASettings& settings) noexcept
 	{
-		if (!std::isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0f ||
+		if (!IsTemporalHistoryAgeValid(previousHistoryAge) ||
+			!std::isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0f ||
 			!std::isfinite(currentLuminance) || !std::isfinite(historyLuminance))
 		{
 			return 0.0f;
 		}
 
 		const TemporalAASettings resolved = ResolveTemporalAASettings(settings);
+		const float ageWeight = previousHistoryAge / (previousHistoryAge + 1.0f);
+		const float baseHistoryWeight =
+			std::min(ageWeight, resolved.m_MaxHistoryFeedback);
 		const float velocityConfidence = 1.0f - std::clamp(
 			motionMagnitudePixels * resolved.m_VelocityWeightScale, 0.0f, 1.0f);
 		const float luminanceDenominator =
@@ -168,7 +189,7 @@ namespace gglab
 			std::abs(currentLuminance - historyLuminance) / luminanceDenominator;
 		const float luminanceConfidence = 1.0f - std::clamp(
 			relativeLuminanceDifference * resolved.m_LuminanceWeightScale, 0.0f, 1.0f);
-		return resolved.m_HistoryWeight * velocityConfidence * luminanceConfidence;
+		return baseHistoryWeight * velocityConfidence * luminanceConfidence;
 	}
 
 	enum class TemporalAAHistoryRejectionReason : uint32_t
