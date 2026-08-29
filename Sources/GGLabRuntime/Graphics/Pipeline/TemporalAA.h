@@ -17,6 +17,8 @@ namespace gglab
 	inline constexpr float TemporalAADefaultVelocityWeightScale = 0.05f;
 	inline constexpr float TemporalAADefaultLuminanceWeightScale = 4.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
+	inline constexpr float TemporalHistoryInitialAge = 1.0f;
+	inline constexpr float TemporalHistoryMaxAge = 255.0f;
 	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
@@ -24,6 +26,21 @@ namespace gglab
 	inline constexpr uint32_t TemporalAAUnitRangePairMask = 0xffffu;
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
+	static_assert(TemporalHistoryMaxAge <= 2048.0f);
+
+	[[nodiscard]] inline bool IsTemporalHistoryAgeValid(float historyAge) noexcept
+	{
+		return std::isfinite(historyAge) && historyAge >= TemporalHistoryInitialAge &&
+			historyAge <= TemporalHistoryMaxAge;
+	}
+
+	[[nodiscard]] inline float ResolveTemporalHistoryNextAge(
+		bool historyAccepted, float previousHistoryAge) noexcept
+	{
+		return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
+			? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAge)
+			: TemporalHistoryInitialAge;
+	}
 
 	[[nodiscard]] inline Vector2 ResolveTemporalHistoryMotionUV(
 		const Vector2& rasterMotionUV, const Vector2& currentJitterUV,

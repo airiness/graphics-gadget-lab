@@ -11,6 +11,7 @@
 
 namespace gglab
 {
+	// Persistent history RGB stores accumulated color; alpha stores HistoryAge.
 	inline constexpr RHIFormat TemporalHistoryColorFormat = RHIFormat::R16G16B16A16Float;
 	inline constexpr RHIFormat TemporalHistoryDepthFormat = RHIFormat::R32Float;
 

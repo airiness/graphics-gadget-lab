@@ -14,6 +14,8 @@ static const uint TAA_HISTORY_VALID_BIT = 0x80000000u;
 static const uint TAA_HISTORY_COLOR_PREVIEW_BIT = 0x40000000u;
 static const uint TAA_VIEW_FLAG_MASK =
 	TAA_HISTORY_VALID_BIT | TAA_HISTORY_COLOR_PREVIEW_BIT;
+static const float TAA_HISTORY_INITIAL_AGE = 1.0;
+static const float TAA_HISTORY_MAX_AGE = 255.0;
 
 float2 UnpackTemporalAAUnitRangePair(uint packedValues)
 {
@@ -28,6 +30,19 @@ bool IsTemporalUVInBounds(float2 uv)
 bool IsTemporalColorFinite(float3 color)
 {
 	return all(isfinite(color));
+}
+
+bool IsTemporalHistoryAgeValid(float historyAge)
+{
+	return isfinite(historyAge) && historyAge >= TAA_HISTORY_INITIAL_AGE &&
+		historyAge <= TAA_HISTORY_MAX_AGE;
+}
+
+float ResolveTemporalHistoryNextAge(bool historyAccepted, float previousHistoryAge)
+{
+	return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
+		? min(previousHistoryAge + 1.0, TAA_HISTORY_MAX_AGE)
+		: TAA_HISTORY_INITIAL_AGE;
 }
 
 float2 ResolveTemporalHistoryMotionUV(float2 rasterMotionUV,

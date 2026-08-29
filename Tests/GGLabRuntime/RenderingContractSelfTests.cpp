@@ -3686,6 +3686,9 @@ namespace gglab
 				afterNoResolve.m_LastCommitted.m_GraphicsFence == firstFence &&
 				viewHistory.m_NextJitterIndex == 1,
 				"A completed frame without temporal resolve advances no temporal participant");
+			context.Check(afterAbort.m_ReadIndex == firstCommitted.m_ReadIndex &&
+				afterNoResolve.m_ReadIndex == firstCommitted.m_ReadIndex,
+				"History age remains on the committed color/depth ping-pong read index across abort and non-resolve paths");
 
 			TemporalFrameTransaction invalidFenceTransaction;
 			invalidFenceTransaction.Begin(
@@ -4828,6 +4831,20 @@ namespace gglab
 				!IsTemporalSkyHistoryCompatible(
 					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
 				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
+
+			context.Check(TemporalHistoryInitialAge == 1.0f &&
+				TemporalHistoryMaxAge == 255.0f &&
+				IsTemporalHistoryAgeValid(TemporalHistoryInitialAge) &&
+				IsTemporalHistoryAgeValid(TemporalHistoryMaxAge) &&
+				!IsTemporalHistoryAgeValid(0.0f) &&
+				!IsTemporalHistoryAgeValid(TemporalHistoryMaxAge + 1.0f) &&
+				!IsTemporalHistoryAgeValid(std::numeric_limits<float>::quiet_NaN()) &&
+				ResolveTemporalHistoryNextAge(false, 37.0f) == TemporalHistoryInitialAge &&
+				ResolveTemporalHistoryNextAge(true, 0.0f) == TemporalHistoryInitialAge &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAge) == 2.0f &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAge) ==
+					TemporalHistoryMaxAge,
+				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at its bounded R16Float-exact maximum");
 
 			const TemporalAASettings defaultTemporalAA{};
 			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);

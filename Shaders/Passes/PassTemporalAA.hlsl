@@ -72,6 +72,7 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	float2 historyMotionUV = 0.0.xx;
 	bool accepted = false;
 	float3 historyColor = currentColor;
+	float previousHistoryAge = TAA_HISTORY_INITIAL_AGE;
 	if (previousHistoryValid)
 	{
 		if (IsDepthBackground(currentRawDepth, viewData.DepthConvention))
@@ -101,9 +102,14 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				GetTexture2DFloat4(g_Pass.PreviousColorIndex);
 			SamplerState linearClampSampler =
 				GetSamplerState(g_Pass.LinearClampSamplerIndex);
+			SamplerState pointClampSampler =
+				GetSamplerState(g_Pass.PointClampSamplerIndex);
 			historyColor = previousColorTexture.SampleLevel(
 				linearClampSampler, previousHistoryUV, 0.0).rgb;
-			if (!IsTemporalColorFinite(historyColor))
+			previousHistoryAge = previousColorTexture.SampleLevel(
+				pointClampSampler, previousHistoryUV, 0.0).a;
+			if (!IsTemporalColorFinite(historyColor) ||
+				!IsTemporalHistoryAgeValid(previousHistoryAge))
 			{
 				rejectionReason = TAA_REJECTION_NON_FINITE;
 			}
@@ -111,8 +117,6 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			{
 				Texture2D<float> previousDepthTexture =
 					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
-				SamplerState pointClampSampler =
-					GetSamplerState(g_Pass.PointClampSamplerIndex);
 				const float previousRawDepth = previousDepthTexture.SampleLevel(
 					pointClampSampler, previousRasterUV, 0.0);
 				if (!isfinite(previousRawDepth))
@@ -132,8 +136,6 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 			{
 				Texture2D<float> previousDepthTexture =
 					GetTexture2DFloat(g_Pass.PreviousDepthIndex);
-				SamplerState pointClampSampler =
-					GetSamplerState(g_Pass.PointClampSamplerIndex);
 				accepted = ValidateTemporalGeometryDepth(currentUV, currentRawDepth,
 					previousRasterUV, previousDepthTexture, pointClampSampler, viewData,
 					depthThresholds.x, depthThresholds.y);
@@ -180,11 +182,14 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		rejectionReason = TAA_REJECTION_NON_FINITE;
 	}
 
-	const float4 output = float4(outputColor, 1.0);
-	resolvedColor[pixel] = output;
-	nextHistoryColor[pixel] = output;
+	const float nextHistoryAge =
+		ResolveTemporalHistoryNextAge(accepted, previousHistoryAge);
+	const float4 resolvedOutput = float4(outputColor, 1.0);
+	const float4 historyOutput = float4(outputColor, nextHistoryAge);
+	resolvedColor[pixel] = resolvedOutput;
+	nextHistoryColor[pixel] = historyOutput;
 	nextHistoryDepth[pixel] = currentRawDepth;
 	reprojectionDiagnostics[pixel] = writeHistoryColorPreview
-		? output
+		? resolvedOutput
 		: float4(historyWeight, float(rejectionReason), previousHistoryUV);
 }
