@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "AppRuntimeLog.h"
 
 #include "Core/Math/MathFunctions.h"
 #include "Core/Math/Quaternion.h"
@@ -7,6 +8,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -24,6 +26,10 @@ namespace gglab
 	{
 		constexpr std::string_view AlphaBlendModeTestPath =
 			"Assets/Models/AlphaBlendModeTest/AlphaBlendModeTest.gltf";
+		constexpr uint32_t TemporalAAEvidenceJitterCycleCount = 2;
+		constexpr uint32_t TemporalAAEvidenceWarmupFrameCount =
+			temporal::JitterSampleCount * TemporalAAEvidenceJitterCycleCount;
+		constexpr uint32_t TemporalAAGpuTimingSampleTarget = 120;
 
 		const LabParameterId EnabledId("temporal_aa.enabled");
 		const LabParameterId PreviewTapId("temporal_aa.preview_tap");
@@ -49,7 +55,8 @@ namespace gglab
 	}
 
 	TemporalAALabSession::TemporalAALabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>()),
+		m_ViewportWidth(createInfo.m_WindowWidth), m_ViewportHeight(createInfo.m_WindowHeight)
 	{
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_TemporalAA.m_Enabled = true;
@@ -140,11 +147,18 @@ namespace gglab
 		m_AssetPreparation.Reset();
 		m_World.GetRegistry().clear();
 		m_MovingEntity = entt::null;
+		ResetEvidenceCapture();
 		m_LoadingProgress = LoadingProgress::Ready();
 	}
 
 	void TemporalAALabSession::OnEnter() noexcept
 	{
+		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		{
+			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
+			gpuProfiler->SetEnabled(true);
+		}
+		ResetEvidenceCapture();
 		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
 		m_IsEntered = true;
@@ -154,6 +168,10 @@ namespace gglab
 	void TemporalAALabSession::OnExit() noexcept
 	{
 		m_IsEntered = false;
+		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		{
+			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+		}
 		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
@@ -197,28 +215,62 @@ namespace gglab
 			GetCamera().Update();
 		}
 		RequestPreviewRefresh();
+		CaptureGpuTiming();
+	}
+
+	void TemporalAALabSession::OnFrameSubmitted(
+		const DemoFrameFeedback& feedback) noexcept
+	{
+		if (feedback.m_RenderSceneStatus == RenderSceneBuildStatus::Ready &&
+			feedback.m_SubmittedFence.IsValid())
+		{
+			++m_CommittedFrameCount;
+		}
+	}
+
+	void TemporalAALabSession::OnResize(uint32_t width, uint32_t height) noexcept
+	{
+		LabSessionBase::OnResize(width, height);
+		m_ViewportWidth = width;
+		m_ViewportHeight = height;
+		ResetEvidenceCapture();
 	}
 
 	void TemporalAALabSession::ApplyImmediateParameters() noexcept
 	{
 		const auto& parameters = GetParameters();
 		auto& taa = GetMutableViewRenderProfile().m_TemporalAA;
-		taa.m_Enabled = parameters.Get(EnabledId, true);
-		taa.m_MaxHistoryFeedback = parameters.Get(
+		const bool enabled = parameters.Get(EnabledId, true);
+		const float maxHistoryFeedback = parameters.Get(
 			MaxHistoryFeedbackId, TemporalAAProvisionalDefaultMaxHistoryFeedback);
+		const bool enableCameraInput = parameters.Get(EnableCameraInputId, false);
+		const bool animateObject = parameters.Get(AnimateObjectId, true);
+		const bool orbitCamera = parameters.Get(OrbitCameraId, false);
+		const bool continuousFovZoom = parameters.Get(ContinuousFovZoomId, false);
+		const bool evidenceDomainChanged = taa.m_Enabled != enabled ||
+			taa.m_MaxHistoryFeedback != maxHistoryFeedback ||
+			m_EnableCameraInput != enableCameraInput || m_AnimateObject != animateObject ||
+			m_OrbitCamera != orbitCamera || m_ContinuousFovZoom != continuousFovZoom;
+		taa.m_Enabled = enabled;
+		taa.m_MaxHistoryFeedback = maxHistoryFeedback;
 		const PostProcessDebugTap selectedTap = static_cast<PostProcessDebugTap>(parameters.Get(
 			PreviewTapId, int32_t(PostProcessDebugTap::TemporalHistoryWeight)));
 		const bool selectedTapChanged = selectedTap != m_SelectedTap;
 		m_SelectedTap = selectedTap;
-		m_EnableCameraInput = parameters.Get(EnableCameraInputId, false);
-		m_AnimateObject = parameters.Get(AnimateObjectId, true);
-		m_OrbitCamera = parameters.Get(OrbitCameraId, false);
-		m_ContinuousFovZoom = parameters.Get(ContinuousFovZoomId, false);
+		m_EnableCameraInput = enableCameraInput;
+		m_AnimateObject = animateObject;
+		m_OrbitCamera = orbitCamera;
+		m_ContinuousFovZoom = continuousFovZoom;
 		const uint32_t cutSerial = parameters.Get(CameraCutSerialId, uint32_t(0));
-		if (cutSerial != m_LastCameraCutSerial)
+		const bool cameraCutRequested = cutSerial != m_LastCameraCutSerial;
+		if (cameraCutRequested)
 		{
 			m_LastCameraCutSerial = cutSerial;
 			GetCamera().RequestTemporalReset();
+		}
+		if (evidenceDomainChanged || cameraCutRequested)
+		{
+			ResetEvidenceCapture();
 		}
 		if (m_IsEntered)
 		{
@@ -243,6 +295,7 @@ namespace gglab
 
 	void TemporalAALabSession::BuildScene() noexcept
 	{
+		ResetEvidenceCapture();
 		ResetAssetInterests();
 		m_AssetPreparation.Reset();
 		auto& registry = m_World.GetRegistry();
@@ -303,6 +356,38 @@ namespace gglab
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.distant_reference",
 				Color(0.95f, 0.72f, 0.08f, 1.0f), 0.28f, 0.15f),
 			});
+
+		// The world-size pair differs only in placement. It exposes the natural projected-size
+		// change with distance without changing shape, material, orientation, or lighting.
+		const Vector3 matchedWorldScale(0.055f, 0.8f, 0.12f);
+		const Color matchedWorldColor(0.96f, 0.35f, 0.08f, 1.0f);
+		const entt::entity matchedWorldNear = createCube(
+			"gglab.lab.temporal_aa.matched_world_near", Vector3(-4.8f, 2.8f, 8.0f),
+			matchedWorldScale, matchedWorldColor, 0.4f);
+		const entt::entity matchedWorldFar = createCube(
+			"gglab.lab.temporal_aa.matched_world_far", Vector3(-7.5f, 5.2f, 44.0f),
+			matchedWorldScale, matchedWorldColor, 0.4f);
+
+		// Scale the far fixture by the exact center-point camera-space depth ratio. The pair
+		// otherwise keeps equivalent shape, material, orientation, lighting, and contrast.
+		const Vector3 matchedProjectedNearPosition(4.5f, 2.8f, 8.0f);
+		const Vector3 matchedProjectedFarPosition(9.0f, 5.2f, 44.0f);
+		const Vector3 matchedProjectedNearScale(0.055f, 0.8f, 0.12f);
+		const float matchedProjectedNearDepth =
+			(matchedProjectedNearPosition - GetCamera().GetPosition()).Dot(
+				GetCamera().GetForward());
+		const float matchedProjectedFarDepth =
+			(matchedProjectedFarPosition - GetCamera().GetPosition()).Dot(
+				GetCamera().GetForward());
+		const Vector3 matchedProjectedFarScale = matchedProjectedNearScale *
+			(matchedProjectedFarDepth / matchedProjectedNearDepth);
+		const Color matchedProjectedColor(0.78f, 0.95f, 0.12f, 1.0f);
+		const entt::entity matchedProjectedNear = createCube(
+			"gglab.lab.temporal_aa.matched_projected_near", matchedProjectedNearPosition,
+			matchedProjectedNearScale, matchedProjectedColor, 0.4f);
+		const entt::entity matchedProjectedFar = createCube(
+			"gglab.lab.temporal_aa.matched_projected_far", matchedProjectedFarPosition,
+			matchedProjectedFarScale, matchedProjectedColor, 0.4f);
 		const entt::entity alphaEdge = registry.create();
 		components::TransformComponent alphaTransform{};
 		alphaTransform.m_Position = Vector3(-4.2f, -0.25f, 6.8f);
@@ -323,7 +408,8 @@ namespace gglab
 			});
 		const entt::entity fixtures[] = {
 			floor, thinA, thinB, emissive, specular, background, distantBoard,
-			distantReference, alphaEdge, m_MovingEntity };
+			distantReference, matchedWorldNear, matchedWorldFar, matchedProjectedNear,
+			matchedProjectedFar, alphaEdge, m_MovingEntity };
 		m_FixtureConfigured = std::ranges::all_of(fixtures, [&registry](entt::entity entity)
 			{ return registry.valid(entity); });
 		BuildLighting();
@@ -364,12 +450,144 @@ namespace gglab
 		}
 	}
 
+	void TemporalAALabSession::CaptureGpuTiming() noexcept
+	{
+		if (m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget)
+		{
+			return;
+		}
+		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
+		if (!gpuProfiler || !gpuProfiler->IsEnabled())
+		{
+			return;
+		}
+		const GpuProfileFrameSnapshot frame = gpuProfiler->GetLatestFrame();
+		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
+		{
+			return;
+		}
+		m_LastGpuProfileFrame = frame.m_FrameIndex;
+		if (m_GpuTimingWarmupFrames > 0)
+		{
+			--m_GpuTimingWarmupFrames;
+			return;
+		}
+
+		double temporalAAMilliseconds = 0.0;
+		bool hasTemporalAASample = false;
+		for (const auto& sample : frame.m_Samples)
+		{
+			if (sample.m_Name == "PostProcess.TemporalAA")
+			{
+				temporalAAMilliseconds += sample.m_Milliseconds;
+				hasTemporalAASample = true;
+			}
+		}
+		if (!hasTemporalAASample)
+		{
+			return;
+		}
+
+		if (m_GpuTimingSampleCount == 0)
+		{
+			m_GpuTimingMinMilliseconds = temporalAAMilliseconds;
+			m_GpuTimingMaxMilliseconds = temporalAAMilliseconds;
+		}
+		else
+		{
+			m_GpuTimingMinMilliseconds =
+				std::min(m_GpuTimingMinMilliseconds, temporalAAMilliseconds);
+			m_GpuTimingMaxMilliseconds =
+				std::max(m_GpuTimingMaxMilliseconds, temporalAAMilliseconds);
+		}
+		m_GpuTimingSumMilliseconds += temporalAAMilliseconds;
+		++m_GpuTimingSampleCount;
+		if (m_GpuTimingSampleCount == TemporalAAGpuTimingSampleTarget)
+		{
+			const auto* device = m_Services.m_Renderer->GetDevice();
+			const std::string_view adapterIdentity = device
+				? device->GetAdapterCompatibilityIdentity() : "unavailable";
+			const auto& taa = GetViewRenderProfile().m_TemporalAA;
+			const std::string_view cameraMode = m_OrbitCamera ? "pan/rotation"
+				: (m_ContinuousFovZoom ? "continuous-fov" : "static");
+			GGLAB_LOG_INFO(
+				"Temporal AA A4 timing window complete: adapter='{}', extent={}x{}, "
+				"feedback={:.6f}, animate_object={}, camera_mode='{}', samples={}, "
+				"average_ms={:.6f}, min_ms={:.6f}, max_ms={:.6f}.",
+				adapterIdentity, m_ViewportWidth, m_ViewportHeight,
+				taa.m_MaxHistoryFeedback, m_AnimateObject, cameraMode,
+				m_GpuTimingSampleCount,
+				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
+				m_GpuTimingMinMilliseconds, m_GpuTimingMaxMilliseconds);
+		}
+	}
+
+	void TemporalAALabSession::ResetEvidenceCapture() noexcept
+	{
+		m_LastGpuProfileFrame = 0;
+		m_CommittedFrameCount = 0;
+		m_GpuTimingSampleCount = 0;
+		m_GpuTimingSumMilliseconds = 0.0;
+		m_GpuTimingMinMilliseconds = 0.0;
+		m_GpuTimingMaxMilliseconds = 0.0;
+		ArmGpuTimingCaptureWarmup();
+	}
+
+	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
+	{
+		const auto* rhiContext = m_Services.m_Renderer
+			? m_Services.m_Renderer->GetRHIContext()
+			: nullptr;
+		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
+			rhiContext ? rhiContext->GetFrameSlotCount() : 3u);
+	}
+
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		const auto history =
 			m_Services.m_Renderer->GetTemporalHistoryManager()->GetDiagnostics();
-		diagnostics.m_Title = "Temporal AA Deterministic Cases";
+		const auto* device = m_Services.m_Renderer->GetDevice();
+		const auto& camera = GetCamera();
+		const auto& taa = GetViewRenderProfile().m_TemporalAA;
+		const float saturationAge =
+			ResolveTemporalAAFeedbackSaturationAge(taa.m_MaxHistoryFeedback);
+		const float ceilingSaturationAge = ResolveTemporalAAFeedbackSaturationAge(
+			TemporalAAProvisionalMaxHistoryFeedbackCeiling);
+		const float packedCeiling = UnpackTemporalAAUnitRangePair(
+			PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+				TemporalAAProvisionalMaxHistoryFeedbackCeiling, 0.0f))[0];
+		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAge &&
+			packedCeiling < 1.0f;
+		const std::string gpuTiming = m_GpuTimingSampleCount > 0
+			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
+				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
+				m_GpuTimingMinMilliseconds, m_GpuTimingMaxMilliseconds,
+				m_GpuTimingSampleCount, TemporalAAGpuTimingSampleTarget)
+			: std::format("warming up, 0/{} samples", TemporalAAGpuTimingSampleTarget);
+		diagnostics.m_Title = "Temporal AA A4 Evidence Domain";
 		diagnostics.m_Metrics = {
+			{.m_Name = "Adapter/driver domain",
+				.m_Value = device ? std::string(device->GetAdapterCompatibilityIdentity())
+					: "unavailable"},
+			{.m_Name = "Extent", .m_Value = std::format("{} x {}",
+				m_ViewportWidth, m_ViewportHeight)},
+			{.m_Name = "Camera transform", .m_Value = std::format(
+				"pos ({:.3f}, {:.3f}, {:.3f}), yaw {:.5f}, pitch {:.5f}",
+				camera.GetPosition().m_X, camera.GetPosition().m_Y, camera.GetPosition().m_Z,
+				camera.GetYaw(), camera.GetPitch())},
+			{.m_Name = "Camera optics", .m_Value = std::format(
+				"FOV {:.3f} deg, exposure {:.3f} EV", camera.GetFov(),
+				camera.GetExposureCompensationEV())},
+			{.m_Name = "TAA settings", .m_Value = std::format(
+				"feedback {:.6f}, velocity {:.6f}, luminance {:.6f}, clamp {:.6f}",
+				taa.m_MaxHistoryFeedback, taa.m_VelocityWeightScale,
+				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion)},
+			{.m_Name = "Age bound", .m_Value = std::format(
+				"saturation {:.0f}, max {:.0f}", saturationAge, TemporalHistoryMaxAge)},
+			{.m_Name = "Evidence frames", .m_Value = std::format(
+				"{} committed after reset; last jitter {}", m_CommittedFrameCount,
+				history.m_LastCommitted.m_JitterIndex)},
+			{.m_Name = "PostProcess.TemporalAA", .m_Value = gpuTiming},
 			{.m_Name = "History", .m_Value = history.m_HistoryValid ? "valid" : "invalid"},
 			{.m_Name = "Compatibility generation",
 				.m_Value = std::format("{}", history.m_AllocationGeneration)},
@@ -383,11 +601,22 @@ namespace gglab
 			{.m_Name = "Deterministic fixture",
 				.m_Status = m_FixtureConfigured ? LabDiagnosticCheckStatus::Passed
 					: LabDiagnosticCheckStatus::Pending,
-				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, and distant curved/straight silhouette references are present."},
+				.m_Detail = "Thin and alpha-test edges, emissive/specular highlights, rigid motion, foreground disocclusion, background sky, curved/straight references, and controlled matched-world-size and matched-projected-footprint pairs are present."},
 			{.m_Name = "Temporal history allocation",
 				.m_Status = GetViewRenderProfile().m_TemporalAA.m_Enabled && history.m_HasActiveHistory
 					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
 				.m_Detail = "Enable TAA and allow one submitted frame to allocate fresh history."},
+			{.m_Name = "Coupled accumulation bound",
+				.m_Status = coupledBoundValid ? LabDiagnosticCheckStatus::Passed
+					: LabDiagnosticCheckStatus::Failed,
+				.m_Detail = "The selected feedback ceiling must saturate no later than MaxHistoryAge and its UNORM16 representation must remain below one."},
+			{.m_Name = "GPU timing capture",
+				.m_Status = m_GpuTimingSampleCount >= TemporalAAGpuTimingSampleTarget
+					? LabDiagnosticCheckStatus::Passed : LabDiagnosticCheckStatus::Pending,
+				.m_Detail = "The fixed 120-frame window starts after two complete 8-sample jitter cycles and resets when the evidence domain changes."},
+			{.m_Name = "Sampling-footprint review",
+				.m_Status = LabDiagnosticCheckStatus::Pending,
+				.m_Detail = "Inspect named edge/disocclusion ROIs: RGB is bilinear (4 texels), age is point sampled (1 texel), and depth acceptance searches a 3x3 neighborhood. A pass requires no material mismatch artifact."},
 		};
 	}
 
