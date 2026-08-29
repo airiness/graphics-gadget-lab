@@ -71,11 +71,11 @@ namespace gglab
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = MaxHistoryFeedbackId,
-			.m_Name = "Max History Feedback (Provisional)", .m_Group = "Temporal AA",
+			.m_Name = "Max History Feedback", .m_Group = "Temporal AA",
 			.m_Type = LabParameterType::Float, .m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = TemporalAAProvisionalDefaultMaxHistoryFeedback,
+			.m_DefaultValue = TemporalAADefaultMaxHistoryFeedback,
 			.m_MinValue = LabValue(0.0f),
-			.m_MaxValue = LabValue(TemporalAAProvisionalMaxHistoryFeedbackCeiling),
+			.m_MaxValue = LabValue(TemporalAAMaxHistoryFeedbackCeiling),
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PreviewTapId, .m_Name = "Preview", .m_Group = "Diagnostics",
@@ -242,7 +242,7 @@ namespace gglab
 		auto& taa = GetMutableViewRenderProfile().m_TemporalAA;
 		const bool enabled = parameters.Get(EnabledId, true);
 		const float maxHistoryFeedback = parameters.Get(
-			MaxHistoryFeedbackId, TemporalAAProvisionalDefaultMaxHistoryFeedback);
+			MaxHistoryFeedbackId, TemporalAADefaultMaxHistoryFeedback);
 		const bool enableCameraInput = parameters.Get(EnableCameraInputId, false);
 		const bool animateObject = parameters.Get(AnimateObjectId, true);
 		const bool orbitCamera = parameters.Get(OrbitCameraId, false);
@@ -552,12 +552,14 @@ namespace gglab
 		const float saturationAge =
 			ResolveTemporalAAFeedbackSaturationAge(taa.m_MaxHistoryFeedback);
 		const float ceilingSaturationAge = ResolveTemporalAAFeedbackSaturationAge(
-			TemporalAAProvisionalMaxHistoryFeedbackCeiling);
+			TemporalAAMaxHistoryFeedbackCeiling);
 		const float packedCeiling = UnpackTemporalAAUnitRangePair(
 			PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-				TemporalAAProvisionalMaxHistoryFeedbackCeiling, 0.0f))[0];
+				TemporalAAMaxHistoryFeedbackCeiling, 0.0f))[0];
+		const float packedCeilingSaturationAge =
+			ResolveTemporalAAFeedbackSaturationAge(packedCeiling);
 		const bool coupledBoundValid = ceilingSaturationAge <= TemporalHistoryMaxAge &&
-			packedCeiling < 1.0f;
+			packedCeilingSaturationAge <= TemporalHistoryMaxAge && packedCeiling < 1.0f;
 		const std::string gpuTiming = m_GpuTimingSampleCount > 0
 			? std::format("{:.3f} ms avg [{:.3f}, {:.3f}], {}/{} samples",
 				m_GpuTimingSumMilliseconds / static_cast<double>(m_GpuTimingSampleCount),
@@ -584,6 +586,10 @@ namespace gglab
 				taa.m_LuminanceWeightScale, taa.m_NeighborhoodClampExpansion)},
 			{.m_Name = "Age bound", .m_Value = std::format(
 				"saturation {:.0f}, max {:.0f}", saturationAge, TemporalHistoryMaxAge)},
+			{.m_Name = "Frozen ceiling", .m_Value = std::format(
+				"{:.6f} -> age {:.0f}; packed {:.6f} -> age {:.0f}",
+				TemporalAAMaxHistoryFeedbackCeiling, ceilingSaturationAge,
+				packedCeiling, packedCeilingSaturationAge)},
 			{.m_Name = "Evidence frames", .m_Value = std::format(
 				"{} committed after reset; last jitter {}", m_CommittedFrameCount,
 				history.m_LastCommitted.m_JitterIndex)},

@@ -17,12 +17,9 @@ namespace gglab
 	inline constexpr float TemporalAADefaultLuminanceWeightScale = 0.0f;
 	inline constexpr float TemporalAADefaultNeighborhoodClampExpansion = 0.0f;
 	inline constexpr float TemporalHistoryInitialAge = 1.0f;
-	// Provisional until feedback tuning freezes the coupled accumulation bound.
 	inline constexpr float TemporalHistoryMaxAge = 255.0f;
-	// These feedback values are branch-test candidates, not production-approved tuning.
-	inline constexpr float TemporalAAProvisionalDefaultMaxHistoryFeedback = 0.9f;
-	inline constexpr float TemporalAAProvisionalMaxHistoryFeedbackCeiling =
-		TemporalHistoryMaxAge / (TemporalHistoryMaxAge + 1.0f);
+	inline constexpr float TemporalAADefaultMaxHistoryFeedback = 0.97f;
+	inline constexpr float TemporalAAMaxHistoryFeedbackCeiling = 0.99f;
 	inline constexpr float TemporalAAMaxDepthThreshold = 1.0f;
 	inline constexpr float TemporalAAMaxVelocityWeightScale = 1.0f;
 	inline constexpr float TemporalAAMaxLuminanceWeightScale = 16.0f;
@@ -31,10 +28,11 @@ namespace gglab
 	inline constexpr float TemporalAAUnitRangeQuantizationScale =
 		static_cast<float>(TemporalAAUnitRangePairMask);
 	static_assert(TemporalHistoryMaxAge <= 2048.0f);
-	static_assert(TemporalAAProvisionalDefaultMaxHistoryFeedback >= 0.0f &&
-		TemporalAAProvisionalDefaultMaxHistoryFeedback <
-			TemporalAAProvisionalMaxHistoryFeedbackCeiling);
-	static_assert(TemporalAAProvisionalMaxHistoryFeedbackCeiling < 1.0f);
+	static_assert(TemporalAADefaultMaxHistoryFeedback >= 0.0f &&
+		TemporalAADefaultMaxHistoryFeedback < TemporalAAMaxHistoryFeedbackCeiling);
+	static_assert(TemporalAAMaxHistoryFeedbackCeiling < 1.0f);
+	static_assert(TemporalAAMaxHistoryFeedbackCeiling <=
+		TemporalHistoryMaxAge / (TemporalHistoryMaxAge + 1.0f));
 
 	[[nodiscard]] inline bool IsTemporalHistoryAgeValid(float historyAge) noexcept
 	{
@@ -133,9 +131,23 @@ namespace gglab
 			static_cast<float>(TemporalAAUnitRangePairMask - 1u) /
 			TemporalAAUnitRangeQuantizationScale;
 		const float feedback = std::clamp(maxHistoryFeedback, 0.0f, maxPackedFeedback);
-		return std::max(std::ceil(feedback / std::max(
+		float saturationAge = std::max(std::ceil(feedback / std::max(
 			1.0f - feedback, 1.0f / TemporalAAUnitRangeQuantizationScale)),
 			TemporalHistoryInitialAge);
+		// Correct ceil() at exactly representable discrete weights such as 99 / 100.
+		// The diagnostic must report the first integer age whose actual float weight
+		// reaches the cap, rather than inheriting division-rounding error from the
+		// closed-form estimate.
+		while (saturationAge > TemporalHistoryInitialAge &&
+			(saturationAge - 1.0f) / saturationAge >= feedback)
+		{
+			saturationAge -= 1.0f;
+		}
+		while (saturationAge / (saturationAge + 1.0f) < feedback)
+		{
+			saturationAge += 1.0f;
+		}
+		return saturationAge;
 	}
 
 	[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(
@@ -159,7 +171,7 @@ namespace gglab
 		bool m_Enabled = false;
 		float m_DepthAbsoluteThreshold = TemporalAADepthAbsoluteThreshold;
 		float m_DepthRelativeThreshold = TemporalAADepthRelativeThreshold;
-		float m_MaxHistoryFeedback = TemporalAAProvisionalDefaultMaxHistoryFeedback;
+		float m_MaxHistoryFeedback = TemporalAADefaultMaxHistoryFeedback;
 		float m_VelocityWeightScale = TemporalAADefaultVelocityWeightScale;
 		float m_LuminanceWeightScale = TemporalAADefaultLuminanceWeightScale;
 		float m_NeighborhoodClampExpansion = TemporalAADefaultNeighborhoodClampExpansion;
@@ -181,7 +193,7 @@ namespace gglab
 			: defaults.m_DepthRelativeThreshold;
 		settings.m_MaxHistoryFeedback = std::isfinite(settings.m_MaxHistoryFeedback)
 			? std::clamp(settings.m_MaxHistoryFeedback, 0.0f,
-				TemporalAAProvisionalMaxHistoryFeedbackCeiling)
+				TemporalAAMaxHistoryFeedbackCeiling)
 			: defaults.m_MaxHistoryFeedback;
 		settings.m_VelocityWeightScale = std::isfinite(settings.m_VelocityWeightScale)
 			? std::clamp(settings.m_VelocityWeightScale, 0.0f,

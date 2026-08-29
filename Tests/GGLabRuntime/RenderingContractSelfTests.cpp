@@ -4882,7 +4882,7 @@ namespace gglab
 				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAge) == 2.0f &&
 				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAge) ==
 					TemporalHistoryMaxAge,
-				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at its provisional R16Float-exact bound");
+				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at the frozen R16Float-exact bound");
 
 			const TemporalAAOutputAlphaContract accumulatedOutputAlphas =
 				ResolveTemporalAAOutputAlphas(37.0f);
@@ -4899,6 +4899,10 @@ namespace gglab
 				ResolveTemporalAAFeedbackSaturationAge(0.75f);
 			context.Check(previewFeedbackSaturationAge == 3.0f &&
 				ResolveTemporalAAFeedbackSaturationAge(0.0f) == 1.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					TemporalAADefaultMaxHistoryFeedback) == 33.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					TemporalAAMaxHistoryFeedbackCeiling) == 99.0f &&
 				ResolveTemporalAAHistoryAgePreview(1.0f, 0.75f) == 0.0f &&
 				NearlyEqual(ResolveTemporalAAHistoryAgePreview(3.0f, 0.75f),
 					2.0f / 3.0f) &&
@@ -4916,10 +4920,10 @@ namespace gglab
 				TemporalAADepthAbsoluteThreshold,
 				TemporalAADepthRelativeThreshold) == 0x051f0ccdu);
 			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-				TemporalAAProvisionalDefaultMaxHistoryFeedback,
-				TemporalAADefaultNeighborhoodClampExpansion) == 0x0000e666u);
+				TemporalAADefaultMaxHistoryFeedback,
+				TemporalAADefaultNeighborhoodClampExpansion) == 0x0000f851u);
 			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-				TemporalAAProvisionalMaxHistoryFeedbackCeiling, 0.0f) == 0x0000feffu);
+				TemporalAAMaxHistoryFeedbackCeiling, 0.0f) == 0x0000fd70u);
 			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
 				1.0f, 0.0f) == 0x0000fffeu);
 			constexpr std::array<float, 2> packingGolden =
@@ -4930,21 +4934,23 @@ namespace gglab
 			constexpr std::array<float, 2> feedbackCeilingPackingGolden =
 				UnpackTemporalAAUnitRangePair(
 					PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
-						TemporalAAProvisionalMaxHistoryFeedbackCeiling, 0.0f));
+						TemporalAAMaxHistoryFeedbackCeiling, 0.0f));
 			context.Check(NearlyEqual(packingGolden[0], 32768.0f / 65535.0f) &&
 				NearlyEqual(packingGolden[1], 16384.0f / 65535.0f) &&
 				feedbackPackingGolden[0] < 1.0f &&
 				(feedbackPackingGolden[0] * 65535.0f) == 65534.0f &&
 				feedbackCeilingPackingGolden[0] < 1.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					feedbackCeilingPackingGolden[0]) == 100.0f &&
 				std::ceil(feedbackCeilingPackingGolden[0] /
 					(1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAge,
-				"Temporal AA CPU packing matches the HLSL low/high UNORM16 ABI, feedback can never encode one, and the provisional cap remains reachable before age saturation");
+				"Temporal AA CPU packing matches the HLSL low/high UNORM16 ABI, feedback can never encode one, and the frozen cap remains reachable before age saturation");
 
-			constexpr std::array<float, 6> historyAges{ 1.0f, 2.0f, 3.0f, 7.0f, 15.0f,
-				31.0f };
-			constexpr std::array<float, 6> expectedHistoryWeights{ 0.5f, 2.0f / 3.0f,
-				0.75f, 0.875f, TemporalAAProvisionalDefaultMaxHistoryFeedback,
-				TemporalAAProvisionalDefaultMaxHistoryFeedback };
+			constexpr std::array<float, 7> historyAges{ 1.0f, 2.0f, 3.0f, 7.0f, 15.0f,
+				31.0f, 63.0f };
+			constexpr std::array<float, 7> expectedHistoryWeights{ 0.5f, 2.0f / 3.0f,
+				0.75f, 0.875f, 0.9375f, 0.96875f,
+				TemporalAADefaultMaxHistoryFeedback };
 			bool ageWeightGoldenMatches = true;
 			for (size_t index = 0; index < historyAges.size(); ++index)
 			{
@@ -4954,15 +4960,15 @@ namespace gglab
 					expectedHistoryWeights[index]);
 			}
 			const float staticHistoryWeight = ResolveTemporalAAHistoryWeight(
-				15.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+				63.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
 			const float movingHistoryWeight =
-				ResolveTemporalAAHistoryWeight(15.0f, 10.0f, 1.0f, 1.0f, defaultTemporalAA);
+				ResolveTemporalAAHistoryWeight(63.0f, 10.0f, 1.0f, 1.0f, defaultTemporalAA);
 			const float defaultChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
-				15.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
+				63.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
 			TemporalAASettings luminanceResearchSettings = defaultTemporalAA;
 			luminanceResearchSettings.m_LuminanceWeightScale = 4.0f;
 			const float researchChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
-				15.0f, 0.0f, 1.0f, 0.9f, luminanceResearchSettings);
+				63.0f, 0.0f, 1.0f, 0.9f, luminanceResearchSettings);
 			TemporalAASettings packedCeilingSettings = defaultTemporalAA;
 			packedCeilingSettings.m_MaxHistoryFeedback = feedbackCeilingPackingGolden[0];
 			const float saturatedCeilingWeight = ResolveTemporalAAHistoryWeight(
@@ -4970,7 +4976,7 @@ namespace gglab
 			context.Check(ageWeightGoldenMatches &&
 				TemporalAADefaultLuminanceWeightScale == 0.0f &&
 				NearlyEqual(staticHistoryWeight,
-					TemporalAAProvisionalDefaultMaxHistoryFeedback) &&
+					TemporalAADefaultMaxHistoryFeedback) &&
 				NearlyEqual(saturatedCeilingWeight, feedbackCeilingPackingGolden[0]) &&
 				movingHistoryWeight > 0.0f && movingHistoryWeight < staticHistoryWeight &&
 				NearlyEqual(defaultChangedLuminanceWeight, staticHistoryWeight) &&
@@ -4981,7 +4987,7 @@ namespace gglab
 				ResolveTemporalAAHistoryWeight(1.0f,
 					std::numeric_limits<float>::quiet_NaN(),
 					1.0f, 1.0f, defaultTemporalAA) == 0.0f,
-				"Temporal blend follows the age golden sequence, caps at the provisional maximum, retains velocity attenuation, and keeps luminance attenuation research-only by default");
+				"Temporal blend follows the age golden sequence, caps at the frozen maximum, retains velocity attenuation, and keeps luminance attenuation research-only by default");
 
 			RecordingDevice motionCapabilityDevice;
 			motionCapabilityDevice.m_TextureViewsSupported = true;
@@ -5253,7 +5259,7 @@ namespace gglab
 				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthRelativeThreshold,
 					TemporalAADepthRelativeThreshold) &&
 				NearlyEqual(enabledSettings.m_TemporalAA.m_MaxHistoryFeedback,
-					TemporalAAProvisionalDefaultMaxHistoryFeedback) &&
+					TemporalAADefaultMaxHistoryFeedback) &&
 				NearlyEqual(enabledSettings.m_TemporalAA.m_VelocityWeightScale,
 					TemporalAADefaultVelocityWeightScale) &&
 				NearlyEqual(enabledSettings.m_TemporalAA.m_LuminanceWeightScale,
@@ -5264,7 +5270,7 @@ namespace gglab
 				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthRelativeThreshold,
 					TemporalAAMaxDepthThreshold) &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_MaxHistoryFeedback,
-					TemporalAAProvisionalMaxHistoryFeedbackCeiling) &&
+					TemporalAAMaxHistoryFeedbackCeiling) &&
 				clampedSettings.m_TemporalAA.m_MaxHistoryFeedback < 1.0f &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_VelocityWeightScale, 0.0f) &&
 				NearlyEqual(clampedSettings.m_TemporalAA.m_LuminanceWeightScale,
