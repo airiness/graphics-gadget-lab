@@ -5,6 +5,7 @@
 #include "Artifact/ShaderArtifactManifestIO.h"
 #include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
@@ -20,6 +21,8 @@
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <windows.h>
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -148,6 +151,198 @@ namespace gglab
 			auto recordPath = binaryPath;
 			recordPath += L".json";
 			return recordPath;
+		}
+
+		struct GeneratedSurfaceCompileCase final
+		{
+			const wchar_t* m_ArtifactPath = nullptr;
+			const wchar_t* m_ProvenancePath = nullptr;
+			const wchar_t* m_HarnessPath = nullptr;
+			std::uint64_t m_ProfileVersion = 0;
+			const char* m_PinCheckName = nullptr;
+			const char* m_DxilCheckName = nullptr;
+			const char* m_SpirVCheckName = nullptr;
+		};
+
+		[[nodiscard]] bool IsLowercaseHex(std::string_view value, std::size_t length) noexcept
+		{
+			return value.size() == length && std::ranges::all_of(value,
+				[](char character) noexcept
+				{
+					return (character >= '0' && character <= '9') ||
+						(character >= 'a' && character <= 'f');
+				});
+		}
+
+		[[nodiscard]] std::optional<std::vector<std::byte>> ReadExactFileBytes(
+			const std::filesystem::path& path) noexcept
+		{
+			std::ifstream input(path, std::ios::binary | std::ios::ate);
+			if (!input)
+			{
+				return std::nullopt;
+			}
+
+			const std::streampos end = input.tellg();
+			if (end < 0 || static_cast<std::uintmax_t>(end) >
+				std::numeric_limits<std::size_t>::max())
+			{
+				return std::nullopt;
+			}
+
+			std::vector<std::byte> bytes(static_cast<std::size_t>(end));
+			input.seekg(0, std::ios::beg);
+			if (!bytes.empty())
+			{
+				input.read(reinterpret_cast<char*>(bytes.data()),
+					static_cast<std::streamsize>(bytes.size()));
+			}
+			if (!input)
+			{
+				return std::nullopt;
+			}
+			return bytes;
+		}
+
+		[[nodiscard]] std::optional<nlohmann::json> ReadJsonObject(
+			const std::filesystem::path& path) noexcept
+		{
+			std::ifstream input(path, std::ios::binary);
+			if (!input)
+			{
+				return std::nullopt;
+			}
+
+			try
+			{
+				const nlohmann::json document =
+					nlohmann::json::parse(input, nullptr, /*allow_exceptions=*/false);
+				if (document.is_discarded() || !document.is_object())
+				{
+					return std::nullopt;
+				}
+				return document;
+			}
+			catch (...)
+			{
+				return std::nullopt;
+			}
+		}
+
+		[[nodiscard]] bool ReadUnsignedJsonValue(
+			const nlohmann::json& value, std::uint64_t& out) noexcept
+		{
+			if (value.is_number_unsigned())
+			{
+				out = value.get<std::uint64_t>();
+				return true;
+			}
+			if (!value.is_number_integer())
+			{
+				return false;
+			}
+
+			const std::int64_t signedValue = value.get<std::int64_t>();
+			if (signedValue < 0)
+			{
+				return false;
+			}
+			out = static_cast<std::uint64_t>(signedValue);
+			return true;
+		}
+
+		[[nodiscard]] bool ValidateGeneratedSurfaceFixturePin(
+			const std::filesystem::path& shaderSourceRoot,
+			const GeneratedSurfaceCompileCase& compileCase) noexcept
+		{
+			const std::optional<nlohmann::json> document =
+				ReadJsonObject(shaderSourceRoot / compileCase.m_ProvenancePath);
+			constexpr std::array<std::string_view, 7> ExpectedFields{
+				"schemaVersion",
+				"profileId",
+				"profileVersion",
+				"editorCommit",
+				"fixturePath",
+				"generatedSourceIdentity",
+				"byteCount",
+			};
+			if (!document.has_value() || document->size() != ExpectedFields.size() ||
+				!std::ranges::all_of(ExpectedFields,
+					[&document](std::string_view field)
+					{
+						return document->contains(std::string(field));
+					}))
+			{
+				return false;
+			}
+
+			std::uint64_t schemaVersion = 0;
+			std::uint64_t profileVersion = 0;
+			std::uint64_t byteCount = 0;
+			if (!ReadUnsignedJsonValue(document->at("schemaVersion"), schemaVersion) ||
+				schemaVersion != 1 ||
+				!ReadUnsignedJsonValue(document->at("profileVersion"), profileVersion) ||
+				profileVersion != compileCase.m_ProfileVersion ||
+				!ReadUnsignedJsonValue(document->at("byteCount"), byteCount) ||
+				byteCount > std::numeric_limits<std::size_t>::max())
+			{
+				return false;
+			}
+
+			const auto& profileId = document->at("profileId");
+			const auto& editorCommit = document->at("editorCommit");
+			const auto& fixturePath = document->at("fixturePath");
+			const auto& generatedSourceIdentity = document->at("generatedSourceIdentity");
+			if (!profileId.is_string() ||
+				profileId.get_ref<const std::string&>() != "gglab.surface" ||
+				!editorCommit.is_string() ||
+				!IsLowercaseHex(editorCommit.get_ref<const std::string&>(), 40) ||
+				!fixturePath.is_string() || fixturePath.get_ref<const std::string&>().empty() ||
+				!generatedSourceIdentity.is_string() ||
+				!IsLowercaseHex(generatedSourceIdentity.get_ref<const std::string&>(), 64))
+			{
+				return false;
+			}
+
+			const std::optional<std::vector<std::byte>> artifactBytes =
+				ReadExactFileBytes(shaderSourceRoot / compileCase.m_ArtifactPath);
+			if (!artifactBytes.has_value() || artifactBytes->size() != byteCount)
+			{
+				return false;
+			}
+
+			return Sha256DigestToHex(ComputeSha256(std::span(*artifactBytes))) ==
+				generatedSourceIdentity.get_ref<const std::string&>();
+		}
+
+		void RunGeneratedSurfaceContractCompileCase(SelfTestContext& context,
+			ShaderCompiler& compiler, const std::filesystem::path& shaderSourceRoot,
+			ShaderDesc& desc, const GeneratedSurfaceCompileCase& compileCase) noexcept
+		{
+			const bool pinValid =
+				ValidateGeneratedSurfaceFixturePin(shaderSourceRoot, compileCase);
+			context.Check(pinValid, compileCase.m_PinCheckName);
+			if (!pinValid)
+			{
+				return;
+			}
+
+			desc.m_SourcePath = compileCase.m_HarnessPath;
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const ShaderCompileResult dxilArtifact = compiler.Compile(desc);
+			context.Check(dxilArtifact.IsSuccess() &&
+				dxilArtifact.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil,
+				compileCase.m_DxilCheckName);
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult spirVArtifact = compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(spirVArtifact.IsSuccess() &&
+				spirVArtifact.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV,
+				compileCase.m_SpirVCheckName);
 		}
 
 		constexpr std::wstring_view VulkanSdkValidationBaseline = L"1.3.296.0";
@@ -1960,8 +2155,8 @@ namespace gglab
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
-			ShaderCompiler compiler(
-				ResolveShaderSourceRoot(runtimeRoot), ResolveShaderCacheRoot(runtimeRoot));
+			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
+			ShaderCompiler compiler(shaderSourceRoot, ResolveShaderCacheRoot(runtimeRoot));
 			ShaderDesc desc{
 				.m_SourcePath = L"Tests/RenderingContractCompile.hlsl",
 				.m_Stage = ShaderStage::Compute,
@@ -2085,6 +2280,30 @@ namespace gglab
 				"Production DXC compiles the gglab.surface texture signature "
 				"contract for the Vulkan 1.3 target through the toolchain "
 				"bindless-heap binding arguments to SPIR-V");
+
+			const GeneratedSurfaceCompileCase generatedSurfaceV1Case{
+				.m_ArtifactPath = L"Tests/Generated/SurfaceGeneratedV1.hlsli",
+				.m_ProvenancePath = L"Tests/Generated/SurfaceGeneratedV1.provenance.json",
+				.m_HarnessPath = L"Tests/SurfaceGeneratedV1ContractCompile.hlsl",
+				.m_ProfileVersion = 1,
+				.m_PinCheckName = "Generated gglab.surface profileVersion 1 fixture matches its sole provenance pin authority",
+				.m_DxilCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 1 function to DXIL",
+				.m_SpirVCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 1 function to SPIR-V",
+			};
+			RunGeneratedSurfaceContractCompileCase(
+				context, compiler, shaderSourceRoot, desc, generatedSurfaceV1Case);
+
+			const GeneratedSurfaceCompileCase generatedSurfaceV2Case{
+				.m_ArtifactPath = L"Tests/Generated/SurfaceGeneratedV2.hlsli",
+				.m_ProvenancePath = L"Tests/Generated/SurfaceGeneratedV2.provenance.json",
+				.m_HarnessPath = L"Tests/SurfaceGeneratedV2ContractCompile.hlsl",
+				.m_ProfileVersion = 2,
+				.m_PinCheckName = "Generated gglab.surface profileVersion 2 fixture matches its sole provenance pin authority",
+				.m_DxilCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 2 function to DXIL",
+				.m_SpirVCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 2 function to SPIR-V",
+			};
+			RunGeneratedSurfaceContractCompileCase(
+				context, compiler, shaderSourceRoot, desc, generatedSurfaceV2Case);
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

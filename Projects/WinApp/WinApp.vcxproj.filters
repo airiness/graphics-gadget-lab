@@ -100,6 +100,9 @@
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{EEA089C0-E071-EA3C-EFDF-59DAECA485F6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Tests\Generated">
+      <UniqueIdentifier>{7AE87480-80F0-D053-4394-CE077F3B40E8}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{171B5147-9F2B-A638-FB02-84BF202F994B}</UniqueIdentifier>
     </Filter>
@@ -847,6 +850,12 @@
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV2ContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -923,6 +932,18 @@
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli">
+      <Filter>Shaders\Tests\Generated</Filter>
+    </None>
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json">
+      <Filter>Shaders\Tests\Generated</Filter>
+    </None>
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.hlsli">
+      <Filter>Shaders\Tests\Generated</Filter>
+    </None>
+    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.provenance.json">
+      <Filter>Shaders\Tests\Generated</Filter>
     </None>
     <None Include="packages.config" />
   </ItemGroup>
