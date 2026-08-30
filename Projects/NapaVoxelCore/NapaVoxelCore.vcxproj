@@ -42,7 +42,7 @@
   <PropertyGroup>
     <NapaVoxelRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</NapaVoxelRepositoryRoot>
     <OutDir>$(NapaVoxelRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(NapaVoxelRepositoryRoot)Build\Intermediate\$(Platform)\$(Configuration)\NapaVoxelCore\</IntDir>
+    <IntDir>$(NapaVoxelRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>NapaVoxelCore</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
