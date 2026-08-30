@@ -28,7 +28,7 @@ namespace gglab
 	};
 
 	// Platform behavior required by the deterministic qualification harness.
-	// The Application platform layer owns the native window and implements
+	// The qualification platform layer owns the native window and implements
 	// these operations; the Vulkan backend only consumes drawable extents and
 	// requested state changes.
 	class VulkanQualificationHostBase
@@ -50,7 +50,6 @@ namespace gglab
 		VulkanQualificationHostBase* m_Host = nullptr;
 		bool m_IsHostAbiSupported = false;
 		bool m_RequestValidation = false;
-		bool m_ListAdapters = false;
 		std::optional<std::string> m_AdapterSelector;
 		std::filesystem::path m_ShaderSourceRoot;
 		std::filesystem::path m_ShaderCacheRoot;
@@ -72,8 +71,8 @@ namespace gglab
 
 		[[nodiscard]] bool IsConfigurationValid() const noexcept
 		{
-			return HasRequiredSurfaceFactory() &&
-				(m_ListAdapters || (HasRequiredPlatformHost() && HasRequiredRuntimePaths()));
+			return HasRequiredSurfaceFactory() && HasRequiredPlatformHost() &&
+				HasRequiredRuntimePaths();
 		}
 	};
 

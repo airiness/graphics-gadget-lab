@@ -1,4 +1,4 @@
-#include "Application/Rendering/VulkanQualification.h"
+#include "VulkanQualification.h"
 #include "Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
@@ -793,8 +793,7 @@ namespace gglab
 			return 0;
 		}
 
-		[[nodiscard]] int RunVulkanTransferQualification(
-			VulkanDevice& device, VulkanFrameRuntime& runtime) noexcept
+		[[nodiscard]] int RunVulkanTransferQualification(VulkanDevice& device) noexcept
 		{
 			constexpr RHIResourceState commonState{
 				.m_Stages = RHIStage::All,
@@ -1011,36 +1010,38 @@ namespace gglab
 							.m_Category = "BootstrapTexture",
 							.m_Label = bootstrapTexture.m_Name,
 						}));
-						const RHITextureHandle texture = resources.m_Textures.back().Get();
-						if (!texture.IsValid())
-						{
-							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-								"qualify transfer: bootstrap texture '{}' creation failed.",
-								bootstrapTexture.m_Name));
-							return 1;
-						}
+					const RHITextureHandle bootstrapHandle =
+						resources.m_Textures.back().Get();
+					if (!bootstrapHandle.IsValid())
+					{
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+							"qualify transfer: bootstrap texture '{}' creation failed.",
+							bootstrapTexture.m_Name));
+						return 1;
+					}
 
-						const RHITextureViewHandle view = device.CreateTextureView(
-							texture, BuildTextureRHISRVDesc(bootstrapTexture.m_Data));
-						if (view.IsValid())
-						{
-							resources.m_Views.push_back(view);
-						}
-						if (!view.IsValid() || !device.GetTextureViewDescriptor(view).IsValid())
-						{
-							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-								"qualify transfer: bootstrap texture '{}' SRV creation failed.",
-								bootstrapTexture.m_Name));
-							return 1;
-						}
-						if (!batch.UploadTexture(texture, bootstrapTexture.m_Data.MakeUploadData(),
-							UndefinedRHITextureState(), shaderResourceState))
-						{
-							GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
-								"qualify transfer: bootstrap texture '{}' upload recording failed.",
-								bootstrapTexture.m_Name));
-							return 1;
-						}
+					const RHITextureViewHandle view = device.CreateTextureView(
+						bootstrapHandle, BuildTextureRHISRVDesc(bootstrapTexture.m_Data));
+					if (view.IsValid())
+					{
+						resources.m_Views.push_back(view);
+					}
+					if (!view.IsValid() || !device.GetTextureViewDescriptor(view).IsValid())
+					{
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+							"qualify transfer: bootstrap texture '{}' SRV creation failed.",
+							bootstrapTexture.m_Name));
+						return 1;
+					}
+					if (!batch.UploadTexture(bootstrapHandle,
+						bootstrapTexture.m_Data.MakeUploadData(),
+						UndefinedRHITextureState(), shaderResourceState))
+					{
+						GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(std::format(
+							"qualify transfer: bootstrap texture '{}' upload recording failed.",
+							bootstrapTexture.m_Name));
+						return 1;
+					}
 				}
 
 				const RHITransferSubmission submission = batch.Submit(true);
@@ -2742,7 +2743,7 @@ namespace gglab
 			{
 				return 1;
 			}
-			if (RunVulkanTransferQualification(*runtime.GetDevice(), runtime) != 0)
+			if (RunVulkanTransferQualification(*runtime.GetDevice()) != 0)
 			{
 				return 1;
 			}
@@ -2782,7 +2783,7 @@ namespace gglab
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"Vulkan qualification requires a surface factory.");
 			}
-			else if (!options.m_ListAdapters && !options.HasRequiredPlatformHost())
+			else if (!options.HasRequiredPlatformHost())
 			{
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"Vulkan frame qualification requires a platform host.");
@@ -2793,15 +2794,6 @@ namespace gglab
 					"Vulkan frame qualification requires non-empty shader source and cache roots.");
 			}
 			return 1;
-		}
-
-		if (options.m_ListAdapters)
-		{
-			// Inspection-only: enumerate, evaluate and log every adapter,
-			// then exit without creating a frame runtime.
-			VulkanBootstrapReport report;
-			return RunVulkanBootstrap(
-				MakeVulkanBootstrapOptions(options), report);
 		}
 
 		VulkanQualificationDrawableExtent extent{};

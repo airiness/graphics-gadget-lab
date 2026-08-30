@@ -28,9 +28,6 @@
     <Filter Include="Application\Platform\Windows\Input">
       <UniqueIdentifier>{1CD47382-162C-F10D-43A8-59ABECD67F40}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Application\Rendering">
-      <UniqueIdentifier>{FCBECF55-08FC-FB0E-7E29-E0EF56183533}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Application\SelfTest">
       <UniqueIdentifier>{4CA85ECB-F3BE-96CD-9BFB-56439BEEC692}</UniqueIdentifier>
     </Filter>
@@ -264,17 +261,11 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.cpp">
-      <Filter>Application\Platform\Windows</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.cpp">
-      <Filter>Application\Rendering</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
@@ -319,9 +310,6 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
@@ -590,17 +578,11 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.h">
-      <Filter>Application\Platform\Windows</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h">
       <Filter>Application</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.h">
-      <Filter>Application\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
@@ -636,9 +618,6 @@
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">

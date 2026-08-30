@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{C29D935C-88B4-4BA3-BB79-DE4C9D24CB6E}</ProjectGuid>
+    <RootNamespace>GGLabVulkanQualification</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings"></ImportGroup>
+  <ImportGroup Label="Shared"></ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\ShaderDirectory.props" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <Import Project="..\..\PropertySheets\DxcImport.props" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <TargetName>GGLabVulkanQualification</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\Main.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\Platform\Windows\Win32QualificationHost.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\QualificationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\SelfTest\SelfTestRunner.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\SelfTest\VulkanQualificationSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\VulkanQualification.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\Platform\Windows\Win32QualificationHost.h" />
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\QualificationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\SelfTest\SelfTestRunner.h" />
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\SelfTest\VulkanQualificationSelfTests.h" />
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\VulkanQualification.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
+      <Project>{F382CFE9-9912-487D-B999-E649C340125D}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">
+      <Project>{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
+      <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderToolchainCore\ShaderToolchainCore.vcxproj" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
+      <Project>{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0' and Exists('..\..\PropertySheets\DxcImport.targets')" />
+    <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0' and Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
+  </ImportGroup>
+</Project>

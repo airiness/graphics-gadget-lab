@@ -1,6 +1,6 @@
-#include "Application/SelfTest/VulkanQualificationSelfTests.h"
+#include "SelfTest/VulkanQualificationSelfTests.h"
 
-#include "Application/Rendering/VulkanQualification.h"
+#include "VulkanQualification.h"
 
 namespace gglab
 {
@@ -16,16 +16,10 @@ namespace gglab
 		context.Check(!options.HasRequiredPlatformHost(),
 			"Vulkan qualification reports a missing platform host");
 
-		options.m_ListAdapters = true;
-		context.Check(!options.IsConfigurationValid(),
-			"Vulkan adapter inspection rejects a missing surface factory");
 		options.m_SurfaceFactory = reinterpret_cast<const VulkanSurfaceFactoryBase*>(1);
 		options.m_IsHostAbiSupported = true;
-		context.Check(options.IsConfigurationValid(),
-			"Vulkan adapter inspection does not require an unused platform host");
 		context.Check(options.HasRequiredSurfaceFactory(),
 			"Vulkan qualification accepts the supplied surface factory");
-		options.m_ListAdapters = false;
 		context.Check(!options.IsConfigurationValid(),
 			"Vulkan frame qualification requires the platform host independently");
 		options.m_Host = reinterpret_cast<VulkanQualificationHostBase*>(1);

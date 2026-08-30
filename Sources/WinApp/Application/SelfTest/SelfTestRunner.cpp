@@ -9,7 +9,6 @@
 #include "Application/SelfTest/ShaderPreviewRuntimeSessionSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
-#include "Application/SelfTest/VulkanQualificationSelfTests.h"
 #endif
 #if GGLAB_ENABLE_VULKAN
 #include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
@@ -64,10 +63,6 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-development-shader-process-client",
 				.m_Run = &RunDevelopmentShaderBuildProcessClientSelfTests,
-			},
-			SelfTestSuiteDesc{
-				.m_Id = "app-vulkan-qualification",
-				.m_Run = &RunVulkanQualificationSelfTests,
 			},
 #endif
 			SelfTestSuiteDesc{

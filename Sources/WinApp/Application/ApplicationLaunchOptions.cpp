@@ -100,17 +100,6 @@ namespace gglab
 				result.m_Options.m_ListAdapters = true;
 				continue;
 			}
-			if (argument == "--vulkan-qualification")
-			{
-				if (result.m_Options.m_RunVulkanQualification)
-				{
-					result.m_Error =
-						"Option '--vulkan-qualification' may only be specified once.";
-					return result;
-				}
-				result.m_Options.m_RunVulkanQualification = true;
-				continue;
-			}
 			if (argument == "--adapter")
 			{
 				if (result.m_Options.m_AdapterSelector)
@@ -240,7 +229,7 @@ namespace gglab
 				result.m_Options.m_StartWithAbsoluteMouse ||
 				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
-				result.m_Options.m_RunVulkanQualification || result.m_Options.m_AdapterSelector))
+				result.m_Options.m_AdapterSelector))
 		{
 			result.m_Error =
 				"Option '--self-test' cannot be combined with interactive startup options.";
@@ -251,29 +240,6 @@ namespace gglab
 			result.m_Error = "Option '--adapter' cannot be combined with '--list-adapters'.";
 			return result;
 		}
-		if (result.m_Options.m_RunVulkanQualification && result.m_Options.m_ListAdapters)
-		{
-			result.m_Error =
-				"Option '--vulkan-qualification' cannot be combined with '--list-adapters'.";
-			return result;
-		}
-		if (result.m_Options.m_RunVulkanQualification &&
-			(demoSpecified || result.m_Options.m_StartupLabId ||
-				result.m_Options.m_StartWithAbsoluteMouse ||
-				result.m_Options.m_DisableDevelopmentTools))
-		{
-			result.m_Error =
-				"Option '--vulkan-qualification' cannot be combined with interactive startup options.";
-			return result;
-		}
-		if (result.m_Options.m_RunVulkanQualification &&
-			result.m_Options.m_RhiBackendSpecified &&
-			result.m_Options.m_RhiBackend != RHIBackendType::Vulkan)
-		{
-			result.m_Error =
-				"Option '--vulkan-qualification' requires the Vulkan backend and cannot be combined with '--rhi dx12'.";
-			return result;
-		}
 		if (result.m_Options.m_ListAdapters && result.m_Options.m_RhiBackendSpecified &&
 			result.m_Options.m_RhiBackend != RHIBackendType::Vulkan)
 		{
@@ -282,17 +248,12 @@ namespace gglab
 			return result;
 		}
 		if (result.m_Options.m_AdapterSelector &&
-			!result.m_Options.m_RunVulkanQualification &&
 			(!result.m_Options.m_RhiBackendSpecified ||
 				result.m_Options.m_RhiBackend != RHIBackendType::Vulkan))
 		{
 			result.m_Error =
 				"Option '--adapter' requires an explicit '--rhi vulkan'.";
 			return result;
-		}
-		if (result.m_Options.m_RunVulkanQualification)
-		{
-			result.m_Options.m_RhiBackend = RHIBackendType::Vulkan;
 		}
 		return result;
 	}
@@ -313,17 +274,15 @@ namespace gglab
 			"                                  Explicit 'vulkan' never falls back to DX12.\n"
 			"  --list-adapters                 Enumerate Vulkan adapters with profile\n"
 			"                                  evaluation and exit.\n"
-			"  --vulkan-qualification          Run the standalone Vulkan hardware\n"
-			"                                  qualification harness and exit.\n"
 			"  --adapter <index|prefix>        Select a Vulkan adapter by enumeration\n"
 			"                                  index or device UUID/name prefix.\n"
-			"                                  Requires --rhi vulkan or qualification.\n"
+			"                                  Requires --rhi vulkan.\n"
 			"  --self-test <suite-id|all>      Run one or all headless self-test suites.\n"
 			"                                  Available: artifact-cache, asset-data,\n"
 			"                                  publication-accounting, rendering-contracts,\n"
 			"                                  napa-voxel, vulkan-contracts, all.\n"
 			"  --help, -h                      Show this help text.\n"
-			"Requires the Vulkan SDK 1.3.296 for Vulkan backend and qualification builds\n"
+			"Requires the Vulkan SDK 1.3.296 for Vulkan backend builds\n"
 			"(GGLAB_ENABLE_VULKAN=1, the default).\n";
 	}
 }

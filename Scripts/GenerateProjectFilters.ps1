@@ -326,6 +326,16 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "GGLabVulkanQualification"
+        ProjectPath = "Projects\GGLabVulkanQualification\GGLabVulkanQualification.vcxproj"
+        FiltersPath = "Projects\GGLabVulkanQualification\GGLabVulkanQualification.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\GGLabVulkanQualification"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabAppRuntime"
         ProjectPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj"
         FiltersPath = "Projects\GGLabAppRuntime\GGLabAppRuntime.vcxproj.filters"

@@ -67,39 +67,11 @@ namespace gglab
 					"--rhi dx12 with --list-adapters is a parse error");
 			}
 
-			// The standalone qualification command implies Vulkan, accepts an
-			// adapter selector, and excludes other startup modes.
+			// Standalone qualification has its own executable and is not a WinApp mode.
 			{
 				const auto result = parse({ "--vulkan-qualification" });
-				context.Check(result.IsValid() &&
-					result.m_Options.m_RunVulkanQualification &&
-					result.m_Options.m_RhiBackend == RHIBackendType::Vulkan,
-					"--vulkan-qualification is an executable Vulkan mode");
-			}
-			{
-				const auto result =
-					parse({ "--vulkan-qualification", "--adapter", "0" });
-				context.Check(result.IsValid() && result.m_Options.m_AdapterSelector == "0",
-					"--vulkan-qualification accepts a deterministic adapter selector");
-			}
-			{
-				const auto result =
-					parse({ "--rhi", "dx12", "--vulkan-qualification" });
-				context.Check(!result.IsValid() &&
-					result.m_Error.find("Vulkan backend") != std::string::npos,
-					"--vulkan-qualification rejects the DX12 backend");
-			}
-			{
-				const auto result =
-					parse({ "--vulkan-qualification", "--list-adapters" });
 				context.Check(!result.IsValid(),
-					"--vulkan-qualification and --list-adapters are distinct exit modes");
-			}
-			{
-				const auto result =
-					parse({ "--vulkan-qualification", "--lab", "gglab.lab.gtao" });
-				context.Check(!result.IsValid(),
-					"--vulkan-qualification rejects interactive Lab startup");
+					"WinApp rejects the standalone qualification executable's former option");
 			}
 			{
 				const auto result = parse({ "--self-test", "app-path-composition" });

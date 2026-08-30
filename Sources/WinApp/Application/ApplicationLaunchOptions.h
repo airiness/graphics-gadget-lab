@@ -31,8 +31,6 @@ namespace gglab
 		bool m_RhiBackendSpecified = false;
 		// Lists all Vulkan adapters with their profile evaluation and exits.
 		bool m_ListAdapters = false;
-		// Runs the standalone Vulkan hardware qualification and exits.
-		bool m_RunVulkanQualification = false;
 		// Optional deterministic adapter selector (enumeration index or
 		// identity prefix) for the Vulkan backend.
 		std::optional<std::string> m_AdapterSelector;

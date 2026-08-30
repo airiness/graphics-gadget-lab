@@ -7,7 +7,9 @@ param(
 # Enforces the first-party source ownership and dependency direction contracts:
 #   Project graph - WinApp must reference GGLabRuntime and NapaVoxelCore;
 #                   Foundation must remain Tier-0; its tests may reference only
-#                   Foundation; NapaVoxelCore remains an independent sibling.
+#                   Foundation; NapaVoxelCore remains an independent sibling;
+#                   Vulkan qualification owns the explicit privileged Runtime /
+#                   Shader Toolchain dependency closure.
 #   Source ownership - every first-party source item must live below its owning
 #                      project's source root, and every physical source file must
 #                      belong to exactly one owning project.
@@ -51,6 +53,7 @@ $root = Get-RepoRoot $RootDir
 $repositorySourcesDir = Join-Path $root "Sources"
 $repositoryTestsDir = Join-Path $root "Tests"
 $winAppSourcesDir = Join-Path $root "Sources/WinApp"
+$vulkanQualificationSourcesDir = Join-Path $root "Sources/GGLabVulkanQualification"
 $appRuntimeSourcesDir = Join-Path $root "Sources/GGLabAppRuntime"
 $appRuntimeTestsDir = Join-Path $root "Tests/GGLabAppRuntime"
 $foundationSourcesDir = Join-Path $root "Sources/GGLabFoundation"
@@ -221,6 +224,19 @@ $winAppNamespace = New-Object System.Xml.XmlNamespaceManager($winAppProject.Name
 $winAppNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
 $winAppProjectDir = Split-Path -Parent $winAppProjectPath
 
+$vulkanQualificationProjectPath = Join-Path $root `
+    "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj"
+if (-not (Test-Path $vulkanQualificationProjectPath)) {
+    throw "GGLabVulkanQualification project not found: $vulkanQualificationProjectPath"
+}
+$vulkanQualificationProject = [xml](
+    Get-Content -LiteralPath $vulkanQualificationProjectPath -Raw -ErrorAction Stop)
+$vulkanQualificationNamespace = New-Object `
+    System.Xml.XmlNamespaceManager($vulkanQualificationProject.NameTable)
+$vulkanQualificationNamespace.AddNamespace(
+    "msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$vulkanQualificationProjectDir = Split-Path -Parent $vulkanQualificationProjectPath
+
 $appRuntimeProjectPath = Join-Path $root "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj"
 if (-not (Test-Path $appRuntimeProjectPath)) {
     throw "GGLabAppRuntime project not found: $appRuntimeProjectPath"
@@ -376,6 +392,10 @@ $runtimeCompileFiles = Get-ProjectItemPaths $runtimeProject $namespace $runtimeP
     "//msb:ClCompile" "Runtime compile item"
 $winAppCompileFiles = Get-ProjectItemPaths $winAppProject $winAppNamespace `
     $winAppProjectDir "//msb:ClCompile" "WinApp compile item"
+$vulkanQualificationCompileFiles = Get-ProjectItemPaths `
+    $vulkanQualificationProject $vulkanQualificationNamespace `
+    $vulkanQualificationProjectDir "//msb:ClCompile" `
+    "GGLabVulkanQualification compile item"
 $appRuntimeCompileFiles = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ClCompile" "GGLabAppRuntime compile item"
 $foundationCompileFiles = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -389,6 +409,10 @@ $runtimeSourceItems = Get-ProjectItemPaths $runtimeProject $namespace $runtimePr
     "//msb:ClCompile | //msb:ClInclude" "Runtime source item"
 $winAppSourceItems = Get-ProjectItemPaths $winAppProject $winAppNamespace `
     $winAppProjectDir "//msb:ClCompile | //msb:ClInclude" "WinApp source item"
+$vulkanQualificationSourceItems = Get-ProjectItemPaths `
+    $vulkanQualificationProject $vulkanQualificationNamespace `
+    $vulkanQualificationProjectDir "//msb:ClCompile | //msb:ClInclude" `
+    "GGLabVulkanQualification source item"
 $appRuntimeSourceItems = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ClCompile | //msb:ClInclude" "GGLabAppRuntime source item"
 $foundationSourceItems = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -440,6 +464,10 @@ $runtimeProjectReferences = Get-ProjectItemPaths $runtimeProject $namespace $run
     "//msb:ProjectReference" "Runtime project reference"
 $winAppProjectReferences = Get-ProjectItemPaths $winAppProject $winAppNamespace `
     $winAppProjectDir "//msb:ProjectReference" "WinApp project reference"
+$vulkanQualificationProjectReferences = Get-ProjectItemPaths `
+    $vulkanQualificationProject $vulkanQualificationNamespace `
+    $vulkanQualificationProjectDir "//msb:ProjectReference" `
+    "GGLabVulkanQualification project reference"
 $appRuntimeProjectReferences = Get-ProjectItemPaths $appRuntimeProject $appRuntimeNamespace `
     $appRuntimeProjectDir "//msb:ProjectReference" "GGLabAppRuntime project reference"
 $foundationProjectReferences = Get-ProjectItemPaths $foundationProject $foundationNamespace `
@@ -482,6 +510,9 @@ $runtimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[str
     ([System.StringComparer]::OrdinalIgnoreCase)
 $winAppProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
+$vulkanQualificationProjectReferenceSet = New-Object `
+    'System.Collections.Generic.HashSet[string]' `
+    ([System.StringComparer]::OrdinalIgnoreCase)
 $appRuntimeProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
     ([System.StringComparer]::OrdinalIgnoreCase)
 $foundationProjectReferenceSet = New-Object 'System.Collections.Generic.HashSet[string]' `
@@ -513,6 +544,9 @@ foreach ($path in $runtimeProjectReferences) {
 }
 foreach ($path in $winAppProjectReferences) {
     [void]$winAppProjectReferenceSet.Add($path)
+}
+foreach ($path in $vulkanQualificationProjectReferences) {
+    [void]$vulkanQualificationProjectReferenceSet.Add($path)
 }
 foreach ($path in $appRuntimeProjectReferences) {
     [void]$appRuntimeProjectReferenceSet.Add($path)
@@ -619,6 +653,8 @@ function Test-ProjectIncludeVisibility {
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
 $winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
+$vulkanQualificationIncludeRoot = `
+    '$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification'
 $appRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabAppRuntime'
 $shaderArtifactRuntimePublicIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public'
@@ -648,8 +684,16 @@ Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
         $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot) `
     @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot,
-        $shaderToolchainIncludeRoot)
+        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot)
+Test-ProjectIncludeVisibility $vulkanQualificationProject `
+    $vulkanQualificationNamespace `
+    "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" `
+    @($vulkanQualificationIncludeRoot, $runtimeIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
+    @($vulkanQualificationIncludeRoot, $runtimeIncludeRoot,
+        $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+        $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
     @($appRuntimeIncludeRoot, $runtimeIncludeRoot,
@@ -838,6 +882,9 @@ Test-ProjectPrivateAccessDefinition $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $vulkanQualificationProject `
+    $vulkanQualificationNamespace `
+    "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" $false
 Test-ProjectPrivateAccessDefinition $shaderArtifactRuntimeProject `
@@ -880,6 +927,11 @@ $ownershipSpecifications = @(
         Name       = "WinApp"
         SourceRoot = $winAppSourcesDir
         ItemPaths  = $winAppSourceItems
+    }
+    [pscustomobject]@{
+        Name       = "GGLabVulkanQualification"
+        SourceRoot = $vulkanQualificationSourcesDir
+        ItemPaths  = $vulkanQualificationSourceItems
     }
     [pscustomobject]@{
         Name       = "GGLabAppRuntime"
@@ -1052,6 +1104,75 @@ if (-not $winAppProjectReferenceSet.Contains($shaderArtifactRuntimeProjectPath))
         Rule   = "project-graph"
         Target = "Projects/WinApp/WinApp.vcxproj"
         Reason = "missing direct ProjectReference to ShaderArtifactRuntime"
+    })
+}
+if ($winAppProjectReferenceSet.Contains($shaderToolchainProjectPath)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "project-graph"
+        Target = "Projects/WinApp/WinApp.vcxproj"
+        Reason = "normal WinApp must not reference ShaderToolchainCore"
+    })
+}
+$winAppProjectContent = Get-Content -LiteralPath $winAppProjectPath -Raw -ErrorAction Stop
+if ($winAppProjectContent -match 'DxcImport\.(?:props|targets)' -or
+    $winAppProjectContent -match 'Sources\\ShaderToolchain') {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "qualification-dependency-isolation"
+        Target = "Projects/WinApp/WinApp.vcxproj"
+        Reason = "normal WinApp must not import DXC or expose Shader Toolchain include visibility"
+    })
+}
+$winAppQualificationDispatchPaths = @(
+    (Join-Path $winAppSourcesDir "Application/Main.cpp"),
+    (Join-Path $winAppSourcesDir "Application/ApplicationLaunchOptions.h"),
+    (Join-Path $winAppSourcesDir "Application/ApplicationLaunchOptions.cpp"),
+    (Join-Path $winAppSourcesDir "Application/RenderingStartup.h"),
+    (Join-Path $winAppSourcesDir "Application/RenderingStartup.cpp")
+)
+$winAppQualificationDispatchRegex = `
+    '\bm_RunVulkanQualification\b|\bRunVulkanQualification\b|' +
+    '#include\s*[<"][^>"]*VulkanQualification\.h[>"]'
+foreach ($dispatchPath in $winAppQualificationDispatchPaths) {
+    $dispatchContent = Get-Content -LiteralPath $dispatchPath -Raw -ErrorAction Stop
+    if ($dispatchContent -match $winAppQualificationDispatchRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "qualification-dependency-isolation"
+            Target = ConvertTo-RepoRelativePath $dispatchPath
+            Reason = "WinApp must not retain standalone Vulkan qualification dispatch or implementation access"
+        })
+    }
+}
+
+$vulkanQualificationRequiredReferences = @(
+    $runtimeProjectPath, $shaderToolchainProjectPath, $shaderArtifactRuntimeProjectPath,
+    $foundationProjectPath, $testCoreProjectPath)
+foreach ($requiredReference in $vulkanQualificationRequiredReferences) {
+    if (-not $vulkanQualificationProjectReferenceSet.Contains($requiredReference)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj"
+            Reason = "missing privileged ProjectReference to " + (Split-Path -Leaf $requiredReference)
+        })
+    }
+}
+foreach ($reference in $vulkanQualificationProjectReferenceSet) {
+    if (-not $vulkanQualificationRequiredReferences.Contains($reference)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "project-graph"
+            Target = "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj"
+            Reason = "qualification may reference only Runtime, Shader Toolchain, Artifact Runtime, Foundation and TestCore"
+        })
+    }
+}
+$vulkanQualificationProjectContent = Get-Content `
+    -LiteralPath $vulkanQualificationProjectPath -Raw -ErrorAction Stop
+if ($vulkanQualificationProjectContent -notmatch 'DxcImport\.props' -or
+    $vulkanQualificationProjectContent -notmatch 'DxcImport\.targets' -or
+    $vulkanQualificationProjectContent -notmatch 'VulkanImport\.props') {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "qualification-dependency-isolation"
+        Target = "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj"
+        Reason = "qualification target must explicitly own its Vulkan and DXC build dependencies"
     })
 }
 $appRuntimeRequiredReferences = @(
@@ -1904,27 +2025,29 @@ foreach ($debt in $transitionalDebt) {
 Write-Host "=== Project Ownership and Runtime Boundary Validation ==="
 Write-Host "Root: $root"
 Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party source files"
-Write-Host (("Project items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
-    "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, " +
-    "{6} ShaderArtifactRuntime, {7} NapaVoxelCore, {8} TestCore, " +
-    "{9} RuntimeTests, {10} ShaderToolchainTests, {11} NapaTests") -f `
-        $winAppSourceItems.Count, $appRuntimeSourceItems.Count,
-        $appRuntimeTestsSourceItems.Count, $foundationSourceItems.Count,
-        $foundationTestsSourceItems.Count, $runtimeSourceItems.Count,
-        $shaderArtifactRuntimeSourceItems.Count, $napaSourceItems.Count,
-        $testCoreSourceItems.Count,
+Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
+    "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
+    "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
+    "{8} NapaVoxelCore, {9} TestCore, {10} RuntimeTests, " +
+    "{11} ShaderToolchainTests, {12} NapaTests") -f `
+        $winAppSourceItems.Count, $vulkanQualificationSourceItems.Count,
+        $appRuntimeSourceItems.Count, $appRuntimeTestsSourceItems.Count,
+        $foundationSourceItems.Count, $foundationTestsSourceItems.Count,
+        $runtimeSourceItems.Count, $shaderArtifactRuntimeSourceItems.Count,
+        $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $napaTestsSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
-Write-Host (("Compile items: {0} WinApp, {1} AppRuntime, {2} AppRuntimeTests, " +
-    "{3} Foundation, {4} FoundationTests, {5} GGLabRuntime, " +
-    "{6} ShaderArtifactRuntime, {7} NapaVoxelCore, {8} TestCore, " +
-    "{9} RuntimeTests, {10} ShaderToolchainTests, {11} NapaTests") -f `
-        $winAppCompileFiles.Count, $appRuntimeCompileFiles.Count,
-        $appRuntimeTestsCompileFiles.Count, $foundationCompileFiles.Count,
-        $foundationTestsCompileFiles.Count, $runtimeCompileFiles.Count,
-        $shaderArtifactRuntimeCompileFiles.Count, $napaCompileFiles.Count,
-        $testCoreCompileFiles.Count,
+Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
+    "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
+    "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
+    "{8} NapaVoxelCore, {9} TestCore, {10} RuntimeTests, " +
+    "{11} ShaderToolchainTests, {12} NapaTests") -f `
+        $winAppCompileFiles.Count, $vulkanQualificationCompileFiles.Count,
+        $appRuntimeCompileFiles.Count, $appRuntimeTestsCompileFiles.Count,
+        $foundationCompileFiles.Count, $foundationTestsCompileFiles.Count,
+        $runtimeCompileFiles.Count, $shaderArtifactRuntimeCompileFiles.Count,
+        $napaCompileFiles.Count, $testCoreCompileFiles.Count,
         $runtimeTestsCompileFiles.Count, $shaderToolchainTestsCompileFiles.Count,
         $napaTestsCompileFiles.Count)
 Write-Host ""
