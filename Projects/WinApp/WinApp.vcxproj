@@ -200,6 +200,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
@@ -248,6 +249,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp" />
@@ -313,6 +315,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
@@ -371,6 +374,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.h" />
@@ -424,6 +428,9 @@
     <None Include="..\..\Shaders\Common\Sampling.hlsli" />
     <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
     <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli" />
+    <None Include="..\..\Shaders\Common\Temporal.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalMotion.hlsli" />
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />
@@ -462,11 +469,14 @@
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV2ContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

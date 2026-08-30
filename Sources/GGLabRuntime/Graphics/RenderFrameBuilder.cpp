@@ -64,7 +64,7 @@ namespace gglab
 			const bool hasSelfFrustum = IsValidBuiltView(renderViews, viewId);
 			const math::Frustum selfFrustum =
 				hasSelfFrustum ? math::CreateFrustumFromViewProjection(
-					renderViews[utils::ToIndex(viewId)].m_ViewProj)
+					renderViews[utils::ToIndex(viewId)].m_UnjitteredViewProj)
 				: math::Frustum{};
 
 			switch (mode)
@@ -124,6 +124,8 @@ namespace gglab
 			.m_RenderViews = std::span<RenderView>(m_RenderViews),
 			.m_ViewRenderSettings =
 				std::span<const ResolvedViewRenderSettings>(m_ViewRenderSettings),
+			.m_TemporalFramePlan = m_TemporalFramePlan,
+			.m_TemporalFrameTransaction = m_TemporalFrameTransaction,
 			.m_DisplayViewId = m_DisplayViewId,
 			.m_RenderScene = m_RenderScene,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
@@ -145,6 +147,8 @@ namespace gglab
 		result.m_FrameSlotIndex = info.m_FrameSlotIndex;
 		result.m_BackBufferIndex = info.m_BackBufferIndex;
 		result.m_FrameSerial = info.m_FrameSerial;
+		result.m_TemporalFramePlan = info.m_TemporalFramePlan;
+		result.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
 
@@ -161,6 +165,7 @@ namespace gglab
 		const RenderViewBuildInfo<RenderViewID::Main> mainViewBuildInfo{
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
+			.m_TemporalFramePlan = info.m_TemporalFramePlan,
 			.m_Width = info.m_WindowWidth,
 			.m_Height = info.m_WindowHeight,
 			.m_Name = StringID("MainView"),
@@ -181,8 +186,8 @@ namespace gglab
 			auto& viewSettings = result.m_ViewRenderSettings[utils::ToIndex(viewId)];
 			viewSettings = ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
-				viewId, *slot->m_Camera, viewSettings, info.m_WindowWidth, info.m_WindowHeight,
-				StringID(std::string_view(slot->m_Name)));
+				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan,
+				info.m_WindowWidth, info.m_WindowHeight, StringID(std::string_view(slot->m_Name)));
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
@@ -199,17 +204,24 @@ namespace gglab
 		result.m_RenderViews[utils::ToIndex(RenderViewID::DirectionalShadow)] =
 			m_ViewBuilder.Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo);
 
-		result.m_DisplayViewId = info.m_CameraRig.GetDisplayViewId();
-		if (!IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId))
-		{
-			result.m_DisplayViewId = RenderViewID::Main;
-		}
+		result.m_DisplayViewId = info.m_DisplayViewId;
+		GGLAB_ASSERT_MSG(IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId),
+			"The pre-resolved effective display view must have been built.");
+		GGLAB_ASSERT_MSG(result.m_DisplayViewId == info.m_TemporalFramePlan.m_DisplayViewId,
+			"Temporal frame plan display view must match the built display view.");
+		GGLAB_ASSERT_NOT_NULL(info.m_TemporalFrameTransaction);
+		info.m_TemporalFrameTransaction->PrepareDisplayView(
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
+		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==
+			result.m_ViewRenderSettings[utils::ToIndex(result.m_DisplayViewId)]
+				.m_TemporalAA.m_Enabled,
+			"Temporal frame plan must be resolved from the display view settings.");
 
 		const bool hasMainFrustum = IsValidBuiltView(result.m_RenderViews, RenderViewID::Main);
 		const math::Frustum mainFrustum =
 			hasMainFrustum
 			? math::CreateFrustumFromViewProjection(
-				result.m_RenderViews[utils::ToIndex(RenderViewID::Main)].m_ViewProj)
+				result.m_RenderViews[utils::ToIndex(RenderViewID::Main)].m_UnjitteredViewProj)
 			: math::Frustum{};
 		const RenderViewVisibilityMode displayVisibilityMode =
 			GetVisibilityModeForView(info.m_CameraRig, result.m_DisplayViewId);
@@ -231,6 +243,7 @@ namespace gglab
 			.m_ObjectTable = *info.m_Renderer.GetObjectStructuredBufferTable(),
 			.m_MaterialTable = *info.m_Renderer.GetMaterialStructuredBufferTable(),
 			.m_LightTable = *info.m_Renderer.GetLightStructuredBufferTable(),
+			.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction,
 			.m_DirectionalShadowLightKey =
 				shadowSettings.m_Enable ? result.m_WorldData.m_MainDirectionalLight.m_EntityKey
 										: std::nullopt,

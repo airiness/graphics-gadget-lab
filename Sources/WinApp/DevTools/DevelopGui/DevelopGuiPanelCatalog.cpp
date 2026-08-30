@@ -19,6 +19,7 @@
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
+#include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #if GGLAB_ENABLE_VULKAN
@@ -49,6 +50,7 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<PostProcessInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<ProfilingPanel>());
 		registry.RegisterPanel(std::make_unique<TaskSystemPanel>());
+		registry.RegisterPanel(std::make_unique<TemporalAAInspectorPanel>());
 		if (dynamic_cast<DX12Context*>(&rhiContext))
 		{
 			registry.RegisterPanel(std::make_unique<DX12BackendSummaryPanel>());

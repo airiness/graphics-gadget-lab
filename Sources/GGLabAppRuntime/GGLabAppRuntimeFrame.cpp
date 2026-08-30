@@ -102,6 +102,12 @@ namespace gglab
 				: AppRuntimeTickResult::Exit;
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
+		const RenderServices services{
+			.m_Renderer = m_Renderer.get(),
+			.m_AssetManager = m_AssetManager.get(),
+			.m_ShaderManager = m_ShaderManager.get(),
+			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
+		};
 		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
 		// Keep the graph alive until after the frame has ended.
 		RenderGraph renderGraph(m_Renderer->CreateRenderGraphCreateInfo());
@@ -117,6 +123,33 @@ namespace gglab
 			applicationTooling->ResolveFrameSettings(authoringViewRenderProfile,
 				shadowVisualizationSettings, effectiveViewRenderProfile);
 		}
+		CameraRig& cameraRig = demo->GetCameraRig();
+		const CameraRig::EffectiveDisplayView effectiveDisplayView =
+			cameraRig.ResolveEffectiveDisplayView();
+		GGLAB_ASSERT_MSG(effectiveDisplayView.IsValid(),
+			"CameraRig must resolve one effective display view before "
+			"frame planning.");
+		const CameraRig::CameraSlot* displayCameraSlot = effectiveDisplayView.m_CameraSlot;
+		const ResolvedViewRenderSettings displayViewSettings =
+			ResolveViewRenderSettings(
+				effectiveViewRenderProfile, *displayCameraSlot->m_Camera);
+		const uint64_t temporalSessionIdentity =
+			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
+			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
+		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
+		renderPipeline.PrepareTemporalFramePlanning(services);
+		const ResolvedTemporalFramePlan temporalFramePlan =
+			renderPipeline.ResolveTemporalFramePlan({
+				.m_Settings = displayViewSettings.m_TemporalAA,
+				.m_Capabilities = m_Renderer->GetTemporalAACapabilityStatus(),
+				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
+				.m_ResetIdentity = displayCameraSlot->m_Camera->GetTemporalResetSerial(),
+				.m_SessionIdentity = temporalSessionIdentity,
+				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
+					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
+			});
+		TemporalFrameTransaction& temporalFrameTransaction = m_Renderer->BeginTemporalFrame(
+			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight);
 		const RenderFrameBuilder::BuildInfo frameBuildInfo{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
@@ -124,6 +157,9 @@ namespace gglab
 			.m_AssetManager = *m_AssetManager,
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
+			.m_TemporalFramePlan = temporalFramePlan,
+			.m_TemporalFrameTransaction = &temporalFrameTransaction,
+			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
 			.m_FrameSlotIndex = frameSlotIndex,
@@ -135,19 +171,19 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
+		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
+		m_Renderer->AdoptFrameBuildResources(rendererFrame, validationContext);
+		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
+		{
+			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
+		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
 		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
-		const RenderServices services{
-			.m_Renderer = m_Renderer.get(),
-			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get(),
-			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
-		};
-
-		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Build");
 			renderPipeline.BuildRenderGraph(renderGraph, renderContext, services);
@@ -195,6 +231,7 @@ namespace gglab
 					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
 				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);

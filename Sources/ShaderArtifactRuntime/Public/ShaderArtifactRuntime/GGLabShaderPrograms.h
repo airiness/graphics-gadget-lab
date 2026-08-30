@@ -19,6 +19,10 @@ namespace gglab::shader_programs
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef DepthPrepassAlphaTestPixel{
 		"gglab.shader.depth-prepass", "pixel.alpha-test", ShaderStage::Pixel };
+	inline const ShaderProgramRef DepthPrepassVelocityOpaquePixel{
+		"gglab.shader.depth-prepass", "pixel.velocity-opaque", ShaderStage::Pixel };
+	inline const ShaderProgramRef DepthPrepassVelocityAlphaTestPixel{
+		"gglab.shader.depth-prepass", "pixel.velocity-alpha-test", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPlusCullCompute{
 		"gglab.shader.forward-plus-cull", "compute", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusCullDiagnosticsCompute{
@@ -37,6 +41,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gtao", "compute.denoise-y", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOUpsampleCompute{
 		"gglab.shader.gtao", "compute.upsample", ShaderStage::Compute };
+	inline const ShaderProgramRef TemporalAAReprojectionCompute{
+		"gglab.shader.temporal-aa", "compute.reprojection", ShaderStage::Compute };
 
 	inline const ShaderProgramRef DirectionalShadowMapVertex{
 		"gglab.shader.directional-shadow-map", "vertex", ShaderStage::Vertex };

@@ -21,8 +21,15 @@ namespace gglab
 		bool m_IsActive = false;
 	};
 
+	struct TemporalAASettingsOverride
+	{
+		TemporalAASettings m_Settings{};
+		bool m_IsActive = false;
+	};
+
 	struct ViewRenderSettingsOverrides
 	{
+		TemporalAASettingsOverride m_TemporalAA{};
 		GTAOSettingsOverride m_GTAO{};
 	};
 

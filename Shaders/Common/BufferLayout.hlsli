@@ -51,6 +51,7 @@ struct SceneData
 struct ObjectData
 {
 	matrix ModelMat;
+	matrix PreviousModelMat;
 	matrix NormalMat;
 	uint MaterialIndex;
 	uint ViewIndex;
@@ -92,13 +93,20 @@ struct ViewData
 	matrix ProjMat;
 	matrix InvViewMat;
 	matrix InvProjMat;
+	matrix PreviousViewMat;
+	matrix PreviousRasterViewProj;
 	float4 CameraPos;
+	float4 PreviousDepthReconstructionParams;
 	float Near;
 	float Far;
 	float FovRadians;
 	float Aspect;
+	float2 CurrentJitterUV;
+	float2 PreviousJitterUV;
 	float ExposureMultiplier;
 	uint Width;
 	uint Height;
 	uint DepthConvention;
+	uint PreviousDepthConvention;
+	uint3 Padding;
 };

@@ -511,6 +511,9 @@ namespace gglab
 		}
 
 		m_ActiveSession = std::move(m_PendingSession);
+		++m_TemporalSessionSerial;
+		GGLAB_ASSERT_MSG(m_TemporalSessionSerial != 0,
+			"Lab temporal session serial overflowed its valid range.");
 		m_ActiveSession->OnResize(m_CreateInfo.m_WindowWidth, m_CreateInfo.m_WindowHeight);
 		if (m_IsEntered)
 		{

@@ -22,6 +22,11 @@ namespace gglab
 		const ViewRenderProfile& authoringProfile) const noexcept
 	{
 		ViewRenderProfile effectiveProfile = authoringProfile;
+		if (m_ViewRenderSettingsOverrides.m_TemporalAA.m_IsActive)
+		{
+			effectiveProfile.m_TemporalAA =
+				m_ViewRenderSettingsOverrides.m_TemporalAA.m_Settings;
+		}
 		if (m_ViewRenderSettingsOverrides.m_GTAO.m_IsActive)
 		{
 			effectiveProfile.m_Lighting.m_GTAO = m_ViewRenderSettingsOverrides.m_GTAO.m_Settings;
@@ -45,6 +50,7 @@ namespace gglab
 			.m_MainRenderView = context.m_MainRenderView,
 			.m_AuthoringViewRenderProfile = context.m_AuthoringViewRenderProfile,
 			.m_EffectiveViewRenderProfile = context.m_EffectiveViewRenderProfile,
+			.m_TemporalFramePlan = context.m_TemporalFramePlan,
 			.m_GTAOOverrideActive = m_ViewRenderSettingsOverrides.m_GTAO.m_IsActive,
 			});
 

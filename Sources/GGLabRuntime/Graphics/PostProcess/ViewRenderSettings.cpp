@@ -9,6 +9,8 @@ namespace gglab
 	ResolvedViewRenderSettings ResolveViewRenderSettings(
 		const ViewRenderProfile& profile, const Camera& camera) noexcept
 	{
+		const TemporalAASettings temporalAA = ResolveTemporalAASettings(profile.m_TemporalAA);
+
 		BloomSettings bloom = profile.m_PostProcess.m_Bloom;
 		bloom.m_Threshold = std::max(bloom.m_Threshold, 0.0f);
 		bloom.m_SoftKnee = std::clamp(bloom.m_SoftKnee, 0.0f, 1.0f);
@@ -28,6 +30,7 @@ namespace gglab
 		gtao.m_DenoiseRadius = std::clamp(gtao.m_DenoiseRadius, 1u, GTAOMaxDenoiseRadius);
 
 		return {
+			.m_TemporalAA = temporalAA,
 			.m_Exposure =
 				{
 					.m_CompensationEV = camera.GetExposureCompensationEV(),

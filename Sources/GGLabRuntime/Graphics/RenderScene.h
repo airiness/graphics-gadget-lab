@@ -19,6 +19,7 @@ namespace gglab
 	class SamplerRegistry;
 	class TransferManager;
 	class RenderResourceRegistry;
+	class TemporalFrameTransaction;
 
 	struct RenderInstance
 	{
@@ -94,6 +95,7 @@ namespace gglab
 			PersistentStructuredBufferTable<uint64_t, ObjectGPU>& m_ObjectTable;
 			PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>& m_MaterialTable;
 			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
+			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_FrameSlotIndex = 0;

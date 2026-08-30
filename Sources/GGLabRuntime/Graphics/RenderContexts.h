@@ -5,6 +5,7 @@
 #include "Graphics/RenderScene.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/ShadowSettings.h"
 
 #include <cstdint>
@@ -17,12 +18,29 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class ShaderManager;
+	class TemporalFrameTransaction;
 	class RenderPipelineOverlayExtensionBase;
+	struct RenderFrameContext;
+
+	struct RenderFrameGpuResources
+	{
+		RHIFencePoint m_UploadFencePoint{};
+		RenderSceneGpuAllocations m_SceneGpuAllocations{};
+
+		void AdoptFrom(const RenderFrameContext& context) noexcept;
+		bool IsEmpty() const noexcept
+		{
+			return !m_UploadFencePoint.IsValid() && m_SceneGpuAllocations.IsEmpty();
+		}
+		void Reset() noexcept { *this = {}; }
+	};
 
 	struct RenderFrameContext
 	{
 		std::span<RenderView> m_RenderViews;
 		std::span<const ResolvedViewRenderSettings> m_ViewRenderSettings;
+		ResolvedTemporalFramePlan m_TemporalFramePlan{};
+		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
@@ -72,6 +90,11 @@ namespace gglab
 			return GetViewRenderSettings(m_DisplayViewId);
 		}
 
+		const ResolvedTemporalFramePlan& GetTemporalFramePlan() const noexcept
+		{
+			return m_TemporalFramePlan;
+		}
+
 		const DirectionalShadowSettings& GetDirectionalShadowSettings() const noexcept
 		{
 			return m_DirectionalShadowSettings;
@@ -91,6 +114,30 @@ namespace gglab
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
 	};
+
+	inline void RenderFrameGpuResources::AdoptFrom(const RenderFrameContext& context) noexcept
+	{
+		if (context.m_UploadFencePoint.IsValid())
+		{
+			GGLAB_ASSERT_MSG(!m_UploadFencePoint.IsValid() ||
+				m_UploadFencePoint == context.m_UploadFencePoint,
+				"A render frame cannot adopt resources from different upload submissions.");
+			m_UploadFencePoint = context.m_UploadFencePoint;
+		}
+		if (!context.m_SceneGpuAllocations || context.m_SceneGpuAllocations->IsEmpty())
+		{
+			return;
+		}
+
+		GGLAB_ASSERT_MSG(m_SceneGpuAllocations.IsEmpty(),
+			"A render frame cannot replace scene GPU allocations before retirement.");
+		if (!m_SceneGpuAllocations.IsEmpty())
+		{
+			return;
+		}
+		m_SceneGpuAllocations = *context.m_SceneGpuAllocations;
+		*context.m_SceneGpuAllocations = {};
+	}
 
 	struct RenderServices
 	{

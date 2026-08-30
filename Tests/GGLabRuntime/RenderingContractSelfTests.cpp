@@ -2,18 +2,28 @@
 #include "Core/Math/MathFunctions.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
+#include "Graphics/CameraController.h"
+#include "Graphics/CameraRig.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalAACapability.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "Graphics/Pipeline/TemporalMotion.h"
+#include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/TemporalAAGraphResources.h"
+#include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderQueue.h"
+#include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
@@ -28,7 +38,9 @@
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/TransferBatch.h"
 
+#include <array>
 #include <filesystem>
+#include <limits>
 #include <type_traits>
 
 namespace gglab
@@ -63,6 +75,11 @@ namespace gglab
 		struct GTAODataflowPassData
 		{
 			std::array<RGTextureViewId, 3> m_Views{};
+		};
+
+		struct TemporalHistoryContractPassData
+		{
+			TemporalHistoryRenderGraphResources m_History;
 		};
 
 		struct BarrierBatchingPassData
@@ -146,6 +163,20 @@ namespace gglab
 			uint32_t& m_AddPassCount;
 		};
 
+		class IntegratedTemporalSceneExtension final : public RenderPipelineSceneExtensionBase
+		{
+		public:
+			SceneExtensionTemporalParticipation GetTemporalParticipation() const noexcept override
+			{
+				return SceneExtensionTemporalParticipation::TemporalIntegrated;
+			}
+
+			void AddOpaqueScenePasses(
+				RenderGraph&, const RenderFrameContext&, const RenderServices&) noexcept override
+			{
+			}
+		};
+
 		class RecordingDevice final : public RHIDevice
 		{
 		public:
@@ -168,13 +199,18 @@ namespace gglab
 				return {};
 			}
 			RHITextureSupportResult QueryTextureViewSupport(
-				const RHITextureDesc&, const RHITextureViewDesc&) const noexcept override
+				const RHITextureDesc& textureDesc,
+				const RHITextureViewDesc& viewDesc) const noexcept override
 			{
-				return {};
+				m_LastTextureViewQueryTextureDesc = textureDesc;
+				m_LastTextureViewQueryDesc = viewDesc;
+				++m_TextureViewQueryCount;
+				return { .m_Supported = m_TextureViewsSupported };
 			}
 			RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&,
 				const RHIResourceDebugIdentityDesc&) noexcept override
 			{
+				++m_CreateTextureCount;
 				return RHITextureHandle{ m_NextTextureIndex++, 1 };
 			}
 			RHIBufferHandle CreateBuffer(
@@ -193,7 +229,10 @@ namespace gglab
 				return {};
 			}
 			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
-			void DestroyTexture(RHITextureHandle) noexcept override {}
+			void DestroyTexture(RHITextureHandle) noexcept override
+			{
+				++m_DestroyTextureCount;
+			}
 			void DestroyBuffer(RHIBufferHandle) noexcept override {}
 			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
@@ -232,11 +271,17 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
-			bool IsFencePointCompleted(const RHIFencePoint&) const noexcept override
+			bool IsFencePointCompleted(const RHIFencePoint& fencePoint) const noexcept override
 			{
-				return true;
+				return !m_UseControlledFenceCompletion ||
+					(fencePoint.IsValid() && fencePoint.m_Value <= m_CompletedFenceValue);
 			}
-			void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
+			void RecordTextureUse(
+				RHITextureHandle, const RHIFencePoint& fencePoint) noexcept override
+			{
+				++m_RecordTextureUseCount;
+				m_LastRecordedFencePoint = fencePoint;
+			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
 				RHITextureViewHandle) const noexcept override
@@ -252,6 +297,17 @@ namespace gglab
 				return {};
 			}
 			void RetireCompletedWork() noexcept override {}
+
+			bool m_TextureViewsSupported = false;
+			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
+			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
+			mutable uint32_t m_TextureViewQueryCount = 0;
+			bool m_UseControlledFenceCompletion = false;
+			uint64_t m_CompletedFenceValue = 0;
+			uint32_t m_CreateTextureCount = 0;
+			uint32_t m_DestroyTextureCount = 0;
+			uint32_t m_RecordTextureUseCount = 0;
+			RHIFencePoint m_LastRecordedFencePoint{};
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
@@ -488,6 +544,9 @@ namespace gglab
 			auto extension = std::make_unique<RecordingOpaqueSceneExtension>(
 				scenePhaseBuffer, addPassCount, destructionCount);
 			RecordingOpaqueSceneExtension* extensionPtr = extension.get();
+			context.Check(extensionPtr->GetTemporalParticipation() ==
+				SceneExtensionTemporalParticipation::PostTAA,
+				"Scene extensions default to post-TAA participation until they declare a temporal contract");
 
 			RenderGraph graph({
 				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
@@ -500,6 +559,15 @@ namespace gglab
 				{
 					scenePhaseBuffer = builder.CreateBuffer("OpaqueScenePhaseBuffer");
 					builder.WriteInPlace(scenePhaseBuffer, RGBufferAccess::StorageWrite);
+					data.m_ScenePhaseBuffer = scenePhaseBuffer;
+				});
+			graph.AddPass<OpaqueSceneExtensionFixturePassData>(
+				"RenderingContract.TemporalAA",
+				[&scenePhaseBuffer](RenderGraph::RGBuilder& builder,
+					OpaqueSceneExtensionFixturePassData& data)
+				{
+					builder.ReadWriteInPlace(
+						scenePhaseBuffer, RGBufferAccess::StorageReadWrite);
 					data.m_ScenePhaseBuffer = scenePhaseBuffer;
 				});
 			const RenderScene renderScene{};
@@ -537,20 +605,22 @@ namespace gglab
 			{
 				RGSnapshot snapshot;
 				BuildRenderGraphSnapshot(graph, snapshot);
-				context.Check(snapshot.m_Passes.size() == 5 &&
-					snapshot.m_Passes[1].m_Name == "RenderingContract.OpaqueSceneExtension" &&
-					!snapshot.m_Passes[1].m_Culled,
+				context.Check(snapshot.m_Passes.size() == 6 &&
+					snapshot.m_Passes[2].m_Name == "RenderingContract.OpaqueSceneExtension" &&
+					!snapshot.m_Passes[2].m_Culled,
 					"Opaque scene extension passes remain live in the compiled graph");
-				context.Check(snapshot.m_Passes.size() == 5 &&
+				context.Check(snapshot.m_Passes.size() == 6 &&
 					snapshot.m_Passes[0].m_ExecutionOrder <
-					snapshot.m_Passes[1].m_ExecutionOrder &&
+						snapshot.m_Passes[1].m_ExecutionOrder &&
 					snapshot.m_Passes[1].m_ExecutionOrder <
-					snapshot.m_Passes[2].m_ExecutionOrder &&
+						snapshot.m_Passes[2].m_ExecutionOrder &&
 					snapshot.m_Passes[2].m_ExecutionOrder <
-					snapshot.m_Passes[3].m_ExecutionOrder &&
+						snapshot.m_Passes[3].m_ExecutionOrder &&
 					snapshot.m_Passes[3].m_ExecutionOrder <
-					snapshot.m_Passes[4].m_ExecutionOrder,
-					"Opaque scene extensions compose after built-in opaque and before transparent, "
+						snapshot.m_Passes[4].m_ExecutionOrder &&
+					snapshot.m_Passes[4].m_ExecutionOrder <
+						snapshot.m_Passes[5].m_ExecutionOrder,
+					"Forward scene composition orders opaque, TAA, post-TAA extension, transparent, "
 					"scene debug, and post-process consumers");
 			}
 
@@ -843,6 +913,24 @@ namespace gglab
 				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
 				"Frame context preserves independent frame-slot and swapchain-image indices");
 
+			RenderFrameBuilder::BuildResult lateValidationFrame{};
+			lateValidationFrame.m_UploadFencePoint =
+				RHIFencePoint{ RHIFenceHandle{ 9, 1 }, 23 };
+			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes = 64;
+			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			const RenderFrameContext lateValidationContext =
+				lateValidationFrame.MakeRenderFrameContext();
+			RenderFrameGpuResources frameGpuResources{};
+			frameGpuResources.AdoptFrom(lateValidationContext);
+			const uint64_t adoptedSceneConstantOffset =
+				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes;
+			frameGpuResources.AdoptFrom(lateValidationContext);
+			context.Check(lateValidationFrame.m_SceneGpuAllocations.IsEmpty() &&
+				frameGpuResources.m_UploadFencePoint == lateValidationFrame.m_UploadFencePoint &&
+				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
+				adoptedSceneConstantOffset == 64,
+				"Frame-build GPU resources transfer before late validation and remain owned on early return");
+
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
 			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
 			context.Check(bgraUnorm.m_Family == RHIFormatFamily::B8G8R8A8 &&
@@ -1030,6 +1118,10 @@ namespace gglab
 				standardSample.m_UV, standardSample.m_RawDepth, math::Inverse(standardProjection));
 			const Vector3 reconstructedReversed = screen_space::ReconstructViewPosition(
 				reversedSample.m_UV, reversedSample.m_RawDepth, math::Inverse(reversedProjection));
+			const Vector4 standardDepthParams =
+				screen_space::MakeDepthReconstructionParams(standardProjection);
+			const Vector4 reversedDepthParams =
+				screen_space::MakeDepthReconstructionParams(reversedProjection);
 
 			context.Check(NearlyEqual(reconstructedStandard, positionVS),
 				"Standard-Z reconstructs a mid-depth view position");
@@ -1045,6 +1137,13 @@ namespace gglab
 					standardSample.m_RawDepth, math::Inverse(standardProjection)),
 					positionVS.m_Z, PositionTolerance),
 				"Standard-Z raw depth reconstructs positive left-handed view Z");
+			context.Check(NearlyEqual(screen_space::RawDepthToPositiveViewZ(
+				standardSample.m_RawDepth, standardDepthParams, DepthConvention::Standard),
+				positionVS.m_Z, PositionTolerance) &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(
+					reversedSample.m_RawDepth, reversedDepthParams, DepthConvention::Reversed),
+					positionVS.m_Z, PositionTolerance),
+				"Compact depth reconstruction matches Standard-Z and Reversed-Z projection contracts");
 
 			const Matrix view = math::CreateLookAtLH(
 				Vector3(3.0f, 2.0f, -4.0f), Vector3(0.0f, 1.0f, 5.0f), Vector3::UnitY);
@@ -1087,10 +1186,14 @@ namespace gglab
 		{
 			Camera camera(Camera::CreateInfo{});
 			const ResolvedViewRenderSettings settings{};
+			const ResolvedTemporalFramePlan temporalFramePlan{
+				.m_DisplayViewId = RenderViewID::Main,
+			};
 			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>(
 				RenderViewBuildInfo<RenderViewID::Main>{
-				.m_Camera = camera,
+					.m_Camera = camera,
 					.m_RenderSettings = settings,
+					.m_TemporalFramePlan = temporalFramePlan,
 					.m_Width = 1280,
 					.m_Height = 720,
 			});
@@ -1101,9 +1204,11 @@ namespace gglab
 			});
 
 			const float mainNear =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near), mainView.m_Proj).m_RawDepth;
+				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Near),
+					mainView.m_RasterProj).m_RawDepth;
 			const float mainFar =
-				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far), mainView.m_Proj).m_RawDepth;
+				ProjectPosition(Vector3(0.0f, 0.0f, mainView.m_Far),
+					mainView.m_RasterProj).m_RawDepth;
 			context.Check(mainView.m_DepthConvention == DepthConvention::Reversed &&
 				NearlyEqual(mainNear, 1.0f) && NearlyEqual(mainFar, 0.0f),
 				"Main view records and projects with its Reversed-Z contract");
@@ -2909,6 +3014,89 @@ namespace gglab
 					"Read-only stage scopes accumulate until a persistent state transition");
 			}
 
+			RenderGraph temporalResolvedInitializationGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			RGTextureId temporalResolvedColor;
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"TAA.InitializeResolvedColor",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.SideEffect();
+					RHITextureDesc desc{};
+					desc.m_Format = TemporalAAResolvedColorFormat;
+					desc.m_Extent = { 1920, 1080, 1 };
+					temporalResolvedColor =
+						builder.CreateTexture("TAA.ResolvedColorInitialization", desc);
+					builder.WriteInPlace(
+						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					data.m_Texture = temporalResolvedColor;
+				});
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"TAA.ComputeResolve", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					// Production TAA stays live through its exported history writes.
+					builder.SideEffect();
+					builder.WriteInPlace(
+						temporalResolvedColor, RGTextureAccess::StorageWrite);
+					data.m_Texture = temporalResolvedColor;
+				});
+			temporalResolvedInitializationGraph.AddPass<TextureStorageAccessPassData>(
+				"Forward.TransparentLoad",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					builder.ReadWriteInPlace(
+						temporalResolvedColor, RGTextureAccess::RenderTarget);
+					data.m_Texture = temporalResolvedColor;
+					builder.SideEffect();
+				});
+			const bool temporalResolvedInitializationCompiled =
+				temporalResolvedInitializationGraph.Compile();
+			context.Check(temporalResolvedInitializationCompiled,
+				"TAA resolved-color initialization fixture compiles");
+			if (temporalResolvedInitializationCompiled)
+			{
+				RGSnapshot temporalResolvedSnapshot;
+				BuildRenderGraphSnapshot(
+					temporalResolvedInitializationGraph, temporalResolvedSnapshot);
+				const auto resource = std::ranges::find(temporalResolvedSnapshot.m_Resources,
+					"TAA.ResolvedColorInitialization", &RGSnapshotResourceInfo::m_Name);
+				const auto isTransition = [](const RGSnapshotPassInfo& pass,
+					RHILayout before, RHILayout after) noexcept
+				{
+					return std::ranges::any_of(pass.m_PreBarriers,
+						[before, after](const RGSnapshotBarrierInfo& barrier) noexcept
+						{
+							return barrier.m_ResourceName ==
+								"TAA.ResolvedColorInitialization" &&
+								barrier.m_Kind == RGBarrierKind::Transition &&
+								barrier.m_Before.m_Layout == before &&
+								barrier.m_After.m_Layout == after;
+						});
+				};
+				context.Check(resource != temporalResolvedSnapshot.m_Resources.end() &&
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
+						RHITextureUsage::RenderTarget) &&
+					Test(static_cast<RHITextureUsage>(resource->m_UsageBits),
+						RHITextureUsage::UnorderedAccess),
+					"TAA resolved color preserves its mixed RTV/UAV usage contract");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[0], RHILayout::Undefined,
+						RHILayout::RenderTarget),
+					"TAA resolved color initializes through a first-use render-target transition");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[1], RHILayout::RenderTarget,
+						RHILayout::UnorderedAccess),
+					"TAA resolve transitions initialized color from RTV to UAV");
+				context.Check(temporalResolvedSnapshot.m_Passes.size() == 3 &&
+					isTransition(temporalResolvedSnapshot.m_Passes[2], RHILayout::UnorderedAccess,
+						RHILayout::RenderTarget),
+					"Transparent load transitions resolved color back from UAV to RTV");
+			}
+
 			RecordingGraphicsCommandContext graphicsContext;
 			RecordingComputeCommandContext directComputeContext;
 			uint32_t graphicsExecutions = 0;
@@ -3074,6 +3262,583 @@ namespace gglab
 					batchingComputeContext.m_FlushBarrierCount == 1,
 					"RenderGraph batches texture and buffer barriers into one explicit flush");
 			}
+		}
+
+		void RunPersistentTexturePoolContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(!std::is_copy_constructible_v<PersistentTextureAllocation>);
+			static_assert(!std::is_copy_assignable_v<PersistentTextureAllocation>);
+			static_assert(std::is_nothrow_move_constructible_v<PersistentTextureAllocation>);
+			static_assert(std::is_nothrow_move_assignable_v<PersistentTextureAllocation>);
+
+			RecordingDevice device;
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool pool(&device);
+
+			auto makeCreateInfo = [](RHIFormat format, uint32_t width, uint32_t height) noexcept
+			{
+				return RHIOwnedTextureCreateInfo{
+					.m_Desc = {
+						.m_Format = format,
+						.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
+						.m_Extent = { width, height, 1 },
+					},
+				};
+			};
+			auto acquireHistorySet = [&](uint32_t width, uint32_t height)
+			{
+				const RHIOwnedTextureCreateInfo colorInfo =
+					makeCreateInfo(RHIFormat::R16G16B16A16Float, width, height);
+				const RHIOwnedTextureCreateInfo depthInfo =
+					makeCreateInfo(RHIFormat::R32Float, width, height);
+				return std::array<PersistentTextureAllocation, 4>{
+					pool.AcquireTexture(colorInfo, "TAA.HistoryColor0"),
+					pool.AcquireTexture(colorInfo, "TAA.HistoryColor1"),
+					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth0"),
+					pool.AcquireTexture(depthInfo, "TAA.HistoryDepth1"),
+				};
+			};
+			auto releaseHistorySet = [&](auto& allocations, const RHIFencePoint& fencePoint)
+			{
+				bool released = true;
+				for (PersistentTextureAllocation& allocation : allocations)
+				{
+					released = pool.ReleaseTexture(std::move(allocation), fencePoint) && released;
+				}
+				return released;
+			};
+			auto allPendingAtFence = [](const PersistentTexturePoolDiagnostics& diagnostics,
+				uint64_t fenceValue) noexcept
+			{
+				return std::ranges::all_of(diagnostics.m_PendingRetirements,
+					[fenceValue](const PersistentTexturePendingRetirementDiagnostics& pending)
+					{
+						return pending.m_Texture.IsValid() &&
+							pending.m_FencePoint.m_Value == fenceValue &&
+							!pending.m_LogicalName.empty();
+					});
+			};
+
+			const auto invalidAllocation = pool.AcquireTexture({}, "Invalid");
+			auto firstGeneration = acquireHistorySet(1920, 1080);
+			const uint64_t fullSizeBytes =
+				2 * EstimatePersistentTextureBytes(firstGeneration[0].GetCreateInfo().m_Desc) +
+				2 * EstimatePersistentTextureBytes(firstGeneration[2].GetCreateInfo().m_Desc);
+			PersistentTextureAllocation movedAllocation = std::move(firstGeneration[0]);
+			const bool moveTransferredOwnership =
+				!firstGeneration[0].IsValid() && movedAllocation.IsValid();
+			firstGeneration[0] = std::move(movedAllocation);
+			const PersistentTexturePoolDiagnostics initialDiagnostics = pool.GetDiagnostics();
+			context.Check(!invalidAllocation.IsValid() && moveTransferredOwnership &&
+				firstGeneration[0].IsValid() && !movedAllocation.IsValid() &&
+				initialDiagnostics.m_ActiveTextureCount == 4 &&
+				initialDiagnostics.m_PendingRetirementTextureCount == 0 &&
+				initialDiagnostics.m_EstimatedActiveBytes == fullSizeBytes &&
+				device.m_CreateTextureCount == 4,
+				"Persistent texture allocations are explicit, move-only, and byte-accounted");
+
+			const bool invalidFenceRejected =
+				!pool.ReleaseTexture(std::move(firstGeneration[0]), {});
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
+			const bool firstReleased = releaseHistorySet(firstGeneration, firstFence);
+			const PersistentTexturePoolDiagnostics firstPending = pool.GetDiagnostics();
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics beforeFirstCompletion = pool.GetDiagnostics();
+			context.Check(invalidFenceRejected && firstReleased &&
+				firstPending.m_ActiveTextureCount == 0 &&
+				firstPending.m_PendingRetirementTextureCount == 4 &&
+				firstPending.m_EstimatedPendingRetirementBytes == fullSizeBytes &&
+				allPendingAtFence(firstPending, 10) &&
+				beforeFirstCompletion.m_PendingRetirementTextureCount == 4 &&
+				device.m_DestroyTextureCount == 0 && device.m_RecordTextureUseCount == 4,
+				"Persistent texture release is logical immediately and physical only after its fence");
+
+			auto resizedGeneration = acquireHistorySet(1280, 720);
+			const uint64_t resizedBytes =
+				2 * EstimatePersistentTextureBytes(resizedGeneration[0].GetCreateInfo().m_Desc) +
+				2 * EstimatePersistentTextureBytes(resizedGeneration[2].GetCreateInfo().m_Desc);
+			const PersistentTexturePoolDiagnostics resizePressure = pool.GetDiagnostics();
+			const RHIFencePoint resizeFence{ RHIFenceHandle{ 1, 1 }, 20 };
+			const bool resizedReleased = releaseHistorySet(resizedGeneration, resizeFence);
+			auto reenabledGeneration = acquireHistorySet(1920, 1080);
+			const PersistentTexturePoolDiagnostics togglePressure = pool.GetDiagnostics();
+			context.Check(resizePressure.m_ActiveTextureCount == 4 &&
+				resizePressure.m_PendingRetirementTextureCount == 4 &&
+				resizePressure.m_EstimatedActiveBytes == resizedBytes &&
+				resizePressure.m_EstimatedPendingRetirementBytes == fullSizeBytes &&
+				resizedReleased && togglePressure.m_ActiveTextureCount == 4 &&
+				togglePressure.m_PendingRetirementTextureCount == 8 &&
+				togglePressure.m_TotalAcquireCount == 12 && device.m_CreateTextureCount == 12,
+				"Resize and toggle pressure create fresh persistent textures while old generations retire");
+
+			device.m_CompletedFenceValue = 10;
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics partiallyRetired = pool.GetDiagnostics();
+			const uint32_t partiallyDestroyedTextureCount = device.m_DestroyTextureCount;
+			const RHIFencePoint reenabledFence{ RHIFenceHandle{ 1, 1 }, 30 };
+			const bool reenabledReleased = releaseHistorySet(reenabledGeneration, reenabledFence);
+			const bool doubleReleaseRejected =
+				!pool.ReleaseTexture(std::move(reenabledGeneration[0]), reenabledFence);
+			device.m_CompletedFenceValue = 30;
+			pool.Tick();
+			const PersistentTexturePoolDiagnostics fullyRetired = pool.GetDiagnostics();
+			context.Check(partiallyRetired.m_ActiveTextureCount == 4 &&
+				partiallyRetired.m_PendingRetirementTextureCount == 4 &&
+				partiallyRetired.m_CompletedRetirementCount == 4 &&
+				partiallyDestroyedTextureCount == 4 && reenabledReleased &&
+				doubleReleaseRejected && fullyRetired.m_ActiveTextureCount == 0 &&
+				fullyRetired.m_PendingRetirementTextureCount == 0 &&
+				fullyRetired.m_TotalReleaseCount == 12 &&
+				fullyRetired.m_CompletedRetirementCount == 12 &&
+				fullyRetired.m_RejectedReleaseCount == 2 &&
+				device.m_DestroyTextureCount == 12 &&
+				device.m_RecordTextureUseCount == 12 &&
+				device.m_LastRecordedFencePoint == reenabledFence,
+				"Fence retirement drains only completed generations and rejects duplicate release");
+		}
+
+		void RunTemporalHistoryTransactionContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice writeProofDevice;
+			RHITextureDesc writeProofDesc{};
+			writeProofDesc.m_Dimension = RHITextureDimension::Texture2D;
+			writeProofDesc.m_Format = TemporalHistoryColorFormat;
+			writeProofDesc.m_Usage =
+				RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess;
+			writeProofDesc.m_Extent = { 8, 8, 1 };
+			const RHITextureHandle writeProofTexture = writeProofDevice.CreateTexture(
+				RHIOwnedTextureCreateInfo{ .m_Desc = writeProofDesc }, {});
+			const RHITextureHandle writeProofNextTexture = writeProofDevice.CreateTexture(
+				RHIOwnedTextureCreateInfo{ .m_Desc = writeProofDesc }, {});
+			RenderGraph writeProofGraph({
+				.m_Device = &writeProofDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			bool initiallyDefinedCountsAsCurrentWrite = true;
+			bool fullCurrentWriteRecognized = false;
+			writeProofGraph.AddPass<RGTextureId>("TemporalHistory.WriteProof",
+				[&](RenderGraph::RGBuilder& builder, RGTextureId& texture)
+				{
+					texture = builder.ImportTexture("TemporalHistory.WriteProof.Texture",
+						writeProofTexture, writeProofDesc, CommonRHIResourceState(),
+						RGContentValidity::Defined);
+					initiallyDefinedCountsAsCurrentWrite =
+						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite);
+					fullCurrentWriteRecognized =
+						builder.IsTextureFullyWrittenByCurrentPass(texture);
+					builder.Export(texture, RGTextureAccess::None);
+				});
+			context.Check(!initiallyDefinedCountsAsCurrentWrite && fullCurrentWriteRecognized &&
+				writeProofGraph.Compile(),
+				"RenderGraph distinguishes prior Defined contents from a full current-pass write");
+
+			RenderGraph historyColorPreviewGraph({
+				.m_Device = &writeProofDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			RHITextureDesc historyColorPreviewPayloadDesc = writeProofDesc;
+			historyColorPreviewPayloadDesc.m_Usage = RHITextureUsage::None;
+			RGTemporalAAResources historyColorPreviewResources{};
+			bool historyColorPreviewUsesTransientPayload = false;
+			bool historyAgePreviewUsesTransientPayload = false;
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"TemporalHistory.ExportPrevious",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					historyColorPreviewResources.m_History.m_PreviousColor =
+						builder.ImportTexture("TAA.Preview.PreviousColor", writeProofTexture,
+							writeProofDesc, CommonRHIResourceState(), RGContentValidity::Defined);
+					historyColorPreviewResources.m_History.m_PreviousColor = builder.Read(
+						historyColorPreviewResources.m_History.m_PreviousColor,
+						RGTextureAccess::Sample);
+					builder.Export(
+						historyColorPreviewResources.m_History.m_PreviousColor,
+						RGTextureAccess::None);
+					historyColorPreviewResources.m_History.m_NextColor =
+						builder.ImportTexture("TAA.Preview.NextColor", writeProofNextTexture,
+							writeProofDesc, CommonRHIResourceState(), RGContentValidity::Defined);
+					builder.WriteInPlace(historyColorPreviewResources.m_History.m_NextColor,
+						RGTextureAccess::StorageWrite);
+					builder.Export(historyColorPreviewResources.m_History.m_NextColor,
+						RGTextureAccess::None);
+
+					historyColorPreviewResources.m_ReprojectionDiagnostics =
+						builder.CreateTexture(
+							"TAA.Preview.AccumulatedHistory", historyColorPreviewPayloadDesc);
+					builder.WriteInPlace(
+						historyColorPreviewResources.m_ReprojectionDiagnostics,
+						RGTextureAccess::StorageWrite);
+					data.m_Texture =
+						historyColorPreviewResources.m_ReprojectionDiagnostics;
+				});
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"PostProcess.Preview.HistoryColor",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					const RGTextureId previewSource = ResolveTemporalAAPreviewSource(
+						historyColorPreviewResources,
+						PostProcessDebugTap::TemporalHistoryColor);
+					historyColorPreviewUsesTransientPayload =
+						previewSource ==
+							historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_NextColor;
+					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			historyColorPreviewGraph.AddPass<TextureStorageAccessPassData>(
+				"PostProcess.Preview.HistoryAge",
+				[&](RenderGraph::RGBuilder& builder, TextureStorageAccessPassData& data)
+				{
+					const RGTextureId previewSource = ResolveTemporalAAPreviewSource(
+						historyColorPreviewResources,
+						PostProcessDebugTap::TemporalHistoryAge);
+					historyAgePreviewUsesTransientPayload =
+						previewSource ==
+							historyColorPreviewResources.m_ReprojectionDiagnostics &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_PreviousColor &&
+						previewSource !=
+							historyColorPreviewResources.m_History.m_NextColor;
+					data.m_Texture = builder.Read(previewSource, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			context.Check(historyColorPreviewUsesTransientPayload &&
+				historyAgePreviewUsesTransientPayload &&
+				UsesTemporalAAHistoryColorPreviewPayload(
+					PostProcessDebugTap::TemporalHistoryColor) &&
+				!UsesTemporalAAHistoryColorPreviewPayload(
+					PostProcessDebugTap::TemporalHistoryAge) &&
+				UsesTemporalAAHistoryAgePreviewPayload(
+					PostProcessDebugTap::TemporalHistoryAge) &&
+				!UsesTemporalAAHistoryAgePreviewPayload(
+					PostProcessDebugTap::TemporalHistoryColor) &&
+				historyColorPreviewGraph.Compile(),
+				"TAA history-color and history-age previews read selected transient payloads instead of exported previous or next history color");
+
+			RecordingDevice device;
+			device.m_TextureViewsSupported = true;
+			const TemporalHistoryFormatSupport formatSupport =
+				QueryTemporalHistoryFormatSupport(device);
+			context.Check(formatSupport.IsSupported() &&
+				device.m_TextureViewQueryCount == 4 &&
+				device.m_LastTextureViewQueryTextureDesc.m_Format == TemporalHistoryDepthFormat &&
+				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage, RHITextureUsage::Sampled) &&
+				Test(device.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::UnorderedAccess) &&
+				device.m_LastTextureViewQueryDesc.m_Type == RHITextureViewType::UnorderedAccess,
+				"Temporal history capability requires SRV and typed-UAV support for both fixed formats");
+			device.m_UseControlledFenceCompletion = true;
+			PersistentTexturePool texturePool(&device);
+			TemporalHistoryManager historyManager(&texturePool);
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			ResolvedTemporalFramePlan activePlan{
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::TemporalIntegrated,
+				.m_Status = TemporalAAFrameStatus::Active,
+				.m_DisableReason = TemporalAADisableReason::None,
+				.m_ResetIdentity = 7,
+				.m_SessionIdentity = 11,
+				.m_Requested = true,
+				.m_Active = true,
+				.m_InternalContractMode = true,
+				.m_DisplayViewEligible = true,
+				.m_DepthVelocityPathAvailable = true,
+			};
+
+			auto prepareDisplayView = [&](TemporalFrameTransaction& transaction)
+			{
+				RenderView view{};
+				view.m_ViewId = RenderViewID::Main;
+				view.m_Width = 64;
+				view.m_Height = 64;
+				view.m_IsValid = true;
+				transaction.PrepareDisplayView(view);
+				return view;
+			};
+			auto buildHistoryGraph = [&](TemporalFrameTransaction& transaction,
+				bool expectPrevious, bool inspectColdStartContract)
+			{
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				bool imported = false;
+				bool exported = false;
+				bool previousMatched = false;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.Contract",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						imported = transaction.ImportHistoryResources(builder, data.m_History);
+						previousMatched = data.m_History.m_PreviousValid == expectPrevious;
+						if (data.m_History.m_PreviousValid)
+						{
+							data.m_History.m_PreviousColor = builder.Read(
+								data.m_History.m_PreviousColor, RGTextureAccess::Sample);
+							data.m_History.m_PreviousDepth = builder.Read(
+								data.m_History.m_PreviousDepth, RGTextureAccess::Sample);
+						}
+						builder.WriteInPlace(
+							data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(
+							data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						exported =
+							transaction.ExportHistoryResources(builder, data.m_History);
+					});
+				const bool compiled = graph.Compile();
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const bool previousExportsCommon = !expectPrevious ||
+					std::ranges::count_if(snapshot.m_Resources,
+						[](const RGSnapshotResourceInfo& resource) noexcept
+						{
+							return resource.m_Name.starts_with("TAA.History.Previous") &&
+								resource.m_HasFinalBarrierState &&
+								resource.m_FinalBarrierState == CommonRHIResourceState();
+						}) == 2;
+				if (!inspectColdStartContract)
+				{
+					return imported && exported && previousMatched && compiled &&
+						previousExportsCommon;
+				}
+
+				const bool importedFour = snapshot.m_Resources.size() == 4 &&
+					std::ranges::all_of(snapshot.m_Resources,
+						[](const RGSnapshotResourceInfo& resource) noexcept
+						{ return resource.m_Imported; });
+				const bool nextExportsCommon = std::ranges::count_if(snapshot.m_Resources,
+					[](const RGSnapshotResourceInfo& resource) noexcept
+					{
+						return resource.m_Name.starts_with("TAA.History.Next") &&
+							resource.m_InitialBarrierState == UndefinedRHITextureState() &&
+							resource.m_HasFinalBarrierState &&
+							resource.m_FinalBarrierState == CommonRHIResourceState();
+					}) == 2;
+				return imported && exported && previousMatched && compiled &&
+					previousExportsCommon && importedFour && nextExportsCommon;
+			};
+			auto buildNoWriteHistoryGraph = [&](TemporalFrameTransaction& transaction)
+			{
+				RenderGraph graph({
+					.m_Device = &device,
+					.m_TransientResourcePool =
+						reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+					});
+				bool imported = false;
+				bool exported = true;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.NoWrite",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						imported = transaction.ImportHistoryResources(builder, data.m_History);
+						exported = transaction.ExportHistoryResources(builder, data.m_History);
+					});
+				return imported && !exported && !transaction.ParticipatedInResolve() &&
+					graph.Compile();
+			};
+
+			TemporalFrameTransaction noWriteTransaction;
+			noWriteTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(noWriteTransaction));
+			const bool noWriteGraphValid = buildNoWriteHistoryGraph(noWriteTransaction);
+			noWriteTransaction.CommitCompleted(RHIFencePoint{ RHIFenceHandle{ 1, 1 }, 5 });
+			const TemporalHistoryManagerDiagnostics afterNoWrite =
+				historyManager.GetDiagnostics();
+			context.Check(noWriteGraphValid &&
+				noWriteTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				!afterNoWrite.m_HistoryValid && afterNoWrite.m_ReadIndex == 0 &&
+				!viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 0,
+				"Export without full current-frame history writes cannot participate or commit");
+
+			TemporalFrameTransaction firstTransaction;
+			firstTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView firstView = prepareDisplayView(firstTransaction);
+			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
+			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
+			firstTransaction.CommitCompleted(firstFence);
+			const TemporalHistoryManagerDiagnostics firstCommitted =
+				historyManager.GetDiagnostics();
+			const uint64_t firstGeneration = firstCommitted.m_AllocationGeneration;
+			context.Check(coldStartGraphValid && !firstView.m_HasPreviousTemporalState &&
+				firstTransaction.GetState() == TemporalFrameTransactionState::Committed &&
+				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
+				firstCommitted.m_ReadIndex == 1 && firstCommitted.m_ActiveBytes > 0 &&
+				firstCommitted.m_LastCommitted.m_JitterIndex == 0 &&
+				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
+				device.m_CreateTextureCount == 4,
+				"Temporal history cold start imports four persistent textures and commits one write pair");
+
+			TemporalViewHistory incompatibleViewHistory = viewHistory;
+			incompatibleViewHistory.Invalidate();
+			TemporalObjectHistory incompatibleObjectHistory;
+			TemporalFrameTransaction incompatibleViewTransaction;
+			incompatibleViewTransaction.Begin(incompatibleViewHistory,
+				incompatibleObjectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView incompatibleView = prepareDisplayView(incompatibleViewTransaction);
+			const bool managerHistoryStillValid =
+				buildHistoryGraph(incompatibleViewTransaction, true, false);
+			const bool finalHistoryCompatibility =
+				incompatibleViewTransaction.HasCompatiblePreviousHistory();
+			incompatibleViewTransaction.Abort();
+			context.Check(managerHistoryStillValid && !finalHistoryCompatibility &&
+				!incompatibleView.m_HasPreviousTemporalState,
+				"Temporal resolve gates imported history with the transaction's final view-and-history compatibility");
+
+			TemporalFrameTransaction abortedTransaction;
+			abortedTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView abortedView = prepareDisplayView(abortedTransaction);
+			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
+			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
+			abortedTransaction.Abort(vulkanAbortFence);
+			const TemporalHistoryManagerDiagnostics afterAbort = historyManager.GetDiagnostics();
+			context.Check(abortGraphValid && abortedView.m_HasPreviousTemporalState &&
+				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
+				afterAbort.m_AllocationGeneration == firstGeneration &&
+				afterAbort.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 1,
+				"Vulkan abort fences gate lifetime without advancing logical temporal history");
+
+			TemporalFrameTransaction noResolveTransaction;
+			noResolveTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const RenderView noResolveView = prepareDisplayView(noResolveTransaction);
+			const RHIFencePoint noResolveFence{ RHIFenceHandle{ 1, 1 }, 30 };
+			noResolveTransaction.CommitCompleted(noResolveFence);
+			const TemporalHistoryManagerDiagnostics afterNoResolve =
+				historyManager.GetDiagnostics();
+			context.Check(noResolveView.m_HasPreviousTemporalState &&
+				noResolveTransaction.GetJitterIndex() == 1 &&
+				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterNoResolve.m_ReadIndex == 1 &&
+				afterNoResolve.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_NextJitterIndex == 1,
+				"A completed frame without temporal resolve advances no temporal participant");
+			context.Check(afterAbort.m_ReadIndex == firstCommitted.m_ReadIndex &&
+				afterNoResolve.m_ReadIndex == firstCommitted.m_ReadIndex,
+				"History age remains on the committed color/depth ping-pong read index across abort and non-resolve paths");
+
+			TemporalFrameTransaction invalidFenceTransaction;
+			invalidFenceTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(invalidFenceTransaction));
+			const bool invalidFenceGraphValid =
+				buildHistoryGraph(invalidFenceTransaction, true, false);
+			invalidFenceTransaction.CommitCompleted();
+			const TemporalHistoryManagerDiagnostics afterInvalidFence =
+				historyManager.GetDiagnostics();
+			context.Check(invalidFenceGraphValid &&
+				invalidFenceTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				afterInvalidFence.m_HistoryValid && afterInvalidFence.m_ReadIndex == 1 &&
+				afterInvalidFence.m_LastCommitted.m_GraphicsFence == firstFence &&
+				viewHistory.m_NextJitterIndex == 1,
+				"A completed transaction without a valid submitted fence cannot commit history");
+
+			TemporalFrameTransaction fatalTransaction;
+			fatalTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(fatalTransaction));
+			const bool fatalGraphValid = buildHistoryGraph(fatalTransaction, true, false);
+			const RHIFencePoint fatalFence{ RHIFenceHandle{ 1, 1 }, 40 };
+			fatalTransaction.InvalidateAfterFatal(fatalFence);
+			const TemporalHistoryManagerDiagnostics afterFatal = historyManager.GetDiagnostics();
+			const bool fatalFencesAreRetirementOnly =
+				!afterFatal.m_PendingRetirementFences.empty() &&
+				std::ranges::all_of(afterFatal.m_PendingRetirementFences,
+					[&](const RHIFencePoint& fence) noexcept { return fence == fatalFence; });
+			device.m_CompletedFenceValue = 39;
+			texturePool.Tick();
+			const uint32_t destroyedBeforeFatalFence = device.m_DestroyTextureCount;
+			device.m_CompletedFenceValue = 40;
+			texturePool.Tick();
+			context.Check(fatalGraphValid &&
+				fatalTransaction.GetState() == TemporalFrameTransactionState::Invalidated &&
+				!viewHistory.m_Valid && !afterFatal.m_HasActiveHistory &&
+				afterFatal.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission &&
+				afterFatal.m_PendingRetirementBytes > 0 && fatalFencesAreRetirementOnly &&
+				destroyedBeforeFatalFence == 0 && device.m_DestroyTextureCount == 4,
+				"Fatal-after-submit invalidates history and uses its fence only for retirement");
+
+			TemporalFrameTransaction reenabledTransaction;
+			reenabledTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			const TemporalHistoryManagerDiagnostics reenabled = historyManager.GetDiagnostics();
+			reenabledTransaction.Abort();
+			context.Check(
+				reenabled.m_LastResetReason == TemporalHistoryResetReason::FatalSubmission,
+				"Fresh history allocation preserves its explicit reset cause instead of ColdStart");
+			ResolvedTemporalFramePlan disabledPlan = activePlan;
+			disabledPlan.m_Status = TemporalAAFrameStatus::Disabled;
+			disabledPlan.m_DisableReason = TemporalAADisableReason::NotRequested;
+			disabledPlan.m_Requested = false;
+			disabledPlan.m_Active = false;
+			TemporalFrameTransaction disabledTransaction;
+			disabledTransaction.Begin(
+				viewHistory, objectHistory, disabledPlan, 64, 64, &historyManager);
+			disabledTransaction.Abort();
+			const TemporalHistoryManagerDiagnostics disabled = historyManager.GetDiagnostics();
+			context.Check(reenabled.m_HasActiveHistory && !reenabled.m_HistoryValid &&
+				reenabled.m_AllocationGeneration > firstGeneration &&
+				device.m_CreateTextureCount == 8 && !disabled.m_HasActiveHistory &&
+				disabled.m_LastResetReason == TemporalHistoryResetReason::Disabled &&
+				device.m_DestroyTextureCount == 8,
+				"Disabled history releases immediately and re-enable never revives retired allocations");
+
+			TemporalFrameTransaction preResizeTransaction;
+			preResizeTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+			GGLAB_UNUSED(prepareDisplayView(preResizeTransaction));
+			const bool preResizeGraphValid =
+				buildHistoryGraph(preResizeTransaction, false, false);
+			const RHIFencePoint preResizeFence{ RHIFenceHandle{ 1, 1 }, 50 };
+			preResizeTransaction.CommitCompleted(preResizeFence);
+			const uint64_t preResizeGeneration =
+				historyManager.GetDiagnostics().m_AllocationGeneration;
+			TemporalFrameTransaction resizedTransaction;
+			resizedTransaction.Begin(
+				viewHistory, objectHistory, activePlan, 128, 72, &historyManager);
+			const TemporalHistoryManagerDiagnostics resized = historyManager.GetDiagnostics();
+			resizedTransaction.Abort();
+			context.Check(preResizeGraphValid && resized.m_HasActiveHistory &&
+				!resized.m_HistoryValid && resized.m_Compatibility.m_Width == 128 &&
+				resized.m_Compatibility.m_Height == 72 &&
+				resized.m_AllocationGeneration > preResizeGeneration &&
+				resized.m_LastResetReason == TemporalHistoryResetReason::ExtentChanged &&
+				resized.m_PendingRetirementFences.size() == 4 &&
+				device.m_CreateTextureCount == 16,
+				"Extent changes retire committed history and allocate a fresh invalid generation");
+
+			ResolvedTemporalFramePlan unavailablePlan = activePlan;
+			unavailablePlan.m_CoreAvailable = false;
+			unavailablePlan.m_Active = false;
+			unavailablePlan.m_Status = TemporalAAFrameStatus::Unavailable;
+			unavailablePlan.m_DisableReason = TemporalAADisableReason::CoreCapabilityUnavailable;
+			TemporalFrameTransaction unavailableTransaction;
+			unavailableTransaction.Begin(
+				viewHistory, objectHistory, unavailablePlan, 128, 72, &historyManager);
+			unavailableTransaction.Abort();
+			const TemporalHistoryManagerDiagnostics unavailable = historyManager.GetDiagnostics();
+			context.Check(!unavailable.m_HasActiveHistory &&
+				unavailable.m_LastResetReason == TemporalHistoryResetReason::AvailabilityChanged,
+				"Requested TAA availability loss retires history separately from an explicit toggle off");
+
+			historyManager.Shutdown();
+			device.m_CompletedFenceValue = 50;
+			texturePool.Tick();
+			context.Check(device.m_DestroyTextureCount == 16 &&
+				texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Temporal history shutdown leaves no active or pending persistent allocation");
 		}
 
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
@@ -3985,8 +4750,1014 @@ namespace gglab
 			}
 		}
 
-		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext&) noexcept
+		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext& context) noexcept
 		{
+			static_assert(sizeof(ViewGPU) == 480);
+			static_assert(offsetof(ViewGPU, PreviousViewMat) == 256);
+			static_assert(offsetof(ViewGPU, PreviousDepthReconstructionParams) == 400);
+			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
+			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
+
+			const Vector2 staticMotion = ComputeTemporalMotionUV(
+				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 cameraMotion = ComputeTemporalMotionUV(
+				Vector4(-0.2f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const Vector2 objectMotion = ComputeTemporalMotionUV(
+				Vector4(0.4f, 0.2f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
+			const TemporalMotionReadbackSample objectMotionReadback =
+				ResolveTemporalMotionReadbackSample(objectMotion, 100, 50);
+			context.Check(NearlyEqual(staticMotion, Vector2::Zero) &&
+				NearlyEqual(cameraMotion, Vector2(-0.1f, 0.0f)) &&
+				NearlyEqual(objectMotion, Vector2(0.2f, -0.1f)) &&
+				objectMotionReadback.m_Valid &&
+				NearlyEqual(objectMotionReadback.m_MotionPixels, Vector2(20.0f, -5.0f)) &&
+				NearlyEqual(objectMotionReadback.m_MagnitudePixels, std::sqrt(425.0f)) &&
+				!ResolveTemporalMotionReadbackSample(objectMotion, 0, 50).m_Valid,
+				"Temporal motion uses current-minus-previous top-left UV delta and deterministic pixel magnitude");
+
+			const Vector2 currentJitterUV =
+				temporal::JitterPixelsToUV(Vector2(0.25f, -0.25f), 100, 50);
+			const Vector2 previousJitterUV =
+				temporal::JitterPixelsToUV(Vector2(-0.25f, 0.25f), 100, 50);
+			const Vector4 staticUnjitteredClip(0.2f, -0.1f, 0.5f, 1.0f);
+			const Vector4 currentRasterClip = temporal::ApplyJitterToClipPosition(
+				staticUnjitteredClip,
+				temporal::JitterPixelsToNDC(Vector2(0.25f, -0.25f), 100, 50));
+			const Vector4 previousRasterClip = temporal::ApplyJitterToClipPosition(
+				staticUnjitteredClip,
+				temporal::JitterPixelsToNDC(Vector2(-0.25f, 0.25f), 100, 50));
+			const Vector2 jitterOnlyRasterMotion =
+				ComputeTemporalMotionUV(currentRasterClip, previousRasterClip);
+			const Vector2 currentUV(0.5f, 0.5f);
+			const Vector2 previousRasterUV =
+				temporal::ReprojectToPreviousUV(currentUV, jitterOnlyRasterMotion);
+			const Vector2 staticHistoryMotion = ResolveTemporalHistoryMotionUV(
+				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 previousAccumulatedUV =
+				temporal::ReprojectToPreviousUV(currentUV, staticHistoryMotion);
+			context.Check(NearlyEqual(jitterOnlyRasterMotion,
+					currentJitterUV - previousJitterUV) &&
+				!NearlyEqual(previousRasterUV, currentUV) &&
+				NearlyEqual(staticHistoryMotion, Vector2::Zero) &&
+				NearlyEqual(previousAccumulatedUV, currentUV),
+				"TAA removes raster jitter displacement when reprojecting accumulated history color");
+
+			const Vector2 unjitteredMotionUV(0.03f, -0.02f);
+			const Vector2 movingRasterMotionUV =
+				unjitteredMotionUV + currentJitterUV - previousJitterUV;
+			const Vector2 movingHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				movingRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 movingPreviousHistoryUV =
+				temporal::ReprojectToPreviousUV(currentUV, movingHistoryMotionUV);
+			context.Check(NearlyEqual(movingHistoryMotionUV, unjitteredMotionUV) &&
+				NearlyEqual(movingPreviousHistoryUV, currentUV - unjitteredMotionUV),
+				"TAA preserves real temporal motion while removing raster jitter displacement");
+
+			const Vector2 currentSkyUV(0.15f, 0.08f);
+			const Vector2 previousSkyRasterUV =
+				temporal::ReprojectToPreviousUV(currentSkyUV, jitterOnlyRasterMotion);
+			const Vector2 skyRasterMotionUV = currentSkyUV - previousSkyRasterUV;
+			const Vector2 skyHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				skyRasterMotionUV, currentJitterUV, previousJitterUV);
+			const Vector2 previousSkyHistoryUV =
+				temporal::ReprojectToPreviousUV(currentSkyUV, skyHistoryMotionUV);
+			context.Check(NearlyEqual(skyHistoryMotionUV, Vector2::Zero) &&
+				NearlyEqual(previousSkyHistoryUV, currentSkyUV),
+				"Static sky reprojection removes jitter after resolving its previous raster UV");
+
+			const Vector2 edgeCurrentUV(0.002f, 0.5f);
+			const Vector2 edgePreviousRasterUV =
+				temporal::ReprojectToPreviousUV(edgeCurrentUV, jitterOnlyRasterMotion);
+			const Vector2 edgeHistoryMotionUV = ResolveTemporalHistoryMotionUV(
+				jitterOnlyRasterMotion, currentJitterUV, previousJitterUV);
+			const Vector2 edgePreviousHistoryUV =
+				temporal::ReprojectToPreviousUV(edgeCurrentUV, edgeHistoryMotionUV);
+			context.Check(IsTemporalAAUVInBounds(edgePreviousHistoryUV) &&
+				!IsTemporalAAUVInBounds(edgePreviousRasterUV) &&
+				!AreTemporalAAReprojectionUVsValid(
+					edgePreviousHistoryUV, edgePreviousRasterUV),
+				"TAA rejects history when raw-depth raster UV is out of bounds even if accumulated-history UV is valid");
+
+			context.Check(IsTemporalHistoryDepthCompatible(10.0f, 10.04f) &&
+				IsTemporalHistoryDepthCompatible(100.0f, 101.9f) &&
+				!IsTemporalHistoryDepthCompatible(10.0f, 10.21f) &&
+				!IsTemporalHistoryDepthCompatible(100.0f, 102.1f) &&
+				!IsTemporalHistoryDepthCompatible(0.0f, 0.0f) &&
+				!IsTemporalHistoryDepthCompatible(
+					std::numeric_limits<float>::quiet_NaN(), 1.0f),
+				"Temporal reprojection uses finite positive previous-view Z with max absolute/relative rejection tolerance");
+
+			std::array<TemporalAAGeometryDepthSample, 9> geometryEdgeNeighborhood{};
+			geometryEdgeNeighborhood[4] = { 10.0f, false };
+			geometryEdgeNeighborhood[5] = { 10.04f, true };
+			std::array<TemporalAAGeometryDepthSample, 9> backgroundOnlyNeighborhood{};
+			backgroundOnlyNeighborhood[4] = { 10.0f, false };
+			std::array<TemporalAAGeometryDepthSample, 9> mismatchedGeometryNeighborhood{};
+			mismatchedGeometryNeighborhood[4] = { 10.21f, true };
+			context.Check(HasCompatibleTemporalGeometryDepthSample(
+					10.0f, geometryEdgeNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(
+					10.0f, backgroundOnlyNeighborhood) &&
+				!HasCompatibleTemporalGeometryDepthSample(
+					10.0f, mismatchedGeometryNeighborhood),
+				"TAA geometry depth validation accepts a matching 3x3 geometry neighbor and rejects background or mismatched candidates");
+
+			context.Check(IsTemporalSkyHistoryCompatible(0.0f, DepthConvention::Reversed) &&
+				IsTemporalSkyHistoryCompatible(1.0f, DepthConvention::Standard) &&
+				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Reversed) &&
+				!IsTemporalSkyHistoryCompatible(0.5f, DepthConvention::Standard) &&
+				!IsTemporalSkyHistoryCompatible(
+					std::numeric_limits<float>::quiet_NaN(), DepthConvention::Reversed),
+				"Sky reprojection accepts only finite previous background depth and rejects previous geometry");
+
+			context.Check(TemporalHistoryInitialAge == 1.0f &&
+				TemporalHistoryMaxAge == 255.0f &&
+				IsTemporalHistoryAgeValid(TemporalHistoryInitialAge) &&
+				IsTemporalHistoryAgeValid(TemporalHistoryMaxAge) &&
+				!IsTemporalHistoryAgeValid(0.0f) &&
+				!IsTemporalHistoryAgeValid(TemporalHistoryMaxAge + 1.0f) &&
+				!IsTemporalHistoryAgeValid(std::numeric_limits<float>::quiet_NaN()) &&
+				ResolveTemporalHistoryNextAge(false, 37.0f) == TemporalHistoryInitialAge &&
+				ResolveTemporalHistoryNextAge(true, 0.0f) == TemporalHistoryInitialAge &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryInitialAge) == 2.0f &&
+				ResolveTemporalHistoryNextAge(true, TemporalHistoryMaxAge) ==
+					TemporalHistoryMaxAge,
+				"Temporal history age starts or resets at one, advances only for accepted valid history, and saturates at the frozen R16Float-exact bound");
+
+			const TemporalAAOutputAlphaContract accumulatedOutputAlphas =
+				ResolveTemporalAAOutputAlphas(37.0f);
+			const TemporalAAOutputAlphaContract resetOutputAlphas =
+				ResolveTemporalAAOutputAlphas(
+					std::numeric_limits<float>::quiet_NaN());
+			context.Check(accumulatedOutputAlphas.m_ResolvedAlpha == 1.0f &&
+				accumulatedOutputAlphas.m_HistoryAlpha == 37.0f &&
+				resetOutputAlphas.m_ResolvedAlpha == 1.0f &&
+				resetOutputAlphas.m_HistoryAlpha == TemporalHistoryInitialAge,
+				"TAA output alpha contract keeps resolved color opaque while history carries a finite bounded age");
+
+			const float previewFeedbackSaturationAge =
+				ResolveTemporalAAFeedbackSaturationAge(0.75f);
+			context.Check(previewFeedbackSaturationAge == 3.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(0.0f) == 1.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					TemporalAADefaultMaxHistoryFeedback) == 33.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					TemporalAAMaxHistoryFeedbackCeiling) == 99.0f &&
+				ResolveTemporalAAHistoryAgePreview(1.0f, 0.75f) == 0.0f &&
+				NearlyEqual(ResolveTemporalAAHistoryAgePreview(3.0f, 0.75f),
+					2.0f / 3.0f) &&
+				ResolveTemporalAAHistoryAgePreview(4.0f, 0.75f) == 1.0f &&
+				ResolveTemporalAAHistoryAgePreview(2.0f, 0.0f) == 1.0f &&
+				ResolveTemporalAAHistoryAgePreview(
+					std::numeric_limits<float>::quiet_NaN(), 0.75f) == 0.0f,
+				"TAA history-age preview maps reset NextAge to black and first cap-affected NextAge to white with the intentional off-by-one convention");
+
+			const TemporalAASettings defaultTemporalAA{};
+			static_assert(PackTemporalAAUnitRangePair(0.0f, 1.0f) == 0xffff0000u);
+			static_assert(PackTemporalAAUnitRangePair(1.0f, 0.0f) == 0x0000ffffu);
+			static_assert(PackTemporalAAUnitRangePair(0.5f, 0.25f) == 0x40008000u);
+			static_assert(PackTemporalAAUnitRangePair(
+				TemporalAADepthAbsoluteThreshold,
+				TemporalAADepthRelativeThreshold) == 0x051f0ccdu);
+			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+				TemporalAADefaultMaxHistoryFeedback,
+				TemporalAADefaultNeighborhoodClampExpansion) == 0x0000f851u);
+			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+				TemporalAAMaxHistoryFeedbackCeiling, 0.0f) == 0x0000fd70u);
+			static_assert(PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+				1.0f, 0.0f) == 0x0000fffeu);
+			constexpr std::array<float, 2> packingGolden =
+				UnpackTemporalAAUnitRangePair(0x40008000u);
+			constexpr std::array<float, 2> feedbackPackingGolden =
+				UnpackTemporalAAUnitRangePair(
+					PackTemporalAAMaxHistoryFeedbackAndClampExpansion(1.0f, 0.0f));
+			constexpr std::array<float, 2> feedbackCeilingPackingGolden =
+				UnpackTemporalAAUnitRangePair(
+					PackTemporalAAMaxHistoryFeedbackAndClampExpansion(
+						TemporalAAMaxHistoryFeedbackCeiling, 0.0f));
+			context.Check(NearlyEqual(packingGolden[0], 32768.0f / 65535.0f) &&
+				NearlyEqual(packingGolden[1], 16384.0f / 65535.0f) &&
+				feedbackPackingGolden[0] < 1.0f &&
+				(feedbackPackingGolden[0] * 65535.0f) == 65534.0f &&
+				feedbackCeilingPackingGolden[0] < 1.0f &&
+				ResolveTemporalAAFeedbackSaturationAge(
+					feedbackCeilingPackingGolden[0]) == 100.0f &&
+				std::ceil(feedbackCeilingPackingGolden[0] /
+					(1.0f - feedbackCeilingPackingGolden[0])) <= TemporalHistoryMaxAge,
+				"Temporal AA CPU packing matches the HLSL low/high UNORM16 ABI, feedback can never encode one, and the frozen cap remains reachable before age saturation");
+
+			constexpr std::array<float, 7> historyAges{ 1.0f, 2.0f, 3.0f, 7.0f, 15.0f,
+				31.0f, 63.0f };
+			constexpr std::array<float, 7> expectedHistoryWeights{ 0.5f, 2.0f / 3.0f,
+				0.75f, 0.875f, 0.9375f, 0.96875f,
+				TemporalAADefaultMaxHistoryFeedback };
+			bool ageWeightGoldenMatches = true;
+			for (size_t index = 0; index < historyAges.size(); ++index)
+			{
+				ageWeightGoldenMatches &= NearlyEqual(
+					ResolveTemporalAAHistoryWeight(
+						historyAges[index], 0.0f, 1.0f, 1.0f, defaultTemporalAA),
+					expectedHistoryWeights[index]);
+			}
+			const float staticHistoryWeight = ResolveTemporalAAHistoryWeight(
+				63.0f, 0.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float movingHistoryWeight =
+				ResolveTemporalAAHistoryWeight(63.0f, 10.0f, 1.0f, 1.0f, defaultTemporalAA);
+			const float defaultChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
+				63.0f, 0.0f, 1.0f, 0.9f, defaultTemporalAA);
+			TemporalAASettings luminanceResearchSettings = defaultTemporalAA;
+			luminanceResearchSettings.m_LuminanceWeightScale = 4.0f;
+			const float researchChangedLuminanceWeight = ResolveTemporalAAHistoryWeight(
+				63.0f, 0.0f, 1.0f, 0.9f, luminanceResearchSettings);
+			TemporalAASettings packedCeilingSettings = defaultTemporalAA;
+			packedCeilingSettings.m_MaxHistoryFeedback = feedbackCeilingPackingGolden[0];
+			const float saturatedCeilingWeight = ResolveTemporalAAHistoryWeight(
+				TemporalHistoryMaxAge, 0.0f, 1.0f, 1.0f, packedCeilingSettings);
+			context.Check(ageWeightGoldenMatches &&
+				TemporalAADefaultLuminanceWeightScale == 0.0f &&
+				NearlyEqual(staticHistoryWeight,
+					TemporalAADefaultMaxHistoryFeedback) &&
+				NearlyEqual(saturatedCeilingWeight, feedbackCeilingPackingGolden[0]) &&
+				movingHistoryWeight > 0.0f && movingHistoryWeight < staticHistoryWeight &&
+				NearlyEqual(defaultChangedLuminanceWeight, staticHistoryWeight) &&
+				researchChangedLuminanceWeight > 0.0f &&
+				researchChangedLuminanceWeight < staticHistoryWeight &&
+				ResolveTemporalAAHistoryWeight(std::numeric_limits<float>::quiet_NaN(),
+					0.0f, 1.0f, 1.0f, defaultTemporalAA) == 0.0f &&
+				ResolveTemporalAAHistoryWeight(1.0f,
+					std::numeric_limits<float>::quiet_NaN(),
+					1.0f, 1.0f, defaultTemporalAA) == 0.0f,
+				"Temporal blend follows the age golden sequence, caps at the frozen maximum, retains velocity attenuation, and keeps luminance attenuation research-only by default");
+
+			RecordingDevice motionCapabilityDevice;
+			motionCapabilityDevice.m_TextureViewsSupported = true;
+			const TemporalMotionFormatSupport motionSupport =
+				QueryTemporalMotionFormatSupport(motionCapabilityDevice);
+			const RHITextureDesc motionDesc = MakeTemporalMotionTextureDesc(1280, 720);
+			context.Check(motionSupport.IsSupported() &&
+				motionCapabilityDevice.m_TextureViewQueryCount == 2 &&
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
+					TemporalMotionFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::RenderTarget) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::Sampled) && motionDesc.m_Usage == RHITextureUsage::None &&
+				motionDesc.m_Extent.m_Width == 1280 &&
+				motionDesc.m_Extent.m_Height == 720 && motionDesc.m_ClearValue &&
+				motionDesc.m_ClearValue->m_Color[0] == 0.0f &&
+				motionDesc.m_ClearValue->m_Color[1] == 0.0f,
+				"Temporal motion capability requires the combined R16G16Float render-target and SRV contract");
+
+			motionCapabilityDevice.m_TextureViewQueryCount = 0;
+			const TemporalAAResolvedColorFormatSupport resolvedColorSupport =
+				QueryTemporalAAResolvedColorFormatSupport(motionCapabilityDevice);
+			context.Check(resolvedColorSupport.IsSupported() &&
+				motionCapabilityDevice.m_TextureViewQueryCount == 3 &&
+				motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Format ==
+					TemporalAAResolvedColorFormat &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::RenderTarget) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::Sampled) &&
+				Test(motionCapabilityDevice.m_LastTextureViewQueryTextureDesc.m_Usage,
+					RHITextureUsage::UnorderedAccess),
+				"Temporal resolved color capability requires the combined HDR RTV, SRV, and typed-UAV contract");
+
+			GraphicsPhysicalPipelineKey depthOnlyMotionCoverage{};
+			depthOnlyMotionCoverage.m_BindingLayout = RHIBindingLayoutHandle{ 1, 1 };
+			depthOnlyMotionCoverage.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			depthOnlyMotionCoverage.m_VSId = ShaderID{ 3 };
+			depthOnlyMotionCoverage.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			depthOnlyMotionCoverage.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			depthOnlyMotionCoverage.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+			depthOnlyMotionCoverage.m_DepthPreset = DepthPreset::ReversedZWrite;
+			depthOnlyMotionCoverage.m_BlendPreset = BlendPreset::ColorWriteDisable;
+			GraphicsPhysicalPipelineKey velocityMotionCoverage = depthOnlyMotionCoverage;
+			velocityMotionCoverage.m_PSId = ShaderID{ 4 };
+			velocityMotionCoverage.m_Formats.m_RenderTargetCount = 1;
+			velocityMotionCoverage.m_Formats.m_RenderTargetFormats[0] = TemporalMotionFormat;
+			velocityMotionCoverage.m_BlendPreset = BlendPreset::Default;
+			const uint64_t opaqueMotionVariant =
+				RenderQueueBuilder::EncodeVariantBits(RenderBucket::Opaque, false);
+			const uint64_t alphaMotionVariant =
+				RenderQueueBuilder::EncodeVariantBits(RenderBucket::AlphaTest, false);
+			context.Check(
+				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, opaqueMotionVariant) ==
+					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+						velocityMotionCoverage, opaqueMotionVariant) &&
+				RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+					depthOnlyMotionCoverage, alphaMotionVariant) ==
+					RenderPassDepthPrepass::BuildDepthCoveragePipelineSignatureForVariant(
+						velocityMotionCoverage, alphaMotionVariant),
+				"Velocity MRT preserves opaque and alpha-test depth coverage signatures");
+
+			struct TemporalMotionFixturePassData
+			{
+				RGTextureId m_Motion{};
+			};
+			RenderGraph motionGraph({
+				.m_Device = &motionCapabilityDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+			});
+			motionGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.TemporalMotionSetup",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					resources.m_MotionVectors = builder.CreateTexture(
+						"Temporal.MotionVectors", MakeTemporalMotionTextureDesc(1280, 720));
+					resources.m_MotionSrvDesc =
+						MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					resources.m_Width = 1280;
+					resources.m_Height = 720;
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"View.ClearMotionVectors",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.WriteInPlace(resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"Geometry.DepthPrepass.Velocity",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.ReadWriteInPlace(
+						resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			motionGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.TemporalMotionDebugTap",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					data.m_Motion = builder.Read(
+						resources.m_MotionVectors, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			const bool motionGraphCompiled = motionGraph.Compile();
+			RGSnapshot motionSnapshot;
+			if (motionGraphCompiled)
+			{
+				BuildRenderGraphSnapshot(motionGraph, motionSnapshot);
+			}
+			const auto motionResource = std::ranges::find(
+				motionSnapshot.m_Resources, "Temporal.MotionVectors", &RGSnapshotResourceInfo::m_Name);
+			context.Check(motionGraphCompiled && motionSnapshot.m_Passes.size() == 4 &&
+				motionSnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
+				motionSnapshot.m_Passes[1].m_ExecutionOrder <
+					motionSnapshot.m_Passes[2].m_ExecutionOrder &&
+				motionSnapshot.m_Passes[2].m_ExecutionOrder <
+					motionSnapshot.m_Passes[3].m_ExecutionOrder &&
+				motionResource != motionSnapshot.m_Resources.end() &&
+				motionResource->m_TextureFormat == TemporalMotionFormat &&
+				motionResource->m_TextureExtent.m_Width == 1280 &&
+				motionResource->m_TextureExtent.m_Height == 720 &&
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
+					RHITextureUsage::RenderTarget) &&
+				Test(static_cast<RHITextureUsage>(motionResource->m_UsageBits),
+					RHITextureUsage::Sampled),
+				"Active temporal geometry clears motion before velocity coverage and exposes an explicit sampled debug tap");
+
+			RenderGraph skyOnlyGraph({
+				.m_Device = &motionCapabilityDevice,
+				.m_TransientResourcePool =
+					reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+			});
+			skyOnlyGraph.GetBlackboard().Create<RGTemporalGeometryResources>(
+				TemporalGeometryResourcesName);
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"RenderingContract.SkyOnlyTemporalSetup",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					builder.SideEffect();
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					resources.m_MotionVectors = builder.CreateTexture(
+						"Temporal.SkyOnly.MotionVectors", MakeTemporalMotionTextureDesc(320, 180));
+					resources.m_MotionSrvDesc = MakeRHITexture2DViewDesc(TemporalMotionFormat);
+					resources.m_Width = 320;
+					resources.m_Height = 180;
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"View.ClearMotionVectors",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					builder.WriteInPlace(resources.m_MotionVectors, RGTextureAccess::RenderTarget);
+					data.m_Motion = resources.m_MotionVectors;
+				});
+			skyOnlyGraph.AddPass<TemporalMotionFixturePassData>(
+				"PostProcess.TemporalAA",
+				[](RenderGraph::RGBuilder& builder, TemporalMotionFixturePassData& data)
+				{
+					auto& resources = builder.GetBlackboard().Get<
+						RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+					data.m_Motion = builder.Read(
+						resources.m_MotionVectors, RGTextureAccess::Sample);
+					builder.SideEffect();
+				});
+			const bool skyOnlyGraphCompiled = skyOnlyGraph.Compile();
+			RGSnapshot skyOnlySnapshot;
+			if (skyOnlyGraphCompiled)
+			{
+				BuildRenderGraphSnapshot(skyOnlyGraph, skyOnlySnapshot);
+			}
+			context.Check(skyOnlyGraphCompiled && skyOnlySnapshot.m_Passes.size() == 3 &&
+				skyOnlySnapshot.m_Passes[1].m_Name == "View.ClearMotionVectors" &&
+				!skyOnlySnapshot.m_Passes[1].m_Culled &&
+				skyOnlySnapshot.m_Passes[1].m_ExecutionOrder <
+					skyOnlySnapshot.m_Passes[2].m_ExecutionOrder,
+				"Zero-draw sky-only temporal frames retain motion clear before reprojection resolve");
+
+			context.Check(IsTemporalColorCompatible(
+				TemporalColorAbi::LinearRec709SceneReferredV1,
+				PostProcessColorState::SceneLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::SceneLinearRec709, 0.5f),
+				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
+
+			Camera rigCamera(Camera::CreateInfo{});
+			CameraController rigController(CameraController::CreateInfo{});
+			CameraRig cameraRig;
+			cameraRig.AttachMainCamera(rigCamera, rigController);
+			const CameraRig::EffectiveDisplayView mainDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			const size_t debugCameraIndex = cameraRig.AddDebugCameraFromActive();
+			const CameraRig::CameraSlot* debugCameraSlot =
+				cameraRig.GetCameraSlot(debugCameraIndex);
+			const bool selectedDebugView =
+				debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
+			const CameraRig::EffectiveDisplayView debugDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			CameraRig::CameraSlot* mutableDebugCameraSlot =
+				cameraRig.GetCameraSlot(debugCameraIndex);
+			if (mutableDebugCameraSlot)
+			{
+				mutableDebugCameraSlot->m_EnableRenderView = false;
+			}
+			const CameraRig::EffectiveDisplayView fallbackDisplayView =
+				cameraRig.ResolveEffectiveDisplayView();
+			context.Check(mainDisplayView.IsValid() &&
+				mainDisplayView.m_ViewId == RenderViewID::Main && selectedDebugView &&
+				debugDisplayView.IsValid() &&
+				IsDebugCameraRenderViewID(debugDisplayView.m_ViewId) &&
+				fallbackDisplayView.IsValid() &&
+				fallbackDisplayView.m_ViewId == RenderViewID::Main,
+				"CameraRig resolves the effective display view and fallback exactly once");
+
+			const uint64_t initialResetSerial = rigCamera.GetTemporalResetSerial();
+			rigCamera.SetPosition(Vector3(1.0f, 2.0f, 3.0f));
+			rigCamera.SetFov(55.0f);
+			const bool continuousChangesPreserveSerial =
+				rigCamera.GetTemporalResetSerial() == initialResetSerial;
+			rigCamera.RequestTemporalReset();
+			const uint64_t explicitResetSerial = rigCamera.GetTemporalResetSerial();
+			rigCamera.LookAt(Vector3(2.0f, 3.0f, 4.0f), Vector3::Zero);
+			context.Check(continuousChangesPreserveSerial &&
+				explicitResetSerial == initialResetSerial + 1 &&
+				rigCamera.GetTemporalResetSerial() == explicitResetSerial + 1,
+				"Camera temporal reset serial changes only for explicit discontinuities and cuts");
+
+			ViewRenderProfile profile{};
+			const Camera camera(Camera::CreateInfo{});
+			const ResolvedViewRenderSettings defaultSettings =
+				ResolveViewRenderSettings(profile, camera);
+			profile.m_TemporalAA.m_Enabled = true;
+			const ResolvedViewRenderSettings enabledSettings =
+				ResolveViewRenderSettings(profile, camera);
+			profile.m_TemporalAA.m_DepthAbsoluteThreshold = -1.0f;
+			profile.m_TemporalAA.m_DepthRelativeThreshold = 2.0f;
+			profile.m_TemporalAA.m_MaxHistoryFeedback = 2.0f;
+			profile.m_TemporalAA.m_VelocityWeightScale = -1.0f;
+			profile.m_TemporalAA.m_LuminanceWeightScale = 32.0f;
+			profile.m_TemporalAA.m_NeighborhoodClampExpansion =
+				std::numeric_limits<float>::quiet_NaN();
+			const ResolvedViewRenderSettings clampedSettings =
+				ResolveViewRenderSettings(profile, camera);
+			context.Check(!defaultSettings.m_TemporalAA.m_Enabled &&
+				enabledSettings.m_TemporalAA.m_Enabled &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthAbsoluteThreshold,
+					TemporalAADepthAbsoluteThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_DepthRelativeThreshold,
+					TemporalAADepthRelativeThreshold) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_MaxHistoryFeedback,
+					TemporalAADefaultMaxHistoryFeedback) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_VelocityWeightScale,
+					TemporalAADefaultVelocityWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_LuminanceWeightScale,
+					TemporalAADefaultLuminanceWeightScale) &&
+				NearlyEqual(enabledSettings.m_TemporalAA.m_NeighborhoodClampExpansion,
+					TemporalAADefaultNeighborhoodClampExpansion) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthAbsoluteThreshold, 0.0f) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_DepthRelativeThreshold,
+					TemporalAAMaxDepthThreshold) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_MaxHistoryFeedback,
+					TemporalAAMaxHistoryFeedbackCeiling) &&
+				clampedSettings.m_TemporalAA.m_MaxHistoryFeedback < 1.0f &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_VelocityWeightScale, 0.0f) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_LuminanceWeightScale,
+					TemporalAAMaxLuminanceWeightScale) &&
+				NearlyEqual(clampedSettings.m_TemporalAA.m_NeighborhoodClampExpansion, 0.0f),
+				"Temporal AA authoring defaults off, feedback resolves strictly below one, and quality controls resolve to finite bounded frame settings");
+
+			const TemporalAACapabilityStatus fullCapabilities{
+				.m_MotionRenderTarget = true,
+				.m_MotionShaderResource = true,
+				.m_ResolvedColorRenderTarget = true,
+				.m_ResolvedColorShaderResource = true,
+				.m_ResolvedColorTypedUavStore = true,
+				.m_HistoryColorShaderResource = true,
+				.m_HistoryColorTypedUavStore = true,
+				.m_HistoryDepthShaderResource = true,
+				.m_HistoryDepthTypedUavStore = true,
+				.m_VelocityProgramsAvailable = true,
+				.m_ResolveProgramAvailable = true,
+				.m_BindingLayoutAvailable = true,
+			};
+			context.Check(fullCapabilities.IsCoreAvailable() &&
+				!TemporalAACapabilityStatus{}.IsCoreAvailable(),
+				"Temporal AA core capability requires the complete texture, program, and binding closure");
+
+			TemporalFramePlanResolveInfo resolveInfo{
+				.m_Settings = {.m_Enabled = true},
+				.m_Capabilities = fullCapabilities,
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::PostTAA,
+				.m_ResetIdentity = 17,
+				.m_SessionIdentity = 23,
+				.m_DisplayViewEligible = true,
+				.m_DepthVelocityPathAvailable = true,
+			};
+			const ResolvedTemporalFramePlan activePlan = ResolveTemporalFramePlan(resolveInfo);
+			TemporalFramePlanResolveInfo disabledInfo = resolveInfo;
+			disabledInfo.m_Settings.m_Enabled = false;
+			const ResolvedTemporalFramePlan disabledPlan = ResolveTemporalFramePlan(disabledInfo);
+			TemporalFramePlanResolveInfo missingCoreInfo = resolveInfo;
+			missingCoreInfo.m_Capabilities = {};
+			const ResolvedTemporalFramePlan missingCorePlan =
+				ResolveTemporalFramePlan(missingCoreInfo);
+			TemporalFramePlanResolveInfo ineligibleInfo = resolveInfo;
+			ineligibleInfo.m_DisplayViewEligible = false;
+			const ResolvedTemporalFramePlan ineligiblePlan =
+				ResolveTemporalFramePlan(ineligibleInfo);
+			TemporalFramePlanResolveInfo missingDepthVelocityInfo = resolveInfo;
+			missingDepthVelocityInfo.m_DepthVelocityPathAvailable = false;
+			const ResolvedTemporalFramePlan missingDepthVelocityPlan =
+				ResolveTemporalFramePlan(missingDepthVelocityInfo);
+			TemporalFramePlanResolveInfo unsupportedExtensionInfo = resolveInfo;
+			unsupportedExtensionInfo.m_SceneExtensionParticipation =
+				SceneExtensionTemporalParticipation::TemporalUnsupported;
+			const ResolvedTemporalFramePlan unsupportedExtensionPlan =
+				ResolveTemporalFramePlan(unsupportedExtensionInfo);
+			TemporalFramePlanResolveInfo internalInfo = missingCoreInfo;
+			internalInfo.m_InternalContractMode = true;
+			const ResolvedTemporalFramePlan internalPlan = ResolveTemporalFramePlan(internalInfo);
+			context.Check(activePlan.m_Active && activePlan.m_CoreAvailable &&
+				activePlan.m_Status == TemporalAAFrameStatus::Active &&
+				activePlan.m_DisableReason == TemporalAADisableReason::None &&
+				activePlan.m_ResetIdentity == 17 && activePlan.m_SessionIdentity == 23 &&
+				!disabledPlan.m_Active &&
+				disabledPlan.m_Status == TemporalAAFrameStatus::Disabled &&
+				disabledPlan.m_DisableReason == TemporalAADisableReason::NotRequested &&
+				missingCorePlan.m_DisableReason ==
+					TemporalAADisableReason::CoreCapabilityUnavailable &&
+				ineligiblePlan.m_DisableReason == TemporalAADisableReason::DisplayViewIneligible &&
+				missingDepthVelocityPlan.m_DisableReason ==
+					TemporalAADisableReason::DepthVelocityPathUnavailable &&
+				unsupportedExtensionPlan.m_DisableReason ==
+					TemporalAADisableReason::SceneExtensionUnsupported &&
+				internalPlan.m_Active && !internalPlan.m_CoreAvailable &&
+				internalPlan.m_InternalContractMode,
+				"Temporal frame plan resolves one atomic active state and preserves every disable cause");
+
+			context.Check(IsTemporalAADisplayViewEligible(RenderViewID::Main, 1920, 1080) &&
+				IsTemporalAADisplayViewEligible(RenderViewID::DebugCamera0, 1, 1) &&
+				!IsTemporalAADisplayViewEligible(RenderViewID::DirectionalShadow, 1920, 1080) &&
+				!IsTemporalAADisplayViewEligible(RenderViewID::Main, 0, 1080),
+				"Temporal AA eligibility is restricted to non-empty perspective display views");
+
+			RenderPipelineForwardPBR forwardPipeline;
+			const ResolvedTemporalFramePlan forwardPlan =
+				forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
+			RenderPipelineForwardPBR integratedExtensionPipeline({
+				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
+			});
+			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
+			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
+			const ResolvedTemporalFramePlan integratedExtensionPlan =
+				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
+			context.Check(forwardPlan.m_Active && forwardPlan.m_DepthVelocityPathAvailable &&
+				forwardPlan.m_SceneExtensionParticipation ==
+					SceneExtensionTemporalParticipation::PostTAA &&
+				forwardPlan.m_DisableReason == TemporalAADisableReason::None &&
+				!integratedExtensionPlan.m_Active &&
+				integratedExtensionPlan.m_SceneExtensionParticipation ==
+					SceneExtensionTemporalParticipation::TemporalUnsupported,
+				"ForwardPBR exposes its velocity path and rejects unsupported integrated extensions");
+
+			Renderer renderer;
+			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),
+				"Renderer publishes temporal core capability as unavailable before pipeline closure");
+
+			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
+				.m_Settings = enabledSettings.m_TemporalAA,
+				.m_Capabilities = {},
+				.m_DisplayViewId = RenderViewID::Main,
+				.m_SceneExtensionParticipation =
+					SceneExtensionTemporalParticipation::PostTAA,
+				.m_DisplayViewEligible = true,
+			});
+			RenderViewBuilder viewBuilder;
+			RenderView view = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = defaultSettings,
+				.m_TemporalFramePlan = viewPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			TemporalViewHistory unavailableViewHistory{};
+			TemporalObjectHistory unavailableObjectHistory{};
+			TemporalFrameTransaction unavailableTransaction;
+			unavailableTransaction.Begin(unavailableViewHistory, unavailableObjectHistory,
+				viewPlan, 1920, 1080);
+			unavailableTransaction.PrepareDisplayView(view);
+			unavailableTransaction.CommitCompleted();
+			const float nearRawDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, view.m_Near), view.m_RasterProj).m_RawDepth;
+			const float farRawDepth = ProjectPosition(
+				Vector3(0.0f, 0.0f, view.m_Far), view.m_RasterProj).m_RawDepth;
+			context.Check(viewPlan.m_Requested && !viewPlan.m_CoreAvailable &&
+				!viewPlan.m_Active && viewPlan.m_DisableReason ==
+					TemporalAADisableReason::CoreCapabilityUnavailable &&
+				unavailableTransaction.GetState() == TemporalFrameTransactionState::Committed &&
+				NearlyEqual(unavailableTransaction.GetJitterPixels(), Vector2::Zero) &&
+				!unavailableTransaction.ParticipatedInResolve() &&
+				!unavailableViewHistory.m_Valid &&
+				unavailableObjectHistory.GetDiagnostics().m_EntryCount == 0 &&
+				view.m_UnjitteredProj.ToArray() == view.m_RasterProj.ToArray() &&
+				view.m_UnjitteredViewProj.ToArray() == view.m_RasterViewProj.ToArray() &&
+				view.m_JitterPixels.m_X == 0.0f && view.m_JitterPixels.m_Y == 0.0f &&
+				view.m_JitterUV.m_X == 0.0f && view.m_JitterUV.m_Y == 0.0f &&
+				!view.m_HasPreviousTemporalState &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(nearRawDepth,
+					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Near) &&
+				NearlyEqual(screen_space::RawDepthToPositiveViewZ(farRawDepth,
+					view.m_DepthReconstructionParams, view.m_DepthConvention), view.m_Far,
+					PositionTolerance * view.m_Far),
+				"Core-unavailable temporal frames disable jitter, history participation, and resolve atomically");
+
+			const Vector2 jitterPixels(0.5f, -0.25f);
+			const Vector2 jitterUV = temporal::JitterPixelsToUV(jitterPixels, 100, 50);
+			const Vector2 jitterNDC = temporal::JitterPixelsToNDC(jitterPixels, 100, 50);
+			const Vector4 jitteredClip = temporal::ApplyJitterToClipPosition(
+				Vector4(1.0f, 2.0f, 3.0f, 2.0f), jitterNDC);
+			context.Check(NearlyEqual(jitterUV, Vector2(0.005f, -0.005f)) &&
+				NearlyEqual(jitterNDC, Vector2(0.01f, 0.01f)) &&
+				NearlyEqual(jitteredClip.m_X, 1.02f) &&
+				NearlyEqual(jitteredClip.m_Y, 2.02f) &&
+				NearlyEqual(temporal::ReprojectToPreviousUV(Vector2(0.5f, 0.5f),
+					Vector2(0.1f, -0.2f)), Vector2(0.4f, 0.7f)),
+				"CPU temporal math fixes pixel, NDC, clip, and motion reprojection signs");
+
+			constexpr std::array<Vector2, temporal::JitterSampleCount> expectedJitterSamples = {
+				Vector2(0.0f, -1.0f / 6.0f),
+				Vector2(-1.0f / 4.0f, 1.0f / 6.0f),
+				Vector2(1.0f / 4.0f, -7.0f / 18.0f),
+				Vector2(-3.0f / 8.0f, -1.0f / 18.0f),
+				Vector2(1.0f / 8.0f, 5.0f / 18.0f),
+				Vector2(-1.0f / 8.0f, -5.0f / 18.0f),
+				Vector2(3.0f / 8.0f, 1.0f / 18.0f),
+				Vector2(-7.0f / 16.0f, 7.0f / 18.0f),
+			};
+			bool jitterGoldenTableMatches = true;
+			for (uint32_t index = 0; index < temporal::JitterSampleCount; ++index)
+			{
+				jitterGoldenTableMatches = jitterGoldenTableMatches &&
+					NearlyEqual(temporal::GetJitterSamplePixels(index),
+						expectedJitterSamples[index]);
+			}
+			context.Check(jitterGoldenTableMatches,
+				"Temporal jitter sequence matches the exact Halton(2,3) eight-sample table");
+
+			TemporalViewHistory temporalViewHistory{};
+			TemporalObjectHistory temporalObjectHistory{};
+			TemporalFrameTransaction abortedTransaction;
+			abortedTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+			RenderView abortedView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			abortedTransaction.PrepareDisplayView(abortedView);
+			const Vector4 unjitteredClip = math::Transform(
+				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_UnjitteredProj);
+			const Vector4 rasterClip = math::Transform(
+				Vector4(1.0f, 2.0f, 3.0f, 1.0f), abortedView.m_RasterProj);
+			const Vector4 expectedRasterClip = temporal::ApplyJitterToClipPosition(
+				unjitteredClip,
+				temporal::JitterPixelsToNDC(abortedTransaction.GetJitterPixels(), 1920, 1080));
+			abortedTransaction.Abort();
+
+			TemporalFrameTransaction committedTransaction;
+			committedTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+			RenderView committedView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			committedTransaction.PrepareDisplayView(committedView);
+			committedTransaction.MarkResolveParticipated();
+			committedTransaction.CommitCompleted();
+
+			TemporalFrameTransaction noResolveTransaction;
+			noResolveTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+			RenderView noResolveView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			noResolveTransaction.PrepareDisplayView(noResolveView);
+			noResolveTransaction.CommitCompleted();
+
+			ResolvedTemporalFramePlan changedSessionPlan = activePlan;
+			++changedSessionPlan.m_SessionIdentity;
+			TemporalFrameTransaction changedSessionTransaction;
+			changedSessionTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, changedSessionPlan, 1920, 1080);
+			RenderView changedSessionView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = changedSessionPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			changedSessionTransaction.PrepareDisplayView(changedSessionView);
+			changedSessionTransaction.Abort();
+			const RenderView temporalShadowView =
+				viewBuilder.Build<RenderViewID::DirectionalShadow>({
+					.m_MainView = noResolveView,
+				});
+
+			TemporalFrameTransaction fatalTransaction;
+			fatalTransaction.Begin(
+				temporalViewHistory, temporalObjectHistory, activePlan, 1920, 1080);
+			RenderView fatalView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = activePlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			fatalTransaction.PrepareDisplayView(fatalView);
+			fatalTransaction.MarkResolveParticipated();
+			fatalTransaction.InvalidateAfterFatal();
+			context.Check(abortedTransaction.GetJitterIndex() == 0 &&
+				committedTransaction.GetJitterIndex() == 0 &&
+				noResolveTransaction.GetJitterIndex() == 1 &&
+				noResolveView.m_HasPreviousTemporalState &&
+				noResolveView.m_PreviousJitterUV.m_X == committedView.m_JitterUV.m_X &&
+				noResolveView.m_PreviousJitterUV.m_Y == committedView.m_JitterUV.m_Y &&
+				noResolveTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				changedSessionTransaction.GetJitterIndex() == 0 &&
+				!changedSessionView.m_HasPreviousTemporalState &&
+				temporalShadowView.m_RasterProj.ToArray() ==
+					temporalShadowView.m_UnjitteredProj.ToArray() &&
+				fatalTransaction.GetState() == TemporalFrameTransactionState::Invalidated &&
+				!temporalViewHistory.m_Valid && temporalViewHistory.m_NextJitterIndex == 0 &&
+				NearlyEqual(rasterClip.m_X, expectedRasterClip.m_X) &&
+				NearlyEqual(rasterClip.m_Y, expectedRasterClip.m_Y) &&
+				NearlyEqual(rasterClip.m_Z, expectedRasterClip.m_Z) &&
+				NearlyEqual(rasterClip.m_W, expectedRasterClip.m_W),
+				"Temporal frame transaction advances only on committed resolve and invalidates on fatal");
+
+			TemporalViewHistory submittedViewHistory{};
+			TemporalObjectHistory submittedObjectHistory{};
+			const auto buildSubmittedHistoryView = [&]() noexcept
+			{
+				return viewBuilder.Build<RenderViewID::Main>({
+					.m_Camera = camera,
+					.m_RenderSettings = enabledSettings,
+					.m_TemporalFramePlan = activePlan,
+					.m_Width = 1920,
+					.m_Height = 1080,
+				});
+			};
+			const RenderObjectHistoryKey objectHistoryKey{
+				.m_EntityIdentity = 7,
+				.m_ModelId = ModelID{ 11 },
+				.m_ModelContentGeneration = 3,
+				.m_ModelMeshIndex = 2,
+				.m_MeshId = MeshID{ 13 },
+				.m_MeshContentGeneration = 5,
+				.m_SessionIdentity = activePlan.m_SessionIdentity,
+			};
+			const Matrix initialObjectModel =
+				math::CreateTranslation(Vector3(1.0f, 2.0f, 3.0f));
+			const Matrix movedObjectModel =
+				math::CreateTranslation(Vector3(4.0f, 5.0f, 6.0f));
+
+			TemporalFrameTransaction initialObjectTransaction;
+			initialObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView initialObjectView = buildSubmittedHistoryView();
+			initialObjectTransaction.PrepareDisplayView(initialObjectView);
+			const Matrix initialPreviousModel =
+				initialObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, initialObjectModel);
+			const bool initialObjectStaged =
+				initialObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, initialObjectModel);
+			initialObjectTransaction.MarkResolveParticipated();
+			initialObjectTransaction.CommitCompleted();
+			const TemporalCommittedObjectState* initialCommittedObject =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool initialObjectCommitted = initialCommittedObject &&
+				initialCommittedObject->m_Model.ToArray() == initialObjectModel.ToArray() &&
+				initialCommittedObject->m_LastSeenCommittedFrame == 1;
+
+			TemporalFrameTransaction abortedObjectTransaction;
+			abortedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView abortedObjectView = buildSubmittedHistoryView();
+			abortedObjectTransaction.PrepareDisplayView(abortedObjectView);
+			const Matrix abortedPreviousModel =
+				abortedObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, movedObjectModel);
+			const bool abortedObjectStaged =
+				abortedObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, movedObjectModel);
+			abortedObjectTransaction.CommitCompleted();
+			const TemporalCommittedObjectState* committedAfterAbort =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool objectAbortPreserved = committedAfterAbort &&
+				committedAfterAbort->m_Model.ToArray() == initialObjectModel.ToArray() &&
+				committedAfterAbort->m_LastSeenCommittedFrame == 1;
+
+			TemporalFrameTransaction movedObjectTransaction;
+			movedObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView movedObjectView = buildSubmittedHistoryView();
+			movedObjectTransaction.PrepareDisplayView(movedObjectView);
+			const Matrix movedPreviousModel =
+				movedObjectTransaction.ResolvePreviousObjectModel(
+					objectHistoryKey, movedObjectModel);
+			const bool movedObjectStaged =
+				movedObjectTransaction.StageSubmittedObject(
+					objectHistoryKey, movedObjectModel);
+			movedObjectTransaction.MarkResolveParticipated();
+			movedObjectTransaction.CommitCompleted();
+
+			TemporalFrameTransaction abortedDisappearanceTransaction;
+			abortedDisappearanceTransaction.Begin(submittedViewHistory,
+				submittedObjectHistory, activePlan, 1920, 1080);
+			RenderView abortedDisappearanceView = buildSubmittedHistoryView();
+			abortedDisappearanceTransaction.PrepareDisplayView(abortedDisappearanceView);
+			abortedDisappearanceTransaction.Abort();
+			const TemporalCommittedObjectState* committedAfterAbortedDisappearance =
+				submittedObjectHistory.Find(objectHistoryKey);
+			const bool abortedDisappearancePreserved =
+				committedAfterAbortedDisappearance &&
+				committedAfterAbortedDisappearance->m_Model.ToArray() ==
+					movedObjectModel.ToArray() &&
+				committedAfterAbortedDisappearance->m_LastSeenCommittedFrame == 2;
+
+			RenderObjectHistoryKey replacementKey = objectHistoryKey;
+			replacementKey.m_ModelId = ModelID{ 12 };
+			replacementKey.m_ModelContentGeneration = 1;
+			RenderObjectHistoryKey republishedGeometryKey = objectHistoryKey;
+			++republishedGeometryKey.m_MeshContentGeneration;
+			const Matrix replacementModel =
+				math::CreateTranslation(Vector3(8.0f, 9.0f, 10.0f));
+			RenderObjectHistoryKey reusedEntityKey = objectHistoryKey;
+			++reusedEntityKey.m_EntityIdentity;
+			TemporalFrameTransaction replacementTransaction;
+			replacementTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView replacementView = buildSubmittedHistoryView();
+			replacementTransaction.PrepareDisplayView(replacementView);
+			const Matrix replacementPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					replacementKey, replacementModel);
+			const Matrix reusedEntityPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					reusedEntityKey, replacementModel);
+			const Matrix republishedGeometryPreviousModel =
+				replacementTransaction.ResolvePreviousObjectModel(
+					republishedGeometryKey, replacementModel);
+			const bool replacementStaged = replacementTransaction.StageSubmittedObject(
+				replacementKey, replacementModel);
+			replacementTransaction.MarkResolveParticipated();
+			replacementTransaction.CommitCompleted();
+			const TemporalObjectHistoryDiagnostics replacementDiagnostics =
+				submittedObjectHistory.GetDiagnostics();
+			const TemporalCommittedObjectState* committedReplacement =
+				submittedObjectHistory.Find(replacementKey);
+			const bool replacementRetiredOldIdentity =
+				!submittedObjectHistory.Find(objectHistoryKey) && committedReplacement &&
+				committedReplacement->m_Model.ToArray() == replacementModel.ToArray();
+
+			ResolvedTemporalFramePlan replacementSessionPlan = activePlan;
+			++replacementSessionPlan.m_SessionIdentity;
+			RenderObjectHistoryKey replacementSessionKey = replacementKey;
+			replacementSessionKey.m_SessionIdentity = replacementSessionPlan.m_SessionIdentity;
+			TemporalFrameTransaction replacementSessionTransaction;
+			replacementSessionTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				replacementSessionPlan, 1920, 1080);
+			RenderView replacementSessionView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = replacementSessionPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			replacementSessionTransaction.PrepareDisplayView(replacementSessionView);
+			const Matrix replacementSessionPrevious =
+				replacementSessionTransaction.ResolvePreviousObjectModel(
+					replacementSessionKey, initialObjectModel);
+			replacementSessionTransaction.Abort();
+
+			ResolvedTemporalFramePlan resetObjectPlan = activePlan;
+			++resetObjectPlan.m_ResetIdentity;
+			TemporalFrameTransaction resetObjectTransaction;
+			resetObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				resetObjectPlan, 1920, 1080);
+			RenderView resetObjectView = viewBuilder.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = enabledSettings,
+				.m_TemporalFramePlan = resetObjectPlan,
+				.m_Width = 1920,
+				.m_Height = 1080,
+			});
+			resetObjectTransaction.PrepareDisplayView(resetObjectView);
+			const Matrix resetPreviousModel =
+				resetObjectTransaction.ResolvePreviousObjectModel(
+					replacementKey, initialObjectModel);
+			resetObjectTransaction.Abort();
+
+			TemporalFrameTransaction fatalObjectTransaction;
+			fatalObjectTransaction.Begin(submittedViewHistory, submittedObjectHistory,
+				activePlan, 1920, 1080);
+			RenderView fatalObjectView = buildSubmittedHistoryView();
+			fatalObjectTransaction.PrepareDisplayView(fatalObjectView);
+			fatalObjectTransaction.InvalidateAfterFatal();
+			const TemporalObjectHistoryDiagnostics fatalObjectDiagnostics =
+				submittedObjectHistory.GetDiagnostics();
+			context.Check(objectHistoryKey.IsValid() && initialObjectStaged &&
+				abortedObjectStaged && movedObjectStaged && replacementStaged &&
+				abortedObjectTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
+				initialPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				initialObjectCommitted &&
+				abortedPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				objectAbortPreserved &&
+				movedPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				abortedDisappearancePreserved &&
+				replacementPreviousModel.ToArray() == replacementModel.ToArray() &&
+				reusedEntityPreviousModel.ToArray() == replacementModel.ToArray() &&
+				republishedGeometryPreviousModel.ToArray() == replacementModel.ToArray() &&
+				replacementRetiredOldIdentity &&
+				replacementDiagnostics.m_EntryCount == 1 &&
+				replacementDiagnostics.m_Capacity == MaxObjectCapacity &&
+				replacementDiagnostics.m_LastCommittedFrame == 3 &&
+				replacementSessionPrevious.ToArray() == initialObjectModel.ToArray() &&
+				resetPreviousModel.ToArray() == initialObjectModel.ToArray() &&
+				fatalObjectDiagnostics.m_EntryCount == 0 &&
+				fatalObjectDiagnostics.m_LastCommittedFrame == 0,
+				"Submitted object history commits atomically, rejects stale identities, and "
+				"retires only on committed disappearance");
+
+			RenderFrameBuilder::BuildResult frameResult{};
+			frameResult.m_TemporalFramePlan = activePlan;
+			const RenderFrameContext frameContext = frameResult.MakeRenderFrameContext();
+			context.Check(frameContext.GetTemporalFramePlan() == activePlan,
+				"RenderFrameContext preserves the single pre-frame temporal plan without re-resolution");
 		}
 	}
 
@@ -4001,6 +5772,8 @@ namespace gglab
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunTextureFormatCapabilityTests(context);
+		RunPersistentTexturePoolContractTests(context);
+		RunTemporalHistoryTransactionContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);

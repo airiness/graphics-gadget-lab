@@ -15,6 +15,7 @@
 #include "Diagnostics/Builders/VulkanBackendSnapshotBuilder.h"
 #endif
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
+#include "Diagnostics/Builders/TemporalAADiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/DX12BackendSnapshot.h"
@@ -32,6 +33,7 @@
 #include "Diagnostics/Snapshots/VulkanBackendSnapshot.h"
 #endif
 #include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
+#include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -219,6 +221,46 @@ namespace gglab
 			}
 		};
 
+		class TemporalAADiagnosticsSnapshotProvider final
+			: public SnapshotProvider<TemporalAADiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Temporal AA Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<TemporalAADiagnosticsSnapshot>();
+				if (!context.m_Renderer || !context.m_RenderGraph)
+				{
+					snapshot = {};
+					return;
+				}
+				const RenderView* displayView = nullptr;
+				if (context.m_TemporalFramePlan)
+				{
+					const size_t viewIndex =
+						utils::ToIndex(context.m_TemporalFramePlan->m_DisplayViewId);
+					if (viewIndex < context.m_RenderViews.size())
+					{
+						displayView = &context.m_RenderViews[viewIndex];
+					}
+				}
+				const TemporalAASettings* authoringSettings =
+					context.m_AuthoringViewRenderProfile
+					? &context.m_AuthoringViewRenderProfile->m_TemporalAA
+					: nullptr;
+				const TemporalAASettings* requestedSettings =
+					context.m_EffectiveViewRenderProfile
+					? &context.m_EffectiveViewRenderProfile->m_TemporalAA
+					: nullptr;
+				snapshot = BuildTemporalAADiagnosticsSnapshot(*context.m_Renderer,
+					*context.m_RenderGraph, context.m_TemporalFramePlan, displayView,
+					authoringSettings, requestedSettings);
+			}
+		};
+
 		class TransientResourcePoolSnapshotProvider final
 			: public SnapshotProvider<TransientResourcePoolSnapshot>
 		{
@@ -398,6 +440,8 @@ namespace gglab
 		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<GTAODiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<TemporalAADiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);

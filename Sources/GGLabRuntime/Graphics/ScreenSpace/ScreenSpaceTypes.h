@@ -109,5 +109,32 @@ namespace gglab
 		{
 			return std::max(ReconstructViewPosition(uv, rawDepth, inverseProjection).m_Z, 0.0f);
 		}
+
+		[[nodiscard]] inline constexpr Vector4 MakeDepthReconstructionParams(
+			const Matrix& projection) noexcept
+		{
+			return Vector4(projection.m_33, projection.m_34, projection.m_43, projection.m_44);
+		}
+
+		[[nodiscard]] inline float RawDepthToPositiveViewZ(float rawDepth,
+			const Vector4& reconstructionParams, DepthConvention convention) noexcept
+		{
+			if (convention != DepthConvention::Reversed && convention != DepthConvention::Standard)
+			{
+				return 0.0f;
+			}
+
+			const float denominator = rawDepth * reconstructionParams.m_Y -
+				reconstructionParams.m_X;
+			const float numerator = reconstructionParams.m_Z -
+				rawDepth * reconstructionParams.m_W;
+			if (!std::isfinite(numerator) || !std::isfinite(denominator) ||
+				std::abs(denominator) <= 1.0e-8f)
+			{
+				return 0.0f;
+			}
+
+			return std::max(numerator / denominator, 0.0f);
+		}
 	}
 }

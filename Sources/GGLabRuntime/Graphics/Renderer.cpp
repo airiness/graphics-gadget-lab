@@ -5,9 +5,13 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "Graphics/Pipeline/TemporalAACapability.h"
+#include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
+#include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/TransferManager.h"
 
 #include <atomic>
@@ -86,6 +90,9 @@ namespace gglab
 				});
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
+		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
+		m_TemporalHistoryManager =
+			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
 
 		PipelineCache::CreateInfo pipelineCacheCreateInfo{
 			.m_PipelineSystem = &m_RHIContext->GetPipelineSystem(),
@@ -124,6 +131,44 @@ namespace gglab
 		CreateCommonBindingLayout();
 		InitializeGpuBuffers();
 
+		const TemporalMotionFormatSupport motionSupport =
+			QueryTemporalMotionFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_MotionRenderTarget =
+			motionSupport.m_RenderTarget.IsSupported();
+		m_TemporalAACapabilityStatus.m_MotionShaderResource =
+			motionSupport.m_ShaderResource.IsSupported();
+		const TemporalAAResolvedColorFormatSupport resolvedColorSupport =
+			QueryTemporalAAResolvedColorFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_ResolvedColorRenderTarget =
+			resolvedColorSupport.m_RenderTarget.IsSupported();
+		m_TemporalAACapabilityStatus.m_ResolvedColorShaderResource =
+			resolvedColorSupport.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_ResolvedColorTypedUavStore =
+			resolvedColorSupport.m_TypedUavStore.IsSupported();
+		const TemporalHistoryFormatSupport historySupport =
+			QueryTemporalHistoryFormatSupport(*device);
+		m_TemporalAACapabilityStatus.m_HistoryColorShaderResource =
+			historySupport.m_Color.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryColorTypedUavStore =
+			historySupport.m_Color.m_TypedUavStore.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryDepthShaderResource =
+			historySupport.m_Depth.m_ShaderResource.IsSupported();
+		m_TemporalAACapabilityStatus.m_HistoryDepthTypedUavStore =
+			historySupport.m_Depth.m_TypedUavStore.IsSupported();
+		m_TemporalAACapabilityStatus.m_BindingLayoutAvailable =
+			m_CommonBindingLayout.IsValid();
+		if (createInfo.m_ShaderManager)
+		{
+			const ShaderID coverageVertex =
+				createInfo.m_ShaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
+			const ShaderID velocityOpaque = createInfo.m_ShaderManager->LoadProgram(
+				shader_programs::DepthPrepassVelocityOpaquePixel);
+			const ShaderID velocityAlphaTest = createInfo.m_ShaderManager->LoadProgram(
+				shader_programs::DepthPrepassVelocityAlphaTestPixel);
+			m_TemporalAACapabilityStatus.m_VelocityProgramsAvailable =
+				coverageVertex.IsValid() && velocityOpaque.IsValid() && velocityAlphaTest.IsValid();
+		}
+
 		m_IsInitialized = true;
 		return true;
 	}
@@ -148,6 +193,9 @@ namespace gglab
 		m_RenderResRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
+		m_TemporalHistoryManager->Shutdown();
+		m_TemporalHistoryManager.reset();
+		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
 
@@ -159,6 +207,9 @@ namespace gglab
 		m_MaterialSB.reset();
 		m_LightSB.reset();
 		m_ViewSB.reset();
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
+		m_TemporalAACapabilityStatus = {};
 
 		m_RHIContext.reset();
 
@@ -183,6 +234,7 @@ namespace gglab
 		m_ViewSB->Tick();
 
 		m_TransientResourcePool->Tick();
+		m_PersistentTexturePool->Tick();
 		m_AssetUploadScheduler->Tick();
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
@@ -190,6 +242,53 @@ namespace gglab
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
 		return Frame(this, rhiFrame, frameSerial);
+	}
+
+	TemporalFrameTransaction& Renderer::BeginTemporalFrame(Frame& frame,
+		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Temporal frame planning requires the active begun Renderer::Frame.");
+		frame.m_TemporalTransaction.Begin(
+			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
+			m_TemporalHistoryManager.get());
+		return frame.m_TemporalTransaction;
+	}
+
+	void Renderer::AdoptFrameBuildResources(
+		Frame& frame, const RenderFrameContext& renderContext) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Frame-build resource adoption requires the active begun Renderer::Frame.");
+		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == frame.m_FrameSlotIndex);
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
+		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
+		frame.m_GpuResources.AdoptFrom(renderContext);
+	}
+
+	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
+	{
+		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
+			"Late temporal contract invalidation requires the active begun Renderer::Frame.");
+		frame.m_TemporalTransaction.Abort(m_LastSubmittedFencePoint);
+		m_TemporalHistoryManager->Invalidate(
+			TemporalHistoryResetReason::AvailabilityChanged, m_LastSubmittedFencePoint);
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
+	}
+
+	void Renderer::InvalidateTemporalHistoryAfterResolveProgramChange() noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
+			"Temporal resolve program changes must be activated between renderer frames.");
+		if (m_TemporalHistoryManager)
+		{
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::ResolveProgramChanged,
+				m_LastSubmittedFencePoint);
+		}
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
 	}
 
 	void Renderer::Render(
@@ -205,12 +304,7 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
 
 		frame.m_RenderGraph = &rg;
-		frame.m_UploadFencePoint = renderContext.m_UploadFencePoint;
-		if (renderContext.m_SceneGpuAllocations)
-		{
-			frame.m_SceneGpuAllocations = *renderContext.m_SceneGpuAllocations;
-			*renderContext.m_SceneGpuAllocations = {};
-		}
+		AdoptFrameBuildResources(frame, renderContext);
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -224,9 +318,10 @@ namespace gglab
 		}
 
 		// Wait Structured Buffer upload
-		if (renderContext.m_UploadFencePoint.IsValid())
+		if (frame.m_GpuResources.m_UploadFencePoint.IsValid())
 		{
-			m_RHIContext->WaitForFence(RHIQueueType::Graphics, renderContext.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
 		}
 
 		RGExecuteContext executeContext{ RGBackendExecuteContext{
@@ -257,6 +352,18 @@ namespace gglab
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*frame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
+		if (result.IsCompleted() && submittedFence.IsValid())
+		{
+			frame.m_TemporalTransaction.CommitCompleted(submittedFence);
+		}
+		else
+		{
+			frame.m_TemporalTransaction.InvalidateAfterFatal(submittedFence);
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::FatalSubmission, submittedFence);
+			m_TemporalViewHistory.Invalidate();
+			m_TemporalObjectHistory.Invalidate();
+		}
 		if (submittedFence.IsValid())
 		{
 			m_LastSubmittedFencePoint = submittedFence;
@@ -271,7 +378,8 @@ namespace gglab
 			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
 		if (retirementFence.IsValid())
 		{
-			RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+			RetireSceneGpuAllocations(
+				&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
 			frame.m_RenderGraph->Retire(retirementFence);
 		}
 
@@ -289,13 +397,13 @@ namespace gglab
 		{
 			m_IBLBakeScheduler->OnFrameAborted();
 		}
-
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
 
-		if (m_RHIContext && frame.m_UploadFencePoint.IsValid())
+		if (m_RHIContext && frame.m_GpuResources.m_UploadFencePoint.IsValid())
 		{
-			m_RHIContext->WaitForFence(RHIQueueType::Graphics, frame.m_UploadFencePoint);
+			m_RHIContext->WaitForFence(
+				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
 		}
 
 		if (m_RHIContext && frame.m_RHIFrame)
@@ -307,9 +415,11 @@ namespace gglab
 			}
 			const RHIFencePoint retirementFence =
 				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
+			frame.m_TemporalTransaction.Abort(retirementFence);
 			if (retirementFence.IsValid())
 			{
-				RetireSceneGpuAllocations(&frame.m_SceneGpuAllocations, retirementFence);
+				RetireSceneGpuAllocations(
+					&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
 
 				if (frame.m_RenderGraph)
 				{
@@ -320,6 +430,7 @@ namespace gglab
 			return submittedFence;
 		}
 
+		frame.m_TemporalTransaction.Abort();
 		EndFrameLifetime(frame);
 		return {};
 	}
@@ -329,8 +440,7 @@ namespace gglab
 		frame.m_State = Frame::State::Ended;
 		frame.m_RHIFrame = nullptr;
 		frame.m_RenderGraph = nullptr;
-		frame.m_UploadFencePoint = {};
-		frame.m_SceneGpuAllocations = {};
+		frame.m_GpuResources.Reset();
 		frame.m_Renderer = nullptr;
 		m_HasActiveFrame = false;
 	}
@@ -419,6 +529,8 @@ namespace gglab
 		}
 
 		m_RHIContext->Resize(width, height);
+		m_TemporalHistoryManager->Invalidate(
+			TemporalHistoryResetReason::ExtentChanged, m_LastSubmittedFencePoint);
 	}
 
 	void Renderer::OnSuspend() noexcept
@@ -428,6 +540,13 @@ namespace gglab
 
 	void Renderer::OnResume() noexcept
 	{
+		if (m_TemporalHistoryManager)
+		{
+			m_TemporalHistoryManager->Invalidate(
+				TemporalHistoryResetReason::Resume, m_LastSubmittedFencePoint);
+		}
+		m_TemporalViewHistory.Invalidate();
+		m_TemporalObjectHistory.Invalidate();
 		m_IsSuspended.store(false, std::memory_order_relaxed);
 	}
 

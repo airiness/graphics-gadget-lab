@@ -38,6 +38,10 @@ namespace gglab
 		{
 			return m_Runtime.GetViewRenderProfile();
 		}
+		uint32_t GetTemporalSessionSerial() const noexcept override
+		{
+			return m_Runtime.GetTemporalSessionSerial();
+		}
 		RenderPipelineBase& GetRenderPipeline() noexcept override
 		{
 			return m_Runtime.GetRenderPipeline();

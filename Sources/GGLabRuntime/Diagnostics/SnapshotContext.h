@@ -11,6 +11,7 @@ namespace gglab
 	class World;
 	class RenderGraph;
 	struct ViewRenderProfile;
+	struct ResolvedTemporalFramePlan;
 
 	struct SnapshotContext
 	{
@@ -24,6 +25,7 @@ namespace gglab
 		RenderView* m_MainRenderView = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		bool m_GTAOOverrideActive = false;
 	};
 }

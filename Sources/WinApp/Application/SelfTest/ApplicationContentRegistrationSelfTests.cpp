@@ -3,6 +3,8 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
+#include <algorithm>
+
 namespace gglab
 {
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
@@ -11,8 +13,14 @@ namespace gglab
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 3 &&
-			desktop.m_Labs.size() == 16 && desktopSelection.Succeeded(),
-			"Windows desktop composition reproduces the complete three-Demo, sixteen-Lab catalog");
+			desktop.m_Labs.size() == 17 && desktopSelection.Succeeded() &&
+			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
+				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
+			"Windows desktop composition includes the complete three-Demo, seventeen-Lab catalog and Temporal AA Lab");
+		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
+		context.Check(std::ranges::find(
+			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
+			"Renderer artifact demand includes the production Temporal AA compute program");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -25,11 +33,11 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 34,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 37,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 34,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 37,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 32,
+		checkSelectedDemand("gglab.lab.napa_voxel", 35,
 			"Napa voxel selection contributes two stable shader demands");
 	}
 }

@@ -19,7 +19,8 @@ namespace gglab::devtools
 			}
 
 			Vector4 clipPosition;
-			clipPosition = math::TransformPointHomogeneous(worldPosition, view.m_ViewProj);
+			clipPosition =
+				math::TransformPointHomogeneous(worldPosition, view.m_UnjitteredViewProj);
 			if (!math::IsFinite(clipPosition.m_X) || !math::IsFinite(clipPosition.m_Y) ||
 				!math::IsFinite(clipPosition.m_Z) || !math::IsFinite(clipPosition.m_W) ||
 				clipPosition.m_W <= 1.0e-5f)

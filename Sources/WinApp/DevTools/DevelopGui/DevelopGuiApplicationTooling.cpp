@@ -108,6 +108,7 @@ namespace gglab
 				guiContext.m_AuthoringViewRenderProfile =
 					context.m_AuthoringViewRenderProfile;
 				guiContext.m_EffectiveViewRenderProfile = context.m_EffectiveViewRenderProfile;
+				guiContext.m_TemporalFramePlan = context.m_TemporalFramePlan;
 
 				m_System.Draw(guiContext);
 				if (context.m_LoadingProgress)

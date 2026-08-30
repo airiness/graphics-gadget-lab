@@ -109,6 +109,24 @@ namespace gglab
 		return true;
 	}
 
+	CameraRig::EffectiveDisplayView CameraRig::ResolveEffectiveDisplayView() const noexcept
+	{
+		const CameraSlot* slot = FindRenderViewSlot(m_DisplayViewId);
+		if (slot && slot->m_Camera && slot->m_EnableRenderView)
+		{
+			return {
+				.m_CameraSlot = slot,
+				.m_ViewId = m_DisplayViewId,
+			};
+		}
+
+		const CameraSlot* mainSlot = GetMainCameraSlot();
+		return {
+			.m_CameraSlot = mainSlot,
+			.m_ViewId = mainSlot && mainSlot->m_Camera ? RenderViewID::Main : RenderViewID::Unknown,
+		};
+	}
+
 	CameraRig::CameraSlot* CameraRig::GetCameraSlot(size_t index) noexcept
 	{
 		return index < m_Cameras.size() ? &m_Cameras[index] : nullptr;

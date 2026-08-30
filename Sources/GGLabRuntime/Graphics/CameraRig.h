@@ -33,6 +33,18 @@ namespace gglab
 			bool m_IsDebug = false;
 		};
 
+		struct EffectiveDisplayView
+		{
+			const CameraSlot* m_CameraSlot = nullptr;
+			RenderViewID m_ViewId = RenderViewID::Unknown;
+
+			[[nodiscard]] bool IsValid() const noexcept
+			{
+				return m_CameraSlot != nullptr && m_CameraSlot->m_Camera != nullptr &&
+					   m_ViewId != RenderViewID::Unknown;
+			}
+		};
+
 		CameraRig() noexcept = default;
 		GGLAB_DELETE_COPYABLE(CameraRig);
 		GGLAB_DEFAULT_MOVABLE(CameraRig);
@@ -47,6 +59,8 @@ namespace gglab
 		void SetActiveCameraIndex(size_t index) noexcept;
 		[[nodiscard]] RenderViewID GetDisplayViewId() const noexcept { return m_DisplayViewId; }
 		bool SetDisplayViewId(RenderViewID viewId) noexcept;
+
+		[[nodiscard]] EffectiveDisplayView ResolveEffectiveDisplayView() const noexcept;
 
 		[[nodiscard]] CameraSlot* GetCameraSlot(size_t index) noexcept;
 		[[nodiscard]] const CameraSlot* GetCameraSlot(size_t index) const noexcept;

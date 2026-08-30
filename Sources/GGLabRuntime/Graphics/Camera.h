@@ -46,6 +46,7 @@ namespace gglab
 
 		float GetYaw() const noexcept { return m_Yaw; }
 		float GetPitch() const noexcept { return m_Pitch; }
+		uint64_t GetTemporalResetSerial() const noexcept { return m_TemporalResetSerial; }
 
 		void SetPosition(const Vector3& pos) noexcept;
 		void SetYawPitch(float yawRadians, float pitchRadians) noexcept;
@@ -57,6 +58,7 @@ namespace gglab
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 
 		void LookAt(const Vector3& eye, const Vector3& target) noexcept;
+		void RequestTemporalReset() noexcept;
 
 	public:
 		static float ClampNear(float nearZ) noexcept;
@@ -93,6 +95,7 @@ namespace gglab
 
 		float m_Pitch = 0.0f; // radians
 		float m_Yaw = 0.0f;	  // radians
+		uint64_t m_TemporalResetSerial = 1;
 
 		bool m_ViewDirty = true;
 		bool m_ProjDirty = true;

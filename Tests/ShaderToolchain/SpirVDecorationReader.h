@@ -2,6 +2,7 @@
 #include "Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -39,10 +40,25 @@ namespace gglab
 		uint32_t m_OutputBuiltInCount = 0;
 	};
 
+	struct SpirVStructMemberLayoutReflection
+	{
+		std::string m_Name;
+		uint32_t m_Offset = 0;
+	};
+
+	struct SpirVStructLayoutReflection
+	{
+		uint32_t m_TypeId = 0;
+		std::string m_Name;
+		std::vector<SpirVStructMemberLayoutReflection> m_Members;
+		std::optional<uint32_t> m_ArrayStride;
+	};
+
 	struct SpirVDecorationReflection
 	{
 		std::vector<SpirVEntryPointReflection> m_EntryPoints;
 		std::vector<SpirVDescriptorBindingReflection> m_DescriptorBindings;
+		std::vector<SpirVStructLayoutReflection> m_StructLayouts;
 		std::string m_Error;
 
 		[[nodiscard]] bool IsValid() const noexcept
@@ -50,6 +66,8 @@ namespace gglab
 			return m_Error.empty() && !m_EntryPoints.empty();
 		}
 		[[nodiscard]] const SpirVEntryPointReflection* FindEntryPoint(
+			std::string_view name) const noexcept;
+		[[nodiscard]] const SpirVStructLayoutReflection* FindStructLayout(
 			std::string_view name) const noexcept;
 	};
 

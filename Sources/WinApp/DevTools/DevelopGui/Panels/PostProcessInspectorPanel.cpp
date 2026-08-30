@@ -46,6 +46,20 @@ namespace gglab
 				return "GTAO / Final AO";
 			case PostProcessDebugTap::GTAOAOOnlyLightingContribution:
 				return "GTAO / AO-only Lighting Contribution";
+			case PostProcessDebugTap::TemporalMotionDirection:
+				return "Temporal / Motion Direction";
+			case PostProcessDebugTap::TemporalMotionMagnitude:
+				return "Temporal / Motion Magnitude";
+			case PostProcessDebugTap::TemporalHistoryColor:
+				return "Temporal / Accumulated History Color";
+			case PostProcessDebugTap::TemporalReprojectionUV:
+				return "Temporal / Reprojection UV";
+			case PostProcessDebugTap::TemporalRejection:
+				return "Temporal / Rejection Reason";
+			case PostProcessDebugTap::TemporalHistoryWeight:
+				return "Temporal / History Weight";
+			case PostProcessDebugTap::TemporalHistoryAge:
+				return "Temporal / History Age";
 			default:
 				return "Unknown";
 			}
@@ -71,6 +85,13 @@ namespace gglab
 					PostProcessDebugTap::GTAODenoiseY,
 					PostProcessDebugTap::GTAOFinalAO,
 					PostProcessDebugTap::GTAOAOOnlyLightingContribution,
+					PostProcessDebugTap::TemporalMotionDirection,
+					PostProcessDebugTap::TemporalMotionMagnitude,
+					PostProcessDebugTap::TemporalHistoryColor,
+					PostProcessDebugTap::TemporalReprojectionUV,
+					PostProcessDebugTap::TemporalRejection,
+					PostProcessDebugTap::TemporalHistoryWeight,
+					PostProcessDebugTap::TemporalHistoryAge,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -205,6 +226,15 @@ namespace gglab
 			selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
 			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
 			selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+		const bool temporalMotionSelection =
+			selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
+			selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
+		const bool temporalAASelection =
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
+			selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
+			selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight ||
+			selection.m_Tap == PostProcessDebugTap::TemporalHistoryAge;
 		if (depthSelection && snapshot->m_SceneDepth.m_Available)
 		{
 			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
@@ -215,6 +245,15 @@ namespace gglab
 		else if (gtaoSelection)
 		{
 			ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
+		}
+		else if (temporalMotionSelection)
+		{
+			ImGui::TextDisabled(
+				"Source: active transient R16G16Float motion vectors in UV delta units.");
+		}
+		else if (temporalAASelection)
+		{
+			ImGui::TextDisabled("Source: active TAA history or reprojection diagnostics surface.");
 		}
 		else if (!selectedTexture || !selectedTexture->m_Available)
 		{

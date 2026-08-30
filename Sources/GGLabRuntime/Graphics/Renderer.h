@@ -5,10 +5,12 @@
 #include "Graphics/RHI/RHIBindingLayout.h"
 #include "Graphics/RHI/RHIContext.h"
 #include "Graphics/GPUStructures.h"
+#include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
-#include "Graphics/RenderParameters.h"
 #include "Graphics/RenderScene.h"
 
 #include <array>
@@ -94,9 +96,9 @@ namespace gglab
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
-			RHIFencePoint m_UploadFencePoint = {};
-			RenderSceneGpuAllocations m_SceneGpuAllocations{};
+			RenderFrameGpuResources m_GpuResources{};
 			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
+			TemporalFrameTransaction m_TemporalTransaction{};
 		};
 
 		struct CreateInfo
@@ -126,6 +128,12 @@ namespace gglab
 		bool IsInitialized() const noexcept { return m_IsInitialized; }
 
 		[[nodiscard]] Frame BeginFrame() noexcept;
+		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
+		void AdoptFrameBuildResources(
+			Frame& frame, const RenderFrameContext& renderContext) noexcept;
+		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
+		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept;
 		void Render(
 			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;
@@ -161,6 +169,14 @@ namespace gglab
 		{
 			return m_TransientResourcePool.get();
 		}
+		PersistentTexturePool* GetPersistentTexturePool() const noexcept
+		{
+			return m_PersistentTexturePool.get();
+		}
+		TemporalHistoryManager* GetTemporalHistoryManager() const noexcept
+		{
+			return m_TemporalHistoryManager.get();
+		}
 		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
@@ -169,6 +185,14 @@ namespace gglab
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept
 		{
 			return m_BackBufferClearColor;
+		}
+		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept
+		{
+			return m_TemporalAACapabilityStatus;
+		}
+		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept
+		{
+			m_TemporalAACapabilityStatus.m_ResolveProgramAvailable = available;
 		}
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept
@@ -272,6 +296,8 @@ namespace gglab
 		std::unique_ptr<RHIContext> m_RHIContext;
 		std::unique_ptr<AssetUploadScheduler> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
+		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
+		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
@@ -279,6 +305,9 @@ namespace gglab
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		RHIBindingLayoutHandle m_CommonBindingLayout{};
 		std::array<float, 4> m_BackBufferClearColor{ 0.5f, 0.5f, 0.5f, 1.0f };
+		TemporalAACapabilityStatus m_TemporalAACapabilityStatus{};
+		TemporalViewHistory m_TemporalViewHistory{};
+		TemporalObjectHistory m_TemporalObjectHistory{};
 
 		std::unique_ptr<DynamicConstantBufferAllocator> m_SceneCB;
 

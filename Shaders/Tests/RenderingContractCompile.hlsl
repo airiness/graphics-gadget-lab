@@ -1,4 +1,5 @@
 #include <Common/DepthReconstruction.hlsli>
+#include <Common/Temporal.hlsli>
 
 RWStructuredBuffer<float4> g_ContractOutput : register(u0);
 
@@ -15,6 +16,13 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	const float3 positionVS = ReconstructViewPosition(uv, 0.5, identity);
 	const float3 positionWS = ReconstructWorldPosition(uv, 0.5, identity);
 	const float viewZ = RawDepthToPositiveViewZ(uv, 0.5, identity);
+	const float compactViewZ = RawDepthToPositiveViewZ(
+		0.5, float4(1.0, 1.0, 1.0, 0.0), DEPTH_CONVENTION_REVERSED);
+	const float2 jitterNDC = TemporalJitterPixelsToNDC(float2(0.5, -0.5), uint2(2, 2));
+	const float4 jitteredClip = ApplyTemporalJitterToClipPosition(
+		float4(0.0, 0.0, 0.5, 1.0), jitterNDC);
+	const float2 previousUV = ReprojectTemporalUV(uv, TemporalJitterPixelsToUV(
+		float2(0.5, -0.5), uint2(2, 2)));
 	const bool conventionChecks =
 		GetDepthNearValue(DEPTH_CONVENTION_REVERSED) == 1.0 &&
 		GetDepthFarValue(DEPTH_CONVENTION_REVERSED) == 0.0 &&
@@ -26,8 +34,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		IsDepthFarther(0.75, 0.25, DEPTH_CONVENTION_STANDARD);
 
 	g_ContractOutput[0] = float4(
-		positionVS.x + positionWS.x + roundTripUV.x,
-		positionVS.y + positionWS.y + roundTripUV.y,
-		viewZ,
+		positionVS.x + positionWS.x + roundTripUV.x + jitteredClip.x + previousUV.x,
+		positionVS.y + positionWS.y + roundTripUV.y + jitteredClip.y + previousUV.y,
+		viewZ + compactViewZ,
 		conventionChecks ? 1.0 : 0.0);
 }

@@ -7,25 +7,30 @@
 #include "Compiler/ShaderCompiler.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
+#include "Graphics/GPUStructures.h"
 #include "Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "DevelopmentShaderPaths.h"
+#include "Targets/DX12ShaderTarget.h"
 #include "Targets/ShaderTargetWireNames.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Wire/ShaderWireNames.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
+#include <dxcapi.h>
 #include <windows.h>
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -107,6 +112,74 @@ namespace gglab
 					return descriptor.m_DescriptorSet == descriptorSet &&
 						descriptor.m_Binding == binding;
 				});
+		}
+
+		[[nodiscard]] bool DisassembleDxil(
+			const ShaderBinary& binary, std::string& outDisassembly) noexcept
+		{
+			outDisassembly.clear();
+			if (!binary.IsValid())
+			{
+				return false;
+			}
+
+			ComPtr<IDxcCompiler3> compiler;
+			if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler))))
+			{
+				return false;
+			}
+			const DxcBuffer buffer{
+				.Ptr = binary.Data(),
+				.Size = binary.SizeInBytes(),
+				.Encoding = DXC_CP_ACP,
+			};
+			ComPtr<IDxcResult> result;
+			if (FAILED(compiler->Disassemble(&buffer, IID_PPV_ARGS(&result))))
+			{
+				return false;
+			}
+			HRESULT status = E_FAIL;
+			if (FAILED(result->GetStatus(&status)) || FAILED(status))
+			{
+				return false;
+			}
+			ComPtr<IDxcBlobUtf8> text;
+			if (FAILED(result->GetOutput(
+				DXC_OUT_DISASSEMBLY, IID_PPV_ARGS(&text), nullptr)) || !text)
+			{
+				return false;
+			}
+			outDisassembly.assign(text->GetStringPointer(), text->GetStringLength());
+			return true;
+		}
+
+		[[nodiscard]] std::optional<size_t> ParseUnsignedAfter(
+			std::string_view text, std::string_view marker, size_t searchOffset = 0) noexcept
+		{
+			const size_t markerOffset = text.find(marker, searchOffset);
+			if (markerOffset == std::string_view::npos)
+			{
+				return std::nullopt;
+			}
+			const char* begin = text.data() + markerOffset + marker.size();
+			const char* end = text.data() + text.size();
+			while (begin != end && (*begin == ' ' || *begin == '\t'))
+			{
+				++begin;
+			}
+			size_t value = 0;
+			const auto result = std::from_chars(begin, end, value);
+			return result.ec == std::errc{} ? std::optional<size_t>(value) : std::nullopt;
+		}
+
+		[[nodiscard]] std::optional<size_t> FindDxilMemberOffset(
+			std::string_view disassembly, std::string_view memberName) noexcept
+		{
+			const std::string memberToken = std::format(" {};", memberName);
+			const size_t memberOffset = disassembly.find(memberToken);
+			return memberOffset == std::string_view::npos
+				? std::nullopt
+				: ParseUnsignedAfter(disassembly, "Offset:", memberOffset);
 		}
 
 		[[nodiscard]] ShaderBinary MakeExecutionModelModule(uint32_t executionModel) noexcept
@@ -2168,22 +2241,173 @@ namespace gglab
 				.m_IncludeDirs = {L"."},
 			};
 			const ShaderCompileResult artifact = compiler.Compile(desc);
-			context.Check(artifact.IsSuccess(),
-				"Production DXC compiles screen-space and depth reconstruction helpers");
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const ShaderCompileResult spirVArtifact = compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(artifact.IsSuccess() && spirVArtifact.IsSuccess(),
+				"Production DXC compiles screen-space, depth, and temporal helpers to DXIL and SPIR-V");
+
+			desc.m_SourcePath = L"Tests/TemporalViewLayoutContractCompile.hlsl";
+			desc.m_Target = {
+				.m_Model = ShaderModel::SM_6_7,
+				.m_HlslVersion = L"2021",
+				.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization,
+			};
+			const ShaderCompileResult viewLayoutDxil = compiler.Compile(desc);
+			std::string viewLayoutDisassembly;
+			bool dxilLayoutMatches = viewLayoutDxil.IsSuccess() &&
+				DisassembleDxil(viewLayoutDxil.m_Artifact.m_Binary, viewLayoutDisassembly);
+			const size_t dxilViewDataOffset =
+				viewLayoutDisassembly.find("struct hostlayout.struct.ViewData");
+			const size_t dxilViewDataEnd =
+				viewLayoutDisassembly.find("} $Element;", dxilViewDataOffset);
+			const size_t dxilViewDataLineEnd =
+				viewLayoutDisassembly.find('\n', dxilViewDataEnd);
+			const std::string_view dxilViewDataLayout =
+				dxilViewDataOffset != std::string::npos &&
+				dxilViewDataEnd != std::string::npos && dxilViewDataLineEnd != std::string::npos
+				? std::string_view(viewLayoutDisassembly).substr(
+					dxilViewDataOffset, dxilViewDataLineEnd - dxilViewDataOffset)
+				: std::string_view{};
+			for (const GPUAbiMember& member : ViewGPUAbiMembers)
+			{
+				dxilLayoutMatches = dxilLayoutMatches &&
+					FindDxilMemberOffset(dxilViewDataLayout, member.m_Name) == member.m_Offset;
+			}
+			dxilLayoutMatches = dxilLayoutMatches && !dxilViewDataLayout.empty() &&
+				ParseUnsignedAfter(dxilViewDataLayout, "Size:") == ViewGPUAbiStride;
+			context.Check(dxilLayoutMatches,
+				"DXIL ViewData member offsets and structured-buffer stride match ViewGPU exactly");
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult viewLayoutSpirV = compiler.Compile(desc);
+			SpirVDecorationReflection viewLayoutReflection;
+			const bool reflectedViewLayout = viewLayoutSpirV.IsSuccess() &&
+				ReadSpirVDecorations(viewLayoutSpirV.m_Artifact.m_Binary, viewLayoutReflection);
+			const SpirVStructLayoutReflection* spirVViewData = reflectedViewLayout
+				? viewLayoutReflection.FindStructLayout("ViewData")
+				: nullptr;
+			bool spirVLayoutMatches = spirVViewData &&
+				spirVViewData->m_Members.size() == ViewGPUAbiMembers.size() &&
+				spirVViewData->m_ArrayStride == ViewGPUAbiStride;
+			if (spirVLayoutMatches)
+			{
+				for (size_t index = 0; index < ViewGPUAbiMembers.size(); ++index)
+				{
+					spirVLayoutMatches =
+						spirVViewData->m_Members[index].m_Name == ViewGPUAbiMembers[index].m_Name &&
+						spirVViewData->m_Members[index].m_Offset == ViewGPUAbiMembers[index].m_Offset;
+					if (!spirVLayoutMatches)
+					{
+						break;
+					}
+				}
+			}
+			context.Check(spirVLayoutMatches,
+				"SPIR-V ViewData member offsets and ArrayStride match ViewGPU exactly");
+
+			desc.m_SourcePath = L"Tests/TemporalObjectLayoutContractCompile.hlsl";
+			desc.m_Target = {
+				.m_Model = ShaderModel::SM_6_7,
+				.m_HlslVersion = L"2021",
+				.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization,
+			};
+			const ShaderCompileResult objectLayoutDxil = compiler.Compile(desc);
+			std::string objectLayoutDisassembly;
+			bool dxilObjectLayoutMatches = objectLayoutDxil.IsSuccess() &&
+				DisassembleDxil(objectLayoutDxil.m_Artifact.m_Binary, objectLayoutDisassembly);
+			const size_t dxilObjectDataOffset =
+				objectLayoutDisassembly.find("struct hostlayout.struct.ObjectData");
+			const size_t dxilObjectDataEnd =
+				objectLayoutDisassembly.find("} $Element;", dxilObjectDataOffset);
+			const size_t dxilObjectDataLineEnd =
+				objectLayoutDisassembly.find('\n', dxilObjectDataEnd);
+			const std::string_view dxilObjectDataLayout =
+				dxilObjectDataOffset != std::string::npos &&
+				dxilObjectDataEnd != std::string::npos &&
+				dxilObjectDataLineEnd != std::string::npos
+				? std::string_view(objectLayoutDisassembly).substr(
+					dxilObjectDataOffset, dxilObjectDataLineEnd - dxilObjectDataOffset)
+				: std::string_view{};
+			for (const GPUAbiMember& member : ObjectGPUAbiMembers)
+			{
+				dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
+					FindDxilMemberOffset(dxilObjectDataLayout, member.m_Name) == member.m_Offset;
+			}
+			dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
+				!dxilObjectDataLayout.empty() &&
+				ParseUnsignedAfter(dxilObjectDataLayout, "Size:") == ObjectGPUAbiStride;
+			context.Check(dxilObjectLayoutMatches,
+				"DXIL ObjectData member offsets and structured-buffer stride match ObjectGPU exactly");
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult objectLayoutSpirV = compiler.Compile(desc);
+			SpirVDecorationReflection objectLayoutReflection;
+			const bool reflectedObjectLayout = objectLayoutSpirV.IsSuccess() &&
+				ReadSpirVDecorations(objectLayoutSpirV.m_Artifact.m_Binary,
+					objectLayoutReflection);
+			const SpirVStructLayoutReflection* spirVObjectData = reflectedObjectLayout
+				? objectLayoutReflection.FindStructLayout("ObjectData")
+				: nullptr;
+			bool spirVObjectLayoutMatches = spirVObjectData &&
+				spirVObjectData->m_Members.size() == ObjectGPUAbiMembers.size() &&
+				spirVObjectData->m_ArrayStride == ObjectGPUAbiStride;
+			if (spirVObjectLayoutMatches)
+			{
+				for (size_t index = 0; index < ObjectGPUAbiMembers.size(); ++index)
+				{
+					spirVObjectLayoutMatches =
+						spirVObjectData->m_Members[index].m_Name ==
+							ObjectGPUAbiMembers[index].m_Name &&
+						spirVObjectData->m_Members[index].m_Offset ==
+							ObjectGPUAbiMembers[index].m_Offset;
+					if (!spirVObjectLayoutMatches)
+					{
+						break;
+					}
+				}
+			}
+			context.Check(spirVObjectLayoutMatches,
+				"SPIR-V ObjectData member offsets and ArrayStride match ObjectGPU exactly");
 
 			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;
 			desc.m_Entry = L"VSMain";
-			const ShaderCompileResult coverageVertexArtifact =
-				compiler.Compile(desc);
+			desc.m_Defines.clear();
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Vertex);
+			const ShaderCompileResult coverageVertexDxil = compiler.Compile(desc);
 			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSAlphaTest";
-			const ShaderCompileResult depthAlphaArtifact =
-				compiler.Compile(desc);
-			context.Check(
-				coverageVertexArtifact.IsSuccess() && depthAlphaArtifact.IsSuccess(),
-				"Production DXC compiles the shared coverage vertex shader and alpha-tested prepass");
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult depthAlphaDxil = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityOpaque";
+			const ShaderCompileResult velocityOpaqueDxil = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityAlphaTest";
+			const ShaderCompileResult velocityAlphaDxil = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassForwardCoverage.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex);
+			const ShaderCompileResult coverageVertexSpirV = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassDepthPrepass.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			desc.m_Entry = L"PSAlphaTest";
+			const ShaderCompileResult depthAlphaSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityOpaque";
+			const ShaderCompileResult velocityOpaqueSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"PSVelocityAlphaTest";
+			const ShaderCompileResult velocityAlphaSpirV = compiler.Compile(desc);
+			context.Check(coverageVertexDxil.IsSuccess() && depthAlphaDxil.IsSuccess() &&
+				velocityOpaqueDxil.IsSuccess() && velocityAlphaDxil.IsSuccess() &&
+				coverageVertexSpirV.IsSuccess() && depthAlphaSpirV.IsSuccess() &&
+				velocityOpaqueSpirV.IsSuccess() && velocityAlphaSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile one shared coverage vertex program and matching opaque/alpha velocity pixels");
 
 			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
@@ -2375,6 +2599,28 @@ namespace gglab
 				gtaoDenoiseXArtifact.IsSuccess() &&
 				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
 				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
+
+			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const ShaderCompileResult temporalAADxilArtifact = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const ShaderCompileResult temporalAASpirVArtifact = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassPostProcessPreview.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Target = {};
+			const ShaderCompileResult postProcessPreviewDxilArtifact = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult postProcessPreviewSpirVArtifact = compiler.Compile(desc);
+			desc.m_Target = {};
+			context.Check(temporalAADxilArtifact.IsSuccess() &&
+				temporalAASpirVArtifact.IsSuccess() &&
+				postProcessPreviewDxilArtifact.IsSuccess() &&
+				postProcessPreviewSpirVArtifact.IsSuccess(),
+				"Production DXC compiles TAA reprojection and post-process age preview with point-sampled history age, split resolved/history alpha, transient diagnostics, depth rejection, YCoCg neighborhood clamp, and age-capped temporal blend for DX12 and Vulkan 1.3");
 
 			desc.m_SourcePath = L"Passes/PassNapaVoxel.hlsl";
 			desc.m_Stage = ShaderStage::Vertex;

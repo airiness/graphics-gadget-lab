@@ -5,6 +5,11 @@
 
 namespace gglab
 {
+	enum class TemporalColorAbi : uint8_t
+	{
+		LinearRec709SceneReferredV1,
+	};
+
 	// Compact semantic state for the color representations currently supported by gglab.
 	enum class PostProcessColorState : uint8_t
 	{
@@ -12,6 +17,13 @@ namespace gglab
 		DisplayLinearRec709,
 		DisplayEncodedSRGB,
 	};
+
+	[[nodiscard]] constexpr bool IsTemporalColorCompatible(TemporalColorAbi colorAbi,
+		PostProcessColorState colorState, float preExposure) noexcept
+	{
+		return colorAbi == TemporalColorAbi::LinearRec709SceneReferredV1 &&
+			colorState == PostProcessColorState::SceneLinearRec709 && preExposure == 1.0f;
+	}
 
 	struct RGPostProcessColor
 	{

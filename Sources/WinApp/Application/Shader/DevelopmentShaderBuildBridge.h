@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
+#include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHITypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
@@ -13,6 +14,7 @@
 
 namespace gglab
 {
+	class Renderer;
 	class ShaderManager;
 	class TaskSystem;
 
@@ -66,6 +68,7 @@ namespace gglab
 			DevelopmentShaderBuildRequest m_BuildRequest{};
 			TaskSystem* m_TaskSystem = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
+			Renderer* m_Renderer = nullptr;
 		};
 
 		explicit DevelopmentShaderHotReloadSystem(CreateInfo createInfo) noexcept;
@@ -89,6 +92,8 @@ namespace gglab
 		DevelopmentShaderBuildRequest m_BuildRequest{};
 		TaskSystem* m_TaskSystem = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
+		Renderer* m_Renderer = nullptr;
+		ShaderID m_TemporalAAResolveShader{};
 		std::shared_ptr<BuildJob> m_BuildJob{};
 		TaskHandle m_BuildTask{};
 		std::optional<ShaderProgramRegistryArtifactRef> m_PendingRegistry{};

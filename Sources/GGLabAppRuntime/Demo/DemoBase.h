@@ -50,6 +50,7 @@ namespace gglab
 		virtual CameraController& GetCameraController() noexcept = 0;
 		virtual CameraRig& GetCameraRig() noexcept = 0;
 		virtual const ViewRenderProfile& GetViewRenderProfile() const noexcept = 0;
+		virtual uint32_t GetTemporalSessionSerial() const noexcept { return 0; }
 
 		virtual RenderPipelineBase& GetRenderPipeline() noexcept = 0;
 	};

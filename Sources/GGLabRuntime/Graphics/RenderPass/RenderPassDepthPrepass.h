@@ -37,23 +37,27 @@ namespace gglab
 		[[nodiscard]] static GraphicsLogicalPipelineMetadata BuildLogicalPipelineMetadataForVariant(
 			const GraphicsPhysicalPipelineKey& physicalKey, uint64_t variantBits) noexcept;
 		[[nodiscard]] GraphicsPipelineDescription DescribePipelineVariant(
-			uint64_t variantBits) const noexcept;
+			uint64_t variantBits, bool outputMotion = false) const noexcept;
 
 	private:
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services,
-			RenderViewID viewId) noexcept;
+			RenderViewID viewId, bool outputMotion) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
-			const RenderQueue& renderQueue, const DrawItemsRange& range) noexcept;
+			const RenderQueue& renderQueue, const DrawItemsRange& range,
+			bool outputMotion) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const Renderer& renderer, uint64_t variantBits) noexcept;
+			const Renderer& renderer, uint64_t variantBits, bool outputMotion) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_BasePhysicalKey{};
 		ShaderID m_AlphaTestPixelShader{};
-		std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount> m_PipelineSlots{};
+		ShaderID m_VelocityOpaquePixelShader{};
+		ShaderID m_VelocityAlphaTestPixelShader{};
+		std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>, 2>
+			m_PipelineSlots{};
 		bool m_IsInitialized = false;
 	};
 }

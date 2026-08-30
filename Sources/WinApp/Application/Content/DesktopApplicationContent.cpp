@@ -18,6 +18,7 @@
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
+#include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <memory>
@@ -92,6 +93,7 @@ namespace gglab
 			{ SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create },
 			{ GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create },
 			{ ForwardPlusLabSession::GetDescriptor(), &ForwardPlusLabSession::Create },
+			{ TemporalAALabSession::GetDescriptor(), &TemporalAALabSession::Create },
 			{ AlphaTestLabSession::GetDescriptor(), &AlphaTestLabSession::Create },
 			{ MathFoundationLabSession::GetDescriptor(), &MathFoundationLabSession::Create },
 			{ TaskSystemLabSession::GetDescriptor(), &TaskSystemLabSession::Create },

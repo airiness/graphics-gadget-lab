@@ -13,6 +13,8 @@ namespace gglab
 		ShaderID m_ForwardPlusGTAOContributionPixelShader{};
 		ShaderID m_ForwardPlusValidationGTAOContributionPixelShader{};
 		ShaderID m_AlphaTestPixelShader{};
+		ShaderID m_VelocityOpaquePixelShader{};
+		ShaderID m_VelocityAlphaTestPixelShader{};
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
@@ -22,7 +24,8 @@ namespace gglab
 				m_LegacyGTAOContributionPixelShader.IsValid() &&
 				m_ForwardPlusGTAOContributionPixelShader.IsValid() &&
 				m_ForwardPlusValidationGTAOContributionPixelShader.IsValid() &&
-				m_AlphaTestPixelShader.IsValid();
+				m_AlphaTestPixelShader.IsValid() && m_VelocityOpaquePixelShader.IsValid() &&
+				m_VelocityAlphaTestPixelShader.IsValid();
 		}
 	};
 }

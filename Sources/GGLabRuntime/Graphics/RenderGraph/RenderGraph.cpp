@@ -120,6 +120,46 @@ namespace gglab
 		return static_cast<RGVirtualResource<RGTextureResource>*>(resource)->m_Desc;
 	}
 
+	bool RenderGraph::IsTextureFullyWrittenByPass(
+		RGPassNodeIndex passNodeIndex, RGTextureId textureId) const noexcept
+	{
+		if (!passNodeIndex.IsValid() || passNodeIndex.Value() >= m_PassNodes.size() ||
+			!textureId.IsValid() || textureId.GetHandle().Value() >= m_ResourceSlots.size())
+		{
+			return false;
+		}
+
+		const RGResourceSlot& slot = m_ResourceSlots[textureId.GetHandle().Value()];
+		if (slot.m_Version != textureId.GetVersion() || !slot.m_ResourceNodeIndex.IsValid() ||
+			slot.m_ResourceNodeIndex.Value() >= m_ResourceNodes.size())
+		{
+			return false;
+		}
+
+		const RGResourceNode& resourceNode = m_ResourceNodes[slot.m_ResourceNodeIndex.Value()];
+		if (resourceNode.m_Writer != passNodeIndex || !resourceNode.m_VirtualResource ||
+			resourceNode.m_VirtualResource->m_ResourceType != RGResourceType::RGTexture)
+		{
+			return false;
+		}
+
+		const auto* texture = static_cast<const RGVirtualResource<RGTextureResource>*>(
+			resourceNode.m_VirtualResource);
+		RGTextureContentValidity writtenValidity{};
+		for (const RGPassNode::Access& access : m_PassNodes[passNodeIndex.Value()].m_Accesses)
+		{
+			if (access.m_ResourceNodeIndex == slot.m_ResourceNodeIndex &&
+				access.m_ResourceType == RGResourceType::RGTexture &&
+				(access.m_DependencyAccess == RGDependencyAccess::Write ||
+					access.m_DependencyAccess == RGDependencyAccess::ReadWrite))
+			{
+				MarkTextureSubresourceRangeDefined(
+					writtenValidity, texture->m_Desc, access.m_Subresources);
+			}
+		}
+		return IsTextureSubresourceRangeDefined(writtenValidity, texture->m_Desc, std::nullopt);
+	}
+
 	bool RenderGraph::IsTextureSubresourceRangeDefined(const RGTextureContentValidity& validity,
 		const RHITextureDesc& desc, const std::optional<RHISubresourceRange>& requested) noexcept
 	{

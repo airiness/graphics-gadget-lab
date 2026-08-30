@@ -3,6 +3,8 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
+#include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
@@ -42,6 +44,13 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOFinalAO) == 12);
 		static_assert(static_cast<uint32_t>(
 			PostProcessDebugTap::GTAOAOOnlyLightingContribution) == 13);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalMotionDirection) == 14);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalMotionMagnitude) == 15);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryColor) == 16);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalReprojectionUV) == 17);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalRejection) == 18);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
 
 		struct PassData
 		{
@@ -89,6 +98,21 @@ namespace gglab
 				tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 		}
 
+		bool IsTemporalMotionPreview(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::TemporalMotionDirection ||
+				tap == PostProcessDebugTap::TemporalMotionMagnitude;
+		}
+
+		bool IsTemporalAAPreview(PostProcessDebugTap tap) noexcept
+		{
+			return tap == PostProcessDebugTap::TemporalHistoryColor ||
+				tap == PostProcessDebugTap::TemporalReprojectionUV ||
+				tap == PostProcessDebugTap::TemporalRejection ||
+				tap == PostProcessDebugTap::TemporalHistoryWeight ||
+				tap == PostProcessDebugTap::TemporalHistoryAge;
+		}
+
 		RGTextureId ResolveGTAOPreviewSource(
 			const RGGTAOResources& resources, PostProcessDebugTap tap) noexcept
 		{
@@ -124,6 +148,42 @@ namespace gglab
 		auto* registry = renderer->GetRenderResourceRegistry();
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
+		if (IsTemporalAAPreview(selection.m_Tap))
+		{
+			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
+				TemporalAAResourcesName);
+			const RGTextureId source = temporalAA
+				? ResolveTemporalAAPreviewSource(*temporalAA, selection.m_Tap)
+				: RGTextureId{};
+			if (!temporalAA || !source.IsValid())
+			{
+				registry->InvalidatePostProcessPreview(selection);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest())
+			{
+				return;
+			}
+			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection);
+			return;
+		}
+		if (IsTemporalMotionPreview(selection.m_Tap))
+		{
+			const auto* temporalGeometry = rg.GetBlackboard().TryGet<
+				RGTemporalGeometryResources>(TemporalGeometryResourcesName);
+			if (!temporalGeometry || !temporalGeometry->IsValid())
+			{
+				registry->InvalidatePostProcessPreview(selection);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest())
+			{
+				return;
+			}
+			AddResolvedPass(rg, context, services, temporalGeometry->m_MotionVectors, 1.0f,
+				temporalGeometry->m_MotionSrvDesc, selection);
+			return;
+		}
 		if (IsGTAOPreview(selection.m_Tap))
 		{
 			const auto& gtaoResources =
@@ -230,7 +290,8 @@ namespace gglab
 				registry->HasPublishedPostProcessPreview() && !registry->IsDirty(PreviewIndex),
 				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader));
 		const bool pointSampledPreview =
-			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap);
+			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap) ||
+			IsTemporalMotionPreview(selection.m_Tap) || IsTemporalAAPreview(selection.m_Tap);
 		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
 			pointSampledPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());

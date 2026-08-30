@@ -129,6 +129,14 @@ namespace gglab
 		ComputeYawPitchFromForward(forward);
 
 		MarkViewDirty();
+		RequestTemporalReset();
+	}
+
+	void Camera::RequestTemporalReset() noexcept
+	{
+		++m_TemporalResetSerial;
+		GGLAB_ASSERT_MSG(
+			m_TemporalResetSerial != 0, "Camera temporal reset serial overflowed its valid range.");
 	}
 
 	float Camera::ClampNear(float nearZ) noexcept

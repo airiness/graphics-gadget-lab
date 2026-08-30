@@ -29,6 +29,13 @@ static const uint PREVIEW_SOURCE_GTAO_DENOISE_X = 10;
 static const uint PREVIEW_SOURCE_GTAO_DENOISE_Y = 11;
 static const uint PREVIEW_SOURCE_GTAO_FINAL_AO = 12;
 static const uint PREVIEW_SOURCE_GTAO_AO_ONLY_LIGHTING_CONTRIBUTION = 13;
+static const uint PREVIEW_SOURCE_TEMPORAL_MOTION_DIRECTION = 14;
+static const uint PREVIEW_SOURCE_TEMPORAL_MOTION_MAGNITUDE = 15;
+static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_COLOR = 16;
+static const uint PREVIEW_SOURCE_TEMPORAL_REPROJECTION_UV = 17;
+static const uint PREVIEW_SOURCE_TEMPORAL_REJECTION = 18;
+static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT = 19;
+static const uint PREVIEW_SOURCE_TEMPORAL_HISTORY_AGE = 20;
 
 FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 {
@@ -40,6 +47,45 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_DIRECTION ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_MAGNITUDE)
+	{
+		Texture2D<float2> motionTexture = GetTexture2DFloat2(g_Pass.SourceTextureIndex);
+		const float2 motionUV = motionTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		const float2 motionPixels = motionUV * float2(viewData.Width, viewData.Height);
+		const float magnitudePixels = length(motionPixels);
+		if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_MAGNITUDE)
+		{
+			return float4(saturate(magnitudePixels / 8.0).xxx, 1.0);
+		}
+		const float2 direction = magnitudePixels > 1.0e-6
+			? motionPixels / magnitudePixels
+			: float2(0.0, 0.0);
+		return float4(direction * 0.5 + 0.5, saturate(magnitudePixels / 8.0), 1.0);
+	}
+	if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_REPROJECTION_UV ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_REJECTION ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT ||
+		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_AGE)
+	{
+		Texture2D<float4> diagnosticsTexture = GetTexture2DFloat4(g_Pass.SourceTextureIndex);
+		const float4 diagnostics = diagnosticsTexture.SampleLevel(pointSampler, input.UV, 0.0);
+		if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_REPROJECTION_UV)
+		{
+			return float4(saturate(diagnostics.zw), 0.0, 1.0);
+		}
+		if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_WEIGHT ||
+			g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_HISTORY_AGE)
+		{
+			return float4(saturate(diagnostics.x).xxx, 1.0);
+		}
+		const float reason = diagnostics.y;
+		if (reason < 0.5)
+		{
+			return float4(0.1, 0.8, 0.2, 1.0);
+		}
+		return float4(saturate(reason / 5.0), 0.05, 1.0 - saturate(reason / 5.0), 1.0);
+	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_RAW_AO ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_X ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_GTAO_DENOISE_Y ||
