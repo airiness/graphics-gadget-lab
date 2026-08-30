@@ -6,5 +6,5 @@
 float4 PSMain(ForwardCoverageVSOutput IN) : SV_Target
 {
 	const SurfaceData surface = EvaluateSurface(g_Preview.Metal, g_Preview.Tint, IN.UV0);
-	return VisualizeShaderGraphPreview(surface, IN.NormalWS);
+	return VisualizeShaderGraphPreview(surface, IN);
 }

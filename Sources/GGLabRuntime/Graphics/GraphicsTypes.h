@@ -375,6 +375,7 @@ namespace gglab
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(MeshID, uint32_t);
 	inline constexpr MeshID ProceduralCubeMeshID{ 0u };
 	inline constexpr MeshID ProceduralSphereMeshID{ 1u };
+	inline constexpr MeshID ProceduralPlaneMeshID{ 2u };
 	inline constexpr MeshID::ValueType ReservedMeshCount = 8u;
 	[[nodiscard]] constexpr bool IsReservedMeshId(MeshID id) noexcept
 	{
@@ -449,6 +450,7 @@ namespace gglab
 	GGLAB_DEFINE_TYPED_INDEX_WITH_COUNTER(ModelID, uint32_t);
 	inline constexpr ModelID ProceduralCubeModelID{ 0u };
 	inline constexpr ModelID ProceduralSphereModelID{ 1u };
+	inline constexpr ModelID ProceduralPlaneModelID{ 2u };
 	inline constexpr ModelID::ValueType ReservedModelCount = 8u;
 	[[nodiscard]] constexpr bool IsReservedModelId(ModelID id) noexcept
 	{

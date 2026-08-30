@@ -11,9 +11,9 @@ float3 EvaluateShaderGraphPreviewLighting(float3 normalWS)
 	return (0.20 + 0.60 * keyResponse + 0.20 * fillResponse).xxx;
 }
 
-float4 VisualizeShaderGraphPreview(SurfaceData surface, float3 normalWS)
+float4 VisualizeShaderGraphPreview(SurfaceData surface, ForwardCoverageVSOutput input)
 {
-	float3 color = surface.BaseColor * EvaluateShaderGraphPreviewLighting(normalWS) +
+	float3 color = surface.BaseColor * EvaluateShaderGraphPreviewLighting(input.NormalWS) +
 		surface.Emissive;
 	if (g_Preview.ViewMode == ShaderGraphPreviewViewModeBaseColor)
 	{
@@ -34,6 +34,17 @@ float4 VisualizeShaderGraphPreview(SurfaceData surface, float3 normalWS)
 	else if (g_Preview.ViewMode == ShaderGraphPreviewViewModeOpacity)
 	{
 		color = surface.Opacity.xxx;
+	}
+	else
+	{
+		// Preserve the complete forward-coverage interface for Vulkan pipeline
+		// compatibility. Runtime clamps ViewMode to the supported range, so this
+		// fingerprint is visible only if the CPU/GPU contract is violated.
+		const float contractFingerprint = input.PositionCS.x + input.PositionWS.x +
+			input.NormalWS.x + input.UV0.x + input.UV1.x + input.TangentWS.x +
+			float(input.MaterialIndex) + input.CurrentPositionCS.x +
+			input.PreviousPositionCS.x;
+		color = float3(1.0, 0.0, frac(abs(contractFingerprint)));
 	}
 	return float4(color, 1.0);
 }

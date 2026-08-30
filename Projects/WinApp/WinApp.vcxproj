@@ -245,6 +245,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
@@ -370,6 +371,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />

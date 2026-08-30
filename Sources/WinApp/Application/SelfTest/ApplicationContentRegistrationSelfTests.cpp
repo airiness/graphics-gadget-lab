@@ -13,10 +13,12 @@ namespace gglab
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 3 &&
-			desktop.m_Labs.size() == 17 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
-				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
-			"Windows desktop composition includes the complete three-Demo, seventeen-Lab catalog and Temporal AA Lab");
+				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }) &&
+			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
+				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.shader_graph_preview"); }),
+			"Windows desktop composition includes the complete three-Demo, eighteen-Lab catalog, Temporal AA Lab, and Shader Graph Preview Lab");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
 			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
@@ -39,5 +41,7 @@ namespace gglab
 			"Coordinate conformance selection contributes four stable shader demands");
 		checkSelectedDemand("gglab.lab.napa_voxel", 35,
 			"Napa voxel selection contributes two stable shader demands");
+		checkSelectedDemand("gglab.lab.shader_graph_preview", 35,
+			"Shader Graph Preview selection contributes both pinned Pixel Program demands");
 	}
 }

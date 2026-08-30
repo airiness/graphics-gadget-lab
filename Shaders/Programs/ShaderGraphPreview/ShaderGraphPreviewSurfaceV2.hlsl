@@ -7,5 +7,5 @@ float4 PSMain(ForwardCoverageVSOutput IN) : SV_Target
 {
 	const SurfaceData surface = EvaluateSurface(g_Preview.Roughness,
 		uint2(g_Preview.TextureIndex, g_Preview.SamplerIndex), IN.UV0);
-	return VisualizeShaderGraphPreview(surface, IN.NormalWS);
+	return VisualizeShaderGraphPreview(surface, IN);
 }

@@ -1,6 +1,7 @@
 #include "ShaderGraphPreviewProgramContractSelfTests.h"
 
 #include "DevelopmentShaderPaths.h"
+#include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
@@ -13,6 +14,7 @@
 #include <format>
 #include <fstream>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -62,6 +64,18 @@ namespace gglab
 			input.read(text.data(), static_cast<std::streamsize>(text.size()));
 			return input || text.empty() ? std::optional<std::string>(std::move(text))
 								 : std::nullopt;
+		}
+
+		[[nodiscard]] bool TextIdentityEquals(
+			const std::optional<std::string>& text, std::string_view expected) noexcept
+		{
+			if (!text)
+			{
+				return false;
+			}
+			const auto bytes = std::as_bytes(
+				std::span<const char>(text->data(), text->size()));
+			return Sha256DigestToHex(ComputeSha256(bytes)) == expected;
 		}
 
 		[[nodiscard]] const Json* FindField(
@@ -312,6 +326,8 @@ namespace gglab
 			ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 		const std::filesystem::path contractRoot =
 			shaderRoot / L"Programs" / L"ShaderGraphPreview";
+		const std::optional<std::string> descriptorText =
+			ReadText(contractRoot / L"descriptor.json");
 		const std::optional<Json> descriptor = ReadJsonObject(contractRoot / L"descriptor.json");
 		const std::filesystem::path surfaceProfileRoot =
 			shaderRoot / L"Profiles" / L"GGLab.Surface";
@@ -319,6 +335,12 @@ namespace gglab
 			ReadJsonObject(surfaceProfileRoot / L"1" / L"descriptor.json");
 		const std::optional<Json> surfaceProfileV2 =
 			ReadJsonObject(surfaceProfileRoot / L"2" / L"descriptor.json");
+		const std::filesystem::path generatedFixtureRoot =
+			shaderRoot / L"Tests" / L"Generated";
+		const std::optional<Json> numericProvenance = ReadJsonObject(
+			generatedFixtureRoot / L"SurfaceGeneratedV1.provenance.json");
+		const std::optional<Json> textureProvenance = ReadJsonObject(
+			generatedFixtureRoot / L"SurfaceGeneratedV2.provenance.json");
 		const std::optional<std::string> hlsl =
 			ReadText(contractRoot / L"ShaderGraphPreviewProgram.hlsli");
 
@@ -337,6 +359,14 @@ namespace gglab
 			IntegerFieldEquals(*runtimeBinding, "version",
 				ShaderGraphPreviewRuntimeBindingContractVersion),
 			"Preview Program descriptor publishes the frozen program and binding identities");
+		context.Check(TextIdentityEquals(
+			descriptorText, ShaderGraphPreviewProgramDescriptorIdentity) &&
+			numericProvenance && textureProvenance &&
+			StringFieldEquals(*numericProvenance, "generatedSourceIdentity",
+				ShaderGraphPreviewNumericGeneratedSourceIdentity) &&
+			StringFieldEquals(*textureProvenance, "generatedSourceIdentity",
+				ShaderGraphPreviewTexture2DGeneratedSourceIdentity),
+			"Runtime Preview diagnostics identities project the exact descriptor and provenance bytes");
 
 		context.Check(descriptor && ValidateDescriptorViewModes(*descriptor),
 			"Preview Program descriptor is the authority for every C++ view-mode value");

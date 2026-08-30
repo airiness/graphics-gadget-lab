@@ -18,10 +18,16 @@ namespace gglab
 	inline constexpr std::string_view ShaderGraphPreviewRuntimeBindingContractId =
 		"gglab.shader-graph-preview.pass-parameters";
 	inline constexpr uint32_t ShaderGraphPreviewRuntimeBindingContractVersion = 1;
+	inline constexpr std::string_view ShaderGraphPreviewProgramDescriptorIdentity =
+		"3bcb22e27e7c2edeaf67dcb25d531cc89dbc443a8b5f19efe4d6885f32a5f8ad";
 	inline constexpr std::string_view ShaderGraphPreviewNumericInputContractId =
 		"gglab.preview-input.surface.numeric";
 	inline constexpr std::string_view ShaderGraphPreviewTexture2DInputContractId =
 		"gglab.preview-input.surface.texture2d";
+	inline constexpr std::string_view ShaderGraphPreviewNumericGeneratedSourceIdentity =
+		"b702b5a5483d97342cdbe5c4bd5aa36d3d16c9f8d42d1b10ca03128ae56db5d3";
+	inline constexpr std::string_view ShaderGraphPreviewTexture2DGeneratedSourceIdentity =
+		"82c16e3d6540739178e76d44632166fec3d7fd1898c360e07e8304c4899cb604";
 
 	enum class ShaderGraphPreviewViewMode : uint32_t
 	{

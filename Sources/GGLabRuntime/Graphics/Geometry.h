@@ -63,5 +63,15 @@ namespace gglab
 			static constexpr uint32_t SliceCount = 32;
 			static constexpr uint32_t StackCount = 16;
 		};
+
+		class Plane final : public PrimitiveBase
+		{
+		public:
+			static entt::entity Create(const CreateInfo& info) noexcept;
+
+		private:
+			static std::vector<Vertex> GetVerticesData() noexcept;
+			static std::vector<uint32_t> GetIndicesData() noexcept;
+		};
 	}
 }

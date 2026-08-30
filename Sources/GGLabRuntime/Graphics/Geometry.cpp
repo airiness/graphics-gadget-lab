@@ -218,5 +218,50 @@ namespace gglab
 			}
 			return indices;
 		}
+
+		entt::entity Plane::Create(const CreateInfo& info) noexcept
+		{
+			return CreatePrimitive(info, ProceduralPlaneModelID, ProceduralPlaneMeshID,
+				"ProceduralPlane", &GetVerticesData, &GetIndicesData);
+		}
+
+		std::vector<Vertex> Plane::GetVerticesData() noexcept
+		{
+			return {
+				{
+					Vector3(-1.0f, -1.0f, 0.0f),
+					Vector3(0.0f, 0.0f, -1.0f),
+					Vector2(0.0f, 1.0f),
+					Vector2(0.0f, 1.0f),
+					Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+				},
+				{
+					Vector3(-1.0f, 1.0f, 0.0f),
+					Vector3(0.0f, 0.0f, -1.0f),
+					Vector2(0.0f, 0.0f),
+					Vector2(0.0f, 0.0f),
+					Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+				},
+				{
+					Vector3(1.0f, 1.0f, 0.0f),
+					Vector3(0.0f, 0.0f, -1.0f),
+					Vector2(1.0f, 0.0f),
+					Vector2(1.0f, 0.0f),
+					Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+				},
+				{
+					Vector3(1.0f, -1.0f, 0.0f),
+					Vector3(0.0f, 0.0f, -1.0f),
+					Vector2(1.0f, 1.0f),
+					Vector2(1.0f, 1.0f),
+					Vector4(1.0f, 0.0f, 0.0f, 1.0f),
+				},
+			};
+		}
+
+		std::vector<uint32_t> Plane::GetIndicesData() noexcept
+		{
+			return { 0, 1, 2, 0, 2, 3 };
+		}
 	}
 }
