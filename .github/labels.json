@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "renames": [
     {
       "from": "area:developgui",
@@ -12,10 +12,17 @@
     {
       "from": "area:dx12",
       "to": "backend:dx12"
+    },
+    {
+      "from": "area:core",
+      "to": "area:foundation"
+    },
+    {
+      "from": "area:application",
+      "to": "area:app-runtime"
     }
   ],
   "delete": [
-    "area:foundation",
     "area:renderpass"
   ],
   "labels": [
@@ -66,14 +73,19 @@
     },
 
     {
-      "name": "area:application",
+      "name": "area:winapp",
       "color": "1D76DB",
-      "description": "Application, demo, window, input, and frame loop"
+      "description": "Windows host, window lifecycle, native input, and platform integration"
     },
     {
-      "name": "area:core",
+      "name": "area:app-runtime",
       "color": "1D76DB",
-      "description": "Core utilities, containers, IDs, hashing, and shared infrastructure"
+      "description": "Application runtime, demo and Lab orchestration, loading, and runtime services"
+    },
+    {
+      "name": "area:foundation",
+      "color": "1D76DB",
+      "description": "Foundation utilities, containers, IDs, hashing, serialization, and shared infrastructure"
     },
     {
       "name": "area:math",
@@ -113,12 +125,22 @@
     {
       "name": "area:shader",
       "color": "1D76DB",
-      "description": "HLSL, DXC, reflection, shader management, and shader utilities"
+      "description": "Renderer shader programs, HLSL integration, reflection, and runtime shader use"
+    },
+    {
+      "name": "area:shader-toolchain",
+      "color": "1D76DB",
+      "description": "Shader compilation, targets, manifests, publication, and toolchain contracts"
+    },
+    {
+      "name": "area:shader-artifact-runtime",
+      "color": "1D76DB",
+      "description": "Shader artifacts, stores, program registry, runtime manifests, and runtime ABI"
     },
     {
       "name": "area:asset",
       "color": "1D76DB",
-      "description": "Model and texture loading, importers, and asset registration"
+      "description": "Model and texture loading, importers, derived data, and asset registration"
     },
     {
       "name": "area:material",
@@ -214,7 +236,7 @@
     {
       "name": "topic:raytracing",
       "color": "A371F7",
-      "description": "DXR, acceleration structures, ray queries, and path tracing"
+      "description": "Ray tracing, acceleration structures, ray queries, and path tracing"
     },
     {
       "name": "topic:input",
@@ -224,7 +246,12 @@
     {
       "name": "topic:cache",
       "color": "A371F7",
-      "description": "Persistent or runtime caches for shaders, pipelines, and generated data"
+      "description": "Persistent or runtime caches for shaders, pipelines, assets, and generated data"
+    },
+    {
+      "name": "topic:voxel",
+      "color": "A371F7",
+      "description": "Voxel data, meshing, editing, destruction, and voxel-world experiments"
     },
 
     {
@@ -272,11 +299,21 @@
       "color": "FBCA04",
       "description": "Compilation, shader iteration, project generation, and build latency"
     },
+    {
+      "name": "concern:portability",
+      "color": "FBCA04",
+      "description": "Cross-backend, cross-platform, platform-boundary, and portability risks"
+    },
 
     {
       "name": "backend:dx12",
       "color": "6E7781",
       "description": "Direct3D 12 backend-specific implementation"
+    },
+    {
+      "name": "backend:vulkan",
+      "color": "6E7781",
+      "description": "Vulkan backend-specific implementation"
     }
   ]
 }
