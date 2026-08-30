@@ -2551,6 +2551,7 @@ namespace gglab
 			desc.m_SourcePath =
 				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl";
 			const ShaderCompileResult previewV2SpirV = compiler.Compile(desc);
+			desc.m_Target = {};
 			context.Check(previewV1Dxil.IsSuccess() && previewV2Dxil.IsSuccess() &&
 				previewV1SpirV.IsSuccess() && previewV2SpirV.IsSuccess() &&
 				previewV1Dxil.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
