@@ -127,6 +127,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewPixel, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &ShaderGraphPreviewSurfaceV1Pixel, L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV1.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &ShaderGraphPreviewSurfaceV2Pixel, L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &NapaVoxelVertex, L"Passes/PassNapaVoxel.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &NapaVoxelPixel, L"Passes/PassNapaVoxel.hlsl", L"PSMain" },
 		};

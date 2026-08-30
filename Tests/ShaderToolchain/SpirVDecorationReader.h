@@ -51,6 +51,7 @@ namespace gglab
 		uint32_t m_TypeId = 0;
 		std::string m_Name;
 		std::vector<SpirVStructMemberLayoutReflection> m_Members;
+		std::optional<uint32_t> m_Size;
 		std::optional<uint32_t> m_ArrayStride;
 	};
 

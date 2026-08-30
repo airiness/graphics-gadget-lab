@@ -21,6 +21,7 @@
 #include "Targets/ShaderTargetWireNames.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Wire/ShaderWireNames.h"
+#include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <dxcapi.h>
@@ -2528,6 +2529,87 @@ namespace gglab
 			};
 			RunGeneratedSurfaceContractCompileCase(
 				context, compiler, shaderSourceRoot, desc, generatedSurfaceV2Case);
+
+			desc.m_SourcePath =
+				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV1.hlsl";
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult previewV1Dxil = compiler.Compile(desc);
+			desc.m_SourcePath =
+				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl";
+			const ShaderCompileResult previewV2Dxil = compiler.Compile(desc);
+			desc.m_SourcePath =
+				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV1.hlsl";
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			desc.m_Target.m_Flags =
+				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult previewV1SpirV = compiler.Compile(desc);
+			desc.m_SourcePath =
+				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl";
+			const ShaderCompileResult previewV2SpirV = compiler.Compile(desc);
+			context.Check(previewV1Dxil.IsSuccess() && previewV2Dxil.IsSuccess() &&
+				previewV1SpirV.IsSuccess() && previewV2SpirV.IsSuccess() &&
+				previewV1Dxil.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
+				previewV2Dxil.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
+				previewV1SpirV.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV &&
+				previewV2SpirV.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV,
+				"Production DXC compiles both pinned Shader Graph Preview adapters "
+				"through DX12 and Vulkan target policy");
+
+			std::string previewDxilDisassembly;
+			bool previewDxilLayoutMatches = previewV2Dxil.IsSuccess() &&
+				DisassembleDxil(previewV2Dxil.m_Artifact.m_Binary, previewDxilDisassembly);
+			const size_t previewDxilTypeNameOffset = previewDxilDisassembly.find(
+				"struct struct.ShaderGraphPreviewPassParameters");
+			previewDxilLayoutMatches =
+				previewDxilLayoutMatches && previewDxilTypeNameOffset != std::string::npos;
+			for (const ShaderGraphPreviewPassAbiMember& member :
+				ShaderGraphPreviewPassAbiMembers)
+			{
+				previewDxilLayoutMatches = previewDxilLayoutMatches &&
+					FindDxilMemberOffset(previewDxilDisassembly, member.m_Name) == member.m_Offset;
+			}
+			previewDxilLayoutMatches = previewDxilLayoutMatches &&
+				ParseUnsignedAfter(previewDxilDisassembly, "Size:", previewDxilTypeNameOffset) ==
+					sizeof(ShaderGraphPreviewPassParameters);
+			context.Check(previewDxilLayoutMatches,
+				"DXIL reflection matches every ShaderGraphPreviewPassParameters member "
+				"offset and its 48-byte size");
+
+			SpirVDecorationReflection previewSpirVReflection;
+			const bool reflectedPreviewSpirV = previewV2SpirV.IsSuccess() &&
+				ReadSpirVDecorations(
+					previewV2SpirV.m_Artifact.m_Binary, previewSpirVReflection);
+			const SpirVStructLayoutReflection* previewSpirVLayout = reflectedPreviewSpirV
+				? previewSpirVReflection.FindStructLayout(
+					"type.ConstantBuffer.ShaderGraphPreviewPassParameters")
+				: nullptr;
+			bool previewSpirVLayoutMatches = previewSpirVLayout &&
+				previewSpirVLayout->m_Members.size() ==
+					ShaderGraphPreviewPassAbiMembers.size() &&
+				previewSpirVLayout->m_Size == sizeof(ShaderGraphPreviewPassParameters);
+			if (previewSpirVLayoutMatches)
+			{
+				for (size_t index = 0; index < ShaderGraphPreviewPassAbiMembers.size(); ++index)
+				{
+					previewSpirVLayoutMatches =
+						previewSpirVLayout->m_Members[index].m_Name ==
+							ShaderGraphPreviewPassAbiMembers[index].m_Name &&
+						previewSpirVLayout->m_Members[index].m_Offset ==
+							ShaderGraphPreviewPassAbiMembers[index].m_Offset;
+					if (!previewSpirVLayoutMatches)
+					{
+						break;
+					}
+				}
+			}
+			context.Check(previewSpirVLayoutMatches,
+				"SPIR-V reflection matches every ShaderGraphPreviewPassParameters member "
+				"offset and its 48-byte size");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

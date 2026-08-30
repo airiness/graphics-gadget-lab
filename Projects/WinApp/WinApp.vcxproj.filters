@@ -865,6 +865,12 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV1.hlsl">
+      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV2.hlsl">
+      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -970,6 +976,9 @@
       <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
     </None>
     <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli">
+      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
+    </None>
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewVisualizer.hlsli">
       <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">

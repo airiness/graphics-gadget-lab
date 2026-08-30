@@ -442,6 +442,7 @@
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
     <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json" />
     <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewVisualizer.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json" />
@@ -472,6 +473,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV1.hlsl" />
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV2.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />
