@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderToolchainTestsMain.cpp" />
-    <ClCompile Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.h" />
-    <ClInclude Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.h" />
   </ItemGroup>
 </Project>

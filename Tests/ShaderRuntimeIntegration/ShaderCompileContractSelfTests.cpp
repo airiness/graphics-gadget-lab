@@ -1,4 +1,6 @@
 #include "ShaderCompileContractSelfTests.h"
+
+// This suite intentionally validates the cross-domain Toolchain-to-Runtime contract.
 #include "Testing/ShaderArtifactManifestIOTestAccess.h"
 
 #include "SpirVDecorationReader.h"

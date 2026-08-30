@@ -101,14 +101,15 @@ First-party headless self-tests run as one executable per domain:
 |---|---|---|
 | `GraphicsGadgetLab.exe` | `--self-test all` | Application-owned in-app suites (`app-launch-options`, `app-devtools-view-profile`, `napa-voxel`) |
 | `GGLabVulkanQualification.exe` | `--self-test` | Headless qualification launch and validation-gate contracts |
-| `GGLabRuntimeTests.exe` | `--suite all` | Runtime/Foundation contract suites (`artifact-cache`, `asset-data`, `asset-upload-scheduler`, `publication-accounting`, `shader-compile-contracts`, `rendering-contracts`, `vulkan-contracts`) |
+| `GGLabRuntimeTests.exe` | `--suite all` | Runtime/Foundation contract suites (`artifact-cache`, `asset-data`, `asset-upload-scheduler`, `publication-accounting`, `shader-artifact-runtime`, `rendering-contracts`, `vulkan-contracts`) |
 | `GGLabAppRuntimeTests.exe` | (no arguments) | Host-neutral Application lifecycle and service-composition contracts |
-| `GGLabShaderToolchainTests.exe` | `--suite all` | Shader compiler, CLI, and immutable artifact-publication contracts |
+| `GGLabShaderToolchainTests.exe` | `--suite all` | Toolchain-owned CLI, compiler-process, and immutable artifact-publication contracts without Runtime/RHI dependencies |
+| `GGLabShaderRuntimeIntegrationTests.exe` | `--suite all` | Cross-domain Toolchain, Runtime/RHI ABI, production shader, and artifact-consumption integration contracts |
 | `NapaVoxelCoreTests.exe` | `--suite all` | Pure NapaVoxelCore suites compiled as C++20 (`build-contract`, `coordinate`, `damage`, `edit`, `hash`, `mesher`, `multi-chunk`, `mutation`, `primitive`, `restore`, `storage`, `publication-data-only`) |
 | `GGLabFoundationTests.exe` | (no arguments) | Foundation public-header link probe |
 
 Use `--suite <id>` to select one suite in the domain test executables. CI runs
-all seven executables on the applicable build legs; actual hardware qualification remains
+all eight executables on the applicable build legs; actual hardware qualification remains
 a manual gate on supported Windows adapters.
 
 ## Status

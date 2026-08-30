@@ -1,6 +1,7 @@
 #include "SpirVDecorationReader.h"
 
 #include <algorithm>
+#include <cstring>
 #include <optional>
 #include <unordered_map>
 

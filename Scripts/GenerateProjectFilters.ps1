@@ -396,6 +396,16 @@ $projectSpecifications = @(
         )
     }
     [pscustomobject]@{
+        Name = "ShaderRuntimeIntegrationTests"
+        ProjectPath = "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj"
+        FiltersPath = "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\ShaderRuntimeIntegration"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
         Name = "GGLabTestCore"
         ProjectPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj"
         FiltersPath = "Projects\GGLabTestCore\GGLabTestCore.vcxproj.filters"

@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Shader/ShaderTypes.h"
+#include "ShaderArtifactRuntime/ShaderArtifactTypes.h"
 
 #include <cstdint>
 #include <optional>
