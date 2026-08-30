@@ -113,6 +113,10 @@ namespace gglab::shader_programs
 		"gglab.shader.render-graph-compute", "vertex.preview", ShaderStage::Vertex };
 	inline const ShaderProgramRef RenderGraphComputePreviewPixel{
 		"gglab.shader.render-graph-compute", "pixel.preview", ShaderStage::Pixel };
+	inline const ShaderProgramRef ShaderGraphPreviewSurfaceV1Pixel{
+		"gglab.shader.shader-graph-preview", "pixel.surface-v1", ShaderStage::Pixel };
+	inline const ShaderProgramRef ShaderGraphPreviewSurfaceV2Pixel{
+		"gglab.shader.shader-graph-preview", "pixel.surface-v2", ShaderStage::Pixel };
 	inline const ShaderProgramRef NapaVoxelVertex{
 		"gglab.shader.napa-voxel", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef NapaVoxelPixel{

@@ -50,6 +50,9 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderCompilerProcessContract.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderGraphPreviewProgram.h">
+      <Filter>Public\ShaderArtifactRuntime</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderLooseArtifactIO.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>

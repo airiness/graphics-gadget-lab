@@ -97,6 +97,12 @@
     <Filter Include="Shaders\Profiles\GGLab.Surface\2">
       <UniqueIdentifier>{1D37AE8E-AE2B-8900-EE5C-03A94B2887A7}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Programs">
+      <UniqueIdentifier>{1A4EF42B-4BCC-F632-7BEC-A3C384F7487D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Programs\ShaderGraphPreview">
+      <UniqueIdentifier>{B0BE4E04-E2F5-C6ED-3989-B04824DB5961}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{EEA089C0-E071-EA3C-EFDF-59DAECA485F6}</UniqueIdentifier>
     </Filter>
@@ -959,6 +965,12 @@
     </None>
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json">
       <Filter>Shaders\Profiles\GGLab.Surface\2</Filter>
+    </None>
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json">
+      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
+    </None>
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli">
+      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>

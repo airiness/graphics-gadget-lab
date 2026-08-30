@@ -440,6 +440,8 @@
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json" />
