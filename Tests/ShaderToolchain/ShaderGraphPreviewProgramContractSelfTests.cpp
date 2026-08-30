@@ -318,6 +318,19 @@ namespace gglab
 				"ConstantBuffer<ShaderGraphPreviewPassParameters> g_Preview : register(b2);") !=
 				std::string_view::npos;
 		}
+
+		[[nodiscard]] bool ValidateVisualizerViewModeDispatch(std::string_view hlsl) noexcept
+		{
+			const size_t invalidGuard = hlsl.find(
+				"if (g_Preview.ViewMode > ShaderGraphPreviewViewModeOpacity)");
+			const size_t contractFingerprint = hlsl.find("const float contractFingerprint");
+			const size_t baseColorBranch = hlsl.find(
+				"else if (g_Preview.ViewMode == ShaderGraphPreviewViewModeBaseColor)");
+			return invalidGuard != std::string_view::npos &&
+				contractFingerprint != std::string_view::npos &&
+				baseColorBranch != std::string_view::npos &&
+				invalidGuard < contractFingerprint && contractFingerprint < baseColorBranch;
+		}
 	}
 
 	void RunShaderGraphPreviewProgramContractSelfTests(SelfTestContext& context) noexcept
@@ -343,6 +356,8 @@ namespace gglab
 			generatedFixtureRoot / L"SurfaceGeneratedV2.provenance.json");
 		const std::optional<std::string> hlsl =
 			ReadText(contractRoot / L"ShaderGraphPreviewProgram.hlsli");
+		const std::optional<std::string> visualizer =
+			ReadText(contractRoot / L"ShaderGraphPreviewVisualizer.hlsli");
 
 		const Json* program = descriptor ? FindField(*descriptor, "program") : nullptr;
 		const Json* runtimeBinding =
@@ -372,6 +387,8 @@ namespace gglab
 			"Preview Program descriptor is the authority for every C++ view-mode value");
 		context.Check(hlsl && ValidateHlslProjection(*hlsl),
 			"Preview HLSL view modes and pass fields project the shared C++ contract");
+		context.Check(visualizer && ValidateVisualizerViewModeDispatch(*visualizer),
+			"Preview Combined view remains the default and invalid fingerprint is out-of-range only");
 
 		constexpr std::array numericParameters{
 			ParameterExpectation{ "p.metal", "ScalarParameter", "float", "float" },
