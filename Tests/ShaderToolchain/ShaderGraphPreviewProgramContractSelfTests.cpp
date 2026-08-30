@@ -3,6 +3,7 @@
 #include "DevelopmentShaderPaths.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
+#include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 
@@ -335,6 +336,10 @@ namespace gglab
 
 	void RunShaderGraphPreviewProgramContractSelfTests(SelfTestContext& context) noexcept
 	{
+		context.Check(ShaderProcessContractVersion == 2 &&
+			ShaderPreviewBuildContractVersion == 1,
+			"Preview build contract v1 is independent from the unchanged process-v2 contract");
+
 		const std::filesystem::path shaderRoot =
 			ResolveShaderSourceRoot(win32::GetExecutableDirectory());
 		const std::filesystem::path contractRoot =

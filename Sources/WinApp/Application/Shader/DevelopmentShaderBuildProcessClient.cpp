@@ -303,6 +303,23 @@ namespace gglab
 			return true;
 		}
 
+		[[nodiscard]] bool HasRequiredFields(const nlohmann::json& object,
+			std::initializer_list<std::string_view> fields) noexcept
+		{
+			if (!object.is_object())
+			{
+				return false;
+			}
+			for (std::string_view field : fields)
+			{
+				if (!object.contains(std::string(field)))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
 		[[nodiscard]] bool ReadString(const nlohmann::json& object,
 			std::string_view field, std::string& outValue) noexcept
 		{
@@ -350,7 +367,8 @@ namespace gglab
 		}
 
 		[[nodiscard]] bool ReadDiagnostics(const nlohmann::json& object,
-			std::string& outDiagnostics, size_t& outCount) noexcept
+			std::string& outDiagnostics, size_t& outCount,
+			bool allowUnknownFields = false) noexcept
 		{
 			const auto found = object.find("diagnostics");
 			if (found == object.end() || !found->is_array())
@@ -360,7 +378,10 @@ namespace gglab
 			outCount = found->size();
 			for (const nlohmann::json& diagnostic : *found)
 			{
-				if (!HasExactFields(diagnostic, { "message" }))
+				const bool fieldsValid = allowUnknownFields
+					? HasRequiredFields(diagnostic, { "message" })
+					: HasExactFields(diagnostic, { "message" });
+				if (!fieldsValid)
 				{
 					return false;
 				}
@@ -455,7 +476,7 @@ namespace gglab
 		std::string diagnostics;
 		size_t diagnosticsCount = 0;
 		if (!ReadBoolean(*document, "success", success) ||
-			!HasExactFields(*document, success
+			!HasRequiredFields(*document, success
 				? std::initializer_list<std::string_view>{ "command", "success", "status",
 					"exitCode", "processContractVersion", "compilePolicyRevision",
 					"toolIdentity", "toolVersion", "producerKind", "producerIdentity",
@@ -468,7 +489,8 @@ namespace gglab
 			static_cast<uint64_t>(exitCode) != processExitCode ||
 			!ReadInteger(*document, "processContractVersion", contractVersion) ||
 			contractVersion != ShaderProcessContractVersion ||
-			!ReadDiagnostics(*document, diagnostics, diagnosticsCount))
+			!ReadDiagnostics(*document, diagnostics, diagnosticsCount,
+				/*allowUnknownFields=*/true))
 		{
 			result.m_Diagnostics = "describe JSON fields disagree with the process contract.";
 			return result;
