@@ -22,9 +22,8 @@ namespace gglab
 	{
 		using Json = nlohmann::json;
 
-		struct InputExpectation final
+		struct ParameterExpectation final
 		{
-			std::string_view m_Source;
 			std::string_view m_StableId;
 			std::string_view m_ParameterClass;
 			std::string_view m_GraphValueType;
@@ -91,6 +90,24 @@ namespace gglab
 			return field && field->is_number_integer() && *field == expected;
 		}
 
+		[[nodiscard]] bool StringFieldsEqual(const Json& lhs,
+			std::string_view lhsName, const Json& rhs, std::string_view rhsName) noexcept
+		{
+			const Json* lhsField = FindField(lhs, lhsName);
+			const Json* rhsField = FindField(rhs, rhsName);
+			return lhsField && rhsField && lhsField->is_string() && rhsField->is_string() &&
+				*lhsField == *rhsField;
+		}
+
+		[[nodiscard]] bool IntegerFieldsEqual(const Json& lhs,
+			std::string_view lhsName, const Json& rhs, std::string_view rhsName) noexcept
+		{
+			const Json* lhsField = FindField(lhs, lhsName);
+			const Json* rhsField = FindField(rhs, rhsName);
+			return lhsField && rhsField && lhsField->is_number_integer() &&
+				rhsField->is_number_integer() && *lhsField == *rhsField;
+		}
+
 		[[nodiscard]] bool NumberFieldEquals(
 			const Json& object, std::string_view name, float expected) noexcept
 		{
@@ -130,49 +147,108 @@ namespace gglab
 				StringFieldEquals(value, "stage", ShaderGraphPreviewProgramStage);
 		}
 
-		template <size_t InputCount>
+		template <size_t ParameterCount>
 		[[nodiscard]] bool ValidateInputContract(const Json& contract,
-			uint32_t profileVersion, const ShaderProgramRef& programRef,
-			const std::array<InputExpectation, InputCount>& expectedInputs) noexcept
+			const Json& profileDescriptor, const ShaderProgramRef& programRef,
+			const std::array<ParameterExpectation, ParameterCount>& expectedParameters) noexcept
 		{
 			const Json* profile = FindField(contract, "profile");
 			const Json* serializedProgramRef = FindField(contract, "programRef");
 			const Json* generatedFunction = FindField(contract, "generatedFunction");
 			const Json* orderedInputs = FindField(contract, "orderedInputs");
+			const Json* profileGeneratedFunction =
+				FindField(profileDescriptor, "generatedFunction");
+			const Json* graphVisibleInputs =
+				FindField(profileDescriptor, "graphVisibleInputs");
 			if (!profile || !serializedProgramRef || !generatedFunction || !orderedInputs ||
-				!orderedInputs->is_array() || orderedInputs->size() != expectedInputs.size() ||
-				!StringFieldEquals(*profile, "id", "gglab.surface") ||
-				!IntegerFieldEquals(*profile, "profileVersion", profileVersion) ||
-				!IntegerFieldEquals(*profile, "descriptorVersion", profileVersion) ||
+				!profileGeneratedFunction || !graphVisibleInputs || !orderedInputs->is_array() ||
+				!graphVisibleInputs->is_array() ||
+				orderedInputs->size() != expectedParameters.size() + graphVisibleInputs->size() ||
+				!StringFieldsEqual(*profile, "id", profileDescriptor, "profileId") ||
+				!IntegerFieldsEqual(
+					*profile, "profileVersion", profileDescriptor, "profileVersion") ||
+				!IntegerFieldsEqual(
+					*profile, "descriptorVersion", profileDescriptor, "descriptorVersion") ||
 				!ValidateProgramRef(*serializedProgramRef, programRef) ||
-				!StringFieldEquals(*generatedFunction, "name", "EvaluateSurface") ||
-				!StringFieldEquals(*generatedFunction, "stage", "pixel"))
+				!StringFieldsEqual(
+					*generatedFunction, "name", *profileGeneratedFunction, "name") ||
+				!StringFieldsEqual(
+					*generatedFunction, "stage", *profileGeneratedFunction, "stage"))
 			{
 				return false;
 			}
 
-			for (size_t index = 0; index < expectedInputs.size(); ++index)
+			for (size_t index = 0; index < expectedParameters.size(); ++index)
 			{
-				const InputExpectation& expected = expectedInputs[index];
+				const ParameterExpectation& expected = expectedParameters[index];
 				const Json& input = (*orderedInputs)[index];
-				if (!StringFieldEquals(input, "source", expected.m_Source) ||
+				if (!StringFieldEquals(input, "source", "graphParameter") ||
 					!StringFieldEquals(input, "stableId", expected.m_StableId) ||
 					!StringFieldEquals(input, "graphValueType", expected.m_GraphValueType) ||
 					!StringFieldEquals(input, "generatedType", expected.m_GeneratedType))
 				{
 					return false;
 				}
-				const Json* parameterClass = FindField(input, "parameterClass");
-				if (expected.m_ParameterClass.empty()
-					? parameterClass != nullptr
-					: !parameterClass || !parameterClass->is_string() ||
-						parameterClass->get_ref<const Json::string_t&>() !=
-							expected.m_ParameterClass)
+				if (!StringFieldEquals(input, "parameterClass", expected.m_ParameterClass))
+				{
+					return false;
+				}
+			}
+
+			for (size_t index = 0; index < graphVisibleInputs->size(); ++index)
+			{
+				const Json& input = (*orderedInputs)[expectedParameters.size() + index];
+				const Json& profileInput = (*graphVisibleInputs)[index];
+				if (!StringFieldEquals(input, "source", "graphVisibleInput") ||
+					FindField(input, "parameterClass") != nullptr ||
+					!StringFieldsEqual(input, "stableId", profileInput, "id") ||
+					!StringFieldsEqual(input, "graphValueType", profileInput, "type") ||
+					!StringFieldsEqual(input, "generatedType", profileInput, "type"))
 				{
 					return false;
 				}
 			}
 			return true;
+		}
+
+		[[nodiscard]] bool ValidateTextureBindingSignature(const Json& contract,
+			const Json& profileDescriptor) noexcept
+		{
+			const Json* orderedInputs = FindField(contract, "orderedInputs");
+			const Json* samplingContract = FindField(profileDescriptor, "samplingContract");
+			const Json* generatedTextureSignature = samplingContract
+				? FindField(*samplingContract, "generatedTextureSignature")
+				: nullptr;
+			const Json* componentOrder = generatedTextureSignature
+				? FindField(*generatedTextureSignature, "componentOrder")
+				: nullptr;
+			if (!orderedInputs || !orderedInputs->is_array() || orderedInputs->size() < 2 ||
+				!generatedTextureSignature || !componentOrder || !componentOrder->is_array() ||
+				componentOrder->size() != 2)
+			{
+				return false;
+			}
+
+			const Json& textureInput = (*orderedInputs)[1];
+			const Json* bindingPair = FindField(textureInput, "bindingPair");
+			const Json* parameterType = FindField(*generatedTextureSignature, "parameterType");
+			if (!bindingPair || !bindingPair->is_array() || bindingPair->size() != 2 ||
+				!parameterType || !parameterType->is_string() ||
+				!StringFieldEquals(textureInput, "generatedType",
+					parameterType->get_ref<const Json::string_t&>()))
+			{
+				return false;
+			}
+
+			const Json& textureComponent = (*componentOrder)[0];
+			const Json& samplerComponent = (*componentOrder)[1];
+			return IntegerFieldEquals(textureComponent, "position", 0) &&
+				StringFieldEquals(textureComponent, "role", "textureBindingIndex") &&
+				IntegerFieldEquals(samplerComponent, "position", 1) &&
+				StringFieldEquals(samplerComponent, "role", "samplerBindingIndex") &&
+				(*bindingPair)[0].is_string() && (*bindingPair)[1].is_string() &&
+				(*bindingPair)[0] == *FindField(textureComponent, "role") &&
+				(*bindingPair)[1] == *FindField(samplerComponent, "role");
 		}
 
 		[[nodiscard]] bool ValidateDescriptorViewModes(const Json& descriptor) noexcept
@@ -237,6 +313,12 @@ namespace gglab
 		const std::filesystem::path contractRoot =
 			shaderRoot / L"Programs" / L"ShaderGraphPreview";
 		const std::optional<Json> descriptor = ReadJsonObject(contractRoot / L"descriptor.json");
+		const std::filesystem::path surfaceProfileRoot =
+			shaderRoot / L"Profiles" / L"GGLab.Surface";
+		const std::optional<Json> surfaceProfileV1 =
+			ReadJsonObject(surfaceProfileRoot / L"1" / L"descriptor.json");
+		const std::optional<Json> surfaceProfileV2 =
+			ReadJsonObject(surfaceProfileRoot / L"2" / L"descriptor.json");
 		const std::optional<std::string> hlsl =
 			ReadText(contractRoot / L"ShaderGraphPreviewProgram.hlsli");
 
@@ -261,16 +343,13 @@ namespace gglab
 		context.Check(hlsl && ValidateHlslProjection(*hlsl),
 			"Preview HLSL view modes and pass fields project the shared C++ contract");
 
-		constexpr std::array numericInputs{
-			InputExpectation{ "graphParameter", "p.metal", "ScalarParameter", "float", "float" },
-			InputExpectation{ "graphParameter", "p.tint", "VectorParameter", "float3", "float3" },
-			InputExpectation{ "graphVisibleInput", "uv0", "", "float2", "float2" },
+		constexpr std::array numericParameters{
+			ParameterExpectation{ "p.metal", "ScalarParameter", "float", "float" },
+			ParameterExpectation{ "p.tint", "VectorParameter", "float3", "float3" },
 		};
-		constexpr std::array textureInputs{
-			InputExpectation{ "graphParameter", "p.rough", "ScalarParameter", "float", "float" },
-			InputExpectation{
-				"graphParameter", "p.tex", "Texture2DParameter", "Texture2D", "uint2" },
-			InputExpectation{ "graphVisibleInput", "uv0", "", "float2", "float2" },
+		constexpr std::array textureParameters{
+			ParameterExpectation{ "p.rough", "ScalarParameter", "float", "float" },
+			ParameterExpectation{ "p.tex", "Texture2DParameter", "Texture2D", "uint2" },
 		};
 		const Json* inputContracts = descriptor ? FindField(*descriptor, "inputContracts") : nullptr;
 		const Json* numeric = inputContracts
@@ -279,12 +358,17 @@ namespace gglab
 		const Json* texture = inputContracts
 			? FindObjectById(*inputContracts, ShaderGraphPreviewTexture2DInputContractId)
 			: nullptr;
-		context.Check(numeric && ValidateInputContract(
-			*numeric, 1, shader_programs::ShaderGraphPreviewSurfaceV1Pixel, numericInputs),
-			"Preview descriptor freezes the numeric-v1 input order and ProgramRef");
-		context.Check(texture && ValidateInputContract(
-			*texture, 2, shader_programs::ShaderGraphPreviewSurfaceV2Pixel, textureInputs),
-			"Preview descriptor freezes the texture2d-v2 binding-pair order and ProgramRef");
+		context.Check(numeric && surfaceProfileV1 && ValidateInputContract(*numeric,
+			*surfaceProfileV1, shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
+			numericParameters),
+			"Preview numeric-v1 contract projects the real Surface Profile descriptor");
+		context.Check(texture && surfaceProfileV2 && ValidateInputContract(*texture,
+			*surfaceProfileV2, shader_programs::ShaderGraphPreviewSurfaceV2Pixel,
+			textureParameters),
+			"Preview texture2d-v2 contract projects the real Surface Profile descriptor");
+		context.Check(texture && surfaceProfileV2 &&
+			ValidateTextureBindingSignature(*texture, *surfaceProfileV2),
+			"Preview texture2d-v2 bindingPair strictly projects texture then sampler binding roles");
 
 		const Json* numericValues = numeric ? FindField(*numeric, "labValues") : nullptr;
 		const Json* textureValues = texture ? FindField(*texture, "labValues") : nullptr;
