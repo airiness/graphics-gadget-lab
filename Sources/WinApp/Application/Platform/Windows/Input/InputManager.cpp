@@ -1,9 +1,9 @@
-#include "Core/Input/InputManager.h"
+#include "Application/Platform/Windows/Input/InputManager.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/Mouse.h"
-#include "Core/Input/WindowsInputMapping.h"
+#include "Application/Platform/Windows/Input/Keyboard.h"
+#include "Application/Platform/Windows/Input/Mouse.h"
+#include "Application/Platform/Windows/Input/WindowsInputMapping.h"
 
 #include <array>
 #include <utility>

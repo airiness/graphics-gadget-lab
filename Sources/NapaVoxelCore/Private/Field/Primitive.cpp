@@ -1,7 +1,7 @@
 #include "NapaVoxelCore/Field/Primitive.h"
 
 #include "NapaVoxelCore/Field/DensityQuantization.h"
-#include "NapaVoxelCore/Field/SignedDistance.h"
+#include "Field/SignedDistance.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
 #include "NapaVoxelCore/World/VoxelWorld.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"

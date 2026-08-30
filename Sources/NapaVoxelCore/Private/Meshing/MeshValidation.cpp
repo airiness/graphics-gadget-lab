@@ -3,7 +3,7 @@
 #include "NapaVoxelCore/BuildContract.h"
 #include "NapaVoxelCore/Field/DensityQuantization.h"
 #include "NapaVoxelCore/Hash/CanonicalHash.h"
-#include "NapaVoxelCore/Hash/CanonicalVoxelSerialization.h"
+#include "Hash/CanonicalVoxelSerialization.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"
 
 #include <algorithm>

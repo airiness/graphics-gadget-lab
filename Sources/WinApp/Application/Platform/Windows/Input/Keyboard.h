@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Input/InputBase.h"
+#include "Application/Platform/Windows/Input/InputBase.h"
 
 namespace gglab
 {

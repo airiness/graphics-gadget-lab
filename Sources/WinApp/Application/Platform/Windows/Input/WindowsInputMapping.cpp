@@ -1,4 +1,4 @@
-#include "Core/Input/WindowsInputMapping.h"
+#include "Application/Platform/Windows/Input/WindowsInputMapping.h"
 
 #include <array>
 

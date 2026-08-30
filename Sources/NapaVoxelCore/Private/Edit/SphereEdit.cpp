@@ -1,6 +1,6 @@
 #include "NapaVoxelCore/Edit/SphereEdit.h"
 
-#include "NapaVoxelCore/Field/SignedDistance.h"
+#include "Field/SignedDistance.h"
 #include "NapaVoxelCore/World/VoxelSample.h"
 
 #include <algorithm>

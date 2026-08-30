@@ -14,7 +14,7 @@
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
-#include "Core/Input/InputManager.h"
+#include "Application/Platform/Windows/Input/InputManager.h"
 #include "Graphics/Renderer.h"
 #include "Lab/LabRuntime.h"
 

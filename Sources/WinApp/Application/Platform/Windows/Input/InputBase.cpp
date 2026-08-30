@@ -1,4 +1,4 @@
-#include "Core/Input/InputBase.h"
+#include "Application/Platform/Windows/Input/InputBase.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 

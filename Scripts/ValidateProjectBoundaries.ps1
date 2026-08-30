@@ -11,8 +11,9 @@ param(
 #   Source ownership - every first-party source item must live below its owning
 #                      project's source root, and every physical source file must
 #                      belong to exactly one owning project.
-#   Include visibility - Foundation sees only its Public/Private roots, while its
-#                        tests see only the Foundation Public root.
+#   Include visibility - Foundation and NapaVoxelCore see only their owned
+#                        Public/Private roots, while ordinary consumers receive
+#                        only the corresponding Public root.
 #   Include identity - public logical include paths must be unique across owners.
 #   Foundation boundary - Foundation must not include any upper first-party domain.
 #   Foundation private access - every private header is compiler-gated to the
@@ -23,7 +24,7 @@ param(
 #   Foundation consumers - ShaderCompiler foundational dependencies must come
 #                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
-#                        DevTools/*, or the WinApp-owned Core/Input/*.
+#                        DevTools/*, or WinApp-owned platform input.
 #   Platform leakage - portable runtime files must not depend on unapproved
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
@@ -65,6 +66,7 @@ $shaderArtifactRuntimeSourcesDir = Join-Path $root "Sources/ShaderArtifactRuntim
 $shaderToolchainSourcesDir = Join-Path $root "Sources/ShaderToolchain"
 $shaderCompilerSourcesDir = Join-Path $root "Sources/Tools/ShaderCompiler"
 $napaSourcesDir = Join-Path $root "Sources/NapaVoxelCore"
+$napaPublicDir = Join-Path $napaSourcesDir "Public"
 
 function Test-IsPathUnderRoot {
     param(
@@ -598,8 +600,12 @@ function Test-ProjectIncludeVisibility {
         }
 
         foreach ($includeRoot in $includeRoots) {
-            if ($includeRoot.StartsWith('$(GGLabRepositoryRoot)Sources',
-                    [System.StringComparison]::OrdinalIgnoreCase) -and
+            $isFirstPartySourceRoot =
+                $includeRoot.StartsWith('$(GGLabRepositoryRoot)Sources',
+                    [System.StringComparison]::OrdinalIgnoreCase) -or
+                $includeRoot.StartsWith('$(NapaVoxelRepositoryRoot)Sources',
+                    [System.StringComparison]::OrdinalIgnoreCase)
+            if ($isFirstPartySourceRoot -and
                 $AllowedFirstPartyRoots -notcontains $includeRoot) {
                 $projectContractFindings.Add([pscustomobject]@{
                     Rule   = "include-visibility"
@@ -618,9 +624,6 @@ $shaderArtifactRuntimePublicIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public'
 $shaderToolchainIncludeRoot = '$(GGLabRepositoryRoot)Sources\ShaderToolchain'
 $shaderCompilerIncludeRoot = '$(GGLabRepositoryRoot)Sources\Tools\ShaderCompiler'
-# Allowed, but deliberately not required: the current NapaVoxelCore/... layout
-# still needs this broad root. Foundation Private access is compiler-gated below.
-$repositorySourcesIncludeRoot = '$(GGLabRepositoryRoot)Sources'
 $foundationPublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public'
 $foundationPrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabFoundation\Private'
 $testCorePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public'
@@ -629,7 +632,9 @@ $runtimeTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\GGLabRuntime'
 $shaderToolchainTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\ShaderToolchain'
 $appRuntimeTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\GGLabAppRuntime'
 $napaTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\NapaVoxelCore'
-$napaIncludeRoot = '$(GGLabRepositoryRoot)Sources'
+$napaConsumerPublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public'
+$napaProjectPublicIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Public'
+$napaProjectPrivateIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Private'
 Test-ProjectIncludeVisibility $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
     @($runtimeIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
@@ -640,10 +645,10 @@ Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
     @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot) `
+        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot) `
     @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $repositorySourcesIncludeRoot,
+        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot,
         $shaderToolchainIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
@@ -706,10 +711,35 @@ Test-ProjectIncludeVisibility $shaderCompilerProject $shaderCompilerNamespace `
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot) `
     @($shaderCompilerIncludeRoot, $shaderToolchainIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot)
+Test-ProjectIncludeVisibility $napaProject $napaNamespace `
+    "Projects/NapaVoxelCore/NapaVoxelCore.vcxproj" `
+    @($napaProjectPublicIncludeRoot, $napaProjectPrivateIncludeRoot) `
+    @($napaProjectPublicIncludeRoot, $napaProjectPrivateIncludeRoot)
 Test-ProjectIncludeVisibility $napaTestsProject $napaTestsNamespace `
     "Projects/NapaVoxelCoreTests/NapaVoxelCoreTests.vcxproj" `
-    @($napaTestsIncludeRoot, $napaIncludeRoot) `
-    @($napaTestsIncludeRoot, $napaIncludeRoot)
+    @($napaTestsIncludeRoot, $napaConsumerPublicIncludeRoot) `
+    @($napaTestsIncludeRoot, $napaConsumerPublicIncludeRoot)
+
+$legacyWinAppInputDir = Join-Path $winAppSourcesDir "Core/Input"
+if (Test-Path -LiteralPath $legacyWinAppInputDir) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "winapp-input-ownership"
+        Target = ConvertTo-RepoRelativePath $legacyWinAppInputDir
+        Reason = "Windows input implementation must live under Application/Platform/Windows/Input"
+    })
+}
+$legacyWinAppInputIncludeRegex = '#include\s*[<"]Core[\\/]Input[\\/]'
+foreach ($winAppSourceFile in Get-ChildItem -LiteralPath $winAppSourcesDir -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
+    $content = Get-Content -LiteralPath $winAppSourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match $legacyWinAppInputIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "winapp-input-ownership"
+            Target = ConvertTo-RepoRelativePath $winAppSourceFile.FullName
+            Reason = "WinApp source still includes the legacy Core/Input path"
+        })
+    }
+}
 
 $appRuntimeConfigurationTypes = @($appRuntimeProject.SelectNodes(
     "//msb:PropertyGroup[@Label='Configuration']/msb:ConfigurationType",
@@ -1704,8 +1734,8 @@ $logicalIncludeSpecifications = @(
     }
     [pscustomobject]@{
         Name        = "NapaVoxelCore"
-        ScanRoot    = $napaSourcesDir
-        LogicalRoot = $repositorySourcesDir
+        ScanRoot    = $napaPublicDir
+        LogicalRoot = $napaPublicDir
     }
 )
 $logicalIncludes = @{}
@@ -1720,13 +1750,22 @@ foreach ($specification in $logicalIncludeSpecifications) {
     foreach ($header in $headers) {
         $logicalPath = $header.FullName.Substring($specification.LogicalRoot.Length + 1).
             Replace('\', '/')
-        if ($specification.Name -eq "GGLabFoundation" -and
-            -not $logicalPath.StartsWith("GGLabFoundation/",
+        $requiredLogicalPrefix = if ($specification.Name -eq "GGLabFoundation") {
+            "GGLabFoundation/"
+        }
+        elseif ($specification.Name -eq "NapaVoxelCore") {
+            "NapaVoxelCore/"
+        }
+        else {
+            ""
+        }
+        if (-not [string]::IsNullOrWhiteSpace($requiredLogicalPrefix) -and
+            -not $logicalPath.StartsWith($requiredLogicalPrefix,
                 [System.StringComparison]::Ordinal)) {
             $projectContractFindings.Add([pscustomobject]@{
                 Rule   = "logical-include"
                 Target = ConvertTo-RepoRelativePath $header.FullName
-                Reason = "Foundation public include path lacks the GGLabFoundation/ prefix"
+                Reason = "$($specification.Name) public include path lacks the $requiredLogicalPrefix prefix"
             })
         }
 
@@ -1745,6 +1784,24 @@ foreach ($specification in $logicalIncludeSpecifications) {
                 Owner    = $specification.Name
                 FullPath = $header.FullName
             }
+        }
+    }
+}
+
+$napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'
+foreach ($header in Get-ChildItem -LiteralPath $napaPublicDir -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {
+    $content = Get-Content -LiteralPath $header.FullName -Raw -ErrorAction Stop
+    foreach ($match in [regex]::Matches($content, $napaPublicIncludeRegex)) {
+        $logicalPath = $match.Groups["Path"].Value.Replace('\', '/')
+        $logicalKey = $logicalPath.ToLowerInvariant()
+        if (-not $logicalIncludes.ContainsKey($logicalKey) -or
+            $logicalIncludes[$logicalKey].Owner -ne "NapaVoxelCore") {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "napa-public-closure"
+                Target = ConvertTo-RepoRelativePath $header.FullName
+                Reason = "Napa Public header includes a non-Public Napa header: $logicalPath"
+            })
         }
     }
 }
