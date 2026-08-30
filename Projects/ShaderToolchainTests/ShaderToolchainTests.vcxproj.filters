@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderToolchainTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.cpp" />
@@ -10,6 +11,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.h" />
   </ItemGroup>

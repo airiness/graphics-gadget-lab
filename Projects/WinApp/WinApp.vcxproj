@@ -245,6 +245,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
@@ -370,6 +371,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
@@ -440,6 +442,9 @@
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli" />
+    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewVisualizer.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli" />
     <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json" />
@@ -470,6 +475,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV1.hlsl" />
+    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV2.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />

@@ -16,6 +16,7 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
+#include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
@@ -91,6 +92,10 @@ namespace gglab
 					shader_programs::CoordinateConformancePixel } },
 			{ SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create },
 			{ SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create },
+			{ ShaderGraphPreviewLabSession::GetDescriptor(),
+				&ShaderGraphPreviewLabSession::Create,
+				{ shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
+					shader_programs::ShaderGraphPreviewSurfaceV2Pixel } },
 			{ GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create },
 			{ ForwardPlusLabSession::GetDescriptor(), &ForwardPlusLabSession::Create },
 			{ TemporalAALabSession::GetDescriptor(), &TemporalAALabSession::Create },

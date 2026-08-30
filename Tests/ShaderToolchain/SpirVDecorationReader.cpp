@@ -12,6 +12,9 @@ namespace gglab
 		constexpr uint16_t OpName = 5;
 		constexpr uint16_t OpMemberName = 6;
 		constexpr uint16_t OpEntryPoint = 15;
+		constexpr uint16_t OpTypeInt = 21;
+		constexpr uint16_t OpTypeFloat = 22;
+		constexpr uint16_t OpTypeVector = 23;
 		constexpr uint16_t OpTypeRuntimeArray = 29;
 		constexpr uint16_t OpTypeStruct = 30;
 		constexpr uint16_t OpTypePointer = 32;
@@ -185,6 +188,7 @@ namespace gglab
 		std::unordered_map<uint64_t, DecorationInfo> memberDecorations;
 		std::unordered_map<uint32_t, PointerTypeInfo> pointerTypes;
 		std::unordered_map<uint32_t, std::vector<uint32_t>> structTypes;
+		std::unordered_map<uint32_t, uint32_t> typeSizes;
 		std::unordered_map<uint32_t, uint32_t> runtimeArrayElementTypes;
 		std::unordered_map<uint32_t, VariableInfo> variables;
 		std::unordered_map<uint32_t, std::string> names;
@@ -261,6 +265,23 @@ namespace gglab
 						std::nullopt);
 				}
 				break;
+			case OpTypeInt:
+			case OpTypeFloat:
+				if (wordCount >= 3 && operands[2] % 8u == 0u)
+				{
+					typeSizes[operands[1]] = operands[2] / 8u;
+				}
+				break;
+			case OpTypeVector:
+				if (wordCount == 4)
+				{
+					const auto componentSize = typeSizes.find(operands[2]);
+					if (componentSize != typeSizes.end())
+					{
+						typeSizes[operands[1]] = componentSize->second * operands[3];
+					}
+				}
+				break;
 			case OpTypeStruct:
 				if (wordCount >= 2)
 				{
@@ -328,6 +349,8 @@ namespace gglab
 				.m_Name = nameIterator->second,
 			};
 			layout.m_Members.reserve(memberTypes.size());
+			uint32_t reflectedSize = 0;
+			bool hasCompleteSize = true;
 			for (uint32_t member = 0; member < memberTypes.size(); ++member)
 			{
 				const uint64_t key = MemberKey(structId, member);
@@ -343,6 +366,20 @@ namespace gglab
 					.m_Name = memberNameIterator->second,
 					.m_Offset = *decorationIterator->second.m_Offset,
 				});
+				const auto typeSize = typeSizes.find(memberTypes[member]);
+				if (typeSize == typeSizes.end())
+				{
+					hasCompleteSize = false;
+				}
+				else
+				{
+					reflectedSize = std::max(reflectedSize,
+						*decorationIterator->second.m_Offset + typeSize->second);
+				}
+			}
+			if (hasCompleteSize && !layout.m_Members.empty())
+			{
+				layout.m_Size = reflectedSize;
 			}
 			for (const auto& [arrayTypeId, elementTypeId] : runtimeArrayElementTypes)
 			{

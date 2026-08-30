@@ -1,0 +1,160 @@
+{
+  "kind": "gglab.shader-preview-program",
+  "descriptorVersion": 1,
+  "program": {
+    "id": "gglab.shader.shader-graph-preview",
+    "stage": "pixel",
+    "entry": "PSMain"
+  },
+  "runtimeBindingContract": {
+    "id": "gglab.shader-graph-preview.pass-parameters",
+    "version": 1
+  },
+  "viewModes": [
+    {
+      "name": "combined",
+      "symbol": "ShaderGraphPreviewViewModeCombined",
+      "value": 0
+    },
+    {
+      "name": "base-color",
+      "symbol": "ShaderGraphPreviewViewModeBaseColor",
+      "value": 1
+    },
+    {
+      "name": "emissive",
+      "symbol": "ShaderGraphPreviewViewModeEmissive",
+      "value": 2
+    },
+    {
+      "name": "metallic",
+      "symbol": "ShaderGraphPreviewViewModeMetallic",
+      "value": 3
+    },
+    {
+      "name": "roughness",
+      "symbol": "ShaderGraphPreviewViewModeRoughness",
+      "value": 4
+    },
+    {
+      "name": "opacity",
+      "symbol": "ShaderGraphPreviewViewModeOpacity",
+      "value": 5
+    }
+  ],
+  "inputContracts": [
+    {
+      "id": "gglab.preview-input.surface.numeric",
+      "profile": {
+        "id": "gglab.surface",
+        "profileVersion": 1,
+        "descriptorVersion": 1
+      },
+      "programRef": {
+        "programId": "gglab.shader.shader-graph-preview",
+        "variant": "pixel.surface-v1",
+        "stage": "pixel"
+      },
+      "generatedFunction": {
+        "name": "EvaluateSurface",
+        "stage": "pixel"
+      },
+      "orderedInputs": [
+        {
+          "source": "graphParameter",
+          "stableId": "p.metal",
+          "parameterClass": "ScalarParameter",
+          "graphValueType": "float",
+          "generatedType": "float"
+        },
+        {
+          "source": "graphParameter",
+          "stableId": "p.tint",
+          "parameterClass": "VectorParameter",
+          "graphValueType": "float3",
+          "generatedType": "float3"
+        },
+        {
+          "source": "graphVisibleInput",
+          "stableId": "uv0",
+          "graphValueType": "float2",
+          "generatedType": "float2"
+        }
+      ],
+      "labValues": {
+        "metal": {
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "tint": {
+          "colorSpace": "linear-rgb",
+          "default": [
+            0.15,
+            0.55,
+            1.0
+          ]
+        },
+        "uv0": {
+          "source": "previewMeshPrimaryUv"
+        }
+      }
+    },
+    {
+      "id": "gglab.preview-input.surface.texture2d",
+      "profile": {
+        "id": "gglab.surface",
+        "profileVersion": 2,
+        "descriptorVersion": 2
+      },
+      "programRef": {
+        "programId": "gglab.shader.shader-graph-preview",
+        "variant": "pixel.surface-v2",
+        "stage": "pixel"
+      },
+      "generatedFunction": {
+        "name": "EvaluateSurface",
+        "stage": "pixel"
+      },
+      "orderedInputs": [
+        {
+          "source": "graphParameter",
+          "stableId": "p.rough",
+          "parameterClass": "ScalarParameter",
+          "graphValueType": "float",
+          "generatedType": "float"
+        },
+        {
+          "source": "graphParameter",
+          "stableId": "p.tex",
+          "parameterClass": "Texture2DParameter",
+          "graphValueType": "Texture2D",
+          "generatedType": "uint2",
+          "bindingPair": [
+            "textureBindingIndex",
+            "samplerBindingIndex"
+          ]
+        },
+        {
+          "source": "graphVisibleInput",
+          "stableId": "uv0",
+          "graphValueType": "float2",
+          "generatedType": "float2"
+        }
+      ],
+      "labValues": {
+        "roughness": {
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "texture": {
+          "source": "gglabOwnedDeterministicTextureSamplerFixture"
+        },
+        "uv0": {
+          "source": "previewMeshPrimaryUv"
+        }
+      }
+    }
+  ]
+}

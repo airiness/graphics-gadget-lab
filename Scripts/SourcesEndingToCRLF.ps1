@@ -53,6 +53,28 @@ function Test-IsExcludedPath {
     return $false
 }
 
+function Test-IsBytePinnedGeneratedFixture {
+    param(
+        [string]$Path,
+        [string]$FixtureDirectory
+    )
+
+    # Imported ShaderGraphCore emissions are byte-pinned fixtures. Their
+    # generatedSourceIdentity is the SHA-256 of the exact LF bytes, so the
+    # repository-wide CRLF normalizer must preserve them verbatim.
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+
+    return [System.IO.Path]::GetExtension($fullPath).Equals(
+        ".hlsli",
+        [System.StringComparison]::OrdinalIgnoreCase
+    ) -and [string]::Equals(
+        $directory,
+        $FixtureDirectory,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )
+}
+
 function Convert-BytesToUtf8WithoutBomCRLF {
     param(
         [byte[]]$Bytes,
@@ -120,6 +142,9 @@ function Test-BytesEqual {
 }
 
 $Root = [System.IO.Path]::GetFullPath($Root)
+$bytePinnedGeneratedFixtureDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path $Root "Shaders\Tests\Generated")
+)
 
 Write-Host "Root: $Root"
 Write-Host "Mode: " -NoNewline
@@ -134,7 +159,8 @@ $files = Get-ChildItem -Path $Root -Recurse -File |
     Where-Object {
         ($TargetExtensions -contains $_.Extension.ToLowerInvariant() -or
             $TargetFileNames -contains $_.Name.ToLowerInvariant()) -and
-        -not (Test-IsExcludedPath $_.FullName)
+        -not (Test-IsExcludedPath $_.FullName) -and
+        -not (Test-IsBytePinnedGeneratedFixture $_.FullName $bytePinnedGeneratedFixtureDirectory)
     }
 
 $total = 0
