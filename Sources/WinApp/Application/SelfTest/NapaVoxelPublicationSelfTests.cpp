@@ -6,7 +6,7 @@
 
 #include "ApplicationInput.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Time.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Renderer.h"

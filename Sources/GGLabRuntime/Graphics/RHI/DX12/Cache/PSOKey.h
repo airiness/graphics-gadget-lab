@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/Shader/ShaderTypes.h"
 

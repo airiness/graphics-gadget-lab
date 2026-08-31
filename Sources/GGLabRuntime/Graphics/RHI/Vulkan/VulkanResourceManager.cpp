@@ -9,7 +9,7 @@
 #include <vk_mem_alloc.h>
 
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"

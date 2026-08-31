@@ -5,7 +5,7 @@
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/CameraRig.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include <array>
 

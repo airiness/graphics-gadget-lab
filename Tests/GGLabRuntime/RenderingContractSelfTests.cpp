@@ -1,5 +1,5 @@
 #include "RenderingContractSelfTests.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"

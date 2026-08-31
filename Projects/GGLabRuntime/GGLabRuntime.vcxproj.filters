@@ -1,27 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Core">
-      <UniqueIdentifier>{39776D15-E7E3-9448-D536-52E8A87EE39B}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Allocator">
-      <UniqueIdentifier>{43994716-9911-0D68-A7C4-AECBC39E1151}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Hash">
-      <UniqueIdentifier>{C5669FEA-0496-AE09-D0C0-39FB2FE18527}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Log">
-      <UniqueIdentifier>{8BDEAFE2-D718-1579-9969-EC24C17FAE33}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Math">
-      <UniqueIdentifier>{167DB22B-1CDC-9B6F-ACBA-5A1356FE3766}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Math\Backends">
-      <UniqueIdentifier>{775C4FF7-FB3C-00F9-0E44-E3559673E7E3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Profiling">
-      <UniqueIdentifier>{E3785D7E-78C8-6F43-3AB3-7526EA233732}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Diagnostics">
       <UniqueIdentifier>{F6A745A9-98F8-EDCE-A637-F1F393156953}</UniqueIdentifier>
     </Filter>
@@ -124,6 +103,45 @@
     <Filter Include="Graphics\Utility">
       <UniqueIdentifier>{018A9B5F-6D18-3CE9-09D3-F9E8EA2DD24B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private">
+      <UniqueIdentifier>{4BD2FD6A-CDC4-61FF-1400-C63EE4D2327E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Core">
+      <UniqueIdentifier>{AD0270FA-7A22-E52C-D1EB-4B42CC195474}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Core\Allocator">
+      <UniqueIdentifier>{C0E4D6FD-A644-D965-C900-6B272A8E8C31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Core\Math">
+      <UniqueIdentifier>{D9DAD659-54E1-470E-1FEE-AC9C59FAA0B2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Core\Math\Backends">
+      <UniqueIdentifier>{25915C8B-85C0-B717-8A37-5D495F59BBEE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Core\Profiling">
+      <UniqueIdentifier>{93E48998-AC1B-406E-CB2F-1B6CE799C060}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public">
+      <UniqueIdentifier>{E78ED3F0-CA43-7641-19C1-4A904FBD9763}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime">
+      <UniqueIdentifier>{FEB7FEB7-5F1C-E56B-FF53-EDDCC0BAB8DE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Core">
+      <UniqueIdentifier>{3C14E049-B0A1-9689-C55F-E28BF4542DA8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Core\Hash">
+      <UniqueIdentifier>{4469C4E6-BABF-EA38-957D-DC66FB363DDC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Core\Log">
+      <UniqueIdentifier>{81B7E768-05F9-6532-8BF8-8F08F07541A2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Core\Math">
+      <UniqueIdentifier>{236DE4FE-685B-F4D1-EB07-40D12145A933}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Core\Profiling">
+      <UniqueIdentifier>{52AB0551-0B16-9BE0-CDEB-AECD8D3D335E}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Scene">
       <UniqueIdentifier>{BD68801D-B093-6BBF-5056-A01967FF135B}</UniqueIdentifier>
     </Filter>
@@ -149,45 +167,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>ThirdParty\D3D12MemoryAllocator\src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.cpp">
-      <Filter>Core\Allocator</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp">
-      <Filter>Core\Allocator</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp">
-      <Filter>Core\Math\Backends</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathBackend.cpp">
-      <Filter>Core\Math\Backends</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Color.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.cpp">
-      <Filter>Core\Math</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp">
-      <Filter>Core\Profiling</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp">
-      <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
@@ -768,6 +747,45 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Graphics\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.cpp">
+      <Filter>Private\Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.cpp">
+      <Filter>Private\Core\Allocator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXBoundsBackend.cpp">
+      <Filter>Private\Core\Math\Backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathBackend.cpp">
+      <Filter>Private\Core\Math\Backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Color.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Culling.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Matrix.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Quaternion.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Transform.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Vector.cpp">
+      <Filter>Private\Core\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Profiling\CpuProfiler.cpp">
+      <Filter>Private\Core\Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\StringIdFormatting.cpp">
+      <Filter>Private\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp">
+      <Filter>Private\Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
@@ -775,66 +793,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h">
       <Filter>ThirdParty\VulkanMemoryAllocator\include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\AllocatorBase.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h">
-      <Filter>Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h">
-      <Filter>Core\Hash</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h">
-      <Filter>Core\Log</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathInterop.h">
-      <Filter>Core\Math\Backends</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\BoundingVolumes.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Color.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathConstants.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathFunctions.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.h">
-      <Filter>Core\Math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.h">
-      <Filter>Core\Profiling</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringId.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
@@ -1732,6 +1690,66 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\VertexData.h">
       <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h">
+      <Filter>Private\Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.h">
+      <Filter>Private\Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.h">
+      <Filter>Private\Core\Allocator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h">
+      <Filter>Private\Core\Math\Backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h">
+      <Filter>Public\GGLabRuntime\Core\Hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Log\LogMacros.h">
+      <Filter>Public\GGLabRuntime\Core\Log</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\BoundingVolumes.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Color.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Culling.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathConstants.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathFunctions.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Matrix.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Quaternion.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Transform.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Vector.h">
+      <Filter>Public\GGLabRuntime\Core\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Profiling\CpuProfiler.h">
+      <Filter>Public\GGLabRuntime\Core\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringId.h">
+      <Filter>Public\GGLabRuntime\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringIdFormatting.h">
+      <Filter>Public\GGLabRuntime\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Time.h">
+      <Filter>Public\GGLabRuntime\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h">
+      <Filter>Public\GGLabRuntime\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h">
       <Filter>Scene</Filter>

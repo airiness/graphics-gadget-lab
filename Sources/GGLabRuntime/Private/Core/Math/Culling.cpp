@@ -1,6 +1,6 @@
-#include "Core/Math/Culling.h"
+#include "GGLabRuntime/Core/Math/Culling.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 namespace gglab::math
 {

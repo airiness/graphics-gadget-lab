@@ -1,5 +1,5 @@
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"

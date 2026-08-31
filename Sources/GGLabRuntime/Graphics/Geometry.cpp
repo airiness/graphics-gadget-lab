@@ -1,7 +1,7 @@
 #include "Graphics/Geometry.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/MathConstants.h"
-#include "Core/World.h"
+#include "GGLabRuntime/Core/Math/MathConstants.h"
+#include "GGLabRuntime/Core/World.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/SamplerRegistry.h"
 

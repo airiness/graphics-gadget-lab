@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 
 namespace gglab
 {

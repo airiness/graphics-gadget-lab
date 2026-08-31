@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabFoundation/Base/TypedIndex.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"

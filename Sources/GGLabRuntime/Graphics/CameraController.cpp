@@ -1,5 +1,5 @@
 #include "Graphics/CameraController.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Graphics/Camera.h"
 
 #include <algorithm>

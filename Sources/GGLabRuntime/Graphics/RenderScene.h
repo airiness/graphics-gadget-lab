@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/BoundingVolumes.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/RenderView.h"
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"

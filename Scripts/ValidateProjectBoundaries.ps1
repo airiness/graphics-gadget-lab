@@ -66,6 +66,8 @@ $shaderToolchainTestsDir = Join-Path $root "Tests/ShaderToolchain"
 $shaderRuntimeIntegrationTestsDir = Join-Path $root "Tests/ShaderRuntimeIntegration"
 $napaTestsDir = Join-Path $root "Tests/NapaVoxelCore"
 $runtimeSourcesDir = Join-Path $root "Sources/GGLabRuntime"
+$runtimePublicDir = Join-Path $runtimeSourcesDir "Public"
+$runtimePrivateDir = Join-Path $runtimeSourcesDir "Private"
 $shaderArtifactRuntimeSourcesDir = Join-Path $root "Sources/ShaderArtifactRuntime"
 $shaderToolchainSourcesDir = Join-Path $root "Sources/ShaderToolchain"
 $shaderCompilerSourcesDir = Join-Path $root "Sources/Tools/ShaderCompiler"
@@ -686,6 +688,8 @@ function Test-ProjectIncludeVisibility {
 }
 
 $runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
+$runtimePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public'
+$runtimePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private'
 $winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
 $vulkanQualificationIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification'
@@ -709,32 +713,45 @@ $napaProjectPublicIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore
 $napaProjectPrivateIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Private'
 Test-ProjectIncludeVisibility $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
-    @($runtimeIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot) `
-    @($runtimeIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot)
+# Phase 3A keeps Runtime Private visibility on WinApp because that project still
+# owns the Win32 RHI factory and DX12/Vulkan DevelopGui backend adapters. Phase 4
+# must isolate those sources before Phase 3B removes this target-wide root.
 Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot) `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot)
 Test-ProjectIncludeVisibility $vulkanQualificationProject `
     $vulkanQualificationNamespace `
     "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" `
-    @($vulkanQualificationIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
-    @($vulkanQualificationIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
+# AppRuntime's direct Core includes are Public. Its temporary Private root exists
+# only because legacy Graphics declarations still expose DynamicBufferAllocator's
+# RingSpanAllocator member. The later Phase 3A Graphics migration must remove
+# that transitive implementation leak and both AppRuntime Private roots.
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
-    @($appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot) `
-    @($appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
     "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
@@ -749,10 +766,12 @@ Test-ProjectIncludeVisibility $testCoreProject $testCoreNamespace `
     @($testCorePublicIncludeRoot, $testCorePrivateIncludeRoot)
 Test-ProjectIncludeVisibility $runtimeTestsProject $runtimeTestsNamespace `
     "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj" `
-    @($runtimeTestsIncludeRoot, $runtimeIncludeRoot,
+    @($runtimeTestsIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
-    @($runtimeTestsIncludeRoot, $runtimeIncludeRoot,
+    @($runtimeTestsIncludeRoot, $runtimePrivateIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
@@ -767,18 +786,22 @@ Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
 Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
     $shaderRuntimeIntegrationTestsNamespace `
     "Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj" `
-    @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimeIncludeRoot,
+    @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
+        $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
-    @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimeIncludeRoot,
+    @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
+        $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
-    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
+        $runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
-    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
+        $runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainProject $shaderToolchainNamespace `
@@ -824,6 +847,38 @@ foreach ($winAppSourceFile in Get-ChildItem -LiteralPath $winAppSourcesDir -Recu
             Rule   = "winapp-input-ownership"
             Target = ConvertTo-RepoRelativePath $winAppSourceFile.FullName
             Reason = "WinApp source still includes the legacy Core/Input path"
+        })
+    }
+}
+
+$legacyRuntimeCoreDir = Join-Path $runtimeSourcesDir "Core"
+$legacyRuntimeCoreFiles = if (Test-Path -LiteralPath $legacyRuntimeCoreDir -PathType Container) {
+    @(Get-ChildItem -LiteralPath $legacyRuntimeCoreDir -Recurse -File)
+}
+else {
+    @()
+}
+foreach ($legacyFile in $legacyRuntimeCoreFiles) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-public-private-layout"
+        Target = ConvertTo-RepoRelativePath $legacyFile.FullName
+        Reason = "migrated Runtime Core files must live under Public/GGLabRuntime or Private"
+    })
+}
+
+$legacyRuntimePublicCoreIncludeRegex =
+    '#include\s*[<"]Core[\\/](?:Hash[\\/]KeyHash\.h|Log[\\/]|' +
+    'Math[\\/](?!Backends[\\/])|Profiling[\\/]|StringId(?:Formatting)?\.h|' +
+    'Time\.h|World\.h)'
+foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
+        -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
+    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match $legacyRuntimePublicCoreIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-include-prefix"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "migrated Runtime Core contracts must use the GGLabRuntime/Core include prefix"
         })
     }
 }
@@ -1938,8 +1993,28 @@ $logicalIncludeSpecifications = @(
         LogicalRoot = $appRuntimeSourcesDir
     }
     [pscustomobject]@{
-        Name        = "GGLabRuntime"
-        ScanRoot    = $runtimeSourcesDir
+        Name        = "GGLabRuntimePublic"
+        ScanRoot    = $runtimePublicDir
+        LogicalRoot = $runtimePublicDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabRuntimePrivate"
+        ScanRoot    = $runtimePrivateDir
+        LogicalRoot = $runtimePrivateDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabRuntimeGraphicsLegacy"
+        ScanRoot    = Join-Path $runtimeSourcesDir "Graphics"
+        LogicalRoot = $runtimeSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabRuntimeSceneLegacy"
+        ScanRoot    = Join-Path $runtimeSourcesDir "Scene"
+        LogicalRoot = $runtimeSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "GGLabRuntimeDiagnosticsLegacy"
+        ScanRoot    = Join-Path $runtimeSourcesDir "Diagnostics"
         LogicalRoot = $runtimeSourcesDir
     }
     [pscustomobject]@{
@@ -1973,6 +2048,9 @@ foreach ($specification in $logicalIncludeSpecifications) {
         $requiredLogicalPrefix = if ($specification.Name -eq "GGLabFoundation") {
             "GGLabFoundation/"
         }
+        elseif ($specification.Name -eq "GGLabRuntimePublic") {
+            "GGLabRuntime/"
+        }
         elseif ($specification.Name -eq "NapaVoxelCore") {
             "NapaVoxelCore/"
         }
@@ -2004,6 +2082,35 @@ foreach ($specification in $logicalIncludeSpecifications) {
                 Owner    = $specification.Name
                 FullPath = $header.FullName
             }
+        }
+    }
+}
+
+$runtimePublicIncludeRegex =
+    '#include\s*[<"](?<Path>GGLabRuntime(?:/|\\)[^>"]+)[>"]'
+$runtimePrivateIncludeRegex =
+    '#include\s*[<"](?:(?:Core|Graphics|Scene|Diagnostics)(?:/|\\)|' +
+    '(?:\.\.(?:/|\\))+(?:Private|Core)(?:/|\\))'
+foreach ($header in Get-ChildItem -LiteralPath $runtimePublicDir -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {
+    $content = Get-Content -LiteralPath $header.FullName -Raw -ErrorAction Stop
+    if ($content -match $runtimePrivateIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-closure"
+            Target = ConvertTo-RepoRelativePath $header.FullName
+            Reason = "Runtime Public header includes Runtime Private implementation"
+        })
+    }
+    foreach ($match in [regex]::Matches($content, $runtimePublicIncludeRegex)) {
+        $logicalPath = $match.Groups["Path"].Value.Replace('\', '/')
+        $logicalKey = $logicalPath.ToLowerInvariant()
+        if (-not $logicalIncludes.ContainsKey($logicalKey) -or
+            $logicalIncludes[$logicalKey].Owner -ne "GGLabRuntimePublic") {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "runtime-public-closure"
+                Target = ConvertTo-RepoRelativePath $header.FullName
+                Reason = "Runtime Public header includes a non-Public Runtime header: $logicalPath"
+            })
         }
     }
 }

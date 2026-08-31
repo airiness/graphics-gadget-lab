@@ -1,9 +1,9 @@
 #pragma once
-#include "Core/Math/MathConstants.h"
-#include "Core/Math/Vector.h"
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Quaternion.h"
-#include "Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/MathConstants.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Color.h"
 
 #include <cmath>
 #include <concepts>

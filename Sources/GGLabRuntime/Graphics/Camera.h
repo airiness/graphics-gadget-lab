@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
 
 #include <cstdint>
 

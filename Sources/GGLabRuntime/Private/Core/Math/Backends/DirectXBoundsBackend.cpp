@@ -1,5 +1,5 @@
 #include "Core/Math/Backends/DirectXMathInterop.h"
-#include "Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 
 #include <DirectXCollision.h>
 #include <DirectXMath.h>

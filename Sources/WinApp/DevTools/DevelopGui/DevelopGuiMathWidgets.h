@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 
 namespace gglab::devtools
 {

@@ -2,7 +2,7 @@
 
 #include "ApplicationInput.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Graphics/Camera.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/Renderer.h"

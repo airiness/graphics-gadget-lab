@@ -1,6 +1,6 @@
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <algorithm>

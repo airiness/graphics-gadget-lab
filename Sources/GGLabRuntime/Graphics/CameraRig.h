@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Color.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/GraphicsTypes.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/StringId.h"
 #include "Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"

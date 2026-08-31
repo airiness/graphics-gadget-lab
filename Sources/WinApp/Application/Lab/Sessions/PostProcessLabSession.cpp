@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"

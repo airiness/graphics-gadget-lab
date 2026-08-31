@@ -7,7 +7,7 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"

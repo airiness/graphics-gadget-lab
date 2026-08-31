@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"

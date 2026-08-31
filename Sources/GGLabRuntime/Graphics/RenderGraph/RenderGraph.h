@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/Resource/TransientResourcePool.h"

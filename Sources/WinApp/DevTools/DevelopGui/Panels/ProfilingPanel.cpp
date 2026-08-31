@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Core/Profiling/CpuProfiler.h"
+#include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Diagnostics/DiagnosticsRuntime.h"

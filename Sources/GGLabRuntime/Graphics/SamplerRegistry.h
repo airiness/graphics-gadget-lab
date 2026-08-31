@@ -2,7 +2,7 @@
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHISampler.h"
 #include "Graphics/SamplerTypes.h"
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 
 #include <vector>

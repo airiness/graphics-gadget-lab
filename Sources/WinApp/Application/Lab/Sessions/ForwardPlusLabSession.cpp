@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Camera.h"

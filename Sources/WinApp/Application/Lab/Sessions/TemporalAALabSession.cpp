@@ -1,8 +1,8 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "AppRuntimeLog.h"
 
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Camera.h"

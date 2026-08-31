@@ -1,4 +1,4 @@
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
 namespace gglab::math
 {

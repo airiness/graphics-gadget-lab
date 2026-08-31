@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include <DirectXMath.h>
 

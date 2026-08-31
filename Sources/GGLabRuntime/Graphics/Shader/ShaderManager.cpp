@@ -1,5 +1,5 @@
 #include "Graphics/Shader/ShaderManager.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Shader/Shader.h"
 #include "ShaderArtifactRuntime/ShaderArtifact.h"

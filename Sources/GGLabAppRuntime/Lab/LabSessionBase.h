@@ -5,7 +5,7 @@
 #include "Lab/LabRunConfig.h"
 #include "Lab/LabTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/World.h"
+#include "GGLabRuntime/Core/World.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 

@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
-#include "Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiFormatting.h"

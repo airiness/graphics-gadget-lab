@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Device.h"

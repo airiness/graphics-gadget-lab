@@ -1,5 +1,5 @@
 #include "VulkanQualification.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"

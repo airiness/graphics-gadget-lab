@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 

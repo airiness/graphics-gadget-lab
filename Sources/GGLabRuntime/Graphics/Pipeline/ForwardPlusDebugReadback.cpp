@@ -1,6 +1,6 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 
 #include <array>

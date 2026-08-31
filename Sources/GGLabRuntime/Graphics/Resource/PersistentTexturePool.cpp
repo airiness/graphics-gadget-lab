@@ -1,7 +1,7 @@
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Base/MathUtils.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/RHITextureValidation.h"
 

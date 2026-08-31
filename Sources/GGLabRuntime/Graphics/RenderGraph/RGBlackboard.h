@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/StringId.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 
 namespace gglab

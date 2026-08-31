@@ -53,7 +53,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -64,25 +64,25 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathBackend.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Color.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXBoundsBackend.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathBackend.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Color.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Culling.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Matrix.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Quaternion.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Transform.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Vector.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Profiling\CpuProfiler.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\StringIdFormatting.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
@@ -260,26 +260,26 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTransferContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\AllocatorBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathInterop.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\BoundingVolumes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Color.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathConstants.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathFunctions.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringId.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\BoundingVolumes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Color.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Culling.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathConstants.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathFunctions.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Matrix.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Quaternion.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Transform.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Vector.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Profiling\CpuProfiler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringId.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringIdFormatting.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Time.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />

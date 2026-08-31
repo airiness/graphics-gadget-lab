@@ -1,7 +1,7 @@
 #pragma once
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Vector.h"
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Core/StringId.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Pipeline/TemporalAA.h"

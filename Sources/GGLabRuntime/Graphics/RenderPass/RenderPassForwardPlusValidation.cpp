@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

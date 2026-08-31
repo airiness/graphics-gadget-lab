@@ -1,6 +1,6 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"

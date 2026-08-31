@@ -1,6 +1,6 @@
 #include "Lab/LabRuntime.h"
 #include "AppRuntimeLog.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Time.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RHI/RHIDevice.h"
 

@@ -1,6 +1,6 @@
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
-#include "Core/Math/MathConstants.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathConstants.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include <algorithm>
 #include <array>

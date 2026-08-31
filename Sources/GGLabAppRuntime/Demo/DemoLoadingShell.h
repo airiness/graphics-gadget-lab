@@ -1,6 +1,6 @@
 #pragma once
 #include "Demo/DemoBase.h"
-#include "Core/World.h"
+#include "GGLabRuntime/Core/World.h"
 #include "Graphics/CameraRig.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 

@@ -1,4 +1,4 @@
-#include "Core/Profiling/CpuProfiler.h"
+#include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 
 #include <algorithm>
 #include <iterator>

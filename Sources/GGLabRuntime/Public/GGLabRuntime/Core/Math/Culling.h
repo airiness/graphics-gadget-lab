@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 
 #include <array>
 #include <cstddef>

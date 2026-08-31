@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 
 #include <compare>
 #include <cstdint>

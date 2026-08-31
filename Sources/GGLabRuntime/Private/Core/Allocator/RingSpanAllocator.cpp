@@ -1,5 +1,5 @@
 #include "Core/Allocator/RingSpanAllocator.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 
 #include <algorithm>
 

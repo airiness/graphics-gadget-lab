@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/StringId.h"
 
 #include <cstdint>
 #include <string_view>

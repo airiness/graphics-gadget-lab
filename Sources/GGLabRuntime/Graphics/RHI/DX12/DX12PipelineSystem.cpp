@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/DX12/Cache/PSOCreator.h"

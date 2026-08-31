@@ -1,7 +1,7 @@
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "Graphics/Utility/TextureUtils.h"

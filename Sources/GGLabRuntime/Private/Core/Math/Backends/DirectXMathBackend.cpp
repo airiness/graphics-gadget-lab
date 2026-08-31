@@ -1,8 +1,8 @@
 #include "Core/Math/Backends/DirectXMathInterop.h"
-#include "Core/Math/MathConstants.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/MathConstants.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include <DirectXMath.h>
 

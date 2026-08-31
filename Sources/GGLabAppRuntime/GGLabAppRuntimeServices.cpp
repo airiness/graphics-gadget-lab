@@ -18,7 +18,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Time.h"
 
 #include <optional>
 #include <span>
