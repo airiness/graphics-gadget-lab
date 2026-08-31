@@ -93,8 +93,8 @@ function ConvertTo-RepoRelativePath {
 }
 
 # Legacy Runtime candidate directories (portable candidates; backend leaves included).
-# Migrated Core files are validated through the Public/Private ownership rules below.
-$candidateDirs = @("Scene", "Graphics", "Diagnostics")
+# Migrated Core and Scene files are validated through the Public/Private ownership rules below.
+$candidateDirs = @("Graphics", "Diagnostics")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
@@ -877,6 +877,56 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
             Rule   = "runtime-public-include-prefix"
             Target = ConvertTo-RepoRelativePath $sourceFile.FullName
             Reason = "migrated Runtime Core contracts must use the GGLabRuntime/Core include prefix"
+        })
+    }
+}
+
+$legacyRuntimeGraphicsContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/GraphicsTypes.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/ShadowSettings.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeGraphicsContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated foundational Graphics contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
+$legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
+$legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
+    @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)
+}
+else {
+    @()
+}
+foreach ($legacyFile in $legacyRuntimeSceneFiles) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-public-private-layout"
+        Target = ConvertTo-RepoRelativePath $legacyFile.FullName
+        Reason = "migrated Runtime Scene contracts must live under Public/GGLabRuntime or Private"
+    })
+}
+
+$legacyRuntimeGraphicsContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:GraphicsTypes\.h|ShadowSettings\.h|' +
+    'Asset[\\/]ArtifactContentDigest\.h)[>"]'
+$legacyRuntimeSceneIncludeRegex =
+    '#include\s*[<"]Scene[\\/]Components\.h[>"]'
+foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
+        -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
+    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match $legacyRuntimeGraphicsContractIncludeRegex -or
+        $content -match $legacyRuntimeSceneIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-include-prefix"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "migrated foundational Graphics and Scene contracts must use the GGLabRuntime include prefix"
         })
     }
 }
@@ -2286,7 +2336,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
-Write-Host "Platform: $($candidateFiles.Count) candidate files (Scene/Graphics/Diagnostics)"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (Graphics/Diagnostics)"
 Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +

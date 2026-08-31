@@ -8,7 +8,7 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabFoundation/Base/TypedIndex.h"
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 

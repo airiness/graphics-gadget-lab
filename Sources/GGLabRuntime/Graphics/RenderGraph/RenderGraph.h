@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"

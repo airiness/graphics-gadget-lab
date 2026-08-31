@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataPlatform.h"

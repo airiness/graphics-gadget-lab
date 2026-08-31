@@ -1,6 +1,6 @@
 #pragma once
 #include "LoadingProgress.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <string>
 #include <string_view>

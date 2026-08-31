@@ -3,7 +3,7 @@
 #include "Graphics/GPUStructures.h"
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabFoundation/Base/TypeUtils.h"

@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstddef>
 #include <cstdint>

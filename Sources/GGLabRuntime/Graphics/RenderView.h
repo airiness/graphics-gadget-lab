@@ -2,11 +2,11 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
 

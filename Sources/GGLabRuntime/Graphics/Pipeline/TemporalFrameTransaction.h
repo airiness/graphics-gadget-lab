@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"

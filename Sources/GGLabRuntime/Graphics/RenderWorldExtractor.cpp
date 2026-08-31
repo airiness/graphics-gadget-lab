@@ -2,8 +2,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/World.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {

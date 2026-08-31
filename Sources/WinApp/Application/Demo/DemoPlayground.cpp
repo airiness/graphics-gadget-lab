@@ -2,7 +2,7 @@
 #include "ApplicationCameraInput.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Time.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "Graphics/Camera.h"
 #include "Graphics/CameraController.h"
 #include "Graphics/Renderer.h"

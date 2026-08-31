@@ -8,7 +8,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <algorithm>
 #include <cstddef>

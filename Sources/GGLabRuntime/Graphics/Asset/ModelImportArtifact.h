@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"

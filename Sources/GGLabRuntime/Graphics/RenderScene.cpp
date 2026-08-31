@@ -11,7 +11,7 @@
 #include "Graphics/RenderView.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/TransferManager.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <cstring>
 #include <limits>

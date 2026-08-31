@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 

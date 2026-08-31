@@ -18,7 +18,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 
 #include <algorithm>

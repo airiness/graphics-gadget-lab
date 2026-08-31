@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 
 #include <cstddef>

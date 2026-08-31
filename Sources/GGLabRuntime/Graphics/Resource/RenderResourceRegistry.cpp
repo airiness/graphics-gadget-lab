@@ -1,7 +1,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Utility/TextureUtils.h"

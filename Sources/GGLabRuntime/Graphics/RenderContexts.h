@@ -6,7 +6,7 @@
 #include "Graphics/RenderView.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
 #include <span>

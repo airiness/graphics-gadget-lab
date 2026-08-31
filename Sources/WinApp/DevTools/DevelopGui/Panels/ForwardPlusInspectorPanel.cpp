@@ -3,7 +3,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 

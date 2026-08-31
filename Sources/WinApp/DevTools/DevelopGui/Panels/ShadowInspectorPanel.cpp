@@ -1,7 +1,7 @@
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Core/World.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"

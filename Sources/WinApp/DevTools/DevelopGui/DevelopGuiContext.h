@@ -4,7 +4,7 @@
 #include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderView.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 namespace gglab
 {

@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "GGLabRuntime/Core/World.h"

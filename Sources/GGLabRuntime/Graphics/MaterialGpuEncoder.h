@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/GPUStructures.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 namespace gglab
 {

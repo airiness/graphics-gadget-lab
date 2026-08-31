@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>

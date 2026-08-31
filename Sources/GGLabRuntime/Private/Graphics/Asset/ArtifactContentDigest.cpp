@@ -1,4 +1,4 @@
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 
 #include <algorithm>
 #include <cstddef>

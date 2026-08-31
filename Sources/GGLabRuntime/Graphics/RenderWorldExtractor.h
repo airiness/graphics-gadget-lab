@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
 #include <optional>
