@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -18,6 +19,13 @@ namespace gglab
 	class ApplicationToolingIntegrationBase;
 	class PlatformHost;
 	class LabRuntimeLocatorBase;
+	class LabRuntime;
+	class ShaderPreviewRuntimeSession;
+	struct ShaderPreviewPublicationArtifact;
+	struct ShaderPreviewRuntimeSessionSnapshot;
+	using ShaderPreviewLabSessionSynchronizer = void (*)(LabRuntime& runtime,
+		const ShaderPreviewPublicationArtifact& publication,
+		const ShaderPreviewRuntimeSessionSnapshot& snapshot) noexcept;
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	class DevelopmentShaderHotReloadSystem;
 #endif
@@ -41,6 +49,8 @@ namespace gglab
 			std::unique_ptr<PlatformHost> m_PlatformHost;
 			AppRuntimeConfig m_RuntimeConfig{};
 			RuntimePaths m_RuntimePaths{};
+			std::optional<std::string> m_ShaderPreviewSessionId{};
+			ShaderPreviewLabSessionSynchronizer m_ShaderPreviewLabSessionSynchronizer = nullptr;
 			AppRuntimeHostServices m_HostServices{};
 			ApplicationContentRegistration m_ContentRegistration{};
 		};
@@ -66,6 +76,7 @@ namespace gglab
 	private:
 		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
+		void SynchronizeShaderPreviewLab() noexcept;
 
 		void HandlePlatformEvent(const PlatformEvent& event) noexcept;
 
@@ -77,12 +88,15 @@ namespace gglab
 		std::unique_ptr<PlatformHost> m_PlatformHost;
 		AppRuntimeConfig m_RuntimeConfig{};
 		RuntimePaths m_RuntimePaths{};
+		std::optional<std::string> m_ShaderPreviewSessionId{};
+		ShaderPreviewLabSessionSynchronizer m_ShaderPreviewLabSessionSynchronizer = nullptr;
 		AppRuntimeHostServices m_HostServices{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RHIContextFactoryBase> m_RHIContextFactory;
 		std::unique_ptr<InputManager> m_InputManager;
 		std::unique_ptr<GGLabAppRuntime> m_AppRuntime;
 		std::unique_ptr<LabRuntimeLocatorBase> m_LabRuntimeLocator;
+		std::unique_ptr<ShaderPreviewRuntimeSession> m_ShaderPreviewSession;
 		std::unique_ptr<ApplicationToolingIntegrationBase> m_ApplicationTooling;
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		std::unique_ptr<DevelopmentShaderHotReloadSystem> m_ShaderHotReload;

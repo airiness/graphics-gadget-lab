@@ -20,6 +20,7 @@ namespace gglab
 	{
 		ApplicationStartupDemo m_StartupDemo = ApplicationStartupDemo::Start;
 		std::optional<std::string> m_StartupLabId;
+		std::optional<std::string> m_ShaderPreviewSessionId;
 		std::optional<std::string> m_SelfTestSelection;
 		bool m_StartWithAbsoluteMouse = false;
 		bool m_DisableDevelopmentTools = false;

@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
+#include "Application/Content/DesktopApplicationContent.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabFoundation/Base/MathUtils.h"
 #include "GGLabFoundation/Hash/Sha256.h"
@@ -216,6 +217,50 @@ namespace gglab
 			return backend == RHIBackendType::Vulkan ? "gglab-vulkan13 / SPIR-V"
 				: backend == RHIBackendType::DX12 ? "gglab-dx12 / DXIL"
 										 : "Unknown";
+		}
+
+		[[nodiscard]] std::string_view ResolveAttachedSessionStateName(
+			ShaderPreviewRuntimeSessionState state) noexcept
+		{
+			switch (state)
+			{
+			case ShaderPreviewRuntimeSessionState::WaitingForInitialLoad:
+				return "WaitingForInitialLoad";
+			case ShaderPreviewRuntimeSessionState::Pending:
+				return "Pending";
+			case ShaderPreviewRuntimeSessionState::Loaded:
+				return "Loaded";
+			case ShaderPreviewRuntimeSessionState::Rejected:
+				return "Rejected / LastGood";
+			}
+			return "Unknown";
+		}
+
+		[[nodiscard]] std::string_view ResolvePreviewRejectionCodeName(
+			ShaderPreviewRejectionCode code) noexcept
+		{
+			switch (code)
+			{
+			case ShaderPreviewRejectionCode::None:
+				return "None";
+			case ShaderPreviewRejectionCode::PublicationUnavailable:
+				return "PublicationUnavailable";
+			case ShaderPreviewRejectionCode::PublicationInvalid:
+				return "PublicationInvalid";
+			case ShaderPreviewRejectionCode::ShaderArtifactUnavailable:
+				return "ShaderArtifactUnavailable";
+			case ShaderPreviewRejectionCode::ShaderArtifactInvalid:
+				return "ShaderArtifactInvalid";
+			case ShaderPreviewRejectionCode::RegistryUnavailable:
+				return "RegistryUnavailable";
+			case ShaderPreviewRejectionCode::RegistryInvalid:
+				return "RegistryInvalid";
+			case ShaderPreviewRejectionCode::ActivationFailed:
+				return "ActivationFailed";
+			case ShaderPreviewRejectionCode::IOFailure:
+				return "IOFailure";
+			}
+			return "Unknown";
 		}
 
 		class ShaderGraphPreviewRenderPipeline final : public RenderPipelineBase
@@ -877,8 +922,13 @@ namespace gglab
 
 	void ShaderGraphPreviewLabSession::RecreatePipeline() noexcept
 	{
-		const PreviewInputContract contract = ResolveInputContract(GetParameters().Get(
-			InputContractId, int32_t(PreviewInputContract::NumericV1)));
+		const PreviewInputContract contract = m_AttachedPublication
+			? (m_AttachedPublication->m_PreviewInputContractId ==
+					ShaderGraphPreviewTexture2DInputContractId
+				? PreviewInputContract::Texture2DV2
+				: PreviewInputContract::NumericV1)
+			: ResolveInputContract(GetParameters().Get(
+				InputContractId, int32_t(PreviewInputContract::NumericV1)));
 		SetRenderPipeline(
 			std::make_unique<ShaderGraphPreviewRenderPipeline>(m_State, contract));
 	}
@@ -928,15 +978,25 @@ namespace gglab
 	void ShaderGraphPreviewLabSession::BuildDiagnostics(
 		LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
-		diagnostics.m_Title = "Shader Graph Preview (Standalone)";
+		const bool attached = m_AttachedPublication.has_value() && m_AttachedSession.has_value();
+		diagnostics.m_Title = attached
+			? "Shader Graph Preview (Attached Session)"
+			: "Shader Graph Preview (Standalone)";
 		const auto& parameters = GetParameters();
-		const PreviewInputContract contract = ResolveInputContract(parameters.Get(
-			InputContractId, int32_t(PreviewInputContract::NumericV1)));
+		const PreviewInputContract contract = attached
+			? (m_AttachedPublication->m_PreviewInputContractId ==
+					ShaderGraphPreviewTexture2DInputContractId
+				? PreviewInputContract::Texture2DV2
+				: PreviewInputContract::NumericV1)
+			: ResolveInputContract(parameters.Get(
+				InputContractId, int32_t(PreviewInputContract::NumericV1)));
 		const PreviewTextureFixture textureFixture = ResolveTextureFixture(parameters.Get(
 			TextureFixtureId, int32_t(PreviewTextureFixture::White)));
 		const PreviewPrimitiveIsolation isolation = ResolvePrimitiveIsolation(parameters.Get(
 			PrimitiveIsolationId, int32_t(PreviewPrimitiveIsolation::ShowAll)));
-		const ShaderProgramRef& programRef = ResolvePreviewProgramRef(contract);
+		const ShaderProgramRef& programRef = attached
+			? m_AttachedPublication->m_ProgramRef
+			: ResolvePreviewProgramRef(contract);
 		const auto artifactRef = m_Services.m_ShaderManager->ResolveArtifact(programRef);
 		const ShaderProgramRegistryArtifactRef registryRef =
 			m_Services.m_ShaderManager->GetActiveRegistryRef();
@@ -971,14 +1031,37 @@ namespace gglab
 					expectedSamplerIndex);
 		const bool passCurrent = generation > 0 && executions > 0 &&
 			drawCount == expectedDrawCount;
+		const bool publicationMappingMatches = !attached ||
+			(artifactRef && *artifactRef == m_AttachedPublication->m_ShaderArtifactRef &&
+				registryRef == m_AttachedPublication->m_PreviewRegistryRef);
 		const bool artifactResolved = artifactRef && artifactRef->IsValid() &&
-			registryRef.IsValid() && generation > 0;
+			registryRef.IsValid() && generation > 0 && publicationMappingMatches;
 
 		const std::string artifactIdentity = artifactRef
 			? Sha256DigestToHex(artifactRef->m_ArtifactId.m_DurableDigest)
 			: "Unavailable";
 		const std::string registryIdentity = registryRef.IsValid()
 			? Sha256DigestToHex(registryRef.m_RegistryId.m_DurableDigest)
+			: "Unavailable";
+		const std::string generatedSourceIdentity = attached
+			? Sha256DigestToHex(m_AttachedPublication->m_GeneratedSourceIdentity)
+			: std::string(ResolveGeneratedSourceIdentity(contract));
+		const std::string descriptorIdentity = attached
+			? Sha256DigestToHex(m_AttachedPublication->m_PreviewProgramDescriptorIdentity)
+			: std::string(ShaderGraphPreviewProgramDescriptorIdentity);
+		const std::string publicationIdentity = attached
+			? Sha256DigestToHex(
+				m_AttachedPublication->m_PublicationId.m_DurableDigest)
+			: "N/A (standalone)";
+		const std::string candidatePublicationIdentity = attached &&
+			m_AttachedSession->m_ObservedPublicationRef.IsValid()
+			? Sha256DigestToHex(m_AttachedSession->m_ObservedPublicationRef
+				.m_PublicationId.m_DurableDigest)
+			: "Unavailable";
+		const std::string loadedPublicationIdentity = attached &&
+			m_AttachedSession->m_LoadedPublicationRef.IsValid()
+			? Sha256DigestToHex(m_AttachedSession->m_LoadedPublicationRef
+				.m_PublicationId.m_DurableDigest)
 			: "Unavailable";
 		const Color tint = parameters.Get(TintId, Color(0.15f, 0.55f, 1.0f, 1.0f));
 		const uint32_t viewMode = static_cast<uint32_t>(std::clamp(parameters.Get(
@@ -987,16 +1070,33 @@ namespace gglab
 			int32_t(ShaderGraphPreviewViewMode::Opacity)));
 
 		diagnostics.m_Metrics = {
-			{ .m_Name = "Mode", .m_Value = "Standalone pinned fixture" },
-			{ .m_Name = "Eligibility", .m_Value = "Ready" },
-			{ .m_Name = "Profile", .m_Value =
-				std::format("gglab.surface v{}", ResolveProfileVersion(contract)) },
+			{ .m_Name = "Mode", .m_Value = attached
+				? "Attached Shader Editor publication"
+				: "Standalone pinned fixture" },
+			{ .m_Name = "Session", .m_Value = attached
+				? m_AttachedSession->m_SessionId
+				: "N/A" },
+			{ .m_Name = "Runtime session state", .m_Value = attached
+				? std::string(ResolveAttachedSessionStateName(m_AttachedSession->m_State))
+				: "Standalone" },
+			{ .m_Name = "Eligibility", .m_Value = !attached
+				? "Ready"
+				: m_AttachedSession->m_State == ShaderPreviewRuntimeSessionState::Loaded
+					? "Current"
+					: m_AttachedSession->m_State == ShaderPreviewRuntimeSessionState::Rejected
+						? "LastGood / Stale"
+						: "Pending" },
+			{ .m_Name = "Profile", .m_Value = attached
+				? std::format("{} v{}", m_AttachedPublication->m_ProfileId,
+					m_AttachedPublication->m_ProfileVersion)
+				: std::format("gglab.surface v{}", ResolveProfileVersion(contract)) },
 			{ .m_Name = "Preview input contract", .m_Value =
-				std::string(ResolvePreviewInputContractId(contract)) },
+				attached ? m_AttachedPublication->m_PreviewInputContractId
+					: std::string(ResolvePreviewInputContractId(contract)) },
 			{ .m_Name = "Generated source identity", .m_Value =
-				std::string(ResolveGeneratedSourceIdentity(contract)) },
+				generatedSourceIdentity },
 			{ .m_Name = "Preview Program descriptor identity", .m_Value =
-				std::string(ShaderGraphPreviewProgramDescriptorIdentity) },
+				descriptorIdentity },
 			{ .m_Name = "ProgramRef", .m_Value =
 				std::format("{}:{}", programRef.m_ProgramId, programRef.m_VariantId) },
 			{ .m_Name = "Entry", .m_Value = std::string(ShaderGraphPreviewProgramEntry) },
@@ -1004,7 +1104,19 @@ namespace gglab
 			{ .m_Name = "Target", .m_Value = ResolveTargetName(backend) },
 			{ .m_Name = "Shader Artifact ID", .m_Value = artifactIdentity },
 			{ .m_Name = "Registry ID", .m_Value = registryIdentity },
-			{ .m_Name = "Publication ID", .m_Value = "N/A (Milestone A standalone)" },
+			{ .m_Name = "Publication ID", .m_Value = publicationIdentity },
+			{ .m_Name = "Candidate Publication ID", .m_Value =
+				candidatePublicationIdentity },
+			{ .m_Name = "Loaded / LastGood Publication ID", .m_Value =
+				loadedPublicationIdentity },
+			{ .m_Name = "Runtime activation error", .m_Value = attached &&
+				!m_AttachedSession->m_ActivationError.empty()
+				? m_AttachedSession->m_ActivationError
+				: "None" },
+			{ .m_Name = "Runtime rejection code", .m_Value = attached
+				? std::string(ResolvePreviewRejectionCodeName(
+					m_AttachedSession->m_RejectionCode))
+				: "None" },
 			{ .m_Name = "Output view", .m_Value =
 				std::string(ResolveViewModeName(viewMode)) },
 			{ .m_Name = "Numeric v1 values", .m_Value = std::format(
@@ -1021,10 +1133,14 @@ namespace gglab
 			: LabDiagnosticCheckStatus::Failed;
 		diagnostics.m_Checks = {
 			{
-				.m_Name = "Ordinary Runtime catalog mapping",
+				.m_Name = attached
+					? "Attached Preview publication mapping"
+					: "Ordinary Runtime catalog mapping",
 				.m_Status = artifactResolved ? LabDiagnosticCheckStatus::Passed : waitingStatus,
 				.m_Detail = artifactResolved
-					? "ShaderManager resolved the selected Pixel/PSMain ProgramRef from the active registry."
+					? attached
+						? "WinApp validated every publication cross-link and ShaderManager resolves its exact Pixel/PSMain binding."
+						: "ShaderManager resolved the selected Pixel/PSMain ProgramRef from the active registry."
 					: "Waiting for the selected pinned Preview Program artifact.",
 			},
 			{
@@ -1059,9 +1175,30 @@ namespace gglab
 		};
 	}
 
+	void ShaderGraphPreviewLabSession::ApplyAttachedRuntimeSession(
+		const ShaderPreviewPublicationArtifact& loadedPublication,
+		ShaderPreviewRuntimeSessionSnapshot snapshot) noexcept
+	{
+		const int32_t inputContract = loadedPublication.m_PreviewInputContractId ==
+			ShaderGraphPreviewTexture2DInputContractId
+			? int32_t(PreviewInputContract::Texture2DV2)
+			: int32_t(PreviewInputContract::NumericV1);
+		LabChangeImpact impact = LabChangeImpact::Immediate;
+		const bool contractChanged = GetParameters().Get(InputContractId, -1) != inputContract &&
+			SetParameter(InputContractId, inputContract, &impact);
+		m_AttachedPublication = loadedPublication;
+		m_AttachedSession = std::move(snapshot);
+		if (contractChanged)
+		{
+			// RecreatePipeline must observe the newly loaded publication rather than
+			// the previous attached contract during a live v1/v2 switch.
+			ApplyParameterChanges(impact);
+		}
+	}
+
 	LabId ShaderGraphPreviewLabSession::GetId() noexcept
 	{
-		return LabId("gglab.lab.shader_graph_preview");
+		return LabId(DesktopShaderGraphPreviewLabId);
 	}
 
 	LabDescriptor ShaderGraphPreviewLabSession::GetDescriptor() noexcept
