@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <algorithm>
 #include <array>

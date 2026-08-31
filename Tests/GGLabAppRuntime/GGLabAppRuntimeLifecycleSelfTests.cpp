@@ -3,7 +3,7 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
 #include <filesystem>
 

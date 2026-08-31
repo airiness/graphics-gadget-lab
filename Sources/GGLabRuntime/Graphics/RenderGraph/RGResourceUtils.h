@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 namespace gglab
 {

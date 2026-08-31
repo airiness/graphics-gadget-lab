@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 
 #include <array>
 #include <cstdint>

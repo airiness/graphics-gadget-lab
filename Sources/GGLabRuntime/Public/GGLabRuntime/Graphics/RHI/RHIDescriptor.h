@@ -1,8 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIHandles.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
 #include <tuple>

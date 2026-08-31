@@ -13,7 +13,7 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "Graphics/GPUStructures.h"
-#include "Graphics/RHI/RHICoordinatePolicy.h"
+#include "GGLabRuntime/Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "Graphics/Shader/ShaderManager.h"

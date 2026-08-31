@@ -7,9 +7,9 @@
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 

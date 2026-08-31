@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
 #include <tuple>

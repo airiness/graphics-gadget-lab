@@ -7,7 +7,7 @@
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <array>
 

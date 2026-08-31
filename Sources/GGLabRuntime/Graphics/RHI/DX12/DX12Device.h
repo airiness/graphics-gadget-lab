@@ -1,8 +1,8 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 
 #include <D3D12MemAlloc.h>

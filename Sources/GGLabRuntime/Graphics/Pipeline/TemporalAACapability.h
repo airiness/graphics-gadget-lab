@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 namespace gglab
 {

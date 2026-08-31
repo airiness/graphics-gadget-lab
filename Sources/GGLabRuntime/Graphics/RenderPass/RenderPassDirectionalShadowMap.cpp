@@ -5,8 +5,8 @@
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <limits>
 #include <memory>

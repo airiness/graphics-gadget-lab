@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/RHI/RHIFormat.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
 #include <tuple>

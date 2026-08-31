@@ -1,12 +1,12 @@
 #pragma once
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHISampler.h"
-#include "Graphics/RHI/RHITexture.h"
-#include "Graphics/RHI/RHITextureValidation.h"
-#include "Graphics/RHI/RHIResourceDebug.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResourceDebug.h"
 
 #include <memory>
 #include <string_view>

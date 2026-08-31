@@ -1,7 +1,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Shader/ShaderManager.h"
 
 #include <algorithm>

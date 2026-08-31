@@ -3,7 +3,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
-#include "Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 

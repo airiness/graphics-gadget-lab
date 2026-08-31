@@ -1,7 +1,7 @@
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 
 #include "Application/ApplicationLaunchOptions.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 #include <initializer_list>
 #include <string>

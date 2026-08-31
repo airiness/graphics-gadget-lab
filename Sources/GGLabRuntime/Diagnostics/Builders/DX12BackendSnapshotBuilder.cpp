@@ -7,7 +7,7 @@
 #include "Graphics/RHI/DX12/DX12Fence.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12SwapChain.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <D3D12MemAlloc.h>
 #include <array>

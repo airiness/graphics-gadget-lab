@@ -8,7 +8,7 @@
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <algorithm>
 #include <cstdint>

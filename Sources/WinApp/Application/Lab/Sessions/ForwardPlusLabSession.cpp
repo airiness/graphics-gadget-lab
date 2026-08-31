@@ -8,7 +8,7 @@
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/RHI/RHISwapChain.h"
+#include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
 #include "Scene/Components.h"
 
 namespace gglab

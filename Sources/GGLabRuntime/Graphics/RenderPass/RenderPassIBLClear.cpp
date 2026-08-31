@@ -4,7 +4,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <span>
 #include <string>

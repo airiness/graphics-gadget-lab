@@ -3,7 +3,7 @@
 #include "Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
 #include <optional>

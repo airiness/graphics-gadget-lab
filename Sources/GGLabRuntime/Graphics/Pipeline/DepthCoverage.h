@@ -1,9 +1,9 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
 #include "Graphics/RenderParameters.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIPipeline.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>

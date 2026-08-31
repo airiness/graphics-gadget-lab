@@ -2,8 +2,8 @@
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <array>

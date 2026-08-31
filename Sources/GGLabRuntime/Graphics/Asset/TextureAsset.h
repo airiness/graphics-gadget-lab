@@ -3,7 +3,7 @@
 #include "Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstddef>
 #include <cstdint>

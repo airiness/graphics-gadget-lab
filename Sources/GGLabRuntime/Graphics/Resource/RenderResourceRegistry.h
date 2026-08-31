@@ -4,8 +4,8 @@
 #include "Graphics/IBLBakeTypes.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/ShadowSettings.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 
 namespace gglab

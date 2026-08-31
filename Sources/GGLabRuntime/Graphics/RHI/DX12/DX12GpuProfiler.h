@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/ComTypes.h"
 #include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <atomic>
 #include <cstdint>

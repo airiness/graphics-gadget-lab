@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 
 #include <imgui.h>
 

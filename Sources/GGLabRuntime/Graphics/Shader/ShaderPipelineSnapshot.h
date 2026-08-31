@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/Shader/ShaderTypes.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>
 

@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/Buffer/Buffer.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <string>
 #include <vector>

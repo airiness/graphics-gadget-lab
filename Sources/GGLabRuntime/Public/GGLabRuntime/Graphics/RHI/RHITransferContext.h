@@ -1,8 +1,8 @@
 #pragma once
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <vector>
 

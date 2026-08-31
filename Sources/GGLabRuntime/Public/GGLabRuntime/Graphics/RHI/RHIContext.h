@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHISwapChain.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
 
 #include <cstdint>
 #include <memory>

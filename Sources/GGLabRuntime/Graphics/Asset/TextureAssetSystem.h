@@ -7,7 +7,7 @@
 #include "Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/Asset/TextureAsset.h"
 
 #include <cstddef>

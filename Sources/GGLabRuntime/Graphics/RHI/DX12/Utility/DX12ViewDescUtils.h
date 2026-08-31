@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
 #include <d3d12.h>

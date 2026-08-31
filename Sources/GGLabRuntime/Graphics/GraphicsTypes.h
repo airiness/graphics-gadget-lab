@@ -9,8 +9,8 @@
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabFoundation/Base/TypedIndex.h"
 #include "Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <compare>
 #include <cstddef>

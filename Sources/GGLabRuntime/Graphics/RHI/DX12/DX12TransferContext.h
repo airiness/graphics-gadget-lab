@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
-#include "Graphics/RHI/RHITransferContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
 
 #include <cstdint>
 #include <memory>

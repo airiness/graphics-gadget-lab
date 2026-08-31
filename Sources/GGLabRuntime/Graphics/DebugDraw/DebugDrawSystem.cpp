@@ -2,8 +2,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
 #include <array>

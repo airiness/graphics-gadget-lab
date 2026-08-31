@@ -2,7 +2,7 @@
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {

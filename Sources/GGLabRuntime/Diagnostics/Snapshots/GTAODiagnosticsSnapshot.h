@@ -3,7 +3,7 @@
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 namespace gglab
 {

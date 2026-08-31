@@ -1,5 +1,5 @@
-#include "Graphics/RHI/RHIResource.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <utility>
 

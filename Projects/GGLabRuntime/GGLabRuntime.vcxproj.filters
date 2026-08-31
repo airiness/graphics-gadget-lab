@@ -121,6 +121,12 @@
     <Filter Include="Private\Core\Profiling">
       <UniqueIdentifier>{93E48998-AC1B-406E-CB2F-1B6CE799C060}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics">
+      <UniqueIdentifier>{82170968-F3B4-5421-7234-0E81212D46F9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI">
+      <UniqueIdentifier>{ED1647C5-3056-E812-9A61-FC4A35E8B42C}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public">
       <UniqueIdentifier>{E78ED3F0-CA43-7641-19C1-4A904FBD9763}</UniqueIdentifier>
     </Filter>
@@ -141,6 +147,15 @@
     </Filter>
     <Filter Include="Public\GGLabRuntime\Core\Profiling">
       <UniqueIdentifier>{52AB0551-0B16-9BE0-CDEB-AECD8D3D335E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics">
+      <UniqueIdentifier>{1D85059C-21F2-576A-79B1-9C4F63427950}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\RHI">
+      <UniqueIdentifier>{67D2F0C8-FA46-D5CE-C9B6-959AC4B67320}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\Shader">
+      <UniqueIdentifier>{15184CAA-8C09-DB04-FC33-6DEB7BE35BC1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Scene">
       <UniqueIdentifier>{BD68801D-B093-6BBF-5056-A01967FF135B}</UniqueIdentifier>
@@ -642,15 +657,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIContext.cpp">
-      <Filter>Graphics\RHI</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResource.cpp">
-      <Filter>Graphics\RHI</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureValidation.cpp">
-      <Filter>Graphics\RHI</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
@@ -785,6 +791,15 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp">
       <Filter>Private\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1490,76 +1505,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIBuffer.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHICommandContext.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIContext.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHICoordinatePolicy.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDescriptor.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDescriptorCapacityContract.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDevice.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIFence.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIFormat.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandles.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandleTable.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIPipeline.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIPipelineSystem.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResource.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResourceDebug.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISampler.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISubresourceUtils.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISwapChain.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITexture.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureValidation.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITransferContext.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITypes.h">
       <Filter>Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.h">
@@ -1667,9 +1613,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h">
-      <Filter>Graphics\Shader</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ShadowSettings.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1702,6 +1645,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h">
       <Filter>Private\Core\Math\Backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHISubresourceUtils.h">
+      <Filter>Private\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Public\GGLabRuntime\Core\Hash</Filter>
@@ -1750,6 +1696,75 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h">
       <Filter>Public\GGLabRuntime\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBuffer.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICommandContext.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIContext.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICoordinatePolicy.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptor.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptorCapacityContract.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDevice.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFence.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFormat.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIHandles.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipeline.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipelineSystem.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIResource.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIResourceDebug.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHISampler.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHISwapChain.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITexture.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureValidation.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITransferContext.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h">
       <Filter>Scene</Filter>

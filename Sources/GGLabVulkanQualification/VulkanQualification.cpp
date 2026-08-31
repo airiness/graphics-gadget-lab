@@ -4,7 +4,7 @@
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "Graphics/TransferManager.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"

@@ -1,7 +1,7 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/RHI/RHIHandles.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <string>
 #include <vector>

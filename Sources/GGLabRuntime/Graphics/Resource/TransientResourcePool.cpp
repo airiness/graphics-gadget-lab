@@ -1,7 +1,7 @@
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
 #include <iterator>

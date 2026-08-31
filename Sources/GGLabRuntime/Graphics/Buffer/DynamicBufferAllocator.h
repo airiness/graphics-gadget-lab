@@ -1,8 +1,8 @@
 #pragma once
 #include "Graphics/Buffer/Buffer.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <deque>
 #include <memory>

@@ -7,7 +7,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <imgui.h>
 

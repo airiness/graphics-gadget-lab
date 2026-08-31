@@ -8,7 +8,7 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
 
 #include <algorithm>

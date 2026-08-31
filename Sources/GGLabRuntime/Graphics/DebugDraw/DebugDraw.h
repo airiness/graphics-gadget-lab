@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "Graphics/RHI/RHIHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 
 #include <array>
 #include <cstdint>

@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <cstdint>
 #include <limits>

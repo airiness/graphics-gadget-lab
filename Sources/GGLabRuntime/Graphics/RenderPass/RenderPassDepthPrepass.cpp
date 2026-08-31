@@ -4,7 +4,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
-#include "Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 
 #include <array>
 #include <limits>

@@ -10,8 +10,8 @@
 
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/RHI/RHIDescriptorCapacityContract.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanConversions.h"

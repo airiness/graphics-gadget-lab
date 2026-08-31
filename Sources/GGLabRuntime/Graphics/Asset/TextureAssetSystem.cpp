@@ -11,7 +11,7 @@
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/Utility/TextureUtils.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Asset/TextureAsset.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <cstdint>
 #include <string_view>

@@ -1,8 +1,8 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIResource.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>

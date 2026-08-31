@@ -1,6 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/RHI/RHIResourceDebug.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResourceDebug.h"
 
 #include <cstdint>
 #include <string>

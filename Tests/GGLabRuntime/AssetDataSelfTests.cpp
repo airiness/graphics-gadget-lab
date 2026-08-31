@@ -13,7 +13,7 @@
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <Windows.h>

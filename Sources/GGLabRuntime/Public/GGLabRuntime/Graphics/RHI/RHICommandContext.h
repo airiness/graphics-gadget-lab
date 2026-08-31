@@ -1,11 +1,11 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHIFormat.h"
-#include "Graphics/RHI/RHIPipeline.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <array>
 #include <atomic>

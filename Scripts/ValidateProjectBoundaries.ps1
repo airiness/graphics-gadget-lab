@@ -21,8 +21,8 @@ param(
 #   Foundation private access - every private header is compiler-gated to the
 #                               Foundation project even when a broad consumer
 #                               include root can physically resolve its path.
-#   Public header closure - every Foundation Public header must compile in its
-#                           own translation unit without aggregate include help.
+#   Public header closure - Foundation and Runtime Public headers must resolve
+#                           without implementation or legacy Runtime headers.
 #   Foundation consumers - ShaderCompiler foundational dependencies must come
 #                          from Foundation rather than Runtime Core infrastructure.
 #   Ownership boundary - runtime candidates must not include Application/*,
@@ -876,6 +876,50 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
             Rule   = "runtime-public-include-prefix"
             Target = ConvertTo-RepoRelativePath $sourceFile.FullName
             Reason = "migrated Runtime Core contracts must use the GGLabRuntime/Core include prefix"
+        })
+    }
+}
+
+$legacyRuntimeRhiDir = Join-Path $runtimeSourcesDir "Graphics/RHI"
+$legacyRuntimeRhiFiles = if (Test-Path -LiteralPath $legacyRuntimeRhiDir -PathType Container) {
+    @(Get-ChildItem -LiteralPath $legacyRuntimeRhiDir -File |
+        Where-Object { $_.Name -ne "RHIHandleTable.h" })
+}
+else {
+    @()
+}
+foreach ($legacyFile in $legacyRuntimeRhiFiles) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-public-private-layout"
+        Target = ConvertTo-RepoRelativePath $legacyFile.FullName
+        Reason = "migrated backend-neutral RHI files must live under Public/GGLabRuntime or Private"
+    })
+}
+
+$legacyRuntimeShaderTypesPath = Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderTypes.h"
+if (Test-Path -LiteralPath $legacyRuntimeShaderTypesPath -PathType Leaf) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-public-private-layout"
+        Target = ConvertTo-RepoRelativePath $legacyRuntimeShaderTypesPath
+        Reason = "the RHI ShaderTypes contract must live under Public/GGLabRuntime"
+    })
+}
+
+$legacyRuntimePublicRhiIncludeRegex =
+    '#include\s*[<"]Graphics[\\/]RHI[\\/](?!RHIHandleTable\.h[>"]|' +
+    'RHISubresourceUtils\.h[>"]|DX12[\\/]|Vulkan[\\/])RHI[^>"\\/]+'
+$legacyRuntimeShaderTypesIncludeRegex =
+    '#include\s*[<"]Graphics[\\/]Shader[\\/]ShaderTypes\.h[>"]'
+foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
+        -Recurse -File |
+        Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
+    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match $legacyRuntimePublicRhiIncludeRegex -or
+        $content -match $legacyRuntimeShaderTypesIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-include-prefix"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "migrated Runtime RHI contracts must use the GGLabRuntime/Graphics include prefix"
         })
     }
 }
@@ -1775,7 +1819,7 @@ foreach ($itemPath in $applicationCoreContractPaths) {
 
 $presentationContractChecks = @(
     [pscustomobject]@{
-        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/RHIContext.h"
+        Path = Join-Path $runtimePublicDir "GGLabRuntime/Graphics/RHI/RHIContext.h"
         Pattern = '\bm_WindowHandle\b|\bm_Backend\s*='
         Reason = "portable RHI context descriptor contains backend or native-window composition state"
     },

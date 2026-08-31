@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/RHI/RHIHandles.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 #include <array>
 #include <cstdint>

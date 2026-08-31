@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <algorithm>
 #include <array>

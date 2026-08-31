@@ -2,7 +2,7 @@
 #include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Diagnostics/Snapshots/VulkanBackendSnapshot.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"

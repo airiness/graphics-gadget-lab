@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Shader/ShaderTypes.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistry.h"
 
 #include <cstdint>
