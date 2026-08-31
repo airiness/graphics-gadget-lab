@@ -741,17 +741,14 @@ Test-ProjectIncludeVisibility $vulkanQualificationProject `
     @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
-# AppRuntime's direct Core includes are Public. Its temporary Private root exists
-# only because legacy Graphics declarations still expose DynamicBufferAllocator's
-# RingSpanAllocator member. The later Phase 3A Graphics migration must remove
-# that transitive implementation leak and both AppRuntime Private roots.
+# AppRuntime consumes Runtime Public contracts plus the remaining legacy
+# Graphics surface. DynamicBufferAllocator keeps its RingSpanAllocator storage
+# opaque, so neither AppRuntime target receives Runtime Private visibility.
 Test-ProjectIncludeVisibility $appRuntimeProject $appRuntimeNamespace `
     "Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj" `
-    @($appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
-        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot) `
-    @($appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
-        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($appRuntimeIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot)
 Test-ProjectIncludeVisibility $foundationProject $foundationNamespace `
     "Projects/GGLabFoundation/GGLabFoundation.vcxproj" `
@@ -797,11 +794,11 @@ Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
     "Projects/GGLabAppRuntimeTests/GGLabAppRuntimeTests.vcxproj" `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($appRuntimeTestsIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainProject $shaderToolchainNamespace `

@@ -1,4 +1,5 @@
 #include "Graphics/Buffer/DynamicBufferAllocator.h"
+#include "Core/Allocator/RingSpanAllocator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIDevice.h"
@@ -11,7 +12,8 @@
 namespace gglab
 {
 	DynamicBufferAllocator::DynamicBufferAllocator(const CreateInfo& createInfo) noexcept :
-		m_Device(createInfo.m_Device), m_Ring(createInfo.m_CapacityInBytes),
+		m_Device(createInfo.m_Device),
+		m_Ring(std::make_unique<RingSpanAllocator>(createInfo.m_CapacityInBytes)),
 		m_CapacityInBytes(createInfo.m_CapacityInBytes), m_MemoryUsage(createInfo.m_MemoryUsage),
 		m_ViewType(createInfo.m_ViewType)
 	{
@@ -74,18 +76,19 @@ namespace gglab
 			return result;
 		}
 		const uint32_t effectiveAlignment = std::max(alignment, m_AllocationAlignment);
-		const auto allocation = m_Ring.AllocateAligned(sizeInBytes, effectiveAlignment);
+		const auto allocation = m_Ring->AllocateAligned(sizeInBytes, effectiveAlignment);
 		if (!allocation.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_WARN(
 				"DynamicBufferAllocator allocation failed (size={}, alignment={}, capacity={}, used={}).",
-				sizeInBytes, effectiveAlignment, m_CapacityInBytes, m_Ring.GetCurrentUsage());
+				sizeInBytes, effectiveAlignment, m_CapacityInBytes, m_Ring->GetCurrentUsage());
 			return result;
 		}
 
 		result.m_OffsetInBytes = allocation.m_AlignedIndex;
 		result.m_SizeInBytes = sizeInBytes;
-		result.m_ReservedSpan = allocation.m_ReservedSpan;
+		result.m_ReservedIndex = allocation.m_ReservedSpan.m_Index;
+		result.m_ReservedCount = allocation.m_ReservedSpan.m_Count;
 		return result;
 	}
 
@@ -115,7 +118,8 @@ namespace gglab
 			"Dynamic buffer allocations require a valid retirement fence point.");
 
 		const uint64_t version = m_NextRetirementVersion++;
-		m_Ring.RecordRetire(allocation->m_ReservedSpan, version);
+		m_Ring->RecordRetire(
+			{ allocation->m_ReservedIndex, allocation->m_ReservedCount }, version);
 		m_PendingRetirements.push_back({ version, fencePoint });
 		allocation->Reset();
 	}
@@ -130,8 +134,18 @@ namespace gglab
 				break;
 			}
 
-			m_Ring.FreeCompletedVersion(front.m_Version);
+			m_Ring->FreeCompletedVersion(front.m_Version);
 			m_PendingRetirements.pop_front();
 		}
+	}
+
+	uint32_t DynamicBufferAllocator::GetCurrentUsageInBytes() const noexcept
+	{
+		return m_Ring->GetCurrentUsage();
+	}
+
+	uint32_t DynamicBufferAllocator::GetHighWaterInBytes() const noexcept
+	{
+		return m_Ring->GetHighWater();
 	}
 }

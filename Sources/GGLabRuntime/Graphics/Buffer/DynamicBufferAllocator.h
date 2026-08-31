@@ -1,13 +1,16 @@
 #pragma once
-#include "Core/Allocator/RingSpanAllocator.h"
 #include "Graphics/Buffer/Buffer.h"
 #include "Graphics/RHI/RHIBuffer.h"
 #include "Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIResource.h"
 
+#include <deque>
+#include <memory>
+
 namespace gglab
 {
 	class RHIDevice;
+	class RingSpanAllocator;
 
 	struct DynamicBufferAllocation
 	{
@@ -19,7 +22,8 @@ namespace gglab
 
 	private:
 		friend class DynamicBufferAllocator;
-		RingSpanAllocator::IndexSpan m_ReservedSpan{};
+		uint32_t m_ReservedIndex = 0;
+		uint32_t m_ReservedCount = 0;
 	};
 
 	class DynamicBufferAllocator
@@ -56,14 +60,8 @@ namespace gglab
 		[[nodiscard]] RHIMemoryUsage GetMemoryUsage() const noexcept { return m_MemoryUsage; }
 		[[nodiscard]] RHIBufferViewType GetViewType() const noexcept { return m_ViewType; }
 		[[nodiscard]] uint32_t GetCapacityInBytes() const noexcept { return m_CapacityInBytes; }
-		[[nodiscard]] uint32_t GetCurrentUsageInBytes() const noexcept
-		{
-			return m_Ring.GetCurrentUsage();
-		}
-		[[nodiscard]] uint32_t GetHighWaterInBytes() const noexcept
-		{
-			return m_Ring.GetHighWater();
-		}
+		[[nodiscard]] uint32_t GetCurrentUsageInBytes() const noexcept;
+		[[nodiscard]] uint32_t GetHighWaterInBytes() const noexcept;
 
 	private:
 		struct PendingRetirement
@@ -74,7 +72,7 @@ namespace gglab
 
 		RHIDevice* m_Device = nullptr;
 		RHIBufferOwner m_Buffer{};
-		RingSpanAllocator m_Ring;
+		std::unique_ptr<RingSpanAllocator> m_Ring;
 		std::byte* m_MappedData = nullptr;
 		std::deque<PendingRetirement> m_PendingRetirements;
 		uint64_t m_NextRetirementVersion = 1;
