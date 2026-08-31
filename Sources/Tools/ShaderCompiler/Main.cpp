@@ -1,6 +1,7 @@
 #include "ShaderCompilerCommandLine.h"
 #include "ShaderCompilerProcessFactory.h"
 #include "GGLabRuntimeShaderBuild.h"
+#include "GGLabShaderPreviewBuild.h"
 #include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
@@ -18,6 +19,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <charconv>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -97,6 +99,46 @@ namespace
 			return gglab::MakeVulkan13CompileTarget(stage);
 		}
 		return {};
+	}
+
+	[[nodiscard]] std::optional<gglab::Sha256Digest> ParseLowerSha256Digest(
+		std::string_view text) noexcept
+	{
+		if (text.size() != gglab::Sha256Digest::Size * 2)
+		{
+			return std::nullopt;
+		}
+		gglab::Sha256Digest digest{};
+		const auto HexValue = [](char character) noexcept -> int
+			{
+				if (character >= '0' && character <= '9') return character - '0';
+				if (character >= 'a' && character <= 'f') return character - 'a' + 10;
+				return -1;
+			};
+		for (size_t index = 0; index < digest.m_Value.size(); ++index)
+		{
+			const int high = HexValue(text[index * 2]);
+			const int low = HexValue(text[index * 2 + 1]);
+			if (high < 0 || low < 0)
+			{
+				return std::nullopt;
+			}
+			digest.m_Value[index] = static_cast<std::byte>((high << 4) | low);
+		}
+		return digest.IsValid() ? std::optional(digest) : std::nullopt;
+	}
+
+	template<class Value>
+	[[nodiscard]] bool ParseUnsigned(std::string_view text, Value& outValue) noexcept
+	{
+		if (text.empty())
+		{
+			return false;
+		}
+		const char* const end = text.data() + text.size();
+		const std::from_chars_result parsed =
+			std::from_chars(text.data(), end, outValue);
+		return parsed.ec == std::errc{} && parsed.ptr == end;
 	}
 
 	int PrintJsonDocument(const nlohmann::json& document, int exitCode)
@@ -396,6 +438,30 @@ namespace
 		}, ExitCodeInvalidCommandLine);
 	}
 
+	int PrintJsonDescribePreviewFailure(
+		std::string_view status, int exitCode, std::string_view message)
+	{
+		return PrintJsonDocument({
+			{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+				gglab::ShaderCompilerCommand::DescribePreview)) },
+			{ "success", false },
+			{ "status", std::string(status) },
+			{ "exitCode", exitCode },
+			{ "processContractVersion", gglab::ShaderProcessContractVersion },
+			{ "previewBuildContractVersion", gglab::ShaderPreviewBuildContractVersion },
+			{ "diagnostics", nlohmann::json::array({ {
+				{ "message", std::string(message) },
+			} }) },
+		}, exitCode);
+	}
+
+	int PrintJsonDescribePreviewUsageFailure(std::wstring_view message)
+	{
+		return PrintJsonDescribePreviewFailure(
+			"usage-error", ExitCodeInvalidCommandLine,
+			gglab::utils::ToString(message));
+	}
+
 	int RunDescribe()
 	{
 		if (gglab::ShouldForceDescribeInternalErrorForTest())
@@ -456,6 +522,90 @@ namespace
 			// instead of unwinding an allocation/serialization exception to a
 			// process abort. Process crash / CRT abort are outside the contract.
 			return PrintJsonDescribeInternalError();
+		}
+	}
+
+	int RunDescribePreview()
+	{
+		if (gglab::ShouldForceDescribeInternalErrorForTest())
+		{
+			return PrintJsonDescribePreviewFailure(
+				"internal-error", ExitCodeInternalError,
+				"describe-preview internal failure");
+		}
+
+		try
+		{
+			const gglab::ShaderCompilerIdentity identity =
+				gglab::QueryShaderCompilerIdentityForProcess();
+			if (identity.m_CanonicalIdentity.empty() ||
+				identity.m_CanonicalIdentity == L"unknown")
+			{
+				return PrintJsonDescribePreviewFailure(
+					"compiler-unavailable", ExitCodeCompileFailed,
+					"DXC producer runtime could not be resolved");
+			}
+			const auto kindWireName = ProducerKindWireName(identity.m_Kind);
+			if (!kindWireName.has_value())
+			{
+				return PrintJsonDescribePreviewFailure(
+					"internal-error", ExitCodeInternalError,
+					"describe-preview internal failure");
+			}
+
+			nlohmann::json supportedTargets = nlohmann::json::array();
+			for (const std::string& name : gglab::ShaderTargetWire::Names())
+			{
+				supportedTargets.push_back(name);
+			}
+			const nlohmann::json supportedInputContracts = nlohmann::json::array({
+				{
+					{ "id", std::string(gglab::ShaderGraphPreviewNumericInputContractId) },
+					{ "profileId", std::string(gglab::ShaderGraphPreviewSurfaceProfileId) },
+					{ "profileVersion", 1 },
+				},
+				{
+					{ "id", std::string(gglab::ShaderGraphPreviewTexture2DInputContractId) },
+					{ "profileId", std::string(gglab::ShaderGraphPreviewSurfaceProfileId) },
+					{ "profileVersion", 2 },
+				},
+			});
+			const nlohmann::json document{
+				{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+					gglab::ShaderCompilerCommand::DescribePreview)) },
+				{ "success", true },
+				{ "status", "ok" },
+				{ "exitCode", ExitCodeSuccess },
+				{ "processContractVersion", gglab::ShaderProcessContractVersion },
+				{ "previewBuildContractVersion",
+					gglab::ShaderPreviewBuildContractVersion },
+				{ "compilePolicyRevision", gglab::ShaderCompilePolicyRevision },
+				{ "toolIdentity", std::string(gglab::ShaderCompilerToolIdentity) },
+				{ "toolVersion", gglab::utils::ToString(gglab::ShaderCompilerToolVersion) },
+				{ "producerKind", std::string(*kindWireName) },
+				{ "producerIdentity",
+					gglab::utils::ToString(identity.m_CanonicalIdentity) },
+				{ "supportedTargets", std::move(supportedTargets) },
+				{ "previewProgramDescriptorVersion",
+					gglab::ShaderGraphPreviewDescriptorVersion },
+				{ "previewProgramDescriptorIdentity", std::string(
+					gglab::ShaderGraphPreviewProgramDescriptorIdentity) },
+				{ "supportedPreviewInputContracts", supportedInputContracts },
+				{ "previewPublicationSchemaVersion",
+					gglab::ShaderPreviewPublicationArtifactSchemaVersion },
+				{ "previewActivePublicationSchemaVersion",
+					gglab::ShaderPreviewActivePublicationSchemaVersion },
+				{ "previewObservationSchemaVersion",
+					gglab::ShaderPreviewObservationSchemaVersion },
+				{ "diagnostics", nlohmann::json::array() },
+			};
+			return PrintJsonDocument(document, ExitCodeSuccess);
+		}
+		catch (...)
+		{
+			return PrintJsonDescribePreviewFailure(
+				"internal-error", ExitCodeInternalError,
+				"describe-preview internal failure");
 		}
 	}
 
@@ -539,6 +689,167 @@ namespace
 		return ExitCodeSuccess;
 	}
 
+	[[nodiscard]] int ExitCodeForPreviewBuildStatus(
+		gglab::GGLabShaderPreviewBuildStatus status) noexcept
+	{
+		switch (status)
+		{
+		case gglab::GGLabShaderPreviewBuildStatus::Succeeded:
+			return ExitCodeSuccess;
+		case gglab::GGLabShaderPreviewBuildStatus::InvalidInput:
+		case gglab::GGLabShaderPreviewBuildStatus::GeneratedSourceUnavailable:
+		case gglab::GGLabShaderPreviewBuildStatus::GeneratedSourceIdentityMismatch:
+		case gglab::GGLabShaderPreviewBuildStatus::StaleAttempt:
+			return ExitCodeInvalidShaderRequest;
+		case gglab::GGLabShaderPreviewBuildStatus::CompilerUnavailable:
+		case gglab::GGLabShaderPreviewBuildStatus::CompileFailed:
+			return ExitCodeCompileFailed;
+		case gglab::GGLabShaderPreviewBuildStatus::WriterUnavailable:
+		case gglab::GGLabShaderPreviewBuildStatus::BaseRegistryUnavailable:
+		case gglab::GGLabShaderPreviewBuildStatus::ArtifactPublicationFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::RegistryBuildFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::RegistryPublicationFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationBuildFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationValidationFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationPublicationFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::ActivePublicationFailed:
+		case gglab::GGLabShaderPreviewBuildStatus::Failed:
+			return ExitCodeArtifactIOFailure;
+		}
+		return ExitCodeInternalError;
+	}
+
+	[[nodiscard]] std::string_view PreviewBuildStatusText(
+		gglab::GGLabShaderPreviewBuildStatus status) noexcept
+	{
+		switch (status)
+		{
+		case gglab::GGLabShaderPreviewBuildStatus::Succeeded:
+			return "ok";
+		case gglab::GGLabShaderPreviewBuildStatus::InvalidInput:
+			return "invalid-request";
+		case gglab::GGLabShaderPreviewBuildStatus::GeneratedSourceUnavailable:
+			return "source-unavailable";
+		case gglab::GGLabShaderPreviewBuildStatus::GeneratedSourceIdentityMismatch:
+			return "source-identity-mismatch";
+		case gglab::GGLabShaderPreviewBuildStatus::WriterUnavailable:
+			return "writer-unavailable";
+		case gglab::GGLabShaderPreviewBuildStatus::BaseRegistryUnavailable:
+			return "base-registry-unavailable";
+		case gglab::GGLabShaderPreviewBuildStatus::CompilerUnavailable:
+			return "compiler-unavailable";
+		case gglab::GGLabShaderPreviewBuildStatus::CompileFailed:
+			return "compile-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::ArtifactPublicationFailed:
+			return "artifact-publication-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::RegistryBuildFailed:
+			return "registry-build-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::RegistryPublicationFailed:
+			return "registry-publication-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationBuildFailed:
+			return "preview-publication-build-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationValidationFailed:
+			return "preview-publication-invalid";
+		case gglab::GGLabShaderPreviewBuildStatus::PublicationPublicationFailed:
+			return "preview-publication-io-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::StaleAttempt:
+			return "stale-attempt";
+		case gglab::GGLabShaderPreviewBuildStatus::ActivePublicationFailed:
+			return "active-publication-failed";
+		case gglab::GGLabShaderPreviewBuildStatus::Failed:
+			return "internal-error";
+		}
+		return "internal-error";
+	}
+
+	int RunBuildPreview(const gglab::ShaderCompilerCommandLine& commandLine)
+	{
+		const gglab::ShaderBuildPreviewCommandOptions& options =
+			commandLine.m_BuildPreview;
+		gglab::ShaderTargetProfile targetProfile{};
+		uint32_t profileVersion = 0;
+		uint64_t attemptSequence = 0;
+		const std::optional<gglab::Sha256Digest> descriptorIdentity =
+			ParseLowerSha256Digest(options.m_PreviewProgramDescriptorIdentity);
+		const std::optional<gglab::Sha256Digest> sourceIdentity =
+			ParseLowerSha256Digest(options.m_GeneratedSourceIdentity);
+		if (!ParseTarget(options.m_Target, targetProfile) ||
+			!ParseUnsigned(options.m_ProfileVersion, profileVersion) ||
+			!ParseUnsigned(options.m_AttemptSequence, attemptSequence) ||
+			!descriptorIdentity || !sourceIdentity)
+		{
+			const nlohmann::json document{
+				{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+					gglab::ShaderCompilerCommand::BuildPreview)) },
+				{ "success", false },
+				{ "status", "invalid-request" },
+				{ "exitCode", ExitCodeInvalidShaderRequest },
+				{ "attemptSequence", attemptSequence },
+				{ "diagnostics", nlohmann::json::array({ {
+					{ "message", "Preview build option values are invalid." },
+				} }) },
+			};
+			if (options.m_ResultFormat == "json")
+			{
+				return PrintJsonDocument(document, ExitCodeInvalidShaderRequest);
+			}
+			std::cerr << "Preview build option values are invalid.\n";
+			return ExitCodeInvalidShaderRequest;
+		}
+
+		const gglab::GGLabShaderPreviewBuildResult result =
+			gglab::BuildGGLabShaderPreview({
+				.m_SourceRoot = options.m_SourceRoot,
+				.m_GeneratedSourcePath = options.m_GeneratedSource,
+				.m_CacheRoot = options.m_CacheRoot,
+				.m_ArtifactRoot = options.m_ArtifactRoot,
+				.m_SessionId = options.m_SessionId,
+				.m_TargetProfile = targetProfile,
+				.m_ProfileId = options.m_ProfileId,
+				.m_ProfileVersion = profileVersion,
+				.m_PreviewInputContractId = options.m_PreviewInputContractId,
+				.m_PreviewProgramDescriptorIdentity = *descriptorIdentity,
+				.m_GeneratedSourceIdentity = *sourceIdentity,
+				.m_AttemptSequence = attemptSequence,
+			});
+		const int exitCode = ExitCodeForPreviewBuildStatus(result.m_Status);
+		if (options.m_ResultFormat == "json")
+		{
+			nlohmann::json document{
+				{ "command", std::string(gglab::ShaderCompilerCommandWireName(
+					gglab::ShaderCompilerCommand::BuildPreview)) },
+				{ "success", result.IsSuccess() },
+				{ "status", std::string(PreviewBuildStatusText(result.m_Status)) },
+				{ "exitCode", exitCode },
+				{ "attemptSequence", result.m_AttemptSequence },
+				{ "diagnostics", result.m_Error.empty()
+					? nlohmann::json::array()
+					: nlohmann::json::array({ { { "message", result.m_Error } } }) },
+			};
+			if (result.IsSuccess())
+			{
+				document["publicationId"] = gglab::Sha256DigestToHex(
+					result.m_PublicationRef.m_PublicationId.m_DurableDigest);
+				document["shaderArtifactId"] = gglab::Sha256DigestToHex(
+					result.m_ShaderArtifactRef.m_ArtifactId.m_DurableDigest);
+				document["baseRegistryId"] = gglab::Sha256DigestToHex(
+					result.m_BaseRegistryRef.m_RegistryId.m_DurableDigest);
+				document["previewRegistryId"] = gglab::Sha256DigestToHex(
+					result.m_PreviewRegistryRef.m_RegistryId.m_DurableDigest);
+			}
+			return PrintJsonDocument(document, exitCode);
+		}
+		if (!result.IsSuccess())
+		{
+			std::cerr << result.m_Error << '\n';
+			return exitCode;
+		}
+		std::cout << "Published Preview attempt " << result.m_AttemptSequence
+			<< ".\nPublication: " << gglab::Sha256DigestToHex(
+				result.m_PublicationRef.m_PublicationId.m_DurableDigest) << '\n';
+		return ExitCodeSuccess;
+	}
+
 	int RunVersion()
 	{
 		// The producer fact observed at this process boundary. Human-facing
@@ -558,13 +869,18 @@ int wmain(int argumentCount, wchar_t* arguments[])
 	// document, empty stderr) is owned by the command itself, not by
 	// --result-format (which it does not accept).
 	const bool jsonRequested = commandLine.m_JsonRequested ||
-		commandLine.m_Command == gglab::ShaderCompilerCommand::Describe;
+		commandLine.m_Command == gglab::ShaderCompilerCommand::Describe ||
+		commandLine.m_Command == gglab::ShaderCompilerCommand::DescribePreview;
 	ConfigureProcessOutput(jsonRequested);
 	if (!commandLine.IsValid())
 	{
 		if (commandLine.m_Command == gglab::ShaderCompilerCommand::Describe)
 		{
 			return PrintJsonDescribeUsageFailure(commandLine.m_Error);
+		}
+		if (commandLine.m_Command == gglab::ShaderCompilerCommand::DescribePreview)
+		{
+			return PrintJsonDescribePreviewUsageFailure(commandLine.m_Error);
 		}
 		return PrintCommandLineFailure(commandLine.m_Command,
 			commandLine.m_Error, jsonRequested, true);
@@ -576,12 +892,16 @@ int wmain(int argumentCount, wchar_t* arguments[])
 		return RunCompile(commandLine);
 	case gglab::ShaderCompilerCommand::BuildRuntime:
 		return RunBuildRuntime(commandLine);
+	case gglab::ShaderCompilerCommand::BuildPreview:
+		return RunBuildPreview(commandLine);
 	case gglab::ShaderCompilerCommand::Targets:
 		return RunTargets();
 	case gglab::ShaderCompilerCommand::Version:
 		return RunVersion();
 	case gglab::ShaderCompilerCommand::Describe:
 		return RunDescribe();
+	case gglab::ShaderCompilerCommand::DescribePreview:
+		return RunDescribePreview();
 	case gglab::ShaderCompilerCommand::Help:
 	case gglab::ShaderCompilerCommand::None:
 		std::wcout << gglab::ShaderCompilerCommandLineUsage() << L"\n";

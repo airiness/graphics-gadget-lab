@@ -7,7 +7,7 @@ namespace gglab
 	// Stable machine identity used by process clients before they consume any
 	// command result from the external shader producer.
 	inline constexpr std::string_view ShaderCompilerToolIdentity = "gglab-shaderc";
-	inline constexpr const wchar_t* ShaderCompilerToolVersion = L"1.2.0";
+	inline constexpr const wchar_t* ShaderCompilerToolVersion = L"1.3.0";
 
 	// Versions the JSON envelope, status vocabulary, exit-code mapping, and
 	// stdout/stderr channel rules. This is deliberately independent of the

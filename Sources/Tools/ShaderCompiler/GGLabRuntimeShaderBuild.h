@@ -35,6 +35,11 @@ namespace gglab
 		}
 	};
 
+	// Shared artifact-root writer identity for every Toolchain publication
+	// transaction, including ordinary Runtime and Preview builds.
+	[[nodiscard]] std::wstring MakeGGLabShaderArtifactWriterMutexName(
+		const std::filesystem::path& artifactRoot) noexcept;
+
 	[[nodiscard]] GGLabRuntimeShaderBuildResult BuildGGLabRuntimeShaders(
 		ShaderTargetProfile targetProfile,
 		const std::filesystem::path& sourceRoot,

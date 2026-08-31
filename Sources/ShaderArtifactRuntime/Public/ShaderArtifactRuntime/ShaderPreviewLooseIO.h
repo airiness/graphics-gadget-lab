@@ -65,6 +65,41 @@ namespace gglab
 		std::filesystem::path m_Root;
 	};
 
+	enum class ShaderPreviewPublicationReadStatus : uint8_t
+	{
+		Success,
+		NotFound,
+		IOFailure,
+		MalformedArtifact,
+	};
+
+	struct ShaderPreviewPublicationReadResult final
+	{
+		ShaderPreviewPublicationReadStatus m_Status =
+			ShaderPreviewPublicationReadStatus::IOFailure;
+		ShaderPreviewPublicationArtifact m_Artifact{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderPreviewPublicationReadStatus::Success;
+		}
+	};
+
+	class ShaderLoosePreviewPublicationReader final
+	{
+	public:
+		explicit ShaderLoosePreviewPublicationReader(
+			ShaderLoosePreviewPublicationLocator locator);
+
+		[[nodiscard]] const ShaderLoosePreviewPublicationLocator&
+			GetLocator() const noexcept;
+		[[nodiscard]] ShaderPreviewPublicationReadResult ReadArtifact(
+			const ShaderPreviewPublicationRef& publicationRef) noexcept;
+
+	private:
+		ShaderLoosePreviewPublicationLocator m_Locator;
+	};
+
 	struct ShaderLoosePreviewSessionPaths final
 	{
 		std::filesystem::path m_ActivePublicationPath{};
@@ -84,5 +119,61 @@ namespace gglab
 	private:
 		std::filesystem::path m_Root;
 		std::string m_SessionId;
+	};
+
+	enum class ShaderPreviewActivePublicationReadStatus : uint8_t
+	{
+		Success,
+		NotFound,
+		IOFailure,
+		MalformedRecord,
+	};
+
+	struct ShaderPreviewActivePublicationReadResult final
+	{
+		ShaderPreviewActivePublicationReadStatus m_Status =
+			ShaderPreviewActivePublicationReadStatus::IOFailure;
+		ShaderPreviewActivePublication m_ActivePublication{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderPreviewActivePublicationReadStatus::Success;
+		}
+	};
+
+	enum class ShaderPreviewObservationReadStatus : uint8_t
+	{
+		Success,
+		NotFound,
+		IOFailure,
+		MalformedRecord,
+	};
+
+	struct ShaderPreviewObservationReadResult final
+	{
+		ShaderPreviewObservationReadStatus m_Status =
+			ShaderPreviewObservationReadStatus::IOFailure;
+		ShaderPreviewObservation m_Observation{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderPreviewObservationReadStatus::Success;
+		}
+	};
+
+	class ShaderLoosePreviewSessionReader final
+	{
+	public:
+		explicit ShaderLoosePreviewSessionReader(
+			ShaderLoosePreviewSessionLocator locator);
+
+		[[nodiscard]] const ShaderLoosePreviewSessionLocator&
+			GetLocator() const noexcept;
+		[[nodiscard]] ShaderPreviewActivePublicationReadResult
+			ReadActivePublication() noexcept;
+		[[nodiscard]] ShaderPreviewObservationReadResult ReadObservation() noexcept;
+
+	private:
+		ShaderLoosePreviewSessionLocator m_Locator;
 	};
 }

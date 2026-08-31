@@ -1,6 +1,7 @@
 #pragma once
 #include "Contracts/ShaderArtifact.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
+#include "ShaderArtifactRuntime/ShaderPreviewLooseIO.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -73,6 +74,57 @@ namespace gglab
 		}
 	};
 
+	enum class ShaderPreviewPublicationArtifactPublicationStatus : uint8_t
+	{
+		Published,
+		AlreadyPresent,
+		InvalidArtifact,
+		IOFailure,
+	};
+
+	struct ShaderPreviewPublicationArtifactPublicationResult final
+	{
+		ShaderPreviewPublicationArtifactPublicationStatus m_Status =
+			ShaderPreviewPublicationArtifactPublicationStatus::IOFailure;
+		ShaderPreviewPublicationRef m_PublicationRef{};
+		ShaderLoosePreviewPublicationPath m_Path{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status ==
+					ShaderPreviewPublicationArtifactPublicationStatus::Published ||
+				m_Status ==
+					ShaderPreviewPublicationArtifactPublicationStatus::AlreadyPresent;
+		}
+	};
+
+	enum class ShaderPreviewActivePublicationPublicationStatus : uint8_t
+	{
+		Published,
+		AlreadyActive,
+		InvalidCandidate,
+		InvalidCurrent,
+		NotNewer,
+		PublicationUnavailable,
+		IOFailure,
+	};
+
+	struct ShaderPreviewActivePublicationPublicationResult final
+	{
+		ShaderPreviewActivePublicationPublicationStatus m_Status =
+			ShaderPreviewActivePublicationPublicationStatus::IOFailure;
+		ShaderPreviewActivePublication m_ActivePublication{};
+		std::filesystem::path m_Path{};
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status ==
+					ShaderPreviewActivePublicationPublicationStatus::Published ||
+				m_Status ==
+					ShaderPreviewActivePublicationPublicationStatus::AlreadyActive;
+		}
+	};
+
 	[[nodiscard]] ShaderRuntimeArtifact BuildShaderRuntimeArtifact(
 		const ShaderArtifact& artifact);
 
@@ -98,4 +150,19 @@ namespace gglab
 			const std::filesystem::path& artifactRoot,
 			ShaderTargetProfile targetProfile,
 			const ShaderProgramRegistryArtifactRef& registryRef) noexcept;
+
+	// Publishes one immutable content-addressed Preview Publication. The caller
+	// owns complete cross-link validation before making this product reachable.
+	[[nodiscard]] ShaderPreviewPublicationArtifactPublicationResult
+		PublishShaderPreviewPublicationArtifact(
+			const std::filesystem::path& artifactRoot,
+			const ShaderPreviewPublicationArtifact& artifact) noexcept;
+
+	// Atomically advances one Preview session after proving that the immutable
+	// Publication exists. The caller must hold the artifact-root writer lease.
+	[[nodiscard]] ShaderPreviewActivePublicationPublicationResult
+		PublishShaderPreviewActivePublication(
+			const std::filesystem::path& artifactRoot,
+			std::string sessionId,
+			const ShaderPreviewActivePublication& activePublication) noexcept;
 }

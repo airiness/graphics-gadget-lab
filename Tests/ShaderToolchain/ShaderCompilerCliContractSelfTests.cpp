@@ -11,6 +11,7 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
+#include "ShaderArtifactRuntime/ShaderPreviewLooseIO.h"
 #include "Targets/DX12ShaderTarget.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Targets/ShaderTargetWireNames.h"
@@ -24,6 +25,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <span>
@@ -813,6 +815,33 @@ namespace gglab
 				return std::nullopt;
 			}
 			return binary;
+		}
+
+		[[nodiscard]] std::optional<Sha256Digest> ParseLowerSha256Digest(
+			std::string_view text) noexcept
+		{
+			if (text.size() != Sha256Digest::Size * 2)
+			{
+				return std::nullopt;
+			}
+			Sha256Digest digest{};
+			const auto HexValue = [](char character) noexcept -> int
+				{
+					if (character >= '0' && character <= '9') return character - '0';
+					if (character >= 'a' && character <= 'f') return character - 'a' + 10;
+					return -1;
+				};
+			for (size_t index = 0; index < digest.m_Value.size(); ++index)
+			{
+				const int high = HexValue(text[index * 2]);
+				const int low = HexValue(text[index * 2 + 1]);
+				if (high < 0 || low < 0)
+				{
+					return std::nullopt;
+				}
+				digest.m_Value[index] = static_cast<std::byte>((high << 4) | low);
+			}
+			return digest.IsValid() ? std::optional(digest) : std::nullopt;
 		}
 
 		[[nodiscard]] bool CliArtifactFieldsDescribeCommittedEntry(
@@ -1658,6 +1687,372 @@ namespace gglab
 					concurrentActive.m_RegistryRef == firstActive.m_RegistryRef,
 				"Artifact-root writer lease serializes concurrent complete runtime builds");
 		}
+
+		void RunPreviewHandshakeTests(SelfTestContext& context,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			const std::filesystem::path foreignWorkingDirectory =
+				tempRoot / L"PreviewDescribeForeignCwd";
+			std::error_code errorCode;
+			std::filesystem::create_directories(foreignWorkingDirectory, errorCode);
+			const CliRunResult first = RunCli({ L"describe-preview" });
+			const CliRunResult second = RunCli(
+				{ L"describe-preview" }, false, false,
+				foreignWorkingDirectory.wstring());
+			const std::optional<nlohmann::json> document =
+				ParseWireDocument(first.m_StdOut);
+			bool contractShapeValid = false;
+			if (document && document->contains("supportedPreviewInputContracts") &&
+				document->at("supportedPreviewInputContracts").is_array())
+			{
+				const nlohmann::json& contracts =
+					document->at("supportedPreviewInputContracts");
+				contractShapeValid = contracts.size() == 2 &&
+					contracts[0].value("id", "") ==
+						ShaderGraphPreviewNumericInputContractId &&
+					contracts[0].value("profileId", "") ==
+						ShaderGraphPreviewSurfaceProfileId &&
+					contracts[0].value("profileVersion", 0) == 1 &&
+					contracts[1].value("id", "") ==
+						ShaderGraphPreviewTexture2DInputContractId &&
+					contracts[1].value("profileId", "") ==
+						ShaderGraphPreviewSurfaceProfileId &&
+					contracts[1].value("profileVersion", 0) == 2;
+			}
+			context.Check(
+				first.m_ExitCode == 0 && IsSingleJsonDocument(first) &&
+					first.m_StdOut == second.m_StdOut &&
+					std::filesystem::is_empty(foreignWorkingDirectory, errorCode) &&
+					document && document->value("command", "") == "describe-preview" &&
+					document->value("processContractVersion", 0) ==
+						ShaderProcessContractVersion &&
+					document->value("previewBuildContractVersion", 0) ==
+						ShaderPreviewBuildContractVersion &&
+					document->value("previewProgramDescriptorVersion", 0) ==
+						ShaderGraphPreviewDescriptorVersion &&
+					document->value("previewProgramDescriptorIdentity", "") ==
+						ShaderGraphPreviewProgramDescriptorIdentity &&
+					document->value("previewPublicationSchemaVersion", 0) ==
+						ShaderPreviewPublicationArtifactSchemaVersion &&
+					document->value("previewActivePublicationSchemaVersion", 0) ==
+						ShaderPreviewActivePublicationSchemaVersion &&
+					document->value("previewObservationSchemaVersion", 0) ==
+						ShaderPreviewObservationSchemaVersion && contractShapeValid,
+				"describe-preview is byte-stable, zero-side-effect, and publishes the complete Preview compatibility axes");
+
+			const CliRunResult usage = RunCli({ L"describe-preview", L"extra" });
+			const CliRunResult unavailable =
+				RunCli({ L"describe-preview" }, true);
+			const CliRunResult internalError =
+				RunCli({ L"describe-preview" }, false, true);
+			context.Check(
+				HasJsonEnvelope(
+					usage, "usage-error", 2, false, "describe-preview") &&
+				HasJsonEnvelope(
+					unavailable, "compiler-unavailable", 4, false,
+					"describe-preview") &&
+				HasJsonEnvelope(
+					internalError, "internal-error", 7, false,
+					"describe-preview") &&
+				unavailable.m_StdOut.find("\"previewBuildContractVersion\":1") !=
+					std::string::npos,
+				"describe-preview failures preserve the dedicated machine envelope and Preview contract version");
+
+			const CliRunResult ordinaryDescribe = RunCli({ L"describe" });
+			context.Check(
+				ordinaryDescribe.m_ExitCode == 0 &&
+					ordinaryDescribe.m_StdOut.find("previewBuildContractVersion") ==
+						std::string::npos,
+				"ordinary process-v2 describe remains independent of Preview support");
+		}
+
+		[[nodiscard]] std::vector<std::wstring> MakePreviewBuildArguments(
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& generatedSource,
+			std::string_view generatedSourceIdentity,
+			std::string_view inputContractId,
+			uint32_t profileVersion,
+			std::string_view sessionId,
+			uint64_t attemptSequence,
+			const std::filesystem::path& cacheRoot,
+			const std::filesystem::path& artifactRoot) noexcept
+		{
+			return {
+				L"build-preview",
+				L"--source-root", sourceRoot.wstring(),
+				L"--generated-source", generatedSource.wstring(),
+				L"--generated-source-identity",
+					utils::ToWideString(generatedSourceIdentity),
+				L"--target", L"gglab-dx12",
+				L"--profile-id", utils::ToWideString(ShaderGraphPreviewSurfaceProfileId),
+				L"--profile-version", std::to_wstring(profileVersion),
+				L"--preview-input-contract-id", utils::ToWideString(inputContractId),
+				L"--preview-program-descriptor-identity",
+					utils::ToWideString(ShaderGraphPreviewProgramDescriptorIdentity),
+				L"--session-id", utils::ToWideString(sessionId),
+				L"--attempt-sequence", std::to_wstring(attemptSequence),
+				L"--cache-root", cacheRoot.wstring(),
+				L"--artifact-root", artifactRoot.wstring(),
+				L"--result-format", L"json",
+			};
+		}
+
+		void RunPreviewBuildContractTests(SelfTestContext& context,
+			const std::filesystem::path& sourceRoot,
+			const std::filesystem::path& tempRoot) noexcept
+		{
+			const CliRunResult missingOptions = RunCli({
+				L"build-preview", L"--result-format", L"json",
+			});
+			const CliRunResult unknownOption = RunCli({
+				L"build-preview", L"--bogus", L"value",
+				L"--result-format", L"json",
+			});
+			context.Check(
+				HasJsonEnvelope(
+					missingOptions, "usage-error", 2, false, "build-preview") &&
+				HasJsonEnvelope(
+					unknownOption, "usage-error", 2, false, "build-preview"),
+				"build-preview usage failures identify the dedicated operation");
+
+			const std::filesystem::path cacheRoot = tempRoot / L"RuntimeBuildCache";
+			const std::filesystem::path artifactRoot =
+				tempRoot / L"RuntimeBuildArtifacts";
+			ShaderLooseActiveProgramRegistryReader ordinaryActiveReader{
+				ShaderLooseActiveProgramRegistryLocator(
+					artifactRoot, ShaderTargetProfile::GGLabDX12)
+			};
+			const ActiveShaderProgramRegistryReadResult ordinaryActiveBefore =
+				ordinaryActiveReader.Read();
+
+			const std::optional<ShaderBinary> numericFixture = ReadFileBinary(
+				sourceRoot / L"Tests" / L"Generated" / L"SurfaceGeneratedV1.hlsli");
+			const std::optional<ShaderBinary> textureFixture = ReadFileBinary(
+				sourceRoot / L"Tests" / L"Generated" / L"SurfaceGeneratedV2.hlsli");
+			if (!numericFixture || !textureFixture || !ordinaryActiveBefore.IsSuccess())
+			{
+				context.Check(false,
+					"Preview CLI fixtures and ordinary active Registry are available");
+				return;
+			}
+
+			std::string numericSource(
+				static_cast<const char*>(numericFixture->Data()),
+				numericFixture->SizeInBytes());
+			std::string textureSource(
+				static_cast<const char*>(textureFixture->Data()),
+				textureFixture->SizeInBytes());
+			const std::string numericNeedle = "float3(1.0, 1.0, 1.0)";
+			const std::string textureNeedle = "surface.BaseColor = v_n_smp.rgb;";
+			const size_t numericPosition = numericSource.find(numericNeedle);
+			const size_t texturePosition = textureSource.find(textureNeedle);
+			if (numericPosition == std::string::npos ||
+				texturePosition == std::string::npos)
+			{
+				context.Check(false, "Preview CLI test fixtures retain their pinned probes");
+				return;
+			}
+			numericSource.replace(
+				numericPosition, numericNeedle.size(), "float3(0.25, 0.5, 0.75)");
+			textureSource.replace(
+				texturePosition, textureNeedle.size(),
+				"surface.BaseColor = float3(0.1, 0.2, 0.3);");
+			const std::filesystem::path numericSourcePath =
+				tempRoot / L"PreviewGenerated" / L"Numeric.hlsli";
+			const std::filesystem::path textureSourcePath =
+				tempRoot / L"PreviewGenerated" / L"Texture.hlsli";
+			const bool sourcesWritten =
+				WriteTextFile(numericSourcePath, numericSource) &&
+				WriteTextFile(textureSourcePath, textureSource);
+			const std::string numericIdentity = Sha256DigestToHex(ComputeSha256(
+				std::as_bytes(std::span(numericSource))));
+			const std::string textureIdentity = Sha256DigestToHex(ComputeSha256(
+				std::as_bytes(std::span(textureSource))));
+			constexpr std::string_view SessionId =
+				"0123456789abcdef0123456789abcdef";
+
+			const std::vector<std::wstring> numericArguments =
+				MakePreviewBuildArguments(
+					sourceRoot, numericSourcePath, numericIdentity,
+					ShaderGraphPreviewNumericInputContractId, 1, SessionId, 1,
+					cacheRoot, artifactRoot);
+			const CliRunResult numericBuild = sourcesWritten
+				? RunCli(numericArguments)
+				: CliRunResult{};
+			const std::optional<Sha256Digest> numericPublicationId =
+				ParseLowerSha256Digest(
+					ExtractJsonField(numericBuild.m_StdOut, "publicationId"));
+			context.Check(
+				numericBuild.m_ExitCode == 0 && IsSingleJsonDocument(numericBuild) &&
+					numericBuild.m_StdOut.find("\"attemptSequence\":1") !=
+						std::string::npos && numericPublicationId.has_value(),
+				"build-preview compiles and publishes a main-owned numeric-v1 Preview Program");
+
+			const std::vector<std::wstring> textureArguments =
+				MakePreviewBuildArguments(
+					sourceRoot, textureSourcePath, textureIdentity,
+					ShaderGraphPreviewTexture2DInputContractId, 2, SessionId, 2,
+					cacheRoot, artifactRoot);
+			const CliRunResult textureBuild = RunCli(textureArguments);
+			const std::optional<Sha256Digest> texturePublicationId =
+				ParseLowerSha256Digest(
+					ExtractJsonField(textureBuild.m_StdOut, "publicationId"));
+			ShaderLoosePreviewSessionReader sessionReader{
+				ShaderLoosePreviewSessionLocator(artifactRoot, std::string(SessionId))
+			};
+			const ShaderPreviewActivePublicationReadResult activePreview =
+				sessionReader.ReadActivePublication();
+			const ActiveShaderProgramRegistryReadResult ordinaryActiveAfter =
+				ordinaryActiveReader.Read();
+			context.Check(
+				textureBuild.m_ExitCode == 0 && texturePublicationId.has_value() &&
+					activePreview.IsSuccess() &&
+					activePreview.m_ActivePublication.m_AttemptSequence == 2 &&
+					activePreview.m_ActivePublication.m_PublicationRef.
+						m_PublicationId.m_DurableDigest == *texturePublicationId &&
+					ordinaryActiveAfter.IsSuccess() &&
+					ordinaryActiveAfter.m_RegistryRef ==
+						ordinaryActiveBefore.m_RegistryRef,
+				"texture2d-v2 Preview publication advances only the session pointer and leaves the ordinary active Registry untouched");
+
+			ShaderLoosePreviewPublicationReader publicationReader{
+				ShaderLoosePreviewPublicationLocator(artifactRoot)
+			};
+			const ShaderPreviewPublicationReadResult publication =
+				texturePublicationId
+				? publicationReader.ReadArtifact({
+					.m_PublicationId = {
+						.m_DurableDigest = *texturePublicationId,
+					},
+				})
+				: ShaderPreviewPublicationReadResult{};
+			ShaderLooseProgramRegistryArtifactReader registryReader{
+				ShaderLooseProgramRegistryArtifactLocator(artifactRoot)
+			};
+			const ShaderProgramRegistryArtifactReadResult baseRegistry =
+				publication.IsSuccess()
+				? registryReader.ReadArtifact(publication.m_Artifact.m_BaseRegistryRef)
+				: ShaderProgramRegistryArtifactReadResult{};
+			const ShaderProgramRegistryArtifactReadResult previewRegistry =
+				publication.IsSuccess()
+				? registryReader.ReadArtifact(publication.m_Artifact.m_PreviewRegistryRef)
+				: ShaderProgramRegistryArtifactReadResult{};
+			ShaderLooseArtifactReader artifactReader{
+				ShaderLooseArtifactLocator(artifactRoot)
+			};
+			ShaderArtifactStore artifactStore(artifactReader);
+			const ShaderArtifactLoadResult shaderArtifact = publication.IsSuccess()
+				? artifactStore.LoadArtifact(
+					publication.m_Artifact.m_ShaderArtifactRef,
+					ShaderArtifactCompatibilityRequest{
+						.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+						.m_BinaryFormat = ShaderBinaryFormat::Dxil,
+						.m_Stage = ShaderStage::Pixel,
+					})
+				: ShaderArtifactLoadResult{};
+			context.Check(
+				publication.IsSuccess() && baseRegistry.IsSuccess() &&
+					previewRegistry.IsSuccess() && shaderArtifact.IsSuccess() &&
+					ValidateShaderPreviewPublicationLinks(
+						publication.m_Artifact,
+						shaderArtifact.m_Artifact.m_Manifest,
+						baseRegistry.m_Artifact,
+						previewRegistry.m_Artifact) ==
+							ShaderPreviewPublicationLinkValidationStatus::Valid,
+				"build-preview products re-read through compiler-free readers and preserve exact Publication cross-links");
+
+			std::vector<std::wstring> identityMismatchArguments = textureArguments;
+			const auto identityArgument = std::ranges::find(
+				identityMismatchArguments, utils::ToWideString(textureIdentity));
+			if (identityArgument != identityMismatchArguments.end())
+			{
+				*identityArgument = std::wstring(64, L'1');
+			}
+			const CliRunResult identityMismatch = RunCli(identityMismatchArguments);
+			std::vector<std::wstring> staleArguments = textureArguments;
+			const auto attemptOption =
+				std::ranges::find(staleArguments, L"--attempt-sequence");
+			const bool hasAttemptValue = attemptOption != staleArguments.end() &&
+				std::next(attemptOption) != staleArguments.end();
+			if (hasAttemptValue)
+			{
+				*std::next(attemptOption) = L"1";
+			}
+			const CliRunResult stale = RunCli(staleArguments);
+			const ShaderPreviewActivePublicationReadResult afterFailures =
+				sessionReader.ReadActivePublication();
+			context.Check(
+				identityArgument != identityMismatchArguments.end() &&
+					hasAttemptValue &&
+					HasJsonEnvelope(
+						identityMismatch, "source-identity-mismatch", 3, false,
+						"build-preview") &&
+					HasJsonEnvelope(
+						stale, "stale-attempt", 3, false, "build-preview") &&
+					afterFailures.IsSuccess() &&
+					afterFailures.m_ActivePublication ==
+						activePreview.m_ActivePublication,
+				"failed and stale Preview attempts preserve the transactional last-good session publication");
+
+			std::vector<std::wstring> vulkanArguments = textureArguments;
+			const auto vulkanTarget =
+				std::ranges::find(vulkanArguments, L"gglab-dx12");
+			const auto vulkanSession = std::ranges::find(
+				vulkanArguments, utils::ToWideString(SessionId));
+			if (vulkanTarget != vulkanArguments.end())
+			{
+				*vulkanTarget = L"gglab-vulkan13";
+			}
+			if (vulkanSession != vulkanArguments.end())
+			{
+				*vulkanSession = L"fedcba9876543210fedcba9876543210";
+			}
+			const auto vulkanAttempt =
+				std::ranges::find(vulkanArguments, L"--attempt-sequence");
+			if (vulkanAttempt != vulkanArguments.end() &&
+				std::next(vulkanAttempt) != vulkanArguments.end())
+			{
+				*std::next(vulkanAttempt) = L"1";
+			}
+			const CliRunResult vulkanBuild = RunCli(vulkanArguments);
+			const std::optional<Sha256Digest> vulkanPublicationId =
+				ParseLowerSha256Digest(
+					ExtractJsonField(vulkanBuild.m_StdOut, "publicationId"));
+			const ShaderPreviewPublicationReadResult vulkanPublication =
+				vulkanPublicationId
+				? publicationReader.ReadArtifact({
+					.m_PublicationId = {
+						.m_DurableDigest = *vulkanPublicationId,
+					},
+				})
+				: ShaderPreviewPublicationReadResult{};
+			const ShaderCompileTarget vulkanPixelTarget =
+				MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderArtifactLoadResult vulkanArtifact =
+				vulkanPublication.IsSuccess()
+				? artifactStore.LoadArtifact(
+					vulkanPublication.m_Artifact.m_ShaderArtifactRef,
+					ShaderArtifactCompatibilityRequest{
+						.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+						.m_BinaryFormat = vulkanPixelTarget.m_BinaryFormat,
+						.m_SpirVTargetEnvironment =
+							vulkanPixelTarget.m_SpirVTargetEnvironment,
+						.m_BindingABIRevision =
+							vulkanPixelTarget.m_BindingABIRevision,
+						.m_CoordinateOptions =
+							vulkanPixelTarget.m_CoordinateOptions,
+						.m_Stage = ShaderStage::Pixel,
+					})
+				: ShaderArtifactLoadResult{};
+			context.Check(
+				vulkanTarget != vulkanArguments.end() &&
+					vulkanSession != vulkanArguments.end() &&
+					vulkanBuild.m_ExitCode == 0 &&
+					vulkanPublication.IsSuccess() && vulkanArtifact.IsSuccess() &&
+					vulkanPublication.m_Artifact.m_TargetProfile ==
+						ShaderTargetProfile::GGLabVulkan13,
+				"build-preview compiles external texture2d-v2 source through the Vulkan 1.3 target policy");
+		}
 	}
 
 	void RunShaderCompilerCliContractSelfTests(SelfTestContext& context) noexcept
@@ -1687,9 +2082,11 @@ namespace gglab
 		RunJsonProcessContractTests(context, sourceRoot, tempRoot);
 		RunCrossProcessHardGateTests(context, sourceRoot, tempRoot);
 		RunRuntimeBuildContractTests(context, sourceRoot, tempRoot);
+		RunPreviewBuildContractTests(context, sourceRoot, tempRoot);
 		// Machine describe handshake contract self-tests. The remaining
 		// structural no-regression invariants are asserted by the
 		// compile/build-runtime matrix and legacy-grammar checks above.
 		RunDescribeHandshakeTests(context, sourceRoot, tempRoot);
+		RunPreviewHandshakeTests(context, tempRoot);
 	}
 }

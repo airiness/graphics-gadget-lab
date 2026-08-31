@@ -14,32 +14,25 @@ namespace gglab
 {
 	namespace
 	{
-		struct PreviewInputContractProjection final
-		{
-			std::string_view m_InputContractId;
-			uint32_t m_ProfileVersion = 0;
-			const ShaderProgramRef* m_ProgramRef = nullptr;
-		};
-
 		const std::array PreviewInputContracts{
-			PreviewInputContractProjection{
+			ShaderGraphPreviewInputContractProjection{
 				ShaderGraphPreviewNumericInputContractId,
 				1,
 				&shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
 			},
-			PreviewInputContractProjection{
+			ShaderGraphPreviewInputContractProjection{
 				ShaderGraphPreviewTexture2DInputContractId,
 				2,
 				&shader_programs::ShaderGraphPreviewSurfaceV2Pixel,
 			},
 		};
 
-		[[nodiscard]] const PreviewInputContractProjection* FindInputContract(
+		[[nodiscard]] const ShaderGraphPreviewInputContractProjection* FindInputContract(
 			std::string_view inputContractId) noexcept
 		{
 			const auto iterator = std::ranges::find(
 				PreviewInputContracts, inputContractId,
-				&PreviewInputContractProjection::m_InputContractId);
+				&ShaderGraphPreviewInputContractProjection::m_InputContractId);
 			return iterator != PreviewInputContracts.end() ? &*iterator : nullptr;
 		}
 
@@ -71,7 +64,7 @@ namespace gglab
 			{
 				return ShaderPreviewPublicationValidationStatus::InvalidDescriptorIdentity;
 			}
-			const PreviewInputContractProjection* inputContract =
+			const ShaderGraphPreviewInputContractProjection* inputContract =
 				FindInputContract(artifact.m_PreviewInputContractId);
 			if (!inputContract)
 			{
@@ -160,12 +153,20 @@ namespace gglab
 		return FindInputContract(inputContractId) != nullptr;
 	}
 
+	const ShaderGraphPreviewInputContractProjection*
+		ResolveShaderGraphPreviewInputContract(
+		std::string_view inputContractId) noexcept
+	{
+		return FindInputContract(inputContractId);
+	}
+
 	bool IsKnownShaderGraphPreviewProgramRef(
 		const ShaderProgramRef& programRef) noexcept
 	{
 		return std::ranges::any_of(
 			PreviewInputContracts,
-			[&programRef](const PreviewInputContractProjection& projection) noexcept
+			[&programRef](
+				const ShaderGraphPreviewInputContractProjection& projection) noexcept
 			{ return programRef == *projection.m_ProgramRef; });
 	}
 

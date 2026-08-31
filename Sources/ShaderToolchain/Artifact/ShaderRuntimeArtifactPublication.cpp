@@ -387,4 +387,187 @@ namespace gglab
 		}
 		return result;
 	}
+
+	ShaderPreviewPublicationArtifactPublicationResult
+		PublishShaderPreviewPublicationArtifact(
+			const std::filesystem::path& artifactRoot,
+			const ShaderPreviewPublicationArtifact& artifact) noexcept
+	{
+		ShaderPreviewPublicationArtifactPublicationResult result{};
+		try
+		{
+			if (artifactRoot.empty() || !artifactRoot.is_absolute() ||
+				ValidateShaderPreviewPublicationArtifact(artifact) !=
+					ShaderPreviewPublicationValidationStatus::Valid)
+			{
+				result.m_Status =
+					ShaderPreviewPublicationArtifactPublicationStatus::InvalidArtifact;
+				return result;
+			}
+
+			result.m_PublicationRef = {
+				.m_PublicationId = artifact.m_PublicationId,
+			};
+			const ShaderLoosePreviewPublicationLocator locator(artifactRoot);
+			result.m_Path = locator.GetPath(result.m_PublicationRef);
+			ShaderLoosePreviewPublicationReader reader(locator);
+			const ShaderPreviewPublicationReadResult existing =
+				reader.ReadArtifact(result.m_PublicationRef);
+			if (existing.IsSuccess() && existing.m_Artifact == artifact)
+			{
+				result.m_Status =
+					ShaderPreviewPublicationArtifactPublicationStatus::AlreadyPresent;
+				return result;
+			}
+
+			const SerializedShaderPreviewPublication serialized =
+				SerializeShaderPreviewPublication(artifact);
+			if (serialized.empty() ||
+				!utils::CreateParentDirectoryIfNotExist(result.m_Path.m_Path))
+			{
+				return result;
+			}
+
+			constexpr int MaxPublishAttempts = 2;
+			for (int publishAttempt = 0; publishAttempt < MaxPublishAttempts;
+				++publishAttempt)
+			{
+				const std::filesystem::path tempPath =
+					MakeUniqueTempPath(result.m_Path.m_Path);
+				if (!utils::WriteFileBinary(tempPath, serialized) ||
+					!FileEquals(tempPath, serialized))
+				{
+					RemoveFileBestEffort(tempPath);
+					return result;
+				}
+				const bool published = PublishFile(tempPath, result.m_Path.m_Path);
+				RemoveFileBestEffort(tempPath);
+
+				const ShaderPreviewPublicationReadResult observed =
+					reader.ReadArtifact(result.m_PublicationRef);
+				if (observed.IsSuccess() && observed.m_Artifact == artifact)
+				{
+					result.m_Status = published
+						? ShaderPreviewPublicationArtifactPublicationStatus::Published
+						: ShaderPreviewPublicationArtifactPublicationStatus::AlreadyPresent;
+					return result;
+				}
+				RemoveFileBestEffort(result.m_Path.m_Path);
+			}
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
+
+	ShaderPreviewActivePublicationPublicationResult
+		PublishShaderPreviewActivePublication(
+			const std::filesystem::path& artifactRoot,
+			std::string sessionId,
+			const ShaderPreviewActivePublication& activePublication) noexcept
+	{
+		ShaderPreviewActivePublicationPublicationResult result{
+			.m_ActivePublication = activePublication,
+		};
+		try
+		{
+			if (artifactRoot.empty() || !artifactRoot.is_absolute() ||
+				!IsValidShaderPreviewSessionId(sessionId) ||
+				!IsValidShaderPreviewActivePublication(activePublication))
+			{
+				result.m_Status =
+					ShaderPreviewActivePublicationPublicationStatus::InvalidCandidate;
+				return result;
+			}
+
+			ShaderLoosePreviewPublicationReader publicationReader{
+				ShaderLoosePreviewPublicationLocator(artifactRoot)
+			};
+			if (!publicationReader.ReadArtifact(
+				activePublication.m_PublicationRef).IsSuccess())
+			{
+				result.m_Status = ShaderPreviewActivePublicationPublicationStatus::
+					PublicationUnavailable;
+				return result;
+			}
+
+			const ShaderLoosePreviewSessionLocator locator(
+				artifactRoot, std::move(sessionId));
+			const ShaderLoosePreviewSessionPaths paths = locator.GetPaths();
+			result.m_Path = paths.m_ActivePublicationPath;
+			ShaderLoosePreviewSessionReader reader(locator);
+			const ShaderPreviewActivePublicationReadResult current =
+				reader.ReadActivePublication();
+			if (current.IsSuccess() &&
+				current.m_ActivePublication == activePublication)
+			{
+				result.m_Status =
+					ShaderPreviewActivePublicationPublicationStatus::AlreadyActive;
+				return result;
+			}
+			if (current.m_Status ==
+				ShaderPreviewActivePublicationReadStatus::MalformedRecord)
+			{
+				result.m_Status =
+					ShaderPreviewActivePublicationPublicationStatus::InvalidCurrent;
+				return result;
+			}
+			if (current.m_Status == ShaderPreviewActivePublicationReadStatus::IOFailure)
+			{
+				return result;
+			}
+
+			const ShaderPreviewActivePublicationOrderingStatus ordering =
+				ValidateShaderPreviewActivePublicationOrdering(
+					current.IsSuccess() ? &current.m_ActivePublication : nullptr,
+					activePublication);
+			if (ordering != ShaderPreviewActivePublicationOrderingStatus::Publishable)
+			{
+				result.m_Status = ordering ==
+					ShaderPreviewActivePublicationOrderingStatus::NotNewer
+					? ShaderPreviewActivePublicationPublicationStatus::NotNewer
+					: ShaderPreviewActivePublicationPublicationStatus::InvalidCandidate;
+				return result;
+			}
+
+			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path))
+			{
+				return result;
+			}
+			const SerializedShaderPreviewActivePublication serialized =
+				SerializeShaderPreviewActivePublication(activePublication);
+			const std::filesystem::path tempPath = MakeUniqueTempPath(result.m_Path);
+			if (!utils::WriteFileBinary(tempPath, serialized) ||
+				!FileEquals(tempPath, serialized))
+			{
+				RemoveFileBestEffort(tempPath);
+				return result;
+			}
+
+			const BOOL replaced = ::MoveFileExW(
+				tempPath.c_str(), result.m_Path.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+			RemoveFileBestEffort(tempPath);
+			if (replaced == FALSE)
+			{
+				return result;
+			}
+			const ShaderPreviewActivePublicationReadResult observed =
+				reader.ReadActivePublication();
+			if (!observed.IsSuccess() ||
+				observed.m_ActivePublication != activePublication)
+			{
+				return result;
+			}
+			result.m_Status =
+				ShaderPreviewActivePublicationPublicationStatus::Published;
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
 }

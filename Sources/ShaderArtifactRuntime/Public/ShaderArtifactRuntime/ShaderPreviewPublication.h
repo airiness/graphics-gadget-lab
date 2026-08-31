@@ -96,10 +96,20 @@ namespace gglab
 		}
 	};
 
+	struct ShaderGraphPreviewInputContractProjection final
+	{
+		std::string_view m_InputContractId;
+		uint32_t m_ProfileVersion = 0;
+		const ShaderProgramRef* m_ProgramRef = nullptr;
+	};
+
 	[[nodiscard]] bool IsKnownShaderGraphPreviewProgramDescriptorIdentity(
 		const Sha256Digest& identity) noexcept;
 	[[nodiscard]] bool IsKnownShaderGraphPreviewInputContract(
 		std::string_view inputContractId) noexcept;
+	[[nodiscard]] const ShaderGraphPreviewInputContractProjection*
+		ResolveShaderGraphPreviewInputContract(
+			std::string_view inputContractId) noexcept;
 	[[nodiscard]] bool IsKnownShaderGraphPreviewProgramRef(
 		const ShaderProgramRef& programRef) noexcept;
 	[[nodiscard]] ShaderPreviewPublicationId ComputeShaderPreviewPublicationId(

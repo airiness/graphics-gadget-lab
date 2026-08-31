@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <fstream>
 #include <utility>
+#include <vector>
 
 namespace gglab
 {
@@ -158,6 +160,55 @@ namespace gglab
 				reinterpret_cast<const char*>(bytes.data() + offset), size);
 			offset += size;
 			return true;
+		}
+
+		enum class LooseReadStatus : uint8_t
+		{
+			Success,
+			NotFound,
+			IOFailure,
+			Malformed,
+		};
+
+		[[nodiscard]] LooseReadStatus ReadFileBounded(
+			const std::filesystem::path& path,
+			uintmax_t maximumSize,
+			std::vector<std::byte>& outBytes) noexcept
+		{
+			std::error_code errorCode;
+			if (!std::filesystem::exists(path, errorCode))
+			{
+				return errorCode ? LooseReadStatus::IOFailure : LooseReadStatus::NotFound;
+			}
+			const uintmax_t fileSize = std::filesystem::file_size(path, errorCode);
+			if (errorCode)
+			{
+				return LooseReadStatus::IOFailure;
+			}
+			if (fileSize == 0 || fileSize > maximumSize)
+			{
+				return LooseReadStatus::Malformed;
+			}
+			try
+			{
+				outBytes.resize(static_cast<size_t>(fileSize));
+				std::ifstream input(path, std::ios::binary);
+				if (!input)
+				{
+					return LooseReadStatus::IOFailure;
+				}
+				input.read(
+					reinterpret_cast<char*>(outBytes.data()),
+					static_cast<std::streamsize>(outBytes.size()));
+				return input.gcount() == static_cast<std::streamsize>(outBytes.size()) &&
+					input.peek() == std::char_traits<char>::eof()
+					? LooseReadStatus::Success
+					: LooseReadStatus::IOFailure;
+			}
+			catch (...)
+			{
+				return LooseReadStatus::IOFailure;
+			}
 		}
 	}
 
@@ -404,6 +455,65 @@ namespace gglab
 		};
 	}
 
+	ShaderLoosePreviewPublicationReader::ShaderLoosePreviewPublicationReader(
+		ShaderLoosePreviewPublicationLocator locator) : m_Locator(std::move(locator))
+	{
+	}
+
+	const ShaderLoosePreviewPublicationLocator&
+		ShaderLoosePreviewPublicationReader::GetLocator() const noexcept
+	{
+		return m_Locator;
+	}
+
+	ShaderPreviewPublicationReadResult
+		ShaderLoosePreviewPublicationReader::ReadArtifact(
+			const ShaderPreviewPublicationRef& publicationRef) noexcept
+	{
+		ShaderPreviewPublicationReadResult result{};
+		try
+		{
+			const ShaderLoosePreviewPublicationPath path =
+				m_Locator.GetPath(publicationRef);
+			if (path.m_Path.empty())
+			{
+				result.m_Status = ShaderPreviewPublicationReadStatus::MalformedArtifact;
+				return result;
+			}
+			std::vector<std::byte> bytes;
+			const LooseReadStatus read = ReadFileBounded(
+				path.m_Path, MaxSerializedShaderPreviewPublicationSize, bytes);
+			if (read == LooseReadStatus::NotFound)
+			{
+				result.m_Status = ShaderPreviewPublicationReadStatus::NotFound;
+				return result;
+			}
+			if (read != LooseReadStatus::Success)
+			{
+				if (read == LooseReadStatus::Malformed)
+				{
+					result.m_Status =
+						ShaderPreviewPublicationReadStatus::MalformedArtifact;
+				}
+				return result;
+			}
+			const std::optional<ShaderPreviewPublicationArtifact> artifact =
+				DeserializeShaderPreviewPublication(bytes);
+			if (!artifact || artifact->m_PublicationId != publicationRef.m_PublicationId)
+			{
+				result.m_Status = ShaderPreviewPublicationReadStatus::MalformedArtifact;
+				return result;
+			}
+			result.m_Status = ShaderPreviewPublicationReadStatus::Success;
+			result.m_Artifact = *artifact;
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
+
 	ShaderLoosePreviewSessionLocator::ShaderLoosePreviewSessionLocator(
 		std::filesystem::path root, std::string sessionId) :
 		m_Root(std::move(root).lexically_normal()), m_SessionId(std::move(sessionId))
@@ -432,5 +542,114 @@ namespace gglab
 			.m_ActivePublicationPath = sessionRoot / "active.ggsh.preview-active",
 			.m_ObservationPath = sessionRoot / "observed.ggsh.preview-observed",
 		};
+	}
+
+	ShaderLoosePreviewSessionReader::ShaderLoosePreviewSessionReader(
+		ShaderLoosePreviewSessionLocator locator) : m_Locator(std::move(locator))
+	{
+	}
+
+	const ShaderLoosePreviewSessionLocator&
+		ShaderLoosePreviewSessionReader::GetLocator() const noexcept
+	{
+		return m_Locator;
+	}
+
+	ShaderPreviewActivePublicationReadResult
+		ShaderLoosePreviewSessionReader::ReadActivePublication() noexcept
+	{
+		ShaderPreviewActivePublicationReadResult result{};
+		try
+		{
+			const ShaderLoosePreviewSessionPaths paths = m_Locator.GetPaths();
+			if (paths.m_ActivePublicationPath.empty())
+			{
+				result.m_Status =
+					ShaderPreviewActivePublicationReadStatus::MalformedRecord;
+				return result;
+			}
+			std::vector<std::byte> bytes;
+			const LooseReadStatus read = ReadFileBounded(
+				paths.m_ActivePublicationPath,
+				SerializedShaderPreviewActivePublicationSize,
+				bytes);
+			if (read == LooseReadStatus::NotFound)
+			{
+				result.m_Status = ShaderPreviewActivePublicationReadStatus::NotFound;
+				return result;
+			}
+			if (read != LooseReadStatus::Success)
+			{
+				if (read == LooseReadStatus::Malformed)
+				{
+					result.m_Status =
+						ShaderPreviewActivePublicationReadStatus::MalformedRecord;
+				}
+				return result;
+			}
+			const std::optional<ShaderPreviewActivePublication> activePublication =
+				DeserializeShaderPreviewActivePublication(bytes);
+			if (!activePublication)
+			{
+				result.m_Status =
+					ShaderPreviewActivePublicationReadStatus::MalformedRecord;
+				return result;
+			}
+			result.m_Status = ShaderPreviewActivePublicationReadStatus::Success;
+			result.m_ActivePublication = *activePublication;
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
+	}
+
+	ShaderPreviewObservationReadResult
+		ShaderLoosePreviewSessionReader::ReadObservation() noexcept
+	{
+		ShaderPreviewObservationReadResult result{};
+		try
+		{
+			const ShaderLoosePreviewSessionPaths paths = m_Locator.GetPaths();
+			if (paths.m_ObservationPath.empty())
+			{
+				result.m_Status = ShaderPreviewObservationReadStatus::MalformedRecord;
+				return result;
+			}
+			std::vector<std::byte> bytes;
+			const LooseReadStatus read = ReadFileBounded(
+				paths.m_ObservationPath,
+				SerializedShaderPreviewObservationSize,
+				bytes);
+			if (read == LooseReadStatus::NotFound)
+			{
+				result.m_Status = ShaderPreviewObservationReadStatus::NotFound;
+				return result;
+			}
+			if (read != LooseReadStatus::Success)
+			{
+				if (read == LooseReadStatus::Malformed)
+				{
+					result.m_Status =
+						ShaderPreviewObservationReadStatus::MalformedRecord;
+				}
+				return result;
+			}
+			const std::optional<ShaderPreviewObservation> observation =
+				DeserializeShaderPreviewObservation(bytes);
+			if (!observation)
+			{
+				result.m_Status = ShaderPreviewObservationReadStatus::MalformedRecord;
+				return result;
+			}
+			result.m_Status = ShaderPreviewObservationReadStatus::Success;
+			result.m_Observation = *observation;
+		}
+		catch (...)
+		{
+			return result;
+		}
+		return result;
 	}
 }
