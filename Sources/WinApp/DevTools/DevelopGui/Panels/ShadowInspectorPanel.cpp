@@ -12,7 +12,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 
 #include <imgui.h>
 

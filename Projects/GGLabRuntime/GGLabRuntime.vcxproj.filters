@@ -94,9 +94,6 @@
     <Filter Include="Graphics\RHI\Vulkan">
       <UniqueIdentifier>{D119D225-7316-D5D3-D9F5-9D21C3BA52D1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\ScreenSpace">
-      <UniqueIdentifier>{26F91D67-80C0-05F1-A554-950760EA2222}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\Shader">
       <UniqueIdentifier>{8712B320-7C8E-3517-56CD-9D92B05AC57E}</UniqueIdentifier>
     </Filter>
@@ -126,6 +123,9 @@
     </Filter>
     <Filter Include="Private\Graphics\Asset">
       <UniqueIdentifier>{D2FD5874-BBF7-ABEA-BC99-794ACD7E28CE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\PostProcess">
+      <UniqueIdentifier>{28AC8BB7-A089-20BA-62CC-16E74084D632}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private\Graphics\RHI">
       <UniqueIdentifier>{ED1647C5-3056-E812-9A61-FC4A35E8B42C}</UniqueIdentifier>
@@ -157,8 +157,17 @@
     <Filter Include="Public\GGLabRuntime\Graphics\Asset">
       <UniqueIdentifier>{103715BA-0661-08B0-A6E1-E899E72799ED}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\Pipeline">
+      <UniqueIdentifier>{E0A27152-DEA8-ECDD-899B-68E936ED9807}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\PostProcess">
+      <UniqueIdentifier>{8D7D4D96-B962-0924-3836-6419E33AD06B}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\RHI">
       <UniqueIdentifier>{67D2F0C8-FA46-D5CE-C9B6-959AC4B67320}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\ScreenSpace">
+      <UniqueIdentifier>{E2DEC5CD-2609-AE99-42EF-E1814A166053}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\Shader">
       <UniqueIdentifier>{15184CAA-8C09-DB04-FC33-6DEB7BE35BC1}</UniqueIdentifier>
@@ -405,9 +414,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalHistoryManager.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.cpp">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -511,9 +517,6 @@
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderView.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp">
@@ -796,6 +799,12 @@
       <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp">
+      <Filter>Private\Graphics\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
@@ -1136,9 +1145,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalAACapability.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
@@ -1164,9 +1170,6 @@
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessResolution.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h">
@@ -1350,9 +1353,6 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderView.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h">
@@ -1589,9 +1589,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h">
-      <Filter>Graphics\ScreenSpace</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h">
       <Filter>Graphics\Shader</Filter>
     </ClInclude>
@@ -1700,6 +1697,15 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
@@ -1765,6 +1771,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\ScreenSpace</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Shader</Filter>

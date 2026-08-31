@@ -9,7 +9,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
@@ -31,11 +31,11 @@
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/TransferBatch.h"
 
 #include <array>

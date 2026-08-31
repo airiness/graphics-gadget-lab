@@ -3,9 +3,9 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>

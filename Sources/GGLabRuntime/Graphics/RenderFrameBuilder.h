@@ -2,10 +2,10 @@
 #include "Graphics/RenderContexts.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/RenderWorldExtractor.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab
 {

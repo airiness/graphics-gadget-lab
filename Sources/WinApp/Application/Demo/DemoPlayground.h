@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
 #include <filesystem>

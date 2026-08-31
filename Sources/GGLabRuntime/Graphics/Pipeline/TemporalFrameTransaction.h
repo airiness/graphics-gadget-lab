@@ -4,9 +4,9 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
 #include <tuple>

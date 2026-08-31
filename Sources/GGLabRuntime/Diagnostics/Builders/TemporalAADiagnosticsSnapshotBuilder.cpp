@@ -6,7 +6,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 
 namespace gglab
 {

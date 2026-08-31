@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 

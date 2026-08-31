@@ -4,7 +4,7 @@
 #include "Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <array>
 #include <string>

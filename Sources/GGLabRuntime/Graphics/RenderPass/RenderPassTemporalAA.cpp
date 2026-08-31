@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

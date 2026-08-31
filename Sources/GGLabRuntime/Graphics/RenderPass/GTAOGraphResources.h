@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics/Pipeline/GTAO.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>

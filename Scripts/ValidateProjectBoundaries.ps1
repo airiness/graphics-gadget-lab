@@ -915,6 +915,24 @@ foreach ($legacyPath in $legacyRuntimeCameraPaths) {
     }
 }
 
+$legacyRuntimeViewContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/ScreenSpace/ScreenSpaceTypes.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalAA.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/PostProcess/ViewRenderSettings.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/PostProcess/ViewRenderSettings.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderView.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderView.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeViewContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated view and temporal contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)
@@ -935,6 +953,10 @@ $legacyRuntimeGraphicsContractIncludeRegex =
     'Asset[\\/]ArtifactContentDigest\.h)[>"]'
 $legacyRuntimeCameraIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Camera(?:Controller|Rig)?\.h[>"]'
+$legacyRuntimeViewContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:RenderView\.h|' +
+    'Pipeline[\\/]TemporalAA\.h|PostProcess[\\/]ViewRenderSettings\.h|' +
+    'ScreenSpace[\\/]ScreenSpaceTypes\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
@@ -943,6 +965,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
     $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
     if ($content -match $legacyRuntimeGraphicsContractIncludeRegex -or
         $content -match $legacyRuntimeCameraIncludeRegex -or
+        $content -match $legacyRuntimeViewContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

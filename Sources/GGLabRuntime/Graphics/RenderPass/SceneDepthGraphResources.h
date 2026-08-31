@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 namespace gglab
 {

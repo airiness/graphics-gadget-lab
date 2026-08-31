@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 namespace gglab

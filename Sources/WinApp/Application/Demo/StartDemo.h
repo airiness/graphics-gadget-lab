@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab

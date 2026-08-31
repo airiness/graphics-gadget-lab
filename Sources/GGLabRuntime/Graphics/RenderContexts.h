@@ -3,9 +3,9 @@
 #include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
-#include "Graphics/RenderView.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>

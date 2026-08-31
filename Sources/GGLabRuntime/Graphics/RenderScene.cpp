@@ -8,7 +8,7 @@
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/TransferManager.h"
 #include "GGLabRuntime/Scene/Components.h"

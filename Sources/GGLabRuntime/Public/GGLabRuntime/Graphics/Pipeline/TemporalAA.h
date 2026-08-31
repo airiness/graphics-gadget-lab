@@ -2,7 +2,7 @@
 
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <algorithm>
 #include <array>

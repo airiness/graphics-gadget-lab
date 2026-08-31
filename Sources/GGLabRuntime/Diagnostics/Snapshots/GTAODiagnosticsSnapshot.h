@@ -2,7 +2,7 @@
 
 #include "Diagnostics/SnapshotCommon.h"
 #include "Graphics/Pipeline/GTAO.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 namespace gglab

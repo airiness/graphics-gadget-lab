@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <algorithm>

@@ -7,7 +7,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab
 {

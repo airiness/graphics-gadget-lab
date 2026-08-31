@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
 #include <limits>
