@@ -1,4 +1,4 @@
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 
 #include <algorithm>
 #include <cmath>

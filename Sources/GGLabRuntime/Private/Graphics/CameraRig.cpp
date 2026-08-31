@@ -1,4 +1,4 @@
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
 

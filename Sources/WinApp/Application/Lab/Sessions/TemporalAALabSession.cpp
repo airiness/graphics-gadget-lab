@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Profiling/GpuProfiler.h"

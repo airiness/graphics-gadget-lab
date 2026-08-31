@@ -11,7 +11,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/RenderFrameBuilder.h"

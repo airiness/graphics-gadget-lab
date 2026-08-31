@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"

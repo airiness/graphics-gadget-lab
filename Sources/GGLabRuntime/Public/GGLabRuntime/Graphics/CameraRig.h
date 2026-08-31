@@ -1,8 +1,8 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/Color.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstddef>

@@ -5,7 +5,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 
 #include <algorithm>
 #include <string>

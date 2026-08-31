@@ -1,5 +1,5 @@
 #include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Pipeline/GTAO.h"
 
 #include <algorithm>

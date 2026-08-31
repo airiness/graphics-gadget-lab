@@ -1,6 +1,6 @@
-#include "Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 
 #include <algorithm>
 #include <cmath>

@@ -3,8 +3,8 @@
 #include "GGLabRuntime/Core/Math/Culling.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"
 
 #include <array>

@@ -1,7 +1,7 @@
 #pragma once
 #include "Demo/DemoBase.h"
 #include "GGLabRuntime/Core/World.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab

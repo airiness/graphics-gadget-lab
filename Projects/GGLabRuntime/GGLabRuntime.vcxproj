@@ -104,9 +104,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Camera.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Camera.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraController.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp" />
@@ -299,9 +299,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Camera.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraController.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraRig.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBuffer.h" />

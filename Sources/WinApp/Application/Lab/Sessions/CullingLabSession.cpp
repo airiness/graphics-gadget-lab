@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/Renderer.h"

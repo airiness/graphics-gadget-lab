@@ -1,7 +1,7 @@
 #include "Graphics/RenderView.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 
 #include <algorithm>
 #include <array>

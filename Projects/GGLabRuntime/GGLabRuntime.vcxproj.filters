@@ -360,15 +360,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.cpp">
       <Filter>Graphics\Buffer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Camera.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawShapes.cpp">
       <Filter>Graphics\DebugDraw</Filter>
     </ClCompile>
@@ -798,6 +789,15 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Camera.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraController.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
@@ -1087,15 +1087,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Camera.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
       <Filter>Graphics\DebugDraw</Filter>
@@ -1696,6 +1687,15 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraController.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraRig.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
