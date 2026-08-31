@@ -110,6 +110,23 @@ namespace gglab
 	struct AppRuntimeTickInfo
 	{
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
+
+		struct PreContentUpdateHook final
+		{
+			void* m_Context = nullptr;
+			bool (*m_Invoke)(void*) noexcept = nullptr;
+
+			[[nodiscard]] bool Run() const noexcept
+			{
+				return !m_Invoke || m_Invoke(m_Context);
+			}
+		};
+
+		// Runs before active content update and, once startup shaders are ready,
+		// after the requested Demo and its pending Lab have been created but before
+		// pending preparation/commit. Hosts use this seam to apply validated external
+		// state to the first content frame.
+		PreContentUpdateHook m_PreContentUpdate{};
 	};
 
 	struct AppRuntimeShutdownInfo

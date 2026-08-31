@@ -115,6 +115,11 @@ namespace gglab
 			ShaderPreviewActivePublicationPublicationStatus::IOFailure;
 		ShaderPreviewActivePublication m_ActivePublication{};
 		std::filesystem::path m_Path{};
+		// Meaningful for Published: false records that the best-effort
+		// post-commit read did not observe the committed value. MoveFileExW is
+		// still the authoritative commit point and its success is never reported
+		// as an I/O failure.
+		bool m_PostCommitObservationSucceeded = false;
 
 		[[nodiscard]] constexpr bool IsSuccess() const noexcept
 		{

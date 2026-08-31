@@ -331,25 +331,49 @@ namespace gglab
 			m_ShaderHotReload->Update();
 		}
 #endif
+		struct ShaderPreviewPreContentUpdateContext final
+		{
+			Application* m_Application = nullptr;
+			bool m_StartupFailed = false;
+		};
+		ShaderPreviewPreContentUpdateContext shaderPreviewContext{
+			.m_Application = this,
+		};
+		AppRuntimeTickInfo::PreContentUpdateHook preContentUpdate{};
+		if (m_ShaderPreviewSession)
+		{
+			preContentUpdate = {
+				.m_Context = &shaderPreviewContext,
+				.m_Invoke = [](void* opaqueContext) noexcept
+				{
+					auto* context = static_cast<ShaderPreviewPreContentUpdateContext*>(
+						opaqueContext);
+					Application& application = *context->m_Application;
+					if (application.m_ShaderPreviewSession->Update() ==
+						ShaderPreviewRuntimeSessionUpdateStatus::StartupFailed)
+					{
+						context->m_StartupFailed = true;
+						return false;
+					}
+					application.SynchronizeShaderPreviewLab();
+					return true;
+				},
+			};
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
+			.m_PreContentUpdate = preContentUpdate,
 			});
-		if (tickResult == AppRuntimeTickResult::Suspended)
-		{
-			m_PlatformHost->WaitForEvents();
-			return true;
-		}
-		if (tickResult == AppRuntimeTickResult::Continue && m_ShaderPreviewSession &&
-			m_ShaderPreviewSession->Update() ==
-				ShaderPreviewRuntimeSessionUpdateStatus::StartupFailed)
+		if (shaderPreviewContext.m_StartupFailed)
 		{
 			GGLAB_LOG_ERROR("Attached Shader Preview startup failed: {}",
 				m_ShaderPreviewSession->GetLastError());
 			return FailInitialization();
 		}
-		if (tickResult == AppRuntimeTickResult::Continue)
+		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
-			SynchronizeShaderPreviewLab();
+			m_PlatformHost->WaitForEvents();
+			return true;
 		}
 		return tickResult == AppRuntimeTickResult::Continue;
 	}

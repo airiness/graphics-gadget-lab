@@ -554,15 +554,15 @@ namespace gglab
 			{
 				return result;
 			}
-			const ShaderPreviewActivePublicationReadResult observed =
-				reader.ReadActivePublication();
-			if (!observed.IsSuccess() ||
-				observed.m_ActivePublication != activePublication)
-			{
-				return result;
-			}
+			// The write-through atomic replacement is the externally visible commit
+			// point. A transient post-commit read failure must not report that a
+			// committed active pointer was rejected by the publisher.
 			result.m_Status =
 				ShaderPreviewActivePublicationPublicationStatus::Published;
+			const ShaderPreviewActivePublicationReadResult observed =
+				reader.ReadActivePublication();
+			result.m_PostCommitObservationSucceeded = observed.IsSuccess() &&
+				observed.m_ActivePublication == activePublication;
 		}
 		catch (...)
 		{

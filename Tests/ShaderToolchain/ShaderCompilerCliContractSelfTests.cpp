@@ -1,6 +1,7 @@
 #include "ShaderCompilerCliContractSelfTests.h"
 #include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"
 #include "Artifact/ShaderArtifactManifestIO.h"
+#include "Artifact/ShaderRuntimeArtifactPublication.h"
 #include "Compiler/ShaderCompiler.h"
 #include "Contracts/ShaderArtifact.h"
 #include "GGLabFoundation/Hash/Sha256.h"
@@ -1960,6 +1961,32 @@ namespace gglab
 						previewRegistry.m_Artifact) ==
 							ShaderPreviewPublicationLinkValidationStatus::Valid,
 				"build-preview products re-read through compiler-free readers and preserve exact Publication cross-links");
+
+			constexpr std::string_view CommitPointSessionId =
+				"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+			const ShaderPreviewActivePublication committedPointer{
+				.m_AttemptSequence = 1,
+				.m_PublicationRef = publication.IsSuccess()
+					? ShaderPreviewPublicationRef{
+						.m_PublicationId = publication.m_Artifact.m_PublicationId,
+					}
+					: ShaderPreviewPublicationRef{},
+			};
+			const ShaderPreviewActivePublicationPublicationResult commitPointPublication =
+				PublishShaderPreviewActivePublication(
+					artifactRoot, std::string(CommitPointSessionId), committedPointer);
+			ShaderLoosePreviewSessionReader commitPointReader{
+				ShaderLoosePreviewSessionLocator(
+					artifactRoot, std::string(CommitPointSessionId))
+			};
+			const ShaderPreviewActivePublicationReadResult committedPointerRead =
+				commitPointReader.ReadActivePublication();
+			context.Check(commitPointPublication.m_Status ==
+					ShaderPreviewActivePublicationPublicationStatus::Published &&
+				commitPointPublication.m_PostCommitObservationSucceeded &&
+				committedPointerRead.IsSuccess() &&
+				committedPointerRead.m_ActivePublication == committedPointer,
+				"Preview active-pointer publication reports the atomic commit independently from its post-commit observation");
 
 			std::vector<std::wstring> identityMismatchArguments = textureArguments;
 			const auto identityArgument = std::ranges::find(

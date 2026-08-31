@@ -282,6 +282,8 @@ namespace gglab
 		{
 			return ShaderPreviewRuntimeObservationPublicationStatus::InvalidInput;
 		}
+		ShaderPreviewRuntimeObservationPublicationStatus result =
+			ShaderPreviewRuntimeObservationPublicationStatus::IOFailure;
 		try
 		{
 			const ShaderLoosePreviewSessionLocator locator(
@@ -324,17 +326,21 @@ namespace gglab
 			RemoveFileBestEffort(tempPath);
 			if (replaced == FALSE)
 			{
-				return ShaderPreviewRuntimeObservationPublicationStatus::IOFailure;
+				return result;
 			}
+			// MoveFileExW is the commit point. Keep the required post-commit read as
+			// best-effort verification, but never turn an externally visible commit
+			// into a false I/O failure.
+			result = ShaderPreviewRuntimeObservationPublicationStatus::Published;
 			const ShaderPreviewObservationReadResult observed = reader.ReadObservation();
-			return observed.IsSuccess() && observed.m_Observation == observation
-				? ShaderPreviewRuntimeObservationPublicationStatus::Published
-				: ShaderPreviewRuntimeObservationPublicationStatus::IOFailure;
+			const bool postCommitObservationSucceeded =
+				observed.IsSuccess() && observed.m_Observation == observation;
+			GGLAB_UNUSED(postCommitObservationSucceeded);
 		}
 		catch (...)
 		{
-			return ShaderPreviewRuntimeObservationPublicationStatus::IOFailure;
 		}
+		return result;
 	}
 
 	ShaderPreviewRuntimeSession::ShaderPreviewRuntimeSession(CreateInfo createInfo) noexcept :

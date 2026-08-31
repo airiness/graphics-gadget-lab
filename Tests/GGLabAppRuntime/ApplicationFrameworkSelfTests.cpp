@@ -1,8 +1,12 @@
 #include "ApplicationFrameworkSelfTests.h"
 
 #include "ApplicationContentRegistration.h"
+#include "Demo/DemoManager.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "Graphics/Renderer.h"
+
+#include <exception>
 
 namespace gglab
 {
@@ -41,10 +45,80 @@ namespace gglab
 				.m_ProvidesLabRuntime = providesLabRuntime,
 			};
 		}
+
+		struct TransitionTestState final
+		{
+			bool m_Constructed = false;
+			bool m_PrepareBegan = false;
+			bool m_HostStateApplied = false;
+			bool m_PrepareTicked = false;
+			bool m_PrepareTickObservedHostState = false;
+			bool m_PrepareCommitted = false;
+		};
+
+		class TransitionTestDemo final : public DemoBase
+		{
+		public:
+			explicit TransitionTestDemo(TransitionTestState* state) noexcept :
+				m_State(state)
+			{
+			}
+
+			std::string_view GetName() const noexcept override { return "Transition Test"; }
+			void BeginPrepare() noexcept override { m_State->m_PrepareBegan = true; }
+			void TickPrepare() noexcept override
+			{
+				m_State->m_PrepareTicked = true;
+				m_State->m_PrepareTickObservedHostState = m_State->m_HostStateApplied;
+			}
+			void CommitPrepare() noexcept override { m_State->m_PrepareCommitted = true; }
+			void Update() noexcept override {}
+
+			World& GetWorld() noexcept override { std::terminate(); }
+			Camera& GetCamera() noexcept override { std::terminate(); }
+			CameraController& GetCameraController() noexcept override { std::terminate(); }
+			CameraRig& GetCameraRig() noexcept override { std::terminate(); }
+			const ViewRenderProfile& GetViewRenderProfile() const noexcept override
+			{
+				std::terminate();
+			}
+			RenderPipelineBase& GetRenderPipeline() noexcept override { std::terminate(); }
+
+		private:
+			TransitionTestState* m_State = nullptr;
+		};
+
+		void RunDemoTransitionSynchronizationSelfTests(SelfTestContext& context) noexcept
+		{
+			Renderer renderer;
+			DemoManager manager(&renderer);
+			TransitionTestState state{};
+			const uint32_t demoIndex = manager.RegisterDemo("test.demo.transition",
+				[&state]() -> std::unique_ptr<DemoBase>
+				{
+					state.m_Constructed = true;
+					return std::make_unique<TransitionTestDemo>(&state);
+				});
+			manager.RequestActiveDemo(demoIndex);
+			manager.BeginTransitionTick();
+			context.Check(state.m_Constructed && state.m_PrepareBegan &&
+				!state.m_PrepareTicked && !state.m_PrepareCommitted &&
+				manager.GetDemo(demoIndex) != nullptr,
+				"Demo transition exposes newly created pending content before its first preparation tick");
+
+			state.m_HostStateApplied = true;
+			const bool transitionSucceeded = manager.CompleteTransitionTick();
+			context.Check(transitionSucceeded && state.m_PrepareTickObservedHostState &&
+				state.m_PrepareCommitted && manager.GetActiveIndex() == demoIndex,
+				"Host state applied at the transition seam reaches the first preparation and commit");
+			manager.PrepareForAssetShutdown();
+		}
 	}
 
 	void RunApplicationFrameworkSelfTests(SelfTestContext& context) noexcept
 	{
+		RunDemoTransitionSynchronizationSelfTests(context);
+
 		ApplicationContentRegistration empty;
 		context.Check(!empty.IsValid(),
 			"A host cannot start with an empty content registration set");

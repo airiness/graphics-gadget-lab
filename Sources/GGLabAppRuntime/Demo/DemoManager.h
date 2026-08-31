@@ -23,6 +23,12 @@ namespace gglab
 		uint32_t RegisterDemo(std::string name, DemoFactory factory) noexcept;
 		void SetBootstrapDemo(std::unique_ptr<DemoBase> demo) noexcept;
 		void RequestActiveDemo(uint32_t index) noexcept;
+		// Begin creates the requested pending Demo and calls BeginPrepare. Complete
+		// advances preparation and may commit it. The split provides a narrow host
+		// synchronization point for state that must reach newly created content
+		// before its first preparation tick and rendered frame.
+		void BeginTransitionTick() noexcept;
+		bool CompleteTransitionTick() noexcept;
 		bool TickTransitions() noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 		[[nodiscard]] std::optional<LoadingProgress> GetLoadingProgress() const noexcept;
