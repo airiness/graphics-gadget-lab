@@ -135,10 +135,14 @@ namespace gglab
 		m_RequestedDemoIndex = index;
 	}
 
-	bool DemoManager::TickTransitions() noexcept
+	void DemoManager::BeginTransitionTick() noexcept
 	{
 		PollRetiringDemos();
 		BeginRequestedTransition();
+	}
+
+	bool DemoManager::CompleteTransitionTick() noexcept
+	{
 		if (!m_PendingDemo)
 		{
 			return m_ActiveDemo != nullptr;
@@ -160,6 +164,12 @@ namespace gglab
 			return CommitPendingDemo();
 		}
 		return m_ActiveDemo != nullptr;
+	}
+
+	bool DemoManager::TickTransitions() noexcept
+	{
+		BeginTransitionTick();
+		return CompleteTransitionTick();
 	}
 
 	void DemoManager::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept

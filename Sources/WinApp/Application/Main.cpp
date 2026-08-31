@@ -158,6 +158,9 @@ int main(int argc, char* argv[])
 	createInfo.m_RuntimeConfig = gglab::TranslateApplicationLaunchOptions(
 		launchResult.m_Options, InitialExtent, RequestRuntimeValidation);
 	createInfo.m_RuntimePaths = runtimePaths;
+	createInfo.m_ShaderPreviewSessionId = launchResult.m_Options.m_ShaderPreviewSessionId;
+	createInfo.m_ShaderPreviewLabSessionSynchronizer =
+		&gglab::SynchronizeDesktopShaderPreviewLab;
 	createInfo.m_ContentRegistration = gglab::CreateDesktopApplicationContent();
 	createInfo.m_HostServices.m_TaskWorkerLifecycle =
 		std::make_shared<gglab::win32::Win32TaskWorkerLifecycle>();

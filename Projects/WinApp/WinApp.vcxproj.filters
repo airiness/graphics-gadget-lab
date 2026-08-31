@@ -306,6 +306,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -313,6 +316,9 @@
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp">
+      <Filter>Application\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp">
@@ -617,6 +623,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.h">
+      <Filter>Application\SelfTest</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
@@ -624,6 +633,9 @@
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h">
+      <Filter>Application\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">

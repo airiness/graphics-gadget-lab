@@ -69,10 +69,22 @@ namespace gglab
 		const ShaderPreloadStatus shaderPreload = m_ShaderManager->GetPreloadStatus();
 		// The bootstrap demo remains active until every shader required by the
 		// regular render pipelines has been published on the main thread.
-		if (shaderPreload.IsReady() && !m_DemoManager->TickTransitions())
+		if (shaderPreload.IsReady())
 		{
-			GGLAB_LOG_ERROR("No active demo is available for rendering.");
+			m_DemoManager->BeginTransitionTick();
+		}
+		if (!tickInfo.m_PreContentUpdate.Run())
+		{
+			GGLAB_LOG_ERROR("Host pre-content update failed.");
 			return AppRuntimeTickResult::Exit;
+		}
+		if (shaderPreload.IsReady())
+		{
+			if (!m_DemoManager->CompleteTransitionTick())
+			{
+				GGLAB_LOG_ERROR("No active demo is available for rendering.");
+				return AppRuntimeTickResult::Exit;
+			}
 		}
 
 		ApplicationToolingIntegrationBase* applicationTooling =

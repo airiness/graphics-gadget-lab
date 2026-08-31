@@ -70,6 +70,8 @@
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderLooseArtifactIO.cpp" />
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistry.cpp" />
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderProgramRegistryArtifact.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderPreviewLooseIO.cpp" />
+    <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderPreviewPublication.cpp" />
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderRuntimeArtifact.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -82,6 +84,8 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h" />
 	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderCompilerProcessContract.h" />
 	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderGraphPreviewProgram.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderPreviewLooseIO.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderPreviewPublication.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h" />
 	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h" />
 	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\GGLabShaderPrograms.h" />

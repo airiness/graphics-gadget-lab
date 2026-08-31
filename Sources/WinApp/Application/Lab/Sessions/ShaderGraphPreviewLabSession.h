@@ -1,9 +1,11 @@
 #pragma once
 #include "AssetPreparationTracker.h"
+#include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #include "Graphics/GraphicsTypes.h"
 #include "Lab/LabSessionBase.h"
 
 #include <memory>
+#include <optional>
 
 namespace gglab
 {
@@ -25,6 +27,9 @@ namespace gglab
 		void CancelPrepare() noexcept override;
 		void Update(float deltaTime) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
+		void ApplyAttachedRuntimeSession(
+			const ShaderPreviewPublicationArtifact& loadedPublication,
+			ShaderPreviewRuntimeSessionSnapshot snapshot) noexcept;
 
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
@@ -46,5 +51,7 @@ namespace gglab
 		AssetPreparationTracker m_AssetPreparation;
 		LoadingProgress m_LoadingProgress{};
 		bool m_PrimitivesConstructed = false;
+		std::optional<ShaderPreviewPublicationArtifact> m_AttachedPublication{};
+		std::optional<ShaderPreviewRuntimeSessionSnapshot> m_AttachedSession{};
 	};
 }

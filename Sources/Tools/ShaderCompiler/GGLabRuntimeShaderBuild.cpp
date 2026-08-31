@@ -176,7 +176,7 @@ namespace gglab
 				: MakeDX12CompileTarget(stage);
 		}
 
-		[[nodiscard]] std::wstring MakeWriterMutexName(
+		[[nodiscard]] std::wstring MakeWriterMutexNameImpl(
 			const std::filesystem::path& artifactRoot) noexcept
 		{
 			std::wstring identity = artifactRoot.lexically_normal().generic_wstring();
@@ -191,6 +191,12 @@ namespace gglab
 			return L"Local\\GGLab.ShaderRegistryWriter." +
 				utils::ToWideString(Sha256DigestToHex(builder.Finish()));
 		}
+	}
+
+	std::wstring MakeGGLabShaderArtifactWriterMutexName(
+		const std::filesystem::path& artifactRoot) noexcept
+	{
+		return MakeWriterMutexNameImpl(artifactRoot);
 	}
 
 	GGLabRuntimeShaderBuildResult BuildGGLabRuntimeShaders(
@@ -211,7 +217,8 @@ namespace gglab
 
 		try
 		{
-			const std::wstring mutexName = MakeWriterMutexName(artifactRoot);
+			const std::wstring mutexName =
+				MakeGGLabShaderArtifactWriterMutexName(artifactRoot);
 			win32::NamedMutex writerMutex(mutexName);
 			win32::NamedMutexGuard writerLease = writerMutex.Acquire(120'000);
 			if (!writerLease.IsAcquired())

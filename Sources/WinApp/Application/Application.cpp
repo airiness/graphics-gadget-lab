@@ -5,6 +5,7 @@
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "Application/Tooling/ApplicationToolingComposition.h"
+#include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/Shader/DevelopmentShaderBuildBridge.h"
 #else
@@ -15,6 +16,7 @@
 #include "ApplicationInput.h"
 #include "Core/Input/InputManager.h"
 #include "Graphics/Renderer.h"
+#include "Lab/LabRuntime.h"
 
 #include <optional>
 #include <utility>
@@ -28,6 +30,9 @@ namespace gglab
 		m_PlatformHost(std::move(createInfo.m_PlatformHost)),
 		m_RuntimeConfig(std::move(createInfo.m_RuntimeConfig)),
 		m_RuntimePaths(std::move(createInfo.m_RuntimePaths)),
+		m_ShaderPreviewSessionId(std::move(createInfo.m_ShaderPreviewSessionId)),
+		m_ShaderPreviewLabSessionSynchronizer(
+			createInfo.m_ShaderPreviewLabSessionSynchronizer),
 		m_HostServices(std::move(createInfo.m_HostServices)),
 		m_ContentRegistration(std::move(createInfo.m_ContentRegistration))
 	{
@@ -144,6 +149,33 @@ namespace gglab
 		m_RHIContextFactory =
 			Win32RHIContextFactory::Create(activeBackend, mainWindow.GetNativeHandle());
 		ShaderProgramRegistryArtifactRef activeShaderRegistry{};
+		std::optional<ShaderPreviewRuntimeCandidate> shaderPreviewStartup;
+#if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+		const DevelopmentShaderBuildRequest shaderBuildRequest{
+			.m_ActiveBackend = activeBackend,
+			.m_ShaderCompilerPath = m_RuntimePaths.m_RuntimeRoot / "gglab-shaderc.exe",
+			.m_ShaderSourceRoot = m_RuntimePaths.m_RuntimeRoot / "Shaders",
+			.m_ShaderCacheRoot = m_RuntimePaths.m_RuntimeRoot / "ShaderCache",
+			.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
+		};
+#endif
+		if (m_ShaderPreviewSessionId)
+		{
+			shaderPreviewStartup = ReadShaderPreviewRuntimeCandidate(
+				m_RuntimePaths.m_ShaderArtifactRoot, *m_ShaderPreviewSessionId, activeBackend);
+			if (!shaderPreviewStartup->IsSuccess())
+			{
+				GGLAB_LOG_ERROR(
+					"Attached Shader Preview startup requires one readable compatible initial publication (status={}).",
+					static_cast<uint32_t>(shaderPreviewStartup->m_Status));
+				return FailInitialization();
+			}
+			activeShaderRegistry = shaderPreviewStartup->m_Publication.m_PreviewRegistryRef;
+			GGLAB_LOG_INFO(
+				"Attached Shader Preview startup selected the session publication registry before Runtime service composition.");
+		}
+		else
+		{
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		const ShaderTargetProfile activeTargetProfile = activeBackend == RHIBackendType::Vulkan
 			? ShaderTargetProfile::GGLabVulkan13
@@ -166,13 +198,6 @@ namespace gglab
 				? "gglab-vulkan13"
 				: "gglab-dx12");
 #else
-		const DevelopmentShaderBuildRequest shaderBuildRequest{
-			.m_ActiveBackend = activeBackend,
-			.m_ShaderCompilerPath = m_RuntimePaths.m_RuntimeRoot / "gglab-shaderc.exe",
-			.m_ShaderSourceRoot = m_RuntimePaths.m_RuntimeRoot / "Shaders",
-			.m_ShaderCacheRoot = m_RuntimePaths.m_RuntimeRoot / "ShaderCache",
-			.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
-		};
 		const DevelopmentShaderBuildResult shaderArtifacts =
 			RunDevelopmentShaderBuild(shaderBuildRequest);
 		if (!shaderArtifacts.IsSuccess())
@@ -183,6 +208,7 @@ namespace gglab
 		}
 		activeShaderRegistry = shaderArtifacts.m_RegistryRef;
 #endif
+		}
 		const AppRuntimeServiceInitializeResult serviceInitializeResult =
 			m_AppRuntime->InitializeServices({
 				.m_RHIContextFactory = m_RHIContextFactory.get(),
@@ -210,20 +236,50 @@ namespace gglab
 			m_LabRuntimeLocator =
 				std::make_unique<DemoLabRuntimeLocator>(demoManager, *labHostIndex);
 		}
+		if (shaderPreviewStartup)
+		{
+			if (!m_ShaderPreviewLabSessionSynchronizer)
+			{
+				GGLAB_LOG_ERROR(
+					"Attached Shader Preview startup requires a registered Lab synchronization adapter.");
+				return FailInitialization();
+			}
+			m_ShaderPreviewSession = std::make_unique<ShaderPreviewRuntimeSession>(
+				ShaderPreviewRuntimeSession::CreateInfo{
+					.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
+					.m_SessionId = *m_ShaderPreviewSessionId,
+					.m_ActiveBackend = activeBackend,
+					.m_InitialCandidate = *shaderPreviewStartup,
+					.m_ShaderManager = shaderManager,
+				});
+			if (!m_ShaderPreviewSession->IsValid())
+			{
+				GGLAB_LOG_ERROR("Failed to initialize the attached Shader Preview session watcher.");
+				return FailInitialization();
+			}
+		}
 		if (m_RuntimeConfig.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
-			m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
+			if (!m_ShaderPreviewSession)
+			{
+				m_ShaderHotReload = std::make_unique<DevelopmentShaderHotReloadSystem>(
 				DevelopmentShaderHotReloadSystem::CreateInfo{
 					.m_BuildRequest = shaderBuildRequest,
 					.m_TaskSystem = taskSystem,
 					.m_ShaderManager = shaderManager,
 					.m_Renderer = renderer,
 				});
-			if (!m_ShaderHotReload->Initialize())
+				if (!m_ShaderHotReload->Initialize())
+				{
+					GGLAB_LOG_WARN("Application will continue without shader hot reload.");
+					m_ShaderHotReload.reset();
+				}
+			}
+			else
 			{
-				GGLAB_LOG_WARN("Application will continue without shader hot reload.");
-				m_ShaderHotReload.reset();
+				GGLAB_LOG_INFO(
+					"Ordinary main-HLSL hot reload is disabled for the attached Shader Preview session.");
 			}
 #else
 			GGLAB_LOG_INFO(
@@ -275,15 +331,70 @@ namespace gglab
 			m_ShaderHotReload->Update();
 		}
 #endif
+		struct ShaderPreviewPreContentUpdateContext final
+		{
+			Application* m_Application = nullptr;
+			bool m_StartupFailed = false;
+		};
+		ShaderPreviewPreContentUpdateContext shaderPreviewContext{
+			.m_Application = this,
+		};
+		AppRuntimeTickInfo::PreContentUpdateHook preContentUpdate{};
+		if (m_ShaderPreviewSession)
+		{
+			preContentUpdate = {
+				.m_Context = &shaderPreviewContext,
+				.m_Invoke = [](void* opaqueContext) noexcept
+				{
+					auto* context = static_cast<ShaderPreviewPreContentUpdateContext*>(
+						opaqueContext);
+					Application& application = *context->m_Application;
+					if (application.m_ShaderPreviewSession->Update() ==
+						ShaderPreviewRuntimeSessionUpdateStatus::StartupFailed)
+					{
+						context->m_StartupFailed = true;
+						return false;
+					}
+					application.SynchronizeShaderPreviewLab();
+					return true;
+				},
+			};
+		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
+			.m_PreContentUpdate = preContentUpdate,
 			});
+		if (shaderPreviewContext.m_StartupFailed)
+		{
+			GGLAB_LOG_ERROR("Attached Shader Preview startup failed: {}",
+				m_ShaderPreviewSession->GetLastError());
+			return FailInitialization();
+		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
 			m_PlatformHost->WaitForEvents();
 			return true;
 		}
 		return tickResult == AppRuntimeTickResult::Continue;
+	}
+
+	void Application::SynchronizeShaderPreviewLab() noexcept
+	{
+		if (!m_ShaderPreviewSession || !m_ShaderPreviewSession->HasLoadedPublication() ||
+			!m_LabRuntimeLocator)
+		{
+			return;
+		}
+		LabRuntime* runtime = m_LabRuntimeLocator->GetLabRuntimeIfCreated();
+		if (!runtime)
+		{
+			return;
+		}
+		const ShaderPreviewRuntimeSessionSnapshot snapshot =
+			m_ShaderPreviewSession->GetSnapshot();
+		m_ShaderPreviewLabSessionSynchronizer(*runtime,
+			m_ShaderPreviewSession->GetLoadedPublication(),
+			snapshot);
 	}
 
 	bool Application::FailInitialization() noexcept
@@ -306,6 +417,7 @@ namespace gglab
 
 		const bool preserveFailure = m_LifecycleState == LifecycleState::Failed;
 		m_LifecycleState = LifecycleState::ShuttingDown;
+		m_ShaderPreviewSession.reset();
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		if (m_ShaderHotReload)
 		{

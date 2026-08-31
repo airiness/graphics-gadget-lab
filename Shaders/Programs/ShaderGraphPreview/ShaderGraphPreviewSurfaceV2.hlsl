@@ -1,6 +1,10 @@
 #include <Common/ForwardCoverageVaryings.hlsli>
 #include <Programs/ShaderGraphPreview/ShaderGraphPreviewProgram.hlsli>
+#if defined(GGLAB_SHADER_GRAPH_PREVIEW_EXTERNAL_SOURCE)
+#include <Generated/SurfaceGenerated.hlsli>
+#else
 #include <Tests/Generated/SurfaceGeneratedV2.hlsli>
+#endif
 #include <Programs/ShaderGraphPreview/ShaderGraphPreviewVisualizer.hlsli>
 
 float4 PSMain(ForwardCoverageVSOutput IN) : SV_Target

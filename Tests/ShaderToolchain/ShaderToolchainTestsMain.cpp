@@ -3,6 +3,7 @@
 #include "ShaderCompileContractSelfTests.h"
 #include "ShaderCompilerCliContractSelfTests.h"
 #include "ShaderGraphPreviewProgramContractSelfTests.h"
+#include "ShaderPreviewPublicationContractSelfTests.h"
 #include "ShaderRuntimeArtifactPublicationSelfTests.h"
 
 #include <algorithm>
@@ -22,6 +23,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shader-graph-preview-program-contracts",
 			.m_Run = &gglab::RunShaderGraphPreviewProgramContractSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "shader-preview-publication-contracts",
+			.m_Run = &gglab::RunShaderPreviewPublicationContractSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shader-artifact-publication",

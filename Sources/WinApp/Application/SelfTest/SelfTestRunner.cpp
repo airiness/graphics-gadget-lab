@@ -6,6 +6,7 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
 #include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#include "Application/SelfTest/ShaderPreviewRuntimeSessionSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
 #include "Application/SelfTest/VulkanQualificationSelfTests.h"
@@ -54,6 +55,10 @@ namespace gglab
 			SelfTestSuiteDesc{
 				.m_Id = "app-launch-options",
 				.m_Run = &RunLaunchOptionsSelfTests,
+			},
+			SelfTestSuiteDesc{
+				.m_Id = "app-shader-preview-session",
+				.m_Run = &RunShaderPreviewRuntimeSessionSelfTests,
 			},
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 			SelfTestSuiteDesc{

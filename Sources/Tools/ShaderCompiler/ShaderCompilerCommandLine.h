@@ -12,10 +12,12 @@ namespace gglab
 		None,
 		Compile,
 		BuildRuntime,
+		BuildPreview,
 		Targets,
 		Version,
 		Help,
 		Describe,
+		DescribePreview,
 	};
 
 	// Canonical machine vocabulary for commands that own JSON envelopes.
@@ -27,6 +29,23 @@ namespace gglab
 	{
 		std::filesystem::path m_SourceRoot{};
 		std::string m_Target{};
+		std::filesystem::path m_CacheRoot{};
+		std::filesystem::path m_ArtifactRoot{};
+		std::string m_ResultFormat{ "text" };
+	};
+
+	struct ShaderBuildPreviewCommandOptions
+	{
+		std::filesystem::path m_SourceRoot{};
+		std::filesystem::path m_GeneratedSource{};
+		std::string m_GeneratedSourceIdentity{};
+		std::string m_Target{};
+		std::string m_ProfileId{};
+		std::string m_ProfileVersion{};
+		std::string m_PreviewInputContractId{};
+		std::string m_PreviewProgramDescriptorIdentity{};
+		std::string m_SessionId{};
+		std::string m_AttemptSequence{};
 		std::filesystem::path m_CacheRoot{};
 		std::filesystem::path m_ArtifactRoot{};
 		std::string m_ResultFormat{ "text" };
@@ -51,6 +70,7 @@ namespace gglab
 		ShaderCompilerCommand m_Command = ShaderCompilerCommand::None;
 		ShaderCompileCommandOptions m_Compile{};
 		ShaderBuildRuntimeCommandOptions m_BuildRuntime{};
+		ShaderBuildPreviewCommandOptions m_BuildPreview{};
 		// Pre-scanned before normal parsing so every compile usage failure can
 		// honor a caller's JSON transport request, including duplicate options.
 		bool m_JsonRequested = false;

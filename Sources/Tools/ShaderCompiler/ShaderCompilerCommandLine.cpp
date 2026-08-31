@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 namespace gglab
@@ -62,8 +63,17 @@ namespace gglab
 			L"  gglab-shaderc build-runtime --source-root <path>\n"
 			L"      --target <gglab-dx12|gglab-vulkan13> --cache-root <path>\n"
 			L"      --artifact-root <path> [--result-format <text|json>]\n"
+			L"  gglab-shaderc build-preview --source-root <path>\n"
+			L"      --generated-source <path> --generated-source-identity <sha256>\n"
+			L"      --target <gglab-dx12|gglab-vulkan13> --profile-id <id>\n"
+			L"      --profile-version <u32> --preview-input-contract-id <id>\n"
+			L"      --preview-program-descriptor-identity <sha256>\n"
+			L"      --session-id <lower-hex-128> --attempt-sequence <u64>\n"
+			L"      --cache-root <path> --artifact-root <path>\n"
+			L"      [--result-format <text|json>]\n"
 			L"  gglab-shaderc targets\n"
 			L"  gglab-shaderc describe\n"
+			L"  gglab-shaderc describe-preview\n"
 			L"  gglab-shaderc --version\n"
 			L"  gglab-shaderc --help";
 	}
@@ -77,8 +87,12 @@ namespace gglab
 			return "compile";
 		case ShaderCompilerCommand::BuildRuntime:
 			return "build-runtime";
+		case ShaderCompilerCommand::BuildPreview:
+			return "build-preview";
 		case ShaderCompilerCommand::Describe:
 			return "describe";
+		case ShaderCompilerCommand::DescribePreview:
+			return "describe-preview";
 		case ShaderCompilerCommand::None:
 		case ShaderCompilerCommand::Targets:
 		case ShaderCompilerCommand::Version:
@@ -100,13 +114,20 @@ namespace gglab
 		// argv is a structured usage error. Forcing m_JsonRequested on that
 		// error makes the failure document emit through the machine channel.
 		if (argumentCount >= 2 &&
-			std::wstring_view(arguments[1]) == L"describe")
+			(std::wstring_view(arguments[1]) == L"describe" ||
+				std::wstring_view(arguments[1]) == L"describe-preview"))
 		{
-			parsed.m_Command = ShaderCompilerCommand::Describe;
+			const bool preview =
+				std::wstring_view(arguments[1]) == L"describe-preview";
+			parsed.m_Command = preview
+				? ShaderCompilerCommand::DescribePreview
+				: ShaderCompilerCommand::Describe;
 			if (argumentCount > 2)
 			{
 				parsed.m_JsonRequested = true;
-				parsed.m_Error = L"describe accepts no arguments";
+				parsed.m_Error = preview
+					? L"describe-preview accepts no arguments"
+					: L"describe accepts no arguments";
 			}
 			return parsed;
 		}
@@ -124,7 +145,9 @@ namespace gglab
 		{
 			parsed.m_Command = first == L"build-runtime"
 				? ShaderCompilerCommand::BuildRuntime
-				: ShaderCompilerCommand::Compile;
+				: first == L"build-preview"
+					? ShaderCompilerCommand::BuildPreview
+					: ShaderCompilerCommand::Compile;
 			parsed.m_Error = L"--result-format specified multiple times";
 			return parsed;
 		}
@@ -207,6 +230,103 @@ namespace gglab
 			{
 				parsed.m_Error = L"build-runtime requires --source-root, --target, "
 					L"--cache-root, and --artifact-root";
+				return parsed;
+			}
+			if (options.m_ResultFormat != "text" && options.m_ResultFormat != "json")
+			{
+				parsed.m_Error = L"Invalid --result-format value: " +
+					utils::ToWideString(options.m_ResultFormat);
+			}
+			return parsed;
+		}
+		if (first == L"build-preview")
+		{
+			parsed.m_Command = ShaderCompilerCommand::BuildPreview;
+			ShaderBuildPreviewCommandOptions& options = parsed.m_BuildPreview;
+			std::unordered_set<std::wstring> seenOptions;
+			for (int index = 2; index < argumentCount; ++index)
+			{
+				const std::wstring_view argument = arguments[index];
+				if (!seenOptions.insert(std::wstring(argument)).second)
+				{
+					parsed.m_Error = std::wstring(argument) +
+						L" specified multiple times";
+					return parsed;
+				}
+				std::wstring value;
+				if (TakeOptionValue(argumentCount, arguments, index, argument, value,
+					parsed.m_Error) == nullptr)
+				{
+					return parsed;
+				}
+				if (argument == L"--source-root")
+				{
+					options.m_SourceRoot = value;
+				}
+				else if (argument == L"--generated-source")
+				{
+					options.m_GeneratedSource = value;
+				}
+				else if (argument == L"--generated-source-identity")
+				{
+					options.m_GeneratedSourceIdentity = ToString(value);
+				}
+				else if (argument == L"--target")
+				{
+					options.m_Target = ToString(value);
+				}
+				else if (argument == L"--profile-id")
+				{
+					options.m_ProfileId = ToString(value);
+				}
+				else if (argument == L"--profile-version")
+				{
+					options.m_ProfileVersion = ToString(value);
+				}
+				else if (argument == L"--preview-input-contract-id")
+				{
+					options.m_PreviewInputContractId = ToString(value);
+				}
+				else if (argument == L"--preview-program-descriptor-identity")
+				{
+					options.m_PreviewProgramDescriptorIdentity = ToString(value);
+				}
+				else if (argument == L"--session-id")
+				{
+					options.m_SessionId = ToString(value);
+				}
+				else if (argument == L"--attempt-sequence")
+				{
+					options.m_AttemptSequence = ToString(value);
+				}
+				else if (argument == L"--cache-root")
+				{
+					options.m_CacheRoot = value;
+				}
+				else if (argument == L"--artifact-root")
+				{
+					options.m_ArtifactRoot = value;
+				}
+				else if (argument == L"--result-format")
+				{
+					options.m_ResultFormat = ToString(value);
+				}
+				else
+				{
+					parsed.m_Error = L"Unknown argument: " + std::wstring(argument);
+					return parsed;
+				}
+			}
+			if (options.m_SourceRoot.empty() || options.m_GeneratedSource.empty() ||
+				options.m_GeneratedSourceIdentity.empty() || options.m_Target.empty() ||
+				options.m_ProfileId.empty() || options.m_ProfileVersion.empty() ||
+				options.m_PreviewInputContractId.empty() ||
+				options.m_PreviewProgramDescriptorIdentity.empty() ||
+				options.m_SessionId.empty() || options.m_AttemptSequence.empty() ||
+				options.m_CacheRoot.empty() || options.m_ArtifactRoot.empty())
+			{
+				parsed.m_Error = L"build-preview requires source, contract, session, "
+					L"target, cache, and artifact options";
 				return parsed;
 			}
 			if (options.m_ResultFormat != "text" && options.m_ResultFormat != "json")

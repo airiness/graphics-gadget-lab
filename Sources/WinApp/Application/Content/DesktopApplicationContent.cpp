@@ -20,7 +20,9 @@
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "Lab/LabRuntime.h"
 
 #include <memory>
 #include <span>
@@ -109,5 +111,22 @@ namespace gglab
 				{ shader_programs::NapaVoxelVertex, shader_programs::NapaVoxelPixel } },
 		};
 		return registration;
+	}
+
+	void SynchronizeDesktopShaderPreviewLab(LabRuntime& runtime,
+		const ShaderPreviewPublicationArtifact& publication,
+		const ShaderPreviewRuntimeSessionSnapshot& snapshot) noexcept
+	{
+		auto* previewLab = dynamic_cast<ShaderGraphPreviewLabSession*>(
+			runtime.GetActiveSession());
+		if (!previewLab)
+		{
+			previewLab = dynamic_cast<ShaderGraphPreviewLabSession*>(
+				runtime.GetPendingSession());
+		}
+		if (previewLab)
+		{
+			previewLab->ApplyAttachedRuntimeSession(publication, snapshot);
+		}
 	}
 }

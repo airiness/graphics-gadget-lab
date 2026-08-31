@@ -59,7 +59,10 @@ namespace gglab
 		}
 		std::string_view GetLastError() const noexcept { return m_LastError; }
 		const LabCatalog& GetCatalog() const noexcept { return m_Catalog; }
+		LabSessionBase* GetActiveSession() noexcept { return m_ActiveSession.get(); }
 		const LabSessionBase* GetActiveSession() const noexcept { return m_ActiveSession.get(); }
+		LabSessionBase* GetPendingSession() noexcept { return m_PendingSession.get(); }
+		const LabSessionBase* GetPendingSession() const noexcept { return m_PendingSession.get(); }
 		uint32_t GetTemporalSessionSerial() const noexcept { return m_TemporalSessionSerial; }
 
 		World& GetWorld() noexcept;
