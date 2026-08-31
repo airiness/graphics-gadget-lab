@@ -2,6 +2,7 @@
 
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderPreviewLooseIO.h"
+#include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <array>
 #include <cstddef>
@@ -111,7 +112,7 @@ namespace gglab
 					.m_ProfileId = std::string(ShaderGraphPreviewSurfaceProfileId),
 					.m_ProfileVersion = 1,
 					.m_GeneratedSourceIdentity = MakeDigest(71),
-					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_TargetProfile = manifest.m_TargetProfile,
 					.m_ProgramRef =
 						shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
 					.m_ShaderArtifactRef = ShaderArtifactRef{
@@ -288,6 +289,63 @@ namespace gglab
 				"only from an absolute root and valid ref");
 		}
 
+		void RunTargetCompatibilityAuthorityTests(SelfTestContext& context) noexcept
+		{
+			const std::array baseEntries{
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
+					.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+					.m_ArtifactRef = MakeArtifactRef(41),
+				},
+			};
+			const ShaderProgramRegistryArtifact baseRegistry =
+				BuildShaderProgramRegistryArtifact(baseEntries).m_Artifact;
+			const auto validateManifest = [&baseRegistry](
+				ShaderRuntimeArtifactManifest manifest) noexcept
+			{
+				manifest.m_ArtifactId = ComputeShaderArtifactId(manifest);
+				const ShaderPreviewRegistryOverlayBuildResult overlay =
+					BuildShaderPreviewRegistryOverlay(
+						baseRegistry,
+						shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
+						ShaderTargetProfile::GGLabVulkan13,
+						ShaderArtifactRef{ .m_ArtifactId = manifest.m_ArtifactId });
+				const ShaderPreviewPublicationBuildResult publication =
+					BuildPublication(manifest, baseRegistry, overlay.m_Artifact);
+				return overlay.IsSuccess() && publication.IsSuccess()
+					? ValidateShaderPreviewPublicationLinks(
+						publication.m_Artifact, manifest, baseRegistry, overlay.m_Artifact)
+					: ShaderPreviewPublicationLinkValidationStatus::InvalidPublication;
+			};
+
+			ShaderRuntimeArtifactManifest manifest{
+				.m_TargetProfile = ShaderTargetProfile::GGLabVulkan13,
+				.m_BinaryFormat = ShaderBinaryFormat::SpirV,
+				.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::Vulkan1_3,
+				.m_BindingABIRevision = GGLabVulkanShaderRuntimeABI.m_Revision,
+				.m_CoordinateOptions =
+					GetGGLabVulkanShaderCoordinateOptions(ShaderStage::Pixel),
+				.m_Stage = ShaderStage::Pixel,
+				.m_EntryPoint = "PSMain",
+				.m_BinaryContentDigest = BinaryContentDigest{
+					.m_Digest = MakeDigest(92),
+				},
+			};
+			ShaderRuntimeArtifactManifest wrongABI = manifest;
+			++wrongABI.m_BindingABIRevision;
+			ShaderRuntimeArtifactManifest wrongCoordinates = manifest;
+			wrongCoordinates.m_CoordinateOptions = ShaderCoordinateOptions::None;
+			context.Check(
+				validateManifest(manifest) ==
+					ShaderPreviewPublicationLinkValidationStatus::Valid &&
+					validateManifest(wrongABI) ==
+						ShaderPreviewPublicationLinkValidationStatus::ArtifactContractMismatch &&
+					validateManifest(wrongCoordinates) ==
+						ShaderPreviewPublicationLinkValidationStatus::ArtifactContractMismatch,
+				"Preview Publication derives the complete target compatibility request "
+				"from main-owned policy rather than candidate manifest fields");
+		}
+
 		void RunSessionCoordinationTests(SelfTestContext& context) noexcept
 		{
 			const ShaderPreviewPublicationRef publicationRef{
@@ -437,6 +495,7 @@ namespace gglab
 	{
 		RunPublicationIdentityAndOverlayTests(context);
 		RunPublicationCodecAndLocatorTests(context);
+		RunTargetCompatibilityAuthorityTests(context);
 		RunSessionCoordinationTests(context);
 	}
 }

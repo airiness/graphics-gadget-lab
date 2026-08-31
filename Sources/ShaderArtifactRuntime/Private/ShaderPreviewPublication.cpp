@@ -2,6 +2,7 @@
 
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
+#include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <algorithm>
 #include <array>
@@ -114,6 +115,35 @@ namespace gglab
 		{
 			return left.m_ProgramRef == right.m_ProgramRef &&
 				left.m_TargetProfile == right.m_TargetProfile;
+		}
+
+		[[nodiscard]] ShaderArtifactCompatibilityRequest
+			MakePreviewCompatibilityRequest(ShaderTargetProfile targetProfile) noexcept
+		{
+			switch (targetProfile)
+			{
+			case ShaderTargetProfile::GGLabDX12:
+				return {
+					.m_TargetProfile = targetProfile,
+					.m_BinaryFormat = ShaderBinaryFormat::Dxil,
+					.m_SpirVTargetEnvironment = ShaderSpirVTargetEnvironment::None,
+					.m_BindingABIRevision = 0,
+					.m_CoordinateOptions = ShaderCoordinateOptions::None,
+					.m_Stage = ShaderStage::Pixel,
+				};
+			case ShaderTargetProfile::GGLabVulkan13:
+				return {
+					.m_TargetProfile = targetProfile,
+					.m_BinaryFormat = ShaderBinaryFormat::SpirV,
+					.m_SpirVTargetEnvironment =
+						ShaderSpirVTargetEnvironment::Vulkan1_3,
+					.m_BindingABIRevision = GGLabVulkanShaderRuntimeABI.m_Revision,
+					.m_CoordinateOptions =
+						GetGGLabVulkanShaderCoordinateOptions(ShaderStage::Pixel),
+					.m_Stage = ShaderStage::Pixel,
+				};
+			}
+			return {};
 		}
 	}
 
@@ -307,15 +337,7 @@ namespace gglab
 		if (shaderArtifactManifest.m_TargetProfile != publication.m_TargetProfile ||
 			!ValidateShaderArtifactCompatibility(
 				shaderArtifactManifest,
-				ShaderArtifactCompatibilityRequest{
-					.m_TargetProfile = publication.m_TargetProfile,
-					.m_BinaryFormat = shaderArtifactManifest.m_BinaryFormat,
-					.m_SpirVTargetEnvironment =
-						shaderArtifactManifest.m_SpirVTargetEnvironment,
-					.m_BindingABIRevision = shaderArtifactManifest.m_BindingABIRevision,
-					.m_CoordinateOptions = shaderArtifactManifest.m_CoordinateOptions,
-					.m_Stage = ShaderStage::Pixel,
-				}).IsCompatible() ||
+				MakePreviewCompatibilityRequest(publication.m_TargetProfile)).IsCompatible() ||
 			shaderArtifactManifest.m_EntryPoint != ShaderGraphPreviewProgramEntry)
 		{
 			return ShaderPreviewPublicationLinkValidationStatus::ArtifactContractMismatch;
