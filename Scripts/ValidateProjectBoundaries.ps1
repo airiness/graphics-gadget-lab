@@ -92,8 +92,9 @@ function ConvertTo-RepoRelativePath {
     return $Path.Substring($root.Length + 1).Replace('\', '/')
 }
 
-# Candidate runtime directories (portable runtime candidates; backend leaves included).
-$candidateDirs = @("Core", "Scene", "Graphics", "Diagnostics")
+# Legacy Runtime candidate directories (portable candidates; backend leaves included).
+# Migrated Core files are validated through the Public/Private ownership rules below.
+$candidateDirs = @("Scene", "Graphics", "Diagnostics")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
@@ -2285,7 +2286,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
-Write-Host "Platform: $($candidateFiles.Count) candidate files (Core/Scene/Graphics/Diagnostics)"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (Scene/Graphics/Diagnostics)"
 Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
