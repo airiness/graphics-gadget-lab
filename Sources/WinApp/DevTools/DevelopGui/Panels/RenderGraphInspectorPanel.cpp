@@ -4,7 +4,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include <algorithm>

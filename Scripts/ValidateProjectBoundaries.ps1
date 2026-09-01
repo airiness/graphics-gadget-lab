@@ -983,6 +983,29 @@ foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     }
 }
 
+$developGuiDiagnosticsConsumerFiles = @()
+$developGuiPanelsDir = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Panels"
+if (Test-Path -LiteralPath $developGuiPanelsDir -PathType Container) {
+    $developGuiDiagnosticsConsumerFiles += @(
+        Get-ChildItem -LiteralPath $developGuiPanelsDir -Recurse -File |
+            Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }
+    )
+}
+$developGuiContextPath = Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h"
+if (Test-Path -LiteralPath $developGuiContextPath -PathType Leaf) {
+    $developGuiDiagnosticsConsumerFiles += Get-Item -LiteralPath $developGuiContextPath
+}
+foreach ($sourceFile in $developGuiDiagnosticsConsumerFiles) {
+    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match '\bDiagnosticsRuntime\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "diagnostics-read-view"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "DevTools panels must use DiagnosticsView instead of the capture engine"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)

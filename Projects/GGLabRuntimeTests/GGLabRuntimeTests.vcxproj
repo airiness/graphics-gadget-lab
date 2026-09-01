@@ -85,6 +85,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\ArtifactCacheSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\AssetDataSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\DiagnosticsContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\GGLabRuntimeTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp" />
@@ -95,6 +96,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\ArtifactCacheSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetDataSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\AssetUploadSchedulerSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\DiagnosticsContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.h" />

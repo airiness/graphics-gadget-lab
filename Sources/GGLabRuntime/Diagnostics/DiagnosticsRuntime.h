@@ -3,13 +3,15 @@
 #include "Diagnostics/SnapshotContext.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <memory>
 #include <vector>
 
 namespace gglab
 {
-	class DiagnosticsRuntime
+	class DiagnosticsRuntime final : public DiagnosticsView
 	{
 	private:
 		struct ProviderRuntime
@@ -30,33 +32,6 @@ namespace gglab
 		void BeginFrame(const SnapshotContext& context) noexcept;
 		void Reset() noexcept;
 
-		template <typename T> [[nodiscard]] const T* GetSnapshot() noexcept
-		{
-			ProviderRuntime* runtime = FindProvider(SnapshotIdOf<T>);
-			if (!runtime)
-			{
-				return nullptr;
-			}
-
-			const bool missing = !m_Store.Contains(runtime->m_Profile.m_Id);
-			const bool capture =
-				missing ||
-				(runtime->m_Profile.m_Policy == SnapshotUpdatePolicy::EveryFrame &&
-					runtime->m_Profile.m_LastCaptureFrame != m_FrameIndex) ||
-				(runtime->m_Profile.m_Policy != SnapshotUpdatePolicy::ManualRefresh &&
-					runtime->m_Dirty) ||
-				runtime->m_Profile.m_RefreshPending;
-			if (capture)
-			{
-				Capture(*runtime);
-			}
-			else
-			{
-				++runtime->m_Profile.m_CacheHitCount;
-			}
-			return m_Store.Get<T>();
-		}
-
 		template <typename T> void Invalidate() noexcept
 		{
 			if (ProviderRuntime* runtime = FindProvider(SnapshotIdOf<T>))
@@ -65,12 +40,12 @@ namespace gglab
 			}
 		}
 
-		template <typename T> void RequestRefresh() noexcept { RequestRefresh(SnapshotIdOf<T>); }
-
-		void RequestRefresh(SnapshotId id) noexcept;
-		[[nodiscard]] std::vector<SnapshotProfile> GetProfiles() const;
+		using DiagnosticsView::RequestRefresh;
+		void RequestRefresh(SnapshotId id) noexcept override;
+		[[nodiscard]] std::vector<SnapshotProfile> GetProfiles() const override;
 
 	private:
+		[[nodiscard]] const void* GetSnapshotData(SnapshotId id) noexcept override;
 		[[nodiscard]] ProviderRuntime* FindProvider(SnapshotId id) noexcept;
 		void Capture(ProviderRuntime& runtime) noexcept;
 

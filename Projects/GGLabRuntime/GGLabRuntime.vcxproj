@@ -595,6 +595,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotStore.h" />

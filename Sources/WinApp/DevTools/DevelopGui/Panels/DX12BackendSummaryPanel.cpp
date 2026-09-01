@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/Panels/DX12BackendSummaryPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"

@@ -1667,6 +1667,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h">
       <Filter>Public\GGLabRuntime\Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsView.h">
+      <Filter>Public\GGLabRuntime\Diagnostics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>

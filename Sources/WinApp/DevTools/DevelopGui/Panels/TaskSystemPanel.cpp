@@ -1,6 +1,6 @@
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 
 #include <cctype>

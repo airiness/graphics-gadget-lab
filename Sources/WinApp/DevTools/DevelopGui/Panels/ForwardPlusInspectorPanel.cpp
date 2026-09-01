@@ -1,7 +1,7 @@
 #include "DevTools/DevelopGui/Panels/ForwardPlusInspectorPanel.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/Profiling/GpuProfiler.h"

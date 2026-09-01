@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <imgui.h>
 
@@ -101,7 +101,7 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawSnapshotProfiles(DiagnosticsRuntime* diagnostics) noexcept
+		void DrawSnapshotProfiles(DiagnosticsView* diagnostics) noexcept
 		{
 			if (!diagnostics || !ImGui::CollapsingHeader("Snapshot Capture"))
 			{

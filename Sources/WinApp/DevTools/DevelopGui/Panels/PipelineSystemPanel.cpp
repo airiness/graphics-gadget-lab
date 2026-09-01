@@ -5,7 +5,7 @@
 #include "DevTools/RHIText.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 

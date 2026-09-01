@@ -10,7 +10,7 @@
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>

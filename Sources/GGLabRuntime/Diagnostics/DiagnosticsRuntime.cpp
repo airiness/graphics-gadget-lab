@@ -1,5 +1,6 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace gglab
@@ -52,6 +53,33 @@ namespace gglab
 			runtime.m_TotalCaptureMilliseconds = 0.0;
 			runtime.m_Dirty = true;
 		}
+	}
+
+	const void* DiagnosticsRuntime::GetSnapshotData(SnapshotId id) noexcept
+	{
+		ProviderRuntime* runtime = FindProvider(id);
+		if (!runtime)
+		{
+			return nullptr;
+		}
+
+		const bool missing = !m_Store.Contains(runtime->m_Profile.m_Id);
+		const bool capture =
+			missing ||
+			(runtime->m_Profile.m_Policy == SnapshotUpdatePolicy::EveryFrame &&
+				runtime->m_Profile.m_LastCaptureFrame != m_FrameIndex) ||
+			(runtime->m_Profile.m_Policy != SnapshotUpdatePolicy::ManualRefresh &&
+				runtime->m_Dirty) ||
+			runtime->m_Profile.m_RefreshPending;
+		if (capture)
+		{
+			Capture(*runtime);
+		}
+		else
+		{
+			++runtime->m_Profile.m_CacheHitCount;
+		}
+		return m_Store.Get(runtime->m_Profile.m_Id);
 	}
 
 	void DiagnosticsRuntime::RequestRefresh(SnapshotId id) noexcept

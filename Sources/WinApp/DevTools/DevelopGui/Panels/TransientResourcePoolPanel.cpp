@@ -4,7 +4,7 @@
 #include "DevTools/RHIText.h"
 #include "GGLabFoundation/String/StringUtils.h"
 #include "Graphics/Renderer.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 
@@ -217,7 +217,7 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawRenderGraphResources(DiagnosticsRuntime* diagnostics) noexcept
+		void DrawRenderGraphResources(DiagnosticsView* diagnostics) noexcept
 		{
 			const auto* snapshot = diagnostics ? diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
 			if (!snapshot)

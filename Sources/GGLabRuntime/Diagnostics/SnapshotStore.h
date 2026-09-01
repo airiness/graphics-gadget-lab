@@ -14,12 +14,18 @@ namespace gglab
 		{
 		public:
 			virtual ~HolderBase() = default;
+			[[nodiscard]] virtual const void* GetValue() const noexcept = 0;
 		};
 
 		template <typename T> class Holder final : public HolderBase
 		{
 		public:
 			T m_Value{};
+
+			[[nodiscard]] const void* GetValue() const noexcept override
+			{
+				return &m_Value;
+			}
 		};
 
 	public:
@@ -37,12 +43,12 @@ namespace gglab
 			return static_cast<Holder<T>&>(*iterator->second).m_Value;
 		}
 
-		template <typename T> [[nodiscard]] const T* Get() const noexcept
+		[[nodiscard]] const void* Get(SnapshotId id) const noexcept
 		{
-			const auto iterator = m_Snapshots.find(SnapshotIdOf<T>);
+			const auto iterator = m_Snapshots.find(id);
 			return iterator == m_Snapshots.end()
 				? nullptr
-				: &static_cast<const Holder<T>&>(*iterator->second).m_Value;
+				: iterator->second->GetValue();
 		}
 
 		[[nodiscard]] bool Contains(SnapshotId id) const noexcept

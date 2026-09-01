@@ -1,7 +1,7 @@
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
