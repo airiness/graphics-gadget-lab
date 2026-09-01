@@ -119,6 +119,7 @@ namespace gglab
 
 			void EndFrame(ApplicationToolingFrameEndReason) noexcept override
 			{
+				m_System.GetDevToolsRuntime().EndFrame();
 				m_System.EndFrame();
 			}
 

@@ -30,6 +30,7 @@ namespace gglab
 		void RegisterProvider(
 			std::unique_ptr<SnapshotProviderBase> provider, SnapshotUpdatePolicy policy) noexcept;
 		void BeginFrame(const SnapshotContext& context) noexcept;
+		void EndFrame() noexcept;
 		void Reset() noexcept;
 
 		template <typename T> void Invalidate() noexcept
@@ -53,5 +54,6 @@ namespace gglab
 		SnapshotStore m_Store;
 		std::vector<ProviderRuntime> m_Providers;
 		uint64_t m_FrameIndex = 0;
+		bool m_FrameOpen = false;
 	};
 }

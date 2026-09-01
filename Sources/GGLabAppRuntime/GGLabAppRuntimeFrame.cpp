@@ -260,6 +260,7 @@ namespace gglab
 		}
 		if (!frameEndResult.IsCompleted())
 		{
+			toolingFrame.Abort();
 			return AppRuntimeTickResult::Exit;
 		}
 

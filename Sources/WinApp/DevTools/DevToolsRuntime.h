@@ -42,6 +42,7 @@ namespace gglab
 
 		void Reset() noexcept;
 		void Draw(DevelopGuiContext& context) noexcept;
+		void EndFrame() noexcept;
 		void SetTaskSystem(const TaskSystem* taskSystem) noexcept { m_TaskSystem = taskSystem; }
 
 		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }

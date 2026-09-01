@@ -18,6 +18,11 @@ namespace gglab
 		m_ViewRenderSettingsOverrides = {};
 	}
 
+	void DevToolsRuntime::EndFrame() noexcept
+	{
+		m_Diagnostics.EndFrame();
+	}
+
 	ViewRenderProfile DevToolsRuntime::ResolveViewRenderProfile(
 		const ViewRenderProfile& authoringProfile) const noexcept
 	{

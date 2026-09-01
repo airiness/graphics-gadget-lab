@@ -25,7 +25,10 @@ namespace gglab
 
 	void DiagnosticsRuntime::BeginFrame(const SnapshotContext& context) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_FrameOpen,
+			"DiagnosticsRuntime::BeginFrame called before the previous frame ended.");
 		m_Context = context;
+		m_FrameOpen = true;
 		++m_FrameIndex;
 		for (auto& runtime : m_Providers)
 		{
@@ -36,8 +39,15 @@ namespace gglab
 		}
 	}
 
+	void DiagnosticsRuntime::EndFrame() noexcept
+	{
+		m_Context = {};
+		m_FrameOpen = false;
+	}
+
 	void DiagnosticsRuntime::Reset() noexcept
 	{
+		EndFrame();
 		m_Store.Clear();
 		m_FrameIndex = 0;
 		for (auto& runtime : m_Providers)
@@ -73,7 +83,10 @@ namespace gglab
 			runtime->m_Profile.m_RefreshPending;
 		if (capture)
 		{
-			Capture(*runtime);
+			if (m_FrameOpen)
+			{
+				Capture(*runtime);
+			}
 		}
 		else
 		{
@@ -110,6 +123,13 @@ namespace gglab
 
 	void DiagnosticsRuntime::Capture(ProviderRuntime& runtime) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_FrameOpen,
+			"DiagnosticsRuntime cannot capture without an active borrowed frame context.");
+		if (!m_FrameOpen)
+		{
+			return;
+		}
+
 		const auto begin = std::chrono::steady_clock::now();
 		runtime.m_Provider->Capture(m_Context, m_Store);
 		const auto end = std::chrono::steady_clock::now();

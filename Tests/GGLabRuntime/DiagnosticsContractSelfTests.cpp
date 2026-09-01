@@ -3,6 +3,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
+#include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <cstdint>
@@ -46,13 +47,15 @@ namespace gglab
 				return "Diagnostics View Contract";
 			}
 
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const SnapshotContext& snapshotContext, SnapshotStore& store) noexcept override
 			{
+				m_LastWorld = snapshotContext.m_World;
 				store.GetOrCreate<DiagnosticsViewContractSnapshot>().m_CaptureSerial =
 					++m_CaptureCount;
 			}
 
 			uint32_t m_CaptureCount = 0;
+			World* m_LastWorld = nullptr;
 		};
 	}
 
@@ -63,15 +66,18 @@ namespace gglab
 		DiagnosticsViewContractProvider* providerObserver = provider.get();
 		runtime.RegisterProvider(std::move(provider), SnapshotUpdatePolicy::OnDemand);
 		DiagnosticsView& view = runtime;
+		World firstWorld;
+		World secondWorld;
 
 		context.Check(view.GetSnapshot<UnregisteredDiagnosticsViewContractSnapshot>() == nullptr,
 			"Diagnostics view returns no value for an unregistered snapshot contract");
 
-		runtime.BeginFrame({});
+		runtime.BeginFrame({ .m_World = &firstWorld });
 		const DiagnosticsViewContractSnapshot* initial =
 			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(initial && initial->m_CaptureSerial == 1 &&
-				providerObserver->m_CaptureCount == 1,
+				providerObserver->m_CaptureCount == 1 &&
+				providerObserver->m_LastWorld == &firstWorld,
 			"Diagnostics view lazily captures a registered immutable snapshot");
 
 		const DiagnosticsViewContractSnapshot* cached =
@@ -93,5 +99,40 @@ namespace gglab
 				profiles.front().m_CacheHitCount == 1 &&
 				!profiles.front().m_RefreshPending,
 			"Diagnostics view exposes immutable capture profile observations");
+
+		runtime.EndFrame();
+		view.RequestRefresh<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* closedFrameSnapshot =
+			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		context.Check(closedFrameSnapshot && closedFrameSnapshot == refreshed &&
+				closedFrameSnapshot->m_CaptureSerial == 2 &&
+				providerObserver->m_CaptureCount == 2 &&
+				providerObserver->m_LastWorld == &firstWorld,
+			"Closed diagnostics frames cannot capture through a borrowed context");
+
+		runtime.BeginFrame({ .m_World = &secondWorld });
+		const DiagnosticsViewContractSnapshot* nextFrameSnapshot =
+			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		context.Check(nextFrameSnapshot && nextFrameSnapshot == refreshed &&
+				nextFrameSnapshot->m_CaptureSerial == 3 &&
+				providerObserver->m_CaptureCount == 3 &&
+				providerObserver->m_LastWorld == &secondWorld,
+			"Pending refresh captures against the next active frame context");
+
+		runtime.EndFrame();
+		runtime.EndFrame();
+		view.RequestRefresh<DiagnosticsViewContractSnapshot>();
+		const DiagnosticsViewContractSnapshot* repeatedlyClosedSnapshot =
+			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
+		context.Check(repeatedlyClosedSnapshot &&
+				repeatedlyClosedSnapshot == nextFrameSnapshot &&
+				repeatedlyClosedSnapshot->m_CaptureSerial == 3 &&
+				providerObserver->m_CaptureCount == 3,
+			"Diagnostics frame closure is idempotent and preserves immutable publication");
+
+		runtime.Reset();
+		context.Check(view.GetSnapshot<DiagnosticsViewContractSnapshot>() == nullptr &&
+				providerObserver->m_CaptureCount == 3,
+			"Diagnostics reset clears publication without capturing outside a frame");
 	}
 }
