@@ -3,6 +3,7 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
+#include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/RenderingStartup.h"
 #endif
@@ -121,6 +122,22 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 	launchResult.m_Options.m_RhiBackend = *packagedBackend;
+#else
+	if (launchResult.m_Options.m_ShaderPreviewSessionId &&
+		!launchResult.m_Options.m_RhiBackendSpecified)
+	{
+		const gglab::ShaderPreviewRuntimeBackendReadResult previewBackend =
+			gglab::ReadShaderPreviewRuntimeBackend(runtimePaths.m_ShaderArtifactRoot,
+				*launchResult.m_Options.m_ShaderPreviewSessionId);
+		if (!previewBackend.IsSuccess())
+		{
+			std::fprintf(stderr,
+				"Error: attached Shader Preview could not select its published backend (status=%u).\n",
+				static_cast<unsigned int>(previewBackend.m_Status));
+			return EXIT_FAILURE;
+		}
+		launchResult.m_Options.m_RhiBackend = previewBackend.m_Backend;
+	}
 #endif
 	if (isPathSensitiveSelfTest)
 	{
