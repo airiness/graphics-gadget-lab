@@ -13,6 +13,35 @@ namespace gglab
 {
 	class ShaderManager;
 
+	enum class ShaderPreviewRuntimeBackendReadStatus : uint8_t
+	{
+		Success,
+		InvalidInput,
+		ActivePublicationUnavailable,
+		ActivePublicationInvalid,
+		PublicationUnavailable,
+		PublicationInvalid,
+		IOFailure,
+	};
+
+	struct ShaderPreviewRuntimeBackendReadResult final
+	{
+		ShaderPreviewRuntimeBackendReadStatus m_Status =
+			ShaderPreviewRuntimeBackendReadStatus::InvalidInput;
+		RHIBackendType m_Backend = RHIBackendType::Unknown;
+
+		[[nodiscard]] constexpr bool IsSuccess() const noexcept
+		{
+			return m_Status == ShaderPreviewRuntimeBackendReadStatus::Success;
+		}
+	};
+
+	// Reads the initial immutable publication far enough to select the matching
+	// main-owned Runtime backend. Full artifact and Registry validation remain
+	// the candidate reader's startup gate after platform composition.
+	[[nodiscard]] ShaderPreviewRuntimeBackendReadResult ReadShaderPreviewRuntimeBackend(
+		const std::filesystem::path& artifactRoot, std::string_view sessionId) noexcept;
+
 	enum class ShaderPreviewRuntimeCandidateReadStatus : uint8_t
 	{
 		Success,

@@ -80,6 +80,21 @@ namespace gglab
 			}
 		}
 
+		[[nodiscard]] ShaderPreviewRuntimeBackendReadStatus MapBackendActiveReadStatus(
+			ShaderPreviewActivePublicationReadStatus status) noexcept
+		{
+			switch (status)
+			{
+			case ShaderPreviewActivePublicationReadStatus::NotFound:
+				return ShaderPreviewRuntimeBackendReadStatus::ActivePublicationUnavailable;
+			case ShaderPreviewActivePublicationReadStatus::MalformedRecord:
+				return ShaderPreviewRuntimeBackendReadStatus::ActivePublicationInvalid;
+			case ShaderPreviewActivePublicationReadStatus::IOFailure:
+			default:
+				return ShaderPreviewRuntimeBackendReadStatus::IOFailure;
+			}
+		}
+
 		[[nodiscard]] ShaderPreviewRuntimeCandidate ReadCandidateForActivePublication(
 			const std::filesystem::path& artifactRoot,
 			const ShaderPreviewActivePublication& activePublication,
@@ -233,6 +248,72 @@ namespace gglab
 			return wrote != FALSE && bytesWritten == static_cast<DWORD>(bytes.size()) &&
 				flushed != FALSE && closed != FALSE;
 		}
+	}
+
+	ShaderPreviewRuntimeBackendReadResult ReadShaderPreviewRuntimeBackend(
+		const std::filesystem::path& artifactRoot, std::string_view sessionId) noexcept
+	{
+		ShaderPreviewRuntimeBackendReadResult result{};
+		if (artifactRoot.empty() || !artifactRoot.is_absolute() ||
+			!IsValidShaderPreviewSessionId(sessionId))
+		{
+			return result;
+		}
+		try
+		{
+			ShaderLoosePreviewSessionReader sessionReader(
+				ShaderLoosePreviewSessionLocator(artifactRoot, std::string(sessionId)));
+			const ShaderPreviewActivePublicationReadResult active =
+				sessionReader.ReadActivePublication();
+			if (!active.IsSuccess())
+			{
+				result.m_Status = MapBackendActiveReadStatus(active.m_Status);
+				return result;
+			}
+
+			ShaderLoosePreviewPublicationReader publicationReader{
+				ShaderLoosePreviewPublicationLocator(artifactRoot)
+			};
+			const ShaderPreviewPublicationReadResult publication =
+				publicationReader.ReadArtifact(active.m_ActivePublication.m_PublicationRef);
+			if (!publication.IsSuccess())
+			{
+				if (publication.m_Status == ShaderPreviewPublicationReadStatus::NotFound)
+				{
+					result.m_Status =
+						ShaderPreviewRuntimeBackendReadStatus::PublicationUnavailable;
+				}
+				else if (publication.m_Status ==
+					ShaderPreviewPublicationReadStatus::MalformedArtifact)
+				{
+					result.m_Status = ShaderPreviewRuntimeBackendReadStatus::PublicationInvalid;
+				}
+				else
+				{
+					result.m_Status = ShaderPreviewRuntimeBackendReadStatus::IOFailure;
+				}
+				return result;
+			}
+
+			switch (publication.m_Artifact.m_TargetProfile)
+			{
+			case ShaderTargetProfile::GGLabDX12:
+				result.m_Backend = RHIBackendType::DX12;
+				break;
+			case ShaderTargetProfile::GGLabVulkan13:
+				result.m_Backend = RHIBackendType::Vulkan;
+				break;
+			default:
+				result.m_Status = ShaderPreviewRuntimeBackendReadStatus::PublicationInvalid;
+				return result;
+			}
+			result.m_Status = ShaderPreviewRuntimeBackendReadStatus::Success;
+		}
+		catch (...)
+		{
+			result.m_Status = ShaderPreviewRuntimeBackendReadStatus::IOFailure;
+		}
+		return result;
 	}
 
 	ShaderPreviewRuntimeCandidate ReadShaderPreviewRuntimeCandidate(

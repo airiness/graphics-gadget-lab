@@ -3,10 +3,12 @@
 #include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 #include "ShaderArtifactRuntime/ShaderPreviewLooseIO.h"
 
 #include <process.h>
 
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -26,6 +28,93 @@ namespace gglab
 					.m_DurableDigest = builder.Finish(),
 				},
 			};
+		}
+
+		[[nodiscard]] uint8_t HexValue(char character) noexcept
+		{
+			return character >= '0' && character <= '9'
+				? static_cast<uint8_t>(character - '0')
+				: static_cast<uint8_t>(character - 'a' + 10);
+		}
+
+		[[nodiscard]] Sha256Digest ParseDigest(std::string_view lowerHex) noexcept
+		{
+			Sha256Digest digest{};
+			if (lowerHex.size() != digest.m_Value.size() * 2)
+			{
+				return digest;
+			}
+			for (size_t index = 0; index < digest.m_Value.size(); ++index)
+			{
+				digest.m_Value[index] = static_cast<std::byte>(
+					(HexValue(lowerHex[index * 2]) << 4u) |
+					HexValue(lowerHex[index * 2 + 1]));
+			}
+			return digest;
+		}
+
+		[[nodiscard]] ShaderPreviewPublicationArtifact MakeBackendPublication(
+			std::string_view inputContractId, ShaderTargetProfile targetProfile,
+			uint8_t seed) noexcept
+		{
+			const ShaderGraphPreviewInputContractProjection* projection =
+				ResolveShaderGraphPreviewInputContract(inputContractId);
+			if (!projection || !projection->m_ProgramRef)
+			{
+				return {};
+			}
+			const ShaderPreviewPublicationBuildResult publication =
+				BuildShaderPreviewPublicationArtifact({
+					.m_PreviewProgramDescriptorIdentity =
+						ParseDigest(ShaderGraphPreviewProgramDescriptorIdentity),
+					.m_PreviewInputContractId = std::string(inputContractId),
+					.m_ProfileId = std::string(ShaderGraphPreviewSurfaceProfileId),
+					.m_ProfileVersion = projection->m_ProfileVersion,
+					.m_GeneratedSourceIdentity =
+						MakePublicationRef(std::to_string(seed)).m_PublicationId.m_DurableDigest,
+					.m_TargetProfile = targetProfile,
+					.m_ProgramRef = *projection->m_ProgramRef,
+					.m_ShaderArtifactRef = {
+						.m_ArtifactId = {
+							.m_DurableDigest = MakePublicationRef(
+								std::to_string(seed + 1)).m_PublicationId.m_DurableDigest,
+						},
+					},
+					.m_BaseRegistryRef = {
+						.m_RegistryId = {
+							.m_DurableDigest = MakePublicationRef(
+								std::to_string(seed + 2)).m_PublicationId.m_DurableDigest,
+						},
+					},
+					.m_PreviewRegistryRef = {
+						.m_RegistryId = {
+							.m_DurableDigest = MakePublicationRef(
+								std::to_string(seed + 3)).m_PublicationId.m_DurableDigest,
+						},
+					},
+				});
+			return publication.IsSuccess() ? publication.m_Artifact
+				: ShaderPreviewPublicationArtifact{};
+		}
+
+		[[nodiscard]] bool WriteBackendPublication(const std::filesystem::path& root,
+			const ShaderPreviewPublicationArtifact& publication,
+			uint64_t attemptSequence, std::string_view sessionId) noexcept
+		{
+			const ShaderPreviewPublicationRef publicationRef{
+				.m_PublicationId = publication.m_PublicationId,
+			};
+			const ShaderLoosePreviewPublicationPath publicationPath =
+				ShaderLoosePreviewPublicationLocator(root).GetPath(publicationRef);
+			const ShaderLoosePreviewSessionPaths sessionPaths =
+				ShaderLoosePreviewSessionLocator(root, std::string(sessionId)).GetPaths();
+			return utils::WriteFileBinary(publicationPath.m_Path,
+				SerializeShaderPreviewPublication(publication)) &&
+				utils::WriteFileBinary(sessionPaths.m_ActivePublicationPath,
+					SerializeShaderPreviewActivePublication({
+						.m_AttemptSequence = attemptSequence,
+						.m_PublicationRef = publicationRef,
+					}));
 		}
 	}
 
@@ -139,6 +228,34 @@ namespace gglab
 			tempRoot, "invalid", loaded3) ==
 			ShaderPreviewRuntimeObservationPublicationStatus::InvalidInput,
 			"Malformed session identity is rejected before observation path construction");
+
+		const ShaderPreviewRuntimeBackendReadResult missingBackend =
+			ReadShaderPreviewRuntimeBackend(tempRoot,
+				"fedcba9876543210fedcba9876543210");
+		context.Check(missingBackend.m_Status ==
+			ShaderPreviewRuntimeBackendReadStatus::ActivePublicationUnavailable,
+			"Attached backend selection requires one published session pointer");
+
+		const ShaderPreviewPublicationArtifact dx12Publication = MakeBackendPublication(
+			ShaderGraphPreviewNumericInputContractId, ShaderTargetProfile::GGLabDX12, 40);
+		const bool dx12Written = WriteBackendPublication(
+			tempRoot, dx12Publication, 4, SessionId);
+		const ShaderPreviewRuntimeBackendReadResult dx12Backend =
+			ReadShaderPreviewRuntimeBackend(tempRoot, SessionId);
+		context.Check(dx12Written && dx12Backend.IsSuccess() &&
+			dx12Backend.m_Backend == RHIBackendType::DX12,
+			"Attached backend selection projects a validated DX12 Preview publication");
+
+		const ShaderPreviewPublicationArtifact vulkanPublication = MakeBackendPublication(
+			ShaderGraphPreviewTexture2DInputContractId,
+			ShaderTargetProfile::GGLabVulkan13, 50);
+		const bool vulkanWritten = WriteBackendPublication(
+			tempRoot, vulkanPublication, 5, SessionId);
+		const ShaderPreviewRuntimeBackendReadResult vulkanBackend =
+			ReadShaderPreviewRuntimeBackend(tempRoot, SessionId);
+		context.Check(vulkanWritten && vulkanBackend.IsSuccess() &&
+			vulkanBackend.m_Backend == RHIBackendType::Vulkan,
+			"Attached backend selection projects a validated Vulkan Preview publication");
 
 		std::filesystem::remove_all(tempRoot, errorCode);
 	}
