@@ -950,6 +950,21 @@ foreach ($legacyPath in $legacyRuntimeRenderQueueContractPaths) {
     }
 }
 
+$legacyRuntimeDebugDrawContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDraw.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawShapes.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawSystem.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeDebugDrawContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated DebugDraw contracts and implementations must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)
@@ -977,6 +992,8 @@ $legacyRuntimeViewContractIncludeRegex =
 $legacyRuntimeRenderQueueContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:RenderParameters\.h|RenderQueue\.h|' +
     'Pipeline[\\/]DepthCoverage\.h)[>"]'
+$legacyRuntimeDebugDrawContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/]DebugDraw[\\/]DebugDraw\.h[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
@@ -987,6 +1004,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeCameraIncludeRegex -or
         $content -match $legacyRuntimeViewContractIncludeRegex -or
         $content -match $legacyRuntimeRenderQueueContractIncludeRegex -or
+        $content -match $legacyRuntimeDebugDrawContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

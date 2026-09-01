@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab

@@ -168,8 +168,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\DXGIFormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawShapes.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
@@ -398,7 +398,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\DXGIFormatUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDepthPrepass.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPlusGraphResources.h" />

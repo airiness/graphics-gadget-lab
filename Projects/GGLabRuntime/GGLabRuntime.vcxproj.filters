@@ -124,6 +124,9 @@
     <Filter Include="Private\Graphics\Asset">
       <UniqueIdentifier>{D2FD5874-BBF7-ABEA-BC99-794ACD7E28CE}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\DebugDraw">
+      <UniqueIdentifier>{7E20274A-3511-61E4-415C-FFAC5887E34A}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\Pipeline">
       <UniqueIdentifier>{BBE76351-F087-DA04-8980-F260B56D1F40}</UniqueIdentifier>
     </Filter>
@@ -159,6 +162,9 @@
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\Asset">
       <UniqueIdentifier>{103715BA-0661-08B0-A6E1-E899E72799ED}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\DebugDraw">
+      <UniqueIdentifier>{1E5001CD-6CB1-FEB4-2389-2767B2919582}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\Pipeline">
       <UniqueIdentifier>{E0A27152-DEA8-ECDD-899B-68E936ED9807}</UniqueIdentifier>
@@ -371,12 +377,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.cpp">
       <Filter>Graphics\Buffer</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawShapes.cpp">
-      <Filter>Graphics\DebugDraw</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.cpp">
-      <Filter>Graphics\DebugDraw</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.cpp">
       <Filter>Graphics</Filter>
@@ -798,6 +798,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp">
+      <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp">
+      <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -1099,9 +1105,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
-      <Filter>Graphics\DebugDraw</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.h">
       <Filter>Graphics\DebugDraw</Filter>
@@ -1687,6 +1690,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraRig.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
+      <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

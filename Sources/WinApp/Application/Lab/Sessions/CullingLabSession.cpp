@@ -5,7 +5,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 

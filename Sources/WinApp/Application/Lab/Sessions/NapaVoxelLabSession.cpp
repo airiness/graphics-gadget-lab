@@ -4,7 +4,7 @@
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 

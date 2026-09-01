@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <mutex>
