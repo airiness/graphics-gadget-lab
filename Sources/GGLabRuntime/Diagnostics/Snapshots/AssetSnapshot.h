@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"

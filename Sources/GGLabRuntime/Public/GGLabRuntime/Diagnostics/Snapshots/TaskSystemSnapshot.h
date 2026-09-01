@@ -1,6 +1,10 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+
+#include <array>
+#include <cstdint>
+#include <vector>
 
 namespace gglab
 {

@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 
 namespace gglab
 {

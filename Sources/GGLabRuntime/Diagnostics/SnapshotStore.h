@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 
 #include <memory>
 #include <unordered_map>

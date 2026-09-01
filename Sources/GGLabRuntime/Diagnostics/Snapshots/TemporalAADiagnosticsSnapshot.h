@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 

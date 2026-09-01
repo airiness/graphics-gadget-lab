@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/RenderScene.h"
 
 #include <cstdint>

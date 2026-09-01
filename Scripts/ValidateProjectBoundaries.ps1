@@ -965,6 +965,24 @@ foreach ($legacyPath in $legacyRuntimeDebugDrawContractPaths) {
     }
 }
 
+$legacyRuntimeDiagnosticsContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Diagnostics/SnapshotCommon.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/DX12BackendSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/VulkanBackendSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TaskSystemSnapshot.h")
+)
+foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated Diagnostics contracts must live under Public/GGLabRuntime"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)
@@ -994,6 +1012,11 @@ $legacyRuntimeRenderQueueContractIncludeRegex =
     'Pipeline[\\/]DepthCoverage\.h)[>"]'
 $legacyRuntimeDebugDrawContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/]DebugDraw[\\/]DebugDraw\.h[>"]'
+$legacyRuntimeDiagnosticsContractIncludeRegex =
+    '#include\s*[<"]Diagnostics[\\/](?:SnapshotCommon\.h|' +
+    'Snapshots[\\/](?:DX12BackendSnapshot|VulkanBackendSnapshot|' +
+    'DX12ResourceManagerSnapshot|PersistentSceneBufferSnapshot|' +
+    'TaskSystemSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
@@ -1005,11 +1028,12 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeViewContractIncludeRegex -or
         $content -match $legacyRuntimeRenderQueueContractIncludeRegex -or
         $content -match $legacyRuntimeDebugDrawContractIncludeRegex -or
+        $content -match $legacyRuntimeDiagnosticsContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"
             Target = ConvertTo-RepoRelativePath $sourceFile.FullName
-            Reason = "migrated Graphics and Scene contracts must use the GGLabRuntime include prefix"
+            Reason = "migrated Graphics, Scene and Diagnostics contracts must use the GGLabRuntime include prefix"
         })
     }
 }

@@ -1,8 +1,9 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

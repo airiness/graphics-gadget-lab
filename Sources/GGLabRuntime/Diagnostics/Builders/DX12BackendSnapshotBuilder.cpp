@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/DX12BackendSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/DX12BackendSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RHI/DX12/DX12CommandQueue.h"
 #include "Graphics/RHI/DX12/DX12Context.h"

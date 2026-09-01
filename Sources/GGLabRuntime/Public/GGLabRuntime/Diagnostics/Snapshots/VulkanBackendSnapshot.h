@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 
 #include <cstdint>
 #include <string>

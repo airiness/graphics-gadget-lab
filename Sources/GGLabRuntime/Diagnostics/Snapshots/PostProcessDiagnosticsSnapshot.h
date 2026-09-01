@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
