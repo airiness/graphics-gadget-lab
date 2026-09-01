@@ -933,6 +933,23 @@ foreach ($legacyPath in $legacyRuntimeViewContractPaths) {
     }
 }
 
+$legacyRuntimeRenderQueueContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/RenderParameters.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/DepthCoverage.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/DepthCoverage.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderQueue.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderQueue.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeRenderQueueContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated render-queue contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)
@@ -957,6 +974,9 @@ $legacyRuntimeViewContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:RenderView\.h|' +
     'Pipeline[\\/]TemporalAA\.h|PostProcess[\\/]ViewRenderSettings\.h|' +
     'ScreenSpace[\\/]ScreenSpaceTypes\.h)[>"]'
+$legacyRuntimeRenderQueueContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:RenderParameters\.h|RenderQueue\.h|' +
+    'Pipeline[\\/]DepthCoverage\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
@@ -966,6 +986,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
     if ($content -match $legacyRuntimeGraphicsContractIncludeRegex -or
         $content -match $legacyRuntimeCameraIncludeRegex -or
         $content -match $legacyRuntimeViewContractIncludeRegex -or
+        $content -match $legacyRuntimeRenderQueueContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

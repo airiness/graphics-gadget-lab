@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/Pipeline/DepthCoverage.h"
+#include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"

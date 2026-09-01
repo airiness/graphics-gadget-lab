@@ -2,13 +2,19 @@
 #include "GGLabRuntime/Core/Math/Culling.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/Pipeline/DepthCoverage.h"
-#include "Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 
+#include <array>
+#include <cstdint>
 #include <span>
+#include <vector>
 
 namespace gglab
 {
+	class AssetManager;
+	struct RenderScene;
+	struct RenderView;
+
 	struct DrawItem
 	{
 		RenderMaterialKey m_MaterialKey{};

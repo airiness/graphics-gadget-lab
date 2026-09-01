@@ -177,7 +177,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassFinalColor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\GTAO.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlusDebugReadback.cpp" />
@@ -192,7 +192,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp" />
@@ -421,7 +421,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlusDebugReadback.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\GTAO.h" />
@@ -449,7 +449,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h" />
@@ -463,7 +463,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderParameters.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h" />

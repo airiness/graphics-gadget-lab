@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderContexts.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/RenderWorldExtractor.h"

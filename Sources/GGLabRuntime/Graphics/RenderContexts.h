@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"

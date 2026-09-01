@@ -1,5 +1,5 @@
 #include "GGLabFoundation/Base/TypeUtils.h"
-#include "Graphics/Pipeline/DepthCoverage.h"
+#include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 

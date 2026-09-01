@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"

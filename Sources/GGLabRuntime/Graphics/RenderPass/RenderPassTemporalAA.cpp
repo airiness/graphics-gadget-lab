@@ -9,7 +9,7 @@
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
-#include "Graphics/RenderParameters.h"
+#include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/SamplerRegistry.h"

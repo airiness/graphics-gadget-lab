@@ -124,6 +124,9 @@
     <Filter Include="Private\Graphics\Asset">
       <UniqueIdentifier>{D2FD5874-BBF7-ABEA-BC99-794ACD7E28CE}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\Pipeline">
+      <UniqueIdentifier>{BBE76351-F087-DA04-8980-F260B56D1F40}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\PostProcess">
       <UniqueIdentifier>{28AC8BB7-A089-20BA-62CC-16E74084D632}</UniqueIdentifier>
     </Filter>
@@ -390,9 +393,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.cpp">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
@@ -512,9 +512,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Graphics\RenderPipeline</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.cpp">
-      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.cpp">
       <Filter>Graphics</Filter>
@@ -801,8 +798,14 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp">
       <Filter>Private\Graphics\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
@@ -1124,9 +1127,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.h">
       <Filter>Graphics\Pipeline</Filter>
     </ClInclude>
@@ -1219,9 +1219,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGResourceUtils.h">
       <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderParameters.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPBRShaderSet.h">
       <Filter>Graphics\RenderPass</Filter>
@@ -1348,9 +1345,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h">
       <Filter>Graphics\RenderPipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h">
       <Filter>Graphics</Filter>
@@ -1697,11 +1691,20 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h">
       <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

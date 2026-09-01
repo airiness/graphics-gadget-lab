@@ -22,7 +22,7 @@
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"

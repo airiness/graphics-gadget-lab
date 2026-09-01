@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
 #include "Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
