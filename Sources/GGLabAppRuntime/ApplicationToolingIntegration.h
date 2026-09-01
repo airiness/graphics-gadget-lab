@@ -11,6 +11,7 @@ namespace gglab
 	class CameraController;
 	class CameraRig;
 	class DebugDrawSystem;
+	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class RenderGraph;
 	class Renderer;
@@ -31,6 +32,11 @@ namespace gglab
 		bool m_Pointer = false;
 	};
 
+	struct ApplicationToolingFrameSettingsResolution
+	{
+		bool m_GTAOOverrideActive = false;
+	};
+
 	struct ApplicationToolingFrameContext
 	{
 		Camera* m_Camera = nullptr;
@@ -44,6 +50,7 @@ namespace gglab
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
+		DiagnosticsView* m_Diagnostics = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
@@ -70,7 +77,8 @@ namespace gglab
 		virtual void PrepareForShutdown() noexcept = 0;
 		[[nodiscard]] virtual ApplicationToolingInputCapture GetPreviousFrameInputCapture()
 			const noexcept = 0;
-		virtual void ResolveFrameSettings(const ViewRenderProfile& authoringProfile,
+		[[nodiscard]] virtual ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+			const ViewRenderProfile& authoringProfile,
 			ShadowVisualizationSettings& outShadowVisualizationSettings,
 			ViewRenderProfile& outEffectiveProfile) const noexcept = 0;
 		[[nodiscard]] virtual bool BeginFrame() noexcept = 0;

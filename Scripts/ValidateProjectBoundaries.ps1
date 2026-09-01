@@ -1006,6 +1006,24 @@ foreach ($sourceFile in $developGuiDiagnosticsConsumerFiles) {
     }
 }
 
+$winAppDiagnosticsCaptureOwnershipRegex =
+    '\b(?:DiagnosticsRuntime|SnapshotContext|SnapshotProviderBase|SnapshotStore|' +
+    'RegisterBuiltinSnapshotProviders|LabSnapshotProvider)\b'
+foreach ($itemPath in $winAppSourceItems) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $winAppDiagnosticsCaptureOwnershipRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "diagnostics-capture-ownership"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "WinApp must consume DiagnosticsView without owning capture context, providers, or storage"
+        })
+    }
+}
+
 $legacyRuntimeSceneDir = Join-Path $runtimeSourcesDir "Scene"
 $legacyRuntimeSceneFiles = if (Test-Path -LiteralPath $legacyRuntimeSceneDir -PathType Container) {
     @(Get-ChildItem -LiteralPath $legacyRuntimeSceneDir -Recurse -File)

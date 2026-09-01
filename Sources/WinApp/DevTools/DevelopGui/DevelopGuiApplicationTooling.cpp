@@ -8,8 +8,6 @@
 #include "DevTools/DevelopGui/LoadingOverlay.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
-#include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
 
 #include <memory>
 
@@ -48,17 +46,10 @@ namespace gglab
 				}
 
 				auto& runtime = m_System.GetDevToolsRuntime();
-				runtime.SetTaskSystem(createInfo.m_TaskSystem);
 				runtime.GetRegistry().RegisterPanel(
 					std::make_unique<DemoPanel>(createInfo.m_DemoManager));
 				if (createInfo.m_LabRuntimeLocator)
 				{
-					runtime.GetDiagnostics().RegisterProvider(
-						std::make_unique<LabSnapshotProvider>(
-							[runtimeLocator = createInfo.m_LabRuntimeLocator]() noexcept
-								-> const LabSnapshotSourceBase*
-							{ return runtimeLocator->GetLabRuntimeIfCreated(); }),
-						SnapshotUpdatePolicy::EveryFrame);
 					runtime.GetRegistry().RegisterPanel(
 						std::make_unique<LabPanel>(createInfo.m_LabRuntimeLocator));
 				}
@@ -74,7 +65,8 @@ namespace gglab
 				};
 			}
 
-			void ResolveFrameSettings(const ViewRenderProfile& authoringProfile,
+			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+				const ViewRenderProfile& authoringProfile,
 				ShadowVisualizationSettings& outShadowVisualizationSettings,
 				ViewRenderProfile& outEffectiveProfile) const noexcept override
 			{
@@ -82,6 +74,10 @@ namespace gglab
 				outShadowVisualizationSettings =
 					runtime.GetRenderVisualizationSettings().m_Shadow;
 				outEffectiveProfile = runtime.ResolveViewRenderProfile(authoringProfile);
+				return {
+					.m_GTAOOverrideActive =
+						runtime.GetViewRenderSettingsOverrides().m_GTAO.m_IsActive,
+				};
 			}
 
 			bool BeginFrame() noexcept override { return m_System.BeginFrame(); }
@@ -101,6 +97,7 @@ namespace gglab
 				guiContext.m_EnvironmentAssetController =
 					context.m_EnvironmentAssetController;
 				guiContext.m_RenderGraph = context.m_RenderGraph;
+				guiContext.m_Diagnostics = context.m_Diagnostics;
 				guiContext.m_DebugDrawSystem = context.m_DebugDrawSystem;
 				guiContext.m_DebugDrawFrame =
 					context.m_DebugDrawFrame ? *context.m_DebugDrawFrame : DebugDrawFrameView{};
@@ -119,7 +116,6 @@ namespace gglab
 
 			void EndFrame(ApplicationToolingFrameEndReason) noexcept override
 			{
-				m_System.GetDevToolsRuntime().EndFrame();
 				m_System.EndFrame();
 			}
 

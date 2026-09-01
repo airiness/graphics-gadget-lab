@@ -1,5 +1,6 @@
 #include "DiagnosticsContractSelfTests.h"
 
+#include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
@@ -8,6 +9,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace gglab
 {
@@ -56,6 +58,19 @@ namespace gglab
 
 			uint32_t m_CaptureCount = 0;
 			World* m_LastWorld = nullptr;
+		};
+
+		class DiagnosticsLabSnapshotSource final : public LabSnapshotSourceBase
+		{
+		public:
+			LabSnapshot GetLabSnapshot() const noexcept override
+			{
+				LabSnapshot snapshot{};
+				snapshot.m_ActiveLabName = m_ActiveLabName;
+				return snapshot;
+			}
+
+			std::string m_ActiveLabName;
 		};
 	}
 
@@ -134,5 +149,25 @@ namespace gglab
 		context.Check(view.GetSnapshot<DiagnosticsViewContractSnapshot>() == nullptr &&
 				providerObserver->m_CaptureCount == 3,
 			"Diagnostics reset clears publication without capturing outside a frame");
+
+		DiagnosticsRuntime labDiagnostics;
+		labDiagnostics.RegisterProvider(
+			std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		DiagnosticsLabSnapshotSource firstLabSource;
+		firstLabSource.m_ActiveLabName = "First Lab";
+		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &firstLabSource });
+		const LabSnapshot* firstLabSnapshot = labDiagnostics.GetSnapshot<LabSnapshot>();
+		context.Check(firstLabSnapshot && firstLabSnapshot->m_ActiveLabName == "First Lab",
+			"Lab diagnostics capture uses the Runtime-owned frame context source");
+
+		labDiagnostics.EndFrame();
+		DiagnosticsLabSnapshotSource secondLabSource;
+		secondLabSource.m_ActiveLabName = "Second Lab";
+		labDiagnostics.BeginFrame({ .m_LabSnapshotSource = &secondLabSource });
+		const LabSnapshot* secondLabSnapshot = labDiagnostics.GetSnapshot<LabSnapshot>();
+		context.Check(secondLabSnapshot && secondLabSnapshot == firstLabSnapshot &&
+				secondLabSnapshot->m_ActiveLabName == "Second Lab",
+			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
+		labDiagnostics.EndFrame();
 	}
 }

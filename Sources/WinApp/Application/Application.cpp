@@ -288,7 +288,6 @@ namespace gglab
 			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
 				.m_RHIContext = renderer->GetRHIContext(),
-				.m_TaskSystem = taskSystem,
 				.m_DemoManager = demoManager,
 				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,
@@ -362,6 +361,7 @@ namespace gglab
 		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
+			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 			.m_PreContentUpdate = preContentUpdate,
 			});
 		if (shaderPreviewContext.m_StartupFailed)

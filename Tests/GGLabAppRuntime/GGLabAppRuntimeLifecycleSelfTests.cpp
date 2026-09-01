@@ -48,9 +48,11 @@ namespace gglab
 				return {};
 			}
 
-			void ResolveFrameSettings(const ViewRenderProfile&,
+			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+				const ViewRenderProfile&,
 				ShadowVisualizationSettings&, ViewRenderProfile&) const noexcept override
 			{
+				return {};
 			}
 
 			bool BeginFrame() noexcept override
@@ -239,6 +241,8 @@ namespace gglab
 				context.Check(
 					runtime.GetLifecycleState() == AppRuntimeLifecycleState::Uninitialized,
 					"App runtime starts uninitialized");
+				context.Check(runtime.GetDiagnosticsView() == nullptr,
+					"Diagnostics session remains absent before runtime service composition");
 				context.Check(runtime.Initialize(MakeCreateInfo()) ==
 					AppRuntimeInitializeResult::Succeeded,
 					"Valid explicit config and paths initialize the app runtime");
