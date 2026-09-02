@@ -241,7 +241,8 @@ namespace gglab
 				context.Check(
 					runtime.GetLifecycleState() == AppRuntimeLifecycleState::Uninitialized,
 					"App runtime starts uninitialized");
-				context.Check(runtime.GetDiagnosticsView() == nullptr,
+				context.Check(runtime.GetDiagnosticsView() == nullptr &&
+					runtime.GetDiagnosticsControl() == nullptr,
 					"Diagnostics session remains absent before runtime service composition");
 				context.Check(runtime.Initialize(MakeCreateInfo()) ==
 					AppRuntimeInitializeResult::Succeeded,

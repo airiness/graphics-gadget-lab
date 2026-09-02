@@ -53,6 +53,7 @@ namespace gglab
 			}
 
 			[[nodiscard]] DiagnosticsView* GetView() const noexcept { return m_Runtime; }
+			[[nodiscard]] DiagnosticsControl* GetControl() const noexcept { return m_Runtime; }
 
 		private:
 			DiagnosticsRuntime* m_Runtime = nullptr;
@@ -294,6 +295,7 @@ namespace gglab
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				.m_RenderGraph = &renderGraph,
 				.m_Diagnostics = diagnosticsFrame.GetView(),
+				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_DirectionalShadowSettings =

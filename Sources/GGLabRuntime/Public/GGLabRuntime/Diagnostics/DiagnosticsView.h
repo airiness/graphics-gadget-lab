@@ -6,8 +6,8 @@
 
 namespace gglab
 {
-	// Non-owning read/request seam for immutable Runtime diagnostics. Consumers may
-	// request capture, but provider registration and live capture context stay private.
+	// Non-owning read-only seam for immutable Runtime diagnostics. Provider
+	// registration, capture requests and live capture context stay outside this view.
 	class DiagnosticsView
 	{
 	public:
@@ -18,12 +18,6 @@ namespace gglab
 			return static_cast<const T*>(GetSnapshotData(SnapshotIdOf<T>));
 		}
 
-		template <typename T> void RequestRefresh() noexcept
-		{
-			RequestRefresh(SnapshotIdOf<T>);
-		}
-
-		virtual void RequestRefresh(SnapshotId id) noexcept = 0;
 		[[nodiscard]] virtual std::vector<SnapshotProfile> GetProfiles() const = 0;
 
 	private:

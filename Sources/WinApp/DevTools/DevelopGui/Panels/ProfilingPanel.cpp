@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <imgui.h>
@@ -101,7 +102,8 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawSnapshotProfiles(DiagnosticsView* diagnostics) noexcept
+		void DrawSnapshotProfiles(
+			DiagnosticsView* diagnostics, DiagnosticsControl* control) noexcept
 		{
 			if (!diagnostics || !ImGui::CollapsingHeader("Snapshot Capture"))
 			{
@@ -144,8 +146,12 @@ namespace gglab
 				ImGui::Text("%llu / %llu", static_cast<unsigned long long>(profile.m_CaptureCount),
 					static_cast<unsigned long long>(profile.m_CacheHitCount));
 				ImGui::TableSetColumnIndex(6);
-				if (ImGui::SmallButton("Refresh"))
-					diagnostics->RequestRefresh(profile.m_Id);
+				ImGui::BeginDisabled(!control);
+				if (ImGui::SmallButton("Refresh") && control)
+				{
+					control->RequestRefresh(profile.m_Id);
+				}
+				ImGui::EndDisabled();
 				ImGui::PopID();
 			}
 			ImGui::EndTable();
@@ -182,7 +188,7 @@ namespace gglab
 		}
 		ImGui::SameLine();
 		ImGui::Checkbox("Pause display", &state.m_Paused);
-		DrawSnapshotProfiles(context.m_Diagnostics);
+		DrawSnapshotProfiles(context.m_Diagnostics, context.m_DiagnosticsControl);
 
 		if (!state.m_Paused)
 		{

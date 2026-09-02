@@ -1001,7 +1001,19 @@ foreach ($sourceFile in $developGuiDiagnosticsConsumerFiles) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "diagnostics-read-view"
             Target = ConvertTo-RepoRelativePath $sourceFile.FullName
-            Reason = "DevTools panels must use DiagnosticsView instead of the capture engine"
+            Reason = "DevTools panels must use DiagnosticsView or DiagnosticsControl instead of the capture engine"
+        })
+    }
+}
+
+$diagnosticsViewPath = Join-Path $runtimePublicDir "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+if (Test-Path -LiteralPath $diagnosticsViewPath -PathType Leaf) {
+    $diagnosticsViewContent = Get-Content -LiteralPath $diagnosticsViewPath -Raw -ErrorAction Stop
+    if ($diagnosticsViewContent -match '\bRequestRefresh\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "diagnostics-query-control"
+            Target = ConvertTo-RepoRelativePath $diagnosticsViewPath
+            Reason = "DiagnosticsView must remain read-only; refresh requests belong to DiagnosticsControl"
         })
     }
 }
@@ -1019,7 +1031,7 @@ foreach ($itemPath in $winAppSourceItems) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "diagnostics-capture-ownership"
             Target = ConvertTo-RepoRelativePath $itemPath
-            Reason = "WinApp must consume DiagnosticsView without owning capture context, providers, or storage"
+            Reason = "WinApp must consume DiagnosticsView and narrow DiagnosticsControl without owning capture context, providers, or storage"
         })
     }
 }

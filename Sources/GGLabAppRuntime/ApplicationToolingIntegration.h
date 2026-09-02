@@ -11,6 +11,7 @@ namespace gglab
 	class CameraController;
 	class CameraRig;
 	class DebugDrawSystem;
+	class DiagnosticsControl;
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class RenderGraph;
@@ -51,6 +52,7 @@ namespace gglab
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
+		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;

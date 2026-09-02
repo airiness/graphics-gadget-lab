@@ -4,6 +4,7 @@
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <memory>
@@ -11,7 +12,7 @@
 
 namespace gglab
 {
-	class DiagnosticsRuntime final : public DiagnosticsView
+	class DiagnosticsRuntime final : public DiagnosticsView, public DiagnosticsControl
 	{
 	private:
 		struct ProviderRuntime
@@ -41,7 +42,7 @@ namespace gglab
 			}
 		}
 
-		using DiagnosticsView::RequestRefresh;
+		using DiagnosticsControl::RequestRefresh;
 		void RequestRefresh(SnapshotId id) noexcept override;
 		[[nodiscard]] std::vector<SnapshotProfile> GetProfiles() const override;
 

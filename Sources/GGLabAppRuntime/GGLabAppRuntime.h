@@ -81,6 +81,7 @@ namespace gglab
 	class AssetManager;
 	class DebugDrawSystem;
 	class DemoManager;
+	class DiagnosticsControl;
 	class DiagnosticsRuntime;
 	class DiagnosticsView;
 	class EnvironmentAssetController;
@@ -192,6 +193,7 @@ namespace gglab
 		}
 		// Non-owning; null unless optional diagnostics were composed with runtime services.
 		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
+		[[nodiscard]] DiagnosticsControl* GetDiagnosticsControl() const noexcept;
 		[[nodiscard]] Time* GetTime() const noexcept { return m_Time.get(); }
 		[[nodiscard]] std::optional<uint32_t> GetLabHostDemoIndex() const noexcept
 		{

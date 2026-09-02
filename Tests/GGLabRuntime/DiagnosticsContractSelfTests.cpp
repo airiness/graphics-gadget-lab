@@ -5,8 +5,10 @@
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
+#include <concepts>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -33,6 +35,22 @@ namespace gglab
 		static constexpr SnapshotId Id =
 			MakeSnapshotId("Diagnostics.UnregisteredDiagnosticsViewContractSnapshot");
 	};
+
+	template <typename T>
+	concept DiagnosticsSnapshotQuery = requires(T& value) {
+		{ value.template GetSnapshot<DiagnosticsViewContractSnapshot>() } ->
+			std::same_as<const DiagnosticsViewContractSnapshot*>;
+	};
+
+	template <typename T>
+	concept DiagnosticsRefreshControl = requires(T& value) {
+		value.template RequestRefresh<DiagnosticsViewContractSnapshot>();
+	};
+
+	static_assert(DiagnosticsSnapshotQuery<DiagnosticsView>);
+	static_assert(!DiagnosticsRefreshControl<DiagnosticsView>);
+	static_assert(!DiagnosticsSnapshotQuery<DiagnosticsControl>);
+	static_assert(DiagnosticsRefreshControl<DiagnosticsControl>);
 
 	namespace
 	{
@@ -81,6 +99,7 @@ namespace gglab
 		DiagnosticsViewContractProvider* providerObserver = provider.get();
 		runtime.RegisterProvider(std::move(provider), SnapshotUpdatePolicy::OnDemand);
 		DiagnosticsView& view = runtime;
+		DiagnosticsControl& control = runtime;
 		World firstWorld;
 		World secondWorld;
 
@@ -101,12 +120,12 @@ namespace gglab
 				providerObserver->m_CaptureCount == 1,
 			"Diagnostics view reuses the published snapshot until refresh is requested");
 
-		view.RequestRefresh<DiagnosticsViewContractSnapshot>();
+		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
 		const DiagnosticsViewContractSnapshot* refreshed =
 			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(refreshed == initial && refreshed && refreshed->m_CaptureSerial == 2 &&
 				providerObserver->m_CaptureCount == 2,
-			"Diagnostics view refresh requests recapture through the Runtime-owned provider");
+			"Diagnostics control refresh requests recapture through the Runtime-owned provider");
 
 		const auto profiles = view.GetProfiles();
 		context.Check(profiles.size() == 1 && profiles.front().m_HasSnapshot &&
@@ -116,7 +135,7 @@ namespace gglab
 			"Diagnostics view exposes immutable capture profile observations");
 
 		runtime.EndFrame();
-		view.RequestRefresh<DiagnosticsViewContractSnapshot>();
+		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
 		const DiagnosticsViewContractSnapshot* closedFrameSnapshot =
 			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(closedFrameSnapshot && closedFrameSnapshot == refreshed &&
@@ -136,7 +155,7 @@ namespace gglab
 
 		runtime.EndFrame();
 		runtime.EndFrame();
-		view.RequestRefresh<DiagnosticsViewContractSnapshot>();
+		control.RequestRefresh<DiagnosticsViewContractSnapshot>();
 		const DiagnosticsViewContractSnapshot* repeatedlyClosedSnapshot =
 			view.GetSnapshot<DiagnosticsViewContractSnapshot>();
 		context.Check(repeatedlyClosedSnapshot &&

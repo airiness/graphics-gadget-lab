@@ -5,6 +5,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -312,7 +313,10 @@ namespace gglab
 						environmentAssets)
 					{
 						GGLAB_UNUSED(environmentAssets->SelectEnvironment(entry.m_Index));
-						context.m_Diagnostics->RequestRefresh<IBLDiagnosticsSnapshot>();
+						if (context.m_DiagnosticsControl)
+						{
+							context.m_DiagnosticsControl->RequestRefresh<IBLDiagnosticsSnapshot>();
+						}
 					}
 					if (selected)
 					{

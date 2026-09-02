@@ -16,6 +16,7 @@ namespace gglab
 	class AssetManager;
 	class EnvironmentAssetController;
 	class RenderGraph;
+	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
 	class DebugDrawSystem;
@@ -39,6 +40,7 @@ namespace gglab
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
+		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;

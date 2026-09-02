@@ -43,6 +43,11 @@ namespace gglab
 		return m_Diagnostics.get();
 	}
 
+	DiagnosticsControl* GGLabAppRuntime::GetDiagnosticsControl() const noexcept
+	{
+		return m_Diagnostics.get();
+	}
+
 	namespace
 	{
 		[[nodiscard]] RHIBackendType ToRHIBackendType(AppRuntimeRHIBackend backend) noexcept
