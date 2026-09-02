@@ -88,11 +88,17 @@
     <Filter Include="Graphics\RHI\DX12\Descriptor">
       <UniqueIdentifier>{6265109B-344E-8987-6711-C1D8DB260964}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Graphics\RHI\DX12\Diagnostics">
+      <UniqueIdentifier>{4A6877DD-87B9-4881-3F76-BAE31E852D22}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Graphics\RHI\DX12\Utility">
       <UniqueIdentifier>{9909364A-83B1-BE83-3A8B-3485BD7A80E3}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\RHI\Vulkan">
       <UniqueIdentifier>{D119D225-7316-D5D3-D9F5-9D21C3BA52D1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Graphics\RHI\Vulkan\Diagnostics">
+      <UniqueIdentifier>{A9A3D3E6-F49C-A392-5052-9AB4646C87FF}</UniqueIdentifier>
     </Filter>
     <Filter Include="Graphics\Shader">
       <UniqueIdentifier>{8712B320-7C8E-3517-56CD-9D92B05AC57E}</UniqueIdentifier>
@@ -214,6 +220,9 @@
       <Filter>ThirdParty\D3D12MemoryAllocator\src</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BackendSnapshotProviders.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
@@ -567,6 +576,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Buffer.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -656,6 +668,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
@@ -840,6 +855,9 @@
       <Filter>ThirdParty\VulkanMemoryAllocator\include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BackendSnapshotProviders.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.h">
@@ -1388,6 +1406,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Buffer.h">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -1483,6 +1504,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandleTable.h">
       <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.h">
       <Filter>Graphics\RHI\Vulkan</Filter>

@@ -6,6 +6,7 @@
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
+#include "Diagnostics/Builders/BackendSnapshotProviders.h"
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
@@ -227,6 +228,8 @@ namespace gglab
 		{
 			m_Diagnostics = std::make_unique<DiagnosticsRuntime>();
 			RegisterBuiltinSnapshotProviders(*m_Diagnostics);
+			RegisterBackendSnapshotProviders(*m_Diagnostics, *m_Renderer->GetRHIContext(),
+				m_Renderer->GetPipelineCache());
 			if (m_LabHostDemoIndex)
 			{
 				m_Diagnostics->RegisterProvider(

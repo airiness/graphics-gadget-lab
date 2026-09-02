@@ -1018,6 +1018,24 @@ if (Test-Path -LiteralPath $diagnosticsViewPath -PathType Leaf) {
     }
 }
 
+$builtinSnapshotProvidersPath =
+    Join-Path $runtimeSourcesDir "Diagnostics/Builders/BuiltinSnapshotProviders.cpp"
+if (Test-Path -LiteralPath $builtinSnapshotProvidersPath -PathType Leaf) {
+    $builtinSnapshotProvidersContent =
+        Get-Content -LiteralPath $builtinSnapshotProvidersPath -Raw -ErrorAction Stop
+    $builtinBackendProviderRegex =
+        '\b(?:DX12Context|VulkanContext|DX12PipelineSystem|VulkanPipelineSystem|' +
+        'DX12BackendSnapshot|DX12ResourceManagerSnapshot|VulkanBackendSnapshot|' +
+        'RHIPipelineSystemSnapshotProvider|dynamic_cast)\b'
+    if ($builtinSnapshotProvidersContent -match $builtinBackendProviderRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "diagnostics-backend-provider-ownership"
+            Target = ConvertTo-RepoRelativePath $builtinSnapshotProvidersPath
+            Reason = "Backend-neutral diagnostics registration must not rediscover or own DX12/Vulkan snapshot providers"
+        })
+    }
+}
+
 $winAppDiagnosticsCaptureOwnershipRegex =
     '\b(?:DiagnosticsRuntime|SnapshotContext|SnapshotProviderBase|SnapshotStore|' +
     'RegisterBuiltinSnapshotProviders|LabSnapshotProvider)\b'
