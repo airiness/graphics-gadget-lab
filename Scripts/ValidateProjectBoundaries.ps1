@@ -1036,6 +1036,26 @@ if (Test-Path -LiteralPath $builtinSnapshotProvidersPath -PathType Leaf) {
     }
 }
 
+$diagnosticsBuildersDir = Join-Path $runtimeSourcesDir "Diagnostics/Builders"
+$backendSnapshotDispatcherPath =
+    Join-Path $diagnosticsBuildersDir "BackendSnapshotProviders.cpp"
+$backendSpecificDiagnosticsRegex = '\b(?:DX12|Vulkan)'
+foreach ($sourceFile in @(
+        Get-ChildItem -LiteralPath $diagnosticsBuildersDir -File |
+            Where-Object {
+                $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") -and
+                $_.FullName -ne $backendSnapshotDispatcherPath
+            })) {
+    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+    if ($content -match $backendSpecificDiagnosticsRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "diagnostics-backend-builder-ownership"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "Backend-specific diagnostics builders must live with their DX12 or Vulkan backend owner"
+        })
+    }
+}
+
 $winAppDiagnosticsCaptureOwnershipRegex =
     '\b(?:DiagnosticsRuntime|SnapshotContext|SnapshotProviderBase|SnapshotStore|' +
     'RegisterBuiltinSnapshotProviders|LabSnapshotProvider)\b'

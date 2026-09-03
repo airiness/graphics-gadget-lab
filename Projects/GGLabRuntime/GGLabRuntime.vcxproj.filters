@@ -228,12 +228,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -255,9 +249,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -268,9 +259,6 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.cpp">
@@ -576,6 +564,15 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.cpp">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.cpp">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.cpp">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
       <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
     </ClCompile>
@@ -668,6 +665,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.cpp">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
       <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
@@ -863,12 +866,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -890,9 +887,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -903,9 +897,6 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h">
@@ -1406,6 +1397,15 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">
       <Filter>Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.h">
+      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
       <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
     </ClInclude>
@@ -1504,6 +1504,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandleTable.h">
       <Filter>Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.h">
+      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
       <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>

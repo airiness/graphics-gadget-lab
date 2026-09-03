@@ -1,8 +1,5 @@
 #include "Graphics/RHI/DX12/Diagnostics/DX12SnapshotProviders.h"
 
-#include "Diagnostics/Builders/DX12BackendSnapshotBuilder.h"
-#include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
-#include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
@@ -13,6 +10,9 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/Diagnostics/DX12BackendSnapshotBuilder.h"
+#include "Graphics/RHI/DX12/Diagnostics/DX12PipelineSystemSnapshotBuilder.h"
+#include "Graphics/RHI/DX12/Diagnostics/DX12ResourceManagerSnapshotBuilder.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
 

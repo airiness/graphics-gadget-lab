@@ -1,4 +1,4 @@
-#include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
+#include "Graphics/RHI/DX12/Diagnostics/DX12ResourceManagerSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12ResourceManager.h"
