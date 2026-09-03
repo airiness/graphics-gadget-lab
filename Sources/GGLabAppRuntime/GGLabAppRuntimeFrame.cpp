@@ -286,16 +286,12 @@ namespace gglab
 				.m_World = &world,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
-				.m_MainRenderView =
-					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
-				.m_DirectionalShadowSettings =
-					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);

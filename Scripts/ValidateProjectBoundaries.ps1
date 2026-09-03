@@ -2067,6 +2067,18 @@ foreach ($itemPath in $toolingFrameContextPaths) {
     }
 }
 
+$redundantToolingAliasRegex = '\bm_(?:MainRenderView|DirectionalShadowSettings)\b'
+foreach ($itemPath in $toolingFrameContextPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $redundantToolingAliasRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-tooling-redundant-alias"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling frame contexts must resolve main-view and directional-shadow state from their authoritative collections"
+        })
+    }
+}
+
 $applicationFrameOrchestrationRegex =
     '\bRenderFrameBuilder\b|\bRenderGraph\b|\bDebugDrawSystem\b|' +
     '\bShaderPreloadStatus\b|\bPumpCompletions\s*\(|\bDrainLoadCompletions\s*\(|' +

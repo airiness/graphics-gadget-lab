@@ -28,14 +28,12 @@ namespace gglab
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
-		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
-		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;

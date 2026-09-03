@@ -90,7 +90,6 @@ namespace gglab
 				guiContext.m_World = context.m_World;
 				guiContext.m_RenderViews = context.m_RenderViews;
 				guiContext.m_RenderQueues = context.m_RenderQueues;
-				guiContext.m_MainRenderView = context.m_MainRenderView;
 				guiContext.m_AssetManager = context.m_AssetManager;
 				guiContext.m_EnvironmentAssetController =
 					context.m_EnvironmentAssetController;
@@ -99,7 +98,6 @@ namespace gglab
 				guiContext.m_DebugDrawSystem = context.m_DebugDrawSystem;
 				guiContext.m_DebugDrawFrame =
 					context.m_DebugDrawFrame ? *context.m_DebugDrawFrame : DebugDrawFrameView{};
-				guiContext.m_DirectionalShadowSettings = context.m_DirectionalShadowSettings;
 
 				m_System.Draw(guiContext);
 				if (context.m_LoadingProgress)

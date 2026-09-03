@@ -215,9 +215,8 @@ namespace gglab
 				return;
 			}
 
-			context.m_DirectionalShadowSettings =
-				&*lightBinding.m_Light->m_DirectionalShadowSettings;
-			DrawDirectionalShadowSettings(*context.m_DirectionalShadowSettings);
+			DrawDirectionalShadowSettings(
+				*lightBinding.m_Light->m_DirectionalShadowSettings);
 		}
 
 		static void DrawShadowCamera(

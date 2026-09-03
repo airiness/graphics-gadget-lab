@@ -46,6 +46,24 @@ namespace gglab
 			bool m_Hovered = false;
 		};
 
+		[[nodiscard]] const RenderView* FindRenderView(
+			std::span<const RenderView> views, RenderViewID viewId) noexcept
+		{
+			const size_t index = utils::ToIndex(viewId);
+			if (index < views.size() && views[index].m_ViewId == viewId)
+			{
+				return &views[index];
+			}
+			for (const RenderView& view : views)
+			{
+				if (view.m_ViewId == viewId)
+				{
+					return &view;
+				}
+			}
+			return nullptr;
+		}
+
 		[[nodiscard]] bool PassesFilter(const entt::registry& registry, entt::entity entity,
 			EntityComponentFilter filter) noexcept
 		{
@@ -637,6 +655,6 @@ namespace gglab
 		}
 
 		DrawEntityWorldLinks(registry, state, std::span<const EntityListItemAnchor>(entityAnchors),
-			context.m_MainRenderView);
+			FindRenderView(context.m_RenderViews, RenderViewID::Main));
 	}
 }
