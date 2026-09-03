@@ -85,8 +85,6 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				DevelopGuiContext guiContext{};
-				guiContext.m_Camera = context.m_Camera;
-				guiContext.m_CameraController = context.m_CameraController;
 				guiContext.m_CameraRig = context.m_CameraRig;
 				guiContext.m_Renderer = context.m_Renderer;
 				guiContext.m_World = context.m_World;
@@ -103,10 +101,6 @@ namespace gglab
 				guiContext.m_DebugDrawFrame =
 					context.m_DebugDrawFrame ? *context.m_DebugDrawFrame : DebugDrawFrameView{};
 				guiContext.m_DirectionalShadowSettings = context.m_DirectionalShadowSettings;
-				guiContext.m_AuthoringViewRenderProfile =
-					context.m_AuthoringViewRenderProfile;
-				guiContext.m_EffectiveViewRenderProfile = context.m_EffectiveViewRenderProfile;
-				guiContext.m_TemporalFramePlan = context.m_TemporalFramePlan;
 
 				m_System.Draw(guiContext);
 				if (context.m_LoadingProgress)

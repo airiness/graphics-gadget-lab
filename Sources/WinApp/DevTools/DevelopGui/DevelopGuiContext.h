@@ -9,8 +9,6 @@
 namespace gglab
 {
 	class World;
-	class Camera;
-	class CameraController;
 	class CameraRig;
 	class Renderer;
 	class AssetManager;
@@ -20,16 +18,12 @@ namespace gglab
 	class DiagnosticsView;
 	class DevelopGuiSystem;
 	class DebugDrawSystem;
-	struct ViewRenderProfile;
 	struct ViewRenderSettingsOverrides;
-	struct ResolvedTemporalFramePlan;
 
 	class DevelopGuiStateStore;
 
 	struct DevelopGuiContext
 	{
-		Camera* m_Camera = nullptr;
-		CameraController* m_CameraController = nullptr;
 		CameraRig* m_CameraRig = nullptr;
 		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
@@ -45,9 +39,6 @@ namespace gglab
 		DebugDrawFrameView m_DebugDrawFrame{};
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
-		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
-		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
-		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 

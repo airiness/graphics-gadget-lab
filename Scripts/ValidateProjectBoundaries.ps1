@@ -2037,6 +2037,24 @@ foreach ($itemPath in $applicationCoreContractPaths) {
     }
 }
 
+$toolingFrameContextPaths = @(
+    (Join-Path $appRuntimeSourcesDir "ApplicationToolingIntegration.h"),
+    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h")
+)
+$redundantToolingFrameMemberRegex =
+    '\bm_(?:Camera|CameraController|AuthoringViewRenderProfile|' +
+    'EffectiveViewRenderProfile|TemporalFramePlan)\b'
+foreach ($itemPath in $toolingFrameContextPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $redundantToolingFrameMemberRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-tooling-context-surface"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling frame contexts must not republish redundant camera bindings or unused frame-profile state"
+        })
+    }
+}
+
 $applicationFrameOrchestrationRegex =
     '\bRenderFrameBuilder\b|\bRenderGraph\b|\bDebugDrawSystem\b|' +
     '\bShaderPreloadStatus\b|\bPumpCompletions\s*\(|\bDrainLoadCompletions\s*\(|' +

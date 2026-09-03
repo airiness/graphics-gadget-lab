@@ -202,4 +202,3 @@ namespace gglab
 			static_cast<uint32_t>(outSnapshot.m_BindingLayouts.size());
 	}
 }
-

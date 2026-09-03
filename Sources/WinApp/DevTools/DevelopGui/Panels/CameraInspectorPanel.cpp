@@ -101,32 +101,23 @@ namespace gglab
 		static CameraBinding ResolveCameraBinding(
 			CameraPanelState& state, DevelopGuiContext& context) noexcept
 		{
-			if (auto* rig = context.m_CameraRig)
+			auto* rig = context.m_CameraRig;
+			if (!rig || rig->GetCameraCount() == 0)
 			{
-				if (rig->GetCameraCount() == 0)
-				{
-					return {};
-				}
-				state.m_SelectedCameraIndex =
-					std::min(state.m_SelectedCameraIndex, rig->GetCameraCount() - 1);
-				if (!state.m_Initialized)
-				{
-					state.m_SelectedCameraIndex = rig->GetActiveCameraIndex();
-				}
-				auto* slot = rig->GetCameraSlot(state.m_SelectedCameraIndex);
-				return {
-					.m_Camera = slot ? slot->m_Camera : nullptr,
-					.m_Controller = slot ? slot->m_Controller : nullptr,
-					.m_Slot = slot,
-					.m_Index = state.m_SelectedCameraIndex,
-				};
+				return {};
 			}
-
+			state.m_SelectedCameraIndex =
+				std::min(state.m_SelectedCameraIndex, rig->GetCameraCount() - 1);
+			if (!state.m_Initialized)
+			{
+				state.m_SelectedCameraIndex = rig->GetActiveCameraIndex();
+			}
+			auto* slot = rig->GetCameraSlot(state.m_SelectedCameraIndex);
 			return {
-				.m_Camera = context.m_Camera,
-				.m_Controller = context.m_CameraController,
-				.m_Slot = nullptr,
-				.m_Index = 0,
+				.m_Camera = slot ? slot->m_Camera : nullptr,
+				.m_Controller = slot ? slot->m_Controller : nullptr,
+				.m_Slot = slot,
+				.m_Index = state.m_SelectedCameraIndex,
 			};
 		}
 

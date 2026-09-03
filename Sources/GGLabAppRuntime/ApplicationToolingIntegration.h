@@ -7,8 +7,6 @@ namespace gglab
 {
 	class ApplicationToolingIntegrationBase;
 	class AssetManager;
-	class Camera;
-	class CameraController;
 	class CameraRig;
 	class DebugDrawSystem;
 	class DiagnosticsControl;
@@ -25,7 +23,6 @@ namespace gglab
 	struct RenderView;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
-	struct ResolvedTemporalFramePlan;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -40,8 +37,6 @@ namespace gglab
 
 	struct ApplicationToolingFrameContext
 	{
-		Camera* m_Camera = nullptr;
-		CameraController* m_CameraController = nullptr;
 		CameraRig* m_CameraRig = nullptr;
 		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
@@ -56,9 +51,6 @@ namespace gglab
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
-		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
-		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
-		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
 	};
 

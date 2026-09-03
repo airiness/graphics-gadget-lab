@@ -140,7 +140,6 @@ namespace gglab
 		m_EnvironmentAssetController->Tick();
 
 		World& world = demo->GetWorld();
-		Camera& camera = demo->GetCamera();
 		Renderer::Frame rendererFrame = m_Renderer->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
@@ -282,8 +281,6 @@ namespace gglab
 			}
 
 			const ApplicationToolingFrameContext toolingContext{
-				.m_Camera = &camera,
-				.m_CameraController = &demo->GetCameraController(),
 				.m_CameraRig = &demo->GetCameraRig(),
 				.m_Renderer = m_Renderer.get(),
 				.m_World = &world,
@@ -300,9 +297,6 @@ namespace gglab
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_DirectionalShadowSettings =
 					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
-				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
-				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
-				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);
