@@ -290,7 +290,6 @@ namespace gglab
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
-				.m_RenderGraph = &renderGraph,
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),

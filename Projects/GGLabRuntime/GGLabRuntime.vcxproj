@@ -562,6 +562,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.cpp" />
@@ -594,6 +595,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h" />
@@ -608,6 +610,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
 	<ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h" />

@@ -2055,6 +2055,18 @@ foreach ($itemPath in $toolingFrameContextPaths) {
     }
 }
 
+$liveRenderGraphToolingMemberRegex = '\bm_RenderGraph\b'
+foreach ($itemPath in $toolingFrameContextPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $liveRenderGraphToolingMemberRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "application-tooling-render-graph-surface"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling frame contexts must observe RenderGraph state through immutable diagnostics snapshots"
+        })
+    }
+}
+
 $applicationFrameOrchestrationRegex =
     '\bRenderFrameBuilder\b|\bRenderGraph\b|\bDebugDrawSystem\b|' +
     '\bShaderPreloadStatus\b|\bPumpCompletions\s*\(|\bDrainLoadCompletions\s*\(|' +

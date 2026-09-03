@@ -7,6 +7,7 @@
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
+#include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Diagnostics/Builders/TemporalAADiagnosticsSnapshotBuilder.h"
@@ -21,6 +22,7 @@
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
+#include "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 #include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
@@ -125,6 +127,23 @@ namespace gglab
 				{
 					snapshot = {};
 				}
+			}
+		};
+
+		class ShadowDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<ShadowDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Shadow Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<ShadowDiagnosticsSnapshot>();
+				snapshot = context.m_RenderGraph
+					? BuildShadowDiagnosticsSnapshot(*context.m_RenderGraph)
+					: ShadowDiagnosticsSnapshot{};
 			}
 		};
 
@@ -303,6 +322,8 @@ namespace gglab
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<ShadowDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),

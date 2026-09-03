@@ -1130,12 +1130,6 @@ namespace gglab
 		ImGui::TextUnformatted("RenderGraph Inspector");
 		ImGui::Separator();
 
-		if (!context.m_RenderGraph)
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "RenderGraph is null.");
-			return;
-		}
-
 		const auto* snapshotPtr =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
 		if (!snapshotPtr)

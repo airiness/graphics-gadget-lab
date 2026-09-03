@@ -252,6 +252,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -890,6 +893,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h">
+      <Filter>Diagnostics\Builders</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -936,6 +942,9 @@
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
+      <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h">

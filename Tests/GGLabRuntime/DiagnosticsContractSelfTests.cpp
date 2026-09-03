@@ -1,12 +1,16 @@
 #include "DiagnosticsContractSelfTests.h"
 
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
+#include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
+#include "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/RenderPass/ShadowGraphResources.h"
 
 #include <concepts>
 #include <cstdint>
@@ -54,6 +58,10 @@ namespace gglab
 
 	namespace
 	{
+		struct ShadowDiagnosticsFixturePassData
+		{
+		};
+
 		class DiagnosticsViewContractProvider final : public SnapshotProviderBase
 		{
 		public:
@@ -188,5 +196,41 @@ namespace gglab
 				secondLabSnapshot->m_ActiveLabName == "Second Lab",
 			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
 		labDiagnostics.EndFrame();
+
+		RenderGraph shadowGraph({
+			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+			.m_TransientResourcePool =
+				reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+			});
+		shadowGraph.GetBlackboard().Create<RGShadowResources>(ShadowResourcesName);
+		shadowGraph.AddPass<ShadowDiagnosticsFixturePassData>("Diagnostics.ShadowFixture",
+			[](RenderGraph::RGBuilder& builder, ShadowDiagnosticsFixturePassData&)
+			{
+				auto& resources =
+					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+				resources.m_DirectionalShadowMap = builder.CreateTexture("Shadow.Map", {
+					.m_Format = RHIFormat::R32Typeless,
+					.m_Extent = { 2048, 2048, 1 },
+					});
+				resources.m_DirectionalShadowMapPreview = builder.CreateTexture("Shadow.Preview", {
+					.m_Format = RHIFormat::R32Float,
+					.m_Extent = { 512, 512, 1 },
+					});
+				resources.m_ShadowMapSize = 2048;
+				resources.m_ShadowMapPreviewSize = 512;
+			});
+		const ShadowDiagnosticsSnapshot shadowSnapshot =
+			BuildShadowDiagnosticsSnapshot(shadowGraph);
+		context.Check(shadowSnapshot.m_Available &&
+				shadowSnapshot.m_DirectionalShadowMap.m_Available &&
+				shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Width == 2048 &&
+				shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Height == 2048 &&
+				shadowSnapshot.m_DirectionalShadowMap.m_Format == RHIFormat::R32Typeless &&
+				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Available &&
+				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Extent.m_Width == 512 &&
+				shadowSnapshot.m_DirectionalShadowMapPreviewSource.m_Format == RHIFormat::R32Float &&
+				shadowSnapshot.m_ShadowMapSize == 2048 &&
+				shadowSnapshot.m_ShadowMapPreviewSize == 512,
+			"Shadow diagnostics copies RenderGraph resource state into an immutable snapshot");
 	}
 }

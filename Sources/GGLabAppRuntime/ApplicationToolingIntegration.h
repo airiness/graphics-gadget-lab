@@ -12,7 +12,6 @@ namespace gglab
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class EnvironmentAssetController;
-	class RenderGraph;
 	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
 	class World;
@@ -45,7 +44,6 @@ namespace gglab
 		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
-		RenderGraph* m_RenderGraph = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
