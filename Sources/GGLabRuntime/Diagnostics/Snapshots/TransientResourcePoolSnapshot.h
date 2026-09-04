@@ -49,6 +49,7 @@ namespace gglab
 
 	struct TransientResourcePoolSnapshot
 	{
+		bool m_SourceAvailable = false;
 		TransientPoolStateCounts m_TextureCounts{};
 		TransientPoolStateCounts m_BufferCounts{};
 		uint32_t m_PendingRetirementCount = 0;

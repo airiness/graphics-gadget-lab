@@ -2079,6 +2079,25 @@ foreach ($itemPath in $toolingFrameContextPaths) {
     }
 }
 
+$snapshotOnlyToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "PersistentSceneBuffersPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "PersistentSceneBuffersPanel.h"),
+    (Join-Path $developGuiPanelsDir "PipelineSystemPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "PipelineSystemPanel.h"),
+    (Join-Path $developGuiPanelsDir "TransientResourcePoolPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "TransientResourcePoolPanel.h")
+)
+foreach ($itemPath in $snapshotOnlyToolingPanelPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bRenderer\b|\bm_Renderer\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "snapshot-only-tooling-panel-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "snapshot-only tooling panels must not retain a parallel live Renderer dependency"
+        })
+    }
+}
+
 $applicationFrameOrchestrationRegex =
     '\bRenderFrameBuilder\b|\bRenderGraph\b|\bDebugDrawSystem\b|' +
     '\bShaderPreloadStatus\b|\bPumpCompletions\s*\(|\bDrainLoadCompletions\s*\(|' +

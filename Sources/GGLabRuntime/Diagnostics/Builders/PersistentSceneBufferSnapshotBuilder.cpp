@@ -73,6 +73,7 @@ namespace gglab
 		const Renderer& renderer, PersistentSceneBufferSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
+		outSnapshot.m_SourceAvailable = true;
 		const auto* objectBuffer = renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = renderer.GetMaterialStructuredBuffer();
 		const auto* lightBuffer = renderer.GetLightStructuredBuffer();

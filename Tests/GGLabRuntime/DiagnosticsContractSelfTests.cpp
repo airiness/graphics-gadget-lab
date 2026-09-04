@@ -1,14 +1,18 @@
 #include "DiagnosticsContractSelfTests.h"
 
+#include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+#include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 
@@ -196,6 +200,31 @@ namespace gglab
 				secondLabSnapshot->m_ActiveLabName == "Second Lab",
 			"Lab diagnostics recaptures from the current AppRuntime-supplied source");
 		labDiagnostics.EndFrame();
+
+		Renderer resourceSource;
+		DiagnosticsRuntime resourceDiagnostics;
+		RegisterBuiltinSnapshotProviders(resourceDiagnostics);
+		resourceDiagnostics.BeginFrame({ .m_Renderer = &resourceSource });
+		const auto* persistentSnapshot =
+			resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
+		const auto* transientSnapshot =
+			resourceDiagnostics.GetSnapshot<TransientResourcePoolSnapshot>();
+		context.Check(persistentSnapshot && persistentSnapshot->m_SourceAvailable &&
+				persistentSnapshot->m_Objects.m_BufferVersions.empty(),
+			"Persistent buffer diagnostics distinguish a bound source from empty tables");
+		context.Check(transientSnapshot && !transientSnapshot->m_SourceAvailable,
+			"Transient pool diagnostics report a missing pool even with a bound renderer");
+		const PersistentSceneBufferSnapshot retainedPersistentSnapshot =
+			persistentSnapshot ? *persistentSnapshot : PersistentSceneBufferSnapshot{};
+		resourceDiagnostics.EndFrame();
+		resourceDiagnostics.BeginFrame({});
+		persistentSnapshot = resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
+		transientSnapshot = resourceDiagnostics.GetSnapshot<TransientResourcePoolSnapshot>();
+		context.Check(persistentSnapshot && !persistentSnapshot->m_SourceAvailable &&
+				transientSnapshot && !transientSnapshot->m_SourceAvailable &&
+				retainedPersistentSnapshot.m_SourceAvailable,
+			"Missing-source recapture clears availability without changing a retained value copy");
+		resourceDiagnostics.EndFrame();
 
 		RenderGraph shadowGraph({
 			.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),

@@ -1,6 +1,8 @@
 #include "RenderingContractSelfTests.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
@@ -3945,6 +3947,12 @@ namespace gglab
 
 			RecordingDevice reuseDevice;
 			TransientResourcePool reusePool(&reuseDevice);
+			TransientResourcePoolSnapshot emptyPoolSnapshot;
+			BuildTransientResourcePoolSnapshot(reusePool, emptyPoolSnapshot);
+			context.Check(emptyPoolSnapshot.m_SourceAvailable &&
+				emptyPoolSnapshot.m_TextureCounts.m_Total == 0 &&
+				emptyPoolSnapshot.m_BufferCounts.m_Total == 0,
+				"Transient pool diagnostics distinguish an available empty pool from no source");
 			auto discardAllocation = reusePool.AcquireTexture(graphTextureDesc, "Discardable");
 			const TransientResourcePoolSlot discardSlot = discardAllocation.m_PoolSlot;
 			reusePool.RetireTexture(std::move(discardAllocation), {});

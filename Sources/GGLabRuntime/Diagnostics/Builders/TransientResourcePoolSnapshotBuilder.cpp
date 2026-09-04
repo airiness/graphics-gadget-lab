@@ -1,6 +1,7 @@
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "Graphics/Resource/TransientResourcePool.h"
 
 #include <unordered_set>
 
@@ -34,6 +35,7 @@ namespace gglab
 		const TransientResourcePool& pool, TransientResourcePoolSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
+		outSnapshot.m_SourceAvailable = true;
 		outSnapshot.m_PendingRetirementCount =
 			static_cast<uint32_t>(pool.m_PendingRetirements.size());
 		outSnapshot.m_MaxCachedPerKey = pool.m_MaxCachedPerKey;

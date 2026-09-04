@@ -45,6 +45,7 @@ namespace gglab
 
 	struct PersistentSceneBufferSnapshot
 	{
+		bool m_SourceAvailable = false;
 		PersistentBufferTableSnapshot m_Objects;
 		PersistentBufferTableSnapshot m_Materials;
 		PersistentBufferTableSnapshot m_Lights;
