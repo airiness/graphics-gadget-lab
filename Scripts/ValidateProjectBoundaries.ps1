@@ -1004,6 +1004,13 @@ foreach ($sourceFile in $developGuiDiagnosticsConsumerFiles) {
             Reason = "DevTools panels must use DiagnosticsView or DiagnosticsControl instead of the capture engine"
         })
     }
+    if ($content -match '\bGpuProfiler\b|\bGetGpuProfiler\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "gpu-profiling-tooling-boundary"
+            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+            Reason = "DevTools panels must consume the separate Public GPU profiling query and control capabilities"
+        })
+    }
 }
 
 $diagnosticsViewPath = Join-Path $runtimePublicDir "GGLabRuntime/Diagnostics/DiagnosticsView.h"
@@ -2079,7 +2086,11 @@ foreach ($itemPath in $toolingFrameContextPaths) {
     }
 }
 
-$snapshotOnlyToolingPanelPaths = @(
+$rendererIndependentToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "ForwardPlusInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ForwardPlusInspectorPanel.h"),
+    (Join-Path $developGuiPanelsDir "ProfilingPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ProfilingPanel.h"),
     (Join-Path $developGuiPanelsDir "PersistentSceneBuffersPanel.cpp"),
     (Join-Path $developGuiPanelsDir "PersistentSceneBuffersPanel.h"),
     (Join-Path $developGuiPanelsDir "PipelineSystemPanel.cpp"),
@@ -2087,13 +2098,13 @@ $snapshotOnlyToolingPanelPaths = @(
     (Join-Path $developGuiPanelsDir "TransientResourcePoolPanel.cpp"),
     (Join-Path $developGuiPanelsDir "TransientResourcePoolPanel.h")
 )
-foreach ($itemPath in $snapshotOnlyToolingPanelPaths) {
+foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '\bRenderer\b|\bm_Renderer\b') {
         $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "snapshot-only-tooling-panel-boundary"
+            Rule   = "tooling-panel-renderer-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
-            Reason = "snapshot-only tooling panels must not retain a parallel live Renderer dependency"
+            Reason = "panels migrated to snapshots or narrow capabilities must not retain a parallel live Renderer dependency"
         })
     }
 }

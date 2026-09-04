@@ -196,7 +196,7 @@ namespace gglab
 		if (gpuProfiler)
 		{
 			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->SetEnabled(true);
+			gpuProfiler->RequestEnabled(true);
 		}
 		ArmGpuTimingCaptureWarmup();
 	}
@@ -205,7 +205,7 @@ namespace gglab
 	{
 		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
 		{
-			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+			gpuProfiler->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
 		m_DebugReadback->InvalidateResults();
 	}

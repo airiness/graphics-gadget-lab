@@ -15,6 +15,7 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
@@ -290,6 +291,8 @@ namespace gglab
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
+				.m_GpuProfiling = m_Renderer->GetGpuProfiler(),
+				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,

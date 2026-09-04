@@ -12,6 +12,10 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
@@ -60,8 +64,72 @@ namespace gglab
 	static_assert(!DiagnosticsSnapshotQuery<DiagnosticsControl>);
 	static_assert(DiagnosticsRefreshControl<DiagnosticsControl>);
 
+	template <typename T>
+	concept GpuProfilingQuery = requires(const T& value) {
+		{ value.IsEnabled() } -> std::same_as<bool>;
+		{ value.GetLatestFrame() } -> std::same_as<GpuProfileFrameSnapshot>;
+	};
+
+	template <typename T>
+	concept GpuProfilingControl = requires(T& value) {
+		value.RequestEnabled(true);
+	};
+
+	static_assert(GpuProfilingQuery<GpuProfilingViewBase>);
+	static_assert(!GpuProfilingControl<GpuProfilingViewBase>);
+	static_assert(!GpuProfilingQuery<GpuProfilingControlBase>);
+	static_assert(GpuProfilingControl<GpuProfilingControlBase>);
+
 	namespace
 	{
+		class ContractGpuProfiler final : public GpuProfiler
+		{
+		public:
+			void RequestEnabled(bool enabled) noexcept override { m_Enabled = enabled; }
+			bool IsEnabled() const noexcept override { return m_Enabled; }
+			GpuProfileFrameSnapshot GetLatestFrame() const override { return m_LatestFrame; }
+
+			bool m_Enabled = true;
+			GpuProfileFrameSnapshot m_LatestFrame;
+		};
+
+		void RunGpuProfilingContractSelfTests(SelfTestContext& context) noexcept
+		{
+			GpuProfileFrameSnapshot retainedFrame;
+			{
+				ContractGpuProfiler profiler;
+				const GpuProfilingViewBase& view = profiler;
+				GpuProfilingControlBase& control = profiler;
+				context.Check(view.IsEnabled() && !view.GetLatestFrame().IsValid(),
+					"GPU profiling query distinguishes enabled collection from completed data");
+
+				profiler.m_LatestFrame = {
+					.m_FrameIndex = 17,
+					.m_FrameMilliseconds = 2.5,
+					.m_Samples = { { "Opaque", 1.5, 2 } },
+				};
+				retainedFrame = view.GetLatestFrame();
+				control.RequestEnabled(false);
+				context.Check(!view.IsEnabled() && view.GetLatestFrame().m_FrameIndex == 17,
+					"GPU profiling control reaches its owner without discarding completed timings");
+				control.RequestEnabled(true);
+				context.Check(view.IsEnabled(),
+					"GPU profiling queries observe the latest accepted enable request");
+
+				profiler.m_LatestFrame.m_FrameIndex = 18;
+				profiler.m_LatestFrame.m_Samples.front().m_Name = "Transparent";
+				context.Check(view.GetLatestFrame().m_FrameIndex == 18 &&
+					retainedFrame.m_FrameIndex == 17 &&
+					retainedFrame.m_Samples.front().m_Name == "Opaque",
+					"GPU timing value copies remain independent of later backend publication");
+			}
+			context.Check(retainedFrame.IsValid() && retainedFrame.m_FrameMilliseconds == 2.5 &&
+				retainedFrame.m_Samples.size() == 1 &&
+				retainedFrame.m_Samples.front().m_Milliseconds == 1.5 &&
+				retainedFrame.m_Samples.front().m_CallCount == 2,
+				"A retained GPU timing snapshot outlives the profiler owner");
+		}
+
 		struct ShadowDiagnosticsFixturePassData
 		{
 		};
@@ -106,6 +174,8 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunGpuProfilingContractSelfTests(context);
+
 		DiagnosticsRuntime runtime;
 		auto provider = std::make_unique<DiagnosticsViewContractProvider>();
 		DiagnosticsViewContractProvider* providerObserver = provider.get();

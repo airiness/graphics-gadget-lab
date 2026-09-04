@@ -38,7 +38,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanGpuProfiler);
 		~VulkanGpuProfiler() override;
 
-		void SetEnabled(bool enabled) noexcept override;
+		void RequestEnabled(bool enabled) noexcept override;
 		[[nodiscard]] bool IsEnabled() const noexcept override;
 		[[nodiscard]] GpuProfileFrameSnapshot GetLatestFrame() const override;
 

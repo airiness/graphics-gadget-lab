@@ -184,6 +184,9 @@
     <Filter Include="Public\GGLabRuntime\Graphics\PostProcess">
       <UniqueIdentifier>{8D7D4D96-B962-0924-3836-6419E33AD06B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\Profiling">
+      <UniqueIdentifier>{E8DC78AF-7962-D4A4-2E48-49E6AEDC81CA}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\RHI">
       <UniqueIdentifier>{67D2F0C8-FA46-D5CE-C9B6-959AC4B67320}</UniqueIdentifier>
     </Filter>
@@ -1756,6 +1759,15 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h">
       <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfileFrameSnapshot.h">
+      <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingControlBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

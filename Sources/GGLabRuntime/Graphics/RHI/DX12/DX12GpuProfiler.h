@@ -27,7 +27,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DX12GpuProfiler);
 		~DX12GpuProfiler() override;
 
-		void SetEnabled(bool enabled) noexcept override;
+		void RequestEnabled(bool enabled) noexcept override;
 		[[nodiscard]] bool IsEnabled() const noexcept override;
 		[[nodiscard]] GpuProfileFrameSnapshot GetLatestFrame() const override;
 

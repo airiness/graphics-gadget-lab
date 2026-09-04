@@ -449,6 +449,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfileFrameSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingControlBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />

@@ -1,10 +1,14 @@
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+
+#include <algorithm>
+#include <utility>
 
 #include <imgui.h>
 
@@ -162,8 +166,7 @@ namespace gglab
 	{
 		auto& state = context.PanelState<ProfilingPanelState>();
 		auto& profiler = CpuProfiler::Get();
-		GpuProfiler* gpuProfiler =
-			context.m_Renderer ? context.m_Renderer->GetGpuProfiler() : nullptr;
+		const GpuProfilingViewBase* gpuProfiling = context.m_GpuProfiling;
 
 		bool enabled = profiler.IsEnabled();
 		if (ImGui::Checkbox("CPU profiling", &enabled))
@@ -171,13 +174,15 @@ namespace gglab
 			profiler.SetEnabled(enabled);
 		}
 		ImGui::SameLine();
-		if (gpuProfiler)
+		if (gpuProfiling)
 		{
-			bool gpuEnabled = gpuProfiler->IsEnabled();
-			if (ImGui::Checkbox("GPU profiling", &gpuEnabled))
+			bool gpuEnabled = gpuProfiling->IsEnabled();
+			ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+			if (ImGui::Checkbox("GPU profiling", &gpuEnabled) && context.m_GpuProfilingControl)
 			{
-				gpuProfiler->SetEnabled(gpuEnabled);
+				context.m_GpuProfilingControl->RequestEnabled(gpuEnabled);
 			}
+			ImGui::EndDisabled();
 		}
 		else
 		{
@@ -199,9 +204,9 @@ namespace gglab
 				state.m_DisplayedFrame = std::move(latestFrame);
 			}
 
-			if (gpuProfiler)
+			if (gpuProfiling)
 			{
-				auto latestGpuFrame = gpuProfiler->GetLatestFrame();
+				auto latestGpuFrame = gpuProfiling->GetLatestFrame();
 				if (latestGpuFrame.IsValid() &&
 					latestGpuFrame.m_FrameIndex != state.m_DisplayedGpuFrame.m_FrameIndex)
 				{

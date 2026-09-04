@@ -88,7 +88,7 @@ namespace gglab
 		}
 	}
 
-	void VulkanGpuProfiler::SetEnabled(bool enabled) noexcept
+	void VulkanGpuProfiler::RequestEnabled(bool enabled) noexcept
 	{
 		m_Enabled.store(enabled && m_Available, std::memory_order_relaxed);
 	}

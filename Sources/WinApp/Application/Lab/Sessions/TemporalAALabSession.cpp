@@ -156,7 +156,7 @@ namespace gglab
 		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
 		{
 			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->SetEnabled(true);
+			gpuProfiler->RequestEnabled(true);
 		}
 		ResetEvidenceCapture();
 		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
@@ -170,7 +170,7 @@ namespace gglab
 		m_IsEntered = false;
 		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
 		{
-			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+			gpuProfiler->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
 		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
 		{

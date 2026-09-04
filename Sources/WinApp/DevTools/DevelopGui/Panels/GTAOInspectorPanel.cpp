@@ -5,7 +5,8 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
-#include "Graphics/Profiling/GpuProfiler.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -439,14 +440,16 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			GpuProfiler* profiler = context.m_Renderer->GetGpuProfiler();
-			if (profiler)
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = profiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling##GTAO", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling##GTAO", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					profiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (!snapshot->m_GpuTimingAvailable)
 			{

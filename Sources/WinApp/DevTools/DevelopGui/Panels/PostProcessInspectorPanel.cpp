@@ -3,7 +3,8 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
-#include "Graphics/Profiling/GpuProfiler.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -342,14 +343,16 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			auto* gpuProfiler = renderer->GetGpuProfiler();
-			if (gpuProfiler)
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = gpuProfiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					gpuProfiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (!snapshot->m_GpuProfilerEnabled)
 			{

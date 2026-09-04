@@ -3,6 +3,8 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
 #include <filesystem>
@@ -37,6 +39,19 @@ namespace gglab
 			return registration;
 		}
 
+		class TestGpuProfilingView final : public GpuProfilingViewBase
+		{
+		public:
+			bool IsEnabled() const noexcept override { return true; }
+			GpuProfileFrameSnapshot GetLatestFrame() const override { return {}; }
+		};
+
+		class TestGpuProfilingControl final : public GpuProfilingControlBase
+		{
+		public:
+			void RequestEnabled(bool) noexcept override {}
+		};
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -61,7 +76,12 @@ namespace gglab
 				return m_BeginSucceeds;
 			}
 
-			void Draw(const ApplicationToolingFrameContext&) noexcept override { ++m_DrawCount; }
+			void Draw(const ApplicationToolingFrameContext& context) noexcept override
+			{
+				++m_DrawCount;
+				m_LastGpuProfiling = context.m_GpuProfiling;
+				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
+			}
 
 			void EndFrame(ApplicationToolingFrameEndReason reason) noexcept override
 			{
@@ -82,12 +102,33 @@ namespace gglab
 			uint32_t m_BeginCount = 0;
 			uint32_t m_DrawCount = 0;
 			uint32_t m_EndCount = 0;
+			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
+			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
 			ApplicationToolingFrameEndReason m_LastEndReason =
 				ApplicationToolingFrameEndReason::Completed;
 		};
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestGpuProfilingView view;
+				TestGpuProfilingControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastGpuProfiling && !tooling.m_LastGpuProfilingControl,
+					"Tooling GPU profiling capabilities are absent by default");
+				frame.Draw({ .m_GpuProfiling = &view });
+				context.Check(tooling.m_LastGpuProfiling == &view &&
+					!tooling.m_LastGpuProfilingControl,
+					"Tooling can observe GPU profiling without a renderer or control capability");
+				frame.Draw({ .m_GpuProfiling = &view, .m_GpuProfilingControl = &control });
+				context.Check(tooling.m_LastGpuProfiling == &view &&
+					tooling.m_LastGpuProfilingControl == &control,
+					"Tooling forwards GPU profiling query and control as separate capabilities");
+				frame.Complete();
+			}
+
 			{
 				ApplicationToolingFrame frame(nullptr);
 				frame.Draw({});
