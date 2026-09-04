@@ -14,6 +14,8 @@ namespace gglab
 	class EnvironmentAssetController;
 	class GpuProfilingControlBase;
 	class GpuProfilingViewBase;
+	class PostProcessPreviewControlBase;
+	class PostProcessPreviewViewBase;
 	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
 	class World;
@@ -49,6 +51,8 @@ namespace gglab
 		// Borrowed for Draw only; omitted capabilities remain independently null.
 		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
+		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
+		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;

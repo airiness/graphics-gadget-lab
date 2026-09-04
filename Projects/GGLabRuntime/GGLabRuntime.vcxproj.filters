@@ -1172,9 +1172,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessColor.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessDebug.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessGraphResources.h">
       <Filter>Graphics\PostProcess</Filter>
     </ClInclude>
@@ -1756,6 +1753,18 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalAA.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessDebug.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewControlBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewDiagnostics.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewViewBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h">
       <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>

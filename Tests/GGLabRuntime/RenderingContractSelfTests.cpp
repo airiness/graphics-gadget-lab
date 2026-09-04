@@ -16,6 +16,10 @@
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -26,7 +30,9 @@
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Resource/TransientResourcePool.h"
+#include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
@@ -41,6 +47,7 @@
 #include "Graphics/TransferBatch.h"
 
 #include <array>
+#include <concepts>
 #include <filesystem>
 #include <limits>
 #include <type_traits>
@@ -49,6 +56,28 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept PostProcessPreviewQuery = requires(const T& value) {
+			{ value.GetPostProcessPreviewDiagnostics() } ->
+				std::same_as<PostProcessPreviewDiagnostics>;
+		};
+		template <typename T>
+		concept PostProcessPreviewRequest = requires(T& value) {
+			value.SetPostProcessPreviewSelection(PostProcessDebugSelection{});
+			value.SetPostProcessPreviewExposureEV(0.0f);
+			value.RequestPostProcessPreview();
+		};
+		template <typename T>
+		concept PostProcessPreviewConsumption = requires(T& value) {
+			value.ConsumePostProcessPreviewRequest();
+		};
+		static_assert(PostProcessPreviewQuery<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
+		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+
 		constexpr float ProjectionTolerance = 1.0e-4f;
 		constexpr float PositionTolerance = 2.0e-3f;
 
@@ -223,14 +252,19 @@ namespace gglab
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors
+					? RHITextureViewHandle{ m_NextTextureViewIndex++, 1 } : RHITextureViewHandle{};
 			}
 			RHIBufferViewHandle CreateBufferView(
 				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 			{
 				return {};
 			}
-			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
+			{
+				return m_CreateValidDescriptors
+					? RHISamplerHandle{ m_NextSamplerIndex++, 1 } : RHISamplerHandle{};
+			}
 			void DestroyTexture(RHITextureHandle) noexcept override
 			{
 				++m_DestroyTextureCount;
@@ -286,21 +320,26 @@ namespace gglab
 			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
-				RHITextureViewHandle) const noexcept override
+				RHITextureViewHandle view) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && view.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::CbvSrvUav, view.Index() }
+					: RHIDescriptorHandle{};
 			}
 			RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle) const noexcept override
 			{
 				return {};
 			}
-			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle) const noexcept override
+			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && sampler.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::Sampler, sampler.Index() }
+					: RHIDescriptorHandle{};
 			}
 			void RetireCompletedWork() noexcept override {}
 
 			bool m_TextureViewsSupported = false;
+			bool m_CreateValidDescriptors = false;
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
@@ -313,7 +352,103 @@ namespace gglab
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
+			uint32_t m_NextTextureViewIndex = 1;
+			uint32_t m_NextSamplerIndex = 1;
 		};
+
+		void RunPostProcessPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const PostProcessPreviewViewBase& view = registry;
+			PostProcessPreviewControlBase& control = registry;
+			const auto empty = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!empty.m_HasPublished && !empty.m_Requested &&
+				!empty.m_SrvDescriptor.IsValid() && empty.m_Width == 0 && empty.m_Height == 0,
+				"Preview query safely observes an unallocated source without a descriptor lookup");
+
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::BloomPyramid, 999 });
+			control.SetPostProcessPreviewExposureEV(20.0f);
+			const auto selected = view.GetPostProcessPreviewDiagnostics();
+			context.Check(selected.m_Selected.m_BloomPyramidLevel == MaxBloomPyramidLevels - 1 &&
+				selected.m_ExposureEV == 8.0f && !selected.m_Requested &&
+				device.m_CreateTextureCount == 0,
+				"Preview controls clamp requested values without allocating or scheduling GPU work");
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::Count, 0 });
+			control.SetPostProcessPreviewExposureEV(-20.0f);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Selected == selected.m_Selected &&
+				view.GetPostProcessPreviewDiagnostics().m_ExposureEV == -8.0f,
+				"Preview controls ignore invalid taps and retain the existing exposure bounds");
+			control.RequestPostProcessPreview();
+			control.RequestPostProcessPreview();
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Requested &&
+				registry.ConsumePostProcessPreviewRequest() &&
+				!registry.ConsumePostProcessPreviewRequest() && device.m_CreateTextureCount == 0,
+				"Repeated preview requests coalesce and only the Runtime owner consumes them");
+
+			registry.EnsurePostProcessPreviewResources(1024, 512);
+			const auto allocated = view.GetPostProcessPreviewDiagnostics();
+			context.Check(allocated.m_Width == 512 && allocated.m_Height == 256 &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm &&
+				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
+				device.m_CreateTextureCount == 1,
+				"Preview observation distinguishes allocated descriptors from recorded contents");
+			registry.PublishPostProcessPreview(selected.m_Selected);
+			const auto published = view.GetPostProcessPreviewDiagnostics();
+			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
+			control.SetPostProcessPreviewSelection(nextSelection);
+			control.RequestPostProcessPreview();
+			const auto pending = view.GetPostProcessPreviewDiagnostics();
+			context.Check(pending.m_Selected == nextSelection && pending.m_Requested &&
+				pending.m_HasPublished && pending.m_Published == selected.m_Selected &&
+				pending.m_UpdateCount == 1 && published.m_Selected == selected.m_Selected &&
+				!published.m_Requested && device.m_CreateTextureCount == 1,
+				"A new preview request preserves published identity and independently copied observations");
+			registry.InvalidatePostProcessPreview(nextSelection);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_HasPublished,
+				"Invalidating a different preview tap does not erase the published image");
+			registry.InvalidatePostProcessPreview(selected.m_Selected);
+			context.Check(!view.GetPostProcessPreviewDiagnostics().m_HasPublished &&
+				published.m_HasPublished,
+				"Preview invalidation changes live availability without rewriting copied metadata");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.PublishPostProcessPreview(nextSelection);
+			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
+			const auto resized = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
+				resized.m_Height == 512 && resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != published.m_SrvDescriptor.m_Index &&
+				published.m_Height == 256 && device.m_CreateTextureCount == 2,
+				"Resizing a preview publishes new metadata and invalidates the old content identity");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!released.m_HasPublished && !released.m_Requested &&
+				!released.m_SrvDescriptor.IsValid() && released.m_Width == 0 &&
+				released.m_Height == 0,
+				"Preview release removes descriptor availability and pending requests");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(device.m_DestroyTextureCount == 0 &&
+				retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0,
+				"Preview resource retirement waits for the owner's submission fence");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Retired preview resources become reusable only after fence completion");
+		}
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
@@ -5771,6 +5906,7 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunPostProcessPreviewContractTests(context);
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);

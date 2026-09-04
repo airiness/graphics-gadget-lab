@@ -3,6 +3,10 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -52,6 +56,21 @@ namespace gglab
 			void RequestEnabled(bool) noexcept override {}
 		};
 
+		class TestPostProcessPreviewView final : public PostProcessPreviewViewBase
+		{
+		public:
+			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+				const noexcept override { return {}; }
+		};
+
+		class TestPostProcessPreviewControl final : public PostProcessPreviewControlBase
+		{
+		public:
+			void SetPostProcessPreviewSelection(PostProcessDebugSelection) noexcept override {}
+			void SetPostProcessPreviewExposureEV(float) noexcept override {}
+			void RequestPostProcessPreview() noexcept override {}
+		};
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -81,6 +100,8 @@ namespace gglab
 				++m_DrawCount;
 				m_LastGpuProfiling = context.m_GpuProfiling;
 				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
+				m_LastPostProcessPreview = context.m_PostProcessPreview;
+				m_LastPostProcessPreviewControl = context.m_PostProcessPreviewControl;
 			}
 
 			void EndFrame(ApplicationToolingFrameEndReason reason) noexcept override
@@ -104,12 +125,34 @@ namespace gglab
 			uint32_t m_EndCount = 0;
 			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
 			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
+			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
+			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
 			ApplicationToolingFrameEndReason m_LastEndReason =
 				ApplicationToolingFrameEndReason::Completed;
 		};
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestPostProcessPreviewView view;
+				TestPostProcessPreviewControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastPostProcessPreview &&
+					!tooling.m_LastPostProcessPreviewControl,
+					"Tooling post-process preview capabilities are absent by default");
+				frame.Draw({ .m_PostProcessPreview = &view });
+				context.Check(tooling.m_LastPostProcessPreview == &view &&
+					!tooling.m_LastPostProcessPreviewControl,
+					"Tooling can observe post-process previews without a renderer or control capability");
+				frame.Draw({ .m_PostProcessPreview = &view, .m_PostProcessPreviewControl = &control });
+				context.Check(tooling.m_LastPostProcessPreview == &view &&
+					tooling.m_LastPostProcessPreviewControl == &control,
+					"Tooling forwards post-process preview query and control separately");
+				frame.Complete();
+			}
+
 			{
 				RecordingApplicationTooling tooling;
 				TestGpuProfilingView view;

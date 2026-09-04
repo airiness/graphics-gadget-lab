@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/PostProcess/PostProcessColor.h"
-#include "Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/PostProcess/PostProcessOutput.h"
 
 #include <array>

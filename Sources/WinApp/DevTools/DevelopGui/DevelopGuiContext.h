@@ -15,6 +15,8 @@ namespace gglab
 	class EnvironmentAssetController;
 	class GpuProfilingControlBase;
 	class GpuProfilingViewBase;
+	class PostProcessPreviewControlBase;
+	class PostProcessPreviewViewBase;
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
@@ -37,6 +39,8 @@ namespace gglab
 		// Borrowed for this draw only; panels may retain copied timing values.
 		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
+		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
+		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;

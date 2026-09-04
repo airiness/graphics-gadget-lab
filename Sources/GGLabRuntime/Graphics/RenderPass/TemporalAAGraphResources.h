@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
-#include "Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>

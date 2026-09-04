@@ -2,7 +2,9 @@
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/GPUStructures.h"
 #include "Graphics/IBLBakeTypes.h"
-#include "Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
@@ -16,7 +18,8 @@ namespace gglab
 	/*
 	* Management runtime generated GPU Textures
 	*/
-	class RenderResourceRegistry
+	class RenderResourceRegistry : public PostProcessPreviewViewBase,
+		public PostProcessPreviewControlBase
 	{
 	public:
 		struct CreateInfo
@@ -98,7 +101,7 @@ namespace gglab
 	public:
 		explicit RenderResourceRegistry(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderResourceRegistry);
-		~RenderResourceRegistry() = default;
+		~RenderResourceRegistry() override = default;
 
 		void EnsureIblResources(const IBLResourceCreateInfo& createInfo = {},
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
@@ -164,17 +167,19 @@ namespace gglab
 		[[nodiscard]] bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept;
 		[[nodiscard]] uint64_t GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept;
 
-		void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept;
+		[[nodiscard]] PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+			const noexcept override;
+		void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept override;
 		[[nodiscard]] PostProcessDebugSelection GetPostProcessPreviewSelection() const noexcept
 		{
 			return m_PostProcessPreviewState.m_Selection;
 		}
-		void SetPostProcessPreviewExposureEV(float exposureEV) noexcept;
+		void SetPostProcessPreviewExposureEV(float exposureEV) noexcept override;
 		[[nodiscard]] float GetPostProcessPreviewExposureEV() const noexcept
 		{
 			return m_PostProcessPreviewState.m_ExposureEV;
 		}
-		void RequestPostProcessPreview() noexcept;
+		void RequestPostProcessPreview() noexcept override;
 		[[nodiscard]] bool ConsumePostProcessPreviewRequest() noexcept;
 		void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept;
 		void InvalidatePostProcessPreview(PostProcessDebugSelection selection) noexcept;

@@ -882,6 +882,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
 }
 
 $legacyRuntimeGraphicsContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/PostProcess/PostProcessDebug.h"),
     (Join-Path $runtimeSourcesDir "Graphics/GraphicsTypes.h"),
     (Join-Path $runtimeSourcesDir "Graphics/ShadowSettings.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.h"),
@@ -1098,7 +1099,7 @@ foreach ($legacyFile in $legacyRuntimeSceneFiles) {
 
 $legacyRuntimeGraphicsContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:GraphicsTypes\.h|ShadowSettings\.h|' +
-    'Asset[\\/]ArtifactContentDigest\.h)[>"]'
+    'Asset[\\/]ArtifactContentDigest\.h|PostProcess[\\/]PostProcessDebug\.h)[>"]'
 $legacyRuntimeCameraIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Camera(?:Controller|Rig)?\.h[>"]'
 $legacyRuntimeViewContractIncludeRegex =
@@ -2087,6 +2088,12 @@ foreach ($itemPath in $toolingFrameContextPaths) {
 }
 
 $rendererIndependentToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "GTAOInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "GTAOInspectorPanel.h"),
+    (Join-Path $developGuiPanelsDir "PostProcessInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "PostProcessInspectorPanel.h"),
+    (Join-Path $developGuiPanelsDir "TemporalAAInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "TemporalAAInspectorPanel.h"),
     (Join-Path $developGuiPanelsDir "ForwardPlusInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ForwardPlusInspectorPanel.h"),
     (Join-Path $developGuiPanelsDir "ProfilingPanel.cpp"),
@@ -2100,11 +2107,11 @@ $rendererIndependentToolingPanelPaths = @(
 )
 foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
-    if ($content -match '\bRenderer\b|\bm_Renderer\b') {
+    if ($content -match '\bRenderer\b|\bm_Renderer\b|\bRenderResourceRegistry\b') {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "tooling-panel-renderer-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
-            Reason = "panels migrated to snapshots or narrow capabilities must not retain a parallel live Renderer dependency"
+            Reason = "panels migrated to snapshots or narrow capabilities must not retain live Renderer or RenderResourceRegistry dependencies"
         })
     }
 }

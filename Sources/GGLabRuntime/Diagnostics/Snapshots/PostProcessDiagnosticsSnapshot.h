@@ -1,7 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
-#include "Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
@@ -28,20 +29,6 @@ namespace gglab
 		std::string m_Name;
 		double m_Milliseconds = 0.0;
 		uint32_t m_CallCount = 0;
-	};
-
-	struct PostProcessPreviewDiagnostics
-	{
-		PostProcessDebugSelection m_Selected{};
-		PostProcessDebugSelection m_Published{};
-		RHIDescriptorHandle m_SrvDescriptor{};
-		uint64_t m_UpdateCount = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
-		RHIFormat m_Format = RHIFormat::Unknown;
-		float m_ExposureEV = 0.0f;
-		bool m_Requested = false;
-		bool m_HasPublished = false;
 	};
 
 	struct SceneDepthDiagnostics

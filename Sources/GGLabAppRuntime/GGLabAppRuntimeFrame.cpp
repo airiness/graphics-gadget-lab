@@ -18,6 +18,7 @@
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -293,6 +294,8 @@ namespace gglab
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
 				.m_GpuProfiling = m_Renderer->GetGpuProfiler(),
 				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
+				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
+				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,

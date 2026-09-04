@@ -598,6 +598,27 @@ namespace gglab
 		return m_IBLPreviewStates[utils::ToIndex(type)].m_UpdateCount;
 	}
 
+	PostProcessPreviewDiagnostics RenderResourceRegistry::GetPostProcessPreviewDiagnostics()
+		const noexcept
+	{
+		PostProcessPreviewDiagnostics preview{};
+		preview.m_Selected = GetPostProcessPreviewSelection();
+		preview.m_Published = GetPublishedPostProcessPreviewSelection();
+		preview.m_UpdateCount = GetPostProcessPreviewUpdateCount();
+		preview.m_ExposureEV = GetPostProcessPreviewExposureEV();
+		preview.m_Requested = IsPostProcessPreviewRequested();
+		preview.m_HasPublished = HasPublishedPostProcessPreview();
+		const auto* desc = GetTextureDesc(TextureIndex::Preview_PostProcess);
+		if (desc)
+		{
+			preview.m_Width = static_cast<uint32_t>(desc->m_Extent.m_Width);
+			preview.m_Height = desc->m_Extent.m_Height;
+			preview.m_Format = desc->m_Format;
+			preview.m_SrvDescriptor = GetSrvDescriptor(TextureIndex::Preview_PostProcess);
+		}
+		return preview;
+	}
+
 	void RenderResourceRegistry::SetPostProcessPreviewSelection(
 		PostProcessDebugSelection selection) noexcept
 	{

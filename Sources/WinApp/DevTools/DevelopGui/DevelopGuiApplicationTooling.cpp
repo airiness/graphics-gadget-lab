@@ -97,6 +97,8 @@ namespace gglab
 				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
 				guiContext.m_GpuProfiling = context.m_GpuProfiling;
 				guiContext.m_GpuProfilingControl = context.m_GpuProfilingControl;
+				guiContext.m_PostProcessPreview = context.m_PostProcessPreview;
+				guiContext.m_PostProcessPreviewControl = context.m_PostProcessPreviewControl;
 				guiContext.m_DebugDrawSystem = context.m_DebugDrawSystem;
 				guiContext.m_DebugDrawFrame =
 					context.m_DebugDrawFrame ? *context.m_DebugDrawFrame : DebugDrawFrameView{};
