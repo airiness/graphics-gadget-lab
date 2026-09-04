@@ -972,7 +972,8 @@ $legacyRuntimeDiagnosticsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/VulkanBackendSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"),
-    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TaskSystemSnapshot.h")
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TaskSystemSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h")
 )
 foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1115,7 +1116,7 @@ $legacyRuntimeDiagnosticsContractIncludeRegex =
     '#include\s*[<"]Diagnostics[\\/](?:SnapshotCommon\.h|' +
     'Snapshots[\\/](?:DX12BackendSnapshot|VulkanBackendSnapshot|' +
     'DX12ResourceManagerSnapshot|PersistentSceneBufferSnapshot|' +
-    'TaskSystemSnapshot)\.h)[>"]'
+    'TaskSystemSnapshot|ShadowDiagnosticsSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
@@ -2088,6 +2089,8 @@ foreach ($itemPath in $toolingFrameContextPaths) {
 }
 
 $rendererIndependentToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.h"),
     (Join-Path $developGuiPanelsDir "GTAOInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "GTAOInspectorPanel.h"),
     (Join-Path $developGuiPanelsDir "PostProcessInspectorPanel.cpp"),

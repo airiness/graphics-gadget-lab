@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
 #include <filesystem>
@@ -71,6 +72,13 @@ namespace gglab
 			void RequestPostProcessPreview() noexcept override {}
 		};
 
+		class TestShadowPreviewView final : public ShadowPreviewViewBase
+		{
+		public:
+			ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
+				const noexcept override { return {}; }
+		};
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -102,6 +110,7 @@ namespace gglab
 				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
 				m_LastPostProcessPreview = context.m_PostProcessPreview;
 				m_LastPostProcessPreviewControl = context.m_PostProcessPreviewControl;
+				m_LastShadowPreview = context.m_ShadowPreview;
 			}
 
 			void EndFrame(ApplicationToolingFrameEndReason reason) noexcept override
@@ -127,12 +136,27 @@ namespace gglab
 			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
 			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
 			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
+			const ShadowPreviewViewBase* m_LastShadowPreview = nullptr;
 			ApplicationToolingFrameEndReason m_LastEndReason =
 				ApplicationToolingFrameEndReason::Completed;
 		};
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestShadowPreviewView view;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastShadowPreview,
+					"Tooling shadow preview query is absent by default");
+				frame.Draw({ .m_ShadowPreview = &view });
+				context.Check(tooling.m_LastShadowPreview == &view &&
+					!tooling.m_LastPostProcessPreview && !tooling.m_LastPostProcessPreviewControl,
+					"Tooling forwards a shadow preview query without a renderer or unrelated capabilities");
+				frame.Complete();
+			}
+
 			{
 				RecordingApplicationTooling tooling;
 				TestPostProcessPreviewView view;

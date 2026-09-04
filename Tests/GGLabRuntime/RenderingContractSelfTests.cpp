@@ -20,6 +20,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -77,6 +78,16 @@ namespace gglab
 		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
 		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
 		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+
+		template <typename T>
+		concept ShadowPreviewAllocation = requires(T& value) {
+			value.EnsureShadowPreviewResources();
+		};
+		static_assert(requires(const ShadowPreviewViewBase& view) {
+			{ view.GetShadowPreviewDiagnostics() } noexcept -> std::same_as<ShadowPreviewDiagnostics>;
+		});
+		static_assert(!ShadowPreviewAllocation<ShadowPreviewViewBase>);
+		static_assert(ShadowPreviewAllocation<RenderResourceRegistry>);
 
 		constexpr float ProjectionTolerance = 1.0e-4f;
 		constexpr float PositionTolerance = 2.0e-3f;
@@ -355,6 +366,74 @@ namespace gglab
 			uint32_t m_NextTextureViewIndex = 1;
 			uint32_t m_NextSamplerIndex = 1;
 		};
+
+		void RunShadowPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const ShadowPreviewViewBase& view = registry;
+			const auto empty = view.GetShadowPreviewDiagnostics();
+			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
+				empty.m_Width == 0 && empty.m_Height == 0 &&
+				empty.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 0,
+				"Shadow preview query is safe before pipeline allocation and does not allocate");
+
+			constexpr auto Index =
+				RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap;
+			registry.EnsureShadowPreviewResources();
+			const auto allocated = view.GetShadowPreviewDiagnostics();
+			context.Check(allocated.m_Allocated && allocated.m_SrvDescriptor.IsValid() &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Height == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm && registry.IsDirty(Index),
+				"Shadow preview query exposes the pipeline allocation without initializing contents");
+			const auto repeated = view.GetShadowPreviewDiagnostics();
+			context.Check(repeated.m_SrvDescriptor.m_Index == allocated.m_SrvDescriptor.m_Index &&
+				device.m_CreateTextureCount == 1 && registry.IsDirty(Index),
+				"Repeated shadow queries leave allocation identity and pending initialization unchanged");
+			registry.ClearDirty(Index);
+			registry.EnsureShadowPreviewResources();
+			context.Check(view.GetShadowPreviewDiagnostics().m_SrvDescriptor.m_Index ==
+				allocated.m_SrvDescriptor.m_Index && !registry.IsDirty(Index) &&
+				device.m_CreateTextureCount == 1,
+				"Compatible pipeline allocation and tooling queries preserve initialized preview resources");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.EnsureShadowPreviewResources(256, &retireFence);
+			const auto resized = view.GetShadowPreviewDiagnostics();
+			context.Check(resized.m_Allocated && resized.m_Width == 256 && resized.m_Height == 256 &&
+				resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != allocated.m_SrvDescriptor.m_Index &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				registry.IsDirty(Index) && device.m_CreateTextureCount == 2,
+				"Shadow preview replacement changes live metadata without rewriting copied observations");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetShadowPreviewDiagnostics();
+			context.Check(!released.m_Allocated && !released.m_SrvDescriptor.IsValid() &&
+				released.m_Width == 0 && released.m_Height == 0 &&
+				released.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 2,
+				"Shadow preview query after release stays empty instead of recreating a resource");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0 && device.m_DestroyTextureCount == 0,
+				"Shadow preview allocations remain pending until their owner's retirement fence completes");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Shadow preview allocations become reusable only after fence completion");
+		}
 
 		void RunPostProcessPreviewContractTests(SelfTestContext& context) noexcept
 		{
@@ -5907,6 +5986,7 @@ namespace gglab
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunPostProcessPreviewContractTests(context);
+		RunShadowPreviewContractTests(context);
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);

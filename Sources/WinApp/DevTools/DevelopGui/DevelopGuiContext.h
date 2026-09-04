@@ -17,6 +17,7 @@ namespace gglab
 	class GpuProfilingViewBase;
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
+	class ShadowPreviewViewBase;
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
@@ -41,6 +42,7 @@ namespace gglab
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
+		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;

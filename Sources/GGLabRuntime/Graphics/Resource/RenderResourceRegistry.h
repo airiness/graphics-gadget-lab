@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
@@ -19,7 +20,7 @@ namespace gglab
 	* Management runtime generated GPU Textures
 	*/
 	class RenderResourceRegistry : public PostProcessPreviewViewBase,
-		public PostProcessPreviewControlBase
+		public PostProcessPreviewControlBase, public ShadowPreviewViewBase
 	{
 	public:
 		struct CreateInfo
@@ -117,6 +118,8 @@ namespace gglab
 		void EnsureShadowPreviewResources(
 			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
+		[[nodiscard]] ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
+			const noexcept override;
 		void EnsurePostProcessPreviewResources(uint32_t sourceWidth, uint32_t sourceHeight,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
 

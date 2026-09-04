@@ -18,6 +18,7 @@ namespace gglab
 	class PostProcessPreviewViewBase;
 	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
+	class ShadowPreviewViewBase;
 	class World;
 	struct DebugDrawFrameView;
 	struct LoadingProgress;
@@ -53,6 +54,7 @@ namespace gglab
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
+		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;

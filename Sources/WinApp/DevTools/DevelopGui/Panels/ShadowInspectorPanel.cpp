@@ -8,11 +8,14 @@
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+
+#include <algorithm>
+#include <cstdint>
+#include <span>
 
 #include <imgui.h>
 
@@ -287,41 +290,29 @@ namespace gglab
 				return;
 			}
 
-			auto* renderResourceRegistry =
-				context.m_Renderer ? context.m_Renderer->GetRenderResourceRegistry() : nullptr;
-			if (!renderResourceRegistry)
+			if (!context.m_ShadowPreview)
 			{
-				ImGui::TextColored(
-					devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
+				ImGui::TextDisabled("Shadow preview query is not available.");
 				return;
 			}
 
-			using TextureIndex = RenderResourceRegistry::TextureIndex;
-			constexpr TextureIndex ShadowMapPreviewIndex =
-				TextureIndex::Preview_Shadow_DirectionalShadowMap;
-
-			renderResourceRegistry->EnsureShadowPreviewResources(snapshot->m_ShadowMapPreviewSize);
-			const auto* previewDesc = renderResourceRegistry->GetTextureDesc(ShadowMapPreviewIndex);
-			if (!previewDesc)
+			const auto preview = context.m_ShadowPreview->GetShadowPreviewDiagnostics();
+			if (!preview.m_Allocated)
 			{
 				ImGui::TextColored(
 					devtools::style::ErrorTextColor, "ShadowMap preview texture is not allocated.");
 				return;
 			}
 
-			const uint32_t previewSrvIndex =
-				renderResourceRegistry->GetShaderVisibleSrvIndex(ShadowMapPreviewIndex);
 			const ImTextureID previewTextureId =
 				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
-					renderResourceRegistry->GetSrvDescriptor(ShadowMapPreviewIndex));
+					preview.m_SrvDescriptor);
 
 			ImGui::Text("Preview RG Size: %u", snapshot->m_ShadowMapPreviewSize);
-			ImGui::Text("Preview Texture Size: %llu x %u",
-				static_cast<unsigned long long>(previewDesc->m_Extent.m_Width),
-				previewDesc->m_Extent.m_Height);
+			ImGui::Text("Preview Texture Size: %u x %u", preview.m_Width, preview.m_Height);
 			ImGui::Text(
-				"Preview Format: %s", GetRHIFormatInfo(previewDesc->m_Format).m_Name);
-			ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
+				"Preview Format: %s", GetRHIFormatInfo(preview.m_Format).m_Name);
+			ImGui::Text("Preview Shader Visible SRV Index: %u", preview.m_SrvDescriptor.m_Index);
 
 			if (!previewTextureId)
 			{
@@ -347,12 +338,6 @@ namespace gglab
 
 		ImGui::TextUnformatted("Shadow Inspector");
 		ImGui::Separator();
-
-		if (!context.m_Renderer)
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "Renderer is null.");
-			return;
-		}
 
 		DrawShadowCapability(context);
 		if (context.m_ShadowVisualizationSettings)

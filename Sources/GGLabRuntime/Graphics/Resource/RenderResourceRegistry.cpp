@@ -351,6 +351,22 @@ namespace gglab
 			TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}
 
+	ShadowPreviewDiagnostics RenderResourceRegistry::GetShadowPreviewDiagnostics()
+		const noexcept
+	{
+		ShadowPreviewDiagnostics preview{};
+		constexpr TextureIndex Index = TextureIndex::Preview_Shadow_DirectionalShadowMap;
+		if (const auto* desc = GetTextureDesc(Index))
+		{
+			preview.m_SrvDescriptor = GetSrvDescriptor(Index);
+			preview.m_Width = static_cast<uint32_t>(desc->m_Extent.m_Width);
+			preview.m_Height = desc->m_Extent.m_Height;
+			preview.m_Format = desc->m_Format;
+			preview.m_Allocated = true;
+		}
+		return preview;
+	}
+
 	void RenderResourceRegistry::EnsurePostProcessPreviewResources(
 		uint32_t sourceWidth, uint32_t sourceHeight, const RHIFencePoint* retireFenceOpt) noexcept
 	{

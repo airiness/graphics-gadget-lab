@@ -296,6 +296,7 @@ namespace gglab
 				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
 				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
+				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,

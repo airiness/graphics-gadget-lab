@@ -22,7 +22,7 @@
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
-#include "Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 #include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
