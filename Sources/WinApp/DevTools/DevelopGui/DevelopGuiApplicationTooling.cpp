@@ -99,6 +99,7 @@ namespace gglab
 				guiContext.m_EnvironmentLightingControl = context.m_EnvironmentLightingControl;
 				guiContext.m_GpuProfiling = context.m_GpuProfiling;
 				guiContext.m_GpuProfilingControl = context.m_GpuProfilingControl;
+				guiContext.m_IBLCacheControl = context.m_IBLCacheControl;
 				guiContext.m_PostProcessPreview = context.m_PostProcessPreview;
 				guiContext.m_PostProcessPreviewControl = context.m_PostProcessPreviewControl;
 				guiContext.m_ShadowPreview = context.m_ShadowPreview;

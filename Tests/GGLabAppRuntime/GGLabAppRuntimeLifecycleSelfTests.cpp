@@ -5,6 +5,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
@@ -63,6 +64,13 @@ namespace gglab
 			void SetPrefilteredSpecularMaxSampleLuminance(float) noexcept override {}
 			void SetSkyboxEnabled(bool) noexcept override {}
 			void RequestRebake(bool) noexcept override {}
+		};
+
+		class TestIBLCacheControl final : public IBLCacheControlBase
+		{
+		public:
+			void ClearArtifactCache() noexcept override {}
+			bool ClearDerivedDataStore() noexcept override { return true; }
 		};
 
 		class TestGpuProfilingView final : public GpuProfilingViewBase
@@ -131,6 +139,7 @@ namespace gglab
 				m_LastEnvironmentLightingControl = context.m_EnvironmentLightingControl;
 				m_LastGpuProfiling = context.m_GpuProfiling;
 				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
+				m_LastIBLCacheControl = context.m_IBLCacheControl;
 				m_LastPostProcessPreview = context.m_PostProcessPreview;
 				m_LastPostProcessPreviewControl = context.m_PostProcessPreviewControl;
 				m_LastShadowPreview = context.m_ShadowPreview;
@@ -159,6 +168,7 @@ namespace gglab
 			EnvironmentLightingControlBase* m_LastEnvironmentLightingControl = nullptr;
 			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
 			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
+			IBLCacheControlBase* m_LastIBLCacheControl = nullptr;
 			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
 			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
 			const ShadowPreviewViewBase* m_LastShadowPreview = nullptr;
@@ -168,6 +178,23 @@ namespace gglab
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestIBLCacheControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLCacheControl,
+					"Tooling IBL cache control is absent by default");
+				frame.Draw({ .m_IBLCacheControl = &control });
+				context.Check(tooling.m_LastIBLCacheControl == &control &&
+					!tooling.m_LastEnvironmentLighting && !tooling.m_LastEnvironmentLightingControl,
+					"Tooling forwards IBL cache control without Renderer or environment settings");
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLCacheControl,
+					"A later tooling draw does not retain an omitted IBL cache capability");
+				frame.Complete();
+			}
+
 			{
 				RecordingApplicationTooling tooling;
 				TestEnvironmentLightingView view;

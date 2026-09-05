@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/EnvironmentLightingSystem.h"
@@ -180,10 +181,9 @@ namespace gglab
 		{
 			return m_DerivedDataSystem.GetStoreStatistics();
 		}
-		void ClearArtifactCache() noexcept { m_DerivedDataSystem.ClearArtifactCache(); }
-		[[nodiscard]] bool ClearDerivedDataStore() noexcept
+		[[nodiscard]] IBLCacheControlBase& GetCacheControl() noexcept
 		{
-			return m_DerivedDataSystem.ClearStore();
+			return m_DerivedDataSystem;
 		}
 
 	private:

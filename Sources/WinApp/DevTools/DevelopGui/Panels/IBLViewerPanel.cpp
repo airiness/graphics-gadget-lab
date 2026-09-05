@@ -12,7 +12,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "Graphics/Renderer.h"
 
 #include <algorithm>
@@ -160,7 +160,7 @@ namespace gglab
 		}
 
 		static void DrawBakePipelineStatus(
-			const IBLDiagnosticsSnapshot& snapshot, IBLBakeScheduler* scheduler) noexcept
+			const IBLDiagnosticsSnapshot& snapshot, IBLCacheControlBase* cacheControl) noexcept
 		{
 			const auto& bake = snapshot.m_BakeStatus;
 			const char* cacheCoverage = bake.m_CacheHit ? "full hit"
@@ -224,18 +224,17 @@ namespace gglab
 					static_cast<unsigned long long>(ddc.m_CatalogReconciliationCount),
 					static_cast<unsigned long long>(ddc.m_CatalogReconciliationFailureCount));
 			}
-			if (scheduler && ImGui::Button("Clear IBL CPU Cache"))
+			ImGui::BeginDisabled(!cacheControl);
+			if (ImGui::Button("Clear IBL CPU Cache") && cacheControl)
 			{
-				scheduler->ClearArtifactCache();
+				cacheControl->ClearArtifactCache();
 			}
-			if (scheduler)
+			ImGui::SameLine();
+			if (ImGui::Button("Clear IBL Local DDC") && cacheControl)
 			{
-				ImGui::SameLine();
-				if (ImGui::Button("Clear IBL Local DDC"))
-				{
-					GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
-				}
+				GGLAB_UNUSED(cacheControl->ClearDerivedDataStore());
 			}
+			ImGui::EndDisabled();
 			if (bake.m_GpuTimingAvailable)
 			{
 				ImGui::Text("Bake GPU: %.3f ms", bake.m_GpuMilliseconds);
@@ -441,8 +440,7 @@ namespace gglab
 		if (diagnosticsSnapshot &&
 			ImGui::CollapsingHeader("Bake Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			DrawBakePipelineStatus(*diagnosticsSnapshot,
-				renderer ? renderer->GetIBLBakeScheduler() : nullptr);
+			DrawBakePipelineStatus(*diagnosticsSnapshot, context.m_IBLCacheControl);
 		}
 
 		DrawEnvironmentSettings(context);

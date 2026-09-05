@@ -5,6 +5,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/IBLStageArtifactCache.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <array>
@@ -82,7 +83,7 @@ namespace gglab
 		}
 	};
 
-	class IBLDerivedDataSystem final
+	class IBLDerivedDataSystem final : public IBLCacheControlBase
 	{
 	public:
 		struct CreateInfo
@@ -95,7 +96,7 @@ namespace gglab
 
 		explicit IBLDerivedDataSystem(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(IBLDerivedDataSystem);
-		~IBLDerivedDataSystem() = default;
+		~IBLDerivedDataSystem() override = default;
 
 		[[nodiscard]] IBLDerivedDataLookupResult Lookup(
 			const AssetContentFingerprint& contentFingerprint,
@@ -109,8 +110,8 @@ namespace gglab
 
 		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept;
-		void ClearArtifactCache() noexcept;
-		[[nodiscard]] bool ClearStore() noexcept;
+		void ClearArtifactCache() noexcept override;
+		[[nodiscard]] bool ClearDerivedDataStore() noexcept override;
 
 	private:
 		[[nodiscard]] std::array<DerivedDataKey, static_cast<size_t>(IBLArtifactStage::Count)>

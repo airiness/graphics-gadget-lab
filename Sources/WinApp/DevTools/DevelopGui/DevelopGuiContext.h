@@ -17,6 +17,7 @@ namespace gglab
 	class EnvironmentLightingViewBase;
 	class GpuProfilingControlBase;
 	class GpuProfilingViewBase;
+	class IBLCacheControlBase;
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
 	class ShadowPreviewViewBase;
@@ -44,6 +45,7 @@ namespace gglab
 		EnvironmentLightingControlBase* m_EnvironmentLightingControl = nullptr;
 		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
+		IBLCacheControlBase* m_IBLCacheControl = nullptr;
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;

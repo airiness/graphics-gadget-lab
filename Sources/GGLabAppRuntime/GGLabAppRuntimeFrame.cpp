@@ -16,6 +16,7 @@
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
@@ -297,6 +298,8 @@ namespace gglab
 				.m_EnvironmentLightingControl = m_Renderer->GetEnvironmentLightingSystem(),
 				.m_GpuProfiling = m_Renderer->GetGpuProfiler(),
 				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
+				.m_IBLCacheControl = m_Renderer->GetIBLBakeScheduler()
+					? &m_Renderer->GetIBLBakeScheduler()->GetCacheControl() : nullptr,
 				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
 				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),

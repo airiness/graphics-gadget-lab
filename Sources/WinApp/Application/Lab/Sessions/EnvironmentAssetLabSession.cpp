@@ -4,6 +4,7 @@
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
@@ -60,8 +61,8 @@ namespace gglab
 		// The acceptance sequence needs deterministic stage misses even when a
 		// previous run populated the same sample-count variants. DDC entries are
 		// recoverable derived data, so start this cache-focused Lab from a clean set.
-		scheduler->ClearArtifactCache();
-		GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
+		scheduler->GetCacheControl().ClearArtifactCache();
+		GGLAB_UNUSED(scheduler->GetCacheControl().ClearDerivedDataStore());
 		const auto& settings = m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetSettings();
 		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
 		m_State->m_OriginalSpecularSampleCount =
@@ -406,7 +407,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			scheduler.ClearArtifactCache();
+			scheduler.GetCacheControl().ClearArtifactCache();
 			if (scheduler.GetArtifactCacheStatistics().m_CachedEntryCount != 0)
 			{
 				Fail("Clearing the IBL CPU cache left cached stage entries behind.");
@@ -520,7 +521,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			scheduler.ClearArtifactCache();
+			scheduler.GetCacheControl().ClearArtifactCache();
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
 			m_Services.m_Renderer->GetEnvironmentLightingSystem()

@@ -2101,6 +2101,13 @@ foreach ($itemPath in $iblViewerPaths) {
             Reason = "IBL settings must use separate query/control capabilities, not the live environment lighting system"
         })
     }
+    if ($content -match '\bIBLBakeScheduler\b|\bGetIBLBakeScheduler\b|\bIBLDerivedDataSystem\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-ibl-cache-control-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "IBL cache maintenance must use IBLCacheControlBase while bake observations remain snapshot-owned"
+        })
+    }
 }
 
 $rendererIndependentToolingPanelPaths = @(

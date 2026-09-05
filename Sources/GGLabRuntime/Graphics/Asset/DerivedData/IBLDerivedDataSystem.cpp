@@ -166,7 +166,7 @@ namespace gglab
 		m_ArtifactCache.Clear();
 	}
 
-	bool IBLDerivedDataSystem::ClearStore() noexcept
+	bool IBLDerivedDataSystem::ClearDerivedDataStore() noexcept
 	{
 		return m_Store.Clear();
 	}
