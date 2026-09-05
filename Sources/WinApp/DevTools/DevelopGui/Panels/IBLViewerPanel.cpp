@@ -5,15 +5,21 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
-#include "Core/Math/MathFunctions.h"
-#include "Graphics/EnvironmentLightingSystem.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "Graphics/Renderer.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <ranges>
+#include <string>
 
 #include <imgui.h>
 
@@ -154,7 +160,7 @@ namespace gglab
 		}
 
 		static void DrawBakePipelineStatus(
-			const IBLDiagnosticsSnapshot& snapshot, IBLBakeScheduler* scheduler) noexcept
+			const IBLDiagnosticsSnapshot& snapshot, IBLCacheControlBase* cacheControl) noexcept
 		{
 			const auto& bake = snapshot.m_BakeStatus;
 			const char* cacheCoverage = bake.m_CacheHit ? "full hit"
@@ -218,18 +224,17 @@ namespace gglab
 					static_cast<unsigned long long>(ddc.m_CatalogReconciliationCount),
 					static_cast<unsigned long long>(ddc.m_CatalogReconciliationFailureCount));
 			}
-			if (scheduler && ImGui::Button("Clear IBL CPU Cache"))
+			ImGui::BeginDisabled(!cacheControl);
+			if (ImGui::Button("Clear IBL CPU Cache") && cacheControl)
 			{
-				scheduler->ClearArtifactCache();
+				cacheControl->ClearArtifactCache();
 			}
-			if (scheduler)
+			ImGui::SameLine();
+			if (ImGui::Button("Clear IBL Local DDC") && cacheControl)
 			{
-				ImGui::SameLine();
-				if (ImGui::Button("Clear IBL Local DDC"))
-				{
-					GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
-				}
+				GGLAB_UNUSED(cacheControl->ClearDerivedDataStore());
 			}
+			ImGui::EndDisabled();
 			if (bake.m_GpuTimingAvailable)
 			{
 				ImGui::Text("Bake GPU: %.3f ms", bake.m_GpuMilliseconds);
@@ -263,6 +268,85 @@ namespace gglab
 			drawRow("BRDF LUT", snapshot.m_BrdfLut);
 			ImGui::EndTable();
 		}
+
+		static void DrawEnvironmentSettings(DevelopGuiContext& context) noexcept
+		{
+			if (!ImGui::CollapsingHeader("Environment Settings", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				return;
+			}
+			if (!context.m_EnvironmentLighting)
+			{
+				ImGui::TextDisabled("Environment settings query is not available.");
+				return;
+			}
+			const auto settings = context.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+
+			auto* control = context.m_EnvironmentLightingControl;
+			ImGui::BeginDisabled(!control);
+
+			bool skyboxEnabled = settings.m_EnableSkybox;
+			if (ImGui::Checkbox("Enable Skybox", &skyboxEnabled) && control)
+			{
+				control->SetSkyboxEnabled(skyboxEnabled);
+			}
+
+			float intensity = settings.m_Intensity;
+			if (ImGui::DragFloat(
+				"Environment Intensity", &intensity, 0.01f, 0.0f, 100.0f, "%.3f") && control)
+			{
+				control->SetIntensity(intensity);
+			}
+
+			float rotationDegrees = math::ToDegrees(settings.m_RotationRadians);
+			if (ImGui::SliderFloat(
+				"Environment Yaw", &rotationDegrees, -180.0f, 180.0f, "%.1f deg") && control)
+			{
+				control->SetRotationRadians(math::ToRadians(rotationDegrees));
+			}
+
+			IBLQualityPreset qualityPreset = settings.m_QualityPreset;
+			if (DrawQualityPresetCombo(qualityPreset) && control)
+			{
+				control->SetQualityPreset(qualityPreset);
+			}
+			const auto& bakeConfig = settings.m_BakeConfig;
+			ImGui::TextDisabled(
+				"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
+				bakeConfig.m_EnvironmentCubemapSize, bakeConfig.m_IrradianceCubemapSize,
+				bakeConfig.m_IrradianceSampleCount, bakeConfig.m_PrefilteredSpecularCubemapSize,
+				bakeConfig.m_PrefilteredSpecularMipLevels);
+
+			uint32_t sampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+			if (DrawPrefilterSampleCountCombo(sampleCount) && control)
+			{
+				control->SetPrefilteredSpecularSampleCount(sampleCount);
+			}
+
+			float maxSampleLuminance =
+				settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
+			if (ImGui::DragFloat(
+				"Prefilter Firefly Clamp", &maxSampleLuminance, 10.0f, 1.0f, 65000.0f, "%.0f") && control)
+			{
+				control->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip(
+					"Limits individual HDR samples while baking rough specular mips.\n"
+					"Mip 0 remains an exact copy of the environment.");
+			}
+
+			ImGui::TextDisabled(
+				"Skybox, diffuse IBL, specular IBL, and previews share these settings.");
+			if (ImGui::Button("Rebuild IBL") && control)
+			{
+				control->RequestRebake(true);
+			}
+			ImGui::TextDisabled(
+				"Bake changes are generated in staging resources and published atomically.");
+			ImGui::EndDisabled();
+		}
 	}
 
 	void IBLViewerPanel::Draw(DevelopGuiContext& context) noexcept
@@ -273,20 +357,7 @@ namespace gglab
 		ImGui::Separator();
 
 		auto* renderer = context.m_Renderer;
-		if (!renderer)
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "Renderer is null.");
-			return;
-		}
-
-		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
-		if (!renderResRegistry)
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "RenderResourceRegistry is null.");
-			return;
-		}
-
-		auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
+		auto* renderResRegistry = renderer ? renderer->GetRenderResourceRegistry() : nullptr;
 		auto* environmentAssets = context.m_EnvironmentAssetController;
 		const auto* diagnosticsSnapshot =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>()
@@ -312,7 +383,10 @@ namespace gglab
 						environmentAssets)
 					{
 						GGLAB_UNUSED(environmentAssets->SelectEnvironment(entry.m_Index));
-						context.m_Diagnostics->Invalidate<IBLDiagnosticsSnapshot>();
+						if (context.m_DiagnosticsControl)
+						{
+							context.m_DiagnosticsControl->RequestRefresh<IBLDiagnosticsSnapshot>();
+						}
 					}
 					if (selected)
 					{
@@ -366,76 +440,18 @@ namespace gglab
 		if (diagnosticsSnapshot &&
 			ImGui::CollapsingHeader("Bake Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			DrawBakePipelineStatus(*diagnosticsSnapshot, renderer->GetIBLBakeScheduler());
+			DrawBakePipelineStatus(*diagnosticsSnapshot, context.m_IBLCacheControl);
 		}
 
-		if (environmentSystem &&
-			ImGui::CollapsingHeader("Environment Settings", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			const auto settings = environmentSystem->GetSettings();
-
-			bool skyboxEnabled = settings.m_EnableSkybox;
-			if (ImGui::Checkbox("Enable Skybox", &skyboxEnabled))
-			{
-				environmentSystem->SetSkyboxEnabled(skyboxEnabled);
-			}
-
-			float intensity = settings.m_Intensity;
-			if (ImGui::DragFloat("Environment Intensity", &intensity, 0.01f, 0.0f, 100.0f, "%.3f"))
-			{
-				environmentSystem->SetIntensity(intensity);
-			}
-
-			float rotationDegrees = math::ToDegrees(settings.m_RotationRadians);
-			if (ImGui::SliderFloat(
-				"Environment Yaw", &rotationDegrees, -180.0f, 180.0f, "%.1f deg"))
-			{
-				environmentSystem->SetRotationRadians(math::ToRadians(rotationDegrees));
-			}
-
-			IBLQualityPreset qualityPreset = settings.m_QualityPreset;
-			if (DrawQualityPresetCombo(qualityPreset))
-			{
-				environmentSystem->SetQualityPreset(qualityPreset);
-			}
-			const auto& bakeConfig = settings.m_BakeConfig;
-			ImGui::TextDisabled(
-				"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
-				bakeConfig.m_EnvironmentCubemapSize, bakeConfig.m_IrradianceCubemapSize,
-				bakeConfig.m_IrradianceSampleCount, bakeConfig.m_PrefilteredSpecularCubemapSize,
-				bakeConfig.m_PrefilteredSpecularMipLevels);
-
-			uint32_t sampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-			if (DrawPrefilterSampleCountCombo(sampleCount))
-			{
-				environmentSystem->SetPrefilteredSpecularSampleCount(sampleCount);
-			}
-
-			float maxSampleLuminance =
-				settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
-			if (ImGui::DragFloat(
-				"Prefilter Firefly Clamp", &maxSampleLuminance, 10.0f, 1.0f, 65000.0f, "%.0f"))
-			{
-				environmentSystem->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
-			}
-			if (ImGui::IsItemHovered())
-			{
-				ImGui::SetTooltip(
-					"Limits individual HDR samples while baking rough specular mips.\n"
-					"Mip 0 remains an exact copy of the environment.");
-			}
-
-			ImGui::TextDisabled(
-				"Skybox, diffuse IBL, specular IBL, and previews share these settings.");
-			if (ImGui::Button("Rebuild IBL"))
-			{
-				environmentSystem->RequestRebake(true);
-			}
-			ImGui::TextDisabled(
-				"Bake changes are generated in staging resources and published atomically.");
-		}
+		DrawEnvironmentSettings(context);
 
 		ImGui::Spacing();
+
+		if (!renderResRegistry)
+		{
+			ImGui::TextDisabled("IBL preview resources are not available.");
+			return;
+		}
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
 		constexpr TextureIndex EnvironmentIndex = TextureIndex::IBL_EnvironmentCubemap;

@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 
 #include <array>
 #include <optional>

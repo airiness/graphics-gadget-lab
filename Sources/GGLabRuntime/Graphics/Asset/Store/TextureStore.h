@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "Graphics/Asset/TextureAsset.h"
 
 #include <cstddef>

@@ -1,9 +1,9 @@
 #pragma once
-#include "Core/Math/Color.h"
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <array>
 #include <cstddef>

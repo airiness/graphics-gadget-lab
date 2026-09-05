@@ -50,7 +50,7 @@ namespace gglab
 		}
 	}
 
-	void DX12GpuProfiler::SetEnabled(bool enabled) noexcept
+	void DX12GpuProfiler::RequestEnabled(bool enabled) noexcept
 	{
 		m_Enabled.store(enabled, std::memory_order_relaxed);
 	}

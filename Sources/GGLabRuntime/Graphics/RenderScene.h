@@ -1,13 +1,13 @@
 #pragma once
-#include "Core/Math/BoundingVolumes.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <array>
 

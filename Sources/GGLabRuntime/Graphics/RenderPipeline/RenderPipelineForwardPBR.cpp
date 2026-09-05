@@ -1,6 +1,6 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Renderer.h"
@@ -12,7 +12,7 @@
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 

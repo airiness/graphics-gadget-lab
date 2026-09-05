@@ -2,7 +2,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassBase.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 
 namespace gglab
 {

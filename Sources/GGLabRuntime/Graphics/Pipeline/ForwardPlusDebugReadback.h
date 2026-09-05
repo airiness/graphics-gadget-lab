@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics/Pipeline/ForwardPlus.h"
-#include "Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 
 #include <array>
 #include <atomic>

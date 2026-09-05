@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/GraphicsTypes.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 
 namespace gglab
 {

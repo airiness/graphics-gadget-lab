@@ -1,11 +1,11 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/RHI/RHIHandleTable.h"
-#include "Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 
 #include <shared_mutex>
 #include <span>

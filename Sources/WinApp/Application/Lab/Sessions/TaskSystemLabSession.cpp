@@ -2,7 +2,7 @@
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab

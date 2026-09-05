@@ -81,7 +81,11 @@ namespace gglab
 	class AssetManager;
 	class DebugDrawSystem;
 	class DemoManager;
+	class DiagnosticsControl;
+	class DiagnosticsRuntime;
+	class DiagnosticsView;
 	class EnvironmentAssetController;
+	class LabRuntimeLocatorBase;
 	class RenderFrameBuilder;
 	class Renderer;
 	class RHIContextFactoryBase;
@@ -110,6 +114,8 @@ namespace gglab
 	struct AppRuntimeTickInfo
 	{
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
+		// Optional current-content adapter borrowed only for this frame's Lab snapshot.
+		const LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
 
 		struct PreContentUpdateHook final
 		{
@@ -185,6 +191,9 @@ namespace gglab
 		{
 			return m_DebugDrawSystem.get();
 		}
+		// Non-owning; null unless optional diagnostics were composed with runtime services.
+		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
+		[[nodiscard]] DiagnosticsControl* GetDiagnosticsControl() const noexcept;
 		[[nodiscard]] Time* GetTime() const noexcept { return m_Time.get(); }
 		[[nodiscard]] std::optional<uint32_t> GetLabHostDemoIndex() const noexcept
 		{
@@ -212,6 +221,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
 		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
+		std::unique_ptr<DiagnosticsRuntime> m_Diagnostics;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		uint32_t m_WindowWidth = 0;

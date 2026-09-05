@@ -2,7 +2,7 @@
 #include "Graphics/RHI/DX12/Cache/PipelineDesc.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"
 #include "Graphics/RHI/DX12/Utility/DX12InputLayoutUtils.h"
-#include "Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 
 #include <cstdint>
 #include <tuple>

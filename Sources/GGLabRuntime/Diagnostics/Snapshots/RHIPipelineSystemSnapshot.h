@@ -1,6 +1,6 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/RenderPass/RenderPassInfo.h"
 
 #include <cstdint>

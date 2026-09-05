@@ -1,15 +1,15 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
-#include "Core/StringId.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/StringId.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/RenderGraph/RGArenaAllocator.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
 #include "Graphics/RenderGraph/RGCompileDiagnostic.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <memory>
 

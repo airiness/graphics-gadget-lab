@@ -1,6 +1,6 @@
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 
 #include <cstddef>

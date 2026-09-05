@@ -1,10 +1,10 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
-#include "Core/Math/Quaternion.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {

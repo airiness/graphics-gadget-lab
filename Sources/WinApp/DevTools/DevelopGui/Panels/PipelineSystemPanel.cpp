@@ -3,11 +3,16 @@
 #include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/EnumText/EnumTextRenderPass.h"
 #include "DevTools/RHIText.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Pipeline/PipelineCache.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <format>
+#include <span>
+#include <string>
 
 #include <imgui.h>
 
@@ -493,12 +498,6 @@ namespace gglab
 
 	void PipelineSystemPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_Renderer || !context.m_Renderer->GetRHIContext())
-		{
-			ImGui::TextDisabled("RHI context is not available.");
-			return;
-		}
-
 		const auto* snapshotPtr =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RHIPipelineSystemSnapshot>()
 			: nullptr;

@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 
 #include <d3d12.h>
 

@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/Publication/AssetResourcePublication.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <array>
 #include <chrono>

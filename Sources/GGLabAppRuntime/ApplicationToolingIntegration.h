@@ -7,23 +7,28 @@ namespace gglab
 {
 	class ApplicationToolingIntegrationBase;
 	class AssetManager;
-	class Camera;
-	class CameraController;
 	class CameraRig;
 	class DebugDrawSystem;
+	class DiagnosticsControl;
+	class DiagnosticsView;
 	class EnvironmentAssetController;
-	class RenderGraph;
+	class EnvironmentLightingControlBase;
+	class EnvironmentLightingViewBase;
+	class GpuProfilingControlBase;
+	class GpuProfilingViewBase;
+	class IBLCacheControlBase;
+	class PostProcessPreviewControlBase;
+	class PostProcessPreviewViewBase;
 	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
+	class ShadowPreviewViewBase;
 	class World;
 	struct DebugDrawFrameView;
-	struct DirectionalShadowSettings;
 	struct LoadingProgress;
 	struct RenderQueue;
 	struct RenderView;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
-	struct ResolvedTemporalFramePlan;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -31,25 +36,33 @@ namespace gglab
 		bool m_Pointer = false;
 	};
 
+	struct ApplicationToolingFrameSettingsResolution
+	{
+		bool m_GTAOOverrideActive = false;
+	};
+
 	struct ApplicationToolingFrameContext
 	{
-		Camera* m_Camera = nullptr;
-		CameraController* m_CameraController = nullptr;
 		CameraRig* m_CameraRig = nullptr;
 		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
-		RenderView* m_MainRenderView = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
-		RenderGraph* m_RenderGraph = nullptr;
+		DiagnosticsView* m_Diagnostics = nullptr;
+		DiagnosticsControl* m_DiagnosticsControl = nullptr;
+		// Borrowed for Draw only; omitted capabilities remain independently null.
+		const EnvironmentLightingViewBase* m_EnvironmentLighting = nullptr;
+		EnvironmentLightingControlBase* m_EnvironmentLightingControl = nullptr;
+		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
+		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
+		IBLCacheControlBase* m_IBLCacheControl = nullptr;
+		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
+		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
+		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
 		DebugDrawSystem* m_DebugDrawSystem = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
-		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
-		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
-		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
-		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
 	};
 
@@ -70,7 +83,8 @@ namespace gglab
 		virtual void PrepareForShutdown() noexcept = 0;
 		[[nodiscard]] virtual ApplicationToolingInputCapture GetPreviousFrameInputCapture()
 			const noexcept = 0;
-		virtual void ResolveFrameSettings(const ViewRenderProfile& authoringProfile,
+		[[nodiscard]] virtual ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+			const ViewRenderProfile& authoringProfile,
 			ShadowVisualizationSettings& outShadowVisualizationSettings,
 			ViewRenderProfile& outEffectiveProfile) const noexcept = 0;
 		[[nodiscard]] virtual bool BeginFrame() noexcept = 0;

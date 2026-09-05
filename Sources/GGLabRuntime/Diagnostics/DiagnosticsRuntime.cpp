@@ -1,5 +1,6 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace gglab
@@ -24,7 +25,10 @@ namespace gglab
 
 	void DiagnosticsRuntime::BeginFrame(const SnapshotContext& context) noexcept
 	{
+		GGLAB_ASSERT_MSG(!m_FrameOpen,
+			"DiagnosticsRuntime::BeginFrame called before the previous frame ended.");
 		m_Context = context;
+		m_FrameOpen = true;
 		++m_FrameIndex;
 		for (auto& runtime : m_Providers)
 		{
@@ -35,8 +39,15 @@ namespace gglab
 		}
 	}
 
+	void DiagnosticsRuntime::EndFrame() noexcept
+	{
+		m_Context = {};
+		m_FrameOpen = false;
+	}
+
 	void DiagnosticsRuntime::Reset() noexcept
 	{
+		EndFrame();
 		m_Store.Clear();
 		m_FrameIndex = 0;
 		for (auto& runtime : m_Providers)
@@ -52,6 +63,36 @@ namespace gglab
 			runtime.m_TotalCaptureMilliseconds = 0.0;
 			runtime.m_Dirty = true;
 		}
+	}
+
+	const void* DiagnosticsRuntime::GetSnapshotData(SnapshotId id) noexcept
+	{
+		ProviderRuntime* runtime = FindProvider(id);
+		if (!runtime)
+		{
+			return nullptr;
+		}
+
+		const bool missing = !m_Store.Contains(runtime->m_Profile.m_Id);
+		const bool capture =
+			missing ||
+			(runtime->m_Profile.m_Policy == SnapshotUpdatePolicy::EveryFrame &&
+				runtime->m_Profile.m_LastCaptureFrame != m_FrameIndex) ||
+			(runtime->m_Profile.m_Policy != SnapshotUpdatePolicy::ManualRefresh &&
+				runtime->m_Dirty) ||
+			runtime->m_Profile.m_RefreshPending;
+		if (capture)
+		{
+			if (m_FrameOpen)
+			{
+				Capture(*runtime);
+			}
+		}
+		else
+		{
+			++runtime->m_Profile.m_CacheHitCount;
+		}
+		return m_Store.Get(runtime->m_Profile.m_Id);
 	}
 
 	void DiagnosticsRuntime::RequestRefresh(SnapshotId id) noexcept
@@ -82,6 +123,13 @@ namespace gglab
 
 	void DiagnosticsRuntime::Capture(ProviderRuntime& runtime) noexcept
 	{
+		GGLAB_ASSERT_MSG(m_FrameOpen,
+			"DiagnosticsRuntime cannot capture without an active borrowed frame context.");
+		if (!m_FrameOpen)
+		{
+			return;
+		}
+
 		const auto begin = std::chrono::steady_clock::now();
 		runtime.m_Provider->Capture(m_Context, m_Store);
 		const auto end = std::chrono::steady_clock::now();

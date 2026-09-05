@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/GPUStructures.h"
@@ -73,6 +73,7 @@ namespace gglab
 		const Renderer& renderer, PersistentSceneBufferSnapshot& outSnapshot) noexcept
 	{
 		outSnapshot = {};
+		outSnapshot.m_SourceAvailable = true;
 		const auto* objectBuffer = renderer.GetObjectStructuredBuffer();
 		const auto* materialBuffer = renderer.GetMaterialStructuredBuffer();
 		const auto* lightBuffer = renderer.GetLightStructuredBuffer();

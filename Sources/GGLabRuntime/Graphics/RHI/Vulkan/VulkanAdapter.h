@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 
 #include <vulkan/vulkan.h>

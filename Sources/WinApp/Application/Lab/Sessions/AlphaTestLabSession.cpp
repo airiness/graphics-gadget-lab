@@ -1,9 +1,9 @@
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {

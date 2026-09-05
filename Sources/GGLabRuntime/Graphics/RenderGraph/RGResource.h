@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResourceHandle.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <unordered_set>
 #include <variant>

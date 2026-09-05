@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Async/ProgressChannel.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstdint>
 #include <string>

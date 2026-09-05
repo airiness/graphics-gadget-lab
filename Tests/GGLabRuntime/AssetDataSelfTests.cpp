@@ -1,4 +1,5 @@
 #include "AssetDataSelfTests.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "Graphics/Asset/AssetPaths.h"
@@ -8,25 +9,29 @@
 #include "Graphics/Asset/DerivedData/Platform/Win/Win32LocalDerivedDataPlatform.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <Windows.h>
 
 #include <atomic>
 #include <chrono>
+#include <concepts>
 #include <cwctype>
 #include <deque>
 #include <fstream>
+#include <filesystem>
 #include <format>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 
@@ -34,6 +39,19 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept IBLCacheStatisticsQuery = requires(const T& value) {
+			value.GetArtifactCacheStatistics();
+		};
+		template <typename T>
+		concept IBLBakeTick = requires(T& value) { value.Tick({}); };
+		static_assert(requires(IBLCacheControlBase& control) {
+			{ control.ClearArtifactCache() } noexcept -> std::same_as<void>;
+			{ control.ClearDerivedDataStore() } noexcept -> std::same_as<bool>;
+		});
+		static_assert(!IBLCacheStatisticsQuery<IBLCacheControlBase>);
+		static_assert(!IBLBakeTick<IBLCacheControlBase>);
+
 		struct FakeLocalDerivedDataPlatformState final
 		{
 			std::mutex m_MaintenanceMutex;
@@ -1311,6 +1329,81 @@ namespace gglab
 				"RHI texture upload validation explicitly rejects unsupported multi-plane data");
 		}
 
+		void RunIBLCacheControlTests(SelfTestContext& context) noexcept
+		{
+			IBLDerivedDataSystem disabled({});
+			IBLCacheControlBase& disabledControl = disabled;
+			disabledControl.ClearArtifactCache();
+			context.Check(disabledControl.ClearDerivedDataStore() &&
+				disabled.GetArtifactCacheStatistics().m_CachedEntryCount == 0,
+				"IBL cache controls accept an empty CPU cache and a disabled DDC");
+
+			std::error_code errorCode;
+			const auto temporaryRoot = std::filesystem::temp_directory_path(errorCode);
+			if (errorCode)
+			{
+				context.Check(false, "IBL cache control tests resolve a temporary directory");
+				return;
+			}
+			const auto root = temporaryRoot / std::format("gglab.ibl-cache-control.{}.{}",
+				GetCurrentProcessId(), std::chrono::steady_clock::now().time_since_epoch().count());
+			{
+				IBLDerivedDataSystem system({ .m_CacheDirectory = root / "cache" });
+				IBLCacheControlBase& control = system;
+				const auto artifact = CreateIBLStageArtifact(
+					IBLArtifactStage::BrdfLut, MakeTextureFixture());
+				DerivedDataKey key{};
+				key.m_Value[0] = std::byte{ 1 };
+				const auto retained = system.Admit(key, artifact);
+				const bool stored = system.Store(key, artifact);
+				context.Check(retained && stored &&
+					system.GetArtifactCacheStatistics().m_CachedEntryCount == 1 &&
+					system.GetStoreStatistics().m_StoredEntryCount == 1,
+					"IBL cache control fixture populates the real CPU cache and DDC");
+
+				control.ClearArtifactCache();
+				context.Check(system.GetArtifactCacheStatistics().m_CachedEntryCount == 0 &&
+					system.GetArtifactCacheStatistics().m_CachedBytes == 0 &&
+					system.GetStoreStatistics().m_StoredEntryCount == 1 &&
+					retained && retained->IsValid() && retained->m_Texture.m_Pixels[0] == std::byte{ 0x10 },
+					"IBL CPU clear preserves retained artifacts and the persistent DDC");
+
+				const auto readmitted = system.Admit(key, retained);
+				const bool cleared = control.ClearDerivedDataStore();
+				LocalDerivedDataStore observer(root / "cache");
+				const auto read = observer.Read(key, GetIBLStageArtifactType(IBLArtifactStage::BrdfLut),
+					IBLStageArtifactSchemaVersion);
+				context.Check(cleared && readmitted &&
+					system.GetArtifactCacheStatistics().m_CachedEntryCount == 1 &&
+					system.GetStoreStatistics().m_StoredEntryCount == 0 &&
+					read.m_Disposition == DerivedDataReadDisposition::Miss && retained->IsValid(),
+					"IBL DDC clear removes stored entries without clearing CPU or retained artifacts");
+				context.Check(system.Store(key, retained) &&
+					system.GetStoreStatistics().m_StoredEntryCount == 1,
+					"Later IBL bake work can repopulate the DDC after maintenance");
+				control.ClearArtifactCache();
+				control.ClearArtifactCache();
+				const bool firstClear = control.ClearDerivedDataStore();
+				const bool secondClear = control.ClearDerivedDataStore();
+				context.Check(firstClear && secondClear &&
+					system.GetArtifactCacheStatistics().m_CachedEntryCount == 0 &&
+					system.GetStoreStatistics().m_StoredEntryCount == 0,
+					"Repeated IBL cache maintenance remains idempotent");
+			}
+			{
+				const auto blockedParent = root / "blocked";
+				std::ofstream blocker(blockedParent, std::ios::binary);
+				blocker << "not a directory";
+				const bool created = blocker.good();
+				blocker.close();
+				IBLDerivedDataSystem blocked({ .m_CacheDirectory = blockedParent / "cache" });
+				IBLCacheControlBase& control = blocked;
+				context.Check(created && !control.ClearDerivedDataStore(),
+					"IBL cache control preserves the DDC maintenance failure result");
+			}
+			std::filesystem::remove_all(root, errorCode);
+		}
+
 		void RunIBLDerivedDataShaderIdentityTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path cacheDirectory =
@@ -1404,6 +1497,7 @@ namespace gglab
 		RunModelImportArtifactTests(context);
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
+		RunIBLCacheControlTests(context);
 		RunAssetPathTests(context);
 	}
 }

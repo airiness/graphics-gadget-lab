@@ -1,7 +1,7 @@
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 
 #include <algorithm>

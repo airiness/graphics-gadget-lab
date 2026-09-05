@@ -5,7 +5,7 @@
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 namespace gglab
 {
@@ -78,23 +78,7 @@ namespace gglab
 		const auto* registry = renderer.GetRenderResourceRegistry();
 		if (registry)
 		{
-			auto& preview = snapshot.m_Preview;
-			preview.m_Selected = registry->GetPostProcessPreviewSelection();
-			preview.m_Published = registry->GetPublishedPostProcessPreviewSelection();
-			preview.m_UpdateCount = registry->GetPostProcessPreviewUpdateCount();
-			preview.m_ExposureEV = registry->GetPostProcessPreviewExposureEV();
-			preview.m_Requested = registry->IsPostProcessPreviewRequested();
-			preview.m_HasPublished = registry->HasPublishedPostProcessPreview();
-			using TextureIndex = RenderResourceRegistry::TextureIndex;
-			const auto* previewDesc = registry->GetTextureDesc(TextureIndex::Preview_PostProcess);
-			if (previewDesc)
-			{
-				preview.m_Width = static_cast<uint32_t>(previewDesc->m_Extent.m_Width);
-				preview.m_Height = previewDesc->m_Extent.m_Height;
-				preview.m_Format = previewDesc->m_Format;
-				preview.m_SrvDescriptor =
-					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess);
-			}
+			snapshot.m_Preview = registry->GetPostProcessPreviewDiagnostics();
 		}
 
 		const auto* gpuProfiler = renderer.GetGpuProfiler();

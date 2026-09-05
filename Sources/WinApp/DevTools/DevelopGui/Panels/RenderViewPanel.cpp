@@ -1,11 +1,11 @@
 #include "DevTools/DevelopGui/Panels/RenderViewPanel.h"
-#include "Core/Math/Culling.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/Math/Culling.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 
 #include <algorithm>
 #include <string>

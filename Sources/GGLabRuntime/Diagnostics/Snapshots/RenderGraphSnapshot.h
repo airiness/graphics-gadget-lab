@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/Resource/TransientResourcePool.h"

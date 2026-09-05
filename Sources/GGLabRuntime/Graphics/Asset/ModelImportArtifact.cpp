@@ -1,6 +1,6 @@
 #include "Graphics/Asset/ModelImportArtifact.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 
 #include <bit>

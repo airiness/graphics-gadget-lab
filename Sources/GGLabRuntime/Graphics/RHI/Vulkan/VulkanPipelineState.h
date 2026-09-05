@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 
 #include <vulkan/vulkan.h>
 

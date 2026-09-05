@@ -1,7 +1,7 @@
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Base/MathUtils.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 

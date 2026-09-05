@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/RHI/RHIBindingLayout.h"
-#include "Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 
 #include <vulkan/vulkan.h>

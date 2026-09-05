@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>
 #include <string>

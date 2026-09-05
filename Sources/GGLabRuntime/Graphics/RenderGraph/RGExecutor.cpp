@@ -1,8 +1,8 @@
 #include "Graphics/RenderGraph/RGExecutor.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <cstddef>
 #include <string_view>

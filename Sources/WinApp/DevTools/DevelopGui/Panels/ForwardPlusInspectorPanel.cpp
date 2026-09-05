@@ -1,11 +1,16 @@
 #include "DevTools/DevelopGui/Panels/ForwardPlusInspectorPanel.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <iterator>
 
 #include <imgui.h>
 
@@ -189,9 +194,9 @@ namespace gglab
 
 	void ForwardPlusInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_Renderer || !context.m_Diagnostics)
+		if (!context.m_Diagnostics)
 		{
-			ImGui::TextDisabled("Renderer diagnostics are unavailable.");
+			ImGui::TextDisabled("Forward+ diagnostics are unavailable.");
 			return;
 		}
 		const auto* snapshot =
@@ -270,13 +275,16 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("Validation and GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (auto* gpuProfiler = context.m_Renderer->GetGpuProfiler())
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = gpuProfiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					gpuProfiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (snapshot->m_GpuTimingAvailable)
 			{

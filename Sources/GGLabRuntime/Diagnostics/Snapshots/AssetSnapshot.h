@@ -1,9 +1,9 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 namespace gglab
 {

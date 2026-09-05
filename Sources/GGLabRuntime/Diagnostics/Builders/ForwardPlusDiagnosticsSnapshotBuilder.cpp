@@ -6,7 +6,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {

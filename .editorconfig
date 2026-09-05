@@ -19,3 +19,6 @@ insert_final_newline = false
 
 [*.{sh,gltf}]
 end_of_line = lf
+
+[Shaders/Tests/Generated/*.hlsli]
+end_of_line = lf

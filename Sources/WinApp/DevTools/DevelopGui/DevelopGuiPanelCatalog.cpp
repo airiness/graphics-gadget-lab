@@ -20,7 +20,7 @@
 #include "DevTools/DevelopGui/Panels/ProfilingPanel.h"
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
-#include "Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #if GGLAB_ENABLE_VULKAN
 #include "DevTools/DevelopGui/Panels/VulkanBackendSummaryPanel.h"

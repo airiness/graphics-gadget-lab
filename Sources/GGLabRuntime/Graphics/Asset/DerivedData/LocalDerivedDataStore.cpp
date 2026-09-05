@@ -1,7 +1,7 @@
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 
 #include <algorithm>

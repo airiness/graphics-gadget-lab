@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 
 namespace gglab
 {

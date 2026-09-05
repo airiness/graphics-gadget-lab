@@ -342,7 +342,7 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Build ShaderToolchainTests standalone
+      - name: Build ShaderToolchainTests standalone without Runtime dependencies
         if: matrix.pch == 'enabled'
         shell: pwsh
         run: |
@@ -360,6 +360,52 @@ jobs:
           )
 
           msbuild @shaderToolchainTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build ShaderRuntimeIntegrationTests standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $shaderRuntimeIntegrationTestsBuildArguments = @(
+            "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\shader-runtime-integration-tests-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @shaderRuntimeIntegrationTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build GGLabVulkanQualification standalone
+        if: matrix.pch == 'enabled'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $qualificationBuildArguments = @(
+            "Projects\GGLabVulkanQualification\GGLabVulkanQualification.vcxproj"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\gglab-vulkan-qualification-${{ matrix.log_name }}.binlog"
+          )
+
+          msbuild @qualificationBuildArguments
 
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -454,6 +500,17 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Run headless self-tests from unrelated CWD (Vulkan qualification)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $qualification = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabVulkanQualification.exe"
+          & $qualification --self-test
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Prove runtime path composition from unrelated CWD
         shell: pwsh
         working-directory: ${{ runner.temp }}
@@ -508,6 +565,17 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Run headless self-tests from unrelated CWD (ShaderRuntimeIntegrationTests)
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $tests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\GGLabShaderRuntimeIntegrationTests.exe"
+          & $tests --suite all
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run headless self-tests (NapaVoxelCoreTests)
         shell: pwsh
         working-directory: Build/Output/x64/${{ matrix.configuration }}
@@ -532,5 +600,7 @@ jobs:
             Build/Logs/gglab-app-runtime-standalone-${{ matrix.log_name }}.binlog
             Build/Logs/gglab-app-runtime-tests-${{ matrix.log_name }}.binlog
             Build/Logs/shader-toolchain-tests-${{ matrix.log_name }}.binlog
+            Build/Logs/shader-runtime-integration-tests-${{ matrix.log_name }}.binlog
+            Build/Logs/gglab-vulkan-qualification-${{ matrix.log_name }}.binlog
           if-no-files-found: ignore
           retention-days: 7

@@ -3,21 +3,28 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
-#include "Core/Profiling/CpuProfiler.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
+#include "GGLabRuntime/Core/Time.h"
 #include "Demo/DemoBase.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
+#include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Shader/ShaderManager.h"
+#include "Lab/LabInterfaces.h"
+#include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"
 
 #include <optional>
@@ -25,6 +32,38 @@
 
 namespace gglab
 {
+	namespace
+	{
+		class ScopedDiagnosticsFrame final
+		{
+		public:
+			ScopedDiagnosticsFrame(
+				DiagnosticsRuntime* runtime, const SnapshotContext& context) noexcept :
+				m_Runtime(runtime)
+			{
+				if (m_Runtime)
+				{
+					m_Runtime->BeginFrame(context);
+				}
+			}
+			ScopedDiagnosticsFrame(const ScopedDiagnosticsFrame&) = delete;
+			ScopedDiagnosticsFrame& operator=(const ScopedDiagnosticsFrame&) = delete;
+			~ScopedDiagnosticsFrame() noexcept
+			{
+				if (m_Runtime)
+				{
+					m_Runtime->EndFrame();
+				}
+			}
+
+			[[nodiscard]] DiagnosticsView* GetView() const noexcept { return m_Runtime; }
+			[[nodiscard]] DiagnosticsControl* GetControl() const noexcept { return m_Runtime; }
+
+		private:
+			DiagnosticsRuntime* m_Runtime = nullptr;
+		};
+	}
+
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
 	{
 		switch (m_LifecycleState)
@@ -105,7 +144,6 @@ namespace gglab
 		m_EnvironmentAssetController->Tick();
 
 		World& world = demo->GetWorld();
-		Camera& camera = demo->GetCamera();
 		Renderer::Frame rendererFrame = m_Renderer->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
@@ -130,10 +168,12 @@ namespace gglab
 			DefaultShadowVisualizationSettings();
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
 		ViewRenderProfile effectiveViewRenderProfile = authoringViewRenderProfile;
+		ApplicationToolingFrameSettingsResolution toolingSettingsResolution{};
 		if (applicationTooling)
 		{
-			applicationTooling->ResolveFrameSettings(authoringViewRenderProfile,
-				shadowVisualizationSettings, effectiveViewRenderProfile);
+			toolingSettingsResolution = applicationTooling->ResolveFrameSettings(
+				authoringViewRenderProfile, shadowVisualizationSettings,
+				effectiveViewRenderProfile);
 		}
 		CameraRig& cameraRig = demo->GetCameraRig();
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
@@ -214,6 +254,26 @@ namespace gglab
 		if (toolingFrame.IsOpen())
 		{
 			GGLAB_CPU_PROFILE_SCOPE("ApplicationTooling");
+			const LabRuntime* labRuntime = tickInfo.m_LabRuntimeLocator
+				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
+				: nullptr;
+			const SnapshotContext diagnosticsContext{
+				.m_Renderer = m_Renderer.get(),
+				.m_AssetManager = m_AssetManager.get(),
+				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				.m_LabSnapshotSource = labRuntime,
+				.m_TaskSystem = m_TaskSystem.get(),
+				.m_World = &world,
+				.m_RenderGraph = &renderGraph,
+				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
+				.m_MainRenderView =
+					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
+				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
+				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
+				.m_GTAOOverrideActive = toolingSettingsResolution.m_GTAOOverrideActive,
+			};
+			ScopedDiagnosticsFrame diagnosticsFrame(m_Diagnostics.get(), diagnosticsContext);
 			std::optional<LoadingProgress> loadingProgress;
 			if (!shaderPreload.IsReady())
 			{
@@ -225,25 +285,26 @@ namespace gglab
 			}
 
 			const ApplicationToolingFrameContext toolingContext{
-				.m_Camera = &camera,
-				.m_CameraController = &demo->GetCameraController(),
 				.m_CameraRig = &demo->GetCameraRig(),
 				.m_Renderer = m_Renderer.get(),
 				.m_World = &world,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
-				.m_MainRenderView =
-					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
-				.m_RenderGraph = &renderGraph,
+				.m_Diagnostics = diagnosticsFrame.GetView(),
+				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
+				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
+				.m_EnvironmentLightingControl = m_Renderer->GetEnvironmentLightingSystem(),
+				.m_GpuProfiling = m_Renderer->GetGpuProfiler(),
+				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
+				.m_IBLCacheControl = m_Renderer->GetIBLBakeScheduler()
+					? &m_Renderer->GetIBLBakeScheduler()->GetCacheControl() : nullptr,
+				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
+				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
+				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
-				.m_DirectionalShadowSettings =
-					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
-				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
-				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
-				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);
@@ -260,6 +321,7 @@ namespace gglab
 		}
 		if (!frameEndResult.IsCompleted())
 		{
+			toolingFrame.Abort();
 			return AppRuntimeTickResult::Exit;
 		}
 

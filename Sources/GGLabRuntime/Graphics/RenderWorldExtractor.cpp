@@ -1,9 +1,9 @@
 #include "Graphics/RenderWorldExtractor.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Math/Matrix.h"
-#include "Core/World.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {

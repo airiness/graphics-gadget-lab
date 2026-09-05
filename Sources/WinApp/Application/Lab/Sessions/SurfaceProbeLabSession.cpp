@@ -1,14 +1,14 @@
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <algorithm>
 #include <cstddef>

@@ -3,13 +3,18 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "DevTools/DevToolsRuntime.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHIFormat.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
+
+#include <algorithm>
+#include <iterator>
 
 #include <imgui.h>
 
@@ -273,13 +278,79 @@ namespace gglab
 				formatName(resolved.m_FinalAOFormatPreference));
 			ImGui::EndTable();
 		}
+
+		void DrawPreview(DevelopGuiContext& context,
+			const GTAODiagnosticsSnapshot& snapshot) noexcept
+		{
+			const auto* view = context.m_PostProcessPreview;
+			auto* control = context.m_PostProcessPreviewControl;
+			if (!view)
+			{
+				ImGui::TextDisabled("Post-process preview is unavailable.");
+				return;
+			}
+			const auto preview = view->GetPostProcessPreviewDiagnostics();
+			ImGui::BeginDisabled(!control);
+			PostProcessDebugSelection selection = preview.m_Selected;
+			if (selection.m_Tap < PostProcessDebugTap::GTAORawAO ||
+				selection.m_Tap > PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			{
+				selection.m_Tap = PostProcessDebugTap::GTAOFinalAO;
+			}
+			if (DrawPreviewTapCombo(selection.m_Tap) && control)
+			{
+				control->SetPostProcessPreviewSelection(selection);
+			}
+			if (control)
+			{
+				control->RequestPostProcessPreview();
+			}
+			if (selection.m_Tap == PostProcessDebugTap::GTAOFinalAO)
+			{
+				ImGui::TextDisabled("FinalAO is visibility: white is unoccluded, black is occluded.");
+			}
+			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			{
+				float exposureEV = preview.m_ExposureEV;
+				if (ImGui::SliderFloat(
+					"Contribution Exposure", &exposureEV, -8.0f, 8.0f, "%+.2f EV") && control)
+				{
+					control->SetPostProcessPreviewExposureEV(exposureEV);
+				}
+			}
+
+			ImGui::EndDisabled();
+
+			const bool published = preview.m_HasPublished && preview.m_Width && preview.m_Height &&
+				preview.m_Published == selection;
+			if (!published)
+			{
+				ImGui::TextDisabled(snapshot.m_Status == GTAOFrameStatus::Active
+					? "Preview update pending..."
+					: "The selected preview requires an active GTAO frame.");
+			}
+			else
+			{
+				const ImTextureID textureId = devtools::ResolveImGuiTextureId(
+					context.m_DevelopGuiSystem,
+					preview.m_SrvDescriptor);
+				if (textureId)
+				{
+					const float width = std::min(
+						std::max(ImGui::GetContentRegionAvail().x, 64.0f), 768.0f);
+					const float aspect = static_cast<float>(preview.m_Height) /
+						static_cast<float>(preview.m_Width);
+					ImGui::Image(textureId, ImVec2(width, width * aspect));
+				}
+			}
+		}
 	}
 
 	void GTAOInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_Renderer || !context.m_Diagnostics)
+		if (!context.m_Diagnostics)
 		{
-			ImGui::TextDisabled("Renderer diagnostics are unavailable.");
+			ImGui::TextDisabled("GTAO diagnostics are unavailable.");
 			return;
 		}
 		const auto* snapshot = context.m_Diagnostics->GetSnapshot<GTAODiagnosticsSnapshot>();
@@ -339,57 +410,7 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			auto* registry = context.m_Renderer->GetRenderResourceRegistry();
-			GGLAB_ASSERT_NOT_NULL(registry);
-			PostProcessDebugSelection selection = registry->GetPostProcessPreviewSelection();
-			if (selection.m_Tap < PostProcessDebugTap::GTAORawAO ||
-				selection.m_Tap > PostProcessDebugTap::GTAOAOOnlyLightingContribution)
-			{
-				selection.m_Tap = PostProcessDebugTap::GTAOFinalAO;
-			}
-			if (DrawPreviewTapCombo(selection.m_Tap))
-			{
-				registry->SetPostProcessPreviewSelection(selection);
-			}
-			registry->RequestPostProcessPreview();
-			if (selection.m_Tap == PostProcessDebugTap::GTAOFinalAO)
-			{
-				ImGui::TextDisabled("FinalAO is visibility: white is unoccluded, black is occluded.");
-			}
-			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
-			{
-				float exposureEV = registry->GetPostProcessPreviewExposureEV();
-				if (ImGui::SliderFloat(
-					"Contribution Exposure", &exposureEV, -8.0f, 8.0f, "%+.2f EV"))
-				{
-					registry->SetPostProcessPreviewExposureEV(exposureEV);
-				}
-			}
-
-			using TextureIndex = RenderResourceRegistry::TextureIndex;
-			const auto* previewDesc = registry->GetTextureDesc(TextureIndex::Preview_PostProcess);
-			const bool published = registry->HasPublishedPostProcessPreview() && previewDesc &&
-				registry->GetPublishedPostProcessPreviewSelection() == selection;
-			if (!published)
-			{
-				ImGui::TextDisabled(snapshot->m_Status == GTAOFrameStatus::Active
-					? "Preview update pending..."
-					: "The selected preview requires an active GTAO frame.");
-			}
-			else
-			{
-				const ImTextureID textureId = devtools::ResolveImGuiTextureId(
-					context.m_DevelopGuiSystem,
-					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess));
-				if (textureId)
-				{
-					const float width = std::min(
-						std::max(ImGui::GetContentRegionAvail().x, 64.0f), 768.0f);
-					const float aspect = static_cast<float>(previewDesc->m_Extent.m_Height) /
-						static_cast<float>(previewDesc->m_Extent.m_Width);
-					ImGui::Image(textureId, ImVec2(width, width * aspect));
-				}
-			}
+			DrawPreview(context, *snapshot);
 		}
 
 		if (ImGui::CollapsingHeader("Resources", ImGuiTreeNodeFlags_DefaultOpen))
@@ -439,14 +460,16 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			GpuProfiler* profiler = context.m_Renderer->GetGpuProfiler();
-			if (profiler)
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = profiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling##GTAO", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling##GTAO", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					profiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (!snapshot->m_GpuTimingAvailable)
 			{

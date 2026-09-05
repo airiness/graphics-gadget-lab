@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/AssetIdentity.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstdint>
 #include <span>

@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
 #include "Graphics/RHI/DX12/DX12CommandList.h"

@@ -3,10 +3,15 @@
 #include "DevTools/EnumText/EnumTextRenderGraph.h"
 #include "DevTools/RHIText.h"
 #include "GGLabFoundation/String/StringUtils.h"
-#include "Graphics/Renderer.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+
+#include <cstdint>
+#include <format>
+#include <optional>
+#include <string>
+#include <type_traits>
 
 #include <imgui.h>
 
@@ -217,7 +222,7 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawRenderGraphResources(DiagnosticsRuntime* diagnostics) noexcept
+		void DrawRenderGraphResources(DiagnosticsView* diagnostics) noexcept
 		{
 			const auto* snapshot = diagnostics ? diagnostics->GetSnapshot<RGSnapshot>() : nullptr;
 			if (!snapshot)
@@ -275,12 +280,6 @@ namespace gglab
 	void TransientResourcePoolPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<TransientResourcePoolPanelState>();
-		if (!context.m_Renderer || !context.m_Renderer->GetTransientResourcePool())
-		{
-			ImGui::TextDisabled("Transient resource pool is not available.");
-			return;
-		}
-
 		const auto* snapshot =
 			context.m_Diagnostics
 			? context.m_Diagnostics->GetSnapshot<TransientResourcePoolSnapshot>()
@@ -288,6 +287,11 @@ namespace gglab
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Transient pool snapshot provider is not available.");
+			return;
+		}
+		if (!snapshot->m_SourceAvailable)
+		{
+			ImGui::TextDisabled("Transient resource pool is not available.");
 			return;
 		}
 

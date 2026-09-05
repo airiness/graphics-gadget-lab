@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"

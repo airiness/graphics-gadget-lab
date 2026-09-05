@@ -5,7 +5,7 @@
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 namespace gglab
 {

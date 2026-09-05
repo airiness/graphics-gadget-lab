@@ -1,16 +1,16 @@
 #include "DevTools/DevelopGui/Panels/EntityPanel.h"
-#include "Core/Math/Quaternion.h"
-#include "Scene/Components.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/StringIdFormatting.h"
-#include "Core/World.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Scene/Components.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/World.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>
@@ -45,6 +45,24 @@ namespace gglab
 			bool m_Selected = false;
 			bool m_Hovered = false;
 		};
+
+		[[nodiscard]] const RenderView* FindRenderView(
+			std::span<const RenderView> views, RenderViewID viewId) noexcept
+		{
+			const size_t index = utils::ToIndex(viewId);
+			if (index < views.size() && views[index].m_ViewId == viewId)
+			{
+				return &views[index];
+			}
+			for (const RenderView& view : views)
+			{
+				if (view.m_ViewId == viewId)
+				{
+					return &view;
+				}
+			}
+			return nullptr;
+		}
 
 		[[nodiscard]] bool PassesFilter(const entt::registry& registry, entt::entity entity,
 			EntityComponentFilter filter) noexcept
@@ -637,6 +655,6 @@ namespace gglab
 		}
 
 		DrawEntityWorldLinks(registry, state, std::span<const EntityListItemAnchor>(entityAnchors),
-			context.m_MainRenderView);
+			FindRenderView(context.m_RenderViews, RenderViewID::Main));
 	}
 }

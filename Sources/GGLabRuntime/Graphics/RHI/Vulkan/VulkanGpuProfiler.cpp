@@ -1,5 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanGpuProfiler.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
@@ -88,7 +88,7 @@ namespace gglab
 		}
 	}
 
-	void VulkanGpuProfiler::SetEnabled(bool enabled) noexcept
+	void VulkanGpuProfiler::RequestEnabled(bool enabled) noexcept
 	{
 		m_Enabled.store(enabled && m_Available, std::memory_order_relaxed);
 	}

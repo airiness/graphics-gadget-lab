@@ -1,7 +1,7 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/IBLBakeTypes.h"
 
 #include <filesystem>

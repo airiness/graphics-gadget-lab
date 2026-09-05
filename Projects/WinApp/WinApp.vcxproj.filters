@@ -25,8 +25,8 @@
     <Filter Include="Application\Platform\Windows">
       <UniqueIdentifier>{D348BFFD-11FA-3129-4CC8-BCE584C46D29}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Application\Rendering">
-      <UniqueIdentifier>{FCBECF55-08FC-FB0E-7E29-E0EF56183533}</UniqueIdentifier>
+    <Filter Include="Application\Platform\Windows\Input">
+      <UniqueIdentifier>{1CD47382-162C-F10D-43A8-59ABECD67F40}</UniqueIdentifier>
     </Filter>
     <Filter Include="Application\SelfTest">
       <UniqueIdentifier>{4CA85ECB-F3BE-96CD-9BFB-56439BEEC692}</UniqueIdentifier>
@@ -36,12 +36,6 @@
     </Filter>
     <Filter Include="Application\Tooling">
       <UniqueIdentifier>{F5EC7F42-3280-CAC7-E5F1-0CD3A8058F70}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core">
-      <UniqueIdentifier>{AD0FA2B0-4EC8-D43E-CB3B-137A1941462D}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core\Input">
-      <UniqueIdentifier>{8B1FA118-9972-ED9D-9D41-76DE988DB7B2}</UniqueIdentifier>
     </Filter>
     <Filter Include="DevTools">
       <UniqueIdentifier>{B90B6524-0B4B-C864-6024-9EB3622AEB0D}</UniqueIdentifier>
@@ -246,13 +240,25 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Main.cpp">
       <Filter>Application</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\InputBase.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\InputManager.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\Keyboard.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\Mouse.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.cpp">
-      <Filter>Application\Platform\Windows</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.cpp">
       <Filter>Application\Platform\Windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp">
@@ -260,9 +266,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.cpp">
-      <Filter>Application\Rendering</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
@@ -309,9 +312,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
@@ -320,21 +320,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.cpp">
       <Filter>Application\Shader</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputBase.cpp">
-      <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Core\Input\InputManager.cpp">
-      <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Core\Input\Keyboard.cpp">
-      <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Core\Input\Mouse.cpp">
-      <Filter>Core\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Core\Input\WindowsInputMapping.cpp">
-      <Filter>Core\Input</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp">
       <Filter>DevTools</Filter>
@@ -569,6 +554,21 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformWindow.h">
       <Filter>Application\Platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\InputBase.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\InputManager.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\Keyboard.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\Mouse.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\WindowsInputMapping.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32MessageHandler.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
@@ -578,17 +578,11 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32RHIContextFactory.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32VulkanQualificationHost.h">
-      <Filter>Application\Platform\Windows</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.h">
       <Filter>Application\Platform\Windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h">
       <Filter>Application</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Rendering\VulkanQualification.h">
-      <Filter>Application\Rendering</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h">
       <Filter>Application\SelfTest</Filter>
@@ -626,9 +620,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\VulkanQualificationSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
@@ -640,21 +631,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">
       <Filter>Application\Tooling</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Core\Input\InputBase.h">
-      <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Core\Input\InputManager.h">
-      <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Core\Input\Keyboard.h">
-      <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Core\Input\Mouse.h">
-      <Filter>Core\Input</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Core\Input\WindowsInputMapping.h">
-      <Filter>Core\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.h">
       <Filter>DevTools</Filter>

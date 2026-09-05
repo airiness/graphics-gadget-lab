@@ -3,12 +3,14 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "DevTools/DevToolsRuntime.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <imgui.h>
 
@@ -102,13 +104,85 @@ namespace gglab
 			ImGui::DragFloat("Clamp Expansion", &settings.m_NeighborhoodClampExpansion,
 				0.005f, 0.0f, TemporalAAMaxNeighborhoodClampExpansion, "%.3f");
 		}
+
+		void DrawPreview(DevelopGuiContext& context,
+			const TemporalAADiagnosticsSnapshot& snapshot) noexcept
+		{
+			const auto* view = context.m_PostProcessPreview;
+			auto* control = context.m_PostProcessPreviewControl;
+			if (!view)
+			{
+				ImGui::TextDisabled("Post-process preview is unavailable.");
+				return;
+			}
+			const auto preview = view->GetPostProcessPreviewDiagnostics();
+			ImGui::BeginDisabled(!control);
+			constexpr PostProcessDebugTap Taps[] = {
+				PostProcessDebugTap::TemporalHistoryColor,
+				PostProcessDebugTap::TemporalReprojectionUV,
+				PostProcessDebugTap::TemporalRejection,
+				PostProcessDebugTap::TemporalHistoryWeight,
+				PostProcessDebugTap::TemporalHistoryAge,
+				PostProcessDebugTap::TemporalMotionDirection,
+				PostProcessDebugTap::TemporalMotionMagnitude,
+			};
+			PostProcessDebugSelection selection = preview.m_Selected;
+			if (std::ranges::find(Taps, selection.m_Tap) == std::ranges::end(Taps))
+			{
+				selection.m_Tap = PostProcessDebugTap::TemporalHistoryWeight;
+				if (control)
+				{
+					control->SetPostProcessPreviewSelection(selection);
+				}
+			}
+			if (ImGui::BeginCombo("Tap##TemporalAA", TapName(selection.m_Tap)))
+			{
+				for (const auto tap : Taps)
+				{
+					if (ImGui::Selectable(TapName(tap), tap == selection.m_Tap))
+					{
+						selection.m_Tap = tap;
+						if (control)
+						{
+							control->SetPostProcessPreviewSelection(selection);
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::EndDisabled();
+
+			if (control)
+			{
+				control->RequestPostProcessPreview();
+			}
+			if (preview.m_Width && preview.m_Height && preview.m_HasPublished &&
+				preview.m_Published == selection)
+			{
+				const ImTextureID textureId = devtools::ResolveImGuiTextureId(
+					context.m_DevelopGuiSystem,
+					preview.m_SrvDescriptor);
+				if (textureId)
+				{
+					const float width = std::clamp(ImGui::GetContentRegionAvail().x, 64.0f, 768.0f);
+					const float aspect = static_cast<float>(preview.m_Height) /
+						static_cast<float>(preview.m_Width);
+					ImGui::Image(textureId, ImVec2(width, width * aspect));
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled(snapshot.m_FramePlan.m_Active ? "Preview update pending..."
+					: "The selected preview requires an active TAA frame.");
+			}
+		}
 	}
 
 	void TemporalAAInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_Renderer || !context.m_Diagnostics)
+		if (!context.m_Diagnostics)
 		{
-			ImGui::TextDisabled("Renderer diagnostics are unavailable.");
+			ImGui::TextDisabled("Temporal AA diagnostics are unavailable.");
 			return;
 		}
 		const auto* snapshot =
@@ -197,68 +271,21 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			constexpr PostProcessDebugTap Taps[] = {
-				PostProcessDebugTap::TemporalHistoryColor,
-				PostProcessDebugTap::TemporalReprojectionUV,
-				PostProcessDebugTap::TemporalRejection,
-				PostProcessDebugTap::TemporalHistoryWeight,
-				PostProcessDebugTap::TemporalHistoryAge,
-				PostProcessDebugTap::TemporalMotionDirection,
-				PostProcessDebugTap::TemporalMotionMagnitude,
-			};
-			auto* registry = context.m_Renderer->GetRenderResourceRegistry();
-			PostProcessDebugSelection selection = registry->GetPostProcessPreviewSelection();
-			if (std::ranges::find(Taps, selection.m_Tap) == std::ranges::end(Taps))
-			{
-				selection.m_Tap = PostProcessDebugTap::TemporalHistoryWeight;
-				registry->SetPostProcessPreviewSelection(selection);
-			}
-			if (ImGui::BeginCombo("Tap##TemporalAA", TapName(selection.m_Tap)))
-			{
-				for (const auto tap : Taps)
-				{
-					if (ImGui::Selectable(TapName(tap), tap == selection.m_Tap))
-					{
-						selection.m_Tap = tap;
-						registry->SetPostProcessPreviewSelection(selection);
-					}
-				}
-				ImGui::EndCombo();
-			}
-			registry->RequestPostProcessPreview();
-			using TextureIndex = RenderResourceRegistry::TextureIndex;
-			const auto* desc = registry->GetTextureDesc(TextureIndex::Preview_PostProcess);
-			if (desc && registry->HasPublishedPostProcessPreview() &&
-				registry->GetPublishedPostProcessPreviewSelection() == selection)
-			{
-				const ImTextureID textureId = devtools::ResolveImGuiTextureId(
-					context.m_DevelopGuiSystem,
-					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess));
-				if (textureId)
-				{
-					const float width = std::clamp(ImGui::GetContentRegionAvail().x, 64.0f, 768.0f);
-					const float aspect = static_cast<float>(desc->m_Extent.m_Height) /
-						static_cast<float>(desc->m_Extent.m_Width);
-					ImGui::Image(textureId, ImVec2(width, width * aspect));
-				}
-			}
-			else
-			{
-				ImGui::TextDisabled(plan.m_Active ? "Preview update pending..."
-					: "The selected preview requires an active TAA frame.");
-			}
+			DrawPreview(context, *snapshot);
 		}
 
 		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			GpuProfiler* profiler = context.m_Renderer->GetGpuProfiler();
-			if (profiler)
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = profiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling##TemporalAA", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling##TemporalAA", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					profiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (snapshot->m_GpuTimingAvailable)
 			{

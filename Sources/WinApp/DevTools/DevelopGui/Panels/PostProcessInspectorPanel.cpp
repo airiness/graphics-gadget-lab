@@ -1,12 +1,18 @@
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+
+#include <algorithm>
+#include <format>
+#include <string>
 
 #include <imgui.h>
 
@@ -153,24 +159,148 @@ namespace gglab
 			ImGui::TableSetColumnIndex(3);
 			ImGui::Text("%.1f KiB", static_cast<double>(texture.m_LogicalBytes) / 1024.0);
 		}
+
+		void DrawPreview(DevelopGuiContext& context,
+			const PostProcessDiagnosticsSnapshot& snapshot) noexcept
+		{
+			const auto* view = context.m_PostProcessPreview;
+			auto* control = context.m_PostProcessPreviewControl;
+			if (!view)
+			{
+				ImGui::TextDisabled("Post-process preview is unavailable.");
+				return;
+			}
+			const auto preview = view->GetPostProcessPreviewDiagnostics();
+			ImGui::BeginDisabled(!control);
+			PostProcessDebugSelection selection = preview.m_Selected;
+			bool selectionChanged = DrawTapCombo(selection.m_Tap);
+			if (selection.m_Tap == PostProcessDebugTap::BloomPyramid)
+			{
+				const int maxLevel = snapshot.m_BloomLevelCount > 0
+					? static_cast<int>(snapshot.m_BloomLevelCount - 1u)
+					: 0;
+				const uint32_t clampedLevel = static_cast<uint32_t>(
+					std::clamp(static_cast<int>(selection.m_BloomPyramidLevel), 0, maxLevel));
+				if (selection.m_BloomPyramidLevel != clampedLevel)
+				{
+					selection.m_BloomPyramidLevel = clampedLevel;
+					selectionChanged = true;
+				}
+				int level = static_cast<int>(selection.m_BloomPyramidLevel);
+				if (ImGui::SliderInt("Pyramid Level", &level, 0, maxLevel))
+				{
+					selection.m_BloomPyramidLevel = static_cast<uint32_t>(level);
+					selectionChanged = true;
+				}
+			}
+			if (selectionChanged && control)
+			{
+				control->SetPostProcessPreviewSelection(selection);
+			}
+
+			float exposureEV = preview.m_ExposureEV;
+			if (ImGui::SliderFloat("Preview Exposure", &exposureEV, -8.0f, 8.0f, "%+.2f EV") &&
+				control)
+			{
+				control->SetPostProcessPreviewExposureEV(exposureEV);
+			}
+			if (ImGui::Button("Reset Preview Exposure") && control)
+			{
+				control->SetPostProcessPreviewExposureEV(0.0f);
+			}
+
+			ImGui::EndDisabled();
+
+			if (control)
+			{
+				control->RequestPostProcessPreview();
+			}
+			const auto* selectedTexture = ResolveSelectedTexture(snapshot, selection);
+			const bool depthSelection = selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
+				selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
+			const bool gtaoSelection = selection.m_Tap == PostProcessDebugTap::GTAORawAO ||
+				selection.m_Tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
+				selection.m_Tap == PostProcessDebugTap::GTAOReconstructedNormal ||
+				selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
+				selection.m_Tap == PostProcessDebugTap::GTAODenoiseX ||
+				selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
+				selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
+				selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
+			const bool temporalMotionSelection =
+				selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
+				selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
+			const bool temporalAASelection =
+				selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
+				selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
+				selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
+				selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight ||
+				selection.m_Tap == PostProcessDebugTap::TemporalHistoryAge;
+			if (depthSelection && snapshot.m_SceneDepth.m_Available)
+			{
+				ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
+					snapshot.m_SceneDepth.m_Width, snapshot.m_SceneDepth.m_Height,
+					GetRHIFormatInfo(snapshot.m_SceneDepth.m_ResourceFormat).m_Name,
+					GetRHIFormatInfo(snapshot.m_SceneDepth.m_SrvFormat).m_Name);
+			}
+			else if (gtaoSelection)
+			{
+				ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
+			}
+			else if (temporalMotionSelection)
+			{
+				ImGui::TextDisabled(
+					"Source: active transient R16G16Float motion vectors in UV delta units.");
+			}
+			else if (temporalAASelection)
+			{
+				ImGui::TextDisabled("Source: active TAA history or reprojection diagnostics surface.");
+			}
+			else if (!selectedTexture || !selectedTexture->m_Available)
+			{
+				ImGui::TextDisabled(
+					"The selected tap is unavailable in the current pipeline configuration.");
+			}
+			else
+			{
+				ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.3f", selectedTexture->m_Width,
+					selectedTexture->m_Height, GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
+					selectedTexture->m_PreExposure);
+			}
+
+			if (preview.m_HasPublished && preview.m_Width && preview.m_Height)
+			{
+				const auto published = preview.m_Published;
+				if (published != selection)
+				{
+					ImGui::TextDisabled("Preview update pending...");
+				}
+				const ImTextureID textureId =
+					devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
+						preview.m_SrvDescriptor);
+				if (textureId)
+				{
+					const float availableWidth = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
+					const float imageWidth = std::min(availableWidth, 768.0f);
+					const float aspect = static_cast<float>(preview.m_Height) /
+						static_cast<float>(preview.m_Width);
+					ImGui::Image(textureId, ImVec2(imageWidth, imageWidth * aspect));
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled("Preview will be published on the next rendered frame.");
+			}
+		}
 	}
 
 	void PostProcessInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		auto* renderer = context.m_Renderer;
 		auto* diagnostics = context.m_Diagnostics;
-		if (!renderer || !diagnostics)
+		if (!diagnostics)
 		{
-			ImGui::TextDisabled("Renderer diagnostics are unavailable.");
+			ImGui::TextDisabled("Post-process diagnostics are unavailable.");
 			return;
 		}
-		auto* registry = renderer->GetRenderResourceRegistry();
-		if (!registry)
-		{
-			ImGui::TextDisabled("Render resource registry is unavailable.");
-			return;
-		}
-
 		const auto* snapshot = diagnostics->GetSnapshot<PostProcessDiagnosticsSnapshot>();
 		if (!snapshot)
 		{
@@ -178,120 +308,7 @@ namespace gglab
 			return;
 		}
 
-		PostProcessDebugSelection selection = registry->GetPostProcessPreviewSelection();
-		bool selectionChanged = DrawTapCombo(selection.m_Tap);
-		if (selection.m_Tap == PostProcessDebugTap::BloomPyramid)
-		{
-			const int maxLevel = snapshot->m_BloomLevelCount > 0
-				? static_cast<int>(snapshot->m_BloomLevelCount - 1u)
-				: 0;
-			const uint32_t clampedLevel = static_cast<uint32_t>(
-				std::clamp(static_cast<int>(selection.m_BloomPyramidLevel), 0, maxLevel));
-			if (selection.m_BloomPyramidLevel != clampedLevel)
-			{
-				selection.m_BloomPyramidLevel = clampedLevel;
-				selectionChanged = true;
-			}
-			int level = static_cast<int>(selection.m_BloomPyramidLevel);
-			if (ImGui::SliderInt("Pyramid Level", &level, 0, maxLevel))
-			{
-				selection.m_BloomPyramidLevel = static_cast<uint32_t>(level);
-				selectionChanged = true;
-			}
-		}
-		if (selectionChanged)
-		{
-			registry->SetPostProcessPreviewSelection(selection);
-		}
-
-		float exposureEV = registry->GetPostProcessPreviewExposureEV();
-		if (ImGui::SliderFloat("Preview Exposure", &exposureEV, -8.0f, 8.0f, "%+.2f EV"))
-		{
-			registry->SetPostProcessPreviewExposureEV(exposureEV);
-		}
-		if (ImGui::Button("Reset Preview Exposure"))
-		{
-			registry->SetPostProcessPreviewExposureEV(0.0f);
-		}
-
-		registry->RequestPostProcessPreview();
-		const auto* selectedTexture = ResolveSelectedTexture(*snapshot, selection);
-		const bool depthSelection = selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
-			selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
-		const bool gtaoSelection = selection.m_Tap == PostProcessDebugTap::GTAORawAO ||
-			selection.m_Tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
-			selection.m_Tap == PostProcessDebugTap::GTAOReconstructedNormal ||
-			selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
-			selection.m_Tap == PostProcessDebugTap::GTAODenoiseX ||
-			selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
-			selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
-			selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
-		const bool temporalMotionSelection =
-			selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
-			selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
-		const bool temporalAASelection =
-			selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
-			selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
-			selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
-			selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight ||
-			selection.m_Tap == PostProcessDebugTap::TemporalHistoryAge;
-		if (depthSelection && snapshot->m_SceneDepth.m_Available)
-		{
-			ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
-				snapshot->m_SceneDepth.m_Width, snapshot->m_SceneDepth.m_Height,
-				GetRHIFormatInfo(snapshot->m_SceneDepth.m_ResourceFormat).m_Name,
-				GetRHIFormatInfo(snapshot->m_SceneDepth.m_SrvFormat).m_Name);
-		}
-		else if (gtaoSelection)
-		{
-			ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
-		}
-		else if (temporalMotionSelection)
-		{
-			ImGui::TextDisabled(
-				"Source: active transient R16G16Float motion vectors in UV delta units.");
-		}
-		else if (temporalAASelection)
-		{
-			ImGui::TextDisabled("Source: active TAA history or reprojection diagnostics surface.");
-		}
-		else if (!selectedTexture || !selectedTexture->m_Available)
-		{
-			ImGui::TextDisabled(
-				"The selected tap is unavailable in the current pipeline configuration.");
-		}
-		else
-		{
-			ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.3f", selectedTexture->m_Width,
-				selectedTexture->m_Height, GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
-				selectedTexture->m_PreExposure);
-		}
-
-		using TextureIndex = RenderResourceRegistry::TextureIndex;
-		const auto* previewDesc = registry->GetTextureDesc(TextureIndex::Preview_PostProcess);
-		if (registry->HasPublishedPostProcessPreview() && previewDesc)
-		{
-			const auto published = registry->GetPublishedPostProcessPreviewSelection();
-			if (published != selection)
-			{
-				ImGui::TextDisabled("Preview update pending...");
-			}
-			const ImTextureID textureId =
-				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
-					registry->GetSrvDescriptor(TextureIndex::Preview_PostProcess));
-			if (textureId)
-			{
-				const float availableWidth = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
-				const float imageWidth = std::min(availableWidth, 768.0f);
-				const float aspect = static_cast<float>(previewDesc->m_Extent.m_Height) /
-					static_cast<float>(previewDesc->m_Extent.m_Width);
-				ImGui::Image(textureId, ImVec2(imageWidth, imageWidth * aspect));
-			}
-		}
-		else
-		{
-			ImGui::TextDisabled("Preview will be published on the next rendered frame.");
-		}
+		DrawPreview(context, *snapshot);
 
 		if (ImGui::CollapsingHeader("Scene Depth", ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -342,14 +359,16 @@ namespace gglab
 
 		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			auto* gpuProfiler = renderer->GetGpuProfiler();
-			if (gpuProfiler)
+			if (context.m_GpuProfiling)
 			{
-				bool enabled = gpuProfiler->IsEnabled();
-				if (ImGui::Checkbox("GPU Profiling", &enabled))
+				bool enabled = context.m_GpuProfiling->IsEnabled();
+				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+				if (ImGui::Checkbox("GPU Profiling", &enabled) &&
+					context.m_GpuProfilingControl)
 				{
-					gpuProfiler->SetEnabled(enabled);
+					context.m_GpuProfilingControl->RequestEnabled(enabled);
 				}
+				ImGui::EndDisabled();
 			}
 			if (!snapshot->m_GpuProfilerEnabled)
 			{

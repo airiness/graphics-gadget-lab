@@ -1,6 +1,6 @@
 #pragma once
-#include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/SamplerTypes.h"
 
 #include <vector>

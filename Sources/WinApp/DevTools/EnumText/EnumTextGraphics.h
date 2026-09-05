@@ -1,7 +1,7 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerTypes.h"
 

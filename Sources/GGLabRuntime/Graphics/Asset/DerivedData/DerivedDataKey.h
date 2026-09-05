@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <array>
 #include <cstddef>

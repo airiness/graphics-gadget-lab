@@ -1,7 +1,7 @@
 #pragma once
 #include "Demo/DemoBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {

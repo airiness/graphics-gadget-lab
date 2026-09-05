@@ -1,7 +1,7 @@
 #pragma once
 #include "AssetPreparationTracker.h"
 #include "Lab/LabSessionBase.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 namespace gglab
 {

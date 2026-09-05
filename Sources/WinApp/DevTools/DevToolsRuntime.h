@@ -1,14 +1,12 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 namespace gglab
 {
 	struct DevelopGuiContext;
-	class TaskSystem;
 
 	struct RenderVisualizationSettings
 	{
@@ -36,16 +34,14 @@ namespace gglab
 	class DevToolsRuntime
 	{
 	public:
-		DevToolsRuntime() noexcept;
+		DevToolsRuntime() noexcept = default;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DevToolsRuntime);
 		~DevToolsRuntime() = default;
 
 		void Reset() noexcept;
 		void Draw(DevelopGuiContext& context) noexcept;
-		void SetTaskSystem(const TaskSystem* taskSystem) noexcept { m_TaskSystem = taskSystem; }
 
 		DevelopGuiRegistry& GetRegistry() noexcept { return m_Registry; }
-		DiagnosticsRuntime& GetDiagnostics() noexcept { return m_Diagnostics; }
 		RenderVisualizationSettings& GetRenderVisualizationSettings() noexcept
 		{
 			return m_RenderVisualizationSettings;
@@ -58,14 +54,16 @@ namespace gglab
 		{
 			return m_ViewRenderSettingsOverrides;
 		}
+		const ViewRenderSettingsOverrides& GetViewRenderSettingsOverrides() const noexcept
+		{
+			return m_ViewRenderSettingsOverrides;
+		}
 		[[nodiscard]] ViewRenderProfile ResolveViewRenderProfile(
 			const ViewRenderProfile& authoringProfile) const noexcept;
 
 	private:
 		DevelopGuiRegistry m_Registry;
-		DiagnosticsRuntime m_Diagnostics;
 		RenderVisualizationSettings m_RenderVisualizationSettings{};
 		ViewRenderSettingsOverrides m_ViewRenderSettingsOverrides{};
-		const TaskSystem* m_TaskSystem = nullptr;
 	};
 }

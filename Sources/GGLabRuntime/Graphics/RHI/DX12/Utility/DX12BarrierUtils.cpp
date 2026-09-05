@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 

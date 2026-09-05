@@ -4,9 +4,9 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include <algorithm>
 #include <cmath>
 
@@ -1129,12 +1129,6 @@ namespace gglab
 
 		ImGui::TextUnformatted("RenderGraph Inspector");
 		ImGui::Separator();
-
-		if (!context.m_RenderGraph)
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor, "RenderGraph is null.");
-			return;
-		}
 
 		const auto* snapshotPtr =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<RGSnapshot>() : nullptr;

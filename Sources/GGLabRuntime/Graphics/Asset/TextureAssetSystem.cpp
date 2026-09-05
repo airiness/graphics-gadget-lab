@@ -1,6 +1,6 @@
 #include "Graphics/Asset/TextureAssetSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
@@ -11,7 +11,7 @@
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
 #include "Graphics/Utility/TextureUtils.h"
 

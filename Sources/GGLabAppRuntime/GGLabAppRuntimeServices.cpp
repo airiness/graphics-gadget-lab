@@ -6,6 +6,10 @@
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
+#include "Diagnostics/Builders/BackendSnapshotProviders.h"
+#include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
+#include "Diagnostics/Builders/LabSnapshotProvider.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -18,7 +22,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Time.h"
 
 #include <optional>
 #include <span>
@@ -33,6 +37,16 @@ namespace gglab
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
 		Shutdown();
+	}
+
+	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
+	{
+		return m_Diagnostics.get();
+	}
+
+	DiagnosticsControl* GGLabAppRuntime::GetDiagnosticsControl() const noexcept
+	{
+		return m_Diagnostics.get();
 	}
 
 	namespace
@@ -210,6 +224,18 @@ namespace gglab
 		}
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
+		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
+		{
+			m_Diagnostics = std::make_unique<DiagnosticsRuntime>();
+			RegisterBuiltinSnapshotProviders(*m_Diagnostics);
+			RegisterBackendSnapshotProviders(*m_Diagnostics, *m_Renderer->GetRHIContext(),
+				m_Renderer->GetPipelineCache());
+			if (m_LabHostDemoIndex)
+			{
+				m_Diagnostics->RegisterProvider(
+					std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+			}
+		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_Config.m_StartupDemoId,
@@ -330,6 +356,7 @@ namespace gglab
 				prepareApplicationTooling();
 				m_Renderer->GetAssetUploadScheduler()->Finalize();
 
+				m_Diagnostics.reset();
 				m_RenderFrameBuilder.reset();
 				m_DemoManager.reset();
 				m_DebugDrawSystem.reset();
@@ -346,6 +373,7 @@ namespace gglab
 		// Lifecycle-only and partial-initialization runtimes have no GPU work to
 		// quiesce, but still honor the tooling shutdown contract exactly once.
 		prepareApplicationTooling();
+		m_Diagnostics.reset();
 		m_RenderFrameBuilder.reset();
 		m_DemoManager.reset();
 		m_DebugDrawSystem.reset();

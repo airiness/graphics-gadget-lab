@@ -1,61 +1,43 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
-#include "Diagnostics/Builders/DX12BackendSnapshotBuilder.h"
-#include "Diagnostics/Builders/DX12ResourceManagerSnapshotBuilder.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
-#include "Diagnostics/Builders/RHIPipelineSystemSnapshotBuilder.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
+#include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
-#if GGLAB_ENABLE_VULKAN
-#include "Diagnostics/Builders/VulkanBackendSnapshotBuilder.h"
-#endif
 #include "Diagnostics/Builders/TaskSystemSnapshotBuilder.h"
 #include "Diagnostics/Builders/TemporalAADiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/SnapshotProvider.h"
+#include "Diagnostics/SnapshotStore.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
-#include "Diagnostics/Snapshots/DX12BackendSnapshot.h"
-#include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
-#include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
-#if GGLAB_ENABLE_VULKAN
-#include "Diagnostics/Snapshots/VulkanBackendSnapshot.h"
-#endif
-#include "Diagnostics/Snapshots/TaskSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 #include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12PipelineSystem.h"
-#if GGLAB_ENABLE_VULKAN
-#include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
-#include "Graphics/RHI/Vulkan/VulkanContext.h"
-#endif
+
+#include <memory>
+#include <string_view>
 
 namespace gglab
 {
 	namespace
 	{
-		template <typename Snapshot> class SnapshotProvider : public SnapshotProviderBase
-		{
-		public:
-			[[nodiscard]] SnapshotId GetId() const noexcept final { return SnapshotIdOf<Snapshot>; }
-		};
-
-		class AssetSnapshotProvider final : public SnapshotProvider<AssetSnapshot>
+		class AssetSnapshotProvider final : public TypedSnapshotProviderBase<AssetSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override { return "Assets"; }
@@ -67,7 +49,7 @@ namespace gglab
 			}
 		};
 
-		class TaskSystemSnapshotProvider final : public SnapshotProvider<TaskSystemSnapshot>
+		class TaskSystemSnapshotProvider final : public TypedSnapshotProviderBase<TaskSystemSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -89,7 +71,7 @@ namespace gglab
 		};
 
 		class PersistentSceneBufferSnapshotProvider final
-			: public SnapshotProvider<PersistentSceneBufferSnapshot>
+			: public TypedSnapshotProviderBase<PersistentSceneBufferSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -110,7 +92,8 @@ namespace gglab
 			}
 		};
 
-		class IBLDiagnosticsSnapshotProvider final : public SnapshotProvider<IBLDiagnosticsSnapshot>
+		class IBLDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<IBLDiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -126,7 +109,7 @@ namespace gglab
 			}
 		};
 
-		class RenderGraphSnapshotProvider final : public SnapshotProvider<RGSnapshot>
+		class RenderGraphSnapshotProvider final : public TypedSnapshotProviderBase<RGSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -147,8 +130,25 @@ namespace gglab
 			}
 		};
 
+		class ShadowDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<ShadowDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Shadow Diagnostics";
+			}
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<ShadowDiagnosticsSnapshot>();
+				snapshot = context.m_RenderGraph
+					? BuildShadowDiagnosticsSnapshot(*context.m_RenderGraph)
+					: ShadowDiagnosticsSnapshot{};
+			}
+		};
+
 		class PostProcessDiagnosticsSnapshotProvider final
-			: public SnapshotProvider<PostProcessDiagnosticsSnapshot>
+			: public TypedSnapshotProviderBase<PostProcessDiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -171,7 +171,7 @@ namespace gglab
 		};
 
 		class ForwardPlusDiagnosticsSnapshotProvider final
-			: public SnapshotProvider<ForwardPlusDiagnosticsSnapshot>
+			: public TypedSnapshotProviderBase<ForwardPlusDiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -194,7 +194,7 @@ namespace gglab
 		};
 
 		class GTAODiagnosticsSnapshotProvider final
-			: public SnapshotProvider<GTAODiagnosticsSnapshot>
+			: public TypedSnapshotProviderBase<GTAODiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -222,7 +222,7 @@ namespace gglab
 		};
 
 		class TemporalAADiagnosticsSnapshotProvider final
-			: public SnapshotProvider<TemporalAADiagnosticsSnapshot>
+			: public TypedSnapshotProviderBase<TemporalAADiagnosticsSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -262,7 +262,7 @@ namespace gglab
 		};
 
 		class TransientResourcePoolSnapshotProvider final
-			: public SnapshotProvider<TransientResourcePoolSnapshot>
+			: public TypedSnapshotProviderBase<TransientResourcePoolSnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -285,95 +285,8 @@ namespace gglab
 			}
 		};
 
-		class DX12ResourceManagerSnapshotProvider final
-			: public SnapshotProvider<DX12ResourceManagerSnapshot>
-		{
-		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override
-			{
-				return "DX12 Resources";
-			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
-			{
-				auto& snapshot = store.GetOrCreate<DX12ResourceManagerSnapshot>();
-				auto* dx12 = context.m_Renderer
-					? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
-					: nullptr;
-				auto* manager = dx12 ? dx12->GetDX12Device().GetResourceManager() : nullptr;
-				if (manager)
-				{
-					BuildDX12ResourceManagerSnapshot(*manager, snapshot);
-				}
-				else
-				{
-					snapshot = {};
-				}
-			}
-		};
-
-		class DX12BackendSnapshotProvider final : public SnapshotProvider<DX12BackendSnapshot>
-		{
-		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override
-			{
-				return "DirectX 12 Backend";
-			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
-			{
-				auto& snapshot = store.GetOrCreate<DX12BackendSnapshot>();
-				auto* dx12 = context.m_Renderer
-					? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
-					: nullptr;
-				if (dx12)
-				{
-					BuildDX12BackendSnapshot(*dx12, snapshot);
-				}
-				else
-				{
-					snapshot = {};
-				}
-			}
-		};
-
-		class RHIPipelineSystemSnapshotProvider final
-			: public SnapshotProvider<RHIPipelineSystemSnapshot>
-		{
-		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override
-			{
-				return "RHI Pipeline System";
-			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
-			{
-				auto& snapshot = store.GetOrCreate<RHIPipelineSystemSnapshot>();
-				auto* rhi = context.m_Renderer ? context.m_Renderer->GetRHIContext() : nullptr;
-				auto* dx12System =
-					rhi ? dynamic_cast<DX12PipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
-#if GGLAB_ENABLE_VULKAN
-				auto* vulkanSystem =
-					rhi ? dynamic_cast<VulkanPipelineSystem*>(&rhi->GetPipelineSystem()) : nullptr;
-#endif
-				if (dx12System)
-				{
-					BuildDX12PipelineSystemSnapshot(
-						*dx12System, context.m_Renderer->GetPipelineCache(), snapshot);
-				}
-#if GGLAB_ENABLE_VULKAN
-				else if (vulkanSystem)
-				{
-					BuildVulkanPipelineSystemSnapshot(
-						*vulkanSystem, context.m_Renderer->GetPipelineCache(), snapshot);
-				}
-#endif
-				else
-				{
-					snapshot = {};
-				}
-			}
-		};
-
 		class SamplerRegistrySnapshotProvider final
-			: public SnapshotProvider<SamplerRegistrySnapshot>
+			: public TypedSnapshotProviderBase<SamplerRegistrySnapshot>
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override
@@ -395,32 +308,6 @@ namespace gglab
 				}
 			}
 		};
-
-#if GGLAB_ENABLE_VULKAN
-		class VulkanBackendSnapshotProvider final : public SnapshotProvider<VulkanBackendSnapshot>
-		{
-		public:
-			[[nodiscard]] std::string_view GetName() const noexcept override
-			{
-				return "Vulkan Backend";
-			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
-			{
-				auto& snapshot = store.GetOrCreate<VulkanBackendSnapshot>();
-				auto* vulkan = context.m_Renderer
-					? dynamic_cast<VulkanContext*>(context.m_Renderer->GetRHIContext())
-					: nullptr;
-				if (vulkan)
-				{
-					BuildVulkanBackendSnapshot(*vulkan, snapshot);
-				}
-				else
-				{
-					snapshot = {};
-				}
-			}
-		};
-#endif
 	}
 
 	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
@@ -435,6 +322,8 @@ namespace gglab
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<ShadowDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),
@@ -445,16 +334,6 @@ namespace gglab
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<DX12ResourceManagerSnapshotProvider>(),
-			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<DX12BackendSnapshotProvider>(),
-			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<RHIPipelineSystemSnapshotProvider>(),
-			SnapshotUpdatePolicy::EveryFrame);
-#if GGLAB_ENABLE_VULKAN
-		runtime.RegisterProvider(std::make_unique<VulkanBackendSnapshotProvider>(),
-			SnapshotUpdatePolicy::EveryFrame);
-#endif
 		runtime.RegisterProvider(
 			std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 	}

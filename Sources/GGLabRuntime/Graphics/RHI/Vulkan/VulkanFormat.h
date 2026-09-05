@@ -1,8 +1,8 @@
 #pragma once
-#include "Graphics/RHI/RHIFormat.h"
-#include "Graphics/RHI/RHISampler.h"
-#include "Graphics/RHI/RHITexture.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <vulkan/vulkan.h>
 

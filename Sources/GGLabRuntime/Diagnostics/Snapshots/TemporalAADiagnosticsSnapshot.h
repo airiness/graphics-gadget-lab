@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Core/Math/Vector.h"
-#include "Diagnostics/SnapshotCommon.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 
 namespace gglab

@@ -1,12 +1,12 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
-#include "Core/Math/Matrix.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Core/Math/Matrix.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "Graphics/GPUStructures.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
 #include <tuple>

@@ -1,6 +1,6 @@
 #include "Graphics/Asset/TextureArtifact.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 
 #include <cstdint>
 #include <utility>

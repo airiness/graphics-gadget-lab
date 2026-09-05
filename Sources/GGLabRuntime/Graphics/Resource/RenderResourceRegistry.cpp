@@ -1,8 +1,8 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Utility/TextureUtils.h"
 
@@ -351,6 +351,22 @@ namespace gglab
 			TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}
 
+	ShadowPreviewDiagnostics RenderResourceRegistry::GetShadowPreviewDiagnostics()
+		const noexcept
+	{
+		ShadowPreviewDiagnostics preview{};
+		constexpr TextureIndex Index = TextureIndex::Preview_Shadow_DirectionalShadowMap;
+		if (const auto* desc = GetTextureDesc(Index))
+		{
+			preview.m_SrvDescriptor = GetSrvDescriptor(Index);
+			preview.m_Width = static_cast<uint32_t>(desc->m_Extent.m_Width);
+			preview.m_Height = desc->m_Extent.m_Height;
+			preview.m_Format = desc->m_Format;
+			preview.m_Allocated = true;
+		}
+		return preview;
+	}
+
 	void RenderResourceRegistry::EnsurePostProcessPreviewResources(
 		uint32_t sourceWidth, uint32_t sourceHeight, const RHIFencePoint* retireFenceOpt) noexcept
 	{
@@ -596,6 +612,27 @@ namespace gglab
 	uint64_t RenderResourceRegistry::GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept
 	{
 		return m_IBLPreviewStates[utils::ToIndex(type)].m_UpdateCount;
+	}
+
+	PostProcessPreviewDiagnostics RenderResourceRegistry::GetPostProcessPreviewDiagnostics()
+		const noexcept
+	{
+		PostProcessPreviewDiagnostics preview{};
+		preview.m_Selected = GetPostProcessPreviewSelection();
+		preview.m_Published = GetPublishedPostProcessPreviewSelection();
+		preview.m_UpdateCount = GetPostProcessPreviewUpdateCount();
+		preview.m_ExposureEV = GetPostProcessPreviewExposureEV();
+		preview.m_Requested = IsPostProcessPreviewRequested();
+		preview.m_HasPublished = HasPublishedPostProcessPreview();
+		const auto* desc = GetTextureDesc(TextureIndex::Preview_PostProcess);
+		if (desc)
+		{
+			preview.m_Width = static_cast<uint32_t>(desc->m_Extent.m_Width);
+			preview.m_Height = desc->m_Extent.m_Height;
+			preview.m_Format = desc->m_Format;
+			preview.m_SrvDescriptor = GetSrvDescriptor(TextureIndex::Preview_PostProcess);
+		}
+		return preview;
 	}
 
 	void RenderResourceRegistry::SetPostProcessPreviewSelection(

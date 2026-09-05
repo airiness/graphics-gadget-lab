@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 
 #include <array>
 #include <atomic>

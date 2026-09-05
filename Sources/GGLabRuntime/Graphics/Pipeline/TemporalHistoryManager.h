@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/Vector.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 

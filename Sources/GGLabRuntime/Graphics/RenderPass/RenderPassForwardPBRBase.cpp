@@ -12,10 +12,10 @@
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/RHI/RHITextureViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>

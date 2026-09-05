@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderContexts.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 
 #include <string_view>
 

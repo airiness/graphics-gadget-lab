@@ -12,13 +12,13 @@
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 
 #include <algorithm>

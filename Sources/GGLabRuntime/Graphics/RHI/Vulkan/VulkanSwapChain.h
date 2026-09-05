@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
 #include <vulkan/vulkan.h>
 

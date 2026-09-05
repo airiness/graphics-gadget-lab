@@ -1,9 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/Shader/ShaderPipelineSnapshot.h"
-#include "Graphics/Shader/ShaderTypes.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <cstdint>

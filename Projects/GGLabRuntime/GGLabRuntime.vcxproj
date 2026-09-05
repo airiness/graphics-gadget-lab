@@ -53,7 +53,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -64,25 +64,25 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXBoundsBackend.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathBackend.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Color.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Core\Time.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXBoundsBackend.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathBackend.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Color.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Culling.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Matrix.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Quaternion.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Transform.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Vector.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Profiling\CpuProfiler.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\StringIdFormatting.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
@@ -104,13 +104,13 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Camera.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Camera.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraController.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResource.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureValidation.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIContext.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Buffer.cpp" />
@@ -168,8 +168,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\DXGIFormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawShapes.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
@@ -177,7 +177,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassFinalColor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\GTAO.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlusDebugReadback.cpp" />
@@ -190,11 +190,11 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderView.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.cpp" />
@@ -208,7 +208,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
@@ -260,27 +260,27 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTransferContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\AllocatorBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\FreeListSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Allocator\RingSpanAllocator.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Hash\KeyHash.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Log\LogMacros.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Backends\DirectXMathInterop.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\BoundingVolumes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Color.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Culling.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathConstants.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\MathFunctions.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Matrix.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Quaternion.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Transform.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Math\Vector.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Profiling\CpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringId.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\StringIdFormatting.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\Time.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Core\World.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Scene\Components.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Log\LogMacros.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\BoundingVolumes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Color.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Culling.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathConstants.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\MathFunctions.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Matrix.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Quaternion.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Transform.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Math\Vector.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Profiling\CpuProfiler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringId.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\StringIdFormatting.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Time.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\Buffer.h" />
@@ -299,34 +299,34 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Camera.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraController.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\CameraRig.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITransferContext.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraController.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraRig.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITransferContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIBuffer.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHICoordinatePolicy.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHICommandContext.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDescriptor.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDescriptorCapacityContract.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIDevice.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIContext.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIFence.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISwapChain.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBuffer.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICoordinatePolicy.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHICommandContext.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptor.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDescriptorCapacityContract.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIDevice.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIContext.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFence.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHISwapChain.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandleTable.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandles.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIPipeline.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIPipelineSystem.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResource.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIResourceDebug.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISubresourceUtils.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHISampler.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIFormat.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITexture.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureValidation.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHITypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIHandles.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipeline.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipelineSystem.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIResource.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIResourceDebug.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHISubresourceUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHISampler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFormat.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITexture.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureValidation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
@@ -398,7 +398,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\DXGIFormatUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderContexts.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDepthPrepass.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPlusGraphResources.h" />
@@ -421,11 +421,11 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\ForwardPlusDebugReadback.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\GTAO.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalAA.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalFrameTransaction.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalHistoryManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalMotion.h" />
@@ -442,28 +442,34 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessColor.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessDebug.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessDebug.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewDiagnostics.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewViewBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewControlBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessResolution.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderQueue.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfileFrameSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingControlBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderView.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\ShadowSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\GPUStructures.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\GraphicsTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderParameters.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h" />
@@ -475,7 +481,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentityConversions.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetContentFingerprint.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
@@ -522,6 +528,11 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeConfig.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingViewBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingControlBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLCacheControlBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.h" />
@@ -537,7 +548,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\VertexData.h" />
@@ -550,8 +561,8 @@
       <ForcedIncludeFiles />
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BackendSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
 	<ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp" />
@@ -560,21 +571,25 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp" />
-	<ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TaskSystemSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12ResourceManagerSnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\DX12BackendSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\BackendSnapshotProviders.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
 	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h" />
@@ -591,22 +606,32 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RHIPipelineSystemSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotCommon.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsControl.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotContext.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowPreviewViewBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\VulkanBackendSnapshotBuilder.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+	<ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">

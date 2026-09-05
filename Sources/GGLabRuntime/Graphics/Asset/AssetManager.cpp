@@ -1,7 +1,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
@@ -9,8 +9,8 @@
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/TransferManager.h"
 
 #include <algorithm>

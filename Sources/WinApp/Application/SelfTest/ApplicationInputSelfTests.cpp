@@ -3,8 +3,8 @@
 #include "Demo/DemoTypes.h"
 #include "ApplicationCameraInput.h"
 #include "ApplicationInput.h"
-#include "Core/Input/Keyboard.h"
-#include "Core/Input/WindowsInputMapping.h"
+#include "Application/Platform/Windows/Input/Keyboard.h"
+#include "Application/Platform/Windows/Input/WindowsInputMapping.h"
 
 #include <array>
 

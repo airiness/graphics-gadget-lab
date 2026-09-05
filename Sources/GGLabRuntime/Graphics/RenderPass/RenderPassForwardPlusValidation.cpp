@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
@@ -8,8 +8,8 @@
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
-#include "Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/RHIPipelineSystem.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 

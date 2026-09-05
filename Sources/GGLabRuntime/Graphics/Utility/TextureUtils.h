@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <bit>
 #include <cstdint>

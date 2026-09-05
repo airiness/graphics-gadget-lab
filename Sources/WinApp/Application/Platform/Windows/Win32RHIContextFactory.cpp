@@ -1,5 +1,5 @@
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12Context.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanContext.h"

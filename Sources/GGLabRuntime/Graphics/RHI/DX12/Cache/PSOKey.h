@@ -1,7 +1,7 @@
 #pragma once
-#include "Core/Hash/KeyHash.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/Shader/ShaderTypes.h"
+#include "GGLabRuntime/Core/Hash/KeyHash.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>
 #include <tuple>

@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/VertexData.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <entt/entity/entity.hpp>
 

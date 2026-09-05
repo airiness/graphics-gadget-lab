@@ -1,7 +1,7 @@
 #include "Graphics/RHI/Vulkan/VulkanTextureCopy.h"
 #include "GGLabFoundation/Base/MathUtils.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanFormat.h"
 
 #include <algorithm>

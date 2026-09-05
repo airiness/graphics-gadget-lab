@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <array>

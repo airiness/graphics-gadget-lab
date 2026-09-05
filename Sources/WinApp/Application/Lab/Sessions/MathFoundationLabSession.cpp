@@ -1,11 +1,11 @@
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
-#include "Core/Math/BoundingVolumes.h"
-#include "Core/Math/Culling.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Quaternion.h"
-#include "Core/Math/Transform.h"
-#include "Graphics/Camera.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/Culling.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Transform.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab

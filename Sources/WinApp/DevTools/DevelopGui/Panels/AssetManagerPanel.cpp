@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/Panels/AssetManagerPanel.h"
-#include "Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiFormatting.h"
@@ -7,7 +7,7 @@
 #include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/RHIText.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 

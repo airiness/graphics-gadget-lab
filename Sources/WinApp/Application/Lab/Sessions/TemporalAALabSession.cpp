@@ -1,18 +1,18 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "AppRuntimeLog.h"
 
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <algorithm>
 #include <cmath>
@@ -156,7 +156,7 @@ namespace gglab
 		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
 		{
 			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->SetEnabled(true);
+			gpuProfiler->RequestEnabled(true);
 		}
 		ResetEvidenceCapture();
 		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
@@ -170,7 +170,7 @@ namespace gglab
 		m_IsEntered = false;
 		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
 		{
-			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+			gpuProfiler->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
 		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
 		{

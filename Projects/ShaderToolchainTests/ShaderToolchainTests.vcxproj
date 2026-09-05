@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -38,8 +37,6 @@
     <Import Project="..\..\PropertySheets\Common.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" />
-    <Import Project="..\..\PropertySheets\AssimpImport.props" />
-    <Import Project="..\..\PropertySheets\VulkanImport.props" />
     <Import Project="..\..\PropertySheets\JsonImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -47,8 +44,6 @@
     <Import Project="..\..\PropertySheets\Common.props" />
     <Import Project="..\..\PropertySheets\ShaderDirectory.props" />
     <Import Project="..\..\PropertySheets\DxcImport.props" />
-    <Import Project="..\..\PropertySheets\AssimpImport.props" />
-    <Import Project="..\..\PropertySheets\VulkanImport.props" />
     <Import Project="..\..\PropertySheets\JsonImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -59,14 +54,13 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -75,7 +69,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderToolchain;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -84,32 +78,24 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderToolchainTestsMain.cpp" />
-    <ClCompile Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderRuntimeArtifactPublicationSelfTests.h" />
-    <ClInclude Include="..\..\Tests\ShaderToolchain\SpirVDecorationReader.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">
       <Project>{D4E1B7C2-5A3F-4B6D-9E0A-8C7D2F1B6A49}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
-      <Project>{F382CFE9-9912-487D-B999-E649C340125D}</Project>
     </ProjectReference>
     <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">
       <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
@@ -125,14 +111,9 @@
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
       <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\..\Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
-      <Project>{371B9FA9-4C90-4AC6-A123-ACED756D6C77}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
-    <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="..\..\PropertySheets\DxcImport.targets" Condition="Exists('..\..\PropertySheets\DxcImport.targets')" />
     <Import Project="..\..\PropertySheets\LinkShaderDirectory.targets" Condition="Exists('..\..\PropertySheets\LinkShaderDirectory.targets')" />
   </ImportGroup>

@@ -42,7 +42,7 @@
   <PropertyGroup>
     <NapaVoxelRepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</NapaVoxelRepositoryRoot>
     <OutDir>$(NapaVoxelRepositoryRoot)Build\Output\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(NapaVoxelRepositoryRoot)Build\Intermediate\$(Platform)\$(Configuration)\NapaVoxelCore\</IntDir>
+    <IntDir>$(NapaVoxelRepositoryRoot)Build\Intermediate\$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>NapaVoxelCore</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -53,7 +53,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Public;$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Private;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -72,7 +72,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Public;$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Private;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -82,56 +82,56 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelRestore.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\BuildContract.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\SphereEdit.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelDamage.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelMutation.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelRestore.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Field\DensityQuantization.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Field\Primitive.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Hash\CanonicalHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Hash\VoxelWorldHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\BoundaryContour.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\CpuMeshBatch.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\DataOnlyPublication.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\MeshValidation.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\ReferenceMesher.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\WorldMeshHash.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\Coordinates.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelChunk.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelWorld.cpp" />
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelWorldConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelOperationDetail.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalVoxelSerialization.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Math\Vector.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublicationDetail.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelRestore.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\BuildContract.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\SphereEdit.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelDamage.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelMutation.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelOperationDetail.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Field\DensityQuantization.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Field\Primitive.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Private\Field\SignedDistance.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Hash\CanonicalHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Private\Hash\CanonicalVoxelSerialization.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Hash\VoxelWorldHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Math\Vector.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\BoundaryContour.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\ChunkMeshRecord.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\CpuMeshBatch.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\DataOnlyPublication.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\DataOnlyPublicationDetail.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\MeshData.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\MeshValidation.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\ReferenceMesher.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\WorldMeshHash.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Validation\CheckedArithmetic.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Validation\ValidationResult.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\Coordinates.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelChunk.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelRestore.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelSample.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelWorld.h" />
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelWorldConfig.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

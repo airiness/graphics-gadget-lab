@@ -1,19 +1,29 @@
 #include "RenderingContractSelfTests.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/CameraRig.h"
+#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -22,31 +32,96 @@
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Resource/TransientResourcePool.h"
-#include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/SamplerRegistry.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/TransferBatch.h"
 
+#include <algorithm>
 #include <array>
+#include <concepts>
+#include <cmath>
 #include <filesystem>
 #include <limits>
+#include <numbers>
+#include <ranges>
 #include <type_traits>
 
 namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept PostProcessPreviewQuery = requires(const T& value) {
+			{ value.GetPostProcessPreviewDiagnostics() } ->
+				std::same_as<PostProcessPreviewDiagnostics>;
+		};
+		template <typename T>
+		concept PostProcessPreviewRequest = requires(T& value) {
+			value.SetPostProcessPreviewSelection(PostProcessDebugSelection{});
+			value.SetPostProcessPreviewExposureEV(0.0f);
+			value.RequestPostProcessPreview();
+		};
+		template <typename T>
+		concept PostProcessPreviewConsumption = requires(T& value) {
+			value.ConsumePostProcessPreviewRequest();
+		};
+		static_assert(PostProcessPreviewQuery<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
+		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+
+		template <typename T>
+		concept ShadowPreviewAllocation = requires(T& value) {
+			value.EnsureShadowPreviewResources();
+		};
+		static_assert(requires(const ShadowPreviewViewBase& view) {
+			{ view.GetShadowPreviewDiagnostics() } noexcept -> std::same_as<ShadowPreviewDiagnostics>;
+		});
+		static_assert(!ShadowPreviewAllocation<ShadowPreviewViewBase>);
+		static_assert(ShadowPreviewAllocation<RenderResourceRegistry>);
+
+		template <typename T>
+		concept EnvironmentSettingsQuery = requires(const T& value) {
+			{ value.GetEnvironmentLightingSettings() } noexcept ->
+				std::same_as<EnvironmentLightingSettings>;
+		};
+		template <typename T>
+		concept EnvironmentSettingsControl = requires(T& value) {
+			value.SetIntensity(1.0f);
+			value.SetRotationRadians(0.0f);
+			value.SetQualityPreset(IBLQualityPreset::Medium);
+			value.SetPrefilteredSpecularSampleCount(512);
+			value.SetPrefilteredSpecularMaxSampleLuminance(1000.0f);
+			value.SetSkyboxEnabled(true);
+			value.RequestRebake();
+		};
+		template <typename T>
+		concept EnvironmentSourceCommit = requires(T& value) {
+			value.CommitEnvironmentSource(EnvironmentTextureSource{});
+		};
+		static_assert(EnvironmentSettingsQuery<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSettingsControl<EnvironmentLightingViewBase>);
+		static_assert(EnvironmentSettingsControl<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSettingsQuery<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingControlBase>);
+
 		constexpr float ProjectionTolerance = 1.0e-4f;
 		constexpr float PositionTolerance = 2.0e-3f;
 
@@ -221,14 +296,19 @@ namespace gglab
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors
+					? RHITextureViewHandle{ m_NextTextureViewIndex++, 1 } : RHITextureViewHandle{};
 			}
 			RHIBufferViewHandle CreateBufferView(
 				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 			{
 				return {};
 			}
-			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
+			{
+				return m_CreateValidDescriptors
+					? RHISamplerHandle{ m_NextSamplerIndex++, 1 } : RHISamplerHandle{};
+			}
 			void DestroyTexture(RHITextureHandle) noexcept override
 			{
 				++m_DestroyTextureCount;
@@ -284,21 +364,26 @@ namespace gglab
 			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
-				RHITextureViewHandle) const noexcept override
+				RHITextureViewHandle view) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && view.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::CbvSrvUav, view.Index() }
+					: RHIDescriptorHandle{};
 			}
 			RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle) const noexcept override
 			{
 				return {};
 			}
-			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle) const noexcept override
+			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && sampler.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::Sampler, sampler.Index() }
+					: RHIDescriptorHandle{};
 			}
 			void RetireCompletedWork() noexcept override {}
 
 			bool m_TextureViewsSupported = false;
+			bool m_CreateValidDescriptors = false;
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
@@ -311,7 +396,301 @@ namespace gglab
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
+			uint32_t m_NextTextureViewIndex = 1;
+			uint32_t m_NextSamplerIndex = 1;
 		};
+
+		void RunEnvironmentLightingSettingsTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+			const EnvironmentLightingViewBase& view = environment;
+			EnvironmentLightingControlBase& control = environment;
+			const auto initial = view.GetEnvironmentLightingSettings();
+			context.Check(initial.m_Intensity == 1.0f && initial.m_RotationRadians == 0.0f &&
+				initial.m_EnableSkybox && initial.m_QualityPreset == IBLQualityPreset::Medium &&
+				initial.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Medium) &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment query preserves initial settings without requesting a bake");
+
+			constexpr auto PreviewTypes = std::array{
+				RenderResourceRegistry::IBLPreviewType::Environment,
+				RenderResourceRegistry::IBLPreviewType::Irradiance,
+				RenderResourceRegistry::IBLPreviewType::PrefilteredSpecular,
+				};
+			const auto clearPreviews = [&]() {
+				for (auto type : PreviewTypes)
+				{
+					registry.ClearIBLPreviewDirty(type);
+				}
+				};
+			const auto allPreviewsDirty = [&]() {
+				return std::ranges::all_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); });
+				};
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				initial.m_Intensity == 1.0f && allPreviewsDirty() &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment intensity invalidates previews but not captured settings or bake generation");
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			control.SetIntensity(std::numeric_limits<float>::quiet_NaN());
+			control.SetIntensity(std::numeric_limits<float>::infinity());
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged and non-finite intensity inputs do not invalidate previews");
+			control.SetIntensity(-2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 0.0f &&
+				allPreviewsDirty(), "Environment intensity remains clamped to nonnegative values");
+			clearPreviews();
+			constexpr float Rotation = 2.5f * std::numbers::pi_v<float>;
+			control.SetRotationRadians(Rotation);
+			const auto rotated = view.GetEnvironmentLightingSettings();
+			context.Check(std::abs(rotated.m_RotationRadians -
+				std::remainder(Rotation, 2.0f * std::numbers::pi_v<float>)) < 1.0e-6f &&
+				allPreviewsDirty() && environment.GetBakeRequestGeneration() == 0,
+				"Environment yaw wraps and invalidates previews without scheduling a bake");
+			clearPreviews();
+			control.SetRotationRadians(rotated.m_RotationRadians);
+			control.SetRotationRadians(std::numeric_limits<float>::quiet_NaN());
+			control.SetRotationRadians(std::numeric_limits<float>::infinity());
+			control.SetSkyboxEnabled(false);
+			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
+				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
+				environment.GetBakeRequestGeneration() == 0 &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged or non-finite yaw and skybox toggles preserve bake and preview state");
+
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			const auto low = view.GetEnvironmentLightingSettings();
+			context.Check(low.m_QualityPreset == IBLQualityPreset::Low &&
+				low.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Low) &&
+				environment.GetBakeRequestGeneration() == 1,
+				"A concrete environment preset requests one bake with its unchanged configuration");
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			control.SetQualityPreset(IBLQualityPreset::Custom);
+			control.SetQualityPreset(IBLQualityPreset::Count);
+			control.SetQualityPreset(static_cast<IBLQualityPreset>(255));
+			context.Check(environment.GetBakeRequestGeneration() == 1 &&
+				view.GetEnvironmentLightingSettings().m_BakeConfig == low.m_BakeConfig,
+				"Repeated and invalid environment presets leave the request unchanged");
+			control.SetPrefilteredSpecularSampleCount(0);
+			const auto custom = view.GetEnvironmentLightingSettings();
+			context.Check(custom.m_QualityPreset == IBLQualityPreset::Custom &&
+				custom.m_BakeConfig.m_PrefilteredSpecularSampleCount == 1 &&
+				environment.GetBakeRequestGeneration() == 2,
+				"Custom environment samples clamp at the lower bound and request a bake");
+			control.SetPrefilteredSpecularSampleCount(1);
+			context.Check(environment.GetBakeRequestGeneration() == 2,
+				"Repeated environment sample counts do not request redundant bakes");
+			control.SetPrefilteredSpecularSampleCount(std::numeric_limits<uint32_t>::max());
+			const auto maxSamples = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxSamples.m_PrefilteredSpecularSampleCount == 4096 &&
+				environment.GetBakeRequestGeneration() == 3,
+				"Custom environment samples preserve the upper bound");
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::quiet_NaN());
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::infinity());
+			const auto nonFiniteLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(environment.GetBakeRequestGeneration() == 3 &&
+				nonFiniteLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1000.0f,
+				"Non-finite environment luminance inputs do not change requested settings");
+			control.SetPrefilteredSpecularMaxSampleLuminance(0.0f);
+			control.SetPrefilteredSpecularMaxSampleLuminance(1.0f);
+			const auto minLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(minLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1.0f &&
+				environment.GetBakeRequestGeneration() == 4,
+				"Environment luminance clamps low and repeated effective values do not rebake");
+			control.SetPrefilteredSpecularMaxSampleLuminance(100000.0f);
+			const auto maxLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxLuminance.m_PrefilteredSpecularMaxSampleLuminance == 65000.0f &&
+				environment.GetBakeRequestGeneration() == 5 &&
+				low.m_BakeConfig.m_PrefilteredSpecularSampleCount == 128,
+				"Environment luminance clamps high while older copied settings remain unchanged");
+			control.RequestRebake(true);
+			context.Check(environment.GetBakeRequestGeneration() == 6 &&
+				environment.ShouldIgnoreCache(6),
+				"Forced environment rebuild bypasses the cache for its requested generation");
+			control.RequestRebake();
+			control.RequestRebake();
+			context.Check(environment.GetBakeRequestGeneration() == 8 &&
+				!environment.ShouldIgnoreCache(8) &&
+				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
+				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+		}
+
+		void RunShadowPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const ShadowPreviewViewBase& view = registry;
+			const auto empty = view.GetShadowPreviewDiagnostics();
+			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
+				empty.m_Width == 0 && empty.m_Height == 0 &&
+				empty.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 0,
+				"Shadow preview query is safe before pipeline allocation and does not allocate");
+
+			constexpr auto Index =
+				RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap;
+			registry.EnsureShadowPreviewResources();
+			const auto allocated = view.GetShadowPreviewDiagnostics();
+			context.Check(allocated.m_Allocated && allocated.m_SrvDescriptor.IsValid() &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Height == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm && registry.IsDirty(Index),
+				"Shadow preview query exposes the pipeline allocation without initializing contents");
+			const auto repeated = view.GetShadowPreviewDiagnostics();
+			context.Check(repeated.m_SrvDescriptor.m_Index == allocated.m_SrvDescriptor.m_Index &&
+				device.m_CreateTextureCount == 1 && registry.IsDirty(Index),
+				"Repeated shadow queries leave allocation identity and pending initialization unchanged");
+			registry.ClearDirty(Index);
+			registry.EnsureShadowPreviewResources();
+			context.Check(view.GetShadowPreviewDiagnostics().m_SrvDescriptor.m_Index ==
+				allocated.m_SrvDescriptor.m_Index && !registry.IsDirty(Index) &&
+				device.m_CreateTextureCount == 1,
+				"Compatible pipeline allocation and tooling queries preserve initialized preview resources");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.EnsureShadowPreviewResources(256, &retireFence);
+			const auto resized = view.GetShadowPreviewDiagnostics();
+			context.Check(resized.m_Allocated && resized.m_Width == 256 && resized.m_Height == 256 &&
+				resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != allocated.m_SrvDescriptor.m_Index &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				registry.IsDirty(Index) && device.m_CreateTextureCount == 2,
+				"Shadow preview replacement changes live metadata without rewriting copied observations");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetShadowPreviewDiagnostics();
+			context.Check(!released.m_Allocated && !released.m_SrvDescriptor.IsValid() &&
+				released.m_Width == 0 && released.m_Height == 0 &&
+				released.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 2,
+				"Shadow preview query after release stays empty instead of recreating a resource");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0 && device.m_DestroyTextureCount == 0,
+				"Shadow preview allocations remain pending until their owner's retirement fence completes");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Shadow preview allocations become reusable only after fence completion");
+		}
+
+		void RunPostProcessPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const PostProcessPreviewViewBase& view = registry;
+			PostProcessPreviewControlBase& control = registry;
+			const auto empty = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!empty.m_HasPublished && !empty.m_Requested &&
+				!empty.m_SrvDescriptor.IsValid() && empty.m_Width == 0 && empty.m_Height == 0,
+				"Preview query safely observes an unallocated source without a descriptor lookup");
+
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::BloomPyramid, 999 });
+			control.SetPostProcessPreviewExposureEV(20.0f);
+			const auto selected = view.GetPostProcessPreviewDiagnostics();
+			context.Check(selected.m_Selected.m_BloomPyramidLevel == MaxBloomPyramidLevels - 1 &&
+				selected.m_ExposureEV == 8.0f && !selected.m_Requested &&
+				device.m_CreateTextureCount == 0,
+				"Preview controls clamp requested values without allocating or scheduling GPU work");
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::Count, 0 });
+			control.SetPostProcessPreviewExposureEV(-20.0f);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Selected == selected.m_Selected &&
+				view.GetPostProcessPreviewDiagnostics().m_ExposureEV == -8.0f,
+				"Preview controls ignore invalid taps and retain the existing exposure bounds");
+			control.RequestPostProcessPreview();
+			control.RequestPostProcessPreview();
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Requested &&
+				registry.ConsumePostProcessPreviewRequest() &&
+				!registry.ConsumePostProcessPreviewRequest() && device.m_CreateTextureCount == 0,
+				"Repeated preview requests coalesce and only the Runtime owner consumes them");
+
+			registry.EnsurePostProcessPreviewResources(1024, 512);
+			const auto allocated = view.GetPostProcessPreviewDiagnostics();
+			context.Check(allocated.m_Width == 512 && allocated.m_Height == 256 &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm &&
+				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
+				device.m_CreateTextureCount == 1,
+				"Preview observation distinguishes allocated descriptors from recorded contents");
+			registry.PublishPostProcessPreview(selected.m_Selected);
+			const auto published = view.GetPostProcessPreviewDiagnostics();
+			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
+			control.SetPostProcessPreviewSelection(nextSelection);
+			control.RequestPostProcessPreview();
+			const auto pending = view.GetPostProcessPreviewDiagnostics();
+			context.Check(pending.m_Selected == nextSelection && pending.m_Requested &&
+				pending.m_HasPublished && pending.m_Published == selected.m_Selected &&
+				pending.m_UpdateCount == 1 && published.m_Selected == selected.m_Selected &&
+				!published.m_Requested && device.m_CreateTextureCount == 1,
+				"A new preview request preserves published identity and independently copied observations");
+			registry.InvalidatePostProcessPreview(nextSelection);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_HasPublished,
+				"Invalidating a different preview tap does not erase the published image");
+			registry.InvalidatePostProcessPreview(selected.m_Selected);
+			context.Check(!view.GetPostProcessPreviewDiagnostics().m_HasPublished &&
+				published.m_HasPublished,
+				"Preview invalidation changes live availability without rewriting copied metadata");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.PublishPostProcessPreview(nextSelection);
+			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
+			const auto resized = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
+				resized.m_Height == 512 && resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != published.m_SrvDescriptor.m_Index &&
+				published.m_Height == 256 && device.m_CreateTextureCount == 2,
+				"Resizing a preview publishes new metadata and invalidates the old content identity");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!released.m_HasPublished && !released.m_Requested &&
+				!released.m_SrvDescriptor.IsValid() && released.m_Width == 0 &&
+				released.m_Height == 0,
+				"Preview release removes descriptor availability and pending requests");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(device.m_DestroyTextureCount == 0 &&
+				retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0,
+				"Preview resource retirement waits for the owner's submission fence");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Retired preview resources become reusable only after fence completion");
+		}
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
@@ -3945,6 +4324,12 @@ namespace gglab
 
 			RecordingDevice reuseDevice;
 			TransientResourcePool reusePool(&reuseDevice);
+			TransientResourcePoolSnapshot emptyPoolSnapshot;
+			BuildTransientResourcePoolSnapshot(reusePool, emptyPoolSnapshot);
+			context.Check(emptyPoolSnapshot.m_SourceAvailable &&
+				emptyPoolSnapshot.m_TextureCounts.m_Total == 0 &&
+				emptyPoolSnapshot.m_BufferCounts.m_Total == 0,
+				"Transient pool diagnostics distinguish an available empty pool from no source");
 			auto discardAllocation = reusePool.AcquireTexture(graphTextureDesc, "Discardable");
 			const TransientResourcePoolSlot discardSlot = discardAllocation.m_PoolSlot;
 			reusePool.RetireTexture(std::move(discardAllocation), {});
@@ -5763,6 +6148,9 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunPostProcessPreviewContractTests(context);
+		RunShadowPreviewContractTests(context);
+		RunEnvironmentLightingSettingsTests(context);
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);

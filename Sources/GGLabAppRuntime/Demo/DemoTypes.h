@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "Graphics/RenderScene.h"
 
 namespace gglab

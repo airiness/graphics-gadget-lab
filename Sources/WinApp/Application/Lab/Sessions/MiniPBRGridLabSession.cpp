@@ -1,14 +1,14 @@
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "AppRuntimeLog.h"
-#include "Core/Math/BoundingVolumes.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {

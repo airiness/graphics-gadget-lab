@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
-#include "Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 
 #include <array>
 #include <cstdint>

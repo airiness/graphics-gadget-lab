@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
 #include <Windows.h>
 

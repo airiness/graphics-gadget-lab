@@ -1,6 +1,6 @@
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
 #include <ranges>

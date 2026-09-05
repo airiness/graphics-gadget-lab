@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RHI/RHIBindingLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 
 #include <array>
 #include <cstdint>
