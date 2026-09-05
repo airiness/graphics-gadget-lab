@@ -3,6 +3,8 @@
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
@@ -43,6 +45,25 @@ namespace gglab
 				});
 			return registration;
 		}
+
+		class TestEnvironmentLightingView final : public EnvironmentLightingViewBase
+		{
+		public:
+			EnvironmentLightingSettings GetEnvironmentLightingSettings()
+				const noexcept override { return {}; }
+		};
+
+		class TestEnvironmentLightingControl final : public EnvironmentLightingControlBase
+		{
+		public:
+			void SetIntensity(float) noexcept override {}
+			void SetRotationRadians(float) noexcept override {}
+			void SetQualityPreset(IBLQualityPreset) noexcept override {}
+			void SetPrefilteredSpecularSampleCount(uint32_t) noexcept override {}
+			void SetPrefilteredSpecularMaxSampleLuminance(float) noexcept override {}
+			void SetSkyboxEnabled(bool) noexcept override {}
+			void RequestRebake(bool) noexcept override {}
+		};
 
 		class TestGpuProfilingView final : public GpuProfilingViewBase
 		{
@@ -106,6 +127,8 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				++m_DrawCount;
+				m_LastEnvironmentLighting = context.m_EnvironmentLighting;
+				m_LastEnvironmentLightingControl = context.m_EnvironmentLightingControl;
 				m_LastGpuProfiling = context.m_GpuProfiling;
 				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
 				m_LastPostProcessPreview = context.m_PostProcessPreview;
@@ -132,6 +155,8 @@ namespace gglab
 			uint32_t m_BeginCount = 0;
 			uint32_t m_DrawCount = 0;
 			uint32_t m_EndCount = 0;
+			const EnvironmentLightingViewBase* m_LastEnvironmentLighting = nullptr;
+			EnvironmentLightingControlBase* m_LastEnvironmentLightingControl = nullptr;
 			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
 			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
 			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
@@ -143,6 +168,30 @@ namespace gglab
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestEnvironmentLightingView view;
+				TestEnvironmentLightingControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentLighting &&
+					!tooling.m_LastEnvironmentLightingControl,
+					"Tooling environment settings capabilities are absent by default");
+				frame.Draw({ .m_EnvironmentLighting = &view });
+				context.Check(tooling.m_LastEnvironmentLighting == &view &&
+					!tooling.m_LastEnvironmentLightingControl,
+					"Tooling can query environment settings without a renderer or control capability");
+				frame.Draw({ .m_EnvironmentLightingControl = &control });
+				context.Check(!tooling.m_LastEnvironmentLighting &&
+					tooling.m_LastEnvironmentLightingControl == &control,
+					"Tooling can bind environment control independently of its query");
+				frame.Draw({ .m_EnvironmentLighting = &view, .m_EnvironmentLightingControl = &control });
+				context.Check(tooling.m_LastEnvironmentLighting == &view &&
+					tooling.m_LastEnvironmentLightingControl == &control,
+					"Tooling forwards separate environment settings query and control capabilities");
+				frame.Complete();
+			}
+
 			{
 				RecordingApplicationTooling tooling;
 				TestShadowPreviewView view;

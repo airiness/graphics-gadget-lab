@@ -2088,6 +2088,21 @@ foreach ($itemPath in $toolingFrameContextPaths) {
     }
 }
 
+$iblViewerPaths = @(
+    (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "IBLViewerPanel.h")
+)
+foreach ($itemPath in $iblViewerPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bEnvironmentLightingSystem\b|\bGetEnvironmentLightingSystem\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-environment-settings-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "IBL settings must use separate query/control capabilities, not the live environment lighting system"
+        })
+    }
+}
+
 $rendererIndependentToolingPanelPaths = @(
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.h"),

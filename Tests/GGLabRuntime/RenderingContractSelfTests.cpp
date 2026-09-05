@@ -6,6 +6,9 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
@@ -47,10 +50,14 @@
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "Graphics/TransferBatch.h"
 
+#include <algorithm>
 #include <array>
 #include <concepts>
+#include <cmath>
 #include <filesystem>
 #include <limits>
+#include <numbers>
+#include <ranges>
 #include <type_traits>
 
 namespace gglab
@@ -88,6 +95,32 @@ namespace gglab
 		});
 		static_assert(!ShadowPreviewAllocation<ShadowPreviewViewBase>);
 		static_assert(ShadowPreviewAllocation<RenderResourceRegistry>);
+
+		template <typename T>
+		concept EnvironmentSettingsQuery = requires(const T& value) {
+			{ value.GetEnvironmentLightingSettings() } noexcept ->
+				std::same_as<EnvironmentLightingSettings>;
+		};
+		template <typename T>
+		concept EnvironmentSettingsControl = requires(T& value) {
+			value.SetIntensity(1.0f);
+			value.SetRotationRadians(0.0f);
+			value.SetQualityPreset(IBLQualityPreset::Medium);
+			value.SetPrefilteredSpecularSampleCount(512);
+			value.SetPrefilteredSpecularMaxSampleLuminance(1000.0f);
+			value.SetSkyboxEnabled(true);
+			value.RequestRebake();
+		};
+		template <typename T>
+		concept EnvironmentSourceCommit = requires(T& value) {
+			value.CommitEnvironmentSource(EnvironmentTextureSource{});
+		};
+		static_assert(EnvironmentSettingsQuery<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSettingsControl<EnvironmentLightingViewBase>);
+		static_assert(EnvironmentSettingsControl<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSettingsQuery<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingControlBase>);
 
 		constexpr float ProjectionTolerance = 1.0e-4f;
 		constexpr float PositionTolerance = 2.0e-3f;
@@ -366,6 +399,136 @@ namespace gglab
 			uint32_t m_NextTextureViewIndex = 1;
 			uint32_t m_NextSamplerIndex = 1;
 		};
+
+		void RunEnvironmentLightingSettingsTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+			const EnvironmentLightingViewBase& view = environment;
+			EnvironmentLightingControlBase& control = environment;
+			const auto initial = view.GetEnvironmentLightingSettings();
+			context.Check(initial.m_Intensity == 1.0f && initial.m_RotationRadians == 0.0f &&
+				initial.m_EnableSkybox && initial.m_QualityPreset == IBLQualityPreset::Medium &&
+				initial.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Medium) &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment query preserves initial settings without requesting a bake");
+
+			constexpr auto PreviewTypes = std::array{
+				RenderResourceRegistry::IBLPreviewType::Environment,
+				RenderResourceRegistry::IBLPreviewType::Irradiance,
+				RenderResourceRegistry::IBLPreviewType::PrefilteredSpecular,
+				};
+			const auto clearPreviews = [&]() {
+				for (auto type : PreviewTypes)
+				{
+					registry.ClearIBLPreviewDirty(type);
+				}
+				};
+			const auto allPreviewsDirty = [&]() {
+				return std::ranges::all_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); });
+				};
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				initial.m_Intensity == 1.0f && allPreviewsDirty() &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment intensity invalidates previews but not captured settings or bake generation");
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			control.SetIntensity(std::numeric_limits<float>::quiet_NaN());
+			control.SetIntensity(std::numeric_limits<float>::infinity());
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged and non-finite intensity inputs do not invalidate previews");
+			control.SetIntensity(-2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 0.0f &&
+				allPreviewsDirty(), "Environment intensity remains clamped to nonnegative values");
+			clearPreviews();
+			constexpr float Rotation = 2.5f * std::numbers::pi_v<float>;
+			control.SetRotationRadians(Rotation);
+			const auto rotated = view.GetEnvironmentLightingSettings();
+			context.Check(std::abs(rotated.m_RotationRadians -
+				std::remainder(Rotation, 2.0f * std::numbers::pi_v<float>)) < 1.0e-6f &&
+				allPreviewsDirty() && environment.GetBakeRequestGeneration() == 0,
+				"Environment yaw wraps and invalidates previews without scheduling a bake");
+			clearPreviews();
+			control.SetRotationRadians(rotated.m_RotationRadians);
+			control.SetRotationRadians(std::numeric_limits<float>::quiet_NaN());
+			control.SetRotationRadians(std::numeric_limits<float>::infinity());
+			control.SetSkyboxEnabled(false);
+			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
+				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
+				environment.GetBakeRequestGeneration() == 0 &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged or non-finite yaw and skybox toggles preserve bake and preview state");
+
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			const auto low = view.GetEnvironmentLightingSettings();
+			context.Check(low.m_QualityPreset == IBLQualityPreset::Low &&
+				low.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Low) &&
+				environment.GetBakeRequestGeneration() == 1,
+				"A concrete environment preset requests one bake with its unchanged configuration");
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			control.SetQualityPreset(IBLQualityPreset::Custom);
+			control.SetQualityPreset(IBLQualityPreset::Count);
+			control.SetQualityPreset(static_cast<IBLQualityPreset>(255));
+			context.Check(environment.GetBakeRequestGeneration() == 1 &&
+				view.GetEnvironmentLightingSettings().m_BakeConfig == low.m_BakeConfig,
+				"Repeated and invalid environment presets leave the request unchanged");
+			control.SetPrefilteredSpecularSampleCount(0);
+			const auto custom = view.GetEnvironmentLightingSettings();
+			context.Check(custom.m_QualityPreset == IBLQualityPreset::Custom &&
+				custom.m_BakeConfig.m_PrefilteredSpecularSampleCount == 1 &&
+				environment.GetBakeRequestGeneration() == 2,
+				"Custom environment samples clamp at the lower bound and request a bake");
+			control.SetPrefilteredSpecularSampleCount(1);
+			context.Check(environment.GetBakeRequestGeneration() == 2,
+				"Repeated environment sample counts do not request redundant bakes");
+			control.SetPrefilteredSpecularSampleCount(std::numeric_limits<uint32_t>::max());
+			const auto maxSamples = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxSamples.m_PrefilteredSpecularSampleCount == 4096 &&
+				environment.GetBakeRequestGeneration() == 3,
+				"Custom environment samples preserve the upper bound");
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::quiet_NaN());
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::infinity());
+			const auto nonFiniteLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(environment.GetBakeRequestGeneration() == 3 &&
+				nonFiniteLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1000.0f,
+				"Non-finite environment luminance inputs do not change requested settings");
+			control.SetPrefilteredSpecularMaxSampleLuminance(0.0f);
+			control.SetPrefilteredSpecularMaxSampleLuminance(1.0f);
+			const auto minLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(minLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1.0f &&
+				environment.GetBakeRequestGeneration() == 4,
+				"Environment luminance clamps low and repeated effective values do not rebake");
+			control.SetPrefilteredSpecularMaxSampleLuminance(100000.0f);
+			const auto maxLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxLuminance.m_PrefilteredSpecularMaxSampleLuminance == 65000.0f &&
+				environment.GetBakeRequestGeneration() == 5 &&
+				low.m_BakeConfig.m_PrefilteredSpecularSampleCount == 128,
+				"Environment luminance clamps high while older copied settings remain unchanged");
+			control.RequestRebake(true);
+			context.Check(environment.GetBakeRequestGeneration() == 6 &&
+				environment.ShouldIgnoreCache(6),
+				"Forced environment rebuild bypasses the cache for its requested generation");
+			control.RequestRebake();
+			control.RequestRebake();
+			context.Check(environment.GetBakeRequestGeneration() == 8 &&
+				!environment.ShouldIgnoreCache(8) &&
+				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
+				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+		}
 
 		void RunShadowPreviewContractTests(SelfTestContext& context) noexcept
 		{
@@ -5987,6 +6150,7 @@ namespace gglab
 	{
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
+		RunEnvironmentLightingSettingsTests(context);
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);

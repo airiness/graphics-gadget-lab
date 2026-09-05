@@ -13,6 +13,8 @@ namespace gglab
 	class Renderer;
 	class AssetManager;
 	class EnvironmentAssetController;
+	class EnvironmentLightingControlBase;
+	class EnvironmentLightingViewBase;
 	class GpuProfilingControlBase;
 	class GpuProfilingViewBase;
 	class PostProcessPreviewControlBase;
@@ -38,6 +40,8 @@ namespace gglab
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		// Borrowed for this draw only; panels may retain copied timing values.
+		const EnvironmentLightingViewBase* m_EnvironmentLighting = nullptr;
+		EnvironmentLightingControlBase* m_EnvironmentLightingControl = nullptr;
 		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;

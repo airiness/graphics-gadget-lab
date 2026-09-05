@@ -1,7 +1,8 @@
 #pragma once
 #include "Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/TextureAssetViews.h"
-#include "Graphics/IBLBakeTypes.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 
 #include <filesystem>
 
@@ -27,16 +28,8 @@ namespace gglab
 		}
 	};
 
-	struct EnvironmentLightingSettings
-	{
-		float m_Intensity = 1.0f;
-		float m_RotationRadians = 0.0f;
-		IBLQualityPreset m_QualityPreset = IBLQualityPreset::Medium;
-		IBLBakeConfig m_BakeConfig = GetIBLBakeConfig(IBLQualityPreset::Medium);
-		bool m_EnableSkybox = true;
-	};
-
-	class EnvironmentLightingSystem
+	class EnvironmentLightingSystem : public EnvironmentLightingViewBase,
+		public EnvironmentLightingControlBase
 	{
 	public:
 		struct CreateInfo
@@ -46,7 +39,7 @@ namespace gglab
 
 		explicit EnvironmentLightingSystem(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(EnvironmentLightingSystem);
-		~EnvironmentLightingSystem() = default;
+		~EnvironmentLightingSystem() override = default;
 
 		void CommitEnvironmentSource(EnvironmentTextureSource source) noexcept;
 		[[nodiscard]] const EnvironmentTextureSource& GetBakeSource() const noexcept
@@ -58,6 +51,8 @@ namespace gglab
 		{
 			return m_Settings;
 		}
+		[[nodiscard]] EnvironmentLightingSettings GetEnvironmentLightingSettings()
+			const noexcept override { return m_Settings; }
 		[[nodiscard]] const IBLBakeConfig& GetBakeConfig() const noexcept
 		{
 			return m_Settings.m_BakeConfig;
@@ -70,13 +65,13 @@ namespace gglab
 		{
 			return generation == m_IgnoreCacheGeneration;
 		}
-		void SetIntensity(float intensity) noexcept;
-		void SetRotationRadians(float rotationRadians) noexcept;
-		void SetQualityPreset(IBLQualityPreset preset) noexcept;
-		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept;
-		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept;
-		void RequestRebake(bool ignoreCache = false) noexcept;
-		void SetSkyboxEnabled(bool enabled) noexcept { m_Settings.m_EnableSkybox = enabled; }
+		void SetIntensity(float intensity) noexcept override;
+		void SetRotationRadians(float rotationRadians) noexcept override;
+		void SetQualityPreset(IBLQualityPreset preset) noexcept override;
+		void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept override;
+		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept override;
+		void RequestRebake(bool ignoreCache = false) noexcept override;
+		void SetSkyboxEnabled(bool enabled) noexcept override { m_Settings.m_EnableSkybox = enabled; }
 
 	private:
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;

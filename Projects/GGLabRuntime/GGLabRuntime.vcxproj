@@ -528,6 +528,10 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeConfig.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingViewBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingControlBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.h" />

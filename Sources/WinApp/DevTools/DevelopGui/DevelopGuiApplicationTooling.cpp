@@ -95,6 +95,8 @@ namespace gglab
 					context.m_EnvironmentAssetController;
 				guiContext.m_Diagnostics = context.m_Diagnostics;
 				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
+				guiContext.m_EnvironmentLighting = context.m_EnvironmentLighting;
+				guiContext.m_EnvironmentLightingControl = context.m_EnvironmentLightingControl;
 				guiContext.m_GpuProfiling = context.m_GpuProfiling;
 				guiContext.m_GpuProfilingControl = context.m_GpuProfilingControl;
 				guiContext.m_PostProcessPreview = context.m_PostProcessPreview;
