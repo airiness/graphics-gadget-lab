@@ -1,6 +1,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -68,6 +69,20 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept ResourceLifecycleQuery = requires(const T& value) {
+			{ value.GetSnapshot() } -> std::same_as<DX12ResourceLifecycleSnapshot>;
+		};
+		template <typename T>
+		concept ResourceLifecycleMutation = requires(T& value) { value.AddTexture(); value.DestroyAll(); };
+		template <typename T>
+		concept ResourceLifecycleNativeAccess = requires(T& value) { value.GetDX12Device(); };
+		static_assert(ResourceLifecycleQuery<DX12ResourceLifecycleViewBase>);
+		static_assert(!ResourceLifecycleMutation<DX12ResourceLifecycleViewBase>);
+		static_assert(ResourceLifecycleMutation<DX12ResourceLifecycleControlBase>);
+		static_assert(!ResourceLifecycleQuery<DX12ResourceLifecycleControlBase>);
+		static_assert(!ResourceLifecycleNativeAccess<DX12ResourceLifecycleToolsBase>);
+
 		template <typename T>
 		concept EnvironmentCatalogAccess = requires(const T& value) { value.GetEntries(); };
 		template <typename T>

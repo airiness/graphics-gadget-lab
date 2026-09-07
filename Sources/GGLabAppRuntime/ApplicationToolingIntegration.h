@@ -21,7 +21,6 @@ namespace gglab
 	class IBLPreviewControlBase;
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
-	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
 	class ShadowPreviewViewBase;
 	class World;
@@ -46,7 +45,6 @@ namespace gglab
 	struct ApplicationToolingFrameContext
 	{
 		CameraRig* m_CameraRig = nullptr;
-		Renderer* m_Renderer = nullptr;
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;

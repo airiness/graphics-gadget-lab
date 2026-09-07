@@ -3,6 +3,7 @@
 #include "Demo/DemoManager.h"
 #include "Lab/LabRuntime.h"
 #include "ApplicationToolingIntegration.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/LoadingOverlay.h"
@@ -23,11 +24,12 @@ namespace gglab
 			DevelopGuiApplicationTooling& operator=(const DevelopGuiApplicationTooling&) = delete;
 			~DevelopGuiApplicationTooling() override
 			{
-				m_System.Finalize();
+				PrepareForShutdown();
 			}
 
 			void PrepareForShutdown() noexcept override
 			{
+				m_ResourceLifecycleTools.reset();
 				m_System.Finalize();
 			}
 
@@ -45,6 +47,7 @@ namespace gglab
 					return false;
 				}
 
+				m_ResourceLifecycleTools = CreateDX12ResourceLifecycleTools(*createInfo.m_RHIContext);
 				auto& runtime = m_System.GetDevToolsRuntime();
 				runtime.GetRegistry().RegisterPanel(
 					std::make_unique<DemoPanel>(createInfo.m_DemoManager));
@@ -86,7 +89,8 @@ namespace gglab
 			{
 				DevelopGuiContext guiContext{};
 				guiContext.m_CameraRig = context.m_CameraRig;
-				guiContext.m_Renderer = context.m_Renderer;
+				guiContext.m_DX12ResourceLifecycle = m_ResourceLifecycleTools.get();
+				guiContext.m_DX12ResourceLifecycleControl = m_ResourceLifecycleTools.get();
 				guiContext.m_World = context.m_World;
 				guiContext.m_RenderViews = context.m_RenderViews;
 				guiContext.m_RenderQueues = context.m_RenderQueues;
@@ -127,6 +131,7 @@ namespace gglab
 			}
 
 		private:
+			std::unique_ptr<DX12ResourceLifecycleToolsBase> m_ResourceLifecycleTools;
 			DevelopGuiSystem m_System;
 		};
 	}

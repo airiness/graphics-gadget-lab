@@ -24,6 +24,10 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept ToolingRendererAccess = requires(T& value) { value.m_Renderer; };
+		static_assert(!ToolingRendererAccess<ApplicationToolingFrameContext>);
+
 		class NullRHIContextFactory final : public RHIContextFactoryBase
 		{
 		public:

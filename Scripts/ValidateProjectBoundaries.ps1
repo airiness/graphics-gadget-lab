@@ -2127,6 +2127,11 @@ foreach ($itemPath in $environmentSelectionToolingPaths) {
 }
 
 $rendererIndependentToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h"),
+    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
+    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.h"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
@@ -2155,6 +2160,21 @@ foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
             Rule   = "tooling-panel-renderer-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
             Reason = "panels migrated to snapshots or narrow capabilities must not retain live Renderer or RenderResourceRegistry dependencies"
+        })
+    }
+}
+
+$resourceLifecyclePanelPaths = @(
+    (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
+)
+foreach ($itemPath in $resourceLifecyclePanelPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bDX12(Context|Device|QueueSystem|CommandQueue|ResourceManager|FencePoint)\b|\bRHI(Texture|Buffer)Handle\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-dx12-resource-lifecycle-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "resource lifecycle panels must consume value observations and adapter commands, not backend objects or mutation handles"
         })
     }
 }

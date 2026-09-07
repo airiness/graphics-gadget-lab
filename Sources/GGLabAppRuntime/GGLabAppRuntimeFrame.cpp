@@ -286,7 +286,6 @@ namespace gglab
 
 			const ApplicationToolingFrameContext toolingContext{
 				.m_CameraRig = &demo->GetCameraRig(),
-				.m_Renderer = m_Renderer.get(),
 				.m_World = &world,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
