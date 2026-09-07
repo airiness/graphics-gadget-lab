@@ -2168,6 +2168,21 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
+foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "RenderViewPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "LabPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
+    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_RenderQueues\b|\bDrawItem\b|Graphics/RenderQueue\.h') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-render-queue-snapshot-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling queue inspection must consume value snapshots without live queues or draw packets"
+        })
+    }
+}
 foreach ($name in @("RenderViewPanel.cpp", "RenderViewPanel.h")) {
     $itemPath = Join-Path $developGuiPanelsDir $name
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop

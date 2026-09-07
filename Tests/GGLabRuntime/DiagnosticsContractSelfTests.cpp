@@ -1,4 +1,7 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
+#include <limits>
 
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
@@ -174,6 +177,39 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			RenderQueue queue;
+			queue.m_ViewId = RenderViewID::Main;
+			queue.m_Statistics.m_TotalInstanceCount = 7;
+			queue.m_DrawItems.resize(3);
+			queue.m_BucketDrawRanges[0] = { 1, std::numeric_limits<uint32_t>::max() };
+			queue.m_BucketDrawRanges[1] = { 99, 4 };
+			DiagnosticsRuntime queueDiagnostics;
+			RegisterBuiltinSnapshotProviders(queueDiagnostics);
+			context.Check(queueDiagnostics.GetSnapshot<RenderQueueSnapshot>() == nullptr,
+				"Render queue diagnostics do not capture outside a live frame");
+			queueDiagnostics.BeginFrame({ .m_RenderQueues = std::span<const RenderQueue>(&queue, 1) });
+			const auto* captured = queueDiagnostics.GetSnapshot<RenderQueueSnapshot>();
+			context.Check(captured && captured->m_Queues.size() == 1 &&
+				captured->m_Queues[0].m_ViewId == RenderViewID::Main &&
+				captured->m_Queues[0].m_Statistics.m_TotalInstanceCount == 7 &&
+				captured->m_Queues[0].m_Buckets[0].m_UniqueMeshes == 1 &&
+				captured->m_Queues[0].m_Buckets[0].m_UniqueMaterials == 1 &&
+				captured->m_Queues[0].m_Buckets[1].m_UniqueMeshes == 0,
+				"Render queue capture copies counters and clamps bucket ranges without overflow");
+			queue.m_DrawItems.clear();
+			queue.m_Statistics.m_TotalInstanceCount = 0;
+			queueDiagnostics.EndFrame();
+			const auto* retained = queueDiagnostics.GetSnapshot<RenderQueueSnapshot>();
+			context.Check(retained && retained->m_Queues[0].m_Statistics.m_TotalInstanceCount == 7 &&
+				retained->m_Queues[0].m_Buckets[0].m_UniqueMeshes == 1,
+				"Published queue diagnostics retain values after source mutation and frame closure");
+			queueDiagnostics.BeginFrame({});
+			const auto* empty = queueDiagnostics.GetSnapshot<RenderQueueSnapshot>();
+			context.Check(empty && empty->m_Queues.empty(),
+				"A new empty frame clears prior queue observations");
+			queueDiagnostics.EndFrame();
+		}
 		RunGpuProfilingContractSelfTests(context);
 
 		DiagnosticsRuntime runtime;

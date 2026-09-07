@@ -11,6 +11,7 @@ namespace gglab
 	class TaskSystem;
 	class World;
 	class RenderGraph;
+	struct RenderQueue;
 	struct ViewRenderProfile;
 	struct ResolvedTemporalFramePlan;
 
@@ -24,6 +25,7 @@ namespace gglab
 		World* m_World = nullptr;
 		RenderGraph* m_RenderGraph = nullptr;
 		std::span<RenderView> m_RenderViews;
+		std::span<const RenderQueue> m_RenderQueues;
 		RenderView* m_MainRenderView = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;

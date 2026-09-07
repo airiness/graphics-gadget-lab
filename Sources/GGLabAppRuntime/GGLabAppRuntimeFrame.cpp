@@ -266,6 +266,7 @@ namespace gglab
 				.m_World = &world,
 				.m_RenderGraph = &renderGraph,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
+				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
 				.m_MainRenderView =
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
@@ -288,7 +289,6 @@ namespace gglab
 				.m_CameraRig = &demo->GetCameraRig(),
 				.m_World = &world,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
-				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),

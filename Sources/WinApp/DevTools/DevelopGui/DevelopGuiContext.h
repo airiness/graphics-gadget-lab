@@ -2,7 +2,6 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
@@ -42,7 +41,6 @@ namespace gglab
 		DX12ResourceLifecycleControlBase* m_DX12ResourceLifecycleControl = nullptr;
 		World* m_World = nullptr;
 		std::span<RenderView> m_RenderViews;
-		std::span<const RenderQueue> m_RenderQueues;
 		AssetManager* m_AssetManager = nullptr;
 		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;

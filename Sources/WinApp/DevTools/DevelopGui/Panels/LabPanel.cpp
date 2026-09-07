@@ -2,6 +2,7 @@
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
 #include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
@@ -34,7 +35,9 @@ namespace gglab
 
 		void DrawCullingLabStatistics(const DevelopGuiContext& context) noexcept
 		{
-			if (context.m_RenderQueues.empty())
+			const auto* snapshot = context.m_Diagnostics
+				? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
+			if (!snapshot || snapshot->m_Queues.empty())
 			{
 				ImGui::TextDisabled("Render queue statistics are not available yet.");
 				return;
@@ -56,13 +59,13 @@ namespace gglab
 			ImGui::TableSetupColumn("Draw Items", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 			ImGui::TableHeadersRow();
 
-			for (const RenderQueue& queue : context.m_RenderQueues)
+			for (const RenderQueueEntrySnapshot& queue : snapshot->m_Queues)
 			{
 				if (queue.m_ViewId == RenderViewID::Unknown)
 				{
 					continue;
 				}
-				const RenderQueueStatistics& stats = queue.m_Statistics;
+				const RenderQueueStatisticsSnapshot& stats = queue.m_Statistics;
 				if (stats.m_TotalInstanceCount == 0 && stats.m_VisibleInstanceCount == 0 &&
 					stats.m_CulledInstanceCount == 0 && stats.m_InvalidInstanceCount == 0)
 				{

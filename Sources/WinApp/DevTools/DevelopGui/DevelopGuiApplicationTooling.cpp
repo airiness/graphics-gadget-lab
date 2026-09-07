@@ -95,7 +95,6 @@ namespace gglab
 				guiContext.m_DX12ResourceLifecycleControl = m_ResourceLifecycleTools.get();
 				guiContext.m_World = context.m_World;
 				guiContext.m_RenderViews = context.m_RenderViews;
-				guiContext.m_RenderQueues = context.m_RenderQueues;
 				guiContext.m_AssetManager = context.m_AssetManager;
 				guiContext.m_EnvironmentSelectionControl =
 					context.m_EnvironmentSelectionControl;

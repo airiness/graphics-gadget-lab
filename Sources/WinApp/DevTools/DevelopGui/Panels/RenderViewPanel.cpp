@@ -6,6 +6,8 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
 
 #include <algorithm>
 #include <string>
@@ -75,15 +77,15 @@ namespace gglab
 			return devtools::EnumText(view.m_ViewId);
 		}
 
-		const RenderQueue* FindRenderQueue(
-			std::span<const RenderQueue> queues, RenderViewID viewId) noexcept
+		const RenderQueueEntrySnapshot* FindRenderQueue(
+			std::span<const RenderQueueEntrySnapshot> queues, RenderViewID viewId) noexcept
 		{
 			const size_t index = utils::ToIndex(viewId);
 			if (index < queues.size() && queues[index].m_ViewId == viewId)
 			{
 				return &queues[index];
 			}
-			for (const RenderQueue& queue : queues)
+			for (const RenderQueueEntrySnapshot& queue : queues)
 			{
 				if (queue.m_ViewId == viewId)
 				{
@@ -135,7 +137,7 @@ namespace gglab
 			return RenderViewID::Unknown;
 		}
 
-		float VisiblePercent(const RenderQueueStatistics& stats) noexcept
+		float VisiblePercent(const RenderQueueStatisticsSnapshot& stats) noexcept
 		{
 			if (stats.m_TotalInstanceCount == 0)
 			{
@@ -183,28 +185,8 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		template <typename T, typename Predicate>
-		uint32_t CountUniqueInRange(
-			std::span<const DrawItem> drawItems, const DrawItemsRange& range, Predicate predicate)
-		{
-			std::vector<T> values;
-			const uint32_t start =
-				std::min<uint32_t>(range.m_Start, static_cast<uint32_t>(drawItems.size()));
-			const uint32_t end =
-				std::min<uint32_t>(start + range.m_Count, static_cast<uint32_t>(drawItems.size()));
-			values.reserve(end - start);
-			for (uint32_t index = start; index < end; ++index)
-			{
-				T value = predicate(drawItems[index]);
-				if (std::find(values.begin(), values.end(), value) == values.end())
-				{
-					values.push_back(value);
-				}
-			}
-			return static_cast<uint32_t>(values.size());
-		}
-
-		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context,
+			std::span<const RenderQueueEntrySnapshot> queues) noexcept
 		{
 			ImGui::SeparatorText("RenderView Overview");
 			if (context.m_RenderViews.empty())
@@ -250,9 +232,9 @@ namespace gglab
 
 			for (const RenderView& view : context.m_RenderViews)
 			{
-				const RenderQueue* queue = FindRenderQueue(context.m_RenderQueues, view.m_ViewId);
-				const RenderQueueStatistics stats =
-					queue ? queue->m_Statistics : RenderQueueStatistics{};
+				const auto* queue = FindRenderQueue(queues, view.m_ViewId);
+				const RenderQueueStatisticsSnapshot stats =
+					queue ? queue->m_Statistics : RenderQueueStatisticsSnapshot{};
 				const std::string name = RenderViewName(view);
 
 				ImGui::PushID(static_cast<int>(utils::ToIndex(view.m_ViewId)));
@@ -313,9 +295,9 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawQueueStatistics(const RenderQueue& queue) noexcept
+		void DrawQueueStatistics(const RenderQueueEntrySnapshot& queue) noexcept
 		{
-			const RenderQueueStatistics& stats = queue.m_Statistics;
+			const RenderQueueStatisticsSnapshot& stats = queue.m_Statistics;
 			if (!ImGui::BeginTable("RenderQueueStats", 2,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_SizingStretchProp))
@@ -351,7 +333,7 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawBucketStatistics(const RenderQueue& queue) noexcept
+		void DrawBucketStatistics(const RenderQueueEntrySnapshot& queue) noexcept
 		{
 			if (!ImGui::BeginTable("RenderQueueBuckets", 5,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
@@ -371,13 +353,7 @@ namespace gglab
 				++bucketIndex)
 			{
 				const RenderBucket bucket = static_cast<RenderBucket>(bucketIndex);
-				const DrawItemsRange& range = queue.m_BucketDrawRanges[bucketIndex];
-				const uint32_t uniqueMeshes = CountUniqueInRange<MeshID>(queue.m_DrawItems, range,
-					[](const DrawItem& item) noexcept
-					{ return item.m_CoverageDrawPacket.m_Geometry.m_MeshId; });
-				const uint32_t uniqueMaterials =
-					CountUniqueInRange<RenderMaterialKey>(queue.m_DrawItems, range,
-						[](const DrawItem& item) noexcept { return item.m_MaterialKey; });
+				const auto& range = queue.m_Buckets[bucketIndex];
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -387,9 +363,9 @@ namespace gglab
 				ImGui::TableSetColumnIndex(2);
 				ImGui::Text("%u", range.m_Count);
 				ImGui::TableSetColumnIndex(3);
-				ImGui::Text("%u", uniqueMeshes);
+				ImGui::Text("%u", range.m_UniqueMeshes);
 				ImGui::TableSetColumnIndex(4);
-				ImGui::Text("%u", uniqueMaterials);
+				ImGui::Text("%u", range.m_UniqueMaterials);
 			}
 
 			ImGui::EndTable();
@@ -455,10 +431,9 @@ namespace gglab
 		}
 
 		void DrawSelectedQueue(
-			const RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+			const RenderViewPanelState& state, std::span<const RenderQueueEntrySnapshot> queues) noexcept
 		{
-			const RenderQueue* queue =
-				FindRenderQueue(context.m_RenderQueues, state.m_SelectedViewId);
+			const auto* queue = FindRenderQueue(queues, state.m_SelectedViewId);
 			ImGui::SeparatorText("RenderQueue");
 			if (!queue)
 			{
@@ -475,10 +450,14 @@ namespace gglab
 	void RenderViewPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<RenderViewPanelState>();
-		DrawOverview(state, context);
+		const auto* snapshot = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
+		const auto queues = snapshot ? std::span<const RenderQueueEntrySnapshot>(snapshot->m_Queues)
+			: std::span<const RenderQueueEntrySnapshot>{};
+		DrawOverview(state, context, queues);
 		ImGui::Spacing();
 		DrawSelectedRenderView(state, context);
 		ImGui::Spacing();
-		DrawSelectedQueue(state, context);
+		DrawSelectedQueue(state, queues);
 	}
 }
