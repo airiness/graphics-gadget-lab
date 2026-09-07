@@ -70,6 +70,12 @@ namespace gglab
 	namespace
 	{
 		template <typename T>
+		concept CameraRoutingMutation = requires(T& value) { value.SetDisplayViewId(RenderViewID::Main); };
+		template <typename T>
+		concept CameraRoutingSlotAccess = requires(const T& value) { value.FindRenderViewSlot(RenderViewID::Main); };
+		static_assert(!CameraRoutingMutation<CameraRenderViewQueryBase>);
+		static_assert(!CameraRoutingSlotAccess<CameraRenderViewQueryBase>);
+		template <typename T>
 		concept ResourceLifecycleQuery = requires(const T& value) {
 			{ value.GetSnapshot() } -> std::same_as<DX12ResourceLifecycleSnapshot>;
 		};
@@ -5783,11 +5789,18 @@ namespace gglab
 				debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
 			const CameraRig::EffectiveDisplayView debugDisplayView =
 				cameraRig.ResolveEffectiveDisplayView();
+			const CameraRenderViewQueryBase& routingQuery = cameraRig;
+			const auto copiedVisibility = routingQuery.GetRenderViewVisibilityMode(debugDisplayView.m_ViewId);
+			context.Check(routingQuery.GetDisplayViewId() == debugDisplayView.m_ViewId &&
+				copiedVisibility.has_value() &&
+				!routingQuery.GetRenderViewVisibilityMode(RenderViewID::Unknown).has_value(),
+				"Camera routing query observes selected views and distinguishes missing slots");
 			CameraRig::CameraSlot* mutableDebugCameraSlot =
 				cameraRig.GetCameraSlot(debugCameraIndex);
 			if (mutableDebugCameraSlot)
 			{
 				mutableDebugCameraSlot->m_EnableRenderView = false;
+				mutableDebugCameraSlot->m_VisibilityMode = RenderViewVisibilityMode::None;
 			}
 			const CameraRig::EffectiveDisplayView fallbackDisplayView =
 				cameraRig.ResolveEffectiveDisplayView();
@@ -5798,6 +5811,11 @@ namespace gglab
 				fallbackDisplayView.IsValid() &&
 				fallbackDisplayView.m_ViewId == RenderViewID::Main,
 				"CameraRig resolves the effective display view and fallback exactly once");
+			context.Check(copiedVisibility.has_value() &&
+				*copiedVisibility != RenderViewVisibilityMode::None &&
+				routingQuery.GetRenderViewVisibilityMode(debugDisplayView.m_ViewId) == RenderViewVisibilityMode::None &&
+				routingQuery.GetDisplayViewId() == debugDisplayView.m_ViewId,
+				"Camera routing observations are copied and preserve requested display selection during fallback");
 
 			const uint64_t initialResetSerial = rigCamera.GetTemporalResetSerial();
 			rigCamera.SetPosition(Vector3(1.0f, 2.0f, 3.0f));

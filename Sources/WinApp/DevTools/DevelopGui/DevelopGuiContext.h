@@ -10,6 +10,7 @@ namespace gglab
 {
 	class World;
 	class CameraRig;
+	class CameraRenderViewQueryBase;
 	class DX12ResourceLifecycleViewBase;
 	class DX12ResourceLifecycleControlBase;
 	class AssetManager;
@@ -35,6 +36,7 @@ namespace gglab
 	struct DevelopGuiContext
 	{
 		CameraRig* m_CameraRig = nullptr;
+		const CameraRenderViewQueryBase* m_CameraRenderViewQuery = nullptr;
 		// Borrowed from the host's optional DX12 tooling adapter for this draw.
 		const DX12ResourceLifecycleViewBase* m_DX12ResourceLifecycle = nullptr;
 		DX12ResourceLifecycleControlBase* m_DX12ResourceLifecycleControl = nullptr;

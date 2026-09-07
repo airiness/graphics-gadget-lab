@@ -2168,6 +2168,17 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
+foreach ($name in @("RenderViewPanel.cpp", "RenderViewPanel.h")) {
+    $itemPath = Join-Path $developGuiPanelsDir $name
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bCameraRig\b|\bm_CameraRig\b|\bCameraSlot\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-render-view-camera-query-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "render view inspection must use camera routing queries rather than live camera slots"
+        })
+    }
+}
 foreach ($itemPath in $resourceLifecyclePanelPaths) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '\bDX12(Context|Device|QueueSystem|CommandQueue|ResourceManager|FencePoint)\b|\bRHI(Texture|Buffer)Handle\b') {

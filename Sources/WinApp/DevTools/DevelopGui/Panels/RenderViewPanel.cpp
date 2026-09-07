@@ -5,7 +5,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
-#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
 
 #include <algorithm>
 #include <string>
@@ -56,12 +56,12 @@ namespace gglab
 			{
 				return "Shadow Queue";
 			}
-			if (!context.m_CameraRig)
+			if (!context.m_CameraRenderViewQuery)
 			{
 				return devtools::EnumText(RenderViewID::Unknown);
 			}
-			const CameraRig::CameraSlot* slot = context.m_CameraRig->FindRenderViewSlot(viewId);
-			return slot ? devtools::EnumText(slot->m_VisibilityMode)
+			const auto visibility = context.m_CameraRenderViewQuery->GetRenderViewVisibilityMode(viewId);
+			return visibility ? devtools::EnumText(*visibility)
 				: devtools::EnumText(RenderViewVisibilityMode::None);
 		}
 
@@ -113,7 +113,7 @@ namespace gglab
 
 		RenderViewID ResolveDisplayViewId(const DevelopGuiContext& context) noexcept
 		{
-			return context.m_CameraRig ? context.m_CameraRig->GetDisplayViewId()
+			return context.m_CameraRenderViewQuery ? context.m_CameraRenderViewQuery->GetDisplayViewId()
 				: RenderViewID::Main;
 		}
 

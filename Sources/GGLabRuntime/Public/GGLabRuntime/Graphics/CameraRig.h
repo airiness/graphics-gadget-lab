@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstddef>
@@ -15,7 +16,7 @@ namespace gglab
 {
 	class DebugDrawContext;
 
-	class CameraRig
+	class CameraRig : public CameraRenderViewQueryBase
 	{
 	public:
 		struct CameraSlot
@@ -57,7 +58,13 @@ namespace gglab
 		[[nodiscard]] size_t GetCameraCount() const noexcept { return m_Cameras.size(); }
 		[[nodiscard]] size_t GetActiveCameraIndex() const noexcept { return m_ActiveCameraIndex; }
 		void SetActiveCameraIndex(size_t index) noexcept;
-		[[nodiscard]] RenderViewID GetDisplayViewId() const noexcept { return m_DisplayViewId; }
+		[[nodiscard]] RenderViewID GetDisplayViewId() const noexcept override { return m_DisplayViewId; }
+		[[nodiscard]] std::optional<RenderViewVisibilityMode> GetRenderViewVisibilityMode(
+			RenderViewID viewId) const noexcept override
+		{
+			const CameraSlot* slot = FindRenderViewSlot(viewId);
+			return slot ? std::optional{ slot->m_VisibilityMode } : std::nullopt;
+		}
 		bool SetDisplayViewId(RenderViewID viewId) noexcept;
 
 		[[nodiscard]] EffectiveDisplayView ResolveEffectiveDisplayView() const noexcept;
