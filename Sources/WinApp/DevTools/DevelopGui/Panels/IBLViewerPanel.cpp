@@ -11,7 +11,7 @@
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
-#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
@@ -363,7 +363,7 @@ namespace gglab
 		ImGui::TextUnformatted("IBL Viewer");
 		ImGui::Separator();
 
-		auto* environmentAssets = context.m_EnvironmentAssetController;
+		auto* environmentSelection = context.m_EnvironmentSelectionControl;
 		const auto* diagnosticsSnapshot =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<IBLDiagnosticsSnapshot>()
 			: nullptr;
@@ -379,15 +379,16 @@ namespace gglab
 					diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str();
 			}
 
+			ImGui::BeginDisabled(!environmentSelection);
 			if (ImGui::BeginCombo("HDR Environment", activeLabel))
 			{
 				for (const auto& entry : diagnosticsSnapshot->m_Environments)
 				{
 					const bool selected = entry.m_Active;
 					if (ImGui::Selectable(entry.m_DisplayName.c_str(), selected) &&
-						environmentAssets)
+						environmentSelection)
 					{
-						GGLAB_UNUSED(environmentAssets->SelectEnvironment(entry.m_Index));
+						GGLAB_UNUSED(environmentSelection->SelectEnvironment(entry.m_Index));
 						if (context.m_DiagnosticsControl)
 						{
 							context.m_DiagnosticsControl->RequestRefresh<IBLDiagnosticsSnapshot>();
@@ -400,6 +401,7 @@ namespace gglab
 				}
 				ImGui::EndCombo();
 			}
+			ImGui::EndDisabled();
 
 			if (activeIndex < diagnosticsSnapshot->m_Environments.size())
 			{

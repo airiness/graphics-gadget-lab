@@ -1,6 +1,8 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
@@ -66,6 +68,23 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept EnvironmentCatalogAccess = requires(const T& value) { value.GetEntries(); };
+		template <typename T>
+		concept EnvironmentLifecycleControl = requires(T& value) { value.Tick(); value.Reset(); };
+		template <typename T>
+		concept EnvironmentFileSelection = requires(T& value, const std::filesystem::path& path) {
+			value.SelectEnvironmentFile(path);
+		};
+		static_assert(std::derived_from<EnvironmentAssetController, EnvironmentSelectionControlBase>);
+		static_assert(!std::is_abstract_v<EnvironmentAssetController>);
+		static_assert(requires(EnvironmentSelectionControlBase& control) {
+			{ control.SelectEnvironment(0) } noexcept -> std::same_as<bool>;
+		});
+		static_assert(!EnvironmentCatalogAccess<EnvironmentSelectionControlBase>);
+		static_assert(!EnvironmentLifecycleControl<EnvironmentSelectionControlBase>);
+		static_assert(!EnvironmentFileSelection<EnvironmentSelectionControlBase>);
+
 		template <typename T>
 		concept PostProcessPreviewQuery = requires(const T& value) {
 			{ value.GetPostProcessPreviewDiagnostics() } ->

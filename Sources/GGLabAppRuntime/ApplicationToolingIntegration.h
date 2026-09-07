@@ -11,7 +11,7 @@ namespace gglab
 	class DebugDrawSystem;
 	class DiagnosticsControl;
 	class DiagnosticsView;
-	class EnvironmentAssetController;
+	class EnvironmentSelectionControlBase;
 	class EnvironmentLightingControlBase;
 	class EnvironmentLightingViewBase;
 	class GpuProfilingControlBase;
@@ -51,7 +51,8 @@ namespace gglab
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
 		AssetManager* m_AssetManager = nullptr;
-		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
+		// Borrowed for Draw only; selection does not imply source publication.
+		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		// Borrowed for Draw only; omitted capabilities remain independently null.

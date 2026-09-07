@@ -91,8 +91,8 @@ namespace gglab
 				guiContext.m_RenderViews = context.m_RenderViews;
 				guiContext.m_RenderQueues = context.m_RenderQueues;
 				guiContext.m_AssetManager = context.m_AssetManager;
-				guiContext.m_EnvironmentAssetController =
-					context.m_EnvironmentAssetController;
+				guiContext.m_EnvironmentSelectionControl =
+					context.m_EnvironmentSelectionControl;
 				guiContext.m_Diagnostics = context.m_Diagnostics;
 				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
 				guiContext.m_EnvironmentLighting = context.m_EnvironmentLighting;

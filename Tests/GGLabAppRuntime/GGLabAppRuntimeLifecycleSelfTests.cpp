@@ -6,6 +6,7 @@
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
@@ -48,6 +49,21 @@ namespace gglab
 				});
 			return registration;
 		}
+
+		class TestEnvironmentSelectionControl final : public EnvironmentSelectionControlBase
+		{
+		public:
+			bool SelectEnvironment(size_t entryIndex) noexcept override
+			{
+				m_LastEntryIndex = entryIndex;
+				++m_RequestCount;
+				return m_AcceptSelection;
+			}
+
+			size_t m_LastEntryIndex = 0;
+			uint32_t m_RequestCount = 0;
+			bool m_AcceptSelection = true;
+		};
 
 		class TestEnvironmentLightingView final : public EnvironmentLightingViewBase
 		{
@@ -156,6 +172,7 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				++m_DrawCount;
+				m_LastEnvironmentSelectionControl = context.m_EnvironmentSelectionControl;
 				m_LastEnvironmentLighting = context.m_EnvironmentLighting;
 				m_LastEnvironmentLightingControl = context.m_EnvironmentLightingControl;
 				m_LastGpuProfiling = context.m_GpuProfiling;
@@ -187,6 +204,7 @@ namespace gglab
 			uint32_t m_BeginCount = 0;
 			uint32_t m_DrawCount = 0;
 			uint32_t m_EndCount = 0;
+			EnvironmentSelectionControlBase* m_LastEnvironmentSelectionControl = nullptr;
 			const EnvironmentLightingViewBase* m_LastEnvironmentLighting = nullptr;
 			EnvironmentLightingControlBase* m_LastEnvironmentLightingControl = nullptr;
 			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
@@ -203,6 +221,29 @@ namespace gglab
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestEnvironmentSelectionControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentSelectionControl,
+					"Environment selection control is absent by default");
+				frame.Draw({ .m_EnvironmentSelectionControl = &control });
+				context.Check(tooling.m_LastEnvironmentSelectionControl == &control &&
+					!tooling.m_LastEnvironmentLighting && !tooling.m_LastIBLPreview,
+					"Tooling forwards selection independently of Renderer, settings and previews");
+				context.Check(tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(7) &&
+					control.m_LastEntryIndex == 7 && control.m_RequestCount == 1,
+					"The borrowed selection capability forwards the requested catalog index");
+				control.m_AcceptSelection = false;
+				context.Check(!tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(9) &&
+					control.m_LastEntryIndex == 9 && control.m_RequestCount == 2,
+					"Selection rejection reaches tooling without being converted into success");
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentSelectionControl && control.m_RequestCount == 2,
+					"A later draw neither retains nor replays an omitted selection capability");
+				frame.Complete();
+			}
 
 			{
 				RecordingApplicationTooling tooling;

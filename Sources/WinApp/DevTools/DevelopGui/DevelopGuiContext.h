@@ -12,7 +12,7 @@ namespace gglab
 	class CameraRig;
 	class Renderer;
 	class AssetManager;
-	class EnvironmentAssetController;
+	class EnvironmentSelectionControlBase;
 	class EnvironmentLightingControlBase;
 	class EnvironmentLightingViewBase;
 	class GpuProfilingControlBase;
@@ -39,7 +39,7 @@ namespace gglab
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
 		AssetManager* m_AssetManager = nullptr;
-		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
+		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;
 		// Borrowed for this draw only; panels may retain copied timing values.

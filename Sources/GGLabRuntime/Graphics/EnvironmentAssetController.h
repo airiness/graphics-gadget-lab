@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 
@@ -27,7 +28,7 @@ namespace gglab
 		EnvironmentAssetEntryState m_State = EnvironmentAssetEntryState::Unrequested;
 	};
 
-	class EnvironmentAssetController
+	class EnvironmentAssetController : public EnvironmentSelectionControlBase
 	{
 	public:
 		static constexpr size_t InvalidEntryIndex = std::numeric_limits<size_t>::max();
@@ -41,14 +42,14 @@ namespace gglab
 
 		explicit EnvironmentAssetController(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(EnvironmentAssetController);
-		~EnvironmentAssetController();
+		~EnvironmentAssetController() override;
 
 		void Initialize(const std::filesystem::path& rootDirectory) noexcept;
 		void Reset() noexcept;
 		void Tick() noexcept;
 
 		[[nodiscard]] bool SelectDefaultEnvironment() noexcept;
-		[[nodiscard]] bool SelectEnvironment(size_t entryIndex) noexcept;
+		[[nodiscard]] bool SelectEnvironment(size_t entryIndex) noexcept override;
 		[[nodiscard]] bool SelectEnvironmentFile(
 			const std::filesystem::path& path, std::string_view displayName = {}) noexcept;
 

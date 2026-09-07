@@ -2110,6 +2110,22 @@ foreach ($itemPath in $iblViewerPaths) {
     }
 }
 
+$environmentSelectionToolingPaths = @($iblViewerPaths) + @(
+    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
+    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp")
+)
+foreach ($itemPath in $environmentSelectionToolingPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bEnvironmentAssetController\b|\bm_EnvironmentAssetController\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-environment-selection-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling must borrow EnvironmentSelectionControlBase, not the environment source owner"
+        })
+    }
+}
+
 $rendererIndependentToolingPanelPaths = @(
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.h"),

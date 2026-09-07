@@ -291,7 +291,7 @@ namespace gglab
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
 				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
 				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
