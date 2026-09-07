@@ -1,4 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -53,8 +54,8 @@ namespace gglab
 		EnsureInitialized(services);
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
-		using PreviewType = RenderResourceRegistry::IBLPreviewType;
-		using PreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
+		using PreviewType = IBLPreviewType;
+		using PreviewLayout = IBLPreviewLayout;
 		const auto* contextPtr = &context;
 
 		auto addPreviewPass = [this, &rg, renderer, renderResRegistry, contextPtr](

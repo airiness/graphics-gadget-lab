@@ -30,46 +30,6 @@ namespace gglab
 		}
 	}
 
-	namespace
-	{
-		IBLTextureDiagnostics BuildTextureDiagnostics(const RenderResourceRegistry& registry,
-			RenderResourceRegistry::TextureIndex index) noexcept
-		{
-			IBLTextureDiagnostics diagnostics{};
-			const auto* desc = registry.GetTextureDesc(index);
-			if (!desc)
-			{
-				return diagnostics;
-			}
-
-			diagnostics.m_BakeState =
-				registry.IsDirty(index) ? IBLBakeState::Dirty : IBLBakeState::Ready;
-			diagnostics.m_Width = desc->m_Extent.m_Width;
-			diagnostics.m_Height = desc->m_Extent.m_Height;
-			diagnostics.m_ArraySize = desc->m_ArraySize;
-			diagnostics.m_MipLevels = desc->m_MipLevels;
-			diagnostics.m_Format = desc->m_Format;
-			diagnostics.m_SrvDescriptor = registry.GetSrvDescriptor(index);
-			diagnostics.m_ShaderVisibleSrvIndex = diagnostics.m_SrvDescriptor.m_Index;
-			return diagnostics;
-		}
-
-		IBLPreviewDiagnostics BuildPreviewDiagnostics(const RenderResourceRegistry& registry,
-			RenderResourceRegistry::TextureIndex textureIndex,
-			RenderResourceRegistry::IBLPreviewType previewType,
-			RenderResourceRegistry::IBLPreviewLayout layout, uint32_t selectedMip) noexcept
-		{
-			return {
-				.m_Texture = BuildTextureDiagnostics(registry, textureIndex),
-				.m_Layout = static_cast<uint32_t>(layout),
-				.m_SelectedMip = selectedMip,
-				.m_UpdateCount = registry.GetIBLPreviewUpdateCount(previewType),
-				.m_Dirty = registry.IsIBLPreviewDirty(previewType),
-				.m_Requested = registry.IsIBLPreviewRequested(previewType),
-			};
-		}
-	}
-
 	IBLDiagnosticsSnapshot BuildIBLDiagnosticsSnapshot(
 		const Renderer& renderer, const EnvironmentAssetController* environmentAssets) noexcept
 	{
@@ -150,26 +110,14 @@ namespace gglab
 			}
 		}
 
-		using TextureIndex = RenderResourceRegistry::TextureIndex;
-		using PreviewType = RenderResourceRegistry::IBLPreviewType;
-		snapshot.m_Environment =
-			BuildTextureDiagnostics(*registry, TextureIndex::IBL_EnvironmentCubemap);
-		snapshot.m_Irradiance =
-			BuildTextureDiagnostics(*registry, TextureIndex::IBL_IrradianceCubemap);
-		snapshot.m_PrefilteredSpecular =
-			BuildTextureDiagnostics(*registry, TextureIndex::IBL_PrefilteredSpecularCubemap);
-		snapshot.m_BrdfLut = BuildTextureDiagnostics(*registry, TextureIndex::IBL_BrdfLut);
-
-		snapshot.m_EnvironmentPreview = BuildPreviewDiagnostics(*registry,
-			TextureIndex::Preview_IBL_EnvironmentCubemap, PreviewType::Environment,
-			registry->GetIBLEnvironmentPreviewLayout(), registry->GetIBLEnvironmentPreviewMip());
-		snapshot.m_IrradiancePreview =
-			BuildPreviewDiagnostics(*registry, TextureIndex::Preview_IBL_IrradianceCubemap,
-				PreviewType::Irradiance, registry->GetIBLIrradiancePreviewLayout(), 0);
-		snapshot.m_PrefilteredSpecularPreview = BuildPreviewDiagnostics(*registry,
-			TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, PreviewType::PrefilteredSpecular,
-			registry->GetIBLPrefilteredSpecularPreviewLayout(),
-			registry->GetIBLPrefilteredSpecularPreviewMip());
+		const auto resources = registry->GetIBLPreviewResourcesDiagnostics();
+		snapshot.m_Environment = resources.m_Environment;
+		snapshot.m_Irradiance = resources.m_Irradiance;
+		snapshot.m_PrefilteredSpecular = resources.m_PrefilteredSpecular;
+		snapshot.m_BrdfLut = resources.m_BrdfLut;
+		snapshot.m_EnvironmentPreview = resources.m_EnvironmentPreview;
+		snapshot.m_IrradiancePreview = resources.m_IrradiancePreview;
+		snapshot.m_PrefilteredSpecularPreview = resources.m_PrefilteredSpecularPreview;
 		return snapshot;
 	}
 }

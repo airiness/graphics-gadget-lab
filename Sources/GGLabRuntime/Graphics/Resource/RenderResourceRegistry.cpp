@@ -351,6 +351,62 @@ namespace gglab
 			TextureIndex::Preview_Shadow_DirectionalShadowMap, desc, srvDesc, retireFenceOpt);
 	}
 
+	IBLTextureDiagnostics RenderResourceRegistry::BuildIBLTextureDiagnostics(
+		TextureIndex index) const noexcept
+	{
+		IBLTextureDiagnostics diagnostics{};
+		const auto* desc = GetTextureDesc(index);
+		if (!desc)
+		{
+			return diagnostics;
+		}
+
+		diagnostics.m_BakeState =
+			IsDirty(index) ? IBLBakeState::Dirty : IBLBakeState::Ready;
+		diagnostics.m_Width = desc->m_Extent.m_Width;
+		diagnostics.m_Height = desc->m_Extent.m_Height;
+		diagnostics.m_ArraySize = desc->m_ArraySize;
+		diagnostics.m_MipLevels = desc->m_MipLevels;
+		diagnostics.m_Format = desc->m_Format;
+		diagnostics.m_SrvDescriptor = GetSrvDescriptor(index);
+		diagnostics.m_ShaderVisibleSrvIndex = diagnostics.m_SrvDescriptor.m_Index;
+		return diagnostics;
+	}
+
+	IBLPreviewResourcesDiagnostics RenderResourceRegistry::GetIBLPreviewResourcesDiagnostics()
+		const noexcept
+	{
+		auto buildPreview = [this](TextureIndex textureIndex, IBLPreviewType previewType,
+			IBLPreviewLayout layout, uint32_t selectedMip) noexcept -> IBLPreviewDiagnostics
+		{
+			return {
+				.m_Texture = BuildIBLTextureDiagnostics(textureIndex),
+				.m_Layout = static_cast<uint32_t>(layout),
+				.m_SelectedMip = selectedMip,
+				.m_UpdateCount = GetIBLPreviewUpdateCount(previewType),
+				.m_Dirty = IsIBLPreviewDirty(previewType),
+				.m_Requested = IsIBLPreviewRequested(previewType),
+			};
+		};
+
+		IBLPreviewResourcesDiagnostics resources{};
+		resources.m_Environment = BuildIBLTextureDiagnostics(TextureIndex::IBL_EnvironmentCubemap);
+		resources.m_Irradiance = BuildIBLTextureDiagnostics(TextureIndex::IBL_IrradianceCubemap);
+		resources.m_PrefilteredSpecular =
+			BuildIBLTextureDiagnostics(TextureIndex::IBL_PrefilteredSpecularCubemap);
+		resources.m_BrdfLut = BuildIBLTextureDiagnostics(TextureIndex::IBL_BrdfLut);
+		resources.m_EnvironmentPreview = buildPreview(
+			TextureIndex::Preview_IBL_EnvironmentCubemap, IBLPreviewType::Environment,
+			GetIBLEnvironmentPreviewLayout(), GetIBLEnvironmentPreviewMip());
+		resources.m_IrradiancePreview = buildPreview(
+			TextureIndex::Preview_IBL_IrradianceCubemap, IBLPreviewType::Irradiance,
+			GetIBLIrradiancePreviewLayout(), 0);
+		resources.m_PrefilteredSpecularPreview = buildPreview(
+			TextureIndex::Preview_IBL_PrefilteredSpecularCubemap, IBLPreviewType::PrefilteredSpecular,
+			GetIBLPrefilteredSpecularPreviewLayout(), GetIBLPrefilteredSpecularPreviewMip());
+		return resources;
+	}
+
 	ShadowPreviewDiagnostics RenderResourceRegistry::GetShadowPreviewDiagnostics()
 		const noexcept
 	{
@@ -567,6 +623,10 @@ namespace gglab
 
 	void RenderResourceRegistry::RequestIBLPreview(IBLPreviewType type) noexcept
 	{
+		if (type >= IBLPreviewType::Count)
+		{
+			return;
+		}
 		m_IBLPreviewStates[utils::ToIndex(type)].m_Requested = true;
 	}
 

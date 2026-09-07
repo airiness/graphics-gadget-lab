@@ -1,3 +1,5 @@
+#include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
 #include "ApplicationFrameworkSelfTests.h"
 #include "ApplicationInput.h"
@@ -108,6 +110,25 @@ namespace gglab
 				const noexcept override { return {}; }
 		};
 
+
+		class TestIBLPreviewView final : public IBLPreviewViewBase
+		{
+		public:
+			IBLPreviewResourcesDiagnostics GetIBLPreviewResourcesDiagnostics()
+				const noexcept override { return {}; }
+		};
+
+		class TestIBLPreviewControl final : public IBLPreviewControlBase
+		{
+		public:
+			void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLIrradiancePreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLEnvironmentPreviewMip(uint32_t) noexcept override {}
+			void SetIBLPrefilteredSpecularPreviewMip(uint32_t) noexcept override {}
+			void RequestIBLPreview(IBLPreviewType) noexcept override {}
+		};
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -140,6 +161,8 @@ namespace gglab
 				m_LastGpuProfiling = context.m_GpuProfiling;
 				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
 				m_LastIBLCacheControl = context.m_IBLCacheControl;
+				m_LastIBLPreview = context.m_IBLPreview;
+				m_LastIBLPreviewControl = context.m_IBLPreviewControl;
 				m_LastPostProcessPreview = context.m_PostProcessPreview;
 				m_LastPostProcessPreviewControl = context.m_PostProcessPreviewControl;
 				m_LastShadowPreview = context.m_ShadowPreview;
@@ -169,6 +192,8 @@ namespace gglab
 			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
 			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
 			IBLCacheControlBase* m_LastIBLCacheControl = nullptr;
+			const IBLPreviewViewBase* m_LastIBLPreview = nullptr;
+			IBLPreviewControlBase* m_LastIBLPreviewControl = nullptr;
 			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
 			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
 			const ShadowPreviewViewBase* m_LastShadowPreview = nullptr;
@@ -178,6 +203,30 @@ namespace gglab
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+
+			{
+				RecordingApplicationTooling tooling;
+				TestIBLPreviewView view;
+				TestIBLPreviewControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLPreview && !tooling.m_LastIBLPreviewControl,
+					"IBL preview capabilities are absent by default");
+				frame.Draw({ .m_IBLPreview = &view });
+				context.Check(tooling.m_LastIBLPreview == &view && !tooling.m_LastIBLPreviewControl,
+					"Tooling can query IBL previews without control or Renderer");
+				frame.Draw({ .m_IBLPreviewControl = &control });
+				context.Check(!tooling.m_LastIBLPreview && tooling.m_LastIBLPreviewControl == &control,
+					"Tooling can bind IBL preview controls independently");
+				frame.Draw({ .m_IBLPreview = &view, .m_IBLPreviewControl = &control });
+				context.Check(tooling.m_LastIBLPreview == &view &&
+					tooling.m_LastIBLPreviewControl == &control,
+					"Tooling forwards both borrowed IBL preview capabilities");
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLPreview && !tooling.m_LastIBLPreviewControl,
+					"A later draw does not retain omitted IBL preview capabilities");
+				frame.Complete();
+			}
 			{
 				RecordingApplicationTooling tooling;
 				TestIBLCacheControl control;

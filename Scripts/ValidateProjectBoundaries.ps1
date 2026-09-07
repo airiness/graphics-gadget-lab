@@ -2111,6 +2111,8 @@ foreach ($itemPath in $iblViewerPaths) {
 }
 
 $rendererIndependentToolingPanelPaths = @(
+    (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "IBLViewerPanel.h"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.h"),
     (Join-Path $developGuiPanelsDir "GTAOInspectorPanel.cpp"),

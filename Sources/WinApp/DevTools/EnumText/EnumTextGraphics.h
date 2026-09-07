@@ -2,7 +2,7 @@
 #include "DevTools/EnumText/EnumText.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "Graphics/SamplerTypes.h"
 
 namespace gglab::devtools
@@ -142,9 +142,8 @@ namespace gglab::devtools
 		};
 	};
 
-	template <> struct EnumTextTraits<RenderResourceRegistry::IBLPreviewLayout>
+	template <> struct EnumTextTraits<IBLPreviewLayout>
 	{
-		using IBLPreviewLayout = RenderResourceRegistry::IBLPreviewLayout;
 
 		static constexpr std::array Entries = {
 			EnumTextEntry{IBLPreviewLayout::Grid2x3, "2x3 Grid"},

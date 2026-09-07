@@ -1,3 +1,5 @@
+#include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
@@ -79,6 +81,33 @@ namespace gglab
 		concept PostProcessPreviewConsumption = requires(T& value) {
 			value.ConsumePostProcessPreviewRequest();
 		};
+		template <typename T>
+		concept IBLPreviewQuery = requires(const T& value) {
+			{ value.GetIBLPreviewResourcesDiagnostics() } ->
+				std::same_as<IBLPreviewResourcesDiagnostics>;
+		};
+		template <typename T>
+		concept IBLPreviewRequest = requires(T& value) {
+			value.RequestIBLPreview(IBLPreviewType::Environment);
+			value.SetIBLEnvironmentPreviewMip(1);
+		};
+		template <typename T>
+		concept IBLPreviewConsumption = requires(T& value) {
+			value.ConsumeIBLPreviewRequest(IBLPreviewType::Environment);
+		};
+		template <typename T>
+		concept IBLPreviewAllocation = requires(T& value) {
+			value.EnsureIblResources();
+		};
+		static_assert(IBLPreviewQuery<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewRequest<IBLPreviewViewBase>);
+		static_assert(IBLPreviewRequest<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewQuery<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewConsumption<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewConsumption<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewAllocation<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewAllocation<IBLPreviewControlBase>);
+
 		static_assert(PostProcessPreviewQuery<PostProcessPreviewViewBase>);
 		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
 		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
@@ -422,9 +451,9 @@ namespace gglab
 				"Environment query preserves initial settings without requesting a bake");
 
 			constexpr auto PreviewTypes = std::array{
-				RenderResourceRegistry::IBLPreviewType::Environment,
-				RenderResourceRegistry::IBLPreviewType::Irradiance,
-				RenderResourceRegistry::IBLPreviewType::PrefilteredSpecular,
+				IBLPreviewType::Environment,
+				IBLPreviewType::Irradiance,
+				IBLPreviewType::PrefilteredSpecular,
 				};
 			const auto clearPreviews = [&]() {
 				for (auto type : PreviewTypes)
@@ -528,6 +557,134 @@ namespace gglab
 				!environment.ShouldIgnoreCache(8) &&
 				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
 				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+		}
+
+		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const IBLPreviewViewBase& view = registry;
+			IBLPreviewControlBase& control = registry;
+			const auto empty = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(empty.m_Environment.m_BakeState == IBLBakeState::Unavailable &&
+				!empty.m_BrdfLut.m_SrvDescriptor.IsValid() &&
+				!empty.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				empty.m_EnvironmentPreview.m_UpdateCount == 0 && device.m_CreateTextureCount == 0,
+				"IBL preview queries before allocation neither allocate nor claim initialized content");
+
+			control.RequestIBLPreview(IBLPreviewType::Count);
+			control.RequestIBLPreview(static_cast<IBLPreviewType>(255));
+			context.Check(!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
+				"Invalid public preview requests are ignored");
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			context.Check(registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+				!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment),
+				"Repeated preview requests coalesce until the render pass consumes them");
+			registry.ClearIBLPreviewDirty(IBLPreviewType::Environment);
+			registry.ClearIBLPreviewDirty(IBLPreviewType::Irradiance);
+			registry.ClearIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			context.Check(!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
+				"A clean preview consumes its request without scheduling another update");
+			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Count);
+			control.SetIBLIrradiancePreviewLayout(static_cast<IBLPreviewLayout>(99));
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Count);
+			context.Check(!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Dirty &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_IrradiancePreview.m_Dirty &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_PrefilteredSpecularPreview.m_Dirty,
+				"Invalid layouts preserve clean preview state");
+			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Cross);
+			control.SetIBLIrradiancePreviewLayout(IBLPreviewLayout::Cross);
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Cross);
+			const auto unchanged = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(unchanged.m_EnvironmentPreview.m_Dirty &&
+				!unchanged.m_IrradiancePreview.m_Dirty &&
+				!unchanged.m_PrefilteredSpecularPreview.m_Dirty,
+				"Same-layout controls preserve the established per-preview dirty semantics");
+			control.SetIBLIrradiancePreviewLayout(IBLPreviewLayout::Grid2x3);
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Grid2x3);
+			control.SetIBLEnvironmentPreviewMip(1000);
+			control.SetIBLPrefilteredSpecularPreviewMip(2000);
+			const auto selected = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(selected.m_EnvironmentPreview.m_SelectedMip == 1000 &&
+				selected.m_PrefilteredSpecularPreview.m_SelectedMip == 2000 &&
+				selected.m_IrradiancePreview.m_Dirty &&
+				selected.m_PrefilteredSpecularPreview.m_Dirty &&
+				unchanged.m_PrefilteredSpecularPreview.m_SelectedMip == 0 &&
+				device.m_CreateTextureCount == 0,
+				"Controls preserve requested mips for pass-side clamping without allocating or rewriting copies");
+
+			RenderResourceRegistry::IBLResourceCreateInfo info;
+			registry.EnsureIblResources(info);
+			const auto allocated = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(device.m_CreateTextureCount == 7 &&
+				allocated.m_Environment.m_Width == 512 && allocated.m_Environment.m_ArraySize == 6 &&
+				allocated.m_Environment.m_MipLevels == 10 &&
+				allocated.m_PrefilteredSpecular.m_MipLevels == 5 &&
+				allocated.m_BrdfLut.m_SrvDescriptor.IsValid() &&
+				allocated.m_EnvironmentPreview.m_Texture.m_Width == 1024 &&
+				allocated.m_EnvironmentPreview.m_Texture.m_Height == 768 &&
+				allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				!registry.HasInitializedActiveIBL(),
+				"IBL preview queries expose active allocation metadata without initializing GPU content");
+			registry.EnsureIblResources(info);
+			context.Check(device.m_CreateTextureCount == 7 &&
+				view.GetIBLPreviewResourcesDiagnostics().m_Environment.m_SrvDescriptor.m_Index ==
+					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				"Compatible allocations and repeated queries preserve descriptor identity");
+
+			IBLBakeConfig config;
+			config.m_EnvironmentCubemapSize = 64;
+			registry.EnsureIBLBakeResources(config);
+			const auto staging = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(device.m_CreateTextureCount == 11 &&
+				staging.m_Environment.m_Width == allocated.m_Environment.m_Width &&
+				staging.m_Environment.m_SrvDescriptor.m_Index ==
+					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				"Staging bake allocations remain hidden from the tooling view");
+			registry.PublishIBLBakeResources();
+			const auto published = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(published.m_Environment.m_Width == 64 &&
+				published.m_Environment.m_SrvDescriptor.m_Index !=
+					allocated.m_Environment.m_SrvDescriptor.m_Index &&
+				published.m_Environment.m_BakeState == IBLBakeState::Ready &&
+				published.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index ==
+					allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index &&
+				published.m_EnvironmentPreview.m_Dirty && registry.HasInitializedActiveIBL(),
+				"Runtime publication switches the active source while preserving preview ownership");
+
+			control.RequestIBLPreview(IBLPreviewType::Irradiance);
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(released.m_Environment.m_BakeState == IBLBakeState::Unavailable &&
+				!released.m_Environment.m_SrvDescriptor.IsValid() &&
+				!released.m_IrradiancePreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				released.m_EnvironmentPreview.m_SelectedMip == 1000 &&
+				released.m_IrradiancePreview.m_Requested && device.m_CreateTextureCount == 11,
+				"Release empties borrowed resource metadata while retaining existing requested state");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 11 &&
+				retirement.m_TextureCounts.m_Available == 0 && device.m_DestroyTextureCount == 0,
+				"Active and staging IBL resources remain pending until the owner fence completes");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 11,
+				"IBL resources become reusable only after fence completion");
 		}
 
 		void RunShadowPreviewContractTests(SelfTestContext& context) noexcept
@@ -6148,6 +6305,7 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunIBLPreviewContractTests(context);
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);

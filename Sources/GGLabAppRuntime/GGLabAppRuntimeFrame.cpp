@@ -300,6 +300,8 @@ namespace gglab
 				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
 				.m_IBLCacheControl = m_Renderer->GetIBLBakeScheduler()
 					? &m_Renderer->GetIBLBakeScheduler()->GetCacheControl() : nullptr,
+				.m_IBLPreview = m_Renderer->GetRenderResourceRegistry(),
+				.m_IBLPreviewControl = m_Renderer->GetRenderResourceRegistry(),
 				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
 				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),

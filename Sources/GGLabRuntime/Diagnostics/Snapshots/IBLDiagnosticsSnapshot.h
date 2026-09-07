@@ -1,7 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
-#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/IBLPreviewDiagnostics.h"
 #include "Graphics/IBLBakeTypes.h"
 
 #include <filesystem>
@@ -11,35 +10,6 @@
 
 namespace gglab
 {
-	enum class IBLBakeState : uint8_t
-	{
-		Unavailable,
-		Dirty,
-		Ready,
-	};
-
-	struct IBLTextureDiagnostics
-	{
-		IBLBakeState m_BakeState = IBLBakeState::Unavailable;
-		uint64_t m_Width = 0;
-		uint32_t m_Height = 0;
-		uint16_t m_ArraySize = 0;
-		uint16_t m_MipLevels = 0;
-		RHIFormat m_Format = RHIFormat::Unknown;
-		RHIDescriptorHandle m_SrvDescriptor{};
-		uint32_t m_ShaderVisibleSrvIndex = 0;
-	};
-
-	struct IBLPreviewDiagnostics
-	{
-		IBLTextureDiagnostics m_Texture;
-		uint32_t m_Layout = 0;
-		uint32_t m_SelectedMip = 0;
-		uint64_t m_UpdateCount = 0;
-		bool m_Dirty = true;
-		bool m_Requested = false;
-	};
-
 	enum class IBLEnvironmentEntryState : uint8_t
 	{
 		Unrequested,
