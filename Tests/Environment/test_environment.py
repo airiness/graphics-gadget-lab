@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -42,7 +43,15 @@ def fixture(root):
 class EnvironmentTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="gglab-environment-tests-")
-        self.addCleanup(self.temp.cleanup)
+        owned = Path(self.temp.name).resolve()
+        def cleanup_owned_root():
+            # Only remove the exact root allocated for this test, never a checkout.
+            target = Path(self.temp.name).resolve()
+            self.assertEqual(target, owned)
+            self.assertTrue(target.is_relative_to(Path(tempfile.gettempdir()).resolve()))
+            self.assertTrue(target.name.startswith("gglab-environment-tests-"))
+            self.temp.cleanup()
+        self.addCleanup(cleanup_owned_root)
         self.root = Path(self.temp.name) / "environment"
         self.root.mkdir()
         self.m = fixture(self.root)
@@ -64,7 +73,7 @@ class EnvironmentTests(unittest.TestCase):
             self.rejects("unsupported-version", lambda: p.dispatch({"requestVersion": version}))
 
     def test_invalid_paths(self):
-        for value in ["../x", "/root", "C:/x", "a\\b", "a//b", "a/./b", "a/../b", "a/x.", "a/x ", "a/x:y", "a/NUL.txt", "a/COM1", "a/é"]:
+        for value in ["../x", "/root", "C:/x", "a\\b", "a//b", "a/./b", "a/../b", "a/x.", "a/x ", "a/x:y", "a/NUL.txt", "a/COM1", "a/ﾃｩ"]:
             self.rejects("invalid-path", lambda: p.locator(value))
 
     def test_json_duplicate_bom_nonfinite_and_limit(self):
@@ -107,6 +116,104 @@ class EnvironmentTests(unittest.TestCase):
         stage = self.root.with_name(".staging-abandoned")
         self.root.rename(stage)
         self.rejects("incomplete-publication", lambda: p.verify(stage))
+
+    def staging_vectors(self):
+        directory = ROOT / "Tests/Environment/fixtures"
+        for name in ("index.json", "filesystem-cases.json", "process-cases.json"):
+            self.assertEqual(json.loads((directory / name).read_text())["stagingCasesFile"], "staging-cases.json")
+        return json.loads((directory / "staging-cases.json").read_text())
+
+    def materialize_staging_vector(self, root, vectors):
+        raw = (ROOT / "Tests/Environment/fixtures" / vectors["baseManifest"]).read_bytes()
+        manifest = p.validate_manifest(p.parse(raw))
+        root.mkdir()
+        for member in manifest["members"]:
+            path = root / member["path"]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(vectors["memberUtf8"].encode("utf-8"))
+        (root / "environment.json").write_bytes(raw)
+        # Internal pre-finalization validation proves complete hashes and identity.
+        self.assertEqual(p.verify(root, staging=True), manifest)
+        return manifest
+
+    def process_response(self, request, expected):
+        result = subprocess.run([sys.executable, "-B", str(ROOT / "Scripts/Environment/publish_environment.py")],
+                                input=p.canonical(request), capture_output=True, check=False)
+        self.assertEqual(result.returncode, expected["exitCode"])
+        self.assertEqual(len(result.stdout.splitlines()), 1)
+        response = p.parse(result.stdout)
+        self.assertEqual(set(response), {"resultVersion", "operation", "success", "result", "error"})
+        self.assertEqual(response["resultVersion"], 1)
+        self.assertEqual(response["operation"], request["operation"])
+        self.assertIs(response["success"], expected["success"])
+        if expected["success"]:
+            self.assertIsNone(response["error"])
+            self.assertIsInstance(response["result"], dict)
+        else:
+            self.assertIsNone(response["result"])
+            self.assertEqual(set(response["error"]), {"code", "message"})
+            self.assertEqual(response["error"]["code"], expected["errorCode"])
+            self.assertIsInstance(response["error"]["message"], str)
+        return response
+
+    def test_staging_spellings_and_destination_preflight(self):
+        vectors = self.staging_vectors()
+        for i, name in enumerate(vectors["pathSpellings"]):
+            with self.subTest(name=name):
+                parent = self.root.with_name("spelling-" + str(i))
+                parent.mkdir()
+                stage = parent / name
+                self.materialize_staging_vector(stage, vectors)
+                self.rejects("incomplete-publication", lambda: p.verify(stage))
+                for destination in (stage, parent / "absent" / name):
+                    with patch.object(p, "deployment_inputs") as inputs, patch.object(p, "provenance") as provenance, \
+                            patch.object(p, "run_native") as native, patch.object(p, "copy_tree") as copying:
+                        self.rejects("invalid-path", lambda: p.publish(parent / "repo", parent / "deploy", destination))
+                        for operation in (inputs, provenance, native, copying):
+                            operation.assert_not_called()
+                    self.assertFalse((parent / "absent").exists())
+        for name in ("environment", ".staging", "ordinary.staging-case"):
+            self.assertFalse(p.is_staging_name(Path(name)))
+
+    @unittest.skipUnless(os.name == "nt", "Requires real Windows case-insensitive filesystem aliases")
+    def test_windows_staging_alias_process_vectors_preserve_environment_and_state(self):
+        vectors = self.staging_vectors()
+        self.assertTrue(vectors["requiresRealWindowsFilesystem"])
+        stage = self.root.with_name(vectors["physicalDirectory"])
+        manifest = self.materialize_staging_vector(stage, vectors)
+        state = self.root.with_name("state")
+        p.init_state(self.root, state)
+        (state / "ShaderCache/cache").write_bytes(b"last-good mutable cache")
+        owned = Path(self.temp.name).resolve()
+        def snapshot():
+            return {path.relative_to(owned).as_posix(): path.read_bytes() if path.is_file() else None
+                    for path in owned.rglob("*")}
+        before = snapshot()
+        for name in vectors["pathSpellings"]:
+            alias = stage.with_name(name)
+            self.assertTrue(stage.samefile(alias), "Test storage must resolve spellings to the same physical directory")
+            for operation in ("verify", "init-state", "publish"):
+                with self.subTest(name=name, operation=operation):
+                    request = {"requestVersion": 1, "operation": operation}
+                    if operation == "publish":
+                        request.update(repositoryRoot=str(owned / "missing-repo"), deployment="Build/Output/x64/Test",
+                                       destination=str(alias), cancelFile=None)
+                    else:
+                        request["environmentRoot"] = str(alias)
+                        if operation == "init-state":
+                            request["stateRoot"] = str(state)
+                    self.process_response(request, vectors["expected"][operation])
+                    if operation == "publish":
+                        request["destination"] = str(owned / "absent-parent" / name)
+                        self.process_response(request, vectors["expected"][operation])
+                    elif operation == "init-state":
+                        request["stateRoot"] = str(owned / "new-state")
+                        self.process_response(request, vectors["expected"][operation])
+                    self.assertEqual(snapshot(), before)
+        response = self.process_response({"requestVersion": 1, "operation": "verify", "environmentRoot": str(self.root)},
+                                         {"exitCode": 0, "success": True})
+        self.assertEqual(response["result"]["environmentId"], manifest["environmentId"])
+        self.assertEqual(snapshot(), before)
 
     def test_state_preserves_identity_and_refuses_overlap_or_overwrite(self):
         state = self.root.with_name("state")

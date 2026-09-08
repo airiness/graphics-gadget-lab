@@ -38,3 +38,14 @@ synthetic and must never be used to claim native compatibility.
 
 See [Verification.md](Verification.md) for executed checks, durable native
 evidence, limitations and the Editor handoff.
+
+Staging case-alias regressions are in
+[`staging-cases.json`](../../Tests/Environment/fixtures/staging-cases.json), linked
+by `stagingCasesFile` from the existing index, filesystem and process vector files.
+Materialize `valid.json` and the specified synthetic member bytes once in the
+staging root. On a real Windows filesystem, assert that all three supplied path
+spellings identify that same directory; each must fail without finalization.
+The vectors specify publish destination rejection, init-state refusal, structured
+exit/envelope expectations and preservation checks. Portable spelling tests alone
+do not establish real Windows alias coverage. Synthetic vectors do not establish
+native compatibility or authorize Editor import.
