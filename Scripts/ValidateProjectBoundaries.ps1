@@ -2111,9 +2111,9 @@ foreach ($itemPath in $iblViewerPaths) {
 }
 
 $environmentSelectionToolingPaths = @($iblViewerPaths) + @(
-    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
-    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
-    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp")
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
+    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp")
 )
 foreach ($itemPath in $environmentSelectionToolingPaths) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
@@ -2129,9 +2129,9 @@ foreach ($itemPath in $environmentSelectionToolingPaths) {
 $rendererIndependentToolingPanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h"),
-    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
-    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
-    (Join-Path $RootDir "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
+    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.h"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
@@ -2172,7 +2172,7 @@ foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "AssetManagerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
-    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
 )) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '\bm_AssetManager\b|\bAssetManager\b|Diagnostics/AssetToolingControl\.h') {
@@ -2215,7 +2215,7 @@ foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
-    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
 )) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '\bm_RenderViews\b') {
@@ -2230,7 +2230,7 @@ foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "RenderViewPanel.cpp"),
     (Join-Path $developGuiPanelsDir "LabPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
-    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
 )) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '\bm_RenderQueues\b|\bDrawItem\b|Graphics/RenderQueue\.h') {
