@@ -1,4 +1,7 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "Diagnostics/DirectionalLightTooling.h"
+#include "Graphics/RenderFrameBuilder.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -83,6 +86,21 @@ namespace gglab
 	static_assert(!GpuProfilingControl<GpuProfilingViewBase>);
 	static_assert(!GpuProfilingQuery<GpuProfilingControlBase>);
 	static_assert(GpuProfilingControl<GpuProfilingControlBase>);
+
+	template <typename T>
+	concept DirectionalLightQuery = requires(const T& value) {
+		{ value.GetLight() } -> std::same_as<std::optional<DirectionalLightObservation>>;
+	};
+
+	template <typename T>
+	concept DirectionalLightControl = requires(T& value) {
+		value.SetRadiance(0, Color::White, 1.0f);
+	};
+
+	static_assert(DirectionalLightQuery<DirectionalLightViewBase>);
+	static_assert(!DirectionalLightControl<DirectionalLightViewBase>);
+	static_assert(!DirectionalLightQuery<DirectionalLightControlBase>);
+	static_assert(DirectionalLightControl<DirectionalLightControlBase>);
 
 	namespace
 	{
@@ -178,6 +196,70 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			World world;
+			auto& registry = world.GetRegistry();
+			DirectionalLightTooling tooling(world);
+			const DirectionalLightViewBase& view = tooling;
+			DirectionalLightControlBase& control = tooling;
+			context.Check(!view.GetLight(), "Empty worlds have no directional light observation");
+			const auto entity = registry.create();
+			registry.emplace<components::LightComponent>(entity);
+			context.Check(!view.GetLight(), "Lights without transforms are not tool targets");
+			registry.emplace<components::TransformComponent>(entity);
+			const auto original = view.GetLight();
+			context.Check(original.has_value(), "Directional lights produce value observations");
+			if (original)
+			{
+				const auto id = original->m_Id;
+				control.SetDirection(id, Vector3(0.0f, -2.0f, 0.0f));
+				control.SetRadiance(id, Color::Red, 3.0f);
+				DirectionalShadowSettings settings{};
+				settings.m_ShadowMapSize = 2048;
+				control.SetShadowSettings(id, settings);
+				const auto edited = view.GetLight();
+				context.Check(edited && edited->m_Direction.m_Y < -0.999f &&
+					edited->m_Intensity == 3.0f && edited->m_Color.m_G == 0.0f &&
+					edited->m_ShadowSettings && edited->m_ShadowSettings->m_ShadowMapSize == 2048 &&
+					original->m_Intensity == 1.0f && !original->m_ShadowSettings,
+					"Typed edits update authoring without changing retained observations");
+				control.SetDirection(id, Vector3::Zero);
+				control.SetDirection(id, Vector3(std::numeric_limits<float>::infinity(), 0.0f, 0.0f));
+				context.Check(view.GetLight()->m_Direction.m_Y < -0.999f,
+					"Zero and non-finite directions leave the light orientation unchanged");
+				RenderFrameBuilder::BuildResult builtFrame{};
+				builtFrame.m_WorldData = RenderWorldExtractor().Extract(world);
+				const auto renderContext = builtFrame.MakeRenderFrameContext();
+				control.SetShadowSettings(id, std::nullopt);
+				context.Check(renderContext.m_DirectionalShadowSettings.m_ShadowMapSize == 2048 &&
+					!RenderWorldExtractor().Extract(world).m_MainDirectionalLight.m_ShadowSettings,
+					"Tooling shadow edits leave the constructed render context intact until the next extraction");
+				context.Check(!view.GetLight()->m_ShadowSettings &&
+					edited && edited->m_ShadowSettings,
+					"Disabling shadows preserves previously copied settings");
+				registry.get<components::LightComponent>(entity).m_Type = LightType::Point;
+				control.SetRadiance(id, Color::White, 9.0f);
+				context.Check(!view.GetLight() &&
+					registry.get<components::LightComponent>(entity).m_Intensity == 3.0f,
+					"Commands reject targets that are no longer directional lights");
+				registry.destroy(entity);
+				const auto replacement = registry.create();
+				registry.emplace<components::TransformComponent>(replacement);
+				registry.emplace<components::LightComponent>(replacement);
+				control.SetRadiance(id, Color::Red, 9.0f);
+				control.SetDirection(id, -Vector3::UnitY);
+				control.SetShadowSettings(id, settings);
+				const auto fresh = view.GetLight();
+				context.Check(entt::to_entity(replacement) == entt::to_entity(entity) &&
+					fresh && fresh->m_Id != id && fresh->m_Intensity == 1.0f &&
+					fresh->m_Direction.m_Y == 0.0f && !fresh->m_ShadowSettings,
+					"Stale versioned IDs cannot edit a replacement light in a recycled entity slot");
+				registry.remove<components::TransformComponent>(replacement);
+				control.SetRadiance(entt::to_integral(replacement), Color::Red, 9.0f);
+				context.Check(registry.get<components::LightComponent>(replacement).m_Intensity == 1.0f,
+					"Commands reject lights whose transform was removed");
+			}
+		}
 		{
 			RenderView source;
 			source.m_ViewId = RenderViewID::DirectionalShadow;

@@ -9,6 +9,7 @@
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
+#include "Diagnostics/DirectionalLightTooling.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -285,9 +286,12 @@ namespace gglab
 				loadingProgress = m_DemoManager->GetLoadingProgress();
 			}
 
+			DirectionalLightTooling directionalLightTooling(world);
 			const ApplicationToolingFrameContext toolingContext{
 				.m_CameraRig = &demo->GetCameraRig(),
 				.m_World = &world,
+				.m_DirectionalLight = &directionalLightTooling,
+				.m_DirectionalLightControl = &directionalLightTooling,
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),

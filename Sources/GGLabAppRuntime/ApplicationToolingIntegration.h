@@ -24,6 +24,8 @@ namespace gglab
 	class RenderPipelineOverlayExtensionBase;
 	class ShadowPreviewViewBase;
 	class World;
+	class DirectionalLightViewBase;
+	class DirectionalLightControlBase;
 	struct DebugDrawFrameView;
 	struct LoadingProgress;
 	struct ShadowVisualizationSettings;
@@ -44,6 +46,8 @@ namespace gglab
 	{
 		CameraRig* m_CameraRig = nullptr;
 		World* m_World = nullptr;
+		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
+		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		// Borrowed for Draw only; selection does not imply source publication.
 		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;

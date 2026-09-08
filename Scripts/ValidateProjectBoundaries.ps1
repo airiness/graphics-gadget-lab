@@ -2169,6 +2169,19 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
 foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_World\b|\bGetRegistry\b|\bcomponents::|Core/World\.h|Scene/Components\.h|Diagnostics/DirectionalLightTooling\.h') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-directional-light-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "shadow authoring must use public directional light queries and typed controls without World or ECS access"
+        })
+    }
+}
+foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "RenderViewPanel.cpp"),
     (Join-Path $developGuiPanelsDir "EntityPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
