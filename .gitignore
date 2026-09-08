@@ -403,3 +403,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 *.dat
+
+# Environment publication and native qualification products.
+/Build/EnvironmentQualification/
+/Build/Output/

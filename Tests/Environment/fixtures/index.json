@@ -1,0 +1,41 @@
+{
+  "fixtureVersion": 1,
+  "purpose": "Synthetic strict-reader vectors; no native compatibility claim",
+  "cases": [
+    {
+      "file": "valid.json",
+      "accept": true,
+      "environmentId": "sha256:19c56de7c321e5a01efa8449acffd13f94a295254d4d2108403784428e6ce13f"
+    },
+    {
+      "file": "unsupported-version.json",
+      "accept": false,
+      "error": "unsupported-version"
+    },
+    {
+      "file": "escaped-path.json",
+      "accept": false,
+      "error": "invalid-path"
+    },
+    {
+      "file": "wrong-identity.json",
+      "accept": false,
+      "error": "identity-mismatch"
+    },
+    {
+      "file": "wrong-role.json",
+      "accept": false,
+      "error": "invalid-role"
+    },
+    {
+      "file": "duplicate-member.json",
+      "accept": false,
+      "error": "path-conflict"
+    },
+    {
+      "file": "missing-tool.json",
+      "accept": false,
+      "error": "missing-member"
+    }
+  ]
+}

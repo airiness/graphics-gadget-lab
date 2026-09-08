@@ -1,6 +1,7 @@
 #include "Application/ApplicationHostConfiguration.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabFoundation/IO/PathUtils.h"
+#include "GGLabFoundation/String/StringUtils.h"
 
 namespace gglab
 {
@@ -50,24 +51,52 @@ namespace gglab
 		return config;
 	}
 
-	RuntimePaths BuildRuntimePaths(const std::filesystem::path& executableDirectory) noexcept
+	RuntimePaths BuildRuntimePaths(const std::filesystem::path& executableDirectory,
+		const std::filesystem::path& stateDirectory) noexcept
 	{
-		if (executableDirectory.empty() || !executableDirectory.is_absolute())
+		if (executableDirectory.empty() || !executableDirectory.is_absolute() ||
+			(!stateDirectory.empty() && !stateDirectory.is_absolute()))
 		{
 			return {};
 		}
 
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);
+		const std::filesystem::path stateRoot = stateDirectory.empty()
+			? runtimeRoot : utils::Canonical(stateDirectory);
+		if (!stateDirectory.empty())
+		{
+			const auto isWithin = [](const std::filesystem::path& child,
+				const std::filesystem::path& parent)
+				{
+					auto item = child.begin();
+					for (const auto& component : parent)
+					{
+						if (item == child.end() || !utils::EqualsAsciiIgnoreCase(
+							item->string(), component.string()))
+						{
+							return false;
+						}
+						++item;
+					}
+					return true;
+				};
+			const auto immutableRoot = std::filesystem::exists(
+				runtimeRoot.parent_path() / "environment.json") ? runtimeRoot.parent_path() : runtimeRoot;
+			if (isWithin(stateRoot, immutableRoot) || isWithin(immutableRoot, stateRoot))
+			{
+				return {};
+			}
+		}
 		const std::filesystem::path assetRoot = runtimeRoot / "Assets";
-		const std::filesystem::path derivedDataRoot = runtimeRoot / "DerivedDataCache";
+		const std::filesystem::path derivedDataRoot = stateRoot / "DerivedDataCache";
 		return {
 			.m_RuntimeRoot = runtimeRoot,
 			.m_AssetRoot = assetRoot,
-			.m_ShaderArtifactRoot = runtimeRoot / "ShaderArtifacts",
+			.m_ShaderArtifactRoot = stateRoot / "ShaderArtifacts",
 			.m_IblDerivedDataRoot = derivedDataRoot / "IBL",
 			.m_TextureDerivedDataRoot = derivedDataRoot / "Texture",
 			.m_EnvironmentAssetRoot = assetRoot / "Textures" / "Skybox",
-			.m_SettingsRoot = runtimeRoot,
+			.m_SettingsRoot = stateDirectory.empty() ? stateRoot : stateRoot / "Settings",
 		};
 	}
 }

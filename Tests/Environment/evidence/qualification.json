@@ -1,0 +1,596 @@
+{
+  "snapshotVersion": 1,
+  "recordedDate": "2026-09-08",
+  "nativeRunDateLocal": "2026-09-07",
+  "authority": "Historical producer qualification evidence; not consumer compatibility authority or contract approval.",
+  "runs": [
+    {
+      "evidenceVersion": 1,
+      "sourceIsolation": "disposable-publication-source-mirror-renamed",
+      "originalCheckoutAccessDenied": false,
+      "native": [
+        {
+          "backend": "dx12",
+          "profileVersion": 1,
+          "sessionId": "fb469dfee6b34aa68f95e9133762613b",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96",
+            "binaryFormat": "dxil",
+            "binaryHash": "491bc48ae92b0e032ce79e645ee3636fb54e7d9ce07f28ca7e55d39de3b8e43e",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v1\\ShaderCache\\dxil\\12\\8b\\128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0.ps.dxil",
+            "buildKey": "128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v1\\ShaderCache\\dxil\\12\\8b\\128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0.ps.dxil.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "d0d412f4ac246b8903295373481ffb5a9adb3c4835c08612e61e885022016e3e",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v1\\ShaderArtifacts\\3b\\79\\3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v1\\ShaderArtifacts\\3b\\79\\3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-dx12"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "e312cf0dd561df0439d659c9249e3e09ed6770d240673179c792fc7082f3fe50",
+            "loaded": "e312cf0dd561df0439d659c9249e3e09ed6770d240673179c792fc7082f3fe50",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "bc0b1789bb0bf81e805d7bdc358f74ffdeaf50fe8c5ed75e8a8a530d390c506d",
+            "loaded": "bc0b1789bb0bf81e805d7bdc358f74ffdeaf50fe8c5ed75e8a8a530d390c506d",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": false,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": null,
+          "gameInputUnavailableDiagnosticPresent": false
+        },
+        {
+          "backend": "dx12",
+          "profileVersion": 2,
+          "sessionId": "761b925c3b4f45de93301eb27f46348a",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7",
+            "binaryFormat": "dxil",
+            "binaryHash": "75a423172be2e5e14d13894cf6d9f914bc090cef36c9ea518c372b90086bd19e",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v2\\ShaderCache\\dxil\\ef\\6a\\ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092.ps.dxil",
+            "buildKey": "ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v2\\ShaderCache\\dxil\\ef\\6a\\ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092.ps.dxil.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "64fbf874ef11f0e20ac8772efb2884248b422ac292af19acf0b24c4b767664a7",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v2\\ShaderArtifacts\\2c\\dd\\2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-dx12-v2\\ShaderArtifacts\\2c\\dd\\2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-dx12"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "b1d58b7bd427bae78769773cf81bdd2bb56a7a858cc22db84d81086f8a6d23e9",
+            "loaded": "b1d58b7bd427bae78769773cf81bdd2bb56a7a858cc22db84d81086f8a6d23e9",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "ff4ef52c776f92500c0ac491187cd5f6354206ba9e5c9336f4edd432ac616f58",
+            "loaded": "ff4ef52c776f92500c0ac491187cd5f6354206ba9e5c9336f4edd432ac616f58",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": false,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": null,
+          "gameInputUnavailableDiagnosticPresent": false
+        },
+        {
+          "backend": "vulkan",
+          "profileVersion": 1,
+          "sessionId": "0324fb17972a4863a5c2330b64d17533",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e",
+            "binaryFormat": "spirv",
+            "binaryHash": "308775cc251ab08a2f8e380313b4e78bbd50df8fb55f9c11be037108d5b54229",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v1\\ShaderCache\\spirv\\21\\57\\2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e.ps.spv",
+            "buildKey": "2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v1\\ShaderCache\\spirv\\21\\57\\2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e.ps.spv.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "dcb05616e3b50688a18ebeaafe72030d4f752e8dcd1a6e7f7e6fbcbede4d70be",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v1\\ShaderArtifacts\\c9\\b4\\c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v1\\ShaderArtifacts\\c9\\b4\\c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-vulkan13"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "44407d59e880853ed57ec324c92d5b5a3c089d109fedf578d966f1489b98a6f8",
+            "loaded": "44407d59e880853ed57ec324c92d5b5a3c089d109fedf578d966f1489b98a6f8",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "450a94506486e5461cbf2a8e890e374787dc28157fd3ab186ffda0080ed10d87",
+            "loaded": "450a94506486e5461cbf2a8e890e374787dc28157fd3ab186ffda0080ed10d87",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": false,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": false,
+          "gameInputUnavailableDiagnosticPresent": false
+        },
+        {
+          "backend": "vulkan",
+          "profileVersion": 2,
+          "sessionId": "bfca9884349246a0a875b7e64023af39",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90",
+            "binaryFormat": "spirv",
+            "binaryHash": "5e6aaa868ab1648f8d1a68fe1142cfafdf54a0585753b9576d80bdef5705d83b",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v2\\ShaderCache\\spirv\\d3\\79\\d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc.ps.spv",
+            "buildKey": "d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v2\\ShaderCache\\spirv\\d3\\79\\d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc.ps.spv.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "71f2be6ce7a89223c97d3feb90db98297b981e93533ade3e1e02c376e468e1b8",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v2\\ShaderArtifacts\\a7\\ac\\a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\state-vulkan-v2\\ShaderArtifacts\\a7\\ac\\a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-vulkan13"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "64afd7a374b743922fa8546112d7d363f795527654db69c9bac40d7d6960c896",
+            "loaded": "64afd7a374b743922fa8546112d7d363f795527654db69c9bac40d7d6960c896",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "4b953d7c9ac0f199d749f99f044f1afcab3a81f55d10dc29a3a2067a7aed337a",
+            "loaded": "4b953d7c9ac0f199d749f99f044f1afcab3a81f55d10dc29a3a2067a7aed337a",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": false,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": false,
+          "gameInputUnavailableDiagnosticPresent": false
+        }
+      ],
+      "publication": {
+        "outcome": "published",
+        "environmentRoot": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\environment",
+        "environmentId": "sha256:67f15515342d5411fce12ea1f3ec836990150646e77c3070254fe0745873bda6"
+      },
+      "duplicatePublication": {
+        "outcome": "already-present",
+        "environmentRoot": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\environment",
+        "environmentId": "sha256:67f15515342d5411fce12ea1f3ec836990150646e77c3070254fe0745873bda6"
+      },
+      "unavailableSourcePaths": [
+        "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\source\\Shaders\\Programs\\ShaderGraphPreview\\descriptor.json",
+        "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\source\\Build\\Output\\x64\\Selected\\gglab-shaderc.exe"
+      ],
+      "finalExecutables": {
+        "gglab-shaderc.exe": {
+          "path": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\environment\\payload\\gglab-shaderc.exe",
+          "sha256": "1e0f4274af1d69b4700285d5fce760df696bb23ae4622d0a47ce2fd3d8972586"
+        },
+        "GraphicsGadgetLab.exe": {
+          "path": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ7\\environment\\payload\\GraphicsGadgetLab.exe",
+          "sha256": "6798dbb012d2d3c0ac13fedb01f605ddd6ed64cbda3fb4ffa119c0eca569f725"
+        }
+      },
+      "describe": {
+        "command": "describe",
+        "compilePolicyRevision": 1,
+        "diagnostics": [],
+        "exitCode": 0,
+        "processContractVersion": 2,
+        "producerIdentity": "1.9+5402.0d3ee6b5",
+        "producerKind": "dxc",
+        "status": "ok",
+        "success": true,
+        "supportedTargets": [
+          "gglab-dx12",
+          "gglab-vulkan13"
+        ],
+        "toolIdentity": "gglab-shaderc",
+        "toolVersion": "1.3.0"
+      },
+      "describe-preview": {
+        "command": "describe-preview",
+        "compilePolicyRevision": 1,
+        "diagnostics": [],
+        "exitCode": 0,
+        "previewActivePublicationSchemaVersion": 1,
+        "previewBuildContractVersion": 1,
+        "previewObservationSchemaVersion": 1,
+        "previewProgramDescriptorIdentity": "3bcb22e27e7c2edeaf67dcb25d531cc89dbc443a8b5f19efe4d6885f32a5f8ad",
+        "previewProgramDescriptorVersion": 1,
+        "previewPublicationSchemaVersion": 1,
+        "processContractVersion": 2,
+        "producerIdentity": "1.9+5402.0d3ee6b5",
+        "producerKind": "dxc",
+        "status": "ok",
+        "success": true,
+        "supportedPreviewInputContracts": [
+          {
+            "id": "gglab.preview-input.surface.numeric",
+            "profileId": "gglab.surface",
+            "profileVersion": 1
+          },
+          {
+            "id": "gglab.preview-input.surface.texture2d",
+            "profileId": "gglab.surface",
+            "profileVersion": 2
+          }
+        ],
+        "supportedTargets": [
+          "gglab-dx12",
+          "gglab-vulkan13"
+        ],
+        "toolIdentity": "gglab-shaderc",
+        "toolVersion": "1.3.0"
+      },
+      "success": true,
+      "configuration": "Release",
+      "rawEvidence": "Build/Output/EQ7/evidence.json"
+    },
+    {
+      "evidenceVersion": 1,
+      "sourceIsolation": "disposable-publication-source-mirror-renamed",
+      "originalCheckoutAccessDenied": false,
+      "native": [
+        {
+          "backend": "dx12",
+          "profileVersion": 1,
+          "sessionId": "ec6415a49445441885812528cf6c1043",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96",
+            "binaryFormat": "dxil",
+            "binaryHash": "491bc48ae92b0e032ce79e645ee3636fb54e7d9ce07f28ca7e55d39de3b8e43e",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v1\\ShaderCache\\dxil\\12\\8b\\128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0.ps.dxil",
+            "buildKey": "128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v1\\ShaderCache\\dxil\\12\\8b\\128b381c0ac059cc9e644f7b54f3b1cb3268d0d2c03a42cd85add256b104cfe0.ps.dxil.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "d0d412f4ac246b8903295373481ffb5a9adb3c4835c08612e61e885022016e3e",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v1\\ShaderArtifacts\\3b\\79\\3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v1\\ShaderArtifacts\\3b\\79\\3b795454f4054b2753878cc65df27bb8fefaa47f8141b51eeff307a692c69d96.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-dx12"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "e312cf0dd561df0439d659c9249e3e09ed6770d240673179c792fc7082f3fe50",
+            "loaded": "e312cf0dd561df0439d659c9249e3e09ed6770d240673179c792fc7082f3fe50",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "bc0b1789bb0bf81e805d7bdc358f74ffdeaf50fe8c5ed75e8a8a530d390c506d",
+            "loaded": "bc0b1789bb0bf81e805d7bdc358f74ffdeaf50fe8c5ed75e8a8a530d390c506d",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": true,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": null,
+          "gameInputUnavailableDiagnosticPresent": true
+        },
+        {
+          "backend": "dx12",
+          "profileVersion": 2,
+          "sessionId": "516678a054794e6185dfadb373b1cb46",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7",
+            "binaryFormat": "dxil",
+            "binaryHash": "75a423172be2e5e14d13894cf6d9f914bc090cef36c9ea518c372b90086bd19e",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v2\\ShaderCache\\dxil\\ef\\6a\\ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092.ps.dxil",
+            "buildKey": "ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v2\\ShaderCache\\dxil\\ef\\6a\\ef6a50928f0468e48efab36034c30e8bfcba1232b9833f4b4aa975af3f4e8092.ps.dxil.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "64fbf874ef11f0e20ac8772efb2884248b422ac292af19acf0b24c4b767664a7",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v2\\ShaderArtifacts\\2c\\dd\\2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-dx12-v2\\ShaderArtifacts\\2c\\dd\\2cdddc14f55b3e71719e8c8d633e78a6b2f3a3944f378b8d1137a5ba5bdcefe7.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-dx12"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "b1d58b7bd427bae78769773cf81bdd2bb56a7a858cc22db84d81086f8a6d23e9",
+            "loaded": "b1d58b7bd427bae78769773cf81bdd2bb56a7a858cc22db84d81086f8a6d23e9",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "ff4ef52c776f92500c0ac491187cd5f6354206ba9e5c9336f4edd432ac616f58",
+            "loaded": "ff4ef52c776f92500c0ac491187cd5f6354206ba9e5c9336f4edd432ac616f58",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": true,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": null,
+          "gameInputUnavailableDiagnosticPresent": true
+        },
+        {
+          "backend": "vulkan",
+          "profileVersion": 1,
+          "sessionId": "4d3f92c8e6ec4bd9a1d8b127400aca0a",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e",
+            "binaryFormat": "spirv",
+            "binaryHash": "308775cc251ab08a2f8e380313b4e78bbd50df8fb55f9c11be037108d5b54229",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v1\\ShaderCache\\spirv\\21\\57\\2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e.ps.spv",
+            "buildKey": "2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v1\\ShaderCache\\spirv\\21\\57\\2157962be20f2b5f8d4bf139b28b22360497db68ed71d5c8c80d45ddec6ca02e.ps.spv.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "dcb05616e3b50688a18ebeaafe72030d4f752e8dcd1a6e7f7e6fbcbede4d70be",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v1\\ShaderArtifacts\\c9\\b4\\c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v1\\ShaderArtifacts\\c9\\b4\\c9b47bc35c6e6504ecd0d0196edc0ff768dc88bdc550b1b0cbe0c9692c79557e.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-vulkan13"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "44407d59e880853ed57ec324c92d5b5a3c089d109fedf578d966f1489b98a6f8",
+            "loaded": "44407d59e880853ed57ec324c92d5b5a3c089d109fedf578d966f1489b98a6f8",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "450a94506486e5461cbf2a8e890e374787dc28157fd3ab186ffda0080ed10d87",
+            "loaded": "450a94506486e5461cbf2a8e890e374787dc28157fd3ab186ffda0080ed10d87",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": true,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": true,
+          "gameInputUnavailableDiagnosticPresent": true
+        },
+        {
+          "backend": "vulkan",
+          "profileVersion": 2,
+          "sessionId": "be89c8298b734a63b76f4618dd69a515",
+          "developmentToolsEnabled": true,
+          "ordinaryCompile": {
+            "artifactId": "a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90",
+            "binaryFormat": "spirv",
+            "binaryHash": "5e6aaa868ab1648f8d1a68fe1142cfafdf54a0585753b9576d80bdef5705d83b",
+            "binaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v2\\ShaderCache\\spirv\\d3\\79\\d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc.ps.spv",
+            "buildKey": "d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc",
+            "cacheRecordPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v2\\ShaderCache\\spirv\\d3\\79\\d379c5bfcefa4216a10da14783d83783438fe191c277b4e33f3dd5f4efc2cecc.ps.spv.json",
+            "command": "compile",
+            "diagnostics": [],
+            "exitCode": 0,
+            "fromCache": false,
+            "recipeId": "71f2be6ce7a89223c97d3feb90db98297b981e93533ade3e1e02c376e468e1b8",
+            "runtimeArtifactBinaryPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v2\\ShaderArtifacts\\a7\\ac\\a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90.ggsh.bin",
+            "runtimeArtifactManifestPath": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\state-vulkan-v2\\ShaderArtifacts\\a7\\ac\\a7ac79a732d7b5ab044711a3ce37412963bcba2503a91a46360a8fbc57c5ca90.ggsh.manifest",
+            "status": "ok",
+            "success": true,
+            "target": "gglab-vulkan13"
+          },
+          "initialObservation": {
+            "attempt": 1,
+            "observed": "64afd7a374b743922fa8546112d7d363f795527654db69c9bac40d7d6960c896",
+            "loaded": "64afd7a374b743922fa8546112d7d363f795527654db69c9bac40d7d6960c896",
+            "status": 1,
+            "rejection": 0
+          },
+          "failedBuild": {
+            "exitCode": 4,
+            "lastGoodPointerPreserved": true,
+            "lastGoodObservationPreserved": true
+          },
+          "recoveryObservation": {
+            "attempt": 3,
+            "observed": "4b953d7c9ac0f199d749f99f044f1afcab3a81f55d10dc29a3a2067a7aed337a",
+            "loaded": "4b953d7c9ac0f199d749f99f044f1afcab3a81f55d10dc29a3a2067a7aed337a",
+            "status": 1,
+            "rejection": 0
+          },
+          "success": true,
+          "immutableClosurePreserved": true,
+          "validationErrors": 0,
+          "validationWarnings": 0,
+          "platformInputUnavailable": true,
+          "runtimeErrors": [],
+          "firstProductionFrame": true,
+          "vulkanValidationEnabled": true,
+          "gameInputUnavailableDiagnosticPresent": true
+        }
+      ],
+      "publication": {
+        "outcome": "published",
+        "environmentRoot": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\environment",
+        "environmentId": "sha256:50127ee6dcb1218bd29c8a115a35ef670872be00f4f1bca8386109854b34f34c"
+      },
+      "duplicatePublication": {
+        "outcome": "already-present",
+        "environmentRoot": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\environment",
+        "environmentId": "sha256:50127ee6dcb1218bd29c8a115a35ef670872be00f4f1bca8386109854b34f34c"
+      },
+      "unavailableSourcePaths": [
+        "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\source\\Shaders\\Programs\\ShaderGraphPreview\\descriptor.json",
+        "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\source\\Build\\Output\\x64\\Selected\\gglab-shaderc.exe"
+      ],
+      "finalExecutables": {
+        "gglab-shaderc.exe": {
+          "path": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\environment\\payload\\gglab-shaderc.exe",
+          "sha256": "24835370b732ce509399e4824b941b56f3c7649ba39f3bba79921414a0668ae4"
+        },
+        "GraphicsGadgetLab.exe": {
+          "path": "D:\\Grezzo\\Ruisong\\GraphicsGadgetLab\\Build\\Output\\EQ8\\environment\\payload\\GraphicsGadgetLab.exe",
+          "sha256": "68f05b2d55aa8b564c18016d4694125298bfffbf2df98448c9036759206afa6e"
+        }
+      },
+      "describe": {
+        "command": "describe",
+        "compilePolicyRevision": 1,
+        "diagnostics": [],
+        "exitCode": 0,
+        "processContractVersion": 2,
+        "producerIdentity": "1.9+5402.0d3ee6b5",
+        "producerKind": "dxc",
+        "status": "ok",
+        "success": true,
+        "supportedTargets": [
+          "gglab-dx12",
+          "gglab-vulkan13"
+        ],
+        "toolIdentity": "gglab-shaderc",
+        "toolVersion": "1.3.0"
+      },
+      "describe-preview": {
+        "command": "describe-preview",
+        "compilePolicyRevision": 1,
+        "diagnostics": [],
+        "exitCode": 0,
+        "previewActivePublicationSchemaVersion": 1,
+        "previewBuildContractVersion": 1,
+        "previewObservationSchemaVersion": 1,
+        "previewProgramDescriptorIdentity": "3bcb22e27e7c2edeaf67dcb25d531cc89dbc443a8b5f19efe4d6885f32a5f8ad",
+        "previewProgramDescriptorVersion": 1,
+        "previewPublicationSchemaVersion": 1,
+        "processContractVersion": 2,
+        "producerIdentity": "1.9+5402.0d3ee6b5",
+        "producerKind": "dxc",
+        "status": "ok",
+        "success": true,
+        "supportedPreviewInputContracts": [
+          {
+            "id": "gglab.preview-input.surface.numeric",
+            "profileId": "gglab.surface",
+            "profileVersion": 1
+          },
+          {
+            "id": "gglab.preview-input.surface.texture2d",
+            "profileId": "gglab.surface",
+            "profileVersion": 2
+          }
+        ],
+        "supportedTargets": [
+          "gglab-dx12",
+          "gglab-vulkan13"
+        ],
+        "toolIdentity": "gglab-shaderc",
+        "toolVersion": "1.3.0"
+      },
+      "success": true,
+      "configuration": "Debug (GGLAB_USE_PCH=0)",
+      "rawEvidence": "Build/Output/EQ8/evidence.json"
+    }
+  ]
+}
