@@ -2169,6 +2169,21 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
 foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "AssetManagerPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_AssetManager\b|\bAssetManager\b|Diagnostics/AssetToolingControl\.h') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-asset-control-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "asset tooling must consume snapshots and public typed controls without the live AssetManager facade"
+        })
+    }
+}
+foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "EntityPanel.cpp"),
     (Join-Path $developGuiPanelsDir "EntityPanel.h")
 )) {

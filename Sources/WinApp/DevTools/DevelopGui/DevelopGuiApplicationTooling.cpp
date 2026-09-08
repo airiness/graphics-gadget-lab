@@ -96,7 +96,7 @@ namespace gglab
 				guiContext.m_World = context.m_World;
 				guiContext.m_DirectionalLight = context.m_DirectionalLight;
 				guiContext.m_DirectionalLightControl = context.m_DirectionalLightControl;
-				guiContext.m_AssetManager = context.m_AssetManager;
+				guiContext.m_AssetControl = context.m_AssetControl;
 				guiContext.m_EnvironmentSelectionControl =
 					context.m_EnvironmentSelectionControl;
 				guiContext.m_Diagnostics = context.m_Diagnostics;

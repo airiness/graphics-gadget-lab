@@ -13,7 +13,7 @@ namespace gglab
 	class CameraRenderViewQueryBase;
 	class DX12ResourceLifecycleViewBase;
 	class DX12ResourceLifecycleControlBase;
-	class AssetManager;
+	class AssetToolingControlBase;
 	class EnvironmentSelectionControlBase;
 	class EnvironmentLightingControlBase;
 	class EnvironmentLightingViewBase;
@@ -43,7 +43,7 @@ namespace gglab
 		World* m_World = nullptr;
 		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
 		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
-		AssetManager* m_AssetManager = nullptr;
+		AssetToolingControlBase* m_AssetControl = nullptr;
 		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;
 		DiagnosticsControl* m_DiagnosticsControl = nullptr;

@@ -1,4 +1,5 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "GGLabRuntime/Graphics/Asset/AssetToolingControlBase.h"
 #include "Diagnostics/DirectionalLightTooling.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -101,6 +102,19 @@ namespace gglab
 	static_assert(!DirectionalLightControl<DirectionalLightViewBase>);
 	static_assert(!DirectionalLightQuery<DirectionalLightControlBase>);
 	static_assert(DirectionalLightControl<DirectionalLightControlBase>);
+
+	template <typename T>
+	concept AssetToolingSubmission = requires(T& value, const std::filesystem::path& path) {
+		{ value.LoadModelAsync(path) } -> std::same_as<ModelLoadReceipt>;
+		{ value.LoadTextureAsync(path, TextureSemantic::Normal) } -> std::same_as<TextureLoadReceipt>;
+		{ value.ClearTextureDerivedDataCache() } -> std::same_as<bool>;
+	};
+
+	template <typename T>
+	concept LiveModelAccess = requires(const T& value) { value.GetModel(ModelID{}); };
+
+	static_assert(AssetToolingSubmission<AssetToolingControlBase>);
+	static_assert(!LiveModelAccess<AssetToolingControlBase>);
 
 	namespace
 	{

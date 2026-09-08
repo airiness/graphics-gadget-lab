@@ -6,7 +6,7 @@
 namespace gglab
 {
 	class ApplicationToolingIntegrationBase;
-	class AssetManager;
+	class AssetToolingControlBase;
 	class CameraRig;
 	class DebugDrawSystem;
 	class DiagnosticsControl;
@@ -48,7 +48,7 @@ namespace gglab
 		World* m_World = nullptr;
 		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
 		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
-		AssetManager* m_AssetManager = nullptr;
+		AssetToolingControlBase* m_AssetControl = nullptr;
 		// Borrowed for Draw only; selection does not imply source publication.
 		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
 		DiagnosticsView* m_Diagnostics = nullptr;

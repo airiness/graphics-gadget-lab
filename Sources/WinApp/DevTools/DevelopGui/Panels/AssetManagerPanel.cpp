@@ -6,7 +6,11 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/RHIText.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetToolingControlBase.h"
+#include <array>
+#include <filesystem>
+#include <format>
+#include <string>
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
@@ -103,7 +107,7 @@ namespace gglab
 			}
 		}
 
-		void DrawModelAssets(AssetManager& assetManager, AssetManagerPanelState& state,
+		void DrawModelAssets(AssetToolingControlBase* control, AssetManagerPanelState& state,
 			const AssetSnapshot& assetSnapshot) noexcept
 		{
 			ImGui::PushID("Models");
@@ -111,20 +115,20 @@ namespace gglab
 			ImGui::InputText("glTF Path", state.m_ModelPath.data(), state.m_ModelPath.size());
 			ImGui::SameLine();
 			const bool hasPath = state.m_ModelPath[0] != '\0';
-			if (!hasPath)
+			if (!hasPath || !control)
 			{
 				ImGui::BeginDisabled();
 			}
-			if (ImGui::Button("Load Model"))
+			if (ImGui::Button("Load Model") && control)
 			{
 				const std::filesystem::path path(state.m_ModelPath.data());
-				const auto request = assetManager.LoadModelAsync(path);
+				const auto request = control->LoadModelAsync(path);
 				state.m_Status = request.IsValid()
 					? std::format("Queued model {} (task {}).",
-						request.m_ModelId.Value(), request.m_Task.m_Value)
+						request.m_ModelId.Value(), request.m_TaskId)
 					: "Failed to load model. Only .gltf is currently supported.";
 			}
-			if (!hasPath)
+			if (!hasPath || !control)
 			{
 				ImGui::EndDisabled();
 			}
@@ -159,11 +163,13 @@ namespace gglab
 				assetSnapshot.m_ModelImportArtifactEvictionCount,
 				static_cast<double>(assetSnapshot.m_ModelImportArtifactEvictedBytes) /
 				(1024.0 * 1024.0));
-			if (ImGui::Button("Clear Model Import CPU Cache"))
+			ImGui::BeginDisabled(!control);
+			if (ImGui::Button("Clear Model Import CPU Cache") && control)
 			{
-				assetManager.ClearModelImportArtifactCache();
+				control->ClearModelImportArtifactCache();
 				state.m_Status = "Model import CPU artifact cache cleared.";
 			}
+			ImGui::EndDisabled();
 			ImGui::SeparatorText("Loaded Models");
 			ImGui::Text("%u models", static_cast<uint32_t>(models.size()));
 
@@ -251,7 +257,7 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawTextureAssets(AssetManager& assetManager, AssetManagerPanelState& state,
+		void DrawTextureAssets(AssetToolingControlBase* control, AssetManagerPanelState& state,
 			const AssetSnapshot& assetSnapshot) noexcept
 		{
 			ImGui::PushID("Textures");
@@ -279,22 +285,22 @@ namespace gglab
 			}
 
 			const bool hasPath = state.m_TexturePath[0] != '\0';
-			if (!hasPath)
+			if (!hasPath || !control)
 			{
 				ImGui::BeginDisabled();
 			}
-			if (ImGui::Button("Load Texture"))
+			if (ImGui::Button("Load Texture") && control)
 			{
 				const std::filesystem::path path(state.m_TexturePath.data());
 				const TextureSemantic semantic =
 					TextureSemantics[static_cast<size_t>(state.m_TextureSemanticIndex)];
-				const auto request = assetManager.LoadTextureAsync(path, semantic);
+				const auto request = control->LoadTextureAsync(path, semantic);
 				state.m_Status = request.IsValid()
 					? std::format("Queued texture {} (task {}).",
-						request.m_TextureId.Value(), request.m_Task.m_Value)
+						request.m_TextureId.Value(), request.m_TaskId)
 					: "Failed to load texture.";
 			}
-			if (!hasPath)
+			if (!hasPath || !control)
 			{
 				ImGui::EndDisabled();
 			}
@@ -327,11 +333,13 @@ namespace gglab
 				assetSnapshot.m_TextureArtifactEvictionCount,
 				static_cast<double>(assetSnapshot.m_TextureArtifactEvictedBytes) /
 				(1024.0 * 1024.0));
-			if (ImGui::Button("Clear Texture CPU Cache"))
+			ImGui::BeginDisabled(!control);
+			if (ImGui::Button("Clear Texture CPU Cache") && control)
 			{
-				assetManager.ClearTextureArtifactCache();
+				control->ClearTextureArtifactCache();
 				state.m_Status = "Texture CPU artifact cache cleared.";
 			}
+			ImGui::EndDisabled();
 			ImGui::SeparatorText("Texture Local DDC");
 			const uint64_t ddcLookupCount = assetSnapshot.m_TextureDerivedDataHitCount +
 				assetSnapshot.m_TextureDerivedDataMissCount;
@@ -396,13 +404,15 @@ namespace gglab
 			ImGui::Text("Shared failures: %llu | Cancelled participants: %llu",
 				assetSnapshot.m_TextureDerivedDataBuildFailureCount,
 				assetSnapshot.m_TextureDerivedDataCancelledWaiterCount);
-			if (ImGui::Button("Clear Texture Local DDC"))
+			ImGui::BeginDisabled(!control);
+			if (ImGui::Button("Clear Texture Local DDC") && control)
 			{
 				state.m_Status =
-					assetManager.ClearTextureDerivedDataCache()
+					control->ClearTextureDerivedDataCache()
 					? "Texture local DDC cleared."
 					: "Texture local DDC clear failed; existing data was preserved.";
 			}
+			ImGui::EndDisabled();
 			ImGui::SeparatorText("Loaded Textures");
 			ImGui::Text("%u textures", static_cast<uint32_t>(textures.size()));
 
@@ -972,12 +982,6 @@ namespace gglab
 
 	void AssetManagerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_AssetManager)
-		{
-			ImGui::TextUnformatted("No AssetManager bound in DevelopGuiContext.");
-			return;
-		}
-
 		auto& state = context.PanelState<AssetManagerPanelState>();
 		const auto* snapshot =
 			context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<AssetSnapshot>() : nullptr;
@@ -1049,12 +1053,12 @@ namespace gglab
 		{
 			if (ImGui::BeginTabItem("Models"))
 			{
-				DrawModelAssets(*context.m_AssetManager, state, *snapshot);
+				DrawModelAssets(context.m_AssetControl, state, *snapshot);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Textures"))
 			{
-				DrawTextureAssets(*context.m_AssetManager, state, *snapshot);
+				DrawTextureAssets(context.m_AssetControl, state, *snapshot);
 				ImGui::EndTabItem();
 			}
 			if (ImGui::BeginTabItem("Meshes"))
