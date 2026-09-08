@@ -9,7 +9,6 @@
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
-#include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
@@ -437,18 +436,20 @@ namespace gglab
 		}
 
 		void DrawModelComponent(
-			const components::ModelComponent& model, const AssetManager* assetManager) noexcept
+			const components::ModelComponent& model, const AssetSnapshot* assetSnapshot) noexcept
 		{
 			ImGui::PushID("Component.Model");
 			if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				ImGui::Text("ModelID: %u", model.m_ModelId.Value());
-				if (assetManager)
+				if (assetSnapshot)
 				{
-					if (const auto* asset = assetManager->GetModel(model.m_ModelId))
+					const auto asset = std::find_if(assetSnapshot->m_Models.begin(),
+						assetSnapshot->m_Models.end(),
+						[&](const AssetSnapshot::Model& entry) { return entry.m_Id == model.m_ModelId; });
+					if (asset != assetSnapshot->m_Models.end())
 					{
-						ImGui::Text("Mesh Instances: %u",
-							static_cast<uint32_t>(asset->m_MeshInstance.size()));
+						ImGui::Text("Mesh Instances: %u", asset->m_MeshInstanceCount);
 						const std::string name = utils::StringIdToString(asset->m_Name);
 						if (!name.empty())
 						{
@@ -458,8 +459,12 @@ namespace gglab
 					else
 					{
 						ImGui::TextColored(
-							devtools::style::NoticeTextColor, "Model asset is not loaded.");
+							devtools::style::NoticeTextColor, "Model asset is not present in the current snapshot.");
 					}
+				}
+				else
+				{
+					ImGui::TextDisabled("Asset diagnostics snapshot is not available.");
 				}
 				ImGui::TextDisabled("Model assignment is read-only in this panel for now.");
 			}
@@ -467,7 +472,7 @@ namespace gglab
 		}
 
 		void DrawAddComponentButton(entt::registry& registry, entt::entity entity,
-			AssetManager* assetManager, const AssetSnapshot* assetSnapshot) noexcept
+			const AssetSnapshot* assetSnapshot) noexcept
 		{
 			ImGui::PushID("AddComponent");
 			if (ImGui::Button("+"))
@@ -492,9 +497,9 @@ namespace gglab
 				{
 					ImGui::MenuItem("Model", nullptr, false, false);
 				}
-				else if (!assetManager || !assetSnapshot)
+				else if (!assetSnapshot)
 				{
-					ImGui::MenuItem("Model", "No AssetManager", false, false);
+					ImGui::MenuItem("Model", "No asset snapshot", false, false);
 				}
 				else if (ImGui::BeginMenu("Model"))
 				{
@@ -519,7 +524,7 @@ namespace gglab
 		}
 
 		void DrawSelectedEntity(entt::registry& registry, EntityPanelState& state,
-			AssetManager* assetManager, const AssetSnapshot* assetSnapshot) noexcept
+			const AssetSnapshot* assetSnapshot) noexcept
 		{
 			if (state.m_SelectedEntity == entt::null || !registry.valid(state.m_SelectedEntity))
 			{
@@ -532,7 +537,7 @@ namespace gglab
 			ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
 			ImGui::Text("Entity %u", entt::to_integral(entity));
 			ImGui::SameLine();
-			DrawAddComponentButton(registry, entity, assetManager, assetSnapshot);
+			DrawAddComponentButton(registry, entity, assetSnapshot);
 			ImGui::SameLine();
 			if (ImGui::Button("Delete Entity"))
 			{
@@ -586,7 +591,7 @@ namespace gglab
 
 			if (const auto* model = registry.try_get<components::ModelComponent>(entity))
 			{
-				DrawModelComponent(*model, assetManager);
+				DrawModelComponent(*model, assetSnapshot);
 			}
 
 			ImGui::PopID();
@@ -632,7 +637,7 @@ namespace gglab
 			const auto* assetSnapshot = context.m_Diagnostics
 				? context.m_Diagnostics->GetSnapshot<AssetSnapshot>()
 				: nullptr;
-			DrawSelectedEntity(registry, state, context.m_AssetManager, assetSnapshot);
+			DrawSelectedEntity(registry, state, assetSnapshot);
 
 			ImGui::EndTable();
 		}

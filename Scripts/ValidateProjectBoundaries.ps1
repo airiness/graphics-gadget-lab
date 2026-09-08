@@ -2169,6 +2169,19 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
 foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "EntityPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "EntityPanel.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_AssetManager\b|\bAssetManager\b|\bGetModel\s*\(') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-entity-model-snapshot-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "entity model inspection and assignment choices must consume asset snapshots without live AssetManager access"
+        })
+    }
+}
+foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.h")
 )) {
