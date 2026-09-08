@@ -56,6 +56,19 @@ namespace gglab
 			"Executable directory preserves artifact and derived-data roots without authoring paths");
 		context.Check(!BuildRuntimePaths("relative/runtime").IsValid(),
 			"Host path translation rejects a relative executable directory");
+		const auto stateRoot = runtimeRoot.parent_path() / "gglab-writable-state";
+		const auto isolatedPaths = BuildRuntimePaths(executableDirectory, stateRoot);
+		context.Check(isolatedPaths.m_RuntimeRoot == paths.m_RuntimeRoot &&
+			isolatedPaths.m_AssetRoot == paths.m_AssetRoot &&
+			isolatedPaths.m_ShaderArtifactRoot == stateRoot / "ShaderArtifacts" &&
+			isolatedPaths.m_IblDerivedDataRoot == stateRoot / "DerivedDataCache" / "IBL" &&
+			isolatedPaths.m_SettingsRoot == stateRoot / "Settings",
+			"Explicit writable state leaves deployed input roots unchanged");
+		context.Check(!BuildRuntimePaths(executableDirectory, "relative/state").IsValid(),
+			"Host path translation rejects a relative state directory");
+		context.Check(!BuildRuntimePaths(executableDirectory, executableDirectory / "state").IsValid() &&
+			!BuildRuntimePaths(executableDirectory, executableDirectory.parent_path()).IsValid(),
+			"Writable state cannot overlap immutable deployment inputs in either direction");
 
 		AppRuntimeConfig invalidAdapterConfig = config;
 		invalidAdapterConfig.m_RhiBackend = AppRuntimeRHIBackend::DX12;

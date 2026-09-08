@@ -1,0 +1,11 @@
+{
+  "bootstrapVersion": 1,
+  "publisher": "Scripts/Environment/publish_environment.py",
+  "interpreter": "python",
+  "minimumPythonVersion": "3.12",
+  "transport": "single-utf8-json-stdin-stdout",
+  "requestVersions": [1],
+  "resultVersions": [1],
+  "defaultSearchRoots": ["Build/Output"],
+  "contractStatus": "implemented-pending-owner-review"
+}
