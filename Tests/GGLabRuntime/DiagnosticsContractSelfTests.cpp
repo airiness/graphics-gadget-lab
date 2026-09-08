@@ -1,4 +1,5 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include <limits>
@@ -177,6 +178,43 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			RenderView source;
+			source.m_ViewId = RenderViewID::DirectionalShadow;
+			source.m_Width = 2048;
+			source.m_CameraPosition = Vector3(1.0f, 2.0f, 3.0f);
+			source.m_IsValid = true;
+			DiagnosticsRuntime viewDiagnostics;
+			RegisterBuiltinSnapshotProviders(viewDiagnostics);
+			context.Check(viewDiagnostics.GetSnapshot<RenderViewSnapshot>() == nullptr,
+				"Render view diagnostics require an open frame for initial capture");
+			viewDiagnostics.BeginFrame({ .m_RenderViews = std::span<RenderView>(&source, 1) });
+			const auto* publication = viewDiagnostics.GetSnapshot<RenderViewSnapshot>();
+			const auto* shadow = publication ? publication->FindView(RenderViewID::DirectionalShadow) : nullptr;
+			context.Check(shadow && shadow != &source && shadow->m_Width == 2048 &&
+				shadow->m_CameraPosition.m_Y == 2.0f && shadow->m_IsValid &&
+				!publication->FindView(RenderViewID::Main),
+				"Render view publication owns values and resolves sparse views by identity");
+			source.m_Width = 1024;
+			source.m_CameraPosition = Vector3::Zero;
+			viewDiagnostics.EndFrame();
+			const auto* retained = viewDiagnostics.GetSnapshot<RenderViewSnapshot>();
+			context.Check(retained && retained->FindView(RenderViewID::DirectionalShadow) &&
+				retained->FindView(RenderViewID::DirectionalShadow)->m_Width == 2048 &&
+				retained->FindView(RenderViewID::DirectionalShadow)->m_CameraPosition.m_Y == 2.0f,
+				"Closed render view publication does not observe later source mutations");
+			viewDiagnostics.BeginFrame({ .m_RenderViews = std::span<RenderView>(&source, 1) });
+			const auto* updated = viewDiagnostics.GetSnapshot<RenderViewSnapshot>();
+			context.Check(updated && updated->FindView(RenderViewID::DirectionalShadow) &&
+				updated->FindView(RenderViewID::DirectionalShadow)->m_Width == 1024,
+				"Render view diagnostics refresh from the next borrowed frame");
+			viewDiagnostics.EndFrame();
+			viewDiagnostics.BeginFrame({});
+			const auto* empty = viewDiagnostics.GetSnapshot<RenderViewSnapshot>();
+			context.Check(empty && empty->m_Views.empty(),
+				"An empty frame removes obsolete render view observations");
+			viewDiagnostics.EndFrame();
+		}
 		{
 			RenderQueue queue;
 			queue.m_ViewId = RenderViewID::Main;

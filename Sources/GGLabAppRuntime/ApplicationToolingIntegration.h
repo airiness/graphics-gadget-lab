@@ -26,7 +26,6 @@ namespace gglab
 	class World;
 	struct DebugDrawFrameView;
 	struct LoadingProgress;
-	struct RenderView;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
 
@@ -45,7 +44,6 @@ namespace gglab
 	{
 		CameraRig* m_CameraRig = nullptr;
 		World* m_World = nullptr;
-		std::span<RenderView> m_RenderViews;
 		AssetManager* m_AssetManager = nullptr;
 		// Borrowed for Draw only; selection does not imply source publication.
 		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;

@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TaskSystemSnapshot.h"
 
+#include <algorithm>
 #include <cctype>
 #include <numeric>
 

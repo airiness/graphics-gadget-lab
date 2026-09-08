@@ -1533,6 +1533,27 @@ namespace gglab
 			}
 			context.Check(locationsAreExplicit,
 				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
+			const auto shadowInput = BuildRHIVertexInputLayoutDesc(
+				InputLayoutID::MeshPositionUVs, ShaderBinaryFormat::SpirV);
+			context.Check(shadowInput.m_AttributeCount == 3 && shadowInput.m_VertexBufferCount == 1 &&
+				shadowInput.m_VertexBuffers[0].m_StrideInBytes == 56 &&
+				shadowInput.m_Attributes[0].m_AlignedByteOffset == 0 &&
+				shadowInput.m_Attributes[1].m_AlignedByteOffset == 24 &&
+				shadowInput.m_Attributes[2].m_AlignedByteOffset == 32 &&
+				shadowInput.m_Attributes[0].m_Location == 0 &&
+				shadowInput.m_Attributes[1].m_Location == 2 &&
+				shadowInput.m_Attributes[2].m_Location == 3 &&
+				shadowInput.m_Attributes[1].m_SemanticIndex == 0 &&
+				shadowInput.m_Attributes[2].m_SemanticIndex == 1,
+				"Shadow mesh input omits unused normal/tangent without repacking vertices or UV semantics");
+			GraphicsPhysicalPipelineKey shadowRecipe;
+			shadowRecipe.m_InputLayoutId = InputLayoutID::MeshPositionUVs;
+			const auto dxilShadow = BuildRHIGraphicsPipelineDesc(shadowRecipe, ShaderBinaryFormat::Dxil);
+			const auto spirvShadow = BuildRHIGraphicsPipelineDesc(shadowRecipe, ShaderBinaryFormat::SpirV);
+			context.Check(dxilShadow.m_VertexInput.m_AttributeCount == 5 &&
+				spirvShadow.m_VertexInput.m_AttributeCount == 3 &&
+				dxilShadow.m_VertexInput.m_VertexBuffers[0].m_StrideInBytes == 56,
+				"Shadow pipeline lowering preserves the full DXIL signature and prunes only SPIR-V inputs");
 
 			RHIRenderingSignature renderingSignature{};
 			renderingSignature.m_ColorFormats[0] = RHIFormat::R8G8B8A8Unorm;

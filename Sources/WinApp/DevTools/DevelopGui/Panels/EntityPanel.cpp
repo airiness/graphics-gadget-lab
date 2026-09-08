@@ -11,6 +11,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>
@@ -45,24 +46,6 @@ namespace gglab
 			bool m_Selected = false;
 			bool m_Hovered = false;
 		};
-
-		[[nodiscard]] const RenderView* FindRenderView(
-			std::span<const RenderView> views, RenderViewID viewId) noexcept
-		{
-			const size_t index = utils::ToIndex(viewId);
-			if (index < views.size() && views[index].m_ViewId == viewId)
-			{
-				return &views[index];
-			}
-			for (const RenderView& view : views)
-			{
-				if (view.m_ViewId == viewId)
-				{
-					return &view;
-				}
-			}
-			return nullptr;
-		}
 
 		[[nodiscard]] bool PassesFilter(const entt::registry& registry, entt::entity entity,
 			EntityComponentFilter filter) noexcept
@@ -654,7 +637,9 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
+		const auto* views = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
 		DrawEntityWorldLinks(registry, state, std::span<const EntityListItemAnchor>(entityAnchors),
-			FindRenderView(context.m_RenderViews, RenderViewID::Main));
+			views ? views->FindView(RenderViewID::Main) : nullptr);
 	}
 }

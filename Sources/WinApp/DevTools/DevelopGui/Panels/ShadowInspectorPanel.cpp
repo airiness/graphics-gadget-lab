@@ -9,6 +9,7 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
@@ -81,17 +82,6 @@ namespace gglab
 			}
 
 			return binding;
-		}
-
-		static const RenderView* FindRenderView(
-			std::span<RenderView> views, RenderViewID viewId) noexcept
-		{
-			const auto index = utils::ToIndex(viewId);
-			if (index >= views.size())
-			{
-				return nullptr;
-			}
-			return &views[index];
 		}
 
 		static void DrawLightControl(DevelopGuiContext& context) noexcept
@@ -227,8 +217,9 @@ namespace gglab
 		{
 			ImGui::SeparatorText("Shadow Camera / Frustum");
 
-			const RenderView* shadowView =
-				FindRenderView(context.m_RenderViews, RenderViewID::DirectionalShadow);
+			const auto* views = context.m_Diagnostics
+				? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
+			const RenderView* shadowView = views ? views->FindView(RenderViewID::DirectionalShadow) : nullptr;
 			if (!shadowView)
 			{
 				ImGui::TextColored(devtools::style::ErrorTextColor,

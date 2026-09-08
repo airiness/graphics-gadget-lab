@@ -1736,6 +1736,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderQueueSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderViewSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>

@@ -173,7 +173,7 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::DirectionalShadowMapPixel);
 
 			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
-			m_BaseRecipe.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			m_BaseRecipe.m_InputLayoutId = InputLayoutID::MeshPositionUVs;
 			m_BaseRecipe.m_VSId = vsId;
 			// The opaque shadow bucket is depth-only and has no pixel shader.
 			// Assign ShaderID::Invalid() explicitly: a bare "= {}" would zero-initialize

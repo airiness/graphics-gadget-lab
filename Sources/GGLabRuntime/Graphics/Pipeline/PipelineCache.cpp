@@ -48,7 +48,7 @@ namespace gglab
 		}
 
 		RHIGraphicsPipelineCreateInfo createInfo{};
-		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(physicalKey);
+		createInfo.m_Desc = BuildRHIGraphicsPipelineDesc(physicalKey, shaderSnapshots[0].m_Bytecode.m_Format);
 		createInfo.m_VertexShader = shaderSnapshots[0].m_Bytecode;
 		createInfo.m_PixelShader = shaderSnapshots[1].m_Bytecode;
 		createInfo.m_DomainShader = shaderSnapshots[2].m_Bytecode;

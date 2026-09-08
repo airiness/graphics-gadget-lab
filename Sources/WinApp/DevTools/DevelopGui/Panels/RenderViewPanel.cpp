@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 
 #include <algorithm>
 #include <string>
@@ -186,10 +187,10 @@ namespace gglab
 		}
 
 		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context,
-			std::span<const RenderQueueEntrySnapshot> queues) noexcept
+			std::span<const RenderQueueEntrySnapshot> queues, std::span<const RenderView> views) noexcept
 		{
 			ImGui::SeparatorText("RenderView Overview");
-			if (context.m_RenderViews.empty())
+			if (views.empty())
 			{
 				ImGui::TextDisabled("No RenderViews are available.");
 				return;
@@ -230,7 +231,7 @@ namespace gglab
 			ImGui::TableSetupScrollFreeze(0, 1);
 			ImGui::TableHeadersRow();
 
-			for (const RenderView& view : context.m_RenderViews)
+			for (const RenderView& view : views)
 			{
 				const auto* queue = FindRenderQueue(queues, view.m_ViewId);
 				const RenderQueueStatisticsSnapshot stats =
@@ -372,10 +373,11 @@ namespace gglab
 		}
 
 		void DrawSelectedRenderView(
-			RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+			RenderViewPanelState& state, const DevelopGuiContext& context,
+			std::span<const RenderView> views) noexcept
 		{
-			state.m_SelectedViewId = ResolveSelectedViewId(state, context.m_RenderViews);
-			const RenderView* view = FindRenderView(context.m_RenderViews, state.m_SelectedViewId);
+			state.m_SelectedViewId = ResolveSelectedViewId(state, views);
+			const RenderView* view = FindRenderView(views, state.m_SelectedViewId);
 			if (!view)
 			{
 				ImGui::TextDisabled("No RenderView selected.");
@@ -450,13 +452,17 @@ namespace gglab
 	void RenderViewPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<RenderViewPanelState>();
+		const auto* viewSnapshot = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
+		const auto views = viewSnapshot ? std::span<const RenderView>(viewSnapshot->m_Views)
+			: std::span<const RenderView>{};
 		const auto* snapshot = context.m_Diagnostics
 			? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
 		const auto queues = snapshot ? std::span<const RenderQueueEntrySnapshot>(snapshot->m_Queues)
 			: std::span<const RenderQueueEntrySnapshot>{};
-		DrawOverview(state, context, queues);
+		DrawOverview(state, context, queues, views);
 		ImGui::Spacing();
-		DrawSelectedRenderView(state, context);
+		DrawSelectedRenderView(state, context, views);
 		ImGui::Spacing();
 		DrawSelectedQueue(state, queues);
 	}

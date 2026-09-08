@@ -1,10 +1,12 @@
 #pragma once
 #include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 namespace gglab
 {
 	[[nodiscard]] RHIVertexInputLayoutDesc BuildRHIVertexInputLayoutDesc(
-		InputLayoutID inputLayoutId) noexcept;
+		InputLayoutID inputLayoutId, ShaderBinaryFormat vertexFormat = ShaderBinaryFormat::Dxil) noexcept;
 	[[nodiscard]] RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPhysicalPipelineKey& recipe) noexcept;
+		const GraphicsPhysicalPipelineKey& recipe,
+		ShaderBinaryFormat vertexFormat = ShaderBinaryFormat::Dxil) noexcept;
 }

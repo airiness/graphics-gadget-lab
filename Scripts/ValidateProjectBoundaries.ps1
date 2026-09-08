@@ -2170,6 +2170,23 @@ $resourceLifecyclePanelPaths = @(
 )
 foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "RenderViewPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "EntityPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_RenderViews\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-render-view-snapshot-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling render view inspection must consume owned diagnostics snapshots, not live frame views"
+        })
+    }
+}
+foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "RenderViewPanel.cpp"),
     (Join-Path $developGuiPanelsDir "LabPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
     (Join-Path $RootDir "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")

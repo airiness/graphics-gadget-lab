@@ -7,6 +7,7 @@
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
@@ -38,6 +39,17 @@ namespace gglab
 {
 	namespace
 	{
+		class RenderViewSnapshotProvider final : public TypedSnapshotProviderBase<RenderViewSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override { return "Render Views"; }
+			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<RenderViewSnapshot>();
+				snapshot.m_Views.assign(context.m_RenderViews.begin(), context.m_RenderViews.end());
+			}
+		};
+
 		class RenderQueueSnapshotProvider final : public TypedSnapshotProviderBase<RenderQueueSnapshot>
 		{
 		public:
@@ -322,6 +334,8 @@ namespace gglab
 
 	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
 	{
+		runtime.RegisterProvider(
+			std::make_unique<RenderViewSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<RenderQueueSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(

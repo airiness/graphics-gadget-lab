@@ -154,7 +154,8 @@ namespace gglab
 		}
 	}
 
-	RHIVertexInputLayoutDesc BuildRHIVertexInputLayoutDesc(InputLayoutID inputLayoutId) noexcept
+	RHIVertexInputLayoutDesc BuildRHIVertexInputLayoutDesc(
+		InputLayoutID inputLayoutId, ShaderBinaryFormat vertexFormat) noexcept
 	{
 		RHIVertexInputLayoutDesc desc{};
 		uint32_t offset = 0;
@@ -189,6 +190,7 @@ namespace gglab
 			SetVertexBufferLayout(desc, offset);
 			break;
 		case InputLayoutID::P3N3T2T2Tan4:
+		case InputLayoutID::MeshPositionUVs:
 			AddVertexAttribute(desc, "POSITION", 0, RHIFormat::R32G32B32Float, offset);
 			offset += Float3Size;
 			AddVertexAttribute(desc, "NORMAL", 0, RHIFormat::R32G32B32Float, offset);
@@ -200,6 +202,14 @@ namespace gglab
 			AddVertexAttribute(desc, "TANGENT", 0, RHIFormat::R32G32B32A32Float, offset);
 			offset += Float4Size;
 			SetVertexBufferLayout(desc, offset);
+			if (inputLayoutId == InputLayoutID::MeshPositionUVs && vertexFormat == ShaderBinaryFormat::SpirV)
+			{
+				// SPIR-V drops unused inputs; DXIL retains the complete declared signature.
+				// Preserve the mesh buffer stride, UV offsets and shader ABI locations.
+				desc.m_Attributes[1] = desc.m_Attributes[2];
+				desc.m_Attributes[2] = desc.m_Attributes[3];
+				desc.m_AttributeCount = 3;
+			}
 			break;
 		case InputLayoutID::P3C4:
 			AddVertexAttribute(desc, "POSITION", 0, RHIFormat::R32G32B32Float, offset);
@@ -216,7 +226,7 @@ namespace gglab
 	}
 
 	RHIGraphicsPipelineDesc BuildRHIGraphicsPipelineDesc(
-		const GraphicsPhysicalPipelineKey& recipe) noexcept
+		const GraphicsPhysicalPipelineKey& recipe, ShaderBinaryFormat vertexFormat) noexcept
 	{
 		RHIGraphicsPipelineDesc desc{};
 		desc.m_BindingLayout = recipe.m_BindingLayout;
@@ -225,7 +235,7 @@ namespace gglab
 		desc.m_DomainShader = ToRHIShaderHandle(recipe.m_DSId);
 		desc.m_HullShader = ToRHIShaderHandle(recipe.m_HSId);
 		desc.m_GeometryShader = ToRHIShaderHandle(recipe.m_GSId);
-		desc.m_VertexInput = BuildRHIVertexInputLayoutDesc(recipe.m_InputLayoutId);
+		desc.m_VertexInput = BuildRHIVertexInputLayoutDesc(recipe.m_InputLayoutId, vertexFormat);
 		desc.m_TopologyType = recipe.m_TopologyType;
 		desc.m_PrimitiveTopology = recipe.m_PrimitiveTopology;
 		desc.m_Rasterizer = ToRHIRasterizerDesc(recipe);
