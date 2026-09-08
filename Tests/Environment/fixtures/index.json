@@ -1,5 +1,6 @@
 {
   "fixtureVersion": 1,
+  "stagingCasesFile": "staging-cases.json",
   "purpose": "Synthetic strict-reader vectors; no native compatibility claim",
   "cases": [
     {

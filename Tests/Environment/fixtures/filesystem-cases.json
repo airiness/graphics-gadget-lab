@@ -1,5 +1,6 @@
 {
   "fixtureVersion": 1,
+  "stagingCasesFile": "staging-cases.json",
   "baseManifest": "valid.json",
   "materialization": "Write synthetic fixture; not executable followed by LF to every member path. Copy valid.json to environment.json.",
   "cases": [

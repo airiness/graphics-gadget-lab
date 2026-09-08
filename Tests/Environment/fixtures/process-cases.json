@@ -1,5 +1,6 @@
 {
   "fixtureVersion": 1,
+  "stagingCasesFile": "staging-cases.json",
   "cases": [
     {"request":{"requestVersion":2,"operation":"discover"},"error":"unsupported-version"},
     {"request":{"requestVersion":true,"operation":"verify"},"error":"unsupported-version"},

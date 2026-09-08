@@ -240,9 +240,14 @@ def validate_manifest(m):
     return m
 
 
+def is_staging_name(path):
+    # Windows aliases retain caller spelling through abspath; reservation must not.
+    return path.name.lower().startswith(".staging-")
+
+
 def verify(root, staging=False):
     root = plain_path(root)
-    require(staging or not root.name.startswith(".staging-"), "incomplete-publication", "Staging is not a usable Environment")
+    require(staging or not is_staging_name(root), "incomplete-publication", "Staging is not a usable Environment")
     plain_path(root / "environment.json")
     require((root / "environment.json").is_file(), "incomplete-publication", "Final manifest is absent")
     m = validate_manifest(parse((root / "environment.json").read_bytes()))
@@ -349,9 +354,9 @@ def provenance(repository, deployment):
 
 
 def publish(repository, deployment, destination, cancel=None):
-    repository, deployment = deployment_inputs(repository, deployment)
     destination = plain_path(destination)
-    require(not destination.name.startswith(".staging-"), "invalid-path", "Destination uses a reserved staging name")
+    require(not is_staging_name(destination), "invalid-path", "Destination uses a reserved staging name")
+    repository, deployment = deployment_inputs(repository, deployment)
     require(disjoint(destination, deployment) and disjoint(destination, repository / "Shaders")
             and disjoint(destination, repository / "Assets"), "invalid-path", "Destination overlaps inputs")
     check_cancel(cancel)

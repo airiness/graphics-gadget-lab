@@ -1,0 +1,38 @@
+{
+  "fixtureVersion": 1,
+  "purpose": "Synthetic staging reservation vectors; no native compatibility claim",
+  "baseManifest": "valid.json",
+  "memberUtf8": "synthetic fixture; not executable\n",
+  "materialization": "In an owned temporary root, copy baseManifest to environment.json and write memberUtf8 to every manifest member. Do not finalize or rename the staging directory.",
+  "physicalDirectory": ".staging-case",
+  "pathSpellings": [
+    ".staging-case",
+    ".STAGING-CASE",
+    ".StAgInG-CaSe"
+  ],
+  "requiresRealWindowsFilesystem": true,
+  "aliasAssertion": "Materialize physicalDirectory once; assert samefile for each pathSpelling. Do not create separate directories or mock path identity.",
+  "expected": {
+    "verify": {
+      "exitCode": 2,
+      "success": false,
+      "result": null,
+      "errorCode": "incomplete-publication"
+    },
+    "init-state": {
+      "exitCode": 2,
+      "success": false,
+      "result": null,
+      "errorCode": "incomplete-publication"
+    },
+    "publish": {
+      "exitCode": 2,
+      "success": false,
+      "result": null,
+      "errorCode": "invalid-path"
+    }
+  },
+  "publishSetup": "Use each spelling as destination, both existing and absent, with an absolute temporary repositoryRoot and deployment Build/Output/x64/Test. Rejection precedes deployment inspection, copying, native work and staging creation.",
+  "preservation": "Snapshot the entire temporary tree containing a separate valid finalized Environment and initialized state. Failed requests must preserve all paths and bytes. init-state must reject both fresh and existing stateRoot without writes.",
+  "finalizedControl": "Materialize a separate ordinary environment root; verify exits 0, success true, error null and returns the base manifest environmentId."
+}
