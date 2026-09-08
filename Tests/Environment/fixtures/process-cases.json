@@ -1,0 +1,10 @@
+{
+  "fixtureVersion": 1,
+  "cases": [
+    {"request":{"requestVersion":2,"operation":"discover"},"error":"unsupported-version"},
+    {"request":{"requestVersion":true,"operation":"verify"},"error":"unsupported-version"},
+    {"request":{"requestVersion":1,"operation":"unknown"},"error":"unsupported-operation"},
+    {"request":{"requestVersion":1,"operation":"verify","environmentRoot":"../escape"},"error":"invalid-path"},
+    {"request":{"requestVersion":1,"operation":"publish"},"error":"invalid-shape"}
+  ]
+}

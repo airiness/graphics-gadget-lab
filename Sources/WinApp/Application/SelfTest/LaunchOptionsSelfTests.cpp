@@ -21,6 +21,11 @@ namespace gglab
 				};
 
 			// --adapter requires an explicit --rhi vulkan.
+			context.Check(parse({ "--state-root", "C:/gglab-state" }).IsValid() &&
+				!parse({ "--state-root", "relative" }).IsValid() &&
+				!parse({ "--state-root" }).IsValid() &&
+				!parse({ "--state-root", "C:/one", "--state-root", "C:/two" }).IsValid(),
+				"Explicit state root accepts one absolute path and rejects malformed or duplicate options");
 			{
 				const auto result = parse({ "--adapter", "0" });
 				context.Check(!result.IsValid() && result.m_Error.find("--rhi vulkan") !=

@@ -1,0 +1,11 @@
+{
+  "fixtureVersion": 1,
+  "baseManifest": "valid.json",
+  "materialization": "Write synthetic fixture; not executable followed by LF to every member path. Copy valid.json to environment.json.",
+  "cases": [
+    {"name":"missing-file","mutation":"remove","path":"payload/gglab-shaderc.exe","error":"membership-mismatch"},
+    {"name":"hash-mismatch","mutation":"write","path":"payload/gglab-shaderc.exe","replacementUtf8":"corrupted","error":"hash-mismatch"},
+    {"name":"unlisted-file","mutation":"write","path":"unexpected.txt","replacementUtf8":"unlisted","error":"membership-mismatch"},
+    {"name":"incomplete","mutation":"remove","path":"environment.json","error":"incomplete-publication"}
+  ]
+}

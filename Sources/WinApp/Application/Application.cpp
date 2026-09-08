@@ -155,7 +155,7 @@ namespace gglab
 			.m_ActiveBackend = activeBackend,
 			.m_ShaderCompilerPath = m_RuntimePaths.m_RuntimeRoot / "gglab-shaderc.exe",
 			.m_ShaderSourceRoot = m_RuntimePaths.m_RuntimeRoot / "Shaders",
-			.m_ShaderCacheRoot = m_RuntimePaths.m_RuntimeRoot / "ShaderCache",
+			.m_ShaderCacheRoot = m_RuntimePaths.m_ShaderArtifactRoot.parent_path() / "ShaderCache",
 			.m_ArtifactRoot = m_RuntimePaths.m_ShaderArtifactRoot,
 		};
 #endif

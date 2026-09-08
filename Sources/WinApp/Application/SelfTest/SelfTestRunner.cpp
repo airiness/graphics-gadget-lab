@@ -196,8 +196,8 @@ namespace gglab
 #else
 		static_cast<void>(backend);
 		context.Check(runtimePaths.m_ShaderArtifactRoot ==
-			runtimePaths.m_RuntimeRoot / "ShaderArtifacts",
-			"Executable discovery composes the development artifact root independently of process CWD");
+			runtimePaths.m_IblDerivedDataRoot.parent_path().parent_path() / "ShaderArtifacts",
+			"Artifact and derived-data paths share the explicit writable root independently of process CWD");
 #endif
 
 		reporter.OnSuiteFinished(

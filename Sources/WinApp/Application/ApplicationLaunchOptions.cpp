@@ -50,6 +50,21 @@ namespace gglab
 				result.m_Options.m_StartWithAbsoluteMouse = true;
 				continue;
 			}
+			if (argument == "--state-root")
+			{
+				if (!result.m_Options.m_StateRoot.empty() || ++index >= arguments.size())
+				{
+					result.m_Error = "Option '--state-root' requires one absolute directory and may only be specified once.";
+					return result;
+				}
+				result.m_Options.m_StateRoot = std::filesystem::path(arguments[index]);
+				if (!result.m_Options.m_StateRoot.is_absolute())
+				{
+					result.m_Error = "Option '--state-root' requires an absolute directory.";
+					return result;
+				}
+				continue;
+			}
 			if (argument == "--no-devtools")
 			{
 				if (result.m_Options.m_DisableDevelopmentTools)
@@ -308,6 +323,7 @@ namespace gglab
 			"                                  lowercase hexadecimal session ID. Requires\n"
 			"                                  --lab gglab.lab.shader_graph_preview.\n"
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
+			"  --state-root <absolute-path>    Store artifacts, caches and settings outside deployed inputs.\n"
 			"  --no-devtools                   Disable optional desktop development tooling.\n"
 			"  --rhi <dx12|vulkan>             Select the RHI backend (default: dx12).\n"
 			"                                  Explicit 'vulkan' never falls back to DX12.\n"

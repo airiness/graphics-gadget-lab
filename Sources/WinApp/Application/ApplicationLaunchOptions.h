@@ -2,6 +2,7 @@
 #include "Graphics/RHI/RHITypes.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string>
@@ -22,6 +23,7 @@ namespace gglab
 		std::optional<std::string> m_StartupLabId;
 		std::optional<std::string> m_ShaderPreviewSessionId;
 		std::optional<std::string> m_SelfTestSelection;
+		std::filesystem::path m_StateRoot;
 		bool m_StartWithAbsoluteMouse = false;
 		bool m_DisableDevelopmentTools = false;
 
