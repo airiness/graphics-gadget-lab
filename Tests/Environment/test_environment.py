@@ -1,5 +1,6 @@
 """Producer contract tests. Synthetic closure fixtures do not qualify native readiness."""
 import copy
+import ctypes
 from concurrent.futures import ThreadPoolExecutor
 import importlib.util
 import json
@@ -214,6 +215,42 @@ class EnvironmentTests(unittest.TestCase):
                                          {"exitCode": 0, "success": True})
         self.assertEqual(response["result"]["environmentId"], manifest["environmentId"])
         self.assertEqual(snapshot(), before)
+
+    @unittest.skipUnless(os.name == "nt", "Requires Windows 8.3 filesystem aliases")
+    def test_windows_short_staging_aliases_use_final_filesystem_path(self):
+        vectors = self.staging_vectors()
+        stage = self.root.with_name(".staging-long-short-name-regression")
+        self.materialize_staging_vector(stage, vectors)
+        buffer = ctypes.create_unicode_buffer(32768)
+        count = ctypes.windll.kernel32.GetShortPathNameW(str(stage), buffer, len(buffer))
+        self.assertTrue(0 < count < len(buffer))
+        short = Path(buffer.value)
+        self.assertTrue(short.samefile(stage))
+        if short.name.casefold() == stage.name.casefold():
+            self.skipTest("Filesystem provides no distinct 8.3 staging basename")
+        self.assertEqual(p.plain_path(short), stage.resolve())
+        for alias in (stage, stage.with_name(stage.name.upper()), short):
+            with self.subTest(alias=str(alias)):
+                self.process_response({"requestVersion": 1, "operation": "verify", "environmentRoot": str(alias)}, vectors["expected"]["verify"])
+                for state in (self.root.with_name("absent-state"), self.root):
+                    self.process_response({"requestVersion": 1, "operation": "init-state", "environmentRoot": str(alias), "stateRoot": str(state)}, vectors["expected"]["init-state"])
+                self.process_response({"requestVersion": 1, "operation": "publish", "repositoryRoot": str(self.root), "deployment": "missing", "destination": str(alias), "cancelFile": None}, vectors["expected"]["publish"])
+                # Canonicalize existing ancestor aliases even for absent destinations.
+                absent = short.parent / "absent-parent" / ".STAGING-new"
+                with patch.object(p, "deployment_inputs") as inputs:
+                    self.rejects("invalid-path", lambda: p.publish(self.root, self.root, absent))
+                    inputs.assert_not_called()
+                self.assertFalse(absent.parent.exists())
+        final = stage.with_name("finalized-short-name-control")
+        stage.rename(final)
+        count = ctypes.windll.kernel32.GetShortPathNameW(str(final), buffer, len(buffer))
+        self.assertTrue(0 < count < len(buffer))
+        final_alias = Path(buffer.value)
+        self.assertTrue(final_alias.samefile(final))
+        self.assertEqual(p.verify(final_alias), p.verify(final))
+        state = self.root.with_name("final-control-state")
+        p.init_state(final_alias, state)
+        self.assertTrue((state / "state.json").is_file())
 
     def test_state_preserves_identity_and_refuses_overlap_or_overwrite(self):
         state = self.root.with_name("state")

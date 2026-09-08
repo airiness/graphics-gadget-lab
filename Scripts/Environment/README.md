@@ -49,3 +49,14 @@ The vectors specify publish destination rejection, init-state refusal, structure
 exit/envelope expectations and preservation checks. Portable spelling tests alone
 do not establish real Windows alias coverage. Synthetic vectors do not establish
 native compatibility or authorize Editor import.
+
+## Windows staging aliases
+
+Path validation rejects reparse ancestors before resolving the canonical final
+filesystem path, including existing 8.3 components. The reserved staging basename
+is classified on that resolved path for verify, init-state and publish. Absent
+publish destinations retain their unresolved suffix after existing ancestor
+canonicalization. Long, case and distinct short aliases of one staging directory
+are unusable until finalization. The main-owned short-name regression checks
+process envelopes and a finalized control; it explicitly skips when the storage
+volume does not provide a distinct 8.3 staging basename.

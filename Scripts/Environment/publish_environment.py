@@ -160,7 +160,13 @@ def plain_path(path):
     for item in (path, *path.parents):
         if item.exists() or item.is_symlink():
             require(not is_reparse(item), "reparse-point", "Reparse point is forbidden: " + str(item))
-    return path
+    # Resolve existing components (including Win32 8.3 names) only after rejecting
+    # reparse ancestors. Nonexistent destinations retain their unresolved suffix.
+    resolved = path.resolve(strict=False)
+    for item in (resolved, *resolved.parents):
+        if item.exists() or item.is_symlink():
+            require(not is_reparse(item), "reparse-point", "Reparse point is forbidden: " + str(item))
+    return resolved
 
 
 def contained(path, root):
@@ -241,8 +247,8 @@ def validate_manifest(m):
 
 
 def is_staging_name(path):
-    # Windows aliases retain caller spelling through abspath; reservation must not.
-    return path.name.lower().startswith(".staging-")
+    # Caller spelling cannot conceal a staging directory behind a short alias.
+    return plain_path(path).name.lower().startswith(".staging-")
 
 
 def verify(root, staging=False):
