@@ -720,16 +720,15 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot)
-# Phase 3A keeps Runtime Private visibility on WinApp because that project still
-# owns the Win32 RHI factory and DX12/Vulkan DevelopGui backend adapters. Phase 4
-# must isolate those sources before Phase 3B removes this target-wide root.
+# Native host/GUI adapters still consume legacy backend declarations, but their
+# descriptor allocator storage is opaque. WinApp must not receive Runtime Private.
 Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot,
         $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot) `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot, $runtimePrivateIncludeRoot,
+    @($winAppIncludeRoot, $appRuntimeIncludeRoot,
         $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot)

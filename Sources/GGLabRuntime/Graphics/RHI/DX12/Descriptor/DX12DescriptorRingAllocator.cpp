@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorRingAllocator.h"
+#include "Core/Allocator/RingSpanAllocator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 
@@ -7,9 +8,12 @@
 namespace gglab
 {
 	DX12DescriptorRingAllocator::DX12DescriptorRingAllocator(const CreateInfo& createInfo) noexcept :
-		DX12DescriptorAllocatorBase(createInfo), m_Allocator(createInfo.m_Range.m_Count)
+		DX12DescriptorAllocatorBase(createInfo),
+		m_Allocator(std::make_unique<RingSpanAllocator>(createInfo.m_Range.m_Count))
 	{
 	}
+
+	DX12DescriptorRingAllocator::~DX12DescriptorRingAllocator() = default;
 
 	DX12DescriptorHandle DX12DescriptorRingAllocator::AllocateHandle(uint32_t count) noexcept
 	{
@@ -17,7 +21,7 @@ namespace gglab
 
 		FreeCompleted();
 
-		const auto local = m_Allocator.Allocate(count);
+		const auto local = m_Allocator->Allocate(count);
 		if (!local.IsValid())
 		{
 			return {};
@@ -53,7 +57,7 @@ namespace gglab
 		const DX12DescriptorSpan globalSpan{ descriptorHandle.Index(), descriptorHandle.Count() };
 		const DX12DescriptorSpan localSpan = ToLocalSpan(globalSpan);
 
-		m_Allocator.RecordRetire({ localSpan.m_Index, localSpan.m_Count }, fencePoint.GetValue());
+		m_Allocator->RecordRetire({ localSpan.m_Index, localSpan.m_Count }, fencePoint.GetValue());
 		m_PendingFences.push_back(fencePoint);
 	}
 
@@ -74,7 +78,7 @@ namespace gglab
 
 		if (latestCompletedFenceValue != 0)
 		{
-			m_Allocator.FreeCompletedVersion(latestCompletedFenceValue);
+			m_Allocator->FreeCompletedVersion(latestCompletedFenceValue);
 		}
 	}
 }

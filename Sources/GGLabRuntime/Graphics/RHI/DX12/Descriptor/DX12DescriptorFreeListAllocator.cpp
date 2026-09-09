@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
+#include "Core/Allocator/FreeListSpanAllocator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
@@ -7,15 +8,26 @@
 
 namespace gglab
 {
+	namespace
+	{
+		DX12DescriptorSpan ToSpan(
+			const AllocatorBase::IndexSpan& indexSpan) noexcept
+		{
+			return { .m_Index = indexSpan.m_Index, .m_Count = indexSpan.m_Count };
+		}
+	}
+
 	DX12DescriptorFreeListAllocator::DX12DescriptorFreeListAllocator(
 		const CreateInfo& createInfo) noexcept :
 		DX12DescriptorAllocatorBase(createInfo),
-		m_Allocator(createInfo.m_Range.m_Count),
+		m_Allocator(std::make_unique<FreeListSpanAllocator>(createInfo.m_Range.m_Count)),
 		m_Generation(createInfo.m_Range.m_Count, 1),
 		m_SlotStates(createInfo.m_Range.m_Count, SlotState::Free)
 	{
 		m_FreeInFrameSpans.reserve(FreeInFrameSpansReserveSize);
 	}
+
+	DX12DescriptorFreeListAllocator::~DX12DescriptorFreeListAllocator() = default;
 
 	DX12DescriptorHandle DX12DescriptorFreeListAllocator::AllocateHandle(uint32_t count) noexcept
 	{
@@ -23,7 +35,7 @@ namespace gglab
 
 		FreeCompleted();
 
-		const auto local = m_Allocator.Allocate(count);
+		const auto local = m_Allocator->Allocate(count);
 		if (!local.IsValid())
 		{
 			return {};
@@ -33,7 +45,7 @@ namespace gglab
 
 		if (!TryMarkAllocated(localSpan))
 		{
-			m_Allocator.Free(local);
+			m_Allocator->Free(local);
 			return {};
 		}
 
@@ -49,7 +61,7 @@ namespace gglab
 
 		FreeCompleted();
 
-		const auto local = m_Allocator.Allocate(1);
+		const auto local = m_Allocator->Allocate(1);
 		if (!local.IsValid())
 		{
 			return {};
@@ -58,7 +70,7 @@ namespace gglab
 		const auto localSpan = ToSpan(local);
 		if (!TryMarkAllocated(localSpan))
 		{
-			m_Allocator.Free(local);
+			m_Allocator->Free(local);
 			return {};
 		}
 
@@ -80,7 +92,7 @@ namespace gglab
 
 		FreeCompleted();
 
-		const auto local = m_Allocator.Allocate(1);
+		const auto local = m_Allocator->Allocate(1);
 		if (!local.IsValid())
 		{
 			return {};
@@ -89,7 +101,7 @@ namespace gglab
 		const auto localSpan = ToSpan(local);
 		if (!TryMarkAllocated(localSpan))
 		{
-			m_Allocator.Free(local);
+			m_Allocator->Free(local);
 			return {};
 		}
 
@@ -437,7 +449,7 @@ namespace gglab
 			++m_Generation[localSpan.m_Index + index];
 		}
 
-		m_Allocator.Free(
+		m_Allocator->Free(
 			AllocatorBase::IndexSpan{ .m_Index = localSpan.m_Index, .m_Count = localSpan.m_Count });
 	}
 
@@ -454,11 +466,5 @@ namespace gglab
 		}
 
 		m_FreeInFrameSpans.push_back(localSpan);
-	}
-
-	DX12DescriptorSpan DX12DescriptorFreeListAllocator::ToSpan(
-		const AllocatorBase::IndexSpan& indexSpan) noexcept
-	{
-		return { .m_Index = indexSpan.m_Index, .m_Count = indexSpan.m_Count };
 	}
 }

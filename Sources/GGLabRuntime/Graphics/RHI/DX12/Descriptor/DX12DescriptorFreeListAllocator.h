@@ -1,15 +1,16 @@
 #pragma once
-#include "Core/Allocator/FreeListSpanAllocator.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorAllocatorBase.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <memory>
 #include <vector>
 
 namespace gglab
 {
+	class FreeListSpanAllocator;
 	class DX12DescriptorFreeListAllocator : public DX12DescriptorAllocatorBase
 	{
 	private:
@@ -28,7 +29,7 @@ namespace gglab
 
 	public:
 		explicit DX12DescriptorFreeListAllocator(const CreateInfo& createInfo) noexcept;
-		~DX12DescriptorFreeListAllocator() override = default;
+		~DX12DescriptorFreeListAllocator() override;
 
 		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
 		DX12DescriptorView AllocateView() noexcept;
@@ -63,13 +64,10 @@ namespace gglab
 		void DeferFreeFromGlobalIndexInFrame(uint32_t globalIndex) noexcept;
 
 	private:
-		static DX12DescriptorSpan ToSpan(const AllocatorBase::IndexSpan& indexSpan) noexcept;
-
-	private:
 		static constexpr uint32_t FreeInFrameSpansReserveSize = 256;
 
 	private:
-		FreeListSpanAllocator m_Allocator;
+		std::unique_ptr<FreeListSpanAllocator> m_Allocator;
 
 		std::deque<Pending> m_PendingQueue;
 		std::vector<DX12DescriptorSpan> m_FreeInFrameSpans;

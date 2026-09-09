@@ -1,19 +1,20 @@
 #pragma once
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorAllocatorBase.h"
-#include "Core/Allocator/RingSpanAllocator.h"
 #include "Graphics/RHI/DX12/DX12FencePoint.h"
 
 #include <deque>
 #include <mutex>
+#include <memory>
 
 namespace gglab
 {
+	class RingSpanAllocator;
 	class DX12DescriptorAllocator;
 	class DX12DescriptorRingAllocator : public DX12DescriptorAllocatorBase
 	{
 	public:
 		explicit DX12DescriptorRingAllocator(const CreateInfo& createInfo) noexcept;
-		~DX12DescriptorRingAllocator() override = default;
+		~DX12DescriptorRingAllocator() override;
 
 		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
 
@@ -28,7 +29,7 @@ namespace gglab
 		void FreeCompleted() noexcept;
 
 	private:
-		RingSpanAllocator m_Allocator;
+		std::unique_ptr<RingSpanAllocator> m_Allocator;
 		std::deque<DX12FencePoint> m_PendingFences;
 
 		std::mutex m_Mutex;
