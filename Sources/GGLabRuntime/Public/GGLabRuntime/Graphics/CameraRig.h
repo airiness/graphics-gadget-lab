@@ -21,6 +21,7 @@ namespace gglab
 	public:
 		struct CameraSlot
 		{
+			uint64_t m_Id = 0;
 			std::string m_Name;
 			Camera* m_Camera = nullptr;
 			CameraController* m_Controller = nullptr;

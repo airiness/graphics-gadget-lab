@@ -7,7 +7,9 @@ namespace gglab
 {
 	class ApplicationToolingIntegrationBase;
 	class AssetToolingControlBase;
-	class CameraRig;
+	class CameraToolingViewBase;
+	class CameraToolingControlBase;
+	class CameraRenderViewQueryBase;
 	class DebugDrawSystem;
 	class DiagnosticsControl;
 	class DiagnosticsView;
@@ -44,7 +46,9 @@ namespace gglab
 
 	struct ApplicationToolingFrameContext
 	{
-		CameraRig* m_CameraRig = nullptr;
+		const CameraToolingViewBase* m_Cameras = nullptr;
+		CameraToolingControlBase* m_CameraControl = nullptr;
+		const CameraRenderViewQueryBase* m_CameraRenderViewQuery = nullptr;
 		World* m_World = nullptr;
 		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
 		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;

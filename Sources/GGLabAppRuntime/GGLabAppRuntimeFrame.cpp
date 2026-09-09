@@ -11,6 +11,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/DirectionalLightTooling.h"
 #include "Diagnostics/AssetToolingControl.h"
+#include "Diagnostics/CameraTooling.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -289,8 +290,11 @@ namespace gglab
 
 			DirectionalLightTooling directionalLightTooling(world);
 			AssetToolingControl assetToolingControl(*m_AssetManager);
+			CameraTooling cameraTooling(demo->GetCameraRig());
 			const ApplicationToolingFrameContext toolingContext{
-				.m_CameraRig = &demo->GetCameraRig(),
+				.m_Cameras = &cameraTooling,
+				.m_CameraControl = &cameraTooling,
+				.m_CameraRenderViewQuery = &demo->GetCameraRig(),
 				.m_World = &world,
 				.m_DirectionalLight = &directionalLightTooling,
 				.m_DirectionalLightControl = &directionalLightTooling,

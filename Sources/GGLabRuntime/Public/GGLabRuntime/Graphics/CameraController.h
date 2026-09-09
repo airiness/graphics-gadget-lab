@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/CameraControllerSettings.h"
 
 namespace gglab
 {
@@ -24,13 +25,7 @@ namespace gglab
 	class CameraController
 	{
 	public:
-		struct Params
-		{
-			float m_MovementSpeed = 10.0f;
-			float m_MouseSensitivityRadPerCount = 0.001f;
-			float m_AccelerateMultiplier = 3.0f;
-			float m_SmoothStepT = 0.5f;
-		};
+		using Params = CameraControllerSettings;
 
 		struct CreateInfo
 		{

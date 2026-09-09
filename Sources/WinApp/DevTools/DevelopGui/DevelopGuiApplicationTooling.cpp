@@ -3,7 +3,6 @@
 #include "Demo/DemoManager.h"
 #include "Lab/LabRuntime.h"
 #include "ApplicationToolingIntegration.h"
-#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
@@ -89,8 +88,9 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				DevelopGuiContext guiContext{};
-				guiContext.m_CameraRig = context.m_CameraRig;
-				guiContext.m_CameraRenderViewQuery = context.m_CameraRig;
+				guiContext.m_Cameras = context.m_Cameras;
+				guiContext.m_CameraControl = context.m_CameraControl;
+				guiContext.m_CameraRenderViewQuery = context.m_CameraRenderViewQuery;
 				guiContext.m_DX12ResourceLifecycle = m_ResourceLifecycleTools.get();
 				guiContext.m_DX12ResourceLifecycleControl = m_ResourceLifecycleTools.get();
 				guiContext.m_World = context.m_World;

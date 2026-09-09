@@ -2169,6 +2169,21 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
 foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "CameraInspectorPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '\bm_CameraRig\b|\bCameraRig\b|\bCameraController\b|Graphics/Camera\.h|Diagnostics/CameraTooling\.h') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-camera-authoring-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "camera tooling must use value queries and typed controls without live cameras, controllers or rig slots"
+        })
+    }
+}
+foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "AssetManagerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),

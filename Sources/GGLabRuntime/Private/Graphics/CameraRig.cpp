@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <format>
 #include <memory>
 #include <utility>
@@ -12,6 +13,8 @@ namespace gglab
 {
 	namespace
 	{
+		// Fresh identities survive vector relocation and reject removed/rebound cameras.
+		std::atomic<uint64_t> s_NextCameraId{ 1 };
 		constexpr std::array<RenderViewID, 3> DebugCameraRenderViewIds = {
 			RenderViewID::DebugCamera0,
 			RenderViewID::DebugCamera1,
@@ -23,6 +26,7 @@ namespace gglab
 	void CameraRig::AttachMainCamera(Camera& camera, CameraController& controller) noexcept
 	{
 		CameraSlot mainSlot{};
+		mainSlot.m_Id = s_NextCameraId.fetch_add(1, std::memory_order_relaxed);
 		mainSlot.m_Name = "Main Camera";
 		mainSlot.m_Camera = &camera;
 		mainSlot.m_Controller = &controller;
@@ -236,6 +240,7 @@ namespace gglab
 		}
 
 		CameraSlot debugSlot{};
+		debugSlot.m_Id = s_NextCameraId.fetch_add(1, std::memory_order_relaxed);
 		debugSlot.m_Name = MakeDebugCameraName();
 		debugSlot.m_OwnedCamera = std::make_unique<Camera>(*sourceSlot->m_Camera);
 		debugSlot.m_OwnedController = std::make_unique<CameraController>(controllerCreateInfo);

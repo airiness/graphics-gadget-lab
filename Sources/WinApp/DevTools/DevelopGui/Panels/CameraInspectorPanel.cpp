@@ -2,12 +2,13 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
-#include "GGLabRuntime/Graphics/Camera.h"
-#include "GGLabRuntime/Graphics/CameraController.h"
-#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraTooling.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include <array>
+#include <cmath>
+#include <cstdint>
+#include <string>
 
 #include <imgui.h>
 
@@ -23,8 +24,8 @@ namespace gglab
 			bool m_SyncFromController = true;
 			bool m_ShowBasis = true;
 			bool m_ShowMatrices = false;
-			size_t m_SelectedCameraIndex = 0;
-			const Camera* m_LastCamera = nullptr;
+			uint64_t m_SelectedCameraId = 0;
+			uint64_t m_LastCameraId = 0;
 
 			// cached edit values
 			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
@@ -37,302 +38,186 @@ namespace gglab
 			float m_ExposureCompensationEV = 0.0f;
 
 			// controller params
-			CameraController::Params m_CtrlParams{};
+			CameraControllerSettings m_CtrlParams{};
 
 			// first time initialize
 			bool m_Initialized = false;
 		};
 
-		struct CameraBinding
+		static void PullFromCamera(CameraPanelState& state, const CameraToolingObservation& camera) noexcept
 		{
-			Camera* m_Camera = nullptr;
-			CameraController* m_Controller = nullptr;
-			CameraRig::CameraSlot* m_Slot = nullptr;
-			size_t m_Index = 0;
-		};
-
-		static void PullFromCamera(CameraPanelState& state, const Camera& camera) noexcept
-		{
-			const Vector3 p = camera.GetPosition();
+			const Vector3 p = camera.m_Settings.m_Position;
 			state.m_Pos[0] = p.m_X;
 			state.m_Pos[1] = p.m_Y;
 			state.m_Pos[2] = p.m_Z;
 
-			state.m_YawDegree = math::ToDegrees(camera.GetYaw());
-			state.m_PitchDegree = math::ToDegrees(camera.GetPitch());
+			state.m_YawDegree = math::ToDegrees(camera.m_Settings.m_Yaw);
+			state.m_PitchDegree = math::ToDegrees(camera.m_Settings.m_Pitch);
 
-			state.m_FovDegree = camera.GetFov();
-			state.m_NearZ = camera.GetNear();
-			state.m_FarZ = camera.GetFar();
-			state.m_ExposureCompensationEV = camera.GetExposureCompensationEV();
+			state.m_FovDegree = camera.m_Settings.m_Fov;
+			state.m_NearZ = camera.m_Settings.m_Near;
+			state.m_FarZ = camera.m_Settings.m_Far;
+			state.m_ExposureCompensationEV = camera.m_Settings.m_ExposureCompensationEV;
 		}
 
-		static void PullFromController(
-			CameraPanelState& state, const CameraController& camCtrl) noexcept
+
+		static void PushToCamera(CameraPanelState& state, const CameraToolingViewBase& view,
+			CameraToolingControlBase& control, uint64_t id) noexcept
 		{
-			state.m_CtrlParams = camCtrl.GetParams();
-		}
-
-		static void PushToCamera(CameraPanelState& state, Camera& camera) noexcept
-		{
-			// sanitize
-			state.m_FovDegree = Camera::ClampFov(state.m_FovDegree);
-			state.m_NearZ = Camera::ClampNear(state.m_NearZ);
-			state.m_FarZ = Camera::ClampFar(state.m_NearZ, state.m_FarZ);
-			state.m_ExposureCompensationEV =
-				Camera::ClampExposureCompensationEV(state.m_ExposureCompensationEV);
-
-			camera.SetPosition(Vector3{ state.m_Pos[0], state.m_Pos[1], state.m_Pos[2] });
-			camera.SetYawPitch(
-				math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree));
-			camera.SetFov(state.m_FovDegree);
-			camera.SetNearFar(state.m_NearZ, state.m_FarZ);
-			camera.SetExposureCompensationEV(state.m_ExposureCompensationEV);
-
-			// Update camera
-			camera.Update();
-		}
-
-		static void PushToController(CameraPanelState& s, CameraController& ctrl) noexcept
-		{
-			ctrl.SetParams(s.m_CtrlParams);
-		}
-
-		static CameraBinding ResolveCameraBinding(
-			CameraPanelState& state, DevelopGuiContext& context) noexcept
-		{
-			auto* rig = context.m_CameraRig;
-			if (!rig || rig->GetCameraCount() == 0)
-			{
-				return {};
-			}
-			state.m_SelectedCameraIndex =
-				std::min(state.m_SelectedCameraIndex, rig->GetCameraCount() - 1);
-			if (!state.m_Initialized)
-			{
-				state.m_SelectedCameraIndex = rig->GetActiveCameraIndex();
-			}
-			auto* slot = rig->GetCameraSlot(state.m_SelectedCameraIndex);
-			return {
-				.m_Camera = slot ? slot->m_Camera : nullptr,
-				.m_Controller = slot ? slot->m_Controller : nullptr,
-				.m_Slot = slot,
-				.m_Index = state.m_SelectedCameraIndex,
+			const CameraEditSettings settings{
+				Vector3(state.m_Pos[0], state.m_Pos[1], state.m_Pos[2]),
+				math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree),
+				state.m_FovDegree, state.m_NearZ, state.m_FarZ, state.m_ExposureCompensationEV
 			};
+			if (control.SetCamera(id, settings))
+			{
+				const auto updated = view.GetCameras();
+				if (const auto* camera = updated.FindCamera(id)) PullFromCamera(state, *camera);
+			}
 		}
 
-		static void DrawCameraRigControls(CameraPanelState& state, CameraRig& rig) noexcept
+		static void DrawCameraControls(CameraPanelState& state, const CameraToolingSnapshot& snapshot,
+			CameraToolingControlBase* control) noexcept
 		{
-			if (rig.GetCameraCount() == 0)
+			const CameraToolingObservation* display = nullptr;
+			for (const auto& camera : snapshot.m_Cameras)
 			{
-				ImGui::TextUnformatted("No cameras registered.");
-				return;
+				if (camera.m_RenderViewId == snapshot.m_DisplayViewId) display = &camera;
 			}
-
-			const RenderViewID displayViewId = rig.GetDisplayViewId();
-			const CameraRig::CameraSlot* displaySlot = rig.FindRenderViewSlot(displayViewId);
-			const std::string displayViewIdText = devtools::EnumText(displayViewId);
-			const char* displayPreview =
-				displayViewId == RenderViewID::Main
-				? "Main Camera"
-				: (displaySlot ? displaySlot->m_Name.c_str() : displayViewIdText.c_str());
-			if (ImGui::BeginCombo("Display View", displayPreview))
+			const std::string fallback = devtools::EnumText(snapshot.m_DisplayViewId);
+			ImGui::BeginDisabled(!control);
+			if (ImGui::BeginCombo("Display View", display ? display->m_Name.c_str() : fallback.c_str()))
 			{
-				const bool mainSelected = displayViewId == RenderViewID::Main;
-				if (ImGui::Selectable("Main Camera", mainSelected))
+				for (const auto& camera : snapshot.m_Cameras)
 				{
-					GGLAB_UNUSED(rig.SetDisplayViewId(RenderViewID::Main));
-				}
-				if (mainSelected)
-				{
-					ImGui::SetItemDefaultFocus();
-				}
-
-				for (size_t index = 0; index < rig.GetCameraCount(); ++index)
-				{
-					const auto* slot = rig.GetCameraSlot(index);
-					if (!slot || !slot->m_IsDebug || !slot->m_EnableRenderView ||
-						!IsDebugCameraRenderViewID(slot->m_RenderViewId))
-					{
-						continue;
-					}
-
-					const bool selected = displayViewId == slot->m_RenderViewId;
-					if (ImGui::Selectable(slot->m_Name.c_str(), selected))
-					{
-						GGLAB_UNUSED(rig.SetDisplayViewId(slot->m_RenderViewId));
-					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
+					if (!camera.m_EnableRenderView && camera.m_RenderViewId != RenderViewID::Main) continue;
+					const bool selected = camera.m_RenderViewId == snapshot.m_DisplayViewId;
+					if (ImGui::Selectable(camera.m_Name.c_str(), selected) && control)
+						control->SetDisplayCamera(camera.m_Id);
+					if (selected) ImGui::SetItemDefaultFocus();
 				}
 				ImGui::EndCombo();
 			}
-
-			state.m_SelectedCameraIndex =
-				std::min(state.m_SelectedCameraIndex, rig.GetCameraCount() - 1);
-
-			const auto* selectedSlot = rig.GetCameraSlot(state.m_SelectedCameraIndex);
-			const char* preview = selectedSlot ? selectedSlot->m_Name.c_str() : "Camera";
-			if (ImGui::BeginCombo("Edit Camera", preview))
+			const auto* selectedCamera = snapshot.FindCamera(state.m_SelectedCameraId);
+			if (ImGui::BeginCombo("Edit Camera", selectedCamera ? selectedCamera->m_Name.c_str() : "Camera"))
 			{
-				for (size_t index = 0; index < rig.GetCameraCount(); ++index)
+				for (const auto& camera : snapshot.m_Cameras)
 				{
-					const auto* slot = rig.GetCameraSlot(index);
-					if (!slot)
+					const bool selected = camera.m_Id == state.m_SelectedCameraId;
+					if (ImGui::Selectable(camera.m_Name.c_str(), selected) && control &&
+						control->SetActiveCamera(camera.m_Id))
 					{
-						continue;
-					}
-					const bool selected = index == state.m_SelectedCameraIndex;
-					if (ImGui::Selectable(slot->m_Name.c_str(), selected))
-					{
-						state.m_SelectedCameraIndex = index;
-						rig.SetActiveCameraIndex(index);
+						state.m_SelectedCameraId = camera.m_Id;
 						state.m_Initialized = false;
 					}
-					if (selected)
-					{
-						ImGui::SetItemDefaultFocus();
-					}
+					if (selected) ImGui::SetItemDefaultFocus();
 				}
 				ImGui::EndCombo();
 			}
-
-			if (ImGui::Button("Add Debug Camera"))
+			if (ImGui::Button("Add Debug Camera") && control)
 			{
-				state.m_SelectedCameraIndex = rig.AddDebugCameraFromActive();
+				state.m_SelectedCameraId = control->AddDebugCamera();
 				state.m_Initialized = false;
 			}
 			ImGui::SameLine();
-			const bool canRemove = state.m_SelectedCameraIndex > 0;
-			if (!canRemove)
+			ImGui::BeginDisabled(!selectedCamera || !selectedCamera->m_IsDebug);
+			if (ImGui::Button("Remove Camera") && control &&
+				control->RemoveCamera(state.m_SelectedCameraId))
 			{
-				ImGui::BeginDisabled();
-			}
-			if (ImGui::Button("Remove Camera"))
-			{
-				GGLAB_UNUSED(rig.RemoveCamera(state.m_SelectedCameraIndex));
-				state.m_SelectedCameraIndex = rig.GetActiveCameraIndex();
+				state.m_SelectedCameraId = 0;
 				state.m_Initialized = false;
 			}
-			if (!canRemove)
-			{
-				ImGui::EndDisabled();
-			}
+			ImGui::EndDisabled();
+			ImGui::EndDisabled();
 		}
 	}
 
 	void CameraInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<CameraPanelState>();
-		if (context.m_CameraRig)
+		if (!context.m_Cameras)
 		{
-			DrawCameraRigControls(state, *context.m_CameraRig);
-			ImGui::Spacing();
-		}
-
-		CameraBinding binding = ResolveCameraBinding(state, context);
-		Camera* camera = binding.m_Camera;
-		CameraController* cameraCtrl = binding.m_Controller;
-
-		if (!camera)
-		{
-			ImGui::TextUnformatted("No camera bound in DevelopGuiContext.");
+			ImGui::TextUnformatted("Camera tooling query is not available.");
+			state.m_Initialized = false;
+			state.m_SelectedCameraId = 0;
 			return;
 		}
-
-		// Get camera params when first time
-		if (!state.m_Initialized || state.m_LastCamera != camera)
+		const auto& view = *context.m_Cameras;
+		auto* control = context.m_CameraControl;
+		auto snapshot = view.GetCameras();
+		if (!snapshot.FindCamera(state.m_SelectedCameraId))
+			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
+		DrawCameraControls(state, snapshot, control);
+		snapshot = view.GetCameras();
+		if (!snapshot.FindCamera(state.m_SelectedCameraId))
+			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
+		const auto* selected = snapshot.FindCamera(state.m_SelectedCameraId);
+		if (!selected)
 		{
-			PullFromCamera(state, *camera);
-			if (cameraCtrl)
-			{
-				PullFromController(state, *cameraCtrl);
-			}
-			state.m_LastCamera = camera;
+			ImGui::TextUnformatted("No cameras registered.");
+			state.m_Initialized = false;
+			return;
+		}
+		auto camera = *selected;
+		const uint64_t id = camera.m_Id;
+		const bool cameraCtrl = camera.m_Controller.has_value();
+		if (!state.m_Initialized || state.m_LastCameraId != id)
+		{
+			PullFromCamera(state, camera);
+			if (cameraCtrl) state.m_CtrlParams = *camera.m_Controller;
+			state.m_LastCameraId = id;
 			state.m_Initialized = true;
 		}
+		if (state.m_SyncFromCamera && state.m_AutoApply) PullFromCamera(state, camera);
+		if (cameraCtrl && state.m_SyncFromController && state.m_AutoApply)
+			state.m_CtrlParams = *camera.m_Controller;
 
-		// AutoApply
-		const bool allowSync = state.m_AutoApply;
-
-		if (state.m_SyncFromCamera && allowSync)
-		{
-			PullFromCamera(state, *camera);
-		}
-		if (cameraCtrl && state.m_SyncFromController && allowSync)
-		{
-			PullFromController(state, *cameraCtrl);
-		}
-
-		ImGui::TextUnformatted(binding.m_Slot ? binding.m_Slot->m_Name.c_str() : "Camera");
+		ImGui::TextUnformatted(camera.m_Name.c_str());
 		ImGui::Separator();
-
 		ImGui::Checkbox("Auto Apply", &state.m_AutoApply);
 		ImGui::SameLine();
 		ImGui::Checkbox("Sync Camera", &state.m_SyncFromCamera);
 		ImGui::SameLine();
 		ImGui::Checkbox("Sync Controller", &state.m_SyncFromController);
-
 		ImGui::Checkbox("Show Basis", &state.m_ShowBasis);
 		ImGui::SameLine();
 		ImGui::Checkbox("Show Matrices", &state.m_ShowMatrices);
 
-		if (binding.m_Slot)
+		ImGui::BeginDisabled(!control);
+		bool frustumChanged = ImGui::Checkbox("Draw Frustum", &camera.m_ShowFrustum);
+		if (camera.m_ShowFrustum)
+			frustumChanged |= ImGui::ColorEdit4("Frustum Color", &camera.m_FrustumColor.m_R);
+		if (frustumChanged && control) control->SetFrustum(id, camera.m_ShowFrustum, camera.m_FrustumColor);
+		if (camera.m_IsDebug)
 		{
-			ImGui::SameLine();
-			ImGui::Checkbox("Draw Frustum", &binding.m_Slot->m_ShowFrustum);
-			if (binding.m_Slot->m_ShowFrustum)
+			bool enabled = camera.m_EnableRenderView;
+			if (ImGui::Checkbox("Build RenderView", &enabled) && control)
 			{
-				ImGui::ColorEdit4("Frustum Color", &binding.m_Slot->m_FrustumColor.m_R);
+				control->SetRenderViewEnabled(id, enabled);
+				const auto updated = view.GetCameras();
+				if (const auto* current = updated.FindCamera(id)) camera = *current;
 			}
-			if (binding.m_Slot->m_IsDebug && context.m_CameraRig)
+			if (camera.m_EnableRenderView && IsDebugCameraRenderViewID(camera.m_RenderViewId))
 			{
-				bool enableRenderView = binding.m_Slot->m_EnableRenderView;
-				if (ImGui::Checkbox("Build RenderView", &enableRenderView))
+				ImGui::Text("RenderView: %s", devtools::EnumText(camera.m_RenderViewId).c_str());
+				const std::string modeText = devtools::EnumText(camera.m_VisibilityMode);
+				if (ImGui::BeginCombo("Visibility Mode", modeText.c_str()))
 				{
-					GGLAB_UNUSED(context.m_CameraRig->SetDebugRenderViewEnabled(
-						binding.m_Index, enableRenderView));
-				}
-				if (binding.m_Slot->m_EnableRenderView &&
-					IsDebugCameraRenderViewID(binding.m_Slot->m_RenderViewId))
-				{
-					ImGui::Text("RenderView: %s",
-						devtools::EnumText(binding.m_Slot->m_RenderViewId).c_str());
-					RenderViewVisibilityMode visibilityMode = binding.m_Slot->m_VisibilityMode;
-					const std::string visibilityModeText = devtools::EnumText(visibilityMode);
-					if (ImGui::BeginCombo("Visibility Mode", visibilityModeText.c_str()))
+					constexpr std::array modes = { RenderViewVisibilityMode::Self,
+						RenderViewVisibilityMode::MainCamera, RenderViewVisibilityMode::IntersectionWithMainCamera,
+						RenderViewVisibilityMode::None };
+					for (const auto mode : modes)
 					{
-						constexpr std::array modes = {
-							RenderViewVisibilityMode::Self,
-							RenderViewVisibilityMode::MainCamera,
-							RenderViewVisibilityMode::IntersectionWithMainCamera,
-							RenderViewVisibilityMode::None,
-						};
-						for (const RenderViewVisibilityMode mode : modes)
-						{
-							const bool selected = visibilityMode == mode;
-							if (ImGui::Selectable(devtools::EnumText(mode).c_str(), selected))
-							{
-								binding.m_Slot->m_VisibilityMode = mode;
-								visibilityMode = mode;
-							}
-							if (selected)
-							{
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
+						const bool selectedMode = mode == camera.m_VisibilityMode;
+						if (ImGui::Selectable(devtools::EnumText(mode).c_str(), selectedMode) && control)
+							control->SetVisibilityMode(id, mode);
+						if (selectedMode) ImGui::SetItemDefaultFocus();
 					}
-				}
-				else
-				{
-					ImGui::TextDisabled("RenderView: None");
+					ImGui::EndCombo();
 				}
 			}
+			else ImGui::TextDisabled("RenderView: None");
 		}
-
 		ImGui::Spacing();
 
 		bool camChanged = false;
@@ -380,12 +265,12 @@ namespace gglab
 
 			if (ImGui::Button("Reset Velocity"))
 			{
-				cameraCtrl->ResetVelocity();
+				if (control) control->ResetVelocity(id);
 			}
 		}
 		else
 		{
-			ImGui::TextUnformatted("No CameraController bound (read-only camera).");
+			ImGui::TextUnformatted("No controller bound.");
 		}
 
 		ImGui::Spacing();
@@ -395,11 +280,11 @@ namespace gglab
 		{
 			if (camChanged)
 			{
-				PushToCamera(state, *camera);
+				if (control) PushToCamera(state, view, *control, id);
 			}
 			if (cameraCtrl && ctrlChanged)
 			{
-				PushToController(state, *cameraCtrl);
+				if (control) control->SetController(id, state.m_CtrlParams);
 			}
 		}
 		else
@@ -407,38 +292,42 @@ namespace gglab
 			ImGui::Separator();
 			if (ImGui::Button("Apply"))
 			{
-				PushToCamera(state, *camera);
+				if (control) PushToCamera(state, view, *control, id);
 				if (cameraCtrl)
 				{
-					PushToController(state, *cameraCtrl);
+					if (control) control->SetController(id, state.m_CtrlParams);
 				}
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Revert From Runtime"))
 			{
-				PullFromCamera(state, *camera);
+				PullFromCamera(state, camera);
 				if (cameraCtrl)
 				{
-					PullFromController(state, *cameraCtrl);
+					state.m_CtrlParams = *camera.m_Controller;
 				}
 			}
 		}
 
+		ImGui::EndDisabled();
+		const auto refreshed = view.GetCameras();
+		if (const auto* current = refreshed.FindCamera(id)) camera = *current;
+
 		// Read only infos
 		ImGui::SeparatorText("Runtime Info");
-		ImGui::Text("Aspect: %.4f", camera->GetAspect());
+		ImGui::Text("Aspect: %.4f", camera.m_Aspect);
 
 		if (state.m_ShowBasis)
 		{
-			devtools::DrawVector3Text("Forward", camera->GetForward());
-			devtools::DrawVector3Text("Right", camera->GetRight());
-			devtools::DrawVector3Text("Up", camera->GetUp());
+			devtools::DrawVector3Text("Forward", camera.m_Forward);
+			devtools::DrawVector3Text("Right", camera.m_Right);
+			devtools::DrawVector3Text("Up", camera.m_Up);
 		}
 
 		if (state.m_ShowMatrices)
 		{
-			devtools::DrawMatrix4x4Tree("View Matrix", camera->GetViewMatrix());
-			devtools::DrawMatrix4x4Tree("Proj Matrix", camera->GetProjMatrix());
+			devtools::DrawMatrix4x4Tree("View Matrix", camera.m_ViewMatrix);
+			devtools::DrawMatrix4x4Tree("Proj Matrix", camera.m_ProjMatrix);
 		}
 	}
 }

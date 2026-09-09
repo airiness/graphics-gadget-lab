@@ -1,4 +1,6 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "Diagnostics/CameraTooling.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/Asset/AssetToolingControlBase.h"
 #include "Diagnostics/DirectionalLightTooling.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -116,6 +118,17 @@ namespace gglab
 	static_assert(AssetToolingSubmission<AssetToolingControlBase>);
 	static_assert(!LiveModelAccess<AssetToolingControlBase>);
 
+	template <typename T>
+	concept CameraToolingQuery = requires(const T& value) {
+		{ value.GetCameras() } -> std::same_as<CameraToolingSnapshot>;
+	};
+	template <typename T>
+	concept CameraToolingMutation = requires(T& value) { value.RemoveCamera(0); };
+	static_assert(CameraToolingQuery<CameraToolingViewBase>);
+	static_assert(!CameraToolingMutation<CameraToolingViewBase>);
+	static_assert(!CameraToolingQuery<CameraToolingControlBase>);
+	static_assert(CameraToolingMutation<CameraToolingControlBase>);
+
 	namespace
 	{
 		class ContractGpuProfiler final : public GpuProfiler
@@ -210,6 +223,111 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			CameraRig rig;
+			CameraTooling tooling(rig);
+			const CameraToolingViewBase& view = tooling;
+			CameraToolingControlBase& control = tooling;
+			context.Check(view.GetCameras().m_Cameras.empty() && control.AddDebugCamera() == 0 &&
+				!control.RemoveCamera(0) && !control.SetActiveCamera(0),
+				"Camera tooling handles an empty rig without creating or targeting a camera");
+			Camera mainCamera(Camera::CreateInfo{});
+			CameraController controller(CameraController::CreateInfo{});
+			rig.AttachMainCamera(mainCamera, controller);
+			const auto original = view.GetCameras();
+			const auto mainId = original.m_ActiveCameraId;
+			rig.GetMainCameraSlot()->m_EnableRenderView = false;
+			context.Check(control.SetDisplayCamera(mainId),
+				"Main display selection preserves the rig's requested-view fallback policy");
+			rig.GetMainCameraSlot()->m_EnableRenderView = true;
+			context.Check(mainId != 0 && original.m_Cameras.size() == 1 &&
+				original.FindCamera(mainId) && !control.RemoveCamera(mainId) &&
+				!control.SetRenderViewEnabled(mainId, false),
+				"Main camera has a value identity and cannot be removed or disabled as a debug view");
+			CameraEditSettings edit;
+			edit.m_Position = Vector3(2.0f, 3.0f, 4.0f);
+			edit.m_Fov = 200.0f;
+			edit.m_Near = -1.0f;
+			edit.m_Far = -2.0f;
+			edit.m_ExposureCompensationEV = 20.0f;
+			const auto resetSerial = mainCamera.GetTemporalResetSerial();
+			context.Check(control.SetCamera(mainId, edit) &&
+				mainCamera.GetPosition().m_X == 2.0f &&
+				mainCamera.GetFov() == Camera::ClampFov(edit.m_Fov) &&
+				mainCamera.GetNear() > 0.0f && mainCamera.GetFar() > mainCamera.GetNear() &&
+				mainCamera.GetExposureCompensationEV() == Camera::ClampExposureCompensationEV(20.0f) &&
+				mainCamera.GetTemporalResetSerial() == resetSerial &&
+				original.m_Cameras.front().m_Settings.m_Position.m_X == 0.0f,
+				"Camera edits preserve owner clamping and temporal reset policy while observations remain independent");
+			const auto debugId = control.AddDebugCamera();
+			const auto otherId = control.AddDebugCamera();
+			context.Check(debugId != 0 && otherId != debugId &&
+				control.SetActiveCamera(debugId) && view.GetCameras().m_ActiveCameraId == debugId &&
+				control.SetDisplayCamera(debugId),
+				"Tooling adds independent cameras and selects active and display cameras separately");
+			context.Check(control.SetFrustum(debugId, false, Color::Red) &&
+				control.SetVisibilityMode(debugId, RenderViewVisibilityMode::MainCamera) &&
+				!view.GetCameras().FindCamera(debugId)->m_ShowFrustum &&
+				view.GetCameras().FindCamera(debugId)->m_VisibilityMode == RenderViewVisibilityMode::MainCamera,
+				"Frustum and visibility edits reach only the identified camera");
+			const auto retained = view.GetCameras();
+			context.Check(control.RemoveCamera(debugId) &&
+				view.GetCameras().m_DisplayViewId == RenderViewID::Main &&
+				!control.SetCamera(debugId, edit) && !control.SetActiveCamera(debugId) &&
+				!control.SetDisplayCamera(debugId) && !control.SetFrustum(debugId, true, Color::White) &&
+				!control.SetRenderViewEnabled(debugId, true) &&
+				!control.SetVisibilityMode(debugId, RenderViewVisibilityMode::Self) &&
+				!control.SetController(debugId, {}) && !control.ResetVelocity(debugId) &&
+				!control.RemoveCamera(debugId) && retained.FindCamera(debugId) &&
+				control.SetActiveCamera(otherId),
+				"Removed IDs reject every command while surviving IDs remain valid after slot compaction");
+			const auto replacementId = control.AddDebugCamera();
+			context.Check(replacementId != debugId && control.SetDisplayCamera(replacementId) &&
+				control.SetRenderViewEnabled(replacementId, false) &&
+				view.GetCameras().m_DisplayViewId == RenderViewID::Main &&
+				!control.SetDisplayCamera(replacementId) && control.SetRenderViewEnabled(replacementId, true),
+				"Reused render-view slots do not reuse camera IDs and disabling display restores Main");
+			GGLAB_UNUSED(control.AddDebugCamera());
+			const auto overflowId = control.AddDebugCamera();
+			context.Check(!view.GetCameras().FindCamera(overflowId)->m_EnableRenderView &&
+				!control.SetRenderViewEnabled(overflowId, true),
+				"Tooling preserves the finite debug render-view capacity");
+			CameraControllerSettings params;
+			params.m_MovementSpeed = -1.0f;
+			params.m_SmoothStepT = 2.0f;
+			context.Check(control.SetController(mainId, params) &&
+				controller.GetMovementSpeed() >= 0.0f && controller.GetSmoothStepT() <= 1.0f,
+				"Controller edits retain runtime sanitization");
+			params.m_MovementSpeed = 10.0f;
+			params.m_SmoothStepT = 0.5f;
+			control.SetController(mainId, params);
+			controller.Update(mainCamera, CameraInput{ .m_Front = true }, 0.01f);
+			const auto position = mainCamera.GetPosition();
+			context.Check(control.ResetVelocity(mainId), "Velocity reset reaches the selected controller");
+			controller.Update(mainCamera, CameraInput{}, 0.01f);
+			context.Check((mainCamera.GetPosition() - position).LengthSquared() == 0.0f,
+				"Velocity reset prevents residual controller movement on the next update");
+			rig.GetMainCameraSlot()->m_Controller = nullptr;
+			context.Check(!view.GetCameras().FindCamera(mainId)->m_Controller &&
+				!control.ResetVelocity(mainId) && !control.SetController(mainId, params) &&
+				control.SetCamera(mainId, edit),
+				"Cameras without controllers remain editable and reject controller-only commands");
+			rig.AttachMainCamera(mainCamera, controller);
+			const auto reboundId = rig.GetMainCameraSlot()->m_Id;
+			context.Check(reboundId != mainId && !control.SetCamera(mainId, edit) &&
+				control.SetCamera(reboundId, edit),
+				"Reattaching even the same main camera invalidates the previous identity");
+			CameraRig otherRig;
+			otherRig.AttachMainCamera(mainCamera, controller);
+			CameraTooling otherTooling(otherRig);
+			context.Check(!otherTooling.SetCamera(reboundId, edit),
+				"Camera identities cannot cross rig or session boundaries");
+			CameraRig movedRig(std::move(rig));
+			CameraTooling movedTooling(movedRig);
+			context.Check(movedTooling.SetActiveCamera(otherId) &&
+				movedTooling.GetCameras().m_ActiveCameraId == otherId,
+				"Moving a camera rig preserves the identities of its owned slots");
+		}
 		{
 			World world;
 			auto& registry = world.GetRegistry();
