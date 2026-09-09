@@ -6,7 +6,8 @@
 
 namespace gglab
 {
-	class World;
+	class WorldToolingViewBase;
+	class WorldToolingControlBase;
 	class DirectionalLightViewBase;
 	class DirectionalLightControlBase;
 	class CameraToolingViewBase;
@@ -42,7 +43,8 @@ namespace gglab
 		// Borrowed from the host's optional DX12 tooling adapter for this draw.
 		const DX12ResourceLifecycleViewBase* m_DX12ResourceLifecycle = nullptr;
 		DX12ResourceLifecycleControlBase* m_DX12ResourceLifecycleControl = nullptr;
-		World* m_World = nullptr;
+		const WorldToolingViewBase* m_WorldView = nullptr;
+		WorldToolingControlBase* m_WorldControl = nullptr;
 		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
 		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
 		AssetToolingControlBase* m_AssetControl = nullptr;

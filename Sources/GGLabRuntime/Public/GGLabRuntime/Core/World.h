@@ -9,7 +9,13 @@ namespace gglab
 	{
 	public:
 		World() noexcept = default;
-		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(World);
+		GGLAB_DELETE_COPYABLE(World);
+		World(World&& other) noexcept
+		{
+			// Leave a usable empty registry so borrowed tooling can reject moved-away targets.
+			m_Registry.swap(other.m_Registry);
+		}
+		World& operator=(World&&) noexcept = default;
 		~World() = default;
 
 		entt::registry& GetRegistry() noexcept { return m_Registry; }

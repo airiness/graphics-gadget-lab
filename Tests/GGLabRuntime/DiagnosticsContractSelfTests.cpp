@@ -1,4 +1,5 @@
 #include "DiagnosticsContractSelfTests.h"
+#include "Diagnostics/WorldTooling.h"
 #include "Diagnostics/CameraTooling.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/Asset/AssetToolingControlBase.h"
@@ -129,6 +130,17 @@ namespace gglab
 	static_assert(!CameraToolingQuery<CameraToolingControlBase>);
 	static_assert(CameraToolingMutation<CameraToolingControlBase>);
 
+	template <typename T>
+	concept WorldToolingQuery = requires(const T& value) {
+		{ value.GetEntities() } -> std::same_as<WorldToolingSnapshot>;
+	};
+	template <typename T>
+	concept WorldToolingMutation = requires(T& value) { value.DestroyEntity(EntityToolingTarget{}); };
+	static_assert(WorldToolingQuery<WorldToolingViewBase>);
+	static_assert(!WorldToolingMutation<WorldToolingViewBase>);
+	static_assert(!WorldToolingQuery<WorldToolingControlBase>);
+	static_assert(WorldToolingMutation<WorldToolingControlBase>);
+
 	namespace
 	{
 		class ContractGpuProfiler final : public GpuProfiler
@@ -223,6 +235,105 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			World world;
+			WorldTooling tooling(world);
+			const WorldToolingViewBase& view = tooling;
+			WorldToolingControlBase& control = tooling;
+			const auto empty = view.GetEntities();
+			context.Check(empty.m_WorldId != 0 && empty.m_Entities.empty() &&
+				!control.DestroyEntity({}), "World tooling identifies empty worlds and rejects empty targets");
+			const auto target = control.CreateEntity();
+			const auto original = view.GetEntities();
+			context.Check(original.FindEntity(target) && original.FindEntity(target)->m_Transform &&
+				!original.FindEntity(target)->m_Light && !control.AddTransform(target),
+				"Entity creation supplies one transform and duplicate additions are rejected");
+			context.Check(control.AddLight(target) && !control.AddLight(target) &&
+				control.AddModel(target, ModelID{ 42 }) && !control.AddModel(target, ModelID{ 43 }),
+				"Light/model additions retain one component and do not replace model assignment");
+			const auto defaults = view.GetEntities();
+			const auto* entity = defaults.FindEntity(target);
+			context.Check(entity && entity->m_Light && entity->m_Light->m_Type == LightType::Point &&
+				entity->m_Light->m_Intensity == 3.0f && entity->m_Light->m_Range == 15.0f &&
+				entity->m_Light->m_SpotAngle == 45.0f && entity->m_Model->m_ModelId == ModelID{ 42 } &&
+				defaults.m_Entities.size() == 1 && !original.FindEntity(target)->m_Light,
+				"Snapshots deduplicate multi-component entities and preserve authoring defaults as owned values");
+			components::TransformComponent transform;
+			transform.m_Position = Vector3(2.0f, 3.0f, 4.0f);
+			context.Check(control.SetTransform(target, transform) &&
+				view.GetEntities().FindEntity(target)->m_Transform->m_Position.m_X == 2.0f &&
+				original.FindEntity(target)->m_Transform->m_Position.m_X == 0.0f,
+				"Transform commands update the entity without mutating retained observations");
+			components::LightComponent light;
+			light.m_DirectionalShadowSettings.emplace();
+			light.m_Intensity = -2.0f;
+			light.m_Range = -1.0f;
+			light.m_SpotAngle = 400.0f;
+			control.SetLight(target, light);
+			const auto directional = view.GetEntities();
+			context.Check(directional.FindEntity(target)->m_Light->m_DirectionalShadowSettings &&
+				directional.FindEntity(target)->m_Light->m_Intensity == 0.0f &&
+				directional.FindEntity(target)->m_Light->m_Range == 0.001f &&
+				directional.FindEntity(target)->m_Light->m_SpotAngle == 179.0f,
+				"Light authoring retains value normalization and optional shadow settings");
+			light.m_Type = LightType::Spot;
+			control.SetLight(target, light);
+			context.Check(!view.GetEntities().FindEntity(target)->m_Light->m_DirectionalShadowSettings &&
+				directional.FindEntity(target)->m_Light->m_DirectionalShadowSettings,
+				"Changing away from directional lighting clears authoring shadows without changing copied values");
+			World otherWorld;
+			WorldTooling otherTooling(otherWorld);
+			const auto otherTarget = otherTooling.CreateEntity();
+			context.Check(otherTarget.m_EntityId == target.m_EntityId &&
+				otherTarget.m_WorldId != target.m_WorldId &&
+				!otherTooling.DestroyEntity(target) && !otherTooling.SetTransform(target, transform) &&
+				!otherTooling.GetEntities().FindEntity(target),
+				"Matching entity IDs in different Worlds cannot alias a selected or pending-delete target");
+			context.Check(control.DestroyEntity(target), "Entity deletion reaches the owning registry");
+			const auto replacement = control.CreateEntity();
+			context.Check(entt::to_entity(static_cast<entt::entity>(target.m_EntityId)) ==
+				entt::to_entity(static_cast<entt::entity>(replacement.m_EntityId)) &&
+				target.m_EntityId != replacement.m_EntityId &&
+				!control.DestroyEntity(target) && !control.AddTransform(target) &&
+				!control.AddLight(target) && !control.AddModel(target, ModelID{ 42 }) &&
+				!control.SetTransform(target, transform) && !control.SetLight(target, light) &&
+				view.GetEntities().FindEntity(replacement) && original.FindEntity(target),
+				"Every command rejects a recycled entity's old version and retained snapshots stay independent");
+			const auto rawEntity = world.GetRegistry().create();
+			const EntityToolingTarget rawTarget{ empty.m_WorldId, entt::to_integral(rawEntity) };
+			context.Check(!view.GetEntities().FindEntity(rawTarget) &&
+				!control.SetTransform(rawTarget, transform) && !control.SetLight(rawTarget, light) &&
+				!control.AddModel(rawTarget, {}) && control.AddModel(rawTarget, ModelID{ 7 }) &&
+				view.GetEntities().FindEntity(rawTarget)->m_Transform,
+				"Unsupported empty entities stay out of the list; model addition repairs a missing transform");
+			world.GetRegistry().remove<components::TransformComponent>(rawEntity);
+			context.Check(control.AddLight(rawTarget) && view.GetEntities().FindEntity(rawTarget)->m_Transform,
+				"Adding a light also repairs a missing transform");
+			world.GetRegistry().remove<components::TransformComponent>(rawEntity);
+			context.Check(control.AddTransform(rawTarget) && !control.AddTransform(rawTarget),
+				"Explicit transform repair preserves existing components");
+			const auto sorted = view.GetEntities();
+			context.Check(sorted.m_Entities.size() == 2 &&
+				sorted.m_Entities[0].m_Target.m_EntityId < sorted.m_Entities[1].m_Target.m_EntityId,
+				"Entity observations retain the panel's numeric versioned-ID ordering");
+			WorldTooling nextDraw(world);
+			context.Check(nextDraw.GetEntities().m_WorldId == empty.m_WorldId,
+				"Reconstructing a draw-scoped adapter preserves World identity");
+			World movedWorld(std::move(world));
+			WorldTooling movedTooling(movedWorld);
+			context.Check(movedTooling.GetEntities().FindEntity(replacement) &&
+				tooling.GetEntities().m_WorldId == 0 && !tooling.DestroyEntity(replacement),
+				"World identity follows registry moves and invalidates adapters bound to the moved-from World");
+			WorldTooling reusedSource(world);
+			context.Check(reusedSource.GetEntities().m_WorldId != empty.m_WorldId &&
+				!reusedSource.DestroyEntity(replacement),
+				"A reused moved-from World receives a fresh identity");
+			otherWorld = std::move(movedWorld);
+			WorldTooling assignedTooling(otherWorld);
+			context.Check(assignedTooling.GetEntities().FindEntity(replacement) &&
+				!otherTooling.DestroyEntity(otherTarget) && !movedTooling.DestroyEntity(replacement),
+				"World move assignment preserves incoming identity and invalidates previously bound adapters");
+		}
 		{
 			CameraRig rig;
 			CameraTooling tooling(rig);

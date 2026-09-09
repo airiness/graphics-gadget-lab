@@ -25,7 +25,8 @@ namespace gglab
 	class PostProcessPreviewViewBase;
 	class RenderPipelineOverlayExtensionBase;
 	class ShadowPreviewViewBase;
-	class World;
+	class WorldToolingViewBase;
+	class WorldToolingControlBase;
 	class DirectionalLightViewBase;
 	class DirectionalLightControlBase;
 	struct DebugDrawFrameView;
@@ -49,7 +50,8 @@ namespace gglab
 		const CameraToolingViewBase* m_Cameras = nullptr;
 		CameraToolingControlBase* m_CameraControl = nullptr;
 		const CameraRenderViewQueryBase* m_CameraRenderViewQuery = nullptr;
-		World* m_World = nullptr;
+		const WorldToolingViewBase* m_WorldView = nullptr;
+		WorldToolingControlBase* m_WorldControl = nullptr;
 		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
 		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
 		AssetToolingControlBase* m_AssetControl = nullptr;

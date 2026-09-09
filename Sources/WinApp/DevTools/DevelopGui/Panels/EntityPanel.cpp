@@ -3,7 +3,11 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/StringIdFormatting.h"
-#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Scene/WorldTooling.h"
+#include <format>
+#include <span>
+#include <string>
+#include <string_view>
 #include "DevTools/AssetSnapshotText.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
@@ -32,7 +36,9 @@ namespace gglab
 
 		struct EntityPanelState
 		{
-			entt::entity m_SelectedEntity = entt::null;
+			EntityToolingTarget m_SelectedEntity{};
+			EntityToolingTarget m_DeleteTarget{};
+			bool m_RequestDelete = false;
 			int32_t m_ComponentFilter = static_cast<int32_t>(EntityComponentFilter::All);
 			bool m_SelectCreatedEntity = true;
 			bool m_ShowWorldLinks = true;
@@ -40,151 +46,53 @@ namespace gglab
 
 		struct EntityListItemAnchor
 		{
-			entt::entity m_Entity = entt::null;
+			EntityToolingTarget m_Entity{};
 			ImVec2 m_Position = ImVec2(0.0f, 0.0f);
 			bool m_Selected = false;
 			bool m_Hovered = false;
 		};
 
-		[[nodiscard]] bool PassesFilter(const entt::registry& registry, entt::entity entity,
+		[[nodiscard]] bool PassesFilter(const EntityToolingObservation& entity,
 			EntityComponentFilter filter) noexcept
 		{
 			switch (filter)
 			{
-			case EntityComponentFilter::Transform:
-				return registry.all_of<components::TransformComponent>(entity);
-			case EntityComponentFilter::Model:
-				return registry.all_of<components::ModelComponent>(entity);
-			case EntityComponentFilter::Light:
-				return registry.all_of<components::LightComponent>(entity);
-			case EntityComponentFilter::All:
-			default:
-				return true;
+			case EntityComponentFilter::Transform: return entity.m_Transform.has_value();
+			case EntityComponentFilter::Model: return entity.m_Model.has_value();
+			case EntityComponentFilter::Light: return entity.m_Light.has_value();
+			default: return true;
 			}
 		}
 
-		[[nodiscard]] std::string BuildEntityLabel(
-			const entt::registry& registry, entt::entity entity) noexcept
+		[[nodiscard]] std::string BuildEntityLabel(const EntityToolingObservation& entity)
 		{
-			std::string label = std::format("Entity {}", entt::to_integral(entity));
+			std::string label = std::format("Entity {}", entity.m_Target.m_EntityId);
 			bool hasAnyComponent = false;
-			auto appendComponent = [&](std::string_view name)
-				{
-					label += hasAnyComponent ? ", " : " [";
-					label += name;
-					hasAnyComponent = true;
-				};
-
-			if (registry.all_of<components::TransformComponent>(entity))
-			{
-				appendComponent("Transform");
-			}
-			if (registry.all_of<components::ModelComponent>(entity))
-			{
-				appendComponent("Model");
-			}
-			if (registry.all_of<components::LightComponent>(entity))
-			{
-				appendComponent("Light");
-			}
-			if (hasAnyComponent)
-			{
-				label += "]";
-			}
+			auto appendComponent = [&](std::string_view name) {
+				label += hasAnyComponent ? ", " : " [";
+				label += name;
+				hasAnyComponent = true;
+			};
+			if (entity.m_Transform) appendComponent("Transform");
+			if (entity.m_Model) appendComponent("Model");
+			if (entity.m_Light) appendComponent("Light");
+			if (hasAnyComponent) label += "]";
 			return label;
 		}
 
-		[[nodiscard]] std::vector<entt::entity> CollectEntities(
-			const entt::registry& registry, EntityComponentFilter filter)
-		{
-			std::vector<entt::entity> entities;
-
-			auto addEntity = [&](entt::entity entity)
-				{
-					if (!PassesFilter(registry, entity, filter) ||
-						std::find(entities.begin(), entities.end(), entity) != entities.end())
-					{
-						return;
-					}
-					entities.push_back(entity);
-				};
-
-			for (const entt::entity entity : registry.view<components::TransformComponent>())
-			{
-				addEntity(entity);
-			}
-			for (const entt::entity entity : registry.view<components::ModelComponent>())
-			{
-				addEntity(entity);
-			}
-			for (const entt::entity entity : registry.view<components::LightComponent>())
-			{
-				addEntity(entity);
-			}
-
-			std::sort(entities.begin(), entities.end(), [](entt::entity lhs, entt::entity rhs)
-				{ return entt::to_integral(lhs) < entt::to_integral(rhs); });
-			return entities;
-		}
-
-		entt::entity CreateEntity(entt::registry& registry) noexcept
-		{
-			const auto entity = registry.create();
-			registry.emplace<components::TransformComponent>(entity);
-			return entity;
-		}
-
-		void AddDefaultLightComponent(entt::registry& registry, entt::entity entity) noexcept
-		{
-			if (!registry.valid(entity) || registry.all_of<components::LightComponent>(entity))
-			{
-				return;
-			}
-
-			if (!registry.all_of<components::TransformComponent>(entity))
-			{
-				registry.emplace<components::TransformComponent>(entity);
-			}
-
-			components::LightComponent light{};
-			light.m_Type = LightType::Point;
-			light.m_Color = Color::White;
-			light.m_Intensity = 3.0f;
-			light.m_Range = 15.0f;
-			light.m_SpotAngle = 45.0f;
-			registry.emplace<components::LightComponent>(entity, light);
-		}
-
-		void AddModelComponent(
-			entt::registry& registry, entt::entity entity, ModelID modelId) noexcept
-		{
-			if (!registry.valid(entity) || !modelId.IsValid() ||
-				registry.all_of<components::ModelComponent>(entity))
-			{
-				return;
-			}
-
-			if (!registry.all_of<components::TransformComponent>(entity))
-			{
-				registry.emplace<components::TransformComponent>(entity);
-			}
-
-			components::ModelComponent model{};
-			model.m_ModelId = modelId;
-			registry.emplace<components::ModelComponent>(entity, model);
-		}
-
-		void DrawEntityListToolbar(entt::registry& registry, EntityPanelState& state) noexcept
+		void DrawEntityListToolbar(WorldToolingControlBase* control, EntityPanelState& state) noexcept
 		{
 			ImGui::PushID("EntityListToolbar");
-			if (ImGui::Button("Add Entity"))
+			ImGui::BeginDisabled(!control);
+			if (ImGui::Button("Add Entity") && control)
 			{
-				const entt::entity entity = CreateEntity(registry);
+				const auto entity = control->CreateEntity();
 				if (state.m_SelectCreatedEntity)
 				{
 					state.m_SelectedEntity = entity;
 				}
 			}
+			ImGui::EndDisabled();
 			ImGui::SameLine();
 			ImGui::Checkbox("Select Created", &state.m_SelectCreatedEntity);
 			ImGui::SameLine();
@@ -196,7 +104,7 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawEntityList(const entt::registry& registry, std::span<const entt::entity> entities,
+		void DrawEntityList(std::span<const EntityToolingObservation> entities,
 			EntityPanelState& state, std::vector<EntityListItemAnchor>& anchors) noexcept
 		{
 			ImGui::PushID("EntityList");
@@ -205,14 +113,16 @@ namespace gglab
 
 			if (!ImGui::BeginChild("List", ImVec2(0.0f, 0.0f), true))
 			{
+				ImGui::EndChild();
 				ImGui::PopID();
 				return;
 			}
 
-			for (const entt::entity entity : entities)
+			for (const auto& observation : entities)
 			{
-				const std::string label = BuildEntityLabel(registry, entity);
-				ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
+				const auto entity = observation.m_Target;
+				const std::string label = BuildEntityLabel(observation);
+				ImGui::PushID(static_cast<int>(entity.m_EntityId));
 				if (ImGui::Selectable(label.c_str(), entity == state.m_SelectedEntity))
 				{
 					state.m_SelectedEntity = entity;
@@ -237,7 +147,7 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawEntityWorldLinks(const entt::registry& registry, const EntityPanelState& state,
+		void DrawEntityWorldLinks(const WorldToolingSnapshot& snapshot, const EntityPanelState& state,
 			std::span<const EntityListItemAnchor> anchors,
 			const RenderView* mainRenderView) noexcept
 		{
@@ -260,14 +170,13 @@ namespace gglab
 				const bool selected =
 					anchor.m_Selected || anchor.m_Entity == state.m_SelectedEntity;
 				const bool shouldDraw = selected || anchor.m_Hovered;
-				if (!shouldDraw || !registry.valid(anchor.m_Entity))
+				if (!shouldDraw)
 				{
 					continue;
 				}
 
-				const auto* transform =
-					registry.try_get<components::TransformComponent>(anchor.m_Entity);
-				if (transform == nullptr)
+				const auto* entity = snapshot.FindEntity(anchor.m_Entity);
+				if (!entity || !entity->m_Transform)
 				{
 					continue;
 				}
@@ -275,7 +184,7 @@ namespace gglab
 				ImVec2 worldScreenPosition;
 				bool screenClamped = false;
 				if (!devtools::ProjectWorldPositionToScreenClamped(
-					*mainRenderView, transform->m_Position, worldScreenPosition, screenClamped))
+					*mainRenderView, entity->m_Transform->m_Position, worldScreenPosition, screenClamped))
 				{
 					continue;
 				}
@@ -300,7 +209,7 @@ namespace gglab
 				}
 
 				const std::string label =
-					std::format("Entity {}", entt::to_integral(anchor.m_Entity));
+					std::format("Entity {}", anchor.m_Entity.m_EntityId);
 				const ImVec2 labelPosition(
 					worldScreenPosition.x + radius + 5.0f, worldScreenPosition.y - radius - 2.0f);
 				drawList->AddText(ImVec2(labelPosition.x + 1.0f, labelPosition.y + 1.0f),
@@ -309,12 +218,13 @@ namespace gglab
 			}
 		}
 
-		void DrawTransformComponent(components::TransformComponent& transform) noexcept
+		bool DrawTransformComponent(components::TransformComponent& transform) noexcept
 		{
+			bool changed = false;
 			ImGui::PushID("Component.Transform");
 			if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				ImGui::DragFloat3("Translate", &transform.m_Position.m_X, 0.05f);
+				changed |= ImGui::DragFloat3("Translate", &transform.m_Position.m_X, 0.05f);
 
 				Vector3 euler = transform.m_Rotation.ToEuler();
 				float rotationDegrees[3] = {
@@ -324,6 +234,7 @@ namespace gglab
 				};
 				if (ImGui::DragFloat3("Rotate (deg)", rotationDegrees, 0.25f))
 				{
+					changed = true;
 					transform.m_Rotation = math::CreateFromYawPitchRoll(
 						math::ToRadians(rotationDegrees[1]), math::ToRadians(rotationDegrees[0]),
 						math::ToRadians(rotationDegrees[2]));
@@ -331,45 +242,51 @@ namespace gglab
 
 				if (ImGui::DragFloat3("Scale", &transform.m_Scale.m_X, 0.01f, 0.001f, 1000.0f))
 				{
+					changed = true;
 					transform.m_Scale.m_X = std::max(transform.m_Scale.m_X, 0.001f);
 					transform.m_Scale.m_Y = std::max(transform.m_Scale.m_Y, 0.001f);
 					transform.m_Scale.m_Z = std::max(transform.m_Scale.m_Z, 0.001f);
 				}
 			}
 			ImGui::PopID();
+			return changed;
 		}
 
-		void DrawDirectionalShadowSettings(DirectionalShadowSettings& settings) noexcept
+		bool DrawDirectionalShadowSettings(DirectionalShadowSettings& settings) noexcept
 		{
+			bool changed = false;
 			ImGui::PushID("DirectionalShadowSettings");
-			ImGui::Checkbox("Enable Shadow", &settings.m_Enable);
+			changed |= ImGui::Checkbox("Enable Shadow", &settings.m_Enable);
 			ImGui::SameLine();
-			ImGui::Checkbox("PCF", &settings.m_EnablePCF);
+			changed |= ImGui::Checkbox("PCF", &settings.m_EnablePCF);
 
 			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
 			if (ImGui::DragInt("Shadow Map Size", &shadowMapSize, 16.0f, 256, 8192))
 			{
+				changed = true;
 				settings.m_ShadowMapSize = static_cast<uint32_t>(std::max(shadowMapSize, 1));
 			}
-			ImGui::DragFloat(
+			changed |= ImGui::DragFloat(
 				"Max Shadow Distance", &settings.m_MaxShadowDistance, 1.0f, 1.0f, 10000.0f, "%.1f");
-			ImGui::DragFloat("Caster Extrusion", &settings.m_CasterExtrusionDistance, 1.0f, 0.0f,
+			changed |= ImGui::DragFloat("Caster Extrusion", &settings.m_CasterExtrusionDistance, 1.0f, 0.0f,
 				10000.0f, "%.1f");
-			ImGui::DragFloat(
+			changed |= ImGui::DragFloat(
 				"Ortho Padding", &settings.m_OrthoPadding, 0.1f, 0.0f, 1000.0f, "%.2f");
-			ImGui::DragFloat(
+			changed |= ImGui::DragFloat(
 				"Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
-			ImGui::DragFloat(
+			changed |= ImGui::DragFloat(
 				"Receiver Depth Bias", &settings.m_ReceiverDepthBias, 0.0001f, 0.0f, 0.1f, "%.5f");
-			ImGui::DragInt(
+			changed |= ImGui::DragInt(
 				"Rasterizer Depth Bias", &settings.m_RasterizerDepthBias, 1.0f, -100000, 100000);
-			ImGui::DragFloat("Slope Scaled Bias", &settings.m_RasterizerSlopeScaledDepthBias, 0.01f,
+			changed |= ImGui::DragFloat("Slope Scaled Bias", &settings.m_RasterizerSlopeScaledDepthBias, 0.01f,
 				-100.0f, 100.0f, "%.3f");
 			ImGui::PopID();
+			return changed;
 		}
 
-		void DrawLightComponent(components::LightComponent& light) noexcept
+		bool DrawLightComponent(components::LightComponent& light) noexcept
 		{
+			bool changed = false;
 			ImGui::PushID("Component.Light");
 			if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
 			{
@@ -377,6 +294,7 @@ namespace gglab
 				int type = static_cast<int>(light.m_Type);
 				if (ImGui::Combo("Type", &type, lightTypes, IM_ARRAYSIZE(lightTypes)))
 				{
+					changed = true;
 					light.m_Type = static_cast<LightType>(
 						std::clamp(type, static_cast<int>(LightType::Directional),
 							static_cast<int>(LightType::Point)));
@@ -393,15 +311,18 @@ namespace gglab
 				};
 				if (ImGui::ColorEdit3("Color", color))
 				{
+					changed = true;
 					light.m_Color.m_R = color[0];
 					light.m_Color.m_G = color[1];
 					light.m_Color.m_B = color[2];
 				}
 
-				ImGui::DragFloat("Intensity", &light.m_Intensity, 0.05f, 0.0f, 1000.0f, "%.3f");
-				ImGui::DragFloat("Range", &light.m_Range, 0.1f, 0.001f, 10000.0f, "%.2f");
-				ImGui::DragFloat("Spot Angle", &light.m_SpotAngle, 0.1f, 0.001f, 179.0f, "%.2f");
+				changed |= ImGui::DragFloat("Intensity", &light.m_Intensity, 0.05f, 0.0f, 1000.0f, "%.3f");
+				changed |= ImGui::DragFloat("Range", &light.m_Range, 0.1f, 0.001f, 10000.0f, "%.2f");
+				changed |= ImGui::DragFloat("Spot Angle", &light.m_SpotAngle, 0.1f, 0.001f, 179.0f, "%.2f");
 
+				changed |= light.m_Intensity < 0.0f || light.m_Range < 0.001f ||
+					light.m_SpotAngle < 0.001f || light.m_SpotAngle > 179.0f;
 				light.m_Intensity = std::max(light.m_Intensity, 0.0f);
 				light.m_Range = std::max(light.m_Range, 0.001f);
 				light.m_SpotAngle = std::clamp(light.m_SpotAngle, 0.001f, 179.0f);
@@ -411,6 +332,7 @@ namespace gglab
 					bool castShadows = light.m_DirectionalShadowSettings.has_value();
 					if (ImGui::Checkbox("Cast Directional Shadows", &castShadows))
 					{
+						changed = true;
 						if (castShadows)
 						{
 							light.m_DirectionalShadowSettings.emplace();
@@ -424,7 +346,7 @@ namespace gglab
 					if (light.m_DirectionalShadowSettings &&
 						ImGui::TreeNode("Directional Shadow Settings"))
 					{
-						DrawDirectionalShadowSettings(*light.m_DirectionalShadowSettings);
+						changed |= DrawDirectionalShadowSettings(*light.m_DirectionalShadowSettings);
 						ImGui::TreePop();
 					}
 				}
@@ -433,6 +355,7 @@ namespace gglab
 				ImGui::Text("Resolved Type: %s", lightType.c_str());
 			}
 			ImGui::PopID();
+			return changed;
 		}
 
 		void DrawModelComponent(
@@ -471,27 +394,29 @@ namespace gglab
 			ImGui::PopID();
 		}
 
-		void DrawAddComponentButton(entt::registry& registry, entt::entity entity,
+		void DrawAddComponentButton(WorldToolingControlBase* control, const EntityToolingObservation& observation,
 			const AssetSnapshot* assetSnapshot) noexcept
 		{
 			ImGui::PushID("AddComponent");
+			ImGui::BeginDisabled(!control);
+			const auto entity = observation.m_Target;
 			if (ImGui::Button("+"))
 			{
 				ImGui::OpenPopup("ComponentMenu");
 			}
 			if (ImGui::BeginPopup("ComponentMenu"))
 			{
-				const bool hasTransform = registry.all_of<components::TransformComponent>(entity);
-				const bool hasLight = registry.all_of<components::LightComponent>(entity);
-				const bool hasModel = registry.all_of<components::ModelComponent>(entity);
+				const bool hasTransform = observation.m_Transform.has_value();
+				const bool hasLight = observation.m_Light.has_value();
+				const bool hasModel = observation.m_Model.has_value();
 
 				if (ImGui::MenuItem("Transform", "Required", false, !hasTransform))
 				{
-					registry.emplace<components::TransformComponent>(entity);
+					if (control) control->AddTransform(entity);
 				}
 				if (ImGui::MenuItem("Light", nullptr, false, !hasLight))
 				{
-					AddDefaultLightComponent(registry, entity);
+					if (control) control->AddLight(entity);
 				}
 				if (hasModel)
 				{
@@ -513,105 +438,111 @@ namespace gglab
 							"{}##{}", devtools::ModelDisplayName(model), model.m_Id.Value());
 						if (ImGui::MenuItem(label.c_str()))
 						{
-							AddModelComponent(registry, entity, model.m_Id);
+							if (control) control->AddModel(entity, model.m_Id);
 						}
 					}
 					ImGui::EndMenu();
 				}
 				ImGui::EndPopup();
 			}
+			ImGui::EndDisabled();
 			ImGui::PopID();
 		}
 
-		void DrawSelectedEntity(entt::registry& registry, EntityPanelState& state,
-			const AssetSnapshot* assetSnapshot) noexcept
+		void DrawSelectedEntity(const WorldToolingViewBase& view, WorldToolingControlBase* control,
+			EntityPanelState& state, const AssetSnapshot* assetSnapshot) noexcept
 		{
-			if (state.m_SelectedEntity == entt::null || !registry.valid(state.m_SelectedEntity))
+			auto snapshot = view.GetEntities();
+			const auto* selected = snapshot.FindEntity(state.m_SelectedEntity);
+			if (!selected)
 			{
 				ImGui::TextDisabled("No entity selected.");
-				state.m_SelectedEntity = entt::null;
+				state.m_SelectedEntity = {};
 				return;
 			}
-
-			const entt::entity entity = state.m_SelectedEntity;
-			ImGui::PushID(static_cast<int>(entt::to_integral(entity)));
-			ImGui::Text("Entity %u", entt::to_integral(entity));
+			auto observation = *selected;
+			const auto entity = observation.m_Target;
+			ImGui::PushID(static_cast<int>(entity.m_EntityId));
+			ImGui::Text("Entity %u", entity.m_EntityId);
 			ImGui::SameLine();
-			DrawAddComponentButton(registry, entity, assetSnapshot);
+			DrawAddComponentButton(control, observation, assetSnapshot);
+			snapshot = view.GetEntities();
+			if (const auto* updated = snapshot.FindEntity(entity)) observation = *updated;
 			ImGui::SameLine();
+			ImGui::BeginDisabled(!control);
 			if (ImGui::Button("Delete Entity"))
 			{
-				ImGui::OpenPopup("DeleteEntityConfirm");
+				state.m_DeleteTarget = entity;
+				state.m_RequestDelete = true;
 			}
-
-			if (ImGui::BeginPopupModal(
-				"DeleteEntityConfirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-			{
-				ImGui::Text("Delete Entity %u?", entt::to_integral(entity));
-				if (ImGui::Button("Delete"))
-				{
-					if (registry.valid(entity))
-					{
-						registry.destroy(entity);
-					}
-					state.m_SelectedEntity = entt::null;
-					ImGui::CloseCurrentPopup();
-					ImGui::EndPopup();
-					ImGui::PopID();
-					return;
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel"))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
-
 			ImGui::Separator();
-
-			if (auto* transform = registry.try_get<components::TransformComponent>(entity))
+			if (observation.m_Transform)
 			{
-				DrawTransformComponent(*transform);
+				if (DrawTransformComponent(*observation.m_Transform) && control)
+					control->SetTransform(entity, *observation.m_Transform);
 			}
 			else
 			{
 				ImGui::TextColored(devtools::style::NoticeTextColor,
 					"Transform is missing. New entities always include it.");
-				if (ImGui::Button("Repair Transform"))
-				{
-					registry.emplace<components::TransformComponent>(entity);
-				}
+				if (ImGui::Button("Repair Transform") && control) control->AddTransform(entity);
 			}
-
-			if (auto* light = registry.try_get<components::LightComponent>(entity))
-			{
-				DrawLightComponent(*light);
-			}
-
-			if (const auto* model = registry.try_get<components::ModelComponent>(entity))
-			{
-				DrawModelComponent(*model, assetSnapshot);
-			}
-
+			if (observation.m_Light && DrawLightComponent(*observation.m_Light) && control)
+				control->SetLight(entity, *observation.m_Light);
+			ImGui::EndDisabled();
+			if (observation.m_Model) DrawModelComponent(*observation.m_Model, assetSnapshot);
 			ImGui::PopID();
 		}
+
+		void DrawDeleteConfirmation(const WorldToolingSnapshot& snapshot,
+			WorldToolingControlBase* control, EntityPanelState& state) noexcept
+		{
+			if (state.m_RequestDelete)
+			{
+				ImGui::OpenPopup("DeleteEntityConfirm");
+				state.m_RequestDelete = false;
+			}
+			if (!ImGui::BeginPopupModal("DeleteEntityConfirm", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+				return;
+			if (!snapshot.FindEntity(state.m_DeleteTarget))
+			{
+				ImGui::CloseCurrentPopup();
+				ImGui::EndPopup();
+				return;
+			}
+			ImGui::Text("Delete Entity %u?", state.m_DeleteTarget.m_EntityId);
+			ImGui::BeginDisabled(!control);
+			if (ImGui::Button("Delete") && control)
+			{
+				if (control->DestroyEntity(state.m_DeleteTarget) && state.m_SelectedEntity == state.m_DeleteTarget)
+					state.m_SelectedEntity = {};
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
 	}
 
 	void EntityPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_World)
+		auto& state = context.PanelState<EntityPanelState>();
+		if (!context.m_WorldView)
 		{
-			ImGui::TextUnformatted("No world bound in DevelopGuiContext.");
+			ImGui::TextUnformatted("World tooling query is not available.");
+			state.m_SelectedEntity = {};
+			DrawDeleteConfirmation({}, nullptr, state);
 			return;
 		}
 
-		auto& state = context.PanelState<EntityPanelState>();
-		auto& registry = context.m_World->GetRegistry();
+		const auto& view = *context.m_WorldView;
+		auto snapshot = view.GetEntities();
 		std::vector<EntityListItemAnchor> entityAnchors;
-		if (state.m_SelectedEntity != entt::null && !registry.valid(state.m_SelectedEntity))
+		if (!snapshot.FindEntity(state.m_SelectedEntity))
 		{
-			state.m_SelectedEntity = entt::null;
+			state.m_SelectedEntity = {};
 		}
 
 		ImGui::TextUnformatted("Entity");
@@ -624,27 +555,36 @@ namespace gglab
 			ImGui::TableNextRow();
 
 			ImGui::TableSetColumnIndex(0);
-			DrawEntityListToolbar(registry, state);
+			DrawEntityListToolbar(context.m_WorldControl, state);
+			snapshot = view.GetEntities();
 
 			const auto updatedFilter = static_cast<EntityComponentFilter>(std::clamp(
 				state.m_ComponentFilter, static_cast<int32_t>(EntityComponentFilter::All),
 				static_cast<int32_t>(EntityComponentFilter::Light)));
-			const std::vector<entt::entity> entities = CollectEntities(registry, updatedFilter);
+			std::vector<EntityToolingObservation> entities;
+			for (const auto& entity : snapshot.m_Entities)
+			{
+				if (PassesFilter(entity, updatedFilter)) entities.push_back(entity);
+			}
 			entityAnchors.reserve(entities.size());
-			DrawEntityList(registry, std::span<const entt::entity>(entities), state, entityAnchors);
+			DrawEntityList(entities, state, entityAnchors);
 
 			ImGui::TableSetColumnIndex(1);
 			const auto* assetSnapshot = context.m_Diagnostics
 				? context.m_Diagnostics->GetSnapshot<AssetSnapshot>()
 				: nullptr;
-			DrawSelectedEntity(registry, state, assetSnapshot);
+			DrawSelectedEntity(view, context.m_WorldControl, state, assetSnapshot);
 
 			ImGui::EndTable();
 		}
 
+		snapshot = view.GetEntities();
+		DrawDeleteConfirmation(snapshot, context.m_WorldControl, state);
+
 		const auto* views = context.m_Diagnostics
 			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
-		DrawEntityWorldLinks(registry, state, std::span<const EntityListItemAnchor>(entityAnchors),
+		snapshot = view.GetEntities();
+		DrawEntityWorldLinks(snapshot, state, std::span<const EntityListItemAnchor>(entityAnchors),
 			views ? views->FindView(RenderViewID::Main) : nullptr);
 	}
 }

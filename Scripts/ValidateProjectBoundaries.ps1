@@ -2169,6 +2169,23 @@ $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")
 )
 foreach ($itemPath in @(
+    (Join-Path $developGuiPanelsDir "EntityPanel.cpp"),
+    (Join-Path $developGuiPanelsDir "EntityPanel.h"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
+    (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    $hasEntityRegistryAccess = (Split-Path $itemPath -Leaf) -match '^EntityPanel\.(cpp|h)$' -and $content -match '\bGetRegistry\b'
+    if ($hasEntityRegistryAccess -or $content -match '\bm_World\b|\bentt::|Core/World\.h|Diagnostics/WorldTooling\.h|class\s+World\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "tooling-world-authoring-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "entity tooling must consume owned component values and scoped commands without live World or registry access"
+        })
+    }
+}
+foreach ($itemPath in @(
     (Join-Path $developGuiPanelsDir "CameraInspectorPanel.cpp"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiContext.h"),
     (Join-Path $developGuiPanelsDir "../DevelopGuiApplicationTooling.cpp"),

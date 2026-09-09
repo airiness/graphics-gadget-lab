@@ -93,7 +93,8 @@ namespace gglab
 				guiContext.m_CameraRenderViewQuery = context.m_CameraRenderViewQuery;
 				guiContext.m_DX12ResourceLifecycle = m_ResourceLifecycleTools.get();
 				guiContext.m_DX12ResourceLifecycleControl = m_ResourceLifecycleTools.get();
-				guiContext.m_World = context.m_World;
+				guiContext.m_WorldView = context.m_WorldView;
+				guiContext.m_WorldControl = context.m_WorldControl;
 				guiContext.m_DirectionalLight = context.m_DirectionalLight;
 				guiContext.m_DirectionalLightControl = context.m_DirectionalLightControl;
 				guiContext.m_AssetControl = context.m_AssetControl;

@@ -285,6 +285,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DirectionalLightTooling.cpp">
       <Filter>Diagnostics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\WorldTooling.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -982,6 +985,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\WorldTooling.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
       <Filter>Graphics\Asset</Filter>
@@ -1950,6 +1956,9 @@
       <Filter>Public\GGLabRuntime\Scene</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\DirectionalLightTooling.h">
+      <Filter>Public\GGLabRuntime\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\WorldTooling.h">
       <Filter>Public\GGLabRuntime\Scene</Filter>
     </ClInclude>
   </ItemGroup>
