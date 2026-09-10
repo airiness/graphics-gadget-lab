@@ -1,17 +1,6 @@
 #include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
-#include "Graphics/RHI/DX12/DX12QueueSystem.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorTypes.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
-#include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
-#include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12CommandList.h"
-#include "Graphics/RHI/DX12/DX12CommandContext.h"
-#include "Graphics/Utility/DXGIFormatUtils.h"
 
 #include <imgui.h>
 
@@ -24,29 +13,23 @@ namespace gglab
 			return false;
 		}
 
-		auto* dx12Context = dynamic_cast<DX12Context*>(&context);
-		if (!dx12Context)
+		m_Interop = CreateDX12GuiInterop(context);
+		if (!m_Interop)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"DevelopGui DX12 render backend requires the DX12 RHI backend.");
 			return false;
 		}
 
-		m_DX12Device = &dx12Context->GetDX12Device();
-		m_DescriptorManager = &dx12Context->GetDescriptorManager();
-		auto& swapChain = dx12Context->GetSwapChain();
+		const auto native = m_Interop->GetNativeInfo();
 
 		ImGui_ImplDX12_InitInfo initInfo{};
-		initInfo.Device = m_DX12Device->Get();
-		initInfo.CommandQueue =
-			dx12Context->GetQueueSystem().GetQueue(DX12QueueType::Graphics).Get();
-		initInfo.NumFramesInFlight = context.GetFrameSlotCount();
-		initInfo.RTVFormat = ToDXGIFormat(swapChain.GetFormat());
+		initInfo.Device = native.m_Device;
+		initInfo.CommandQueue = native.m_GraphicsQueue;
+		initInfo.NumFramesInFlight = native.m_FrameSlotCount;
+		initInfo.RTVFormat = native.m_ColorFormat;
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		initInfo.SrvDescriptorHeap = m_DescriptorManager
-			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)
-			->GetHeap()
-			->Get();
+		initInfo.SrvDescriptorHeap = native.m_TextureHeap;
 		initInfo.SrvDescriptorAllocFn = DescriptorAlloc;
 		initInfo.SrvDescriptorFreeFn = DescriptorFree;
 		initInfo.UserData = this;
@@ -58,8 +41,7 @@ namespace gglab
 			{
 				ImGui_ImplDX12_Shutdown();
 			}
-			m_DX12Device = nullptr;
-			m_DescriptorManager = nullptr;
+			m_Interop.reset();
 			return false;
 		}
 
@@ -75,8 +57,7 @@ namespace gglab
 		}
 
 		ImGui_ImplDX12_Shutdown();
-		m_DX12Device = nullptr;
-		m_DescriptorManager = nullptr;
+		m_Interop.reset();
 		m_IsInitialized = false;
 	}
 
@@ -100,44 +81,31 @@ namespace gglab
 			return;
 		}
 
-		auto* dx12Context = dynamic_cast<DX12GraphicsCommandContext*>(commandContext);
-		GGLAB_ASSERT_NOT_NULL(dx12Context);
-		if (!dx12Context)
+		auto* nativeCommands = m_Interop->PrepareDraw(commandContext, renderTarget);
+		if (!nativeCommands)
 		{
 			return;
 		}
 
-		const RHIRenderingAttachment colorAttachment{ .m_View = renderTarget };
-		commandContext->BeginRendering({ .m_ColorAttachments =
-			std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-
-		auto* heap = m_DescriptorManager
-			->GetFreeListAllocator(DX12DescriptorManager::AllocatorType::DevelopGuiSrv)
-			->GetHeap();
-		dx12Context->GetCommandList()->SetDescriptorHeap(*heap);
-
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx12Context->Get());
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), nativeCommands);
 	}
 
 	ImTextureID DevelopGuiDX12RenderBackend::ResolveTextureId(
 		RHIDescriptorHandle descriptor) const noexcept
 	{
-		if (!m_IsInitialized || !m_DescriptorManager || !descriptor.IsValid() ||
-			descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
+		if (!m_IsInitialized || !m_Interop)
 		{
 			return {};
 		}
 
-		auto* heap = m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav);
-		return heap ? static_cast<ImTextureID>(heap->GpuHandleAt(descriptor.m_Index).ptr)
-			: ImTextureID{};
+		return static_cast<ImTextureID>(m_Interop->ResolveTexture(descriptor).ptr);
 	}
 
 	void DevelopGuiDX12RenderBackend::DescriptorAlloc(ImGui_ImplDX12_InitInfo* info,
 		D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
 	{
 		auto* backend = static_cast<DevelopGuiDX12RenderBackend*>(info->UserData);
-		auto descriptorView = backend->m_DescriptorManager->AllocateDevelopGuiSrvView();
+		auto descriptorView = backend->m_Interop->AllocateTextureDescriptor();
 		*outCpuHandle = descriptorView.m_CpuHandle;
 		*outGpuHandle = descriptorView.m_GpuHandle;
 	}
@@ -147,6 +115,6 @@ namespace gglab
 	{
 		GGLAB_UNUSED(cpuHandle);
 		auto* backend = static_cast<DevelopGuiDX12RenderBackend*>(info->UserData);
-		backend->m_DescriptorManager->DeferFreeDevelopGuiSrvInFrame(gpuHandle);
+		backend->m_Interop->RetireTextureDescriptor(gpuHandle);
 	}
 }

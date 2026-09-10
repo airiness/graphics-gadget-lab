@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
@@ -156,7 +157,7 @@ namespace gglab
 		uint64_t m_CurrentGeneration = 1;
 	};
 
-	class VulkanDescriptorBacking
+	class VulkanDescriptorBacking : public VulkanImageViewLeaseBase
 	{
 	public:
 		enum class Kind : uint8_t
@@ -172,10 +173,10 @@ namespace gglab
 			std::shared_ptr<void> parentOwner, uint64_t estimatedRetainedBytes = 0) noexcept;
 		VulkanDescriptorBacking(VkDevice device, VkSampler sampler) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanDescriptorBacking);
-		~VulkanDescriptorBacking() noexcept;
+		~VulkanDescriptorBacking() noexcept override;
 
 		[[nodiscard]] Kind GetKind() const noexcept { return m_Kind; }
-		[[nodiscard]] VkImageView GetImageView() const noexcept { return m_ImageView; }
+		[[nodiscard]] VkImageView GetImageView() const noexcept override { return m_ImageView; }
 		[[nodiscard]] VkBufferView GetBufferView() const noexcept { return m_BufferView; }
 		[[nodiscard]] VkSampler GetSampler() const noexcept { return m_Sampler; }
 		[[nodiscard]] const std::shared_ptr<void>& GetParentOwner() const noexcept

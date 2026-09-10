@@ -2183,6 +2183,21 @@ foreach ($itemPath in @(
     }
 }
 
+# Native API objects are intentional here; Runtime implementation types are not.
+foreach ($backend in @("DX12", "Vulkan")) {
+    foreach ($extension in @("h", "cpp")) {
+        $itemPath = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Backends/$backend/DevelopGui${backend}RenderBackend.$extension"
+        $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+        if ($content -match '#include\s*[<"](?:Graphics|Diagnostics)[\\/]|\b(?:DX12|Vulkan)(?:Context|Device|DescriptorManager|DescriptorBacking|GraphicsCommandContext|SwapChain)\b') {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "native-gui-interop-boundary"
+                Target = ConvertTo-RepoRelativePath $itemPath
+                Reason = "native GUI adapters must consume Runtime Public interop without backend implementation objects"
+            })
+        }
+    }
+}
+
 $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")

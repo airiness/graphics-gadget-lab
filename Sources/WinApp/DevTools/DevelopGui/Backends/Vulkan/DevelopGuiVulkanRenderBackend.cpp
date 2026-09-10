@@ -1,11 +1,6 @@
 #include "DevTools/DevelopGui/Backends/Vulkan/DevelopGuiVulkanRenderBackend.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
-#include "Graphics/RHI/Vulkan/VulkanContext.h"
-#include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
-#include "Graphics/RHI/Vulkan/VulkanDevice.h"
-#include "Graphics/RHI/Vulkan/VulkanSwapChain.h"
 
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
@@ -46,14 +41,14 @@ namespace gglab
 		{
 			return false;
 		}
-		m_Context = dynamic_cast<VulkanContext*>(&context);
-		if (!m_Context)
+		m_Interop = CreateVulkanGuiInterop(context);
+		if (!m_Interop)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"DevelopGui Vulkan render backend requires the Vulkan RHI backend.");
 			return false;
 		}
-		m_Device = &m_Context->GetVulkanDevice();
+		m_Native = m_Interop->GetNativeInfo();
 		// The multi-viewport policy stays in io.ConfigFlags (GGLab never enables
 		// ImGuiConfigFlags_ViewportsEnable). This capability suppression states
 		// a fact about this vendored backend pair, not that policy: the vendored
@@ -66,8 +61,8 @@ namespace gglab
 		ImGui::GetIO().BackendFlags &= ~ImGuiBackendFlags_PlatformHasViewports;
 		if (!InitializeNativeBackend())
 		{
-			m_Context = nullptr;
-			m_Device = nullptr;
+			m_Interop.reset();
+			m_Native = {};
 			return false;
 		}
 		m_IsInitialized = true;
@@ -76,19 +71,19 @@ namespace gglab
 
 	void DevelopGuiVulkanRenderBackend::Finalize() noexcept
 	{
-		if (!m_Context && !m_Device)
+		if (!m_Interop && m_Native.m_Device == VK_NULL_HANDLE)
 		{
 			return;
 		}
 		// User texture sets and ImGui pipelines may still be referenced by an
 		// in-flight frame. Finalization is an explicit quiescent boundary.
-		if (m_IsInitialized && m_Context)
+		if (m_IsInitialized && m_Interop)
 		{
-			m_Context->WaitIdle();
+			m_Interop->WaitIdle();
 		}
 		ShutdownNativeBackend();
-		m_Context = nullptr;
-		m_Device = nullptr;
+		m_Interop.reset();
+		m_Native = {};
 		m_IsInitialized = false;
 	}
 
@@ -101,7 +96,7 @@ namespace gglab
 		}
 		if (PresentationContractChanged())
 		{
-			// VulkanContext recreates only at a queue-idle safe point. Application
+			// The RHI recreates only at a queue-idle safe point. Application
 			// begins DevelopGui after RHI BeginFrame, so no command in the active
 			// transaction has referenced the old ImGui contract yet.
 			ShutdownNativeBackend();
@@ -133,31 +128,25 @@ namespace gglab
 		{
 			return;
 		}
-		auto* vulkanContext = dynamic_cast<VulkanGraphicsCommandContext*>(commandContext);
-		GGLAB_ASSERT_NOT_NULL(vulkanContext);
-		if (!vulkanContext || vulkanContext->Get() == VK_NULL_HANDLE)
+		const VkCommandBuffer nativeCommands = m_Interop->PrepareDraw(commandContext, renderTarget);
+		if (nativeCommands == VK_NULL_HANDLE)
 		{
 			return;
 		}
 
-		const RHIRenderingAttachment colorAttachment{ .m_View = renderTarget };
-		commandContext->BeginRendering({ .m_ColorAttachments =
-			std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vulkanContext->Get());
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), nativeCommands);
 	}
 
 	ImTextureID DevelopGuiVulkanRenderBackend::ResolveTextureId(
 		RHIDescriptorHandle descriptor) const noexcept
 	{
-		if (!m_IsInitialized || !m_Device || m_TextureSampler == VK_NULL_HANDLE ||
+		if (!m_IsInitialized || !m_Interop || m_TextureSampler == VK_NULL_HANDLE ||
 			!descriptor.IsValid() || descriptor.m_HeapType != RHIDescriptorHeapType::CbvSrvUav)
 		{
 			return {};
 		}
-		auto backing = m_Device->GetDescriptorManager().GetPublishedResourceBacking(
-			descriptor.m_Index);
-		if (!backing || backing->GetKind() != VulkanDescriptorBacking::Kind::ImageView ||
-			backing->GetImageView() == VK_NULL_HANDLE)
+		auto backing = m_Interop->GetPublishedImage(descriptor.m_Index);
+		if (!backing)
 		{
 			return {};
 		}
@@ -203,14 +192,14 @@ namespace gglab
 
 	void DevelopGuiVulkanRenderBackend::CompletePreviousFrameTextureUses() noexcept
 	{
-		if (m_TextureFrameSerial == 0 || !m_Context)
+		if (m_TextureFrameSerial == 0 || !m_Interop)
 		{
 			return;
 		}
 		// ResolveTextureId runs before RHIContext submits the frame. The next
 		// successful GUI NewFrame is the first backend callback that can bind
 		// those touches to the committed graphics timeline value.
-		const uint64_t submittedTimeline = m_Context->GetSubmittedTimelineValue();
+		const uint64_t submittedTimeline = m_Interop->GetSubmittedTimelineValue();
 		auto completeUses = [this, submittedTimeline](std::vector<TextureBinding>& bindings) noexcept
 			{
 				for (TextureBinding& binding : bindings)
@@ -230,16 +219,14 @@ namespace gglab
 
 	void DevelopGuiVulkanRenderBackend::RetireStaleTextureBindings() noexcept
 	{
-		if (!m_Device)
+		if (!m_Interop)
 		{
 			return;
 		}
 		for (size_t index = 0; index < m_ActiveTextureBindings.size();)
 		{
 			const TextureBinding& binding = m_ActiveTextureBindings[index];
-			const auto publishedBacking =
-				m_Device->GetDescriptorManager().GetPublishedResourceBacking(
-					binding.m_SourceDescriptorIndex);
+			const auto publishedBacking = m_Interop->GetPublishedImage(binding.m_SourceDescriptorIndex);
 			// Keep a binding through the immediately following frame so callers
 			// resolving it every frame retain a stable ImTextureID. Replacement or
 			// one complete untouched frame makes it unreachable by contract.
@@ -255,13 +242,13 @@ namespace gglab
 
 	void DevelopGuiVulkanRenderBackend::ReclaimRetiredTextureBindings() noexcept
 	{
-		if (!m_Context || !ImGui::GetCurrentContext() ||
+		if (!m_Interop || !ImGui::GetCurrentContext() ||
 			!ImGui::GetIO().BackendRendererUserData)
 		{
 			return;
 		}
 		uint64_t completedTimeline = 0;
-		if (!m_Context->TryGetCompletedTimelineValue(completedTimeline))
+		if (!m_Interop->TryGetCompletedTimelineValue(completedTimeline))
 		{
 			return;
 		}
@@ -312,16 +299,16 @@ namespace gglab
 
 	bool DevelopGuiVulkanRenderBackend::InitializeNativeBackend() noexcept
 	{
-		GGLAB_ASSERT_NOT_NULL(m_Context);
-		GGLAB_ASSERT_NOT_NULL(m_Device);
-		const VulkanSwapChain& swapChain = m_Context->GetVulkanSwapChain();
-		const uint32_t imageCount = swapChain.GetImageCount();
-		if (imageCount < 2 || swapChain.GetVkFormat() == VK_FORMAT_UNDEFINED)
+		GGLAB_ASSERT_NOT_NULL(m_Interop);
+		GGLAB_ASSERT_NOT_NULL(m_Native.m_Device);
+		const auto presentation = m_Interop->GetPresentationState();
+		const uint32_t imageCount = presentation.m_ImageCount;
+		if (imageCount < 2 || presentation.m_ColorFormat == VK_FORMAT_UNDEFINED)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("Vulkan swapchain does not satisfy the ImGui image contract.");
 			return false;
 		}
-		const uint32_t minImageCount = std::clamp(swapChain.GetMinImageCount(), 2u, imageCount);
+		const uint32_t minImageCount = std::clamp(presentation.m_MinImageCount, 2u, imageCount);
 
 		VkSamplerCreateInfo samplerInfo{};
 		samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -333,21 +320,21 @@ namespace gglab
 		samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 		const VkResult samplerResult =
-			vkCreateSampler(m_Device->Get(), &samplerInfo, nullptr, &m_TextureSampler);
+			vkCreateSampler(m_Native.m_Device, &samplerInfo, nullptr, &m_TextureSampler);
 		if (samplerResult != VK_SUCCESS)
 		{
 			CheckVkResult(samplerResult);
 			return false;
 		}
 
-		const VkFormat colorFormat = swapChain.GetVkFormat();
+		const VkFormat colorFormat = presentation.m_ColorFormat;
 		ImGui_ImplVulkan_InitInfo initInfo{};
 		initInfo.ApiVersion = VK_API_VERSION_1_3;
-		initInfo.Instance = m_Device->GetInstance();
-		initInfo.PhysicalDevice = m_Device->GetPhysicalDevice();
-		initInfo.Device = m_Device->Get();
-		initInfo.QueueFamily = m_Device->GetGraphicsQueueFamilyIndex();
-		initInfo.Queue = m_Device->GetGraphicsQueue();
+		initInfo.Instance = m_Native.m_Instance;
+		initInfo.PhysicalDevice = m_Native.m_PhysicalDevice;
+		initInfo.Device = m_Native.m_Device;
+		initInfo.QueueFamily = m_Native.m_QueueFamily;
+		initInfo.Queue = m_Native.m_GraphicsQueue;
 		initInfo.DescriptorPoolSize = DevelopGuiDescriptorPoolSize;
 		initInfo.MinImageCount = minImageCount;
 		initInfo.ImageCount = imageCount;
@@ -366,14 +353,14 @@ namespace gglab
 			{
 				ImGui_ImplVulkan_Shutdown();
 			}
-			vkDestroySampler(m_Device->Get(), m_TextureSampler, nullptr);
+			vkDestroySampler(m_Native.m_Device, m_TextureSampler, nullptr);
 			m_TextureSampler = VK_NULL_HANDLE;
 			return false;
 		}
 
-		m_SwapChainGeneration = m_Context->GetSwapChainGeneration();
+		m_SwapChainGeneration = presentation.m_Generation;
 		m_PresentationContract = MakePresentationContract(
-			colorFormat, swapChain.GetMinImageCount(), imageCount);
+			colorFormat, presentation.m_MinImageCount, imageCount);
 		return true;
 	}
 
@@ -389,9 +376,9 @@ namespace gglab
 			m_ActiveTextureBindings.clear();
 			m_RetiredTextureBindings.clear();
 		}
-		if (m_TextureSampler != VK_NULL_HANDLE && m_Device)
+		if (m_TextureSampler != VK_NULL_HANDLE && m_Native.m_Device != VK_NULL_HANDLE)
 		{
-			vkDestroySampler(m_Device->Get(), m_TextureSampler, nullptr);
+			vkDestroySampler(m_Native.m_Device, m_TextureSampler, nullptr);
 			m_TextureSampler = VK_NULL_HANDLE;
 		}
 		m_SwapChainGeneration = 0;
@@ -426,11 +413,11 @@ namespace gglab
 
 	bool DevelopGuiVulkanRenderBackend::PresentationContractChanged() const noexcept
 	{
-		const VulkanSwapChain& swapChain = m_Context->GetVulkanSwapChain();
+		const auto presentation = m_Interop->GetPresentationState();
 		return IsPresentationContractChanged(
 			m_PresentationContract,
 			MakePresentationContract(
-				swapChain.GetVkFormat(), swapChain.GetMinImageCount(), swapChain.GetImageCount()));
+				presentation.m_ColorFormat, presentation.m_MinImageCount, presentation.m_ImageCount));
 	}
 
 	void DevelopGuiVulkanRenderBackend::CheckVkResult(VkResult result) noexcept

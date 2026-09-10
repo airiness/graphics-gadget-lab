@@ -636,6 +636,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12GpuProfiler.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12GuiInterop.cpp">
+      <Filter>Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12HResult.cpp">
       <Filter>Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -739,6 +742,9 @@
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp">
+      <Filter>Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGuiInterop.cpp">
       <Filter>Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanInstance.cpp">
@@ -1877,6 +1883,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ContextFactory.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12GuiInterop.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceLifecycleTools.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -1945,6 +1954,12 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGuiInterop.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanImageViewLease.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32ContextFactory.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>

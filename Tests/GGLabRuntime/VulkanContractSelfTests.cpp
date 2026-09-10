@@ -1,4 +1,5 @@
 #include "VulkanContractSelfTests.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
@@ -1886,6 +1887,31 @@ namespace gglab
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			// Null device keeps this ownership test independent of Vulkan/driver work.
+			const auto imageView = reinterpret_cast<VkImageView>(uintptr_t{ 1 });
+			auto parent = std::make_shared<int>(7);
+			std::weak_ptr<int> parentLifetime = parent;
+			auto backing = std::make_shared<VulkanDescriptorBacking>(
+				VK_NULL_HANDLE, imageView, parent);
+			std::shared_ptr<const VulkanImageViewLeaseBase> first = backing;
+			std::shared_ptr<const VulkanImageViewLeaseBase> second = backing;
+			context.Check(first.get() == second.get() && first->GetImageView() == imageView &&
+				!first.owner_before(second) && !second.owner_before(first),
+				"Native image leases preserve publication identity and share the existing ownership block");
+			std::shared_ptr<const VulkanImageViewLeaseBase> replacement =
+				std::make_shared<VulkanDescriptorBacking>(VK_NULL_HANDLE, imageView, nullptr);
+			context.Check(replacement.get() != first.get() && replacement->GetImageView() == first->GetImageView(),
+				"Image-view handle reuse does not alias distinct publication identities");
+			backing.reset();
+			parent.reset();
+			first.reset();
+			context.Check(!parentLifetime.expired() && second->GetImageView() == imageView,
+				"A retained native image lease pins the parent after the publisher releases its reference");
+			second.reset();
+			context.Check(parentLifetime.expired(),
+				"Releasing the final native image lease destroys the retained parent exactly once");
+		}
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
 		RunVulkanQueueSelectionTests(context);
