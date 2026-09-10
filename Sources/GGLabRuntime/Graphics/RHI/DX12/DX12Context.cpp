@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12Context.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ContextFactory.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/RHI/DX12/DX12CommandAllocator.h"
@@ -21,6 +22,12 @@
 
 namespace gglab
 {
+	std::unique_ptr<RHIContext> CreateDX12Context(const RHIContextDesc& desc, HWND window) noexcept
+	{
+		if (!window) return {};
+		return std::make_unique<DX12Context>(desc, window);
+	}
+
 	DX12FrameContext::DX12FrameContext(DX12Context* context, uint32_t frameSlotIndex) noexcept :
 		m_Context(context), m_FrameSlotIndex(frameSlotIndex)
 	{

@@ -1,6 +1,10 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ContextFactory.h"
+#if GGLAB_ENABLE_VULKAN
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
+#endif
 #include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
@@ -6378,6 +6382,17 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
+		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),
+			"DX12 composition rejects a missing window before creating backend objects");
+#if GGLAB_ENABLE_VULKAN
+		context.Check(!CreateVulkanWin32Context(nativeContextDesc, nullptr, nullptr, true),
+			"Vulkan Win32 composition rejects missing native handles before bootstrap");
+		// Sentinel handles must never reach WSI when host ABI suitability is false.
+		context.Check(!CreateVulkanWin32Context(nativeContextDesc,
+			reinterpret_cast<HINSTANCE>(1), reinterpret_cast<HWND>(1), false),
+			"Vulkan Win32 composition preserves the host ABI rejection before loader or WSI access");
+#endif
 		RunIBLPreviewContractTests(context);
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);

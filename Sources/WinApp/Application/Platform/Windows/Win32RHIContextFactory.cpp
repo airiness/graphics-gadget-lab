@@ -1,9 +1,8 @@
 #include "Application/Platform/Windows/Win32RHIContextFactory.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ContextFactory.h"
 #if GGLAB_ENABLE_VULKAN
-#include "Graphics/RHI/Vulkan/VulkanContext.h"
-#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
 #endif
 
 #include <memory>
@@ -40,13 +39,10 @@ namespace gglab
 		switch (m_Backend)
 		{
 		case RHIBackendType::DX12:
-			return std::make_unique<DX12Context>(desc, m_Window);
+			return CreateDX12Context(desc, m_Window);
 		case RHIBackendType::Vulkan:
 #if GGLAB_ENABLE_VULKAN
-		{
-			VulkanWin32SurfaceFactory surfaceFactory(m_Instance, m_Window);
-			return VulkanContext::Create(desc, surfaceFactory, sizeof(void*) == 8);
-		}
+			return CreateVulkanWin32Context(desc, m_Instance, m_Window, sizeof(void*) == 8);
 #else
 			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 				"The Vulkan RHI was requested, but this build has GGLAB_ENABLE_VULKAN=0.");

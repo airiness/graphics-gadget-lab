@@ -193,6 +193,9 @@
     <Filter Include="Public\GGLabRuntime\Graphics\RHI\DX12">
       <UniqueIdentifier>{6C2494FF-3A8C-5819-6D6A-83948F428E14}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\RHI\Vulkan">
+      <UniqueIdentifier>{363769C1-C4ED-579E-9086-26F5847E70B0}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\ScreenSpace">
       <UniqueIdentifier>{E2DEC5CD-2609-AE99-42EF-E1814A166053}</UniqueIdentifier>
     </Filter>
@@ -1871,6 +1874,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ContextFactory.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceLifecycleTools.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -1939,6 +1945,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32ContextFactory.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\ScreenSpace</Filter>

@@ -2163,6 +2163,26 @@ foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
     }
 }
 
+# Native object creation stays in Runtime; host selection uses Public creation
+# contracts and device backend identity rather than complete backend classes.
+foreach ($itemPath in @(
+    (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.cpp"),
+    (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.h"),
+    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.cpp"),
+    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.h"),
+    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.cpp"),
+    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.h")
+)) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match '#include\s*[<"]Graphics[\\/]RHI[\\/](DX12|Vulkan)[\\/]|\b(DX12Context|VulkanContext|VulkanWin32SurfaceFactory)\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "host-backend-composition"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "host composition must use Public context creation and backend identity without backend implementation declarations"
+        })
+    }
+}
+
 $resourceLifecyclePanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h")

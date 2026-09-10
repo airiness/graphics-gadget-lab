@@ -3,10 +3,9 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "DevTools/DevelopGui/Backends/DX12/DevelopGuiDX12RenderBackend.h"
 #include "DevTools/DevelopGui/Backends/Windows/DevelopGuiWin32PlatformBackend.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #if GGLAB_ENABLE_VULKAN
 #include "DevTools/DevelopGui/Backends/Vulkan/DevelopGuiVulkanRenderBackend.h"
-#include "Graphics/RHI/Vulkan/VulkanContext.h"
 #endif
 
 namespace gglab
@@ -27,12 +26,12 @@ namespace gglab
 	std::unique_ptr<DevelopGuiRenderBackend> CreateDevelopGuiRenderBackend(
 		RHIContext& context) noexcept
 	{
-		if (dynamic_cast<DX12Context*>(&context))
+		if (context.GetDevice().GetBackendType() == RHIBackendType::DX12)
 		{
 			return std::make_unique<DevelopGuiDX12RenderBackend>();
 		}
 #if GGLAB_ENABLE_VULKAN
-		if (dynamic_cast<VulkanContext*>(&context))
+		if (context.GetDevice().GetBackendType() == RHIBackendType::Vulkan)
 		{
 			return std::make_unique<DevelopGuiVulkanRenderBackend>();
 		}

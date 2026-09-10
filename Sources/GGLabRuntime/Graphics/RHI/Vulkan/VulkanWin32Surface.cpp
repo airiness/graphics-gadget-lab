@@ -1,10 +1,20 @@
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
+#include "Graphics/RHI/Vulkan/VulkanContext.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
 #include <format>
 
 namespace gglab
 {
+	std::unique_ptr<RHIContext> CreateVulkanWin32Context(const RHIContextDesc& desc,
+		HINSTANCE instance, HWND window, bool isHostAbiSupported) noexcept
+	{
+		if (!instance || !window) return {};
+		VulkanWin32SurfaceFactory surfaceFactory(instance, window);
+		return VulkanContext::Create(desc, surfaceFactory, isHostAbiSupported);
+	}
+
 	namespace
 	{
 		constexpr std::string_view RequiredInstanceExtensions[] = {

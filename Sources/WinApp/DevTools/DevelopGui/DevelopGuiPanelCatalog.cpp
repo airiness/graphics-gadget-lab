@@ -21,10 +21,8 @@
 #include "DevTools/DevelopGui/Panels/TaskSystemPanel.h"
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
 #if GGLAB_ENABLE_VULKAN
 #include "DevTools/DevelopGui/Panels/VulkanBackendSummaryPanel.h"
-#include "Graphics/RHI/Vulkan/VulkanContext.h"
 #endif
 
 namespace gglab::devtools
@@ -51,12 +49,12 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<ProfilingPanel>());
 		registry.RegisterPanel(std::make_unique<TaskSystemPanel>());
 		registry.RegisterPanel(std::make_unique<TemporalAAInspectorPanel>());
-		if (dynamic_cast<DX12Context*>(&rhiContext))
+		if (rhiContext.GetDevice().GetBackendType() == RHIBackendType::DX12)
 		{
 			registry.RegisterPanel(std::make_unique<DX12BackendSummaryPanel>());
 		}
 #if GGLAB_ENABLE_VULKAN
-		else if (dynamic_cast<VulkanContext*>(&rhiContext))
+		else if (rhiContext.GetDevice().GetBackendType() == RHIBackendType::Vulkan)
 		{
 			registry.RegisterPanel(std::make_unique<VulkanBackendSummaryPanel>());
 		}
