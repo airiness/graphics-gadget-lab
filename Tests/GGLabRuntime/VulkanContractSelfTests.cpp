@@ -1,4 +1,5 @@
 #include "VulkanContractSelfTests.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
@@ -1887,6 +1888,16 @@ namespace gglab
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			const auto instance = reinterpret_cast<HINSTANCE>(uintptr_t{ 1 });
+			const auto window = reinterpret_cast<HWND>(uintptr_t{ 1 });
+			context.Check(InspectVulkanWin32Adapters({}) != 0 &&
+				InspectVulkanWin32Adapters({ .m_Window = window, .m_IsHostAbiSupported = true }) != 0 &&
+				InspectVulkanWin32Adapters({ .m_Instance = instance, .m_IsHostAbiSupported = true }) != 0,
+				"Adapter inspection rejects absent instance or window before native work");
+			context.Check(InspectVulkanWin32Adapters({ .m_Instance = instance, .m_Window = window }) != 0,
+				"Adapter inspection rejects unsupported host ABI before touching sentinel native handles");
+		}
 		{
 			// Null device keeps this ownership test independent of Vulkan/driver work.
 			const auto imageView = reinterpret_cast<VkImageView>(uintptr_t{ 1 });

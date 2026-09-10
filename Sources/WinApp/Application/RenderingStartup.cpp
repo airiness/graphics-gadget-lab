@@ -4,10 +4,7 @@
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
 #include "Application/Platform/Windows/Win32PlatformHost.h"
-#include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
-#include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
-
-#include <optional>
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
 #endif
 
 namespace gglab
@@ -36,15 +33,12 @@ namespace gglab
 		}
 		const HWND hwnd = static_cast<HWND>(platformHost.GetMainWindow().GetNativeHandle());
 
-		VulkanWin32SurfaceFactory surfaceFactory(instance, hwnd);
-		VulkanBootstrapOptions bootstrapOptions{};
-		bootstrapOptions.m_SurfaceFactory = &surfaceFactory;
-		bootstrapOptions.m_IsHostAbiSupported = sizeof(void*) == 8;
-		bootstrapOptions.m_RequestValidation = requestValidation;
-		bootstrapOptions.m_SelectionRequest =
-			ParseVulkanAdapterSelectionRequest(std::nullopt);
-		VulkanBootstrapReport report;
-		const int exitCode = RunVulkanBootstrap(bootstrapOptions, report);
+		const int exitCode = InspectVulkanWin32Adapters({
+			.m_Instance = instance,
+			.m_Window = hwnd,
+			.m_IsHostAbiSupported = sizeof(void*) == 8,
+			.m_RequestValidation = requestValidation,
+			});
 		platformHost.Finalize();
 		return exitCode;
 #else

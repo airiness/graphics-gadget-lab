@@ -2165,6 +2165,22 @@ foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
 
 # Native object creation stays in Runtime; host selection uses Public creation
 # contracts and device backend identity rather than complete backend classes.
+$ordinaryBackendImplementationIncludeRegex =
+    '#include\s*[<"](?!GGLabRuntime[\\/]Graphics[\\/]RHI[\\/])[^>"\r\n]*Graphics[\\/]RHI[\\/](?:DX12|Vulkan)[\\/]'
+foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems)) {
+    if ([System.IO.Path]::GetExtension($itemPath).ToLowerInvariant() -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $ordinaryBackendImplementationIncludeRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "ordinary-consumer-backend-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "ordinary host/application consumers must use Runtime Public backend contracts instead of implementation headers"
+        })
+    }
+}
+
 foreach ($itemPath in @(
     (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.cpp"),
     (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.h"),

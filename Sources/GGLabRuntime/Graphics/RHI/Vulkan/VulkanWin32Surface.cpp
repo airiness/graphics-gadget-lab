@@ -1,5 +1,7 @@
 #include "Graphics/RHI/Vulkan/VulkanWin32Surface.h"
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
+#include "Graphics/RHI/Vulkan/VulkanBootstrap.h"
 #include "Graphics/RHI/Vulkan/VulkanContext.h"
 #include "Graphics/RHI/Vulkan/VulkanUtility.h"
 
@@ -7,6 +9,19 @@
 
 namespace gglab
 {
+	int InspectVulkanWin32Adapters(const VulkanWin32AdapterInspectionDesc& desc) noexcept
+	{
+		if (!desc.m_Instance || !desc.m_Window) return 1;
+		VulkanWin32SurfaceFactory surfaceFactory(desc.m_Instance, desc.m_Window);
+		VulkanBootstrapOptions options{};
+		options.m_SurfaceFactory = &surfaceFactory;
+		options.m_IsHostAbiSupported = desc.m_IsHostAbiSupported;
+		options.m_RequestValidation = desc.m_RequestValidation;
+		options.m_SelectionRequest = ParseVulkanAdapterSelectionRequest(std::nullopt);
+		VulkanBootstrapReport report;
+		return RunVulkanBootstrap(options, report);
+	}
+
 	std::unique_ptr<RHIContext> CreateVulkanWin32Context(const RHIContextDesc& desc,
 		HINSTANCE instance, HWND window, bool isHostAbiSupported) noexcept
 	{

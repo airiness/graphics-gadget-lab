@@ -1961,6 +1961,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanImageViewLease.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32AdapterInspection.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32ContextFactory.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
