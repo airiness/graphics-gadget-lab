@@ -92,20 +92,20 @@ function ConvertTo-RepoRelativePath {
     return $Path.Substring($root.Length + 1).Replace('\', '/')
 }
 
-# Legacy Runtime candidate directories (portable candidates; backend leaves included).
+# Runtime candidate directories (portable candidates; private backend leaves included).
 # Migrated Core and Scene files are validated through the Public/Private ownership rules below.
-$candidateDirs = @("Graphics", "Diagnostics")
+$candidateDirs = @("Graphics", "Diagnostics", "Private/Graphics/RHI")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
 $platformLeafPrefixes = @(
     "Core/Platform/Win", # Windows implementation leaves
     "Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
-    "Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
+    "Private/Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
 )
 $platformLeafFiles = @(
-    "Graphics/RHI/Vulkan/VulkanWin32Surface.h", # Win32 WSI leaf
-    "Graphics/RHI/Vulkan/VulkanWin32Surface.cpp", # Win32 WSI leaf
+    "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.h", # Win32 WSI leaf
+    "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.cpp", # Win32 WSI leaf
     "Graphics/Asset/Loading/TextureLoader.cpp"  # DirectXTex (Windows third-party) consumer
 )
 
@@ -720,8 +720,7 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot)
-# Native host/GUI adapters still consume legacy backend declarations, but their
-# descriptor allocator storage is opaque. WinApp must not receive Runtime Private.
+# Native host/GUI adapters use Public contracts. WinApp must not receive Runtime Private.
 Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
     @($winAppIncludeRoot, $appRuntimeIncludeRoot,
@@ -735,10 +734,10 @@ Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
 Test-ProjectIncludeVisibility $vulkanQualificationProject `
     $vulkanQualificationNamespace `
     "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" `
-    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
-    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 # AppRuntime consumes Runtime Public contracts plus the remaining legacy
@@ -784,11 +783,11 @@ Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
     $shaderRuntimeIntegrationTestsNamespace `
     "Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj" `
     @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
-        $runtimeIncludeRoot,
+        $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
     @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
-        $runtimeIncludeRoot,
+        $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
@@ -1139,8 +1138,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
 
 $legacyRuntimeRhiDir = Join-Path $runtimeSourcesDir "Graphics/RHI"
 $legacyRuntimeRhiFiles = if (Test-Path -LiteralPath $legacyRuntimeRhiDir -PathType Container) {
-    @(Get-ChildItem -LiteralPath $legacyRuntimeRhiDir -File |
-        Where-Object { $_.Name -ne "RHIHandleTable.h" })
+    @(Get-ChildItem -LiteralPath $legacyRuntimeRhiDir -Recurse -File)
 }
 else {
     @()
@@ -1149,7 +1147,7 @@ foreach ($legacyFile in $legacyRuntimeRhiFiles) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "runtime-public-private-layout"
         Target = ConvertTo-RepoRelativePath $legacyFile.FullName
-        Reason = "migrated backend-neutral RHI files must live under Public/GGLabRuntime or Private"
+        Reason = "all RHI contracts and implementations must live under Public/GGLabRuntime or Private"
     })
 }
 
@@ -2163,6 +2161,53 @@ foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
     }
 }
 
+# Private visibility is reserved for Runtime and explicitly privileged tests.
+# Qualification and shader integration may directly inspect RHI implementation,
+# but may not use that include root to reach unrelated Runtime internals.
+function Test-RuntimePrivateImports {
+    param(
+        [string[]]$SourceItems,
+        [string]$AllowedPrivateDirectory = ""
+    )
+
+    foreach ($itemPath in $SourceItems) {
+        if ([System.IO.Path]::GetExtension($itemPath).ToLowerInvariant() -notin $firstPartySourceExtensions) {
+            continue
+        }
+        $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+        foreach ($match in [regex]::Matches($content, '#include\s*[<"](?<Path>[^>"\r\n]+)[>"]')) {
+            $includePath = $match.Groups["Path"].Value.Replace('/', '\')
+            $resolvedPaths = if ([System.IO.Path]::IsPathRooted($includePath)) {
+                @([System.IO.Path]::GetFullPath($includePath))
+            }
+            else {
+                @((Split-Path -Parent $itemPath), $runtimePrivateDir, $runtimeSourcesDir) |
+                    ForEach-Object { [System.IO.Path]::GetFullPath((Join-Path $_ $includePath)) }
+            }
+            foreach ($resolvedPath in $resolvedPaths) {
+                if (-not (Test-IsPathUnderRoot $resolvedPath $runtimePrivateDir) -or
+                    -not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
+                    continue
+                }
+                if ($AllowedPrivateDirectory -and
+                    (Test-IsPathUnderRoot $resolvedPath $AllowedPrivateDirectory)) {
+                    continue
+                }
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "runtime-private-import-scope"
+                    Target = ConvertTo-RepoRelativePath $itemPath
+                    Reason = "Runtime Private import is outside this consumer's classified access: $includePath"
+                })
+                break
+            }
+        }
+    }
+}
+
+Test-RuntimePrivateImports (@($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems))
+Test-RuntimePrivateImports (@($vulkanQualificationSourceItems) + @($shaderRuntimeIntegrationTestsSourceItems)) `
+    (Join-Path $runtimePrivateDir "Graphics/RHI")
+
 # Native object creation stays in Runtime; host selection uses Public creation
 # contracts and device backend identity rather than complete backend classes.
 $ordinaryBackendImplementationIncludeRegex =
@@ -2381,12 +2426,12 @@ $presentationContractChecks = @(
         Reason = "portable RHI context descriptor contains backend or native-window composition state"
     },
     [pscustomobject]@{
-        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/Vulkan/VulkanContext.cpp"
+        Path = Join-Path $runtimePrivateDir "Graphics/RHI/Vulkan/VulkanContext.cpp"
         Pattern = '\bCreateVulkanPlatformSurfaceFactory\b'
         Reason = "common Vulkan context selects a platform surface factory through build convention"
     },
     [pscustomobject]@{
-        Path = Join-Path $runtimeSourcesDir "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
+        Path = Join-Path $runtimePrivateDir "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
         Pattern = '\bm_IsWindowsX64\b|\bm_HasVulkanLoader\b|\bm_HasWin32SurfaceExtension\b|\bWin32SurfaceExtensionUnavailable\b'
         Reason = "core Vulkan device profile contains host ABI, loader, or Win32 WSI policy"
     }
@@ -2842,7 +2887,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
-Write-Host "Platform: $($candidateFiles.Count) candidate files (Graphics/Diagnostics)"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (legacy Graphics/Diagnostics and Private RHI)"
 Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +

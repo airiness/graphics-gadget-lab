@@ -76,30 +76,6 @@
     <Filter Include="Graphics\Resource">
       <UniqueIdentifier>{195EF9FA-C795-0182-A83B-11264EFF87CC}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\RHI">
-      <UniqueIdentifier>{E00263A7-6BFF-CCB4-453B-8379B92FEC3B}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\DX12">
-      <UniqueIdentifier>{46909AAE-82C9-5F19-3141-BDF33FC2A4B1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\DX12\Cache">
-      <UniqueIdentifier>{E3E044C6-323F-513C-8EC3-33F1102AC0C6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\DX12\Descriptor">
-      <UniqueIdentifier>{6265109B-344E-8987-6711-C1D8DB260964}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\DX12\Diagnostics">
-      <UniqueIdentifier>{4A6877DD-87B9-4881-3F76-BAE31E852D22}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\DX12\Utility">
-      <UniqueIdentifier>{9909364A-83B1-BE83-3A8B-3485BD7A80E3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\Vulkan">
-      <UniqueIdentifier>{D119D225-7316-D5D3-D9F5-9D21C3BA52D1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RHI\Vulkan\Diagnostics">
-      <UniqueIdentifier>{A9A3D3E6-F49C-A392-5052-9AB4646C87FF}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\Shader">
       <UniqueIdentifier>{8712B320-7C8E-3517-56CD-9D92B05AC57E}</UniqueIdentifier>
     </Filter>
@@ -141,6 +117,27 @@
     </Filter>
     <Filter Include="Private\Graphics\RHI">
       <UniqueIdentifier>{ED1647C5-3056-E812-9A61-FC4A35E8B42C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\DX12">
+      <UniqueIdentifier>{20C30440-15EA-D8A8-604E-F9FFA07F9381}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\DX12\Cache">
+      <UniqueIdentifier>{0F119530-B2F6-0A36-47F4-1CF1EEEDB87C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\DX12\Descriptor">
+      <UniqueIdentifier>{222A930C-DA6B-C509-D00F-0EF2F2D5DCF9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\DX12\Diagnostics">
+      <UniqueIdentifier>{1CF6DFA4-2ED3-37A1-E20E-A344E255C22D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\DX12\Utility">
+      <UniqueIdentifier>{C6E7C85C-B822-5A52-5578-AB408BDD11A3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\Vulkan">
+      <UniqueIdentifier>{D288A297-CB47-5FFE-D53E-EFB4C1DFA034}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\RHI\Vulkan\Diagnostics">
+      <UniqueIdentifier>{6EDE219A-83FA-1C96-CB8E-23AAF722F538}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public">
       <UniqueIdentifier>{E78ED3F0-CA43-7641-19C1-4A904FBD9763}</UniqueIdentifier>
@@ -558,231 +555,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.cpp">
       <Filter>Graphics\Resource</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\PipelineDesc.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\PSOCreator.cpp">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.cpp">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.cpp">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceLifecycleTools.cpp">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.cpp">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Buffer.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandAllocator.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandContext.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandList.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandQueue.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Context.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Device.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Fence.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12FencePoint.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12GpuProfiler.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12GuiInterop.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12HResult.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12PipelineState.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12PipelineSystem.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12QueueSystem.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Resource.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceManager.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12RootSignature.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12SwapChain.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Texture.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.cpp">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12EnumUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.cpp">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBarrier.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBootstrap.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanCommandContext.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanContext.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanConversions.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDevice.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFormat.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGuiInterop.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanInstance.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineState.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResource.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResourceManager.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanSurface.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanSwapChain.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTransferContext.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanUtility.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32Surface.cpp">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -876,6 +648,147 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12PSOCache.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PipelineDesc.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PSOCreator.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12ResourceLifecycleTools.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandAllocator.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandContext.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandList.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandQueue.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Context.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Device.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Fence.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12FencePoint.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12GpuProfiler.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12GuiInterop.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12HResult.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12PipelineState.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12PipelineSystem.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Resource.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12ResourceManager.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RootSignature.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12SwapChain.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Texture.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12TransferContext.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12BarrierUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12EnumUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12SamplerUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
@@ -884,6 +797,90 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp">
       <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCommandContext.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanConversions.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDevice.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGuiInterop.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineState.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineSystem.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResource.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResourceManager.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSurface.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSwapChain.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTextureCopy.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTransferContext.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanUtility.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanWin32Surface.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1412,243 +1409,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.h">
       <Filter>Graphics\Resource</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12PSOCache.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\PipelineDesc.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\PSOCreator.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Cache\PSOKey.h">
-      <Filter>Graphics\RHI\DX12\Cache</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">
-      <Filter>Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.h">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
-      <Filter>Graphics\RHI\DX12\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Buffer.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandAllocator.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandContext.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandList.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12CommandQueue.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Context.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Device.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Fence.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12FencePoint.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12GpuProfiler.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12HResult.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12PipelineState.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12PipelineSystem.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12QueueSystem.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Resource.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceManager.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12RootSignature.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12SwapChain.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12Texture.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\DX12TransferContext.h">
-      <Filter>Graphics\RHI\DX12</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12EnumUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
-      <Filter>Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\RHIHandleTable.h">
-      <Filter>Graphics\RHI</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.h">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
-      <Filter>Graphics\RHI\Vulkan\Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanAdapter.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBarrier.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanBootstrap.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanCommandContext.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanContext.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanConversions.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDescriptorManager.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDevice.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDeviceProfile.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFormat.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanFrameRuntime.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanGpuProfiler.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanInstance.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineState.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResource.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanResourceManager.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanSurface.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanSwapChain.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTextureCopy.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTimelineFence.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanTransferContext.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanUtility.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32Surface.h">
-      <Filter>Graphics\RHI\Vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1697,8 +1457,245 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h">
       <Filter>Private\Core\Math\Backends</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12PSOCache.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12RootSignatureCache.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PipelineDesc.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PSOCreator.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PSOKey.h">
+      <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorFreeListAllocator.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorHeap.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">
+      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.h">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
+      <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandAllocator.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandContext.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandList.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12CommandQueue.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Context.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Device.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Fence.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12FencePoint.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12GpuProfiler.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12HResult.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12PipelineState.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12PipelineSystem.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Resource.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12ResourceManager.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RootSignature.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12SwapChain.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Texture.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12TransferContext.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12BarrierUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12BindingLayoutUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12EnumUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12InputLayoutUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12SamplerUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12TextureSupportUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.h">
+      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIHandleTable.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHISubresourceUtils.h">
       <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanBackendSnapshotBuilder.h">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanPipelineSystemSnapshotBuilder.h">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
+      <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCommandContext.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanConversions.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDevice.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDeviceProfile.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDynamicUniformBuffer.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFrameRuntime.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGlobalDescriptorLayout.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineState.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResource.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResourceManager.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSurface.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSwapChain.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTextureCopy.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTimelineFence.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTransferContext.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanUtility.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanWin32Surface.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h">
       <Filter>Public\GGLabRuntime\Core\Hash</Filter>
