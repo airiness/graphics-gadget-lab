@@ -82,7 +82,7 @@ namespace gglab
 	class DebugDrawSystem;
 	class DemoManager;
 	class DiagnosticsControl;
-	class DiagnosticsRuntime;
+	class DiagnosticsSession;
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class LabRuntimeLocatorBase;
@@ -221,7 +221,7 @@ namespace gglab
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
 		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
-		std::unique_ptr<DiagnosticsRuntime> m_Diagnostics;
+		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		uint32_t m_WindowWidth = 0;

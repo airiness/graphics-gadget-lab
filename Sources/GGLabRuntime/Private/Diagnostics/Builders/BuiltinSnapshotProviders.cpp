@@ -43,7 +43,7 @@ namespace gglab
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override { return "Render Views"; }
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RenderViewSnapshot>();
 				snapshot.m_Views.assign(context.m_RenderViews.begin(), context.m_RenderViews.end());
@@ -54,7 +54,7 @@ namespace gglab
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override { return "Render Queues"; }
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				store.GetOrCreate<RenderQueueSnapshot>() = BuildRenderQueueSnapshot(context.m_RenderQueues);
 			}
@@ -63,7 +63,7 @@ namespace gglab
 		{
 		public:
 			[[nodiscard]] std::string_view GetName() const noexcept override { return "Assets"; }
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<AssetSnapshot>();
 				snapshot = context.m_AssetManager ? BuildAssetSnapshot(*context.m_AssetManager)
@@ -78,7 +78,7 @@ namespace gglab
 			{
 				return "Task System";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TaskSystemSnapshot>();
 				if (context.m_TaskSystem)
@@ -100,7 +100,7 @@ namespace gglab
 			{
 				return "Persistent Scene Buffers";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PersistentSceneBufferSnapshot>();
 				if (context.m_Renderer)
@@ -122,7 +122,7 @@ namespace gglab
 			{
 				return "IBL Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
 				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(*context.m_Renderer,
@@ -138,7 +138,7 @@ namespace gglab
 			{
 				return "Render Graph";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RGSnapshot>();
 				if (context.m_RenderGraph)
@@ -160,7 +160,7 @@ namespace gglab
 			{
 				return "Shadow Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<ShadowDiagnosticsSnapshot>();
 				snapshot = context.m_RenderGraph
@@ -177,7 +177,7 @@ namespace gglab
 			{
 				return "Post Process Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PostProcessDiagnosticsSnapshot>();
 				if (context.m_Renderer && context.m_RenderGraph)
@@ -200,7 +200,7 @@ namespace gglab
 			{
 				return "Forward+ Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<ForwardPlusDiagnosticsSnapshot>();
 				if (context.m_Renderer && context.m_RenderGraph)
@@ -223,7 +223,7 @@ namespace gglab
 			{
 				return "GTAO Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<GTAODiagnosticsSnapshot>();
 				if (!context.m_Renderer || !context.m_RenderGraph)
@@ -251,7 +251,7 @@ namespace gglab
 			{
 				return "Temporal AA Diagnostics";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TemporalAADiagnosticsSnapshot>();
 				if (!context.m_Renderer || !context.m_RenderGraph)
@@ -291,7 +291,7 @@ namespace gglab
 			{
 				return "Transient Resource Pool";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TransientResourcePoolSnapshot>();
 				const auto* pool =
@@ -315,7 +315,7 @@ namespace gglab
 			{
 				return "Sampler Registry";
 			}
-			void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
 				const SamplerRegistry* registry =

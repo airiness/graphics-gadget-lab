@@ -1,7 +1,14 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 
+#include "Diagnostics/Builders/BackendSnapshotProviders.h"
+#include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
+#include "Diagnostics/Builders/LabSnapshotProvider.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "Graphics/Renderer.h"
+
 #include <algorithm>
 #include <chrono>
+#include <memory>
 
 namespace gglab
 {
@@ -23,7 +30,7 @@ namespace gglab
 		m_Providers.push_back(std::move(runtime));
 	}
 
-	void DiagnosticsRuntime::BeginFrame(const SnapshotContext& context) noexcept
+	void DiagnosticsRuntime::BeginFrame(const DiagnosticsFrameContext& context) noexcept
 	{
 		GGLAB_ASSERT_MSG(!m_FrameOpen,
 			"DiagnosticsRuntime::BeginFrame called before the previous frame ended.");
@@ -147,5 +154,27 @@ namespace gglab
 		runtime.m_Profile.m_HasSnapshot = m_Store.Contains(runtime.m_Profile.m_Id);
 		runtime.m_Profile.m_RefreshPending = false;
 		runtime.m_Dirty = false;
+	}
+
+	std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
+		Renderer& renderer, DiagnosticsSessionCreateInfo createInfo) noexcept
+	{
+		RHIContext* context = renderer.GetRHIContext();
+		GGLAB_ASSERT_MSG(context,
+			"Diagnostics session creation requires an initialized RHI context.");
+		if (!context)
+		{
+			return nullptr;
+		}
+
+		auto runtime = std::make_unique<DiagnosticsRuntime>();
+		RegisterBuiltinSnapshotProviders(*runtime);
+		RegisterBackendSnapshotProviders(*runtime, *context, renderer.GetPipelineCache());
+		if (createInfo.m_RegisterLabSnapshotProvider)
+		{
+			runtime->RegisterProvider(
+				std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+		}
+		return runtime;
 	}
 }

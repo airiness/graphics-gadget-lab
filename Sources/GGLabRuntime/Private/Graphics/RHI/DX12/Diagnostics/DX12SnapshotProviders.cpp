@@ -37,7 +37,7 @@ namespace gglab
 			{
 				return "DX12 Resources";
 			}
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext&, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<DX12ResourceManagerSnapshot>();
 				BuildDX12ResourceManagerSnapshot(m_Manager, snapshot);
@@ -60,7 +60,7 @@ namespace gglab
 			{
 				return "DirectX 12 Backend";
 			}
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext&, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<DX12BackendSnapshot>();
 				BuildDX12BackendSnapshot(m_Context, snapshot);
@@ -84,7 +84,7 @@ namespace gglab
 			{
 				return "RHI Pipeline System";
 			}
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext&, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RHIPipelineSystemSnapshot>();
 				BuildDX12PipelineSystemSnapshot(m_System, m_PipelineCache, snapshot);

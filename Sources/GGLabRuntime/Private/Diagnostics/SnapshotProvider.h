@@ -6,8 +6,8 @@
 
 namespace gglab
 {
-	struct SnapshotContext;
 	class SnapshotStore;
+	struct DiagnosticsFrameContext;
 
 	class SnapshotProviderBase
 	{
@@ -16,7 +16,8 @@ namespace gglab
 
 		[[nodiscard]] virtual SnapshotId GetId() const noexcept = 0;
 		[[nodiscard]] virtual std::string_view GetName() const noexcept = 0;
-		virtual void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept = 0;
+		virtual void Capture(
+			const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept = 0;
 	};
 
 	template <typename Snapshot> class TypedSnapshotProviderBase : public SnapshotProviderBase

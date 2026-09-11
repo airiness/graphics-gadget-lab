@@ -31,7 +31,7 @@ namespace gglab
 			{
 				return "Vulkan Backend";
 			}
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext&, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<VulkanBackendSnapshot>();
 				BuildVulkanBackendSnapshot(m_Context, snapshot);
@@ -55,7 +55,7 @@ namespace gglab
 			{
 				return "RHI Pipeline System";
 			}
-			void Capture(const SnapshotContext&, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext&, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<RHIPipelineSystemSnapshot>();
 				BuildVulkanPipelineSystemSnapshot(m_System, m_PipelineCache, snapshot);

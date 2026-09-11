@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Diagnostics/SnapshotContext.h"
 #include "Diagnostics/SnapshotStore.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 
 namespace gglab
 {
@@ -9,7 +9,8 @@ namespace gglab
 		return SnapshotIdOf<LabSnapshot>;
 	}
 
-	void LabSnapshotProvider::Capture(const SnapshotContext& context, SnapshotStore& store) noexcept
+	void LabSnapshotProvider::Capture(
+		const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept
 	{
 		auto& snapshot = store.GetOrCreate<LabSnapshot>();
 		const LabSnapshotSourceBase* source = context.m_LabSnapshotSource;

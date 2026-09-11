@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Diagnostics/SnapshotContext.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 
 #include <memory>
@@ -12,7 +12,10 @@
 
 namespace gglab
 {
-	class DiagnosticsRuntime final : public DiagnosticsView, public DiagnosticsControl
+	class DiagnosticsRuntime final :
+		public DiagnosticsView,
+		public DiagnosticsControl,
+		public DiagnosticsSession
 	{
 	private:
 		struct ProviderRuntime
@@ -28,10 +31,12 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(DiagnosticsRuntime);
 		~DiagnosticsRuntime() = default;
 
+		[[nodiscard]] DiagnosticsView* GetView() noexcept override { return this; }
+		[[nodiscard]] DiagnosticsControl* GetControl() noexcept override { return this; }
 		void RegisterProvider(
 			std::unique_ptr<SnapshotProviderBase> provider, SnapshotUpdatePolicy policy) noexcept;
-		void BeginFrame(const SnapshotContext& context) noexcept;
-		void EndFrame() noexcept;
+		void BeginFrame(const DiagnosticsFrameContext& context) noexcept override;
+		void EndFrame() noexcept override;
 		void Reset() noexcept;
 
 		template <typename T> void Invalidate() noexcept
@@ -51,7 +56,7 @@ namespace gglab
 		[[nodiscard]] ProviderRuntime* FindProvider(SnapshotId id) noexcept;
 		void Capture(ProviderRuntime& runtime) noexcept;
 
-		SnapshotContext m_Context{};
+		DiagnosticsFrameContext m_Context{};
 		SnapshotStore m_Store;
 		std::vector<ProviderRuntime> m_Providers;
 		uint64_t m_FrameIndex = 0;

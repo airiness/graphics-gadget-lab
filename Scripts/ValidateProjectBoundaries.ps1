@@ -1005,6 +1005,30 @@ foreach ($legacyPath in $legacyRuntimeToolingAdapterPaths) {
     }
 }
 
+$legacyRuntimeDiagnosticsEnginePaths = @(
+    "Diagnostics/DiagnosticsRuntime.h",
+    "Diagnostics/DiagnosticsRuntime.cpp",
+    "Diagnostics/SnapshotContext.h",
+    "Diagnostics/SnapshotProvider.h",
+    "Diagnostics/SnapshotStore.h",
+    "Diagnostics/Builders/BuiltinSnapshotProviders.h",
+    "Diagnostics/Builders/BuiltinSnapshotProviders.cpp",
+    "Diagnostics/Builders/BackendSnapshotProviders.h",
+    "Diagnostics/Builders/BackendSnapshotProviders.cpp",
+    "Diagnostics/Builders/LabSnapshotProvider.h",
+    "Diagnostics/Builders/LabSnapshotProvider.cpp"
+)
+foreach ($relativePath in $legacyRuntimeDiagnosticsEnginePaths) {
+    $legacyPath = Join-Path $runtimeSourcesDir $relativePath
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "Runtime diagnostics engine, provider registry, store and live capture context must live under Private"
+        })
+    }
+}
+
 $developGuiDiagnosticsConsumerFiles = @()
 $developGuiPanelsDir = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Panels"
 if (Test-Path -LiteralPath $developGuiPanelsDir -PathType Container) {
@@ -1048,7 +1072,7 @@ if (Test-Path -LiteralPath $diagnosticsViewPath -PathType Leaf) {
 }
 
 $builtinSnapshotProvidersPath =
-    Join-Path $runtimeSourcesDir "Diagnostics/Builders/BuiltinSnapshotProviders.cpp"
+    Join-Path $runtimePrivateDir "Diagnostics/Builders/BuiltinSnapshotProviders.cpp"
 if (Test-Path -LiteralPath $builtinSnapshotProvidersPath -PathType Leaf) {
     $builtinSnapshotProvidersContent =
         Get-Content -LiteralPath $builtinSnapshotProvidersPath -Raw -ErrorAction Stop
@@ -1065,23 +1089,31 @@ if (Test-Path -LiteralPath $builtinSnapshotProvidersPath -PathType Leaf) {
     }
 }
 
-$diagnosticsBuildersDir = Join-Path $runtimeSourcesDir "Diagnostics/Builders"
+$diagnosticsBuildersDirs = @(
+    (Join-Path $runtimeSourcesDir "Diagnostics/Builders"),
+    (Join-Path $runtimePrivateDir "Diagnostics/Builders")
+)
 $backendSnapshotDispatcherPath =
-    Join-Path $diagnosticsBuildersDir "BackendSnapshotProviders.cpp"
+    Join-Path $runtimePrivateDir "Diagnostics/Builders/BackendSnapshotProviders.cpp"
 $backendSpecificDiagnosticsRegex = '\b(?:DX12|Vulkan)'
-foreach ($sourceFile in @(
-        Get-ChildItem -LiteralPath $diagnosticsBuildersDir -File |
-            Where-Object {
-                $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") -and
-                $_.FullName -ne $backendSnapshotDispatcherPath
-            })) {
-    $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
-    if ($content -match $backendSpecificDiagnosticsRegex) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "diagnostics-backend-builder-ownership"
-            Target = ConvertTo-RepoRelativePath $sourceFile.FullName
-            Reason = "Backend-specific diagnostics builders must live with their DX12 or Vulkan backend owner"
-        })
+foreach ($diagnosticsBuildersDir in $diagnosticsBuildersDirs) {
+    if (-not (Test-Path -LiteralPath $diagnosticsBuildersDir -PathType Container)) {
+        continue
+    }
+    foreach ($sourceFile in @(
+            Get-ChildItem -LiteralPath $diagnosticsBuildersDir -File |
+                Where-Object {
+                    $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") -and
+                    $_.FullName -ne $backendSnapshotDispatcherPath
+                })) {
+        $content = Get-Content -LiteralPath $sourceFile.FullName -Raw -ErrorAction Stop
+        if ($content -match $backendSpecificDiagnosticsRegex) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "diagnostics-backend-builder-ownership"
+                Target = ConvertTo-RepoRelativePath $sourceFile.FullName
+                Reason = "Backend-specific diagnostics builders must live with their DX12 or Vulkan backend owner"
+            })
+        }
     }
 }
 
@@ -1099,6 +1131,23 @@ foreach ($itemPath in $winAppSourceItems) {
             Rule   = "diagnostics-capture-ownership"
             Target = ConvertTo-RepoRelativePath $itemPath
             Reason = "WinApp must consume DiagnosticsView and narrow DiagnosticsControl without owning capture context, providers, or storage"
+        })
+    }
+}
+
+# GGLabAppRuntime owns only the optional session lifetime and drives the public
+# begin/end seam; the capture engine, providers, context and store stay private.
+foreach ($itemPath in @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems)) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $winAppDiagnosticsCaptureOwnershipRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "app-runtime-diagnostics-session-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "GGLabAppRuntime must drive the Public diagnostics session without composing the capture engine, providers, context or storage"
         })
     }
 }

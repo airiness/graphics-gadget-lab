@@ -6,12 +6,9 @@
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
-#include "Diagnostics/Builders/BackendSnapshotProviders.h"
-#include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
-#include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/DebugDraw/DebugDrawSystem.h"
@@ -41,12 +38,12 @@ namespace gglab
 
 	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
 	{
-		return m_Diagnostics.get();
+		return m_Diagnostics ? m_Diagnostics->GetView() : nullptr;
 	}
 
 	DiagnosticsControl* GGLabAppRuntime::GetDiagnosticsControl() const noexcept
 	{
-		return m_Diagnostics.get();
+		return m_Diagnostics ? m_Diagnostics->GetControl() : nullptr;
 	}
 
 	namespace
@@ -226,15 +223,9 @@ namespace gglab
 		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
-			m_Diagnostics = std::make_unique<DiagnosticsRuntime>();
-			RegisterBuiltinSnapshotProviders(*m_Diagnostics);
-			RegisterBackendSnapshotProviders(*m_Diagnostics, *m_Renderer->GetRHIContext(),
-				m_Renderer->GetPipelineCache());
-			if (m_LabHostDemoIndex)
-			{
-				m_Diagnostics->RegisterProvider(
-					std::make_unique<LabSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-			}
+			m_Diagnostics = CreateDiagnosticsSession(*m_Renderer, {
+				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value(),
+				});
 		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",

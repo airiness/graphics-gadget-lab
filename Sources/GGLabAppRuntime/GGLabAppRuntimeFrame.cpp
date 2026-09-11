@@ -8,7 +8,7 @@
 #include "Demo/DemoBase.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Diagnostics/RuntimeToolingAdapters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
@@ -39,29 +39,35 @@ namespace gglab
 		{
 		public:
 			ScopedDiagnosticsFrame(
-				DiagnosticsRuntime* runtime, const SnapshotContext& context) noexcept :
-				m_Runtime(runtime)
+				DiagnosticsSession* session, const DiagnosticsFrameContext& context) noexcept :
+				m_Session(session)
 			{
-				if (m_Runtime)
+				if (m_Session)
 				{
-					m_Runtime->BeginFrame(context);
+					m_Session->BeginFrame(context);
 				}
 			}
 			ScopedDiagnosticsFrame(const ScopedDiagnosticsFrame&) = delete;
 			ScopedDiagnosticsFrame& operator=(const ScopedDiagnosticsFrame&) = delete;
 			~ScopedDiagnosticsFrame() noexcept
 			{
-				if (m_Runtime)
+				if (m_Session)
 				{
-					m_Runtime->EndFrame();
+					m_Session->EndFrame();
 				}
 			}
 
-			[[nodiscard]] DiagnosticsView* GetView() const noexcept { return m_Runtime; }
-			[[nodiscard]] DiagnosticsControl* GetControl() const noexcept { return m_Runtime; }
+			[[nodiscard]] DiagnosticsView* GetView() const noexcept
+			{
+				return m_Session ? m_Session->GetView() : nullptr;
+			}
+			[[nodiscard]] DiagnosticsControl* GetControl() const noexcept
+			{
+				return m_Session ? m_Session->GetControl() : nullptr;
+			}
 
 		private:
-			DiagnosticsRuntime* m_Runtime = nullptr;
+			DiagnosticsSession* m_Session = nullptr;
 		};
 	}
 
@@ -258,7 +264,7 @@ namespace gglab
 			const LabRuntime* labRuntime = tickInfo.m_LabRuntimeLocator
 				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
 				: nullptr;
-			const SnapshotContext diagnosticsContext{
+			const DiagnosticsFrameContext diagnosticsContext{
 				.m_Renderer = m_Renderer.get(),
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),

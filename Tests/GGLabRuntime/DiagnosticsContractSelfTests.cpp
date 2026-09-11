@@ -208,7 +208,7 @@ namespace gglab
 				return "Diagnostics View Contract";
 			}
 
-			void Capture(const SnapshotContext& snapshotContext, SnapshotStore& store) noexcept override
+			void Capture(const DiagnosticsFrameContext& snapshotContext, SnapshotStore& store) noexcept override
 			{
 				m_LastWorld = snapshotContext.m_World;
 				store.GetOrCreate<DiagnosticsViewContractSnapshot>().m_CaptureSerial =

@@ -9,6 +9,6 @@ namespace gglab
 	public:
 		[[nodiscard]] SnapshotId GetId() const noexcept override;
 		[[nodiscard]] std::string_view GetName() const noexcept override { return "Lab"; }
-		void Capture(const SnapshotContext& context, SnapshotStore& store) noexcept override;
+		void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override;
 	};
 }
