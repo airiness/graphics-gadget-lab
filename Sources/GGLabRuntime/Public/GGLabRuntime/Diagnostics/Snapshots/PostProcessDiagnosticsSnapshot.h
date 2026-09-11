@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/PostProcess/PostProcessColor.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"

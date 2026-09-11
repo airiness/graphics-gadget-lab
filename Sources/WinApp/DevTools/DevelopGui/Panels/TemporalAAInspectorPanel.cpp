@@ -4,7 +4,7 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"

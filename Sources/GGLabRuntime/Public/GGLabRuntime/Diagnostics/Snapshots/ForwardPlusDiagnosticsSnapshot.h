@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
 
 #include <vector>
 

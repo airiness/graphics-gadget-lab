@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 
 namespace gglab
 {

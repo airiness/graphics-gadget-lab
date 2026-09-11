@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 
-#include "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

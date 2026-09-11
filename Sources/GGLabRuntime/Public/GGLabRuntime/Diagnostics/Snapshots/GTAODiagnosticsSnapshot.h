@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 

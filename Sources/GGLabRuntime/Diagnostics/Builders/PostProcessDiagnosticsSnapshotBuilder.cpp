@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"

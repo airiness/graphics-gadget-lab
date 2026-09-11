@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/TemporalAADiagnosticsSnapshotBuilder.h"
 
-#include "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
 
-#include "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"

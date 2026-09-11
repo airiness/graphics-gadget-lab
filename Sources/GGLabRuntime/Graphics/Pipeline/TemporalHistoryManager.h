@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 
@@ -11,10 +12,6 @@
 
 namespace gglab
 {
-	// Persistent history RGB stores accumulated color; alpha stores HistoryAge.
-	inline constexpr RHIFormat TemporalHistoryColorFormat = RHIFormat::R16G16B16A16Float;
-	inline constexpr RHIFormat TemporalHistoryDepthFormat = RHIFormat::R32Float;
-
 	struct TemporalHistorySurfaceFormatSupport
 	{
 		RHITextureSupportResult m_ShaderResource{};
@@ -39,45 +36,6 @@ namespace gglab
 
 	[[nodiscard]] TemporalHistoryFormatSupport QueryTemporalHistoryFormatSupport(
 		const RHIDevice& device) noexcept;
-
-	enum class TemporalHistoryResetReason : uint8_t
-	{
-		None,
-		ColdStart,
-		Disabled,
-		DisplayViewChanged,
-		ResetIdentityChanged,
-		SessionIdentityChanged,
-		ExtentChanged,
-		FormatChanged,
-		AllocationFailure,
-		AvailabilityChanged,
-		ResolveProgramChanged,
-		FatalSubmission,
-		Resume,
-		Shutdown,
-	};
-
-	struct TemporalHistoryCompatibilityIdentity
-	{
-		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
-		uint64_t m_ResetIdentity = 0;
-		uint64_t m_SessionIdentity = 0;
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
-		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
-		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
-
-		bool operator==(const TemporalHistoryCompatibilityIdentity&) const noexcept = default;
-	};
-
-	struct TemporalHistoryCommittedMetadata
-	{
-		TemporalHistoryCompatibilityIdentity m_Compatibility{};
-		Vector2 m_JitterUV = Vector2::Zero;
-		uint32_t m_JitterIndex = 0;
-		RHIFencePoint m_GraphicsFence{};
-	};
 
 	struct TemporalHistoryFrameState
 	{
@@ -106,21 +64,6 @@ namespace gglab
 			return m_PreviousColor.IsValid() && m_PreviousDepth.IsValid() &&
 				m_NextColor.IsValid() && m_NextDepth.IsValid();
 		}
-	};
-
-	struct TemporalHistoryManagerDiagnostics
-	{
-		TemporalHistoryCompatibilityIdentity m_Compatibility{};
-		TemporalHistoryCommittedMetadata m_LastCommitted{};
-		TemporalHistoryResetReason m_LastResetReason = TemporalHistoryResetReason::None;
-		uint64_t m_AllocationGeneration = 0;
-		uint64_t m_ResetCount = 0;
-		uint64_t m_ActiveBytes = 0;
-		uint64_t m_PendingRetirementBytes = 0;
-		uint32_t m_ReadIndex = 0;
-		bool m_HasActiveHistory = false;
-		bool m_HistoryValid = false;
-		std::vector<RHIFencePoint> m_PendingRetirementFences;
 	};
 
 	class TemporalHistoryManager

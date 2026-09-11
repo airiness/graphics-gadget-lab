@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
@@ -8,14 +9,6 @@ namespace gglab
 	enum class TemporalColorAbi : uint8_t
 	{
 		LinearRec709SceneReferredV1,
-	};
-
-	// Compact semantic state for the color representations currently supported by gglab.
-	enum class PostProcessColorState : uint8_t
-	{
-		SceneLinearRec709,
-		DisplayLinearRec709,
-		DisplayEncodedSRGB,
 	};
 
 	[[nodiscard]] constexpr bool IsTemporalColorCompatible(TemporalColorAbi colorAbi,
