@@ -989,6 +989,22 @@ foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     }
 }
 
+$legacyRuntimeToolingAdapterPaths = foreach ($name in @(
+    "AssetToolingControl", "CameraTooling", "DirectionalLightTooling", "WorldTooling")) {
+    foreach ($extension in @(".h", ".cpp")) {
+        Join-Path $runtimeSourcesDir ("Diagnostics/{0}{1}" -f $name, $extension)
+    }
+}
+foreach ($legacyPath in $legacyRuntimeToolingAdapterPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "Runtime tooling adapter implementations must live under Private"
+        })
+    }
+}
+
 $developGuiDiagnosticsConsumerFiles = @()
 $developGuiPanelsDir = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Panels"
 if (Test-Path -LiteralPath $developGuiPanelsDir -PathType Container) {
@@ -2165,6 +2181,27 @@ foreach ($itemPath in $rendererIndependentToolingPanelPaths) {
             Rule   = "tooling-panel-renderer-boundary"
             Target = ConvertTo-RepoRelativePath $itemPath
             Reason = "panels migrated to snapshots or narrow capabilities must not retain live Renderer or RenderResourceRegistry dependencies"
+        })
+    }
+}
+
+# Ordinary consumers receive the Runtime-owned adapter bundle and must not
+# construct or import its concrete tooling implementations.
+$ordinaryRuntimeToolingImplementationRegex =
+    '#include\s*[<"][^>"\r\n]*Diagnostics[\\/](?:AssetToolingControl|' +
+    'CameraTooling|DirectionalLightTooling|WorldTooling)\.h[>"]|' +
+    '(?m)^\s*(?:AssetToolingControl|CameraTooling|DirectionalLightTooling|' +
+    'WorldTooling)\s+[A-Za-z_]\w*\s*\('
+foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems)) {
+    if ([System.IO.Path]::GetExtension($itemPath).ToLowerInvariant() -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $ordinaryRuntimeToolingImplementationRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "ordinary-consumer-runtime-tooling-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "ordinary consumers must use RuntimeToolingAdapters instead of concrete Runtime tooling implementations"
         })
     }
 }

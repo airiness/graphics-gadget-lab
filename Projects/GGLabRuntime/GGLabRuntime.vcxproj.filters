@@ -100,6 +100,9 @@
     <Filter Include="Private\Core\Profiling">
       <UniqueIdentifier>{93E48998-AC1B-406E-CB2F-1B6CE799C060}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Diagnostics">
+      <UniqueIdentifier>{55F42DAD-23AA-5715-683A-CE91EA85F649}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics">
       <UniqueIdentifier>{82170968-F3B4-5421-7234-0E81212D46F9}</UniqueIdentifier>
     </Filter>
@@ -228,9 +231,6 @@
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>ThirdParty\D3D12MemoryAllocator\src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\AssetToolingControl.cpp">
-      <Filter>Diagnostics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
@@ -279,16 +279,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
       <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\CameraTooling.cpp">
-      <Filter>Diagnostics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.cpp">
-      <Filter>Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\DirectionalLightTooling.cpp">
-      <Filter>Diagnostics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\WorldTooling.cpp">
       <Filter>Diagnostics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp">
@@ -621,6 +612,21 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp">
       <Filter>Private\Core</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\AssetToolingControl.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\CameraTooling.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\DirectionalLightTooling.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\RuntimeToolingAdapters.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
@@ -893,9 +899,6 @@
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h">
       <Filter>ThirdParty\VulkanMemoryAllocator\include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\AssetToolingControl.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
@@ -944,13 +947,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\CameraTooling.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DiagnosticsRuntime.h">
-      <Filter>Diagnostics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\DirectionalLightTooling.h">
       <Filter>Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\SnapshotContext.h">
@@ -985,9 +982,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\WorldTooling.h">
-      <Filter>Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
       <Filter>Graphics\Asset</Filter>
@@ -1442,6 +1436,18 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h">
       <Filter>Private\Core\Math\Backends</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\AssetToolingControl.h">
+      <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\CameraTooling.h">
+      <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\DirectionalLightTooling.h">
+      <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.h">
+      <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
@@ -1734,6 +1740,9 @@
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsView.h">
+      <Filter>Public\GGLabRuntime\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\RuntimeToolingAdapters.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h">

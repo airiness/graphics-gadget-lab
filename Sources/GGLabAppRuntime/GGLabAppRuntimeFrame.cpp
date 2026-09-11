@@ -9,10 +9,7 @@
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
-#include "Diagnostics/DirectionalLightTooling.h"
-#include "Diagnostics/AssetToolingControl.h"
-#include "Diagnostics/CameraTooling.h"
-#include "Diagnostics/WorldTooling.h"
+#include "GGLabRuntime/Diagnostics/RuntimeToolingAdapters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -289,19 +286,18 @@ namespace gglab
 				loadingProgress = m_DemoManager->GetLoadingProgress();
 			}
 
-			DirectionalLightTooling directionalLightTooling(world);
-			AssetToolingControl assetToolingControl(*m_AssetManager);
-			CameraTooling cameraTooling(demo->GetCameraRig());
-			WorldTooling worldTooling(world);
+			RuntimeToolingAdapters runtimeToolingAdapters(
+				world, *m_AssetManager, demo->GetCameraRig());
 			const ApplicationToolingFrameContext toolingContext{
-				.m_Cameras = &cameraTooling,
-				.m_CameraControl = &cameraTooling,
+				.m_Cameras = &runtimeToolingAdapters.GetCameraView(),
+				.m_CameraControl = &runtimeToolingAdapters.GetCameraControl(),
 				.m_CameraRenderViewQuery = &demo->GetCameraRig(),
-				.m_WorldView = &worldTooling,
-				.m_WorldControl = &worldTooling,
-				.m_DirectionalLight = &directionalLightTooling,
-				.m_DirectionalLightControl = &directionalLightTooling,
-				.m_AssetControl = &assetToolingControl,
+				.m_WorldView = &runtimeToolingAdapters.GetWorldView(),
+				.m_WorldControl = &runtimeToolingAdapters.GetWorldControl(),
+				.m_DirectionalLight = &runtimeToolingAdapters.GetDirectionalLightView(),
+				.m_DirectionalLightControl =
+					&runtimeToolingAdapters.GetDirectionalLightControl(),
+				.m_AssetControl = &runtimeToolingAdapters.GetAssetControl(),
 				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
