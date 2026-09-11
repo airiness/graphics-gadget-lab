@@ -184,6 +184,9 @@
     <Filter Include="Public\GGLabRuntime\Graphics\Profiling">
       <UniqueIdentifier>{E8DC78AF-7962-D4A4-2E48-49E6AEDC81CA}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\RenderPass">
+      <UniqueIdentifier>{9722F32E-41FD-20CD-5595-F15658D255EF}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\RHI">
       <UniqueIdentifier>{67D2F0C8-FA46-D5CE-C9B6-959AC4B67320}</UniqueIdentifier>
     </Filter>
@@ -968,9 +971,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
@@ -978,12 +978,6 @@
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h">
@@ -1172,9 +1166,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeTypes.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1346,9 +1337,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassInfo.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1410,9 +1398,6 @@
       <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerTypes.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h">
@@ -1760,6 +1745,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
@@ -1767,6 +1755,12 @@
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderViewSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RHIPipelineSystemSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h">
@@ -1782,6 +1776,9 @@
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetToolingControlBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataIdentity.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h">
@@ -1821,6 +1818,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeConfig.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLCacheControlBase.h">
@@ -1870,6 +1870,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassInfo.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
@@ -1963,6 +1966,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\Vulkan\VulkanWin32ContextFactory.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\SamplerTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\ScreenSpace</Filter>

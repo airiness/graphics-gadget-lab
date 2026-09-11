@@ -1,6 +1,6 @@
 #include "Graphics/RHI/DX12/Diagnostics/DX12PipelineSystemSnapshotBuilder.h"
 
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
 #include "Graphics/RHI/DX12/Cache/DX12RootSignatureCache.h"

@@ -3,7 +3,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/VulkanBackendSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/Vulkan/Diagnostics/VulkanBackendSnapshotBuilder.h"

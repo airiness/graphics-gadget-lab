@@ -7,7 +7,7 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"

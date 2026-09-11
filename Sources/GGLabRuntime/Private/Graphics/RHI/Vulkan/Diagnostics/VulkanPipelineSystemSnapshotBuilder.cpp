@@ -1,6 +1,6 @@
 #include "Graphics/RHI/Vulkan/Diagnostics/VulkanPipelineSystemSnapshotBuilder.h"
 
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"

@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Async/ProgressChannel.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/SamplerTypes.h"
+#include "GGLabRuntime/Graphics/SamplerTypes.h"
 #include "Graphics/Asset/TextureAsset.h"
 #include "Graphics/VertexData.h"
 

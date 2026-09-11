@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"

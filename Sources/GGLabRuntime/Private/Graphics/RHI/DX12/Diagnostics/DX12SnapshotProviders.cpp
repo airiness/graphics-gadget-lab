@@ -3,7 +3,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"

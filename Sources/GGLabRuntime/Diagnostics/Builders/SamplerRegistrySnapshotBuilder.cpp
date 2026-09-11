@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
-#include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "Graphics/SamplerRegistry.h"
 
 namespace gglab

@@ -4,7 +4,7 @@
 #include "DevTools/EnumText/EnumTextRenderPass.h"
 #include "DevTools/RHIText.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
 #include <algorithm>

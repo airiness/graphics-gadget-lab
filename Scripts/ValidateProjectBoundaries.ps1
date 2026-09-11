@@ -965,6 +965,12 @@ foreach ($legacyPath in $legacyRuntimeDebugDrawContractPaths) {
 }
 
 $legacyRuntimeDiagnosticsContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/SamplerTypes.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassInfo.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/IBLBakeTypes.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/SnapshotCommon.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/DX12BackendSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/VulkanBackendSnapshot.h"),
@@ -1098,6 +1104,7 @@ foreach ($legacyFile in $legacyRuntimeSceneFiles) {
 
 $legacyRuntimeGraphicsContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:GraphicsTypes\.h|ShadowSettings\.h|' +
+    'SamplerTypes\.h|IBLBakeTypes\.h|RenderPass[\\/]RenderPassInfo\.h|' +
     'Asset[\\/]ArtifactContentDigest\.h|PostProcess[\\/]PostProcessDebug\.h)[>"]'
 $legacyRuntimeCameraIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Camera(?:Controller|Rig)?\.h[>"]'
@@ -1113,6 +1120,7 @@ $legacyRuntimeDebugDrawContractIncludeRegex =
 $legacyRuntimeDiagnosticsContractIncludeRegex =
     '#include\s*[<"]Diagnostics[\\/](?:SnapshotCommon\.h|' +
     'Snapshots[\\/](?:DX12BackendSnapshot|VulkanBackendSnapshot|' +
+    'SamplerRegistrySnapshot|RHIPipelineSystemSnapshot|IBLDiagnosticsSnapshot|' +
     'DX12ResourceManagerSnapshot|PersistentSceneBufferSnapshot|' +
     'TaskSystemSnapshot|ShadowDiagnosticsSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =

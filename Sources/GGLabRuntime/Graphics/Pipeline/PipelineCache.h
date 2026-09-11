@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
-#include "Graphics/RenderPass/RenderPassInfo.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
 #include "Graphics/Shader/ShaderPipelineSnapshot.h"
 
 #include <array>

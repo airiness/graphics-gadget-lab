@@ -1,8 +1,10 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/IBLPreviewDiagnostics.h"
-#include "Graphics/IBLBakeTypes.h"
+#include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <string>

@@ -13,7 +13,7 @@
 #include <string>
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
-#include "Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 
 #include <algorithm>
 #include <chrono>

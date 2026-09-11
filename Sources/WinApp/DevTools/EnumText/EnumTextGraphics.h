@@ -3,7 +3,7 @@
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
-#include "Graphics/SamplerTypes.h"
+#include "GGLabRuntime/Graphics/SamplerTypes.h"
 
 namespace gglab::devtools
 {

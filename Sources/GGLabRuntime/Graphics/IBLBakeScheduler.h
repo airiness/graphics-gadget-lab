@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/IBLBakeTypes.h"
+#include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <algorithm>

@@ -1,7 +1,9 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/RenderPass/RenderPassInfo.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
 
 #include <cstdint>
 #include <string>

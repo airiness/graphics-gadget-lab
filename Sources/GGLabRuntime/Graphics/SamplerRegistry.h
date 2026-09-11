@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
-#include "Graphics/SamplerTypes.h"
+#include "GGLabRuntime/Graphics/SamplerTypes.h"
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 

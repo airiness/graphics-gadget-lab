@@ -1,8 +1,9 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/SamplerTypes.h"
+#include "GGLabRuntime/Graphics/SamplerTypes.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace gglab

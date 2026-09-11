@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderContexts.h"
-#include "Graphics/RenderPass/RenderPassInfo.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
 
 #include <string>
 #include <string_view>

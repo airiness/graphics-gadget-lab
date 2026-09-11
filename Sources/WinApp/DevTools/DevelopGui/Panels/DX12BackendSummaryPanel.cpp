@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
-#include "Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
 
 #include <algorithm>
 #include <d3d12.h>
