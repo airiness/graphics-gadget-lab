@@ -1,13 +1,18 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "Graphics/SamplerRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
 
 namespace gglab
 {
-	std::unique_ptr<RenderHost> CreateRenderHost(const RenderHostCreateInfo& createInfo) noexcept
+	RenderHostInstance CreateRenderHost(const RenderHostCreateInfo& createInfo) noexcept
 	{
+		RenderHostInstance instance{};
 		if (createInfo.m_RHIContextFactory == nullptr || !createInfo.HasRequiredRuntimePaths())
 		{
-			return nullptr;
+			return instance;
 		}
 
 		auto renderer = std::make_unique<Renderer>();
@@ -23,8 +28,19 @@ namespace gglab
 		};
 		if (!renderer->Initialize(rendererCreateInfo))
 		{
-			return nullptr;
+			return instance;
 		}
-		return renderer;
+
+		instance.m_Services.m_PipelineResolver = renderer->GetPipelineCache();
+		instance.m_Services.m_ShaderPrograms = createInfo.m_ShaderManager;
+		instance.m_Services.m_Samplers = renderer->GetSamplerRegistry();
+		instance.m_Services.m_Resources = renderer->GetRenderResourceRegistry();
+		instance.m_Services.m_FrameBuffers = renderer.get();
+		instance.m_Services.m_Environment = renderer.get();
+		instance.m_Services.m_Presentation = renderer.get();
+		instance.m_Services.m_Renderer = renderer.get();
+		instance.m_Services.m_ShaderManager = createInfo.m_ShaderManager;
+		instance.m_Host = std::move(renderer);
+		return instance;
 	}
 }

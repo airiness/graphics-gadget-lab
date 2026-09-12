@@ -507,6 +507,28 @@ namespace gglab
 		m_HasActiveFrame = false;
 	}
 
+	const EnvironmentLightingSettings& Renderer::GetEnvironmentLightingSettings() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem.get());
+		return m_EnvironmentLightingSystem->GetSettings();
+	}
+
+	bool Renderer::ShouldInitializeIBLBakeResources() const noexcept
+	{
+		return m_IBLBakeScheduler && m_IBLBakeScheduler->ShouldInitializeBakeResources();
+	}
+
+	uint64_t Renderer::GetIBLBakingGeneration() const noexcept
+	{
+		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetBakingGeneration() : 0;
+	}
+
+	const IBLBakeConfig& Renderer::GetIBLBakingConfig() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
+		return m_IBLBakeScheduler->GetBakingConfig();
+	}
+
 	void Renderer::RetireSceneGpuAllocations(
 		RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept
 	{

@@ -4,6 +4,7 @@
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "RuntimePaths.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
@@ -208,6 +209,7 @@ namespace gglab
 		AppRuntimeHostServices m_HostServices{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
+		RenderServices m_RenderServices{};
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
 		std::unique_ptr<AssetManager> m_AssetManager;

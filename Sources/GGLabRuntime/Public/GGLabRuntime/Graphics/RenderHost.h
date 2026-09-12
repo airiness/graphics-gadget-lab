@@ -14,6 +14,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 
 #include <array>
@@ -236,10 +237,18 @@ namespace gglab
 		}
 	};
 
-	// Creates and initializes the Runtime render host. Returns null when the
-	// host-supplied context factory or runtime paths are missing, or when host
-	// initialization fails.
-	[[nodiscard]] std::unique_ptr<RenderHost> CreateRenderHost(
+	// Runtime render host plus the stable explicit service bundle. The host is
+	// null when the host inputs are missing or initialization fails.
+	struct RenderHostInstance
+	{
+		std::unique_ptr<RenderHost> m_Host;
+		RenderServices m_Services;
+	};
+
+	// Creates and initializes the Runtime render host and its explicit service
+	// bundle. The host is null when the host-supplied context factory or runtime
+	// paths are missing, or when host initialization fails.
+	[[nodiscard]] RenderHostInstance CreateRenderHost(
 		const RenderHostCreateInfo& createInfo) noexcept;
 
 	inline RenderFrame RenderHost::MakeReadyFrame(RenderHost* host, uint64_t frameSerial,

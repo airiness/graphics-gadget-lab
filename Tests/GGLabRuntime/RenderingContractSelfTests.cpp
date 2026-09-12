@@ -23,6 +23,7 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
+#include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -47,6 +48,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/SamplerRegistry.h"
+#include "Graphics/Shader/ShaderManager.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
@@ -1595,6 +1597,19 @@ namespace gglab
 			static_assert(!std::is_copy_constructible_v<RenderFrame> &&
 				std::is_move_constructible_v<RenderFrame>,
 				"the Public frame handle is a move-only RAII owner");
+			static_assert(std::is_base_of_v<RenderPipelineResolver, PipelineCache>,
+				"the pipeline cache implements the explicit pipeline resolver contract");
+			static_assert(std::is_base_of_v<RenderShaderProgramAccess, ShaderManager>,
+				"the shader manager implements the explicit program access contract");
+			static_assert(std::is_base_of_v<RenderSamplerAccess, SamplerRegistry>,
+				"the sampler registry implements the explicit sampler access contract");
+			static_assert(
+				std::is_base_of_v<RenderResourceRegistryAccess, RenderResourceRegistry>,
+				"the render resource registry implements the explicit resource contract");
+			static_assert(std::is_base_of_v<RenderFrameBufferAccess, Renderer> &&
+				std::is_base_of_v<RenderEnvironmentAccess, Renderer> &&
+				std::is_base_of_v<RenderPresentationAccess, Renderer>,
+				"the renderer implements the explicit frame, environment and presentation contracts");
 
 			const RenderFrame unavailable(RHIFrameBeginStatus::Unavailable);
 			const RenderFrame fatal(RHIFrameBeginStatus::Fatal);
@@ -1613,12 +1628,16 @@ namespace gglab
 			context.Check(!moved.IsValid() && !assigned.IsReady() && assigned.IsUnavailable(),
 				"assigning a frame handle transfers the abort obligation");
 
-			context.Check(!CreateRenderHost({}),
+			const RenderHostInstance missingFactory = CreateRenderHost({});
+			context.Check(!missingFactory.m_Host && !missingFactory.m_Services.m_Renderer &&
+				!missingFactory.m_Services.m_Presentation,
 				"render host factory rejects a missing host context factory");
 			RenderHostCreateInfo missingPaths{};
 			missingPaths.m_RHIContextFactory =
 				reinterpret_cast<const RHIContextFactoryBase*>(1);
-			context.Check(!CreateRenderHost(missingPaths),
+			const RenderHostInstance missingPathsInstance = CreateRenderHost(missingPaths);
+			context.Check(!missingPathsInstance.m_Host &&
+				!missingPathsInstance.m_Services.m_PipelineResolver,
 				"render host factory rejects missing runtime paths");
 
 			Renderer renderer;

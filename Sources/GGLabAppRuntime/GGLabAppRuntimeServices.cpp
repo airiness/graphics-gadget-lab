@@ -130,7 +130,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::InvalidContentRegistration);
 		}
 
-		m_RenderHost = CreateRenderHost(RenderHostCreateInfo{
+		RenderHostInstance renderHostInstance = CreateRenderHost(RenderHostCreateInfo{
 			.m_RHIContextFactory = createInfo.m_RHIContextFactory,
 			.m_ShaderManager = m_ShaderManager.get(),
 			.m_TaskSystem = m_TaskSystem.get(),
@@ -140,12 +140,14 @@ namespace gglab
 			.m_AdapterSelector = m_Config.m_AdapterSelector,
 			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
 			});
-		if (!m_RenderHost)
+		if (!renderHostInstance.m_Host)
 		{
 			GGLAB_LOG_ERROR("Failed to initialize the render host.");
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
+		m_RenderHost = std::move(renderHostInstance.m_Host);
+		m_RenderServices = renderHostInstance.m_Services;
 		Renderer& legacyRenderer = GetLegacyRenderer(*m_RenderHost);
 
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{

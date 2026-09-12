@@ -157,12 +157,10 @@ namespace gglab
 		}
 		Renderer* const legacyRenderer = GetLegacyRenderer(m_RenderHost.get());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
-		const RenderServices services{
-			.m_Renderer = legacyRenderer,
-			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get(),
-			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
-		};
+		RenderServices services = m_RenderServices;
+		services.m_AssetManager = m_AssetManager.get();
+		services.m_ShaderManager = m_ShaderManager.get();
+		services.m_OverlayExtension = toolingFrame.GetOverlayExtension();
 		// The RAII frame handle may retire RenderGraph resources from its abort
 		// path. Keep the graph alive until after the frame has ended.
 		RenderGraph renderGraph(m_RenderHost->CreateRenderGraphCreateInfo());

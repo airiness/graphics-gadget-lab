@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
@@ -32,7 +33,7 @@ namespace gglab
 		uint64_t m_CacheMissCount = 0;
 	};
 
-	class SamplerRegistry
+	class SamplerRegistry : public RenderSamplerAccess
 	{
 	public:
 		struct CreateInfo

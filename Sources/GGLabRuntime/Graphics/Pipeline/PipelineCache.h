@@ -4,6 +4,7 @@
 #include "Graphics/Pipeline/PipelinePresets.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Shader/ShaderPipelineSnapshot.h"
 
 #include <array>
@@ -112,7 +113,7 @@ namespace gglab
 		uint64_t m_PipelineSystemRevision = 0;
 	};
 
-	class PipelineCache
+	class PipelineCache : public RenderPipelineResolver
 	{
 	public:
 		struct CreateInfo

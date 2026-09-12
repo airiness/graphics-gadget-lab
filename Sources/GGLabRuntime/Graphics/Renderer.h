@@ -47,7 +47,8 @@ namespace gglab
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
-	class Renderer : public RenderHost
+	class Renderer : public RenderHost, public RenderFrameBufferAccess,
+		public RenderEnvironmentAccess, public RenderPresentationAccess
 	{
 	public:
 		// Transitional alias for the Public RAII frame handle. The nested frame
@@ -92,11 +93,11 @@ namespace gglab
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept override;
 
 		RHIContext* GetRHIContext() const noexcept override { return m_RHIContext.get(); }
-		RHIDevice* GetDevice() const noexcept
+		RHIDevice* GetDevice() const noexcept override
 		{
 			return m_RHIContext ? &m_RHIContext->GetDevice() : nullptr;
 		}
-		RHISwapChain* GetSwapChain() const noexcept
+		RHISwapChain* GetSwapChain() const noexcept override
 		{
 			return m_RHIContext ? &m_RHIContext->GetSwapChain() : nullptr;
 		}
@@ -155,7 +156,7 @@ namespace gglab
 		// scheduler and its derived-data ownership remain Runtime-internal.
 		void AttachAssetManager(AssetManager& assetManager) noexcept;
 		void DetachAssetManager() noexcept;
-		const std::array<float, 4>& GetBackBufferClearColor() const noexcept
+		const std::array<float, 4>& GetBackBufferClearColor() const noexcept override
 		{
 			return m_BackBufferClearColor;
 		}
@@ -163,6 +164,13 @@ namespace gglab
 		{
 			return m_TemporalAACapabilityStatus;
 		}
+		// Explicit environment access for pass services. The concrete
+		// environment and bake services remain Runtime-internal.
+		[[nodiscard]] const EnvironmentLightingSettings& GetEnvironmentLightingSettings()
+			const noexcept override;
+		[[nodiscard]] bool ShouldInitializeIBLBakeResources() const noexcept override;
+		[[nodiscard]] uint64_t GetIBLBakingGeneration() const noexcept override;
+		[[nodiscard]] const IBLBakeConfig& GetIBLBakingConfig() const noexcept override;
 		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept
 		{
 			m_TemporalAACapabilityStatus.m_ResolveProgramAvailable = available;
@@ -174,35 +182,37 @@ namespace gglab
 		}
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
-		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept
+		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept override
 		{
 			return m_SceneCB.get();
 		}
-		DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept
+		DynamicConstantBufferAllocator* GetSceneConstantBuffer() noexcept override
 		{
 			return m_SceneCB.get();
 		}
-		const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept
+		const PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() const noexcept override
 		{
 			return m_ObjectSB.get();
 		}
-		PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept
+		PersistentStructuredBuffer<ObjectGPU>* GetObjectStructuredBuffer() noexcept override
 		{
 			return m_ObjectSB.get();
 		}
-		const PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() const noexcept
+		const PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer()
+			const noexcept override
 		{
 			return m_MaterialSB.get();
 		}
-		PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept
+		PersistentStructuredBuffer<MaterialGPU>* GetMaterialStructuredBuffer() noexcept override
 		{
 			return m_MaterialSB.get();
 		}
-		const PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() const noexcept
+		const PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer()
+			const noexcept override
 		{
 			return m_LightSB.get();
 		}
-		PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept
+		PersistentStructuredBuffer<LightGPU>* GetLightStructuredBuffer() noexcept override
 		{
 			return m_LightSB.get();
 		}
@@ -236,11 +246,12 @@ namespace gglab
 		{
 			return m_LightTable.get();
 		}
-		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() const noexcept
+		const DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer()
+			const noexcept override
 		{
 			return m_ViewSB.get();
 		}
-		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept
+		DynamicStructuredBufferAllocator<ViewGPU>* GetViewStructuredBuffer() noexcept override
 		{
 			return m_ViewSB.get();
 		}

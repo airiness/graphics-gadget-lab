@@ -7,6 +7,8 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/Resource/RenderTextureIndex.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
@@ -23,7 +25,8 @@ namespace gglab
 	*/
 	class RenderResourceRegistry : public PostProcessPreviewViewBase,
 		public PostProcessPreviewControlBase, public ShadowPreviewViewBase,
-		public IBLPreviewViewBase, public IBLPreviewControlBase
+		public IBLPreviewViewBase, public IBLPreviewControlBase,
+		public RenderResourceRegistryAccess
 	{
 	public:
 		struct CreateInfo
@@ -58,20 +61,7 @@ namespace gglab
 			RHIFormat m_PreviewIBLPrefilteredSpecularCubemapFormat = RHIFormat::R8G8B8A8Unorm;
 		};
 
-		enum class TextureIndex : uint8_t
-		{
-			IBL_EnvironmentCubemap,
-			IBL_IrradianceCubemap,
-			IBL_PrefilteredSpecularCubemap,
-			IBL_BrdfLut,
-			Preview_IBL_EnvironmentCubemap,
-			Preview_IBL_IrradianceCubemap,
-			Preview_IBL_PrefilteredSpecularCubemap,
-			Preview_Shadow_DirectionalShadowMap,
-			Preview_PostProcess,
-
-			Count
-		};
+		using TextureIndex = RenderTextureIndex;
 
 	private:
 		struct TextureEntry

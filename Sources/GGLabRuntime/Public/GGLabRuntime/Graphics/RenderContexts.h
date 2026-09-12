@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
@@ -17,11 +18,7 @@ namespace gglab
 {
 	struct RenderView;
 	struct RenderQueue;
-	class Renderer;
-	class AssetManager;
-	class ShaderManager;
 	class TemporalFrameTransaction;
-	class RenderPipelineOverlayExtensionBase;
 	struct RenderFrameContext;
 
 	struct RenderFrameContext
@@ -100,15 +97,5 @@ namespace gglab
 				(m_ViewRenderSettings.size() >= utils::ToIndex(RenderViewID::Count)) &&
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
-	};
-
-	struct RenderServices
-	{
-		Renderer* m_Renderer = nullptr;
-		AssetManager* m_AssetManager = nullptr;
-		ShaderManager* m_ShaderManager = nullptr;
-		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
-
-		bool IsValid() const noexcept { return m_Renderer && m_AssetManager && m_ShaderManager; }
 	};
 }
