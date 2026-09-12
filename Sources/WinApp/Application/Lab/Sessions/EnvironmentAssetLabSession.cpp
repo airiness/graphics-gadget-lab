@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"

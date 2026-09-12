@@ -1,6 +1,6 @@
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"

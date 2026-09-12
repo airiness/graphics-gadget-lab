@@ -981,7 +981,10 @@ $legacyRuntimeDiagnosticsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"),
-    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h")
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/LabSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/RenderGraphSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h")
 )
 foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1193,7 +1196,8 @@ $legacyRuntimeDiagnosticsContractIncludeRegex =
     'DX12ResourceManagerSnapshot|PersistentSceneBufferSnapshot|' +
     'TaskSystemSnapshot|ShadowDiagnosticsSnapshot|ForwardPlusDiagnosticsSnapshot|' +
     'GTAODiagnosticsSnapshot|PostProcessDiagnosticsSnapshot|' +
-    'TemporalAADiagnosticsSnapshot)\.h)[>"]'
+    'TemporalAADiagnosticsSnapshot|LabSnapshot|RenderGraphSnapshot|' +
+    'TransientResourcePoolSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

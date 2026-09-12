@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/EnumText/EnumText.h"
 
 namespace gglab::devtools

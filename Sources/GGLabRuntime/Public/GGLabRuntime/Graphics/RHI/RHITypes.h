@@ -163,6 +163,15 @@ namespace gglab
 		};
 	}
 
+	[[nodiscard]] constexpr inline RHIResourceState CommonRHIResourceState() noexcept
+	{
+		return {
+			.m_Stages = RHIStage::All,
+			.m_Access = RHIAccess::Common,
+			.m_Layout = RHILayout::Common,
+		};
+	}
+
 	enum class RHIResourceStateUsage : uint8_t
 	{
 		TextureInitial,

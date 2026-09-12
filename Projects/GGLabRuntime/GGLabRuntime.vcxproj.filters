@@ -190,8 +190,14 @@
     <Filter Include="Public\GGLabRuntime\Graphics\Profiling">
       <UniqueIdentifier>{E8DC78AF-7962-D4A4-2E48-49E6AEDC81CA}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\RenderGraph">
+      <UniqueIdentifier>{8DD11030-1D35-F98A-50B9-62811F513051}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\RenderPass">
       <UniqueIdentifier>{9722F32E-41FD-20CD-5595-F15658D255EF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\Resource">
+      <UniqueIdentifier>{DB6E1121-DF6F-14D3-C289-DC30E6A02AA1}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\RHI">
       <UniqueIdentifier>{67D2F0C8-FA46-D5CE-C9B6-959AC4B67320}</UniqueIdentifier>
@@ -942,15 +948,6 @@
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
       <Filter>Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
@@ -1754,10 +1751,16 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderQueueSnapshot.h">
@@ -1779,6 +1782,9 @@
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h">
@@ -1892,6 +1898,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h">
       <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraphTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
@@ -1901,8 +1910,14 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderSceneTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourceTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ContextFactory.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>

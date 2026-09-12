@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/Resource/TransientResourcePool.h"
 

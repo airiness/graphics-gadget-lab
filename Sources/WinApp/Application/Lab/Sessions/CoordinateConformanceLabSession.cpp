@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

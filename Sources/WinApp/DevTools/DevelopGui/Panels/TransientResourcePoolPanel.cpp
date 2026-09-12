@@ -4,8 +4,8 @@
 #include "DevTools/RHIText.h"
 #include "GGLabFoundation/String/StringUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 
 #include <cstdint>
 #include <format>

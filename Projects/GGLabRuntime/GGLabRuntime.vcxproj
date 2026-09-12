@@ -303,6 +303,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraphTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraController.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraControllerSettings.h" />
@@ -480,6 +481,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderScene.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderSceneTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
@@ -487,6 +489,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourceTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\GPUStructures.h" />
@@ -633,7 +636,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
@@ -659,11 +662,11 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12ResourceManagerSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PersistentSceneBufferSnapshot.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderGraphSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowPreviewViewBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
 	<ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h" />

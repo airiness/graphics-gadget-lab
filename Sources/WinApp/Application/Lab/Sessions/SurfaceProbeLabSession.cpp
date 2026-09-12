@@ -1,6 +1,6 @@
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Camera.h"

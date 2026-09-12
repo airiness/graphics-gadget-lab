@@ -2,7 +2,7 @@
 #include "AppRuntimeLog.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Renderer.h"

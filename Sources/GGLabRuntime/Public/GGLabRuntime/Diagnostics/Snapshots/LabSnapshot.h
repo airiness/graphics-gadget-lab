@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 
 #include <cstdint>
 #include <optional>

@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 
 #include "ApplicationInput.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"

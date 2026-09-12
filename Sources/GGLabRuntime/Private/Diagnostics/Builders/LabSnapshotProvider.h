@@ -1,6 +1,6 @@
 #pragma once
 #include "Diagnostics/SnapshotProvider.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab
 {

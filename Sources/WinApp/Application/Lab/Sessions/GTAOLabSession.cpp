@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/GTAOLabSession.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Geometry.h"
 #include "Graphics/Pipeline/GTAO.h"

@@ -1,8 +1,13 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/RenderGraph/RGPass.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourceTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

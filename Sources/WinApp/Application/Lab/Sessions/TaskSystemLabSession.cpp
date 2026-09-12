@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 

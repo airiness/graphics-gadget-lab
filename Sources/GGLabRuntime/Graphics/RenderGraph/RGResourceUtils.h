@@ -4,15 +4,6 @@
 
 namespace gglab
 {
-	constexpr inline RHIResourceState CommonRHIResourceState() noexcept
-	{
-		return {
-			.m_Stages = RHIStage::All,
-			.m_Access = RHIAccess::Common,
-			.m_Layout = RHILayout::Common,
-		};
-	}
-
 	struct RGPersistentTextureImportContract
 	{
 		RHIResourceState m_InitialState = UndefinedRHITextureState();

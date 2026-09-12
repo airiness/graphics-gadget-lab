@@ -5,7 +5,7 @@
 #include "DevTools/DevelopGui/DevelopGuiFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include <algorithm>
 #include <cmath>

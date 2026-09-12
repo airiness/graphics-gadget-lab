@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Diagnostics/Builders/AssetSnapshotBuilder.h"
 #include "Diagnostics/Snapshots/AssetSnapshot.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"

@@ -7,6 +7,7 @@
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
+#include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <array>
@@ -66,12 +67,6 @@ namespace gglab
 		DynamicBufferAllocation m_SceneConstants{};
 
 		bool IsEmpty() const noexcept { return !m_Views.IsValid() && !m_SceneConstants.IsValid(); }
-	};
-
-	enum class RenderSceneBuildStatus : uint8_t
-	{
-		Ready,
-		GpuUploadFailed,
 	};
 
 	class RenderSceneBuilder

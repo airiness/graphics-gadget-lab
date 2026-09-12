@@ -1,6 +1,6 @@
 #include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
 #include "Application/Content/DesktopApplicationContent.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabFoundation/Base/MathUtils.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Asset/AssetManager.h"

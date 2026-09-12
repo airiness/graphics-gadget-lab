@@ -17,7 +17,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
-#include "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsControl.h"
