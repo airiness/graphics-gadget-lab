@@ -4,7 +4,6 @@
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -126,9 +125,7 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		m_TilePipelineRecipe.m_CSId =
@@ -136,7 +133,7 @@ namespace gglab
 		m_FramePipelineRecipe.m_CSId =
 			shaderManager->LoadProgram(shader_programs::ForwardPlusValidationFrameCompute);
 
-		auto* rhiContext = renderer->GetRHIContext();
+		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
 		auto& pipelineSystem = rhiContext->GetPipelineSystem();
 		m_TilePipelineRecipe.m_BindingLayout =
@@ -167,8 +164,6 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<TilePassData>(
@@ -215,7 +210,7 @@ namespace gglab
 					RHIStage::ComputeShader);
 				data.m_TileMetrics = validation.m_TileMetrics;
 			},
-			[this, renderer](RGExecuteContext& executeContext, TilePassData& data)
+			[this, services](RGExecuteContext& executeContext, TilePassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -229,7 +224,7 @@ namespace gglab
 					depthSrv.IsValid() && tileMetrics.IsValid(),
 					"Forward+ HDR diff tile resources must resolve before dispatch.");
 
-				commandContext->SetPipeline(GetOrCreateTilePipeline(*renderer));
+				commandContext->SetPipeline(GetOrCreateTilePipeline(services));
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(TileRootParameter::OutputMetrics), tileMetrics);
 				commandContext->SetPushConstants(
@@ -270,7 +265,7 @@ namespace gglab
 					RHIStage::ComputeShader);
 				data.m_FrameMetrics = validation.m_FrameMetrics;
 			},
-			[this, renderer](RGExecuteContext& executeContext, FramePassData& data)
+			[this, services](RGExecuteContext& executeContext, FramePassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -281,7 +276,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(tileMetrics.IsValid() && frameMetrics.IsValid(),
 					"Forward+ HDR diff frame resources must resolve before dispatch.");
 
-				commandContext->SetPipeline(GetOrCreateFramePipeline(*renderer));
+				commandContext->SetPipeline(GetOrCreateFramePipeline(services));
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(FrameRootParameter::TileMetrics), tileMetrics);
 				commandContext->SetReadWriteBuffer(
@@ -342,17 +337,17 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassForwardPlusValidation::GetOrCreateTilePipeline(
-		const Renderer& renderer) noexcept
+		const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_TilePipelineSlot, m_TilePipelineRecipe, GetInfo());
 	}
 
 	RHIPipelineHandle RenderPassForwardPlusValidation::GetOrCreateFramePipeline(
-		const Renderer& renderer) noexcept
+		const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_FramePipelineSlot, m_FramePipelineRecipe, GetInfo());
 	}

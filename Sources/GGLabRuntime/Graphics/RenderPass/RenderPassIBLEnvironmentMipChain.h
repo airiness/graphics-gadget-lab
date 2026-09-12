@@ -5,7 +5,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassIBLEnvironmentMipChain : public RenderPassBase
 	{
@@ -29,7 +28,7 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(
-			const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
+			const RenderServices& services, RHIFormat renderTargetFormat) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};

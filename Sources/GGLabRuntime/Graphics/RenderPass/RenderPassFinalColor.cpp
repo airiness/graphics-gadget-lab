@@ -1,6 +1,8 @@
 #include "Graphics/RenderPass/RenderPassFinalColor.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/SamplerRegistry.h"
@@ -52,15 +54,13 @@ namespace gglab
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
-		auto* servicesPtr = &services;
-		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[contextPtr, servicesPtr, displayViewId](
+			[contextPtr, services, displayViewId](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -113,14 +113,12 @@ namespace gglab
 				data.m_Width = displayView.m_Width;
 				data.m_Height = displayView.m_Height;
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 				data.m_SamplerIndex =
-					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 				data.m_BloomIntensity = viewSettings.m_PostProcess.m_Bloom.m_Intensity;
 				data.m_ScenePreExposure = postProcess.m_Inputs.m_SceneColor.m_PreExposure;
 			},
-			[this, contextPtr, servicesPtr, displayViewId](
+			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -133,10 +131,8 @@ namespace gglab
 
 				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPipeline(GetOrCreatePSO(services));
 				const RHIRenderingAttachment colorAttachment{
 					.m_View = outputRtv,
 					.m_LoadOp = RHIContentLoadOp::DontCare,
@@ -148,13 +144,13 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				const auto& viewSB = renderer->GetViewStructuredBuffer();
+				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBufferHandle());
@@ -178,10 +174,8 @@ namespace gglab
 
 	void RenderPassFinalColor::EnsureInitialized(const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -189,14 +183,14 @@ namespace gglab
 			const auto vsId = shaderManager->LoadProgram(shader_programs::FinalColorVertex);
 			const auto psId = shaderManager->LoadProgram(shader_programs::FinalColorPixel);
 
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_BaseRecipe.m_VSId = vsId;
 			m_BaseRecipe.m_PSId = psId;
 
 			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = renderer->GetSwapChain()->GetFormat();
+			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = services.m_Presentation->GetSwapChain()->GetFormat();
 			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
 			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 			m_BaseRecipe.m_Formats.m_SampleCount = 1;
@@ -210,9 +204,9 @@ namespace gglab
 		}
 	}
 
-	RHIPipelineHandle RenderPassFinalColor::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassFinalColor::GetOrCreatePSO(const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}

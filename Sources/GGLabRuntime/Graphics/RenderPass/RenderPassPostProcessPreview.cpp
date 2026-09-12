@@ -1,11 +1,14 @@
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -143,9 +146,7 @@ namespace gglab
 	void RenderPassPostProcessPreview::AddPass(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* registry = renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
 		if (IsTemporalAAPreview(selection.m_Tap))
@@ -231,9 +232,7 @@ namespace gglab
 		const RGPostProcessColor& source, PostProcessDebugTap tap,
 		uint32_t bloomPyramidLevel) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* registry = renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		if (!registry->IsPostProcessPreviewRequested())
 		{
@@ -263,9 +262,7 @@ namespace gglab
 		float sourcePreExposure, std::optional<RHITextureViewDesc> sourceViewDesc,
 		PostProcessDebugSelection selection) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* registry = renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		if (!source.IsValid())
 		{
@@ -277,7 +274,7 @@ namespace gglab
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const RenderView& displayView = context.GetDisplayRenderView();
-		const RHIFencePoint retireFence = renderer->GetLastSubmittedFencePoint();
+		const RHIFencePoint retireFence = services.m_Presentation->GetLastSubmittedFencePoint();
 		registry->EnsurePostProcessPreviewResources(displayView.m_Width, displayView.m_Height,
 			retireFence.IsValid() ? &retireFence : nullptr);
 
@@ -292,7 +289,7 @@ namespace gglab
 		const bool pointSampledPreview =
 			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap) ||
 			IsTemporalMotionPreview(selection.m_Tap) || IsTemporalAAPreview(selection.m_Tap);
-		const uint32_t samplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(
 			pointSampledPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
 		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());
 		const auto* contextPtr = &context;
@@ -328,7 +325,7 @@ namespace gglab
 				data.m_SourcePreExposure = sourcePreExposure;
 				data.m_PreviewExposureScale = previewExposureScale;
 			},
-			[this, renderer, registry, contextPtr, displayViewId](
+			[this, services, registry, contextPtr, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -344,20 +341,20 @@ namespace gglab
 				commandContext->BeginRendering({ .m_ColorAttachments =
 					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPipeline(GetOrCreatePSO(services));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 
 				const PostProcessPreviewPassParameters parameters{
 					.SourceTextureIndex = sourceSrv.m_Index,
@@ -380,9 +377,7 @@ namespace gglab
 		{
 			return;
 		}
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		m_BaseRecipe.m_VSId =
@@ -390,7 +385,7 @@ namespace gglab
 		m_BaseRecipe.m_PSId =
 			shaderManager->LoadProgram(shader_programs::PostProcessPreviewPixel);
 
-		m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+		m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 		m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 		m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
@@ -405,9 +400,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassPostProcessPreview::GetOrCreatePSO(
-		const Renderer& renderer) noexcept
+		const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}

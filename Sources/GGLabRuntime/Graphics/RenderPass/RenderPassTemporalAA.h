@@ -5,7 +5,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassTemporalAA final : public RenderPassBase
 	{
@@ -28,10 +27,10 @@ namespace gglab
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 		[[nodiscard]] bool IsAvailable() const noexcept { return m_IsAvailable; }
-		[[nodiscard]] bool ValidatePipelineClosure(const Renderer& renderer) noexcept;
+		[[nodiscard]] bool ValidatePipelineClosure(const RenderServices& services) noexcept;
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const Renderer& renderer) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(const RenderServices& services) noexcept;
 
 		ComputePipelineRecipe m_PipelineRecipe{};
 		ComputePipelineSlot m_PipelineSlot{};

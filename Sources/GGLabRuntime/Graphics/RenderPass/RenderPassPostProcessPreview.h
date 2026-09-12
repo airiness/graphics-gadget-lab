@@ -8,7 +8,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassPostProcessPreview final : public RenderPassBase
 	{
@@ -39,7 +38,7 @@ namespace gglab
 			std::optional<RHITextureViewDesc> sourceViewDesc,
 			PostProcessDebugSelection selection) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
-		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};

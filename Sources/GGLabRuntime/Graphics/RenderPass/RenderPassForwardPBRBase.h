@@ -78,7 +78,7 @@ namespace gglab
 			bool gtaoContributionOutputEnabled) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const Renderer& renderer, uint64_t variantBits, bool useDepthEqual,
+			const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
 			ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled) noexcept;
 

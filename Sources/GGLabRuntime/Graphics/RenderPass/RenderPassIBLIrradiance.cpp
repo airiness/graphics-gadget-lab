@@ -1,6 +1,5 @@
 #include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
@@ -52,13 +51,11 @@ namespace gglab
 	{
 		GGLAB_UNUSED(context);
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
+		auto* renderResRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 
-		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
+		auto* bakeScheduler = services.m_Environment;
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 		const uint32_t sampleCount = bakeScheduler->GetBakingConfig().m_IrradianceSampleCount;
@@ -67,7 +64,7 @@ namespace gglab
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[renderer, renderResRegistry, sampleCount](
+			[services, renderResRegistry, sampleCount](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -81,7 +78,7 @@ namespace gglab
 				data.m_IrradianceCubemap = iblRes.m_BakeIrradianceCubemap;
 
 				const auto* textureDesc = renderResRegistry->GetIBLBakeTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_IrradianceCubemap);
+					RenderTextureIndex::IBL_IrradianceCubemap);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
 				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
@@ -95,12 +92,12 @@ namespace gglab
 				data.m_Width = textureDesc->m_Extent.m_Width;
 				data.m_Height = textureDesc->m_Extent.m_Height;
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetIBLBakeShaderVisibleSrvIndex(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+					RenderTextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex =
-					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 
 				const auto* environmentDesc = renderResRegistry->GetIBLBakeTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+					RenderTextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(environmentDesc);
 				data.m_EnvironmentResolution =
 					static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
@@ -108,11 +105,11 @@ namespace gglab
 				data.m_SampleCount = sampleCount;
 				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
-			[this, renderer, bakeScheduler, bakeGeneration](
+			[this, services, bakeScheduler, bakeGeneration](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
+				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_RenderTargetFormat));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
@@ -151,10 +148,8 @@ namespace gglab
 
 	void RenderPassIBLIrradiance::EnsureInitialized(const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -162,7 +157,7 @@ namespace gglab
 			const auto vsId = shaderManager->LoadProgram(shader_programs::IBLIrradianceVertex);
 			const auto psId = shaderManager->LoadProgram(shader_programs::IBLIrradiancePixel);
 
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_BaseRecipe.m_VSId = vsId;
 			m_BaseRecipe.m_PSId = psId;
@@ -184,9 +179,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassIBLIrradiance::GetOrCreatePSO(
-		const Renderer& renderer, RHIFormat renderTargetFormat) noexcept
+		const RenderServices& services, RHIFormat renderTargetFormat) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
 		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;

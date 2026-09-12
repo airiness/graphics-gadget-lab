@@ -3006,6 +3006,23 @@ if (Test-Path -LiteralPath $renderHostHeaderPath -PathType Leaf) {
     }
 }
 
+$runtimePassServiceRegex = `
+    '#include\s*[<"]Graphics[\\/]Renderer[.]h|(?:->|\.)m_Renderer\b'
+foreach ($file in $runtimeOwnedFiles) {
+    if (-not ($file.Path.StartsWith("Graphics/RenderPass/") -or
+        $file.Path.StartsWith("Graphics/RenderPipeline/"))) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
+    if ($content -match $runtimePassServiceRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-pass-service-boundary"
+            Target = ConvertTo-RepoRelativePath $file.FullPath
+            Reason = "Runtime passes and pipelines must consume explicit RenderServices contracts, not the concrete renderer"
+        })
+    }
+}
+
 $napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'
 foreach ($header in Get-ChildItem -LiteralPath $napaPublicDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {

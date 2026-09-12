@@ -7,7 +7,6 @@
 namespace gglab
 {
 	class RHIGraphicsCommandContext;
-	class Renderer;
 
 	class RenderPassDepthPrepass final : public RenderPassBase
 	{
@@ -49,7 +48,7 @@ namespace gglab
 			bool outputMotion) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const Renderer& renderer, uint64_t variantBits, bool outputMotion) noexcept;
+			const RenderServices& services, uint64_t variantBits, bool outputMotion) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_BasePhysicalKey{};

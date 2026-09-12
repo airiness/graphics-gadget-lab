@@ -21,7 +21,7 @@ namespace gglab
 	private:
 		static RenderPassInfo MakeInfo(DebugDrawPassMode mode) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
-		RHIPipelineHandle GetPipeline(const Renderer& renderer, bool triangles) noexcept;
+		RHIPipelineHandle GetPipeline(const RenderServices& services, bool triangles) noexcept;
 
 		DebugDrawPassMode m_Mode = DebugDrawPassMode::Scene;
 		std::array<GraphicsPhysicalPipelineKey, 2> m_Recipes{};

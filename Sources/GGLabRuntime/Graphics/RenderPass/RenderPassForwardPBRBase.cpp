@@ -1,7 +1,9 @@
 #include "Graphics/RenderPass/RenderPassForwardPBRBase.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -108,9 +110,10 @@ namespace gglab
 			};
 		}
 
-		RHIBindingLayoutDesc BuildForwardPBRBindingLayout() noexcept
+		RHIBindingLayoutDesc BuildForwardPBRBindingLayout(
+			const RenderServices& services) noexcept
 		{
-			RHIBindingLayoutDesc desc = Renderer::BuildCommonRHIBindingLayoutDesc();
+			RHIBindingLayoutDesc desc = services.m_BindingLayout->GetCommonBindingLayoutDesc();
 			desc.m_DebugName = "ForwardPBR.ForwardPlusBindingLayout";
 			AppendForwardPBRBindingSlot(desc, 5, "ForwardPlusTileHeaders");
 			AppendForwardPBRBindingSlot(desc, 6, "ForwardPlusTileIndices");
@@ -126,15 +129,13 @@ namespace gglab
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
-		auto* servicesPtr = &services;
-		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const bool transparent = m_PassKind == ForwardPBRPassKind::Transparent;
 		const ForwardPBRLightingVariant lightingVariant = ResolveForwardPBRLightingVariant(
 			m_PassKind, context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus,
 			m_HdrDiffValidationAvailable);
-		auto* registry = services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const bool gtaoContributionRequested = !transparent &&
 			registry->IsPostProcessPreviewRequested() &&
@@ -143,7 +144,7 @@ namespace gglab
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[contextPtr, servicesPtr, displayViewId, transparent, lightingVariant,
+			[contextPtr, services, displayViewId, transparent, lightingVariant,
 			gtaoContributionRequested](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
@@ -295,9 +296,7 @@ namespace gglab
 						data.m_Depth, sceneDepth.m_DsvDesc);
 				}
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
-				data.m_ShadowSamplerIndex = renderer->GetSamplerRegistry()->GetSamplerIndex(
+				data.m_ShadowSamplerIndex = services.m_Samplers->GetSamplerIndex(
 					SamplerPreset::ShadowCmpLinearClamp);
 
 				const auto& shadowSettings = contextPtr->GetDirectionalShadowSettings();
@@ -305,7 +304,7 @@ namespace gglab
 					(shadowSettings.m_Enable ? 1u : 0u) | (shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
-			[this, contextPtr, servicesPtr, displayViewId](
+			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
@@ -360,7 +359,6 @@ namespace gglab
 				GGLAB_ASSERT_MSG(shadowSrv.IsValid(),
 					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
 
-				auto* renderer = servicesPtr->m_Renderer;
 				uint32_t gtaoTextureIndex = 0;
 				if (data.m_GTAOEnabled)
 				{
@@ -416,7 +414,7 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(*renderer,
+				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
 					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
 					data.m_UseDepthEqual, data.m_LightingVariant,
 					data.m_GTAOContributionOutputEnabled));
@@ -429,32 +427,32 @@ namespace gglab
 				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
 				// Set object structured buffer
-				const auto& objectSB = renderer->GetObjectStructuredBuffer();
+				const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
 					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				// Set material structured buffer
-				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
+				const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
 				// View structured buffer
-				const auto& viewSB = renderer->GetViewStructuredBuffer();
+				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBufferHandle());
 
 				// Light structured buffer
-				const auto& lightSB = renderer->GetLightStructuredBuffer();
+				const auto& lightSB = services.m_FrameBuffers->GetLightStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 					lightSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
@@ -498,7 +496,7 @@ namespace gglab
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId,
+				DrawRenderQueue(graphicsContext, *contextPtr, services, displayViewId,
 					data.m_ExpectedRenderQueue, data.m_UseDepthEqual, data.m_LightingVariant,
 					data.m_GTAOContributionOutputEnabled);
 			});
@@ -507,8 +505,6 @@ namespace gglab
 	void RenderPassForwardPBRBase::Prepare(
 		const RenderServices& services, const ForwardPBRShaderSet& shaderSet) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
 		if (!m_IsInitialized)
 		{
@@ -522,7 +518,7 @@ namespace gglab
 			// Pipeline recipe
 			auto& legacyKey =
 				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
-			legacyKey.m_BindingLayout = renderer->GetCommonBindingLayout();
+			legacyKey.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			legacyKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			legacyKey.m_VSId = shaderSet.m_CoverageVertexShader;
 			legacyKey.m_PSId = shaderSet.m_LegacyShadingPixelShader;
@@ -540,11 +536,11 @@ namespace gglab
 
 			if (m_PassKind == ForwardPBRPassKind::Opaque)
 			{
-				auto* rhiContext = renderer->GetRHIContext();
+				auto* rhiContext = services.m_Presentation->GetRHIContext();
 				GGLAB_ASSERT_NOT_NULL(rhiContext);
 				const RHIBindingLayoutHandle forwardPlusBindingLayout =
 					rhiContext->GetPipelineSystem().CreateBindingLayout(
-						BuildForwardPBRBindingLayout());
+						BuildForwardPBRBindingLayout(services));
 				GGLAB_ASSERT_MSG(forwardPlusBindingLayout.IsValid(),
 					"Forward+ opaque shading requires its pass-specific binding layout.");
 
@@ -631,8 +627,6 @@ namespace gglab
 		}
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
 		const auto& drawItems = renderQueue.m_DrawItems;
 
@@ -656,7 +650,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*services.m_Renderer, drawItem.m_VariantBits, useDepthEqual, lightingVariant,
+					services, drawItem.m_VariantBits, useDepthEqual, lightingVariant,
 					gtaoContributionOutputEnabled));
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -683,11 +677,11 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
-		const Renderer& renderer, uint64_t variantBits, bool useDepthEqual,
+		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
 		const size_t lightingVariantIndex = static_cast<size_t>(lightingVariant);

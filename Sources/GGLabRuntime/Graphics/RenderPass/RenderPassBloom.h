@@ -8,7 +8,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassBloom final : public RenderPassBase
 	{
@@ -37,7 +36,7 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(
-			const Renderer& renderer, RHIFormat renderTargetFormat, bool additive) noexcept;
+			const RenderServices& services, RHIFormat renderTargetFormat, bool additive) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_FilterPipelineSlot{};

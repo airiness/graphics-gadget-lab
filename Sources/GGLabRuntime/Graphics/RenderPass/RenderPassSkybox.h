@@ -4,7 +4,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassSkybox : public RenderPassBase
 	{
@@ -27,7 +26,7 @@ namespace gglab
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
-		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};

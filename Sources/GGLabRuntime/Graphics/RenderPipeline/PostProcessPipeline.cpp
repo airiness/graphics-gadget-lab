@@ -3,7 +3,6 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab
@@ -38,9 +37,7 @@ namespace gglab
 				},
 		};
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* registry = renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto previewSelection = registry->GetPostProcessPreviewSelection();
 		const bool wantsIntermediateBloomTap =

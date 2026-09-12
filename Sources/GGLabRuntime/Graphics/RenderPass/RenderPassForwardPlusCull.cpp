@@ -1,10 +1,12 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -121,9 +123,7 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		m_PipelineRecipes[0].m_CSId =
@@ -131,7 +131,7 @@ namespace gglab
 		m_PipelineRecipes[1].m_CSId =
 			shaderManager->LoadProgram(shader_programs::ForwardPlusCullDiagnosticsCompute);
 
-		auto* rhiContext = renderer->GetRHIContext();
+		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
 		for (size_t variantIndex = 0; variantIndex < m_PipelineRecipes.size(); ++variantIndex)
 		{
@@ -158,13 +158,11 @@ namespace gglab
 		const RenderScene& renderScene = context.m_RenderScene;
 		const uint32_t viewIndex =
 			renderScene.m_ViewBaseIndex + static_cast<uint32_t>(utils::ToIndex(displayViewId));
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		if (m_DebugReadback)
 		{
-			auto* device = renderer->GetDevice();
-			auto* rhiContext = renderer->GetRHIContext();
-			auto* swapChain = renderer->GetSwapChain();
+			auto* device = services.m_Presentation->GetDevice();
+			auto* rhiContext = services.m_Presentation->GetRHIContext();
+			auto* swapChain = services.m_Presentation->GetSwapChain();
 			GGLAB_ASSERT_NOT_NULL(device);
 			GGLAB_ASSERT_NOT_NULL(rhiContext);
 			GGLAB_ASSERT_NOT_NULL(swapChain);
@@ -245,7 +243,7 @@ namespace gglab
 				data.m_LightCount =
 					std::min(renderScene.m_LightCount, ForwardPlusTileLightCapacity);
 			},
-			[this, renderer, &context](RGExecuteContext& executeContext, PassData& data)
+			[this, services, &context](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -257,13 +255,13 @@ namespace gglab
 					"Forward+ graph resources must resolve before dispatch.");
 
 				commandContext->SetPipeline(
-					GetOrCreatePipeline(*renderer, data.m_DiagnosticsEnabled));
+					GetOrCreatePipeline(services, data.m_DiagnosticsEnabled));
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::ViewBuffer),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::LightBuffer),
-					renderer->GetLightStructuredBuffer()->GetBufferHandle(
+					services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(
 						context.m_FrameSlotIndex));
 				commandContext->SetReadWriteBuffer(
 					static_cast<uint32_t>(ForwardPlusRootParameter::TileHeaders), headers);
@@ -390,9 +388,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassForwardPlusCull::GetOrCreatePipeline(
-		const Renderer& renderer, bool diagnosticsEnabled) noexcept
+		const RenderServices& services, bool diagnosticsEnabled) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const size_t variantIndex = diagnosticsEnabled ? 1u : 0u;
 		const RHIPipelineHandle pipeline =

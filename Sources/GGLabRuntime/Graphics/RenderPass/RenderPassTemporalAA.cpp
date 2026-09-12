@@ -1,10 +1,12 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
@@ -82,14 +84,12 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 		m_IsInitialized = true;
 		m_PipelineRecipe.m_CSId = shaderManager->LoadProgram(
 			shader_programs::TemporalAAReprojectionCompute);
-		m_PipelineRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+		m_PipelineRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		m_IsAvailable = m_PipelineRecipe.m_CSId.IsValid() &&
 			m_PipelineRecipe.m_BindingLayout.IsValid();
 	}
@@ -108,11 +108,9 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
 		auto* transaction = context.m_TemporalFrameTransaction;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_NOT_NULL(transaction);
-		if (!renderer || !transaction)
+		if (!transaction)
 		{
 			return;
 		}
@@ -125,8 +123,8 @@ namespace gglab
 			context.GetDisplayViewRenderSettings().m_TemporalAA;
 		const bool previousHistoryCompatible =
 			transaction->HasCompatiblePreviousHistory();
-		const auto* resourceRegistry = renderer->GetRenderResourceRegistry();
-		const auto* samplerRegistry = renderer->GetSamplerRegistry();
+		const auto* resourceRegistry = services.m_Resources;
+		const auto* samplerRegistry = services.m_Samplers;
 		GGLAB_ASSERT_NOT_NULL(resourceRegistry);
 		GGLAB_ASSERT_NOT_NULL(samplerRegistry);
 		if (!resourceRegistry || !samplerRegistry)
@@ -324,7 +322,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(exported,
 					"Temporal AA must fully write and export its next history pair.");
 			},
-			[this, renderer, &context](RGExecuteContext& executeContext,
+			[this, services, &context](RGExecuteContext& executeContext,
 				TemporalAAPassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
@@ -364,14 +362,14 @@ namespace gglab
 				parameters.m_NextHistoryDepthUavIndex = nextHistoryDepth.m_Index;
 				parameters.m_ReprojectionDiagnosticsUavIndex = diagnostics.m_Index;
 
-				commandContext->SetPipeline(GetOrCreatePipeline(*renderer));
+				commandContext->SetPipeline(GetOrCreatePipeline(services));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
 					context.m_RenderScene.m_SceneConstantBufferOffset);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
@@ -383,15 +381,15 @@ namespace gglab
 			});
 	}
 
-	bool RenderPassTemporalAA::ValidatePipelineClosure(const Renderer& renderer) noexcept
+	bool RenderPassTemporalAA::ValidatePipelineClosure(const RenderServices& services) noexcept
 	{
-		return m_IsAvailable && GetOrCreatePipeline(renderer).IsValid();
+		return m_IsAvailable && GetOrCreatePipeline(services).IsValid();
 	}
 
 	RHIPipelineHandle RenderPassTemporalAA::GetOrCreatePipeline(
-		const Renderer& renderer) noexcept
+		const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const RHIPipelineHandle pipeline =
 			pipelineCache->Resolve(m_PipelineSlot, m_PipelineRecipe, GetInfo());

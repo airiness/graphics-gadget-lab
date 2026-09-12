@@ -8,7 +8,6 @@
 
 namespace gglab
 {
-	class Renderer;
 	class ForwardPlusDebugReadback;
 
 	class RenderPassForwardPlusCull final : public RenderPassBase
@@ -36,7 +35,7 @@ namespace gglab
 
 	private:
 		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(
-			const Renderer& renderer, bool diagnosticsEnabled) noexcept;
+			const RenderServices& services, bool diagnosticsEnabled) noexcept;
 
 		std::array<ComputePipelineRecipe, 2> m_PipelineRecipes{};
 		std::array<ComputePipelineSlot, 2> m_PipelineSlots{};

@@ -1,5 +1,7 @@
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
-#include "Graphics/Renderer.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -121,7 +123,6 @@ namespace gglab
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				auto* renderer = services.m_Renderer;
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv =
 					scene ? executeContext.GetViewHandle(data.m_Dsv) : RHITextureViewHandle{};
@@ -155,21 +156,21 @@ namespace gglab
 					0, std::span<const RHIVertexBufferBinding>(&binding, 1));
 
 				auto draw =
-					[this, contextPtr, commandContext, renderer, displayViewId](
+					[this, contextPtr, commandContext, services, displayViewId](
 						const DebugDrawVertexRange& range, bool triangles, uint32_t flags) noexcept
 					{
 						if (range.IsEmpty())
 						{
 							return;
 						}
-						commandContext->SetPipeline(GetPipeline(*renderer, triangles));
+						commandContext->SetPipeline(GetPipeline(services, triangles));
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-							renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+							services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
 							contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-							renderer->GetViewStructuredBuffer()->GetBufferHandle());
+							services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 						commandContext->SetPrimitiveTopology(triangles
 							? RHIPrimitiveTopology::TriangleList
 							: RHIPrimitiveTopology::LineList);
@@ -197,15 +198,15 @@ namespace gglab
 			return;
 		}
 		const ShaderID vs =
-			services.m_ShaderManager->LoadProgram(shader_programs::DebugDrawVertex);
+			services.m_ShaderPrograms->LoadProgram(shader_programs::DebugDrawVertex);
 		const ShaderID ps =
-			services.m_ShaderManager->LoadProgram(shader_programs::DebugDrawPixel);
+			services.m_ShaderPrograms->LoadProgram(shader_programs::DebugDrawPixel);
 
 		for (uint32_t index = 0; index < m_Recipes.size(); ++index)
 		{
 			auto& recipe = m_Recipes[index];
 			const bool triangles = index != 0;
-			recipe.m_BindingLayout = services.m_Renderer->GetCommonBindingLayout();
+			recipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			recipe.m_InputLayoutId = InputLayoutID::P3C4;
 			recipe.m_VSId = vs;
 			recipe.m_PSId = ps;
@@ -216,7 +217,7 @@ namespace gglab
 			recipe.m_Formats.m_RenderTargetFormats[0] =
 				m_Mode == DebugDrawPassMode::Scene
 				? RHIFormat::R16G16B16A16Float
-				: services.m_Renderer->GetSwapChain()->GetFormat();
+				: services.m_Presentation->GetSwapChain()->GetFormat();
 			recipe.m_Formats.m_RenderTargetCount = 1;
 			recipe.m_Formats.m_DepthStencilFormat =
 				m_Mode == DebugDrawPassMode::Scene ? RHIFormat::D32Float : RHIFormat::Unknown;
@@ -230,10 +231,10 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDebugDraw::GetPipeline(
-		const Renderer& renderer, bool triangles) noexcept
+		const RenderServices& services, bool triangles) noexcept
 	{
 		const size_t index = triangles ? 1 : 0;
-		return renderer.GetPipelineCache()->Resolve(
+		return services.m_PipelineResolver->Resolve(
 			m_PipelineSlots[index], m_Recipes[index], GetInfo());
 	}
 }

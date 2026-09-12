@@ -1,8 +1,8 @@
 #include "Graphics/RenderPass/RenderPassBloom.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/PostProcess/PostProcessResolution.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
@@ -100,10 +100,8 @@ namespace gglab
 			"Bloom requires a positive scene pre-exposure.");
 		EnsureInitialized(services);
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		const uint32_t samplerIndex =
-			renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+			services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const float exposureScaleOverPreExposure =
 			context.GetViewRenderSettings(displayViewId).m_Exposure.m_ExposureScale /
 			postProcess.m_Inputs.m_SceneColor.m_PreExposure;
@@ -161,7 +159,7 @@ namespace gglab
 				data.m_ExposureScaleOverPreExposure = exposureScaleOverPreExposure;
 				data.m_RenderTargetFormat = outputDesc.m_Format;
 			},
-			[this, renderer](RGExecuteContext& executeContext, PassData& data)
+			[this, services](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
@@ -175,7 +173,7 @@ namespace gglab
 					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 				commandContext->SetPipeline(
-					GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
+					GetOrCreatePSO(services, data.m_RenderTargetFormat, false));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
@@ -238,7 +236,7 @@ namespace gglab
 					data.m_FilterMode = BloomFilterMode::Downsample;
 					data.m_RenderTargetFormat = outputDesc.m_Format;
 				},
-				[this, renderer](RGExecuteContext& executeContext, PassData& data)
+				[this, services](RGExecuteContext& executeContext, PassData& data)
 				{
 					auto* commandContext = executeContext.GetGraphicsCommandContext();
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
@@ -253,7 +251,7 @@ namespace gglab
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 					commandContext->SetPipeline(
-						GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, false));
+						GetOrCreatePSO(services, data.m_RenderTargetFormat, false));
 					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 						static_cast<float>(data.m_Height) });
 					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
@@ -314,7 +312,7 @@ namespace gglab
 					data.m_Scatter = settings.m_Scatter;
 					data.m_RenderTargetFormat = outputDesc.m_Format;
 				},
-				[this, renderer](RGExecuteContext& executeContext, PassData& data)
+				[this, services](RGExecuteContext& executeContext, PassData& data)
 				{
 					auto* commandContext = executeContext.GetGraphicsCommandContext();
 					const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
@@ -322,7 +320,7 @@ namespace gglab
 					GGLAB_ASSERT_MSG(
 						sourceSrv.IsValid(), "Bloom source SRV must be shader visible.");
 					commandContext->SetPipeline(
-						GetOrCreatePSO(*renderer, data.m_RenderTargetFormat, true));
+						GetOrCreatePSO(services, data.m_RenderTargetFormat, true));
 					const RHIRenderingAttachment colorAttachment{ .m_View = outputRtv };
 					commandContext->BeginRendering({ .m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
@@ -358,15 +356,13 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		m_BaseRecipe.m_VSId = shaderManager->LoadProgram(shader_programs::BloomVertex);
 		m_BaseRecipe.m_PSId = shaderManager->LoadProgram(shader_programs::BloomPixel);
 
-		m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+		m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 		m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 		m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
@@ -382,9 +378,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassBloom::GetOrCreatePSO(
-		const Renderer& renderer, RHIFormat renderTargetFormat, bool additive) noexcept
+		const RenderServices& services, RHIFormat renderTargetFormat, bool additive) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
 		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;

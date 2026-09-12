@@ -1,9 +1,11 @@
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -162,11 +164,9 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
-		auto* device = renderer->GetDevice();
+		auto* device = services.m_Presentation->GetDevice();
 		GGLAB_ASSERT_NOT_NULL(device);
 
 		m_IsInitialized = true;
@@ -212,12 +212,12 @@ namespace gglab
 			return;
 		}
 
-		const auto loadVariant = [renderer, shaderManager, this](
+		const auto loadVariant = [services, shaderManager, this](
 			PipelineVariant variant, const ShaderProgramRef& programRef) noexcept
 			{
 				auto& recipe = m_PipelineRecipes[static_cast<size_t>(variant)];
 				recipe.m_CSId = shaderManager->LoadProgram(programRef);
-				recipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+				recipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 				return recipe.m_CSId.IsValid() && recipe.m_BindingLayout.IsValid();
 			};
 
@@ -261,9 +261,7 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* registry = renderer->GetRenderResourceRegistry();
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
@@ -355,7 +353,7 @@ namespace gglab
 					.m_Thickness = settings.m_Thickness,
 				};
 			},
-			[this, renderer, &context](RGExecuteContext& executeContext, EvaluatePassData& data)
+			[this, services, &context](RGExecuteContext& executeContext, EvaluatePassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -379,16 +377,16 @@ namespace gglab
 					parameters.m_NormalUavIndex = normalUav.m_Index;
 					parameters.m_SelectedOffsetUavIndex = selectedOffsetUav.m_Index;
 				}
-				commandContext->SetPipeline(GetOrCreatePipeline(*renderer,
+				commandContext->SetPipeline(GetOrCreatePipeline(services,
 					data.m_DiagnosticOutputsEnabled ? PipelineVariant::EvaluateDiagnostics
 					: PipelineVariant::Evaluate));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
 					context.m_RenderScene.m_SceneConstantBufferOffset);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
@@ -396,7 +394,7 @@ namespace gglab
 					(parameters.m_HalfHeight + GTAOThreadGroupSize - 1) / GTAOThreadGroupSize, 1);
 			});
 
-		const auto addDenoisePass = [this, &rg, settings, renderer](const char* passName,
+		const auto addDenoisePass = [this, &rg, settings, services](const char* passName,
 			PipelineVariant variant, bool horizontal) noexcept
 			{
 				rg.AddPass<DenoisePassData>(
@@ -429,7 +427,7 @@ namespace gglab
 							.m_Radius = settings.m_DenoiseRadius,
 						};
 					},
-					[this, renderer, variant](RGExecuteContext& executeContext, DenoisePassData& data)
+					[this, services, variant](RGExecuteContext& executeContext, DenoisePassData& data)
 					{
 						auto* commandContext = executeContext.GetDirectComputeCommandContext();
 						GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -442,7 +440,7 @@ namespace gglab
 						parameters.m_SourceAOIndex = sourceAO.m_Index;
 						parameters.m_HalfDepthIndex = halfDepth.m_Index;
 						parameters.m_OutputAOIndex = outputAO.m_Index;
-						commandContext->SetPipeline(GetOrCreatePipeline(*renderer, variant));
+						commandContext->SetPipeline(GetOrCreatePipeline(services, variant));
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 						commandContext->Dispatch(
@@ -492,7 +490,7 @@ namespace gglab
 					.m_Power = settings.m_Power,
 				};
 			},
-			[this, renderer, &context](RGExecuteContext& executeContext, UpsamplePassData& data)
+			[this, services, &context](RGExecuteContext& executeContext, UpsamplePassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -508,14 +506,14 @@ namespace gglab
 				parameters.m_HalfDepthIndex = halfDepth.m_Index;
 				parameters.m_FullDepthIndex = fullDepth.m_Index;
 				parameters.m_FinalAOUavIndex = finalAO.m_Index;
-				commandContext->SetPipeline(GetOrCreatePipeline(*renderer, PipelineVariant::Upsample));
+				commandContext->SetPipeline(GetOrCreatePipeline(services, PipelineVariant::Upsample));
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+					services.m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
 					context.m_RenderScene.m_SceneConstantBufferOffset);
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->Dispatch(
@@ -525,9 +523,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassGTAO::GetOrCreatePipeline(
-		const Renderer& renderer, PipelineVariant variant) noexcept
+		const RenderServices& services, PipelineVariant variant) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		const size_t index = static_cast<size_t>(variant);
 		GGLAB_ASSERT(index < m_PipelineRecipes.size());

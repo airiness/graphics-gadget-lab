@@ -37,8 +37,8 @@ namespace gglab
 		}
 
 	private:
-		[[nodiscard]] RHIPipelineHandle GetOrCreateTilePipeline(const Renderer& renderer) noexcept;
-		[[nodiscard]] RHIPipelineHandle GetOrCreateFramePipeline(const Renderer& renderer) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreateTilePipeline(const RenderServices& services) noexcept;
+		[[nodiscard]] RHIPipelineHandle GetOrCreateFramePipeline(const RenderServices& services) noexcept;
 
 		std::shared_ptr<ForwardPlusDebugReadback> m_DebugReadback;
 		ComputePipelineRecipe m_TilePipelineRecipe{};

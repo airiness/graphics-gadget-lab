@@ -1,6 +1,8 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
@@ -45,7 +47,6 @@ namespace gglab
 			m_IsInitialized, "Depth prepass must be prepared before graph construction.");
 
 		const auto* contextPtr = &context;
-		const auto* servicesPtr = &services;
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 
 		rg.AddPass<PassData>(
@@ -113,7 +114,7 @@ namespace gglab
 						"Depth and motion targets must share the active coverage raster domain.");
 				}
 			},
-			[this, contextPtr, servicesPtr, displayViewId](
+			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
@@ -172,10 +173,8 @@ namespace gglab
 					return;
 				}
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					*renderer, renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
+					services, renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
 					data.m_OutputMotion));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
@@ -186,22 +185,22 @@ namespace gglab
 				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					renderer->GetObjectStructuredBuffer()->GetBufferHandle(
+					services.m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(
 						contextPtr->m_FrameSlotIndex));
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					renderer->GetMaterialStructuredBuffer()->GetBufferHandle(
+					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
 						contextPtr->m_FrameSlotIndex));
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 
 				const DepthPrepassParameters passParameters{
 					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
@@ -209,7 +208,7 @@ namespace gglab
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr, displayViewId,
+				DrawRenderQueue(graphicsContext, *contextPtr, services, displayViewId,
 					data.m_OutputMotion);
 			});
 	}
@@ -222,8 +221,6 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		GGLAB_ASSERT_MSG(
 			shaderSet.IsValid(), "Depth prepass requires the shared Forward shader set.");
 		if (!shaderSet.IsValid())
@@ -234,7 +231,7 @@ namespace gglab
 		m_VelocityOpaquePixelShader = shaderSet.m_VelocityOpaquePixelShader;
 		m_VelocityAlphaTestPixelShader = shaderSet.m_VelocityAlphaTestPixelShader;
 
-		m_BasePhysicalKey.m_BindingLayout = renderer->GetCommonBindingLayout();
+		m_BasePhysicalKey.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		m_BasePhysicalKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 		m_BasePhysicalKey.m_VSId = shaderSet.m_CoverageVertexShader;
 		m_BasePhysicalKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
@@ -289,7 +286,7 @@ namespace gglab
 			{
 				graphicsContext->SetPipeline(
 					GetOrCreatePSOForVariant(
-						*services.m_Renderer, drawItem.m_VariantBits, outputMotion));
+						services, drawItem.m_VariantBits, outputMotion));
 				lastVariantBits = drawItem.m_VariantBits;
 			}
 
@@ -315,12 +312,12 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDepthPrepass::GetOrCreatePSOForVariant(
-		const Renderer& renderer, uint64_t variantBits, bool outputMotion) noexcept
+		const RenderServices& services, uint64_t variantBits, bool outputMotion) noexcept
 	{
 		const GraphicsPipelineDescription description =
 			DescribePipelineVariant(variantBits, outputMotion);
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(
 			m_PipelineSlots[outputMotion ? 1 : 0][slotIndex], description.m_PhysicalKey, GetInfo());

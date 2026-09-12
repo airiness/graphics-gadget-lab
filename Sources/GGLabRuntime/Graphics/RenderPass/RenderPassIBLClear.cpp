@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassIBLClear.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
@@ -24,8 +24,7 @@ namespace gglab
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
-		auto* renderer = services.m_Renderer;
-		auto* registry = renderer ? renderer->GetRenderResourceRegistry() : nullptr;
+		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		if (!registry || registry->HasInitializedActiveIBL())
 		{
@@ -101,9 +100,8 @@ namespace gglab
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_UNUSED(context);
-		auto* renderer = services.m_Renderer;
-		auto* registry = renderer ? renderer->GetRenderResourceRegistry() : nullptr;
-		auto* bakeScheduler = renderer ? renderer->GetIBLBakeScheduler() : nullptr;
+		auto* registry = services.m_Resources;
+		auto* bakeScheduler = services.m_Environment;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		if (!registry || !bakeScheduler || !bakeScheduler->ShouldInitializeBakeResources())

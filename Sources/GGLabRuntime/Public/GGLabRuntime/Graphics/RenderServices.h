@@ -2,8 +2,10 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
+#include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
@@ -34,6 +36,7 @@ namespace gglab
 	class PersistentStructuredBuffer;
 	struct ComputePipelineRecipe;
 	struct ComputePipelineSlot;
+	struct EnvironmentTextureSource;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
 
@@ -173,9 +176,15 @@ namespace gglab
 
 		[[nodiscard]] virtual const EnvironmentLightingSettings& GetEnvironmentLightingSettings()
 			const noexcept = 0;
-		[[nodiscard]] virtual bool ShouldInitializeIBLBakeResources() const noexcept = 0;
-		[[nodiscard]] virtual uint64_t GetIBLBakingGeneration() const noexcept = 0;
-		[[nodiscard]] virtual const IBLBakeConfig& GetIBLBakingConfig() const noexcept = 0;
+		[[nodiscard]] virtual bool ShouldInitializeBakeResources() const noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetBakingGeneration() const noexcept = 0;
+		[[nodiscard]] virtual const IBLBakeConfig& GetBakingConfig() const noexcept = 0;
+		[[nodiscard]] virtual const IBLBakeStatus& GetBakingStatus() const noexcept = 0;
+		[[nodiscard]] virtual IBLBakeStage GetStageForRecording() const noexcept = 0;
+		virtual void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept = 0;
+		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;
+		[[nodiscard]] virtual const EnvironmentTextureSource& GetBakingSource()
+			const noexcept = 0;
 	};
 
 	class RenderPresentationAccess
@@ -188,6 +197,25 @@ namespace gglab
 		[[nodiscard]] virtual RHISwapChain* GetSwapChain() const noexcept = 0;
 		[[nodiscard]] virtual const std::array<float, 4>& GetBackBufferClearColor()
 			const noexcept = 0;
+		[[nodiscard]] virtual RHIFencePoint GetLastSubmittedFencePoint() const noexcept = 0;
+	};
+
+	class RenderBindingLayoutAccess
+	{
+	public:
+		virtual ~RenderBindingLayoutAccess() = default;
+
+		[[nodiscard]] virtual RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept = 0;
+		[[nodiscard]] virtual RHIBindingLayoutDesc GetCommonBindingLayoutDesc()
+			const noexcept = 0;
+	};
+
+	class RenderTemporalAccess
+	{
+	public:
+		virtual ~RenderTemporalAccess() = default;
+
+		virtual void PublishTemporalAAResolvePipelineClosure(bool available) noexcept = 0;
 	};
 
 	// Explicit services borrowed for one frame or pipeline invocation. The
@@ -203,6 +231,8 @@ namespace gglab
 		RenderFrameBufferAccess* m_FrameBuffers = nullptr;
 		RenderEnvironmentAccess* m_Environment = nullptr;
 		RenderPresentationAccess* m_Presentation = nullptr;
+		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
+		RenderTemporalAccess* m_Temporal = nullptr;
 
 		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;

@@ -48,7 +48,8 @@ namespace gglab
 	struct RenderSceneGpuAllocations;
 
 	class Renderer : public RenderHost, public RenderFrameBufferAccess,
-		public RenderEnvironmentAccess, public RenderPresentationAccess
+		public RenderEnvironmentAccess, public RenderPresentationAccess,
+		public RenderBindingLayoutAccess, public RenderTemporalAccess
 	{
 	public:
 		// Transitional alias for the Public RAII frame handle. The nested frame
@@ -168,18 +169,24 @@ namespace gglab
 		// environment and bake services remain Runtime-internal.
 		[[nodiscard]] const EnvironmentLightingSettings& GetEnvironmentLightingSettings()
 			const noexcept override;
-		[[nodiscard]] bool ShouldInitializeIBLBakeResources() const noexcept override;
-		[[nodiscard]] uint64_t GetIBLBakingGeneration() const noexcept override;
-		[[nodiscard]] const IBLBakeConfig& GetIBLBakingConfig() const noexcept override;
-		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept
+		[[nodiscard]] bool ShouldInitializeBakeResources() const noexcept override;
+		[[nodiscard]] uint64_t GetBakingGeneration() const noexcept override;
+		[[nodiscard]] const IBLBakeConfig& GetBakingConfig() const noexcept override;
+		[[nodiscard]] const IBLBakeStatus& GetBakingStatus() const noexcept override;
+		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept override;
+		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept override;
+		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept override;
+		[[nodiscard]] const EnvironmentTextureSource& GetBakingSource() const noexcept override;
+		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept override
 		{
 			m_TemporalAACapabilityStatus.m_ResolveProgramAvailable = available;
 		}
 
-		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept
+		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override
 		{
 			return m_CommonBindingLayout;
 		}
+		[[nodiscard]] RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override;
 		[[nodiscard]] static RHIBindingLayoutDesc BuildCommonRHIBindingLayoutDesc() noexcept;
 
 		const DynamicConstantBufferAllocator* GetSceneConstantBuffer() const noexcept override
@@ -263,7 +270,7 @@ namespace gglab
 		void OnResume() noexcept override;
 		bool IsSuspended() const noexcept override;
 
-		RHIFencePoint GetLastSubmittedFencePoint() const noexcept
+		RHIFencePoint GetLastSubmittedFencePoint() const noexcept override
 		{
 			return m_LastSubmittedFencePoint;
 		}

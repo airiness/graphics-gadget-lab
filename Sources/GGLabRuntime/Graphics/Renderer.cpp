@@ -513,20 +513,50 @@ namespace gglab
 		return m_EnvironmentLightingSystem->GetSettings();
 	}
 
-	bool Renderer::ShouldInitializeIBLBakeResources() const noexcept
+	bool Renderer::ShouldInitializeBakeResources() const noexcept
 	{
 		return m_IBLBakeScheduler && m_IBLBakeScheduler->ShouldInitializeBakeResources();
 	}
 
-	uint64_t Renderer::GetIBLBakingGeneration() const noexcept
+	uint64_t Renderer::GetBakingGeneration() const noexcept
 	{
 		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetBakingGeneration() : 0;
 	}
 
-	const IBLBakeConfig& Renderer::GetIBLBakingConfig() const noexcept
+	const IBLBakeConfig& Renderer::GetBakingConfig() const noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
 		return m_IBLBakeScheduler->GetBakingConfig();
+	}
+
+	const IBLBakeStatus& Renderer::GetBakingStatus() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
+		return m_IBLBakeScheduler->GetStatus();
+	}
+
+	IBLBakeStage Renderer::GetStageForRecording() const noexcept
+	{
+		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetStageForRecording()
+								  : IBLBakeStage::Idle;
+	}
+
+	void Renderer::NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
+		m_IBLBakeScheduler->NotifyStageExecuted(stage, generation);
+	}
+
+	void Renderer::NotifyBakeResourcesInitialized(uint64_t generation) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
+		m_IBLBakeScheduler->NotifyBakeResourcesInitialized(generation);
+	}
+
+	const EnvironmentTextureSource& Renderer::GetBakingSource() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_IBLBakeScheduler.get());
+		return m_IBLBakeScheduler->GetBakingSource();
 	}
 
 	void Renderer::RetireSceneGpuAllocations(
@@ -549,6 +579,11 @@ namespace gglab
 			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint);
 		}
 		*allocations = {};
+	}
+
+	RHIBindingLayoutDesc Renderer::GetCommonBindingLayoutDesc() const noexcept
+	{
+		return BuildCommonRHIBindingLayoutDesc();
 	}
 
 	RHIBindingLayoutDesc Renderer::BuildCommonRHIBindingLayoutDesc() noexcept

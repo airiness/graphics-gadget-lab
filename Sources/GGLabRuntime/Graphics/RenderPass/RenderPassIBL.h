@@ -35,7 +35,7 @@ namespace gglab
 
 	private:
 		static RGTextureId ImportRuntimeTexture(RenderGraph::RGBuilder& builder,
-			RenderResourceRegistry& registry, RenderResourceRegistry::TextureIndex texIndex,
+			RenderResourceRegistryAccess& registry, RenderTextureIndex texIndex,
 			const char* name, bool initialized, bool bakeTarget = false) noexcept;
 
 	private:

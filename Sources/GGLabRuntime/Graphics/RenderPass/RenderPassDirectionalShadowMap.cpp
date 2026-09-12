@@ -1,6 +1,8 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -39,8 +41,6 @@ namespace gglab
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
-		auto* servicesPtr = &services;
-		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
 
@@ -70,14 +70,12 @@ namespace gglab
 				data.m_Dsv =
 					builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
 			},
-			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 				graphicsContext->BeginRendering({
 					.m_DepthAttachment = RHIRenderingAttachment{
 						.m_View = dsv,
@@ -113,7 +111,7 @@ namespace gglab
 				{
 					return;
 				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(*renderer,
+				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
 					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
 					contextPtr->GetDirectionalShadowSettings()));
 
@@ -125,23 +123,23 @@ namespace gglab
 				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				const auto& objectSB = renderer->GetObjectStructuredBuffer();
+				const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
 					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				const auto& materialSB = renderer->GetMaterialStructuredBuffer();
+				const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				const auto& viewSB = renderer->GetViewStructuredBuffer();
+				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewSB->GetBufferHandle());
@@ -153,16 +151,14 @@ namespace gglab
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, *servicesPtr);
+				DrawRenderQueue(graphicsContext, *contextPtr, services);
 			});
 	}
 
 	void RenderPassDirectionalShadowMap::EnsureInitialized(const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -172,7 +168,7 @@ namespace gglab
 			m_AlphaTestPixelShader =
 				shaderManager->LoadProgram(shader_programs::DirectionalShadowMapPixel);
 
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::MeshPositionUVs;
 			m_BaseRecipe.m_VSId = vsId;
 			// The opaque shadow bucket is depth-only and has no pixel shader.
@@ -223,8 +219,6 @@ namespace gglab
 		}
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		const auto& drawItems = renderQueue.m_DrawItems;
 
 		uint64_t lastVariantBits = std::numeric_limits<uint64_t>::max();
@@ -240,7 +234,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				const auto pipeline = GetOrCreatePSOForVariant(
-					*renderer, drawItem.m_VariantBits, context.GetDirectionalShadowSettings());
+					services, drawItem.m_VariantBits, context.GetDirectionalShadowSettings());
 				graphicsContext->SetPipeline(pipeline);
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -268,11 +262,11 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
-		const Renderer& renderer, uint64_t variantBits,
+		const RenderServices& services, uint64_t variantBits,
 		const DirectionalShadowSettings& shadowSettings) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 
 		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;

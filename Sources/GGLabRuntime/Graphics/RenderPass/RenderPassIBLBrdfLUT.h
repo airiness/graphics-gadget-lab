@@ -5,7 +5,6 @@
 
 namespace gglab
 {
-	class Renderer;
 	class RenderPassIBLBrdfLUT : public RenderPassBase
 	{
 	public:
@@ -30,7 +29,7 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSO(
-			const Renderer& renderer, RHIFormat renderTargetFormat) noexcept;
+			const RenderServices& services, RHIFormat renderTargetFormat) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};

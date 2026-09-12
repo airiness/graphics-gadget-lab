@@ -4,7 +4,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassShadowMapPreview final : public RenderPassBase
 	{
@@ -30,7 +29,7 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		RHIPipelineHandle GetOrCreatePSO(const Renderer& renderer) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};

@@ -1,9 +1,11 @@
 #include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -53,23 +55,23 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		auto* assetManager = services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		const auto* environmentSystem = renderer->GetEnvironmentLightingSystem();
-		if (!environmentSystem || !environmentSystem->GetSettings().m_EnableSkybox)
+		GGLAB_ASSERT_NOT_NULL(services.m_Environment);
+		const EnvironmentLightingSettings& environmentSettings =
+			services.m_Environment->GetEnvironmentLightingSettings();
+		if (!environmentSettings.m_EnableSkybox)
 		{
 			return;
 		}
 
 		EnsureInitialized(services);
-		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
-		auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
+		auto* bakeScheduler = services.m_Environment;
+		auto* renderResourceRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
 
-		const bool useFallback = bakeScheduler->GetStatus().m_ActiveGeneration == 0;
+		const bool useFallback = bakeScheduler->GetBakingStatus().m_ActiveGeneration == 0;
 		RHITextureHandle fallbackTextureHandle{};
 		RHITextureDesc fallbackTextureDesc{};
 		uint32_t environmentTextureIndex = 0;
@@ -94,10 +96,10 @@ namespace gglab
 		else
 		{
 			environmentTextureIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(
-				RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+				RenderTextureIndex::IBL_EnvironmentCubemap);
 		}
 		const uint32_t environmentSamplerIndex =
-			renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+			services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const auto* contextPtr = &context;
 
@@ -150,14 +152,14 @@ namespace gglab
 				data.m_EnvironmentTextureIndex = environmentTextureIndex;
 				data.m_EnvironmentSamplerIndex = environmentSamplerIndex;
 			},
-			[this, renderer, contextPtr, displayViewId](
+			[this, services, contextPtr, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPipeline(GetOrCreatePSO(services));
 				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
 				commandContext->BeginRendering({
 					.m_ColorAttachments =
@@ -169,13 +171,13 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				const auto* viewBuffer = renderer->GetViewStructuredBuffer();
+				const auto* viewBuffer = services.m_FrameBuffers->GetViewStructuredBuffer();
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewBuffer->GetBufferHandle());
@@ -198,15 +200,13 @@ namespace gglab
 			return;
 		}
 
-		auto* renderer = services.m_Renderer;
-		auto* shaderManager = services.m_ShaderManager;
-		GGLAB_ASSERT_NOT_NULL(renderer);
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		const auto vsId = shaderManager->LoadProgram(shader_programs::SkyboxVertex);
 		const auto psId = shaderManager->LoadProgram(shader_programs::SkyboxPixel);
 
-		m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+		m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 		m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 		m_BaseRecipe.m_VSId = vsId;
 		m_BaseRecipe.m_PSId = psId;
@@ -223,9 +223,9 @@ namespace gglab
 		m_IsInitialized = true;
 	}
 
-	RHIPipelineHandle RenderPassSkybox::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassSkybox::GetOrCreatePSO(const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}

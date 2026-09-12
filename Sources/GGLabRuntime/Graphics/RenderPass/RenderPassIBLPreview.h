@@ -4,7 +4,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassIBLPreview : public RenderPassBase
 	{
@@ -28,7 +27,7 @@ namespace gglab
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
-		RHIPipelineHandle GetOrCreateCubemapPreviewPSO(const Renderer& renderer) noexcept;
+		RHIPipelineHandle GetOrCreateCubemapPreviewPSO(const RenderServices& services) noexcept;
 
 	private:
 		GraphicsPhysicalPipelineKey m_CubemapPreviewRecipe{};

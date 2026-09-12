@@ -1,7 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -58,12 +57,10 @@ namespace gglab
 	{
 		GGLAB_UNUSED(context);
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
+		auto* renderResRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
-		auto* bakeScheduler = renderer->GetIBLBakeScheduler();
+		auto* bakeScheduler = services.m_Environment;
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 
@@ -74,7 +71,7 @@ namespace gglab
 		const float maxSampleLuminance = config.m_PrefilteredSpecularMaxSampleLuminance;
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[renderer, renderResRegistry, sampleCount, maxSampleLuminance](
+			[services, renderResRegistry, sampleCount, maxSampleLuminance](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -89,7 +86,7 @@ namespace gglab
 				data.m_PrefilteredSpecularCubemap = iblRes.m_BakePrefilteredSpecularCubemap;
 
 				const auto* textureDesc = renderResRegistry->GetIBLBakeTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_PrefilteredSpecularCubemap);
+					RenderTextureIndex::IBL_PrefilteredSpecularCubemap);
 				GGLAB_ASSERT_NOT_NULL(textureDesc);
 
 				data.m_Rtvs.resize(textureDesc->m_MipLevels * CubemapFaceCount);
@@ -111,12 +108,12 @@ namespace gglab
 				data.m_Height = textureDesc->m_Extent.m_Height;
 				data.m_MipLevels = textureDesc->m_MipLevels;
 				data.m_EnvironmentTextureIndex = renderResRegistry->GetIBLBakeShaderVisibleSrvIndex(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+					RenderTextureIndex::IBL_EnvironmentCubemap);
 				data.m_EnvironmentSamplerIndex =
-					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 
 				const auto* environmentDesc = renderResRegistry->GetIBLBakeTextureDesc(
-					RenderResourceRegistry::TextureIndex::IBL_EnvironmentCubemap);
+					RenderTextureIndex::IBL_EnvironmentCubemap);
 				GGLAB_ASSERT_NOT_NULL(environmentDesc);
 				data.m_EnvironmentResolution =
 					static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
@@ -125,11 +122,11 @@ namespace gglab
 				data.m_MaxSampleLuminance = maxSampleLuminance;
 				data.m_RenderTargetFormat = textureDesc->m_Format;
 			},
-			[this, renderer, bakeScheduler, bakeGeneration](
+			[this, services, bakeScheduler, bakeGeneration](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer, data.m_RenderTargetFormat));
+				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_RenderTargetFormat));
 
 				for (uint32_t mip = 0; mip < data.m_MipLevels; ++mip)
 				{
@@ -181,10 +178,8 @@ namespace gglab
 	void RenderPassIBLPrefilteredSpecular::EnsureInitialized(
 		const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -194,7 +189,7 @@ namespace gglab
 			const auto psId =
 				shaderManager->LoadProgram(shader_programs::IBLPrefilteredSpecularPixel);
 
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_BaseRecipe.m_VSId = vsId;
 			m_BaseRecipe.m_PSId = psId;
@@ -216,9 +211,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassIBLPrefilteredSpecular::GetOrCreatePSO(
-		const Renderer& renderer, RHIFormat renderTargetFormat) noexcept
+		const RenderServices& services, RHIFormat renderTargetFormat) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
 		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;

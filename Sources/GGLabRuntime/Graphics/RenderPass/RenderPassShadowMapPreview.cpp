@@ -1,6 +1,8 @@
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/SamplerRegistry.h"
@@ -51,14 +53,12 @@ namespace gglab
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 
-		auto* servicesPtr = &services;
-		GGLAB_ASSERT_NOT_NULL(servicesPtr);
 
 		EnsureInitialized(services);
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[contextPtr, servicesPtr](RenderGraph::RGBuilder& builder, PassData& data)
+			[contextPtr, services](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes =
 					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
@@ -79,17 +79,15 @@ namespace gglab
 				data.m_Width = shadowRes.m_ShadowMapPreviewSize;
 				data.m_Height = shadowRes.m_ShadowMapPreviewSize;
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 				data.m_SamplerIndex =
-					renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::PointClamp);
+					services.m_Samplers->GetSamplerIndex(SamplerPreset::PointClamp);
 
 				const auto& settings = contextPtr->GetShadowVisualizationSettings();
 				data.m_MinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
 				data.m_MaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
 				data.m_Invert = settings.m_PreviewInvert ? 1u : 0u;
 			},
-			[this, contextPtr, servicesPtr](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto shadowMapSrv = executeContext.GetViewDescriptor(data.m_ShadowMapSrv);
@@ -105,16 +103,14 @@ namespace gglab
 					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 
-				auto* renderer = servicesPtr->m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
 
-				commandContext->SetPipeline(GetOrCreatePSO(*renderer));
+				commandContext->SetPipeline(GetOrCreatePSO(services));
 				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 					static_cast<float>(data.m_Height) });
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 				commandContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 					sceneBuffer->GetBufferHandle(),
@@ -131,8 +127,8 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				commandContext->DrawFullscreenTriangle();
-				renderer->GetRenderResourceRegistry()->ClearDirty(
-					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
+				services.m_Resources->ClearDirty(
+					RenderTextureIndex::Preview_Shadow_DirectionalShadowMap);
 			});
 	}
 
@@ -156,10 +152,8 @@ namespace gglab
 
 	void RenderPassShadowMapPreview::EnsureInitialized(const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -169,7 +163,7 @@ namespace gglab
 			const auto psId =
 				shaderManager->LoadProgram(shader_programs::ShadowMapPreviewPixel);
 
-			m_BaseRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_BaseRecipe.m_VSId = vsId;
 			m_BaseRecipe.m_PSId = psId;
@@ -190,9 +184,9 @@ namespace gglab
 		}
 	}
 
-	RHIPipelineHandle RenderPassShadowMapPreview::GetOrCreatePSO(const Renderer& renderer) noexcept
+	RHIPipelineHandle RenderPassShadowMapPreview::GetOrCreatePSO(const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}

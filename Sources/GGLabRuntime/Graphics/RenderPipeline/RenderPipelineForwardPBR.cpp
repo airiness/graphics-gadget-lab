@@ -1,9 +1,9 @@
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
@@ -51,11 +51,9 @@ namespace gglab
 	void RenderPipelineForwardPBR::PrepareTemporalFramePlanning(
 		const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 		m_TemporalAAPass.Prepare(services);
-		renderer->PublishTemporalAAResolvePipelineClosure(
-			m_TemporalAAPass.ValidatePipelineClosure(*renderer));
+		services.m_Temporal->PublishTemporalAAResolvePipelineClosure(
+			m_TemporalAAPass.ValidatePipelineClosure(services));
 	}
 
 	ResolvedTemporalFramePlan RenderPipelineForwardPBR::ResolveTemporalFramePlan(
@@ -80,8 +78,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 
-		auto* renderer = services.m_Renderer;
-		auto* swapChain = renderer->GetSwapChain();
+		auto* swapChain = services.m_Presentation->GetSwapChain();
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
 
@@ -296,7 +293,7 @@ namespace gglab
 
 		// Shadow Setup
 		rg.AddPass<ShadowSetupPassData>("ShadowMap.Setup",
-			[renderer, &context](RenderGraph::RGBuilder& builder, ShadowSetupPassData&)
+			[services, &context](RenderGraph::RGBuilder& builder, ShadowSetupPassData&)
 			{
 				const auto& shadowSettings = context.GetDirectionalShadowSettings();
 				auto& shadowRes =
@@ -310,23 +307,23 @@ namespace gglab
 					builder.CreateTexture("Shadow.DirectionalShadowMap", shadowMapDesc);
 
 				shadowRes.m_ShadowMapPreviewSize = DefaultDirectionalShadowMapPreviewSize;
-				auto* renderResourceRegistry = renderer->GetRenderResourceRegistry();
+				auto* renderResourceRegistry = services.m_Resources;
 				GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
 				renderResourceRegistry->EnsureShadowPreviewResources(
 					shadowRes.m_ShadowMapPreviewSize);
 
 				const auto* shadowMapPreviewDesc = renderResourceRegistry->GetTextureDesc(
-					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
+					RenderTextureIndex::Preview_Shadow_DirectionalShadowMap);
 				GGLAB_ASSERT_NOT_NULL(shadowMapPreviewDesc);
 				const bool shadowPreviewInitialized = !renderResourceRegistry->IsDirty(
-					RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap);
+					RenderTextureIndex::Preview_Shadow_DirectionalShadowMap);
 				const RGPersistentTextureImportContract shadowPreviewImport =
 					ResolveRGPersistentTextureImportContract(shadowPreviewInitialized);
 
 				shadowRes.m_DirectionalShadowMapPreview = builder.ImportTexture(
 					"Shadow.DirectionalShadowMapPreview",
 					renderResourceRegistry->GetTextureHandle(
-						RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap),
+						RenderTextureIndex::Preview_Shadow_DirectionalShadowMap),
 					*shadowMapPreviewDesc, shadowPreviewImport.m_InitialState,
 					shadowPreviewImport.m_InitialContentValidity);
 			});
@@ -347,7 +344,7 @@ namespace gglab
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_BackBuffer);
 			},
-			[renderer](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
+			[services](RGExecuteContext& executeContext, PrepareBackBufferPassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
@@ -357,7 +354,8 @@ namespace gglab
 				};
 				commandContext->BeginRendering({ .m_ColorAttachments =
 					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-				commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
+				commandContext->ClearColorAttachment(0,
+					services.m_Presentation->GetBackBufferClearColor());
 			});
 
 		// IBL Pass
@@ -485,16 +483,14 @@ namespace gglab
 			return false;
 		}
 
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		const auto* swapChain = renderer ? renderer->GetSwapChain() : nullptr;
-		if (!renderer || !swapChain || !swapChain->IsValid())
+		const auto* swapChain = services.m_Presentation->GetSwapChain();
+		if (!swapChain || !swapChain->IsValid())
 		{
 			return false;
 		}
 		PrepareForwardPasses(services);
 		m_TemporalAAPass.Prepare(services);
-		if (!m_TemporalAAPass.ValidatePipelineClosure(*renderer))
+		if (!m_TemporalAAPass.ValidatePipelineClosure(services))
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Active temporal frame lost its required resolve pipeline closure.");
@@ -516,7 +512,7 @@ namespace gglab
 
 	void RenderPipelineForwardPBR::PrepareForwardPasses(const RenderServices& services) noexcept
 	{
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_ForwardPBRShaderSet.IsValid())

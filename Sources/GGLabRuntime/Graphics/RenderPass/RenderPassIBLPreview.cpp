@@ -1,7 +1,9 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
@@ -46,10 +48,8 @@ namespace gglab
 	void RenderPassIBLPreview::AddPass(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* renderResRegistry = renderer->GetRenderResourceRegistry();
+		auto* renderResRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 		EnsureInitialized(services);
 
@@ -58,7 +58,7 @@ namespace gglab
 		using PreviewLayout = IBLPreviewLayout;
 		const auto* contextPtr = &context;
 
-		auto addPreviewPass = [this, &rg, renderer, renderResRegistry, contextPtr](
+		auto addPreviewPass = [this, &rg, services, renderResRegistry, contextPtr](
 			const char* suffix, PreviewType previewType,
 			TextureIndex sourceIndex, TextureIndex previewIndex,
 			PreviewLayout layout, uint32_t sampleMip) noexcept
@@ -66,7 +66,7 @@ namespace gglab
 				const std::string passName = MakeRenderGraphPassName(suffix);
 				rg.AddPass<CubemapPreviewPassData>(
 					passName.c_str(),
-					[renderer, renderResRegistry, previewType, sourceIndex, previewIndex, layout,
+					[services, renderResRegistry, previewType, sourceIndex, previewIndex, layout,
 					sampleMip](RenderGraph::RGBuilder& builder, CubemapPreviewPassData& data)
 					{
 						builder.SideEffect();
@@ -110,10 +110,10 @@ namespace gglab
 						data.m_CubemapTextureIndex =
 							renderResRegistry->GetShaderVisibleSrvIndex(sourceIndex);
 						data.m_CubemapSamplerIndex =
-							renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearClamp);
+							services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 						data.m_SampleMip = sampleMip;
 					},
-					[this, renderer, renderResRegistry, contextPtr, previewType](
+					[this, services, renderResRegistry, contextPtr, previewType](
 						RGExecuteContext& executeContext, CubemapPreviewPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -125,12 +125,12 @@ namespace gglab
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
 						commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
-						commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(*renderer));
+						commandContext->SetPipeline(GetOrCreateCubemapPreviewPSO(services));
 						commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
 							static_cast<float>(data.m_Height) });
 						commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 							static_cast<int32_t>(data.m_Height) });
-						const auto* sceneBuffer = renderer->GetSceneConstantBuffer();
+						const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 							sceneBuffer->GetBufferHandle(),
@@ -190,10 +190,8 @@ namespace gglab
 
 	void RenderPassIBLPreview::EnsureInitialized(const RenderServices& services) noexcept
 	{
-		auto* renderer = services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
 
-		auto* shaderManager = services.m_ShaderManager;
+		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
 
 		if (!m_IsInitialized)
@@ -203,7 +201,7 @@ namespace gglab
 			const auto psId =
 				shaderManager->LoadProgram(shader_programs::IBLCubemapPreviewPixel);
 
-			m_CubemapPreviewRecipe.m_BindingLayout = renderer->GetCommonBindingLayout();
+			m_CubemapPreviewRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			m_CubemapPreviewRecipe.m_InputLayoutId = InputLayoutID::None;
 			m_CubemapPreviewRecipe.m_VSId = vsId;
 			m_CubemapPreviewRecipe.m_PSId = psId;
@@ -225,9 +223,9 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassIBLPreview::GetOrCreateCubemapPreviewPSO(
-		const Renderer& renderer) noexcept
+		const RenderServices& services) noexcept
 	{
-		auto* pipelineCache = renderer.GetPipelineCache();
+		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
 		return pipelineCache->Resolve(
 			m_CubemapPreviewPipelineSlot, m_CubemapPreviewRecipe, GetInfo());

@@ -8,7 +8,6 @@
 
 namespace gglab
 {
-	class Renderer;
 
 	class RenderPassGTAO final : public RenderPassBase
 	{
@@ -48,7 +47,7 @@ namespace gglab
 		};
 
 		[[nodiscard]] RHIPipelineHandle GetOrCreatePipeline(
-			const Renderer& renderer, PipelineVariant variant) noexcept;
+			const RenderServices& services, PipelineVariant variant) noexcept;
 
 		std::array<ComputePipelineRecipe, static_cast<size_t>(PipelineVariant::Count)>
 			m_PipelineRecipes{};
