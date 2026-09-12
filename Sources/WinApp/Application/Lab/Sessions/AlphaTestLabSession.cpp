@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
@@ -19,7 +19,7 @@ namespace gglab
 	}
 
 	AlphaTestLabSession::AlphaTestLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;

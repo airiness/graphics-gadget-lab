@@ -12,7 +12,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
@@ -57,7 +57,7 @@ namespace gglab
 		controllerCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
-		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
+		m_RenderPipeline = CreateRenderPipelineForwardPBR();
 	}
 
 	void StartDemo::BeginPrepare() noexcept

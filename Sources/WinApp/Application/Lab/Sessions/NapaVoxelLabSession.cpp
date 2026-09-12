@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
@@ -289,7 +289,7 @@ namespace gglab
 	NapaVoxelLabSession::NapaVoxelLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<NapaVoxelRenderFrameSource> frameSource) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo,
-			std::make_unique<RenderPipelineForwardPBR>(RenderPipelineForwardPBR::CreateInfo{
+			CreateRenderPipelineForwardPBR(RenderPipelineForwardPBRCreateInfo{
 				.m_SceneExtension = std::make_unique<NapaVoxelRenderExtension>(frameSource),
 				})),
 				m_FrameSource(std::move(frameSource))

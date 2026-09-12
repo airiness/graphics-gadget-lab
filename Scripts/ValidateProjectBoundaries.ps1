@@ -940,6 +940,7 @@ $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineBlackboard.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineBase.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassBase.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderFrameBuilder.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderFrameBuilder.cpp"),
