@@ -520,7 +520,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadScheduler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadScheduling.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ModelImporter.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\IBLGraphSetupPass.h" />

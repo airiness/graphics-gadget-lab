@@ -11,7 +11,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -73,6 +73,11 @@ namespace gglab
 		return m_EnvironmentLightingSystem.get();
 	}
 
+	AssetUploadControl* Renderer::GetAssetUploadControl() const noexcept
+	{
+		return m_AssetUploadScheduler.get();
+	}
+
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (createInfo.m_RHIContextFactory == nullptr)
@@ -102,11 +107,10 @@ namespace gglab
 		}
 
 		auto* device = &m_RHIContext->GetDevice();
-		m_AssetUploadScheduler =
-			std::make_unique<AssetUploadScheduler>(AssetUploadScheduler::CreateInfo{
-				.m_Device = device,
-				.m_TransferManager = GetTransferManager(),
-				});
+		m_AssetUploadScheduler = CreateAssetUploadScheduler(AssetUploadSchedulerCreateInfo{
+			.m_Device = device,
+			.m_TransferManager = GetTransferManager(),
+			});
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);

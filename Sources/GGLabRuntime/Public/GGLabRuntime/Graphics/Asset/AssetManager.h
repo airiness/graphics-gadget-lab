@@ -56,7 +56,7 @@ namespace gglab
 	class RHIDevice;
 	class AssetPublicationServicesBase;
 	class AssetManagerPublicationServices;
-	class AssetUploadScheduler;
+	class AssetUploadScheduling;
 	class AssetLease;
 	class AssetPublicationRetain;
 	class AssetOwnerScope;
@@ -98,7 +98,7 @@ namespace gglab
 			RHIDevice* m_Device = nullptr;
 			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
-			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+			AssetUploadScheduling* m_AssetUploadScheduler = nullptr;
 			RenderSamplerAccess* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 			TextureArtifactCacheConfig m_TextureArtifactCache{};
@@ -313,7 +313,7 @@ namespace gglab
 	private:
 		RHIDevice* m_Device = nullptr;
 		TransferManager* m_TransferManager = nullptr;
-		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		AssetUploadScheduling* m_AssetUploadScheduler = nullptr;
 		std::filesystem::path m_AssetRoot;
 		RenderSamplerAccess* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};

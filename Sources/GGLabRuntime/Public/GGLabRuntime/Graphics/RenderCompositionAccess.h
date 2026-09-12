@@ -4,7 +4,7 @@
 namespace gglab
 {
 	class AssetManager;
-	class AssetUploadScheduler;
+	class AssetUploadScheduling;
 	class EnvironmentSourceControl;
 	class RenderSamplerAccess;
 	class TransferManager;
@@ -19,7 +19,7 @@ namespace gglab
 		virtual ~RenderCompositionAccess() = default;
 
 		[[nodiscard]] virtual TransferManager* GetTransferManager() const noexcept = 0;
-		[[nodiscard]] virtual AssetUploadScheduler* GetAssetUploadScheduler() const noexcept = 0;
+		[[nodiscard]] virtual AssetUploadScheduling* GetAssetUploadScheduler() const noexcept = 0;
 		[[nodiscard]] virtual RenderSamplerAccess* GetSamplerRegistry() const noexcept = 0;
 		[[nodiscard]] virtual EnvironmentSourceControl* GetEnvironmentSourceControl()
 			const noexcept = 0;

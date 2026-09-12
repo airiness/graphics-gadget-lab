@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
@@ -1133,7 +1133,7 @@ namespace gglab
 			// Workers only enqueue immutable payloads. Resource creation, upload
 			// recording, queue submission, completion polling and descriptor
 			// publication all execute on the captured graphics owner thread.
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -1144,7 +1144,7 @@ namespace gglab
 			};
 			// Hold completion so the test observes the unpublished interval
 			// deterministically instead of racing a fast graphics queue.
-			scheduler.ArmGpuCompletionHold(streamingIdentity);
+			scheduler->ArmGpuCompletionHold(streamingIdentity);
 			const auto streamingPayload = std::make_shared<const TextureAssetData>(textureData);
 			RHITextureOwner streamingTexture;
 			RHITextureViewHandle streamingView;
@@ -1158,13 +1158,13 @@ namespace gglab
 			bool uploadHandleValid = false;
 			std::thread worker([&]()
 				{
-					workerSawOwner = scheduler.IsOwnerThread();
+					workerSawOwner = scheduler->IsOwnerThread();
 					offOwnerMutationRejected = !device.CreateBuffer({
 						.m_SizeInBytes = 16,
 						.m_Usage = RHIBufferUsage::CopyDest,
 						}, { .m_Domain = RHIResourceDebugDomain::Diagnostics,
 							.m_Label = "Qualification.ExpectedOffOwnerRejection" }).IsValid();
-					scheduler.EnqueueCpuPayload({
+					scheduler->EnqueueCpuPayload({
 						.m_Name = "Vulkan texture payload handoff",
 						.m_Identity = streamingIdentity,
 						.m_Estimate = {
@@ -1173,7 +1173,7 @@ namespace gglab
 						},
 						[&]()
 						{
-							resourceWorkRanOnOwner = scheduler.IsOwnerThread();
+							resourceWorkRanOnOwner = scheduler->IsOwnerThread();
 							streamingTexture = RHITextureOwner(&device, device.CreateTexture({
 								.m_Desc = textureDesc,
 								.m_InitialState = UndefinedRHITextureState(),
@@ -1193,7 +1193,7 @@ namespace gglab
 							{
 								return;
 							}
-							scheduler.EnqueueUploadRecording({
+							scheduler->EnqueueUploadRecording({
 								.m_Name = "Vulkan streamed texture upload",
 								.m_Identity = streamingIdentity,
 								.m_Estimate = {
@@ -1204,8 +1204,8 @@ namespace gglab
 								},
 								[&]()
 								{
-									uploadWorkRanOnOwner = scheduler.IsOwnerThread();
-									const AssetUploadHandle handle = scheduler.RecordUpload({
+									uploadWorkRanOnOwner = scheduler->IsOwnerThread();
+									const AssetUploadHandle handle = scheduler->RecordUpload({
 										.m_Name = "Vulkan streamed texture upload",
 										.m_Identity = streamingIdentity,
 										.m_Estimate = {
@@ -1221,7 +1221,7 @@ namespace gglab
 										},
 										[&](const AssetUploadCompletionInfo& completion)
 										{
-											completionRanOnOwner = scheduler.IsOwnerThread();
+											completionRanOnOwner = scheduler->IsOwnerThread();
 											if (completion.m_Status == AssetUploadStatus::Succeeded &&
 												completion.m_FencePoint.IsValid() &&
 												device.IsFencePointCompleted(completion.m_FencePoint) &&
@@ -1236,7 +1236,7 @@ namespace gglab
 						});
 				});
 			worker.join();
-			scheduler.DrainReadyWork();
+			scheduler->DrainReadyWork();
 			const bool publicationWithheld = privateDescriptor.IsValid() &&
 				!publishedDescriptor.IsValid();
 			VulkanTimelineFence* transferTimeline = device.GetTransferTimeline();
@@ -1245,15 +1245,15 @@ namespace gglab
 				: VK_ERROR_INITIALIZATION_FAILED;
 			if (transferWaitResult != VK_SUCCESS)
 			{
-				scheduler.ClearGpuCompletionHold();
-				scheduler.Finalize();
+				scheduler->ClearGpuCompletionHold();
+				scheduler->Finalize();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify transfer: transfer timeline wait failed after scheduler upload.");
 				return 1;
 			}
-			scheduler.ClearGpuCompletionHold();
-			GGLAB_UNUSED(scheduler.Tick());
-			const AssetUploadStatistics statistics = scheduler.GetStatistics();
+			scheduler->ClearGpuCompletionHold();
+			GGLAB_UNUSED(scheduler->Tick());
+			const AssetUploadStatistics statistics = scheduler->GetStatistics();
 			const bool descriptorPublished = publishedDescriptor.IsValid() &&
 				publishedDescriptor.m_HeapType == privateDescriptor.m_HeapType &&
 				publishedDescriptor.m_Index == privateDescriptor.m_Index;
@@ -1264,7 +1264,7 @@ namespace gglab
 				statistics.m_SucceededCount == 1;
 			if (statistics.m_PendingCount == 0)
 			{
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 			if (streamingView.IsValid())
 			{

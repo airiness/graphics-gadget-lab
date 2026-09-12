@@ -1,4 +1,5 @@
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
@@ -6,15 +7,19 @@
 #include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <compare>
 #include <deque>
 #include <exception>
 #include <format>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
 #include <ranges>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
@@ -22,6 +27,207 @@
 
 namespace gglab
 {
+	// Owns the graphics-owner-thread boundaries around resource publication and
+	// transfer work. Workers may enqueue immutable CPU payload handoffs, but jobs
+	// advance and all RHI calls occur only at explicit owner-thread boundaries.
+	class AssetUploadScheduler final : public AssetUploadScheduling
+	{
+	public:
+		using CreateInfo = AssetUploadSchedulerCreateInfo;
+
+		explicit AssetUploadScheduler(const CreateInfo& createInfo) noexcept;
+		GGLAB_DELETE_COPYABLE_MOVABLE(AssetUploadScheduler);
+		~AssetUploadScheduler() override;
+
+		void EnqueueCpuPayload(AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept override;
+		void EnqueueResourcePublication(
+			AssetStreamingWorkDesc desc, std::unique_ptr<IResourcePublicationJob>&& job) noexcept override;
+		void EnqueueUploadRecording(AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept override;
+		uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept;
+		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept override;
+		uint32_t UpdateWorkPriority(
+			const AssetContentVersion& contentVersion, TaskPriority priority) noexcept override;
+		uint32_t UpdateWorkPriority(
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept override;
+
+		[[nodiscard]] AssetUploadHandle RecordUpload(AssetUploadDesc desc, AssetUploadRecord record,
+			AssetUploadCompletion completion = {}) noexcept override;
+		uint32_t Tick() noexcept override;
+		void DrainReadyWork() noexcept override;
+		void Finalize() noexcept override;
+		void SetFrameBudget(const AssetStreamingFrameBudget& budget) noexcept override;
+		[[nodiscard]] const AssetStreamingFrameBudget& GetFrameBudget() const noexcept override
+		{
+			return m_FrameBudget;
+		}
+		void ArmResourcePublicationFault(
+			const AssetResourcePublicationFaultInjection& fault) noexcept override;
+		void ClearResourcePublicationFault() noexcept override;
+		void ArmGpuCompletionHold(const AssetStreamingIdentity& identity) noexcept override;
+		void ClearGpuCompletionHold() noexcept override;
+		[[nodiscard]] bool IsOwnerThread() const noexcept override;
+
+		[[nodiscard]] AssetUploadStatistics GetStatistics() const override;
+
+	private:
+		struct PendingUpload
+		{
+			AssetUploadHandle m_Handle{};
+			AssetUploadDesc m_Desc;
+			RHIFencePoint m_FencePoint{};
+			std::chrono::steady_clock::time_point m_SubmittedAt{};
+			bool m_RecordingSucceeded = false;
+			AssetUploadCompletion m_Completion;
+		};
+
+		struct QueuedWork
+		{
+			AssetStreamingWorkDesc m_Desc;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+			AssetStreamingWork m_Work;
+		};
+
+		struct QueuedResourcePublication
+		{
+			AssetStreamingWorkDesc m_Desc;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+			AssetResourcePublicationPayloadState m_Payload{};
+			bool m_HasStarted = false;
+			std::unique_ptr<IResourcePublicationJob> m_Job;
+		};
+
+		struct PendingGpuFinalize
+		{
+			PendingUpload m_Upload;
+			AssetUploadStatus m_Status = AssetUploadStatus::Failed;
+			std::chrono::steady_clock::time_point m_QueuedAt{};
+		};
+
+		struct QueueTelemetry
+		{
+			uint32_t m_HighWatermark = 0;
+			uint64_t m_EnqueuedCount = 0;
+			uint64_t m_ProcessedCount = 0;
+			uint64_t m_ContinueCount = 0;
+			uint64_t m_CompletedCount = 0;
+			uint64_t m_FailedCount = 0;
+			uint64_t m_CallbackFailureCount = 0;
+			uint64_t m_CancelledCount = 0;
+			uint64_t m_ResourceCreationCount = 0;
+			uint64_t m_SourceBytesReleased = 0;
+			uint64_t m_SourceBytesCopiedToUpload = 0;
+			uint64_t m_QueueSampleCount = 0;
+			double m_TotalQueueMilliseconds = 0.0;
+			double m_MaxQueueMilliseconds = 0.0;
+			double m_TotalExecutionMilliseconds = 0.0;
+			double m_MaxExecutionMilliseconds = 0.0;
+			std::deque<double> m_RecentExecutionMilliseconds;
+		};
+
+		struct PublicationStageTelemetry
+		{
+			uint64_t m_StepCount = 0;
+			double m_TotalMilliseconds = 0.0;
+			double m_MaxMilliseconds = 0.0;
+			std::deque<double> m_RecentExecutionMilliseconds;
+		};
+
+		void InsertQueuedWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
+			QueuedWork&& queued) noexcept;
+		void DrainWorkerHandoffs() noexcept;
+		[[nodiscard]] bool HasWorkerHandoffs() const noexcept;
+		[[nodiscard]] double ExecuteWork(
+			QueuedWork&& queued, QueueTelemetry& telemetry, std::string_view queueName) noexcept;
+		void InsertResourcePublication(QueuedResourcePublication&& publication) noexcept;
+		uint32_t DrainCpuPayloadQueue(bool ignoreBudget) noexcept;
+		uint32_t DrainResourcePublicationQueue(bool ignoreBudget) noexcept;
+		[[nodiscard]] bool TryApplyResourcePublicationFault(const AssetStreamingIdentity& identity,
+			AssetResourcePublicationStage stage, AssetResourcePublicationFaultTiming timing,
+			AssetResourcePublicationStepResult& result) noexcept;
+		uint32_t DrainUploadRecordingQueue(bool ignoreBudget) noexcept;
+		void FlushRecordedUploads() noexcept;
+		uint32_t PollCompletedUploads() noexcept;
+		void EnqueueGpuFinalize(PendingUpload&& upload, AssetUploadStatus status) noexcept;
+		uint32_t DrainGpuFinalizeQueue(bool ignoreBudget) noexcept;
+		void RemoveReadyPayload(
+			const AssetStreamingWorkEstimate& estimate, bool uploadRecording) noexcept;
+		[[nodiscard]] uint64_t RetireResourcePublicationPayload(
+			QueuedResourcePublication& publication,
+			const AssetResourcePublicationStepUsage& usage) noexcept;
+		void RetireTerminalResourcePublicationPayload(
+			QueuedResourcePublication& publication) noexcept;
+		void RetireReadyPayloadBytes(uint64_t bytes) noexcept;
+		uint32_t CancelQueuedWork(std::deque<QueuedWork>& queue, QueueTelemetry& telemetry,
+			const AssetStreamingIdentity& identity, bool uploadRecording) noexcept;
+		uint32_t CancelResourcePublication(const AssetStreamingIdentity& identity,
+			AssetResourcePublicationAbortReason reason) noexcept;
+		uint32_t UpdateQueuedWorkPriority(std::deque<QueuedWork>& queue,
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept;
+		uint32_t UpdateResourcePublicationPriority(
+			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildQueueStatistics(
+			const std::deque<QueuedWork>& queue, const QueueTelemetry& telemetry) const;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildResourcePublicationQueueStatistics() const;
+		[[nodiscard]] AssetStreamingQueueStatistics BuildGpuFinalizeQueueStatistics() const;
+		void FinishUpload(PendingUpload&& upload, AssetUploadStatus status) noexcept;
+
+	private:
+		RHIDevice* m_Device = nullptr;
+		TransferManager* m_TransferManager = nullptr;
+		std::thread::id m_OwnerThreadId;
+		uint32_t m_RecentUploadCapacity = 0;
+		AssetStreamingFrameBudget m_FrameBudget{};
+		AssetStreamingFrameUsage m_LastFrameUsage{};
+		uint64_t m_NextHandle = 1;
+		uint64_t m_ReadyPayloadBytes = 0;
+		uint64_t m_UploadRecordingBacklogBytes = 0;
+		uint64_t m_ReadyPayloadHighWatermark = 0;
+		uint64_t m_InFlightBytes = 0;
+		uint64_t m_RecordedUploadBytes = 0;
+		uint64_t m_InFlightHighWatermark = 0;
+		uint64_t m_UploadPromotionBudgetDeferralCount = 0;
+		uint64_t m_UploadBudgetDeferralCount = 0;
+		uint64_t m_InFlightBudgetDeferralCount = 0;
+		uint64_t m_OversizedAdmissionCount = 0;
+		uint64_t m_BatchSubmissionCount = 0;
+		uint32_t m_LastBatchUploadCount = 0;
+		uint32_t m_MaxUploadsPerBatch = 0;
+		uint64_t m_SubmittedCount = 0;
+		uint64_t m_SucceededCount = 0;
+		uint64_t m_FailedCount = 0;
+		uint64_t m_CompletionCallbackFailureCount = 0;
+		std::deque<QueuedWork> m_CpuPayloadQueue;
+		std::deque<QueuedResourcePublication> m_ResourcePublicationQueue;
+		std::deque<QueuedWork> m_UploadRecordingQueue;
+		mutable std::mutex m_HandoffMutex;
+		std::deque<QueuedWork> m_CpuPayloadHandoffs;
+		std::unique_ptr<TransferBatch> m_RecordingBatch;
+		std::vector<PendingUpload> m_RecordedUploads;
+		std::deque<PendingUpload> m_PendingUploads;
+		std::deque<PendingGpuFinalize> m_GpuFinalizeQueue;
+		std::deque<AssetUploadActivity> m_RecentUploads;
+		QueueTelemetry m_CpuPayloadTelemetry;
+		QueueTelemetry m_ResourcePublicationTelemetry;
+		QueueTelemetry m_UploadRecordingTelemetry;
+		QueueTelemetry m_GpuFinalizeTelemetry;
+		std::array<PublicationStageTelemetry,
+			static_cast<size_t>(AssetResourcePublicationStage::Count)>
+			m_PublicationStageTelemetry;
+		AssetResourcePublicationFaultInjection m_PublicationFault{};
+		uint32_t m_PublicationFaultObservedOccurrences = 0;
+		AssetStreamingIdentity m_GpuCompletionHold{};
+		uint64_t m_PublicationOverBudgetExecutionCount = 0;
+		uint64_t m_PublicationNoProgressContinueCount = 0;
+		uint64_t m_PublicationFaultInjectionCount = 0;
+		bool m_IsRecordingUploadBatch = false;
+	};
+
+	std::unique_ptr<AssetUploadScheduling> CreateAssetUploadScheduler(
+		const AssetUploadSchedulerCreateInfo& createInfo) noexcept
+	{
+		return std::make_unique<AssetUploadScheduler>(createInfo);
+	}
+
 	namespace
 	{
 		constexpr uint32_t MaxResourcePublicationDrainSteps = 1'000'000;

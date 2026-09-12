@@ -1,6 +1,6 @@
 #include "AssetUploadSchedulerSelfTests.h"
 
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
@@ -273,7 +273,7 @@ namespace gglab
 			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -286,8 +286,8 @@ namespace gglab
 
 			std::thread worker([&]()
 				{
-					workerSawOwner = scheduler.IsOwnerThread();
-					scheduler.EnqueueCpuPayload({
+					workerSawOwner = scheduler->IsOwnerThread();
+					scheduler->EnqueueCpuPayload({
 						.m_Name = "Worker immutable payload handoff",
 						.m_Identity = {
 							.m_Kind = AssetStreamingWorkKind::Texture,
@@ -300,7 +300,7 @@ namespace gglab
 						{
 							cpuCallbackRan = true;
 							cpuCallbackThreadId = std::this_thread::get_id();
-							scheduler.EnqueueUploadRecording({
+							scheduler->EnqueueUploadRecording({
 								.m_Name = "Owner upload promotion",
 								.m_Identity = {
 									.m_Kind = AssetStreamingWorkKind::Texture,
@@ -319,8 +319,8 @@ namespace gglab
 
 			context.Check(!workerSawOwner && !cpuCallbackRan && !uploadCallbackRan,
 				"Worker enqueue hands off immutable payload without executing owner work inline");
-			scheduler.DrainReadyWork();
-			const AssetUploadStatistics statistics = scheduler.GetStatistics();
+			scheduler->DrainReadyWork();
+			const AssetUploadStatistics statistics = scheduler->GetStatistics();
 			context.Check(cpuCallbackRan && uploadCallbackRan &&
 				cpuCallbackThreadId == ownerThreadId && uploadCallbackThreadId == ownerThreadId &&
 				statistics.m_CpuPayloadQueue.m_EnqueuedCount == 1 &&
@@ -328,7 +328,7 @@ namespace gglab
 				statistics.m_UploadRecordingQueue.m_EnqueuedCount == 1 &&
 				statistics.m_UploadRecordingQueue.m_ProcessedCount == 1,
 				"Scheduler drains worker handoff and every publication/upload callback on its owner thread");
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 
 	}

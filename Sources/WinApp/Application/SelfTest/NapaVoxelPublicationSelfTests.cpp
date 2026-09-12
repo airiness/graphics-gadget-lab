@@ -1,6 +1,6 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
@@ -515,7 +515,7 @@ namespace gglab
 		struct NapaVoxelLabSwitchTestState
 		{
 			NapaVoxelPublicationTestDevice* m_Device = nullptr;
-			AssetUploadScheduler* m_Scheduler = nullptr;
+			AssetUploadScheduling* m_Scheduler = nullptr;
 			uint64_t m_NextOwnerGeneration = 1;
 			std::vector<uint64_t> m_StartedGenerations;
 			uint32_t m_CancelledSessionCount = 0;
@@ -1090,18 +1090,18 @@ namespace gglab
 			NapaVoxelPublicationTestTransferContext* transferContextView = transferContext.get();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
 
 			std::unique_ptr<napa::voxel::PendingCpuMeshBatch> pending;
 			NapaVoxelCommandQueue commandQueue;
-			NapaVoxelPublicationSession session(&device, &scheduler, &commandQueue);
+			NapaVoxelPublicationSession session(&device, scheduler.get(), &commandQueue);
 			const bool began = BuildPublicationPending(true, pending) &&
 				session.BeginPrepare(pending, 3001, 1);
-			scheduler.DrainReadyWork();
-			const AssetUploadStatistics submitted = scheduler.GetStatistics();
+			scheduler->DrainReadyWork();
+			const AssetUploadStatistics submitted = scheduler->GetStatistics();
 			context.Check(began && !pending &&
 				session.GetPublicationStatus() ==
 				NapaVoxelInitialPublicationStatus::AwaitingFence &&
@@ -1118,13 +1118,13 @@ namespace gglab
 				"Lab switch cancellation releases Session state without retiring in-flight buffers");
 
 			device.CompleteFence();
-			GGLAB_UNUSED(scheduler.Tick());
-			const AssetUploadStatistics completed = scheduler.GetStatistics();
+			GGLAB_UNUSED(scheduler->Tick());
+			const AssetUploadStatistics completed = scheduler->GetStatistics();
 			context.Check(completed.m_PendingCount == 0 && completed.m_SucceededCount == 1 &&
 				device.GetDestroyedBufferCount() == device.GetCreatedBufferCount() &&
 				!session.IsReady() && !session.HasVisibleMeshes() && !session.GetFrameView(),
 				"Post-cancel Copy Fence completion retires buffers without publication or a dangling frame view");
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 
 		void RunInteractivePublicationIntegrationTest(SelfTestContext& context) noexcept
@@ -1133,19 +1133,19 @@ namespace gglab
 			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
 			NapaVoxelCommandQueue commandQueue;
-			NapaVoxelPublicationSession session(&device, &scheduler, &commandQueue);
+			NapaVoxelPublicationSession session(&device, scheduler.get(), &commandQueue);
 			std::unique_ptr<VoxelWorld> world;
 			std::unique_ptr<PendingCpuMeshBatch> initialPending;
 			const bool began = BuildInteractivePublicationInput(world, initialPending) &&
 				session.BeginPrepare(initialPending, 4001, 1);
-			scheduler.DrainReadyWork();
+			scheduler->DrainReadyWork();
 			device.CompleteFence();
-			GGLAB_UNUSED(scheduler.Tick());
+			GGLAB_UNUSED(scheduler->Tick());
 			session.TickPrepare();
 			session.OnFrameSubmitted({ RHIFenceHandle{ 14, 1 }, 1 });
 			const auto initialGpu = session.GetFrameView();
@@ -1209,8 +1209,8 @@ namespace gglab
 				"Interactive surface mutation prepares its revision-bound damage snapshot");
 			context.Check(replacementBegan,
 				"Interactive surface mutation begins one replacement publication");
-			scheduler.DrainReadyWork();
-			GGLAB_UNUSED(scheduler.Tick());
+			scheduler->DrainReadyWork();
+			GGLAB_UNUSED(scheduler->Tick());
 			const bool published = replacementBegan && session.TickMeshPrepare();
 			context.Check(published && !replacementPending && !surfaceSnapshot &&
 				!session.HasActiveMeshPrepare() && !session.HasFailed() &&
@@ -1218,7 +1218,7 @@ namespace gglab
 				session.GetLastPublicationSerial() == 2 &&
 				session.GetFrameView() != damagedGpu,
 				"Interactive surface flow publishes one proof-bound replacement after Copy Fence completion");
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 
 		void RunReplacementBatchContractTests(SelfTestContext& context) noexcept
@@ -1313,7 +1313,7 @@ namespace gglab
 			NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -1325,12 +1325,12 @@ namespace gglab
 				device, 0.1, renderState, pending, replacementChunks);
 			const auto visibleBefore = renderState.GetVisibleGpuMeshes();
 			NapaVoxelMeshReplacementUploadSession session(
-				&device, &scheduler, &commandQueue);
+				&device, scheduler.get(), &commandQueue);
 			const bool began = fixtureBuilt && session.BeginPrepare(
 				pending, visibleBefore, 21, 1);
 			const auto publication = session.GetPublication();
-			scheduler.DrainReadyWork();
-			const AssetUploadStatistics submitted = scheduler.GetStatistics();
+			scheduler->DrainReadyWork();
+			const AssetUploadStatistics submitted = scheduler->GetStatistics();
 			context.Check(began && !pending && publication &&
 				publication->GetStatus() == GGLabMeshPublicationStatus::AwaitingFence &&
 				submitted.m_UploadRecordingQueue.m_EnqueuedCount == 1 &&
@@ -1341,7 +1341,7 @@ namespace gglab
 				"One replacement publication records one Scheduler work item, handle, and fence batch");
 
 			device.CompleteFence();
-			GGLAB_UNUSED(scheduler.Tick());
+			GGLAB_UNUSED(scheduler->Tick());
 			context.Check(publication->IsReadyForCommit() && !session.IsReady() &&
 				renderState.GetVisibleWorldRevision() == 1 &&
 				renderState.GetVisibleGpuMeshes() == visibleBefore,
@@ -1352,7 +1352,7 @@ namespace gglab
 				renderState.GetVisibleGpuMeshes() == visibleBefore,
 				"Owner Update observes upload readiness without publishing replacement state early");
 			session.CancelPrepare();
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 
 		void RunEmptyReplacementUploadTest(SelfTestContext& context) noexcept
@@ -1361,7 +1361,7 @@ namespace gglab
 			NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -1372,7 +1372,7 @@ namespace gglab
 			const bool fixtureBuilt = BuildReplacementPublicationInput(
 				device, 10.0, renderState, pending, replacementChunks);
 			NapaVoxelMeshReplacementUploadSession session(
-				&device, &scheduler, &commandQueue);
+				&device, scheduler.get(), &commandQueue);
 			const bool began = fixtureBuilt && session.BeginPrepare(
 				pending, renderState.GetVisibleGpuMeshes(), 22, 1);
 			const auto publication = session.GetPublication();
@@ -1385,17 +1385,17 @@ namespace gglab
 					allDeletes &= replacement.IsDelete();
 				}
 			}
-			scheduler.DrainReadyWork();
+			scheduler->DrainReadyWork();
 			device.CompleteFence();
-			GGLAB_UNUSED(scheduler.Tick());
+			GGLAB_UNUSED(scheduler->Tick());
 			session.TickPrepare();
 			context.Check(allDeletes && publication->GetUploadEstimate().m_OperationCount == 0 &&
 				transferView->GetUploadCount() == 0 && transferView->GetSubmissionCount() == 1 &&
-				scheduler.GetStatistics().m_SubmittedCount == 1 && session.IsReady() &&
+				scheduler->GetStatistics().m_SubmittedCount == 1 && session.IsReady() &&
 				renderState.GetVisibleWorldRevision() == 1,
 				"An Empty/Delete replacement still receives one durable Scheduler handle and fence without buffer uploads");
 			session.CancelPrepare();
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 
 		void RunReplacementUploadFailureTests(SelfTestContext& context) noexcept
@@ -1405,7 +1405,7 @@ namespace gglab
 				NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 				TransferManager transferManager(std::move(transferContext));
 				NapaVoxelPublicationTestDevice device;
-				AssetUploadScheduler scheduler({
+				auto scheduler = CreateAssetUploadScheduler({
 					.m_Device = &device,
 					.m_TransferManager = &transferManager,
 					});
@@ -1415,12 +1415,12 @@ namespace gglab
 				std::vector<napa::voxel::ChunkCoord> replacementChunks;
 				const bool fixtureBuilt = BuildReplacementPublicationInput(
 					device, 0.1, renderState, pending, replacementChunks);
-				NapaVoxelMeshReplacementUploadSession session(&device, &scheduler, &commandQueue, {
+				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.get(), &commandQueue, {
 					.m_LastPublicationSerial = std::numeric_limits<uint64_t>::max(),
 					});
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, renderState.GetVisibleGpuMeshes(), 31, 1);
-				const AssetUploadStatistics statistics = scheduler.GetStatistics();
+				const AssetUploadStatistics statistics = scheduler->GetStatistics();
 				context.Check(!began && pending && !session.GetPublication() && session.HasFailed() &&
 					session.GetLastPublicationSerial() == std::numeric_limits<uint64_t>::max() &&
 					commandQueue.GetTerminalError() ==
@@ -1429,14 +1429,14 @@ namespace gglab
 					statistics.m_SubmittedCount == 0 && transferView->GetUploadCount() == 0 &&
 					transferView->GetSubmissionCount() == 0,
 					"Publication serial exhaustion freezes FIFO without consuming pending data or scheduling upload work");
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 
 			{
 				auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
 				TransferManager transferManager(std::move(transferContext));
 				NapaVoxelPublicationTestDevice device;
-				AssetUploadScheduler scheduler({
+				auto scheduler = CreateAssetUploadScheduler({
 					.m_Device = &device,
 					.m_TransferManager = &transferManager,
 					});
@@ -1448,7 +1448,7 @@ namespace gglab
 					device, 0.1, renderState, pending, replacementChunks);
 				const auto visibleBefore = renderState.GetVisibleGpuMeshes();
 				device.FailNextBufferCreation();
-				NapaVoxelMeshReplacementUploadSession session(&device, &scheduler, &commandQueue);
+				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, visibleBefore, 32, 1);
 				context.Check(!began && !pending && session.HasFailed() &&
@@ -1456,9 +1456,9 @@ namespace gglab
 					NapaVoxelCommandQueueError::HostPreparationFailed &&
 					renderState.GetVisibleWorldRevision() == 1 &&
 					renderState.GetVisibleGpuMeshes() == visibleBefore &&
-					scheduler.GetStatistics().m_UploadRecordingQueue.m_EnqueuedCount == 0,
+					scheduler->GetStatistics().m_UploadRecordingQueue.m_EnqueuedCount == 0,
 					"GPU resource creation failure freezes FIFO and preserves the complete old Visible state");
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 
 			{
@@ -1467,7 +1467,7 @@ namespace gglab
 				transferView->SetFailUploads(true);
 				TransferManager transferManager(std::move(transferContext));
 				NapaVoxelPublicationTestDevice device;
-				AssetUploadScheduler scheduler({
+				auto scheduler = CreateAssetUploadScheduler({
 					.m_Device = &device,
 					.m_TransferManager = &transferManager,
 					});
@@ -1478,12 +1478,12 @@ namespace gglab
 				const bool fixtureBuilt = BuildReplacementPublicationInput(
 					device, 0.1, renderState, pending, replacementChunks);
 				const auto visibleBefore = renderState.GetVisibleGpuMeshes();
-				NapaVoxelMeshReplacementUploadSession session(&device, &scheduler, &commandQueue);
+				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, visibleBefore, 33, 1);
-				scheduler.DrainReadyWork();
+				scheduler->DrainReadyWork();
 				device.CompleteFence();
-				GGLAB_UNUSED(scheduler.Tick());
+				GGLAB_UNUSED(scheduler->Tick());
 				session.TickPrepare();
 				context.Check(began && session.HasFailed() && !session.IsReady() &&
 					commandQueue.GetTerminalError() ==
@@ -1492,7 +1492,7 @@ namespace gglab
 					renderState.GetVisibleGpuMeshes() == visibleBefore,
 					"Upload failure is observed on owner Update and freezes FIFO without partial publication");
 				session.CancelPrepare();
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 		}
 
@@ -1503,7 +1503,7 @@ namespace gglab
 				NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 				TransferManager transferManager(std::move(transferContext));
 				NapaVoxelPublicationTestDevice device;
-				AssetUploadScheduler scheduler({
+				auto scheduler = CreateAssetUploadScheduler({
 					.m_Device = &device,
 					.m_TransferManager = &transferManager,
 					});
@@ -1513,7 +1513,7 @@ namespace gglab
 				std::vector<napa::voxel::ChunkCoord> replacementChunks;
 				const bool fixtureBuilt = BuildReplacementPublicationInput(
 					device, 0.1, renderState, pending, replacementChunks);
-				NapaVoxelMeshReplacementUploadSession session(&device, &scheduler, &commandQueue);
+				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, renderState.GetVisibleGpuMeshes(), 41, 1);
 				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began
@@ -1525,17 +1525,17 @@ namespace gglab
 					device.GetDestroyedBufferCount() > destroyedBefore &&
 					transferView->GetUploadCount() == 0 &&
 					transferView->GetSubmissionCount() == 0 &&
-					scheduler.GetStatistics().m_UploadRecordingQueue.m_CancelledCount == 1 &&
+					scheduler->GetStatistics().m_UploadRecordingQueue.m_CancelledCount == 1 &&
 					!commandQueue.IsTerminal(),
 					"Recording-before cancellation removes ready work and retires unsubmitted replacement buffers");
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 
 			{
 				auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
 				TransferManager transferManager(std::move(transferContext));
 				NapaVoxelPublicationTestDevice device;
-				AssetUploadScheduler scheduler({
+				auto scheduler = CreateAssetUploadScheduler({
 					.m_Device = &device,
 					.m_TransferManager = &transferManager,
 					});
@@ -1546,26 +1546,26 @@ namespace gglab
 				const bool fixtureBuilt = BuildReplacementPublicationInput(
 					device, 0.1, renderState, pending, replacementChunks);
 				const auto visibleBefore = renderState.GetVisibleGpuMeshes();
-				NapaVoxelMeshReplacementUploadSession session(&device, &scheduler, &commandQueue);
+				NapaVoxelMeshReplacementUploadSession session(&device, scheduler.get(), &commandQueue);
 				const bool began = fixtureBuilt && session.BeginPrepare(
 					pending, visibleBefore, 42, 7);
 				std::weak_ptr<const NapaVoxelGpuMeshSet> prospective = began
 					? session.GetPublication()->GetProspectiveGpuMeshes()
 					: std::shared_ptr<const NapaVoxelGpuMeshSet>{};
-				scheduler.DrainReadyWork();
+				scheduler->DrainReadyWork();
 				const uint32_t destroyedBeforeCancel = device.GetDestroyedBufferCount();
 				session.CancelPrepare();
 				const bool retainedThroughFence = !prospective.expired() &&
 					device.GetDestroyedBufferCount() == destroyedBeforeCancel;
 				device.CompleteFence();
-				GGLAB_UNUSED(scheduler.Tick());
+				GGLAB_UNUSED(scheduler->Tick());
 				context.Check(began && retainedThroughFence && prospective.expired() &&
 					device.GetDestroyedBufferCount() > destroyedBeforeCancel &&
 					renderState.GetVisibleWorldRevision() == 1 &&
 					renderState.GetVisibleGpuMeshes() == visibleBefore &&
 					!session.IsReady() && !commandQueue.IsTerminal(),
 					"Recording-after cancellation retains buffers through Copy Fence and never publishes a frame view");
-				scheduler.Finalize();
+				scheduler->Finalize();
 			}
 		}
 		void RunAtomicDataOnlyPublicationTests(SelfTestContext& context) noexcept
@@ -1723,7 +1723,7 @@ namespace gglab
 			NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -1738,7 +1738,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TaskSystem = &taskSystem,
 				.m_TransferManager = &transferManager,
-				.m_AssetUploadScheduler = &scheduler,
+				.m_AssetUploadScheduler = scheduler.get(),
 				.m_SamplerRegistry = &samplerAccess,
 				.m_AssetRoot = injectedRoot / "Assets",
 				});
@@ -1750,7 +1750,7 @@ namespace gglab
 			Time time;
 			NapaVoxelLabSwitchTestState state{
 				.m_Device = &device,
-				.m_Scheduler = &scheduler,
+				.m_Scheduler = scheduler.get(),
 			};
 			s_NapaVoxelLabSwitchTestState = &state;
 
@@ -1794,8 +1794,8 @@ namespace gglab
 				{
 					runtime.RequestSwitchLab(NapaVoxelLabSwitchPendingSession::GetId());
 					runtime.ProcessPendingCommands();
-					scheduler.DrainReadyWork();
-					const AssetUploadStatistics submitted = scheduler.GetStatistics();
+					scheduler->DrainReadyWork();
+					const AssetUploadStatistics submitted = scheduler->GetStatistics();
 					runtimeValid &= runtime.HasPendingSession() &&
 						submitted.m_PendingCount == index + 1 &&
 						transferView->GetSubmissionCount() == index + 2;
@@ -1825,8 +1825,8 @@ namespace gglab
 				device.CompleteFence({
 					RHIFenceHandle{ 1, 1 }, transferView->GetSubmissionCount(),
 					});
-				GGLAB_UNUSED(scheduler.Tick());
-				context.Check(runtimeValid && IsSchedulerQuiescent(scheduler.GetStatistics()) &&
+				GGLAB_UNUSED(scheduler->Tick());
+				context.Check(runtimeValid && IsSchedulerQuiescent(scheduler->GetStatistics()) &&
 					device.GetLiveBufferCount() == 0 &&
 					device.GetCreatedBufferCount() == device.GetDestroyedBufferCount() &&
 					runtime.IsReady() && runtime.GetActiveSession() &&
@@ -1843,10 +1843,10 @@ namespace gglab
 			taskSystem.Shutdown();
 			taskSystem.PumpCompletions();
 			assetManager.DrainLoadCompletions();
-			scheduler.DrainReadyWork();
+			scheduler->DrainReadyWork();
 			device.CompleteFence();
-			GGLAB_UNUSED(scheduler.Tick());
-			scheduler.Finalize();
+			GGLAB_UNUSED(scheduler->Tick());
+			scheduler->Finalize();
 			assetManager.PrepareForShutdown({});
 		}
 
@@ -1858,23 +1858,23 @@ namespace gglab
 			NapaVoxelPublicationTestTransferContext* transferView = transferContext.get();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			auto scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
 			NapaVoxelCommandQueue commandQueue;
-			NapaVoxelPublicationSession session(&device, &scheduler, &commandQueue);
+			NapaVoxelPublicationSession session(&device, scheduler.get(), &commandQueue);
 			std::unique_ptr<VoxelWorld> world;
 			std::unique_ptr<PendingCpuMeshBatch> initialPending;
 			bool lifecycleValid = BuildInteractivePublicationInput(world, initialPending) &&
 				session.BeginPrepare(initialPending, 10'001, 1);
 			if (lifecycleValid)
 			{
-				scheduler.DrainReadyWork();
+				scheduler->DrainReadyWork();
 				device.CompleteFence({
 					RHIFenceHandle{ 1, 1 }, transferView->GetSubmissionCount(),
 					});
-				GGLAB_UNUSED(scheduler.Tick());
+				GGLAB_UNUSED(scheduler->Tick());
 				session.TickPrepare();
 				lifecycleValid = session.IsReady() && session.GetFrameView() &&
 					session.GetVisibleWorldRevision() == world->GetWorldVoxelRevision();
@@ -1933,11 +1933,11 @@ namespace gglab
 				const uint64_t oldRevision = session.GetVisibleWorldRevision();
 				lifecycleValid = session.BeginMeshPrepare(
 					pending, ++operationSerial, 1, damageSnapshot);
-				const AssetUploadStatistics queued = scheduler.GetStatistics();
+				const AssetUploadStatistics queued = scheduler->GetStatistics();
 				const bool queuedBytes =
 					queued.m_UploadRecordingQueue.m_PendingSourceBytes != 0 &&
 					queued.m_UploadRecordingQueue.m_PendingStagingBytes != 0;
-				scheduler.DrainReadyWork();
+				scheduler->DrainReadyWork();
 				const bool rejectedEarlyCommit = !session.TickMeshPrepare() &&
 					session.GetVisibleWorldRevision() == oldRevision &&
 					session.GetFrameView() == oldFrame;
@@ -1946,7 +1946,7 @@ namespace gglab
 				device.CompleteFence({
 					RHIFenceHandle{ 1, 1 }, transferView->GetSubmissionCount(),
 					});
-				GGLAB_UNUSED(scheduler.Tick());
+				GGLAB_UNUSED(scheduler->Tick());
 				const bool published = session.TickMeshPrepare();
 				std::shared_ptr<const NapaVoxelGpuMeshSet> nextFrame = session.GetFrameView();
 				lifecycleValid &= published && !pending && !damageSnapshot && nextFrame &&
@@ -1968,7 +1968,7 @@ namespace gglab
 				currentFrame = std::move(nextFrame);
 				oldFrame.reset();
 				quiescentBetweenPublications &=
-					IsSchedulerQuiescent(scheduler.GetStatistics()) &&
+					IsSchedulerQuiescent(scheduler->GetStatistics()) &&
 					device.GetLiveBufferBytes() == GetGpuMeshBytes(currentFrame);
 				++graphicsFenceValue;
 				session.OnFrameSubmitted({ graphicsFence, graphicsFenceValue });
@@ -2000,11 +2000,11 @@ namespace gglab
 					exitPending, ++operationSerial, 1, exitDamageSnapshot);
 			if (exitPrepared)
 			{
-				scheduler.DrainReadyWork();
+				scheduler->DrainReadyWork();
 			}
 			const uint64_t visibleBytes = GetGpuMeshBytes(currentFrame);
 			const bool hadInFlightBytes = exitPrepared &&
-				scheduler.GetStatistics().m_InFlightBytes != 0 &&
+				scheduler->GetStatistics().m_InFlightBytes != 0 &&
 				device.GetLiveBufferBytes() > visibleBytes;
 			session.CancelPrepare();
 			const bool noDanglingSessionView = !session.IsReady() &&
@@ -2013,9 +2013,9 @@ namespace gglab
 			device.CompleteFence({
 				RHIFenceHandle{ 1, 1 }, transferView->GetSubmissionCount(),
 				});
-			GGLAB_UNUSED(scheduler.Tick());
+			GGLAB_UNUSED(scheduler->Tick());
 			const bool copyRetiredWithoutPublication = noDanglingSessionView &&
-				IsSchedulerQuiescent(scheduler.GetStatistics()) &&
+				IsSchedulerQuiescent(scheduler->GetStatistics()) &&
 				device.GetLiveBufferBytes() == visibleBytes;
 			device.CompleteFence({ graphicsFence, graphicsFenceValue });
 			currentFrame.reset();
@@ -2025,7 +2025,7 @@ namespace gglab
 			context.Check(hadInFlightBytes && copyRetiredWithoutPublication && allBytesRetired,
 				"Lab exit during replacement upload retires Copy/Graphics resources with zero "
 				"pending bytes and no frame view");
-			scheduler.Finalize();
+			scheduler->Finalize();
 		}
 	}
 

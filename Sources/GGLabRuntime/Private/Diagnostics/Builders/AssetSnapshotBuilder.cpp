@@ -3,7 +3,7 @@
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/AssetManagerState.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 
 #include <algorithm>
 

@@ -23,7 +23,7 @@ namespace gglab
 {
 	class PipelineCache;
 	class AssetManager;
-	class AssetUploadScheduler;
+	class AssetUploadScheduling;
 	class EnvironmentLightingSystem;
 	class IBLBakeScheduler;
 	class RenderResourceRegistry;
@@ -107,10 +107,11 @@ namespace gglab
 		{
 			return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr;
 		}
-		AssetUploadScheduler* GetAssetUploadScheduler() const noexcept override
+		AssetUploadScheduling* GetAssetUploadScheduler() const noexcept override
 		{
 			return m_AssetUploadScheduler.get();
 		}
+		AssetUploadControl* GetAssetUploadControl() const noexcept;
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
 		EnvironmentSourceControl* GetEnvironmentSourceControl() const noexcept override;
 		EnvironmentLightingSystem* GetEnvironmentLightingSystemService() const noexcept
@@ -317,7 +318,7 @@ namespace gglab
 
 	private:
 		std::unique_ptr<RHIContext> m_RHIContext;
-		std::unique_ptr<AssetUploadScheduler> m_AssetUploadScheduler;
+		std::unique_ptr<AssetUploadScheduling> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;

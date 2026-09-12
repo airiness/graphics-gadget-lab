@@ -11,7 +11,7 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"

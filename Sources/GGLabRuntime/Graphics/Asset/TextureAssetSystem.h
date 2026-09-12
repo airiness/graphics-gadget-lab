@@ -25,7 +25,7 @@ namespace gglab
 	class AssetManagerPublicationServices;
 	class AssetResidencyController;
 	class AssetStateEventQueue;
-	class AssetUploadScheduler;
+	class AssetUploadScheduling;
 	class RHIDevice;
 	class TransferBatch;
 	class TransferManager;
@@ -40,7 +40,7 @@ namespace gglab
 			RHIDevice* m_Device = nullptr;
 			AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 			TransferManager* m_TransferManager = nullptr;
-			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+			AssetUploadScheduling* m_AssetUploadScheduler = nullptr;
 			AssetStateEventQueue* m_StateEvents = nullptr;
 			TextureArtifactCache* m_ArtifactCache = nullptr;
 			std::filesystem::path m_AssetRoot;
@@ -182,7 +182,7 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		AssetLoadCoordinator* m_LoadCoordinator = nullptr;
 		TransferManager* m_TransferManager = nullptr;
-		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
+		AssetUploadScheduling* m_AssetUploadScheduler = nullptr;
 		AssetStateEventQueue* m_StateEvents = nullptr;
 		TextureArtifactCache* m_ArtifactCache = nullptr;
 		std::filesystem::path m_AssetRoot;

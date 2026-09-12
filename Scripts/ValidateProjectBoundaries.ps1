@@ -1035,6 +1035,7 @@ $legacyRuntimeAssetContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureAsset.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.cpp"),
+    (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.h"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferManager.h"),
@@ -1455,6 +1456,8 @@ $legacyRuntimeAssetContractIncludeRegex =
     'ModelImportArtifact|TextureLoader|TextureDerivedDataSystem)\.h|' +
     'Asset[\\/](?:Residency[\\/]AssetResidencyTypes|Loading[\\/]ModelImporter)\.h|' +
     'TransferBatch\.h|TransferManager\.h)[>"]'
+$removedPublicAssetIncludeRegex =
+    '#include\s*[<"]GGLabRuntime[\\/]Graphics[\\/]Asset[\\/]AssetUploadScheduler\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1469,6 +1472,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeServiceContractIncludeRegex -or
         $content -match $legacyRuntimeShaderContractIncludeRegex -or
         $content -match $legacyRuntimeAssetContractIncludeRegex -or
+        $content -match $removedPublicAssetIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

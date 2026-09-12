@@ -8,7 +8,7 @@
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/ModelPublicationJob.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
