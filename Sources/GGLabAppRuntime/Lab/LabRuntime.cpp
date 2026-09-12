@@ -545,9 +545,7 @@ namespace gglab
 
 	void LabRuntime::PollRetiringSessions() noexcept
 	{
-		RenderHost* renderHost = m_CreateInfo.m_Services.m_RenderHost;
-		GGLAB_ASSERT_NOT_NULL(renderHost);
-		RHIContext* rhiContext = renderHost ? renderHost->GetRHIContext() : nullptr;
+		RHIContext* rhiContext = m_CreateInfo.m_Services.m_RHIContext;
 		RHIDevice* device = rhiContext ? &rhiContext->GetDevice() : nullptr;
 		if (!device)
 		{

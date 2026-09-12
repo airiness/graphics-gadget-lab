@@ -170,8 +170,7 @@ namespace gglab
 
 		void RunDemoTransitionSynchronizationSelfTests(SelfTestContext& context) noexcept
 		{
-			StubRenderHost renderer;
-			DemoManager manager(&renderer);
+			DemoManager manager(nullptr);
 			TransitionTestState state{};
 			const uint32_t demoIndex = manager.RegisterDemo("test.demo.transition",
 				[&state]() -> std::unique_ptr<DemoBase>

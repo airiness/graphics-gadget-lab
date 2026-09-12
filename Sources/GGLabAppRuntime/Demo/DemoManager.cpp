@@ -6,9 +6,8 @@
 
 namespace gglab
 {
-	DemoManager::DemoManager(RenderHost* renderHost) noexcept : m_RenderHost(renderHost)
+	DemoManager::DemoManager(RHIContext* rhiContext) noexcept : m_RHIContext(rhiContext)
 	{
-		GGLAB_ASSERT_NOT_NULL(m_RenderHost);
 	}
 
 	DemoManager::~DemoManager()
@@ -286,7 +285,7 @@ namespace gglab
 
 	void DemoManager::PollRetiringDemos() noexcept
 	{
-		RHIContext* rhiContext = m_RenderHost ? m_RenderHost->GetRHIContext() : nullptr;
+		RHIContext* rhiContext = m_RHIContext;
 		RHIDevice* device = rhiContext ? &rhiContext->GetDevice() : nullptr;
 		if (!device)
 		{

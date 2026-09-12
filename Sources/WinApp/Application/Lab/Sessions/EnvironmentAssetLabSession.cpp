@@ -60,14 +60,14 @@ namespace gglab
 	void EnvironmentAssetLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
-		IBLCacheControlBase* cacheControl = m_Services.m_RenderHost->GetIBLCacheControl();
+		IBLCacheControlBase* cacheControl = m_Services.m_IBLCacheControl;
 		GGLAB_ASSERT_NOT_NULL(cacheControl);
 		// The acceptance sequence needs deterministic stage misses even when a
 		// previous run populated the same sample-count variants. DDC entries are
 		// recoverable derived data, so start this cache-focused Lab from a clean set.
 		cacheControl->ClearArtifactCache();
 		GGLAB_UNUSED(cacheControl->ClearDerivedDataStore());
-		const auto& settings = m_Services.m_RenderHost->GetEnvironmentLightingView()->GetEnvironmentLightingSettings();
+		const auto& settings = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
 		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
 		m_State->m_OriginalSpecularSampleCount =
 			settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
@@ -85,7 +85,7 @@ namespace gglab
 		if (m_State)
 		{
 			EnvironmentLightingControlBase* environment =
-				m_Services.m_RenderHost->GetEnvironmentLightingControl();
+				m_Services.m_EnvironmentLightingControl;
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
@@ -366,7 +366,7 @@ namespace gglab
 				m_State->m_IBLArtifactDigests[index] = status.m_Artifacts[index].m_ContentDigest;
 			}
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_RenderHost->GetEnvironmentLightingControl()->RequestRebake(false);
+			m_Services.m_EnvironmentLightingControl->RequestRebake(false);
 			m_State->m_Phase = State::Phase::WaitForCpuCacheHit;
 			break;
 		}
@@ -411,7 +411,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_RenderHost->GetIBLCacheControl()->ClearArtifactCache();
+			m_Services.m_IBLCacheControl->ClearArtifactCache();
 			if (scheduler.GetArtifactCacheStatistics().m_CachedEntryCount != 0)
 			{
 				Fail("Clearing the IBL CPU cache left cached stage entries behind.");
@@ -419,7 +419,7 @@ namespace gglab
 			}
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
-			m_Services.m_RenderHost->GetEnvironmentLightingControl()->RequestRebake(false);
+			m_Services.m_EnvironmentLightingControl->RequestRebake(false);
 			m_State->m_Phase = State::Phase::WaitForDerivedDataCacheHit;
 			break;
 		}
@@ -466,7 +466,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_RenderHost->GetEnvironmentLightingControl()
+			m_Services.m_EnvironmentLightingControl
 				->SetPrefilteredSpecularSampleCount(m_State->m_CpuPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForCpuPartialHit;
 			break;
@@ -525,10 +525,10 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_RenderHost->GetIBLCacheControl()->ClearArtifactCache();
+			m_Services.m_IBLCacheControl->ClearArtifactCache();
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
-			m_Services.m_RenderHost->GetEnvironmentLightingControl()
+			m_Services.m_EnvironmentLightingControl
 				->SetPrefilteredSpecularSampleCount(m_State->m_DdcPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForDerivedDataPartialHit;
 			break;
@@ -589,7 +589,7 @@ namespace gglab
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
 			EnvironmentLightingControlBase* environment =
-				m_Services.m_RenderHost->GetEnvironmentLightingControl();
+				m_Services.m_EnvironmentLightingControl;
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);

@@ -596,7 +596,7 @@ namespace gglab
 
 	void AssetPublicationLabSession::StopScenario() noexcept
 	{
-		if (m_Services.m_RenderHost)
+		if (m_Services.m_RenderServices.m_AssetUpload)
 		{
 			AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 			scheduler->ClearResourcePublicationFault();

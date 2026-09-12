@@ -194,8 +194,8 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnEnter() noexcept
 	{
-		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
-		auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl();
+		auto* profilingView = m_Services.m_GpuProfiling;
+		auto* profilingControl = m_Services.m_GpuProfilingControl;
 		if (profilingView && profilingControl)
 		{
 			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
@@ -206,7 +206,7 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnExit() noexcept
 	{
-		if (auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl())
+		if (auto* profilingControl = m_Services.m_GpuProfilingControl)
 		{
 			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
@@ -431,7 +431,7 @@ namespace gglab
 
 	void ForwardPlusLabSession::CaptureGpuTimings() noexcept
 	{
-		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
+		auto* profilingView = m_Services.m_GpuProfiling;
 		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;
@@ -481,9 +481,7 @@ namespace gglab
 
 	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-	const auto* rhiContext = m_Services.m_RenderHost
-		? m_Services.m_RenderServices.m_Presentation->GetRHIContext()
-		: nullptr;
+	const auto* rhiContext = m_Services.m_RHIContext;
 	m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
 	}
 
@@ -545,7 +543,7 @@ namespace gglab
 		const bool hdrDiffRequested =
 			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
 			forwardPlus.m_EnableHdrDiffValidation;
-		const RHIDevice* device = m_Services.m_RenderHost
+		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
 		? m_Services.m_RenderServices.m_Presentation->GetDevice()
 		: nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =

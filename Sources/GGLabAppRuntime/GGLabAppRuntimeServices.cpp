@@ -178,13 +178,18 @@ namespace gglab
 				});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
-		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost.get());
+		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
 				{
-					.m_RenderHost = m_RenderHost.get(),
 					.m_RenderServices = m_RenderServices,
+					.m_EnvironmentLighting = m_RenderHost->GetEnvironmentLightingView(),
+					.m_EnvironmentLightingControl = m_RenderHost->GetEnvironmentLightingControl(),
+					.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
+					.m_GpuProfiling = m_RenderHost->GetGpuProfilingView(),
+					.m_GpuProfilingControl = m_RenderHost->GetGpuProfilingControl(),
+					.m_RHIContext = m_RenderHost->GetRHIContext(),
 					.m_AssetManager = m_AssetManager.get(),
 					.m_ShaderManager = m_ShaderManager.get(),
 					.m_TaskSystem = m_TaskSystem.get(),

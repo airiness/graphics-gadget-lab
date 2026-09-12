@@ -1756,7 +1756,6 @@ namespace gglab
 
 			const LabSessionCreateInfo createInfo{
 				.m_Services = {
-					.m_RenderHost = &renderer,
 					.m_AssetManager = &assetManager,
 					.m_ShaderManager = &shaderManager,
 					.m_TaskSystem = &taskSystem,

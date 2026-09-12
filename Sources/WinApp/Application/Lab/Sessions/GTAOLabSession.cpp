@@ -461,7 +461,7 @@ namespace gglab
 
 	void GTAOLabSession::RequestSelectedPreview() noexcept
 	{
-		if (!m_Services.m_RenderHost)
+		if (!m_Services.m_RenderServices.m_Resources)
 		{
 			return;
 		}

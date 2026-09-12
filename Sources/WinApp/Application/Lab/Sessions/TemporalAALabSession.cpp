@@ -152,8 +152,8 @@ namespace gglab
 
 	void TemporalAALabSession::OnEnter() noexcept
 	{
-		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
-		auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl();
+		auto* profilingView = m_Services.m_GpuProfiling;
+		auto* profilingControl = m_Services.m_GpuProfilingControl;
 		if (profilingView && profilingControl)
 		{
 			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
@@ -169,7 +169,7 @@ namespace gglab
 	void TemporalAALabSession::OnExit() noexcept
 	{
 		m_IsEntered = false;
-		if (auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl())
+		if (auto* profilingControl = m_Services.m_GpuProfilingControl)
 		{
 			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
@@ -457,7 +457,7 @@ namespace gglab
 		{
 			return;
 		}
-		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
+		auto* profilingView = m_Services.m_GpuProfiling;
 		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;
@@ -536,9 +536,7 @@ namespace gglab
 
 	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-	const auto* rhiContext = m_Services.m_RenderHost
-		? m_Services.m_RenderServices.m_Presentation->GetRHIContext()
-		: nullptr;
+	const auto* rhiContext = m_Services.m_RHIContext;
 		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
 			rhiContext ? rhiContext->GetFrameSlotCount() : 3u);
 	}
