@@ -999,6 +999,24 @@ foreach ($legacyPath in $legacyRuntimeServiceContractPaths) {
     }
 }
 
+$legacyRuntimeShaderContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/Shader.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/Shader.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderManager.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderManager.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderProgramCatalog.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderProgramCatalog.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeShaderContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated shader manager and program catalog contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeCameraPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Camera.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Camera.cpp"),
@@ -1379,6 +1397,8 @@ $legacyRuntimeServiceContractIncludeRegex =
     'DynamicStructuredBufferAllocator|PersistentStructuredBuffer)\.h|' +
     'Pipeline[\\/](?:PipelinePresets|GTAO|ForwardPlus|ForwardPlusDebugReadback)\.h|' +
     'Shader[\\/]ShaderPipelineSnapshot\.h)[>"]'
+$legacyRuntimeShaderContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/]Shader[\\/](?:ShaderManager|ShaderProgramCatalog)\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1391,6 +1411,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeDiagnosticsContractIncludeRegex -or
         $content -match $legacyRuntimeFrameContractIncludeRegex -or
         $content -match $legacyRuntimeServiceContractIncludeRegex -or
+        $content -match $legacyRuntimeShaderContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"
@@ -2858,9 +2879,9 @@ Get-ChildItem -LiteralPath $shaderToolchainSourcesDir -Recurse -File |
 # Runtime-facing shader demand contracts expose stable Program/Artifact identity
 # only. Build descriptions and compiler policy remain host/toolchain-owned.
 $shaderRuntimeIdentityBoundaryPaths = @(
-    (Join-Path $runtimeSourcesDir "Graphics/Shader/Shader.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderManager.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderProgramCatalog.h"),
+    (Join-Path $runtimeSourcesDir "Private/Graphics/Shader/Shader.h"),
+    (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Shader/ShaderManager.h"),
+    (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"),
     (Join-Path $appRuntimeSourcesDir "RuntimePaths.h"),
     (Join-Path $appRuntimeSourcesDir "ApplicationContentRegistration.h"),

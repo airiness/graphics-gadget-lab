@@ -11,8 +11,8 @@
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <cmath>
 #include <cstdint>

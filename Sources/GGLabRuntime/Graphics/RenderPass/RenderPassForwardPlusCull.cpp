@@ -12,8 +12,8 @@
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
-#include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
 #include <cstdint>

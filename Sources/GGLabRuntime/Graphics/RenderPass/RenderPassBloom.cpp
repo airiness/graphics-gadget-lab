@@ -4,8 +4,8 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/PostProcess/PostProcessResolution.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
 #include <array>

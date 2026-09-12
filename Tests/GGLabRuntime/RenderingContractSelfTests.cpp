@@ -49,7 +49,7 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/SamplerRegistry.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"

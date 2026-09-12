@@ -1,5 +1,5 @@
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"

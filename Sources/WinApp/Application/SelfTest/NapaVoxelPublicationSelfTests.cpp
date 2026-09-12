@@ -13,7 +13,7 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"

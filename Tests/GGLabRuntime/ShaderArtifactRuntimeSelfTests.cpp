@@ -8,7 +8,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 
 #include <array>
 #include <cstddef>

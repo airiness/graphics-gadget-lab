@@ -7,7 +7,7 @@
 #include "Graphics/RHI/DX12/DX12PipelineState.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/DX12RootSignature.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 
 #include <algorithm>
 #include <shared_mutex>

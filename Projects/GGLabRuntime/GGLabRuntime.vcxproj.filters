@@ -64,9 +64,6 @@
     <Filter Include="Graphics\Resource">
       <UniqueIdentifier>{195EF9FA-C795-0182-A83B-11264EFF87CC}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\Shader">
-      <UniqueIdentifier>{8712B320-7C8E-3517-56CD-9D92B05AC57E}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\Utility">
       <UniqueIdentifier>{018A9B5F-6D18-3CE9-09D3-F9E8EA2DD24B}</UniqueIdentifier>
     </Filter>
@@ -144,6 +141,9 @@
     </Filter>
     <Filter Include="Private\Graphics\RHI\Vulkan\Diagnostics">
       <UniqueIdentifier>{6EDE219A-83FA-1C96-CB8E-23AAF722F538}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Shader">
+      <UniqueIdentifier>{BAB6CAA5-9631-6B1D-E840-C78E14BE3A3F}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private\Graphics\Utility">
       <UniqueIdentifier>{848F3FFA-CC8D-D77D-ED6C-23A18600DB81}</UniqueIdentifier>
@@ -461,15 +461,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp">
       <Filter>Graphics\Resource</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.cpp">
-      <Filter>Graphics\Shader</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.cpp">
-      <Filter>Graphics\Shader</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.cpp">
-      <Filter>Graphics\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.cpp">
       <Filter>Graphics</Filter>
@@ -915,6 +906,15 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\SamplerRegistry.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\Shader.cpp">
+      <Filter>Private\Graphics\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\ShaderManager.cpp">
+      <Filter>Private\Graphics\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\ShaderProgramCatalog.cpp">
+      <Filter>Private\Graphics\Shader</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Private\Graphics\Utility</Filter>
     </ClCompile>
@@ -1210,15 +1210,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h">
       <Filter>Graphics\Resource</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\Shader.h">
-      <Filter>Graphics\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderManager.h">
-      <Filter>Graphics\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
-      <Filter>Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h">
       <Filter>Graphics</Filter>
@@ -1579,6 +1570,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\SamplerRegistry.h">
       <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\Shader.h">
+      <Filter>Private\Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.h">
       <Filter>Private\Graphics\Utility</Filter>
@@ -2072,7 +2066,13 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\ScreenSpace</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderManager.h">
+      <Filter>Public\GGLabRuntime\Graphics\Shader</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h">
+      <Filter>Public\GGLabRuntime\Graphics\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h">
       <Filter>Public\GGLabRuntime\Graphics\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h">

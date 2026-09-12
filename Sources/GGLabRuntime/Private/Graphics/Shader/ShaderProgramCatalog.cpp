@@ -1,4 +1,4 @@
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 
 #include <array>
 

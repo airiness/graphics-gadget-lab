@@ -19,7 +19,7 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"

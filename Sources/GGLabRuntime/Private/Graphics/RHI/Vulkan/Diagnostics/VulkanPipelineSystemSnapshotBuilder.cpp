@@ -4,7 +4,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineState.h"
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 
 #include <algorithm>
 #include <string>

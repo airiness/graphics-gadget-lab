@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 
 #include <algorithm>
 #include <mutex>
