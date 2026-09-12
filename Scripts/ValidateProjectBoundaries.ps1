@@ -3183,6 +3183,13 @@ if (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf) {
             Reason = "the Public pass service bundle must not expose the concrete renderer"
         })
     }
+    if ($renderServicesContent -cmatch '\b(?:AssetManager|ShaderManager)\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-render-services-boundary"
+            Target = ConvertTo-RepoRelativePath $renderServicesHeaderPath
+            Reason = "the Public pass service bundle must not expose the concrete asset or shader service owners"
+        })
+    }
 }
 
 $napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'

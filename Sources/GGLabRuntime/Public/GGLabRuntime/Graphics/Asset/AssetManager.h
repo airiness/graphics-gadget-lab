@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderTextureAssetAccess.h"
 #include "GGLabRuntime/Graphics/TransferBatch.h"
 #include "GGLabRuntime/Graphics/VertexData.h"
 
@@ -70,7 +71,7 @@ namespace gglab
 	class AssetManager;
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept;
 
-	class AssetManager
+	class AssetManager : public RenderTextureAssetAccess
 	{
 	public:
 		using MaterialTextureSamplingSettings = ModelImportSettings;
@@ -155,20 +156,21 @@ namespace gglab
 		void Tick() noexcept;
 		void MarkModelUsed(ModelID modelId) noexcept;
 		void MarkMeshUsed(MeshID meshId) noexcept;
-		void MarkTextureUsed(TextureID textureId) noexcept;
+		void MarkTextureUsed(TextureID textureId) noexcept override;
 		[[nodiscard]] bool SetModelResidencyPolicy(
 			ModelID modelId, AssetResidencyPolicy policy) noexcept;
 		[[nodiscard]] bool SetMeshResidencyPolicy(
 			MeshID meshId, AssetResidencyPolicy policy) noexcept;
 		[[nodiscard]] bool SetTextureResidencyPolicy(
 			TextureID textureId, AssetResidencyPolicy policy) noexcept;
-		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId) const noexcept;
+		[[nodiscard]] TextureContentRef GetTextureContentRef(TextureID textureId)
+			const noexcept override;
 		[[nodiscard]] std::optional<AssetContentFingerprint> GetTextureContentFingerprint(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<AssetState> GetTextureState(
 			TextureContentRef content) const noexcept;
 		[[nodiscard]] std::optional<ResidentTextureResource> GetResidentTextureResource(
-			TextureContentRef content) const noexcept;
+			TextureContentRef content) const noexcept override;
 		[[nodiscard]] TextureArtifactCacheStatistics GetTextureArtifactCacheStatistics()
 			const noexcept;
 		void ClearTextureArtifactCache() noexcept;
@@ -193,7 +195,7 @@ namespace gglab
 		ModelID AddProceduralModel(std::unique_ptr<Model>&& model) noexcept;
 
 		uint32_t ResolveSrvIndex(
-			TextureID textureId, ReservedTextureIDIndex fallback) const noexcept;
+			TextureID textureId, ReservedTextureIDIndex fallback) const noexcept override;
 
 	private:
 		[[nodiscard]] Mesh* EditMesh(MeshID meshId) noexcept;

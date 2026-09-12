@@ -483,7 +483,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 				{
 					const PreviewTextureFixture fixture = static_cast<PreviewTextureFixture>(
 						m_State->m_TextureFixture.load(std::memory_order_relaxed));
-					parameters.TextureIndex = services.m_AssetManager->ResolveSrvIndex(
+					parameters.TextureIndex = services.m_TextureAssets->ResolveSrvIndex(
 						ResolvePreviewTextureId(fixture), ReservedTextureIDIndex::BaseColorWhite);
 					parameters.SamplerIndex = services.m_Samplers->GetSamplerIndex(
 						SamplerPreset::LinearWrap);
@@ -599,7 +599,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 				m_State->m_PassExecutions.fetch_add(1, std::memory_order_relaxed);
 				m_State->m_LastDrawCount.store(drawCount, std::memory_order_relaxed);
 				m_State->m_ExecutedProgramGeneration.store(
-					services.m_ShaderManager->GetGeneration(m_PixelShader),
+					services.m_ShaderPrograms->GetGeneration(m_PixelShader),
 					std::memory_order_relaxed);
 			}
 

@@ -54,7 +54,7 @@ namespace gglab
 	{
 		GGLAB_UNUSED(context);
 
-		auto* assetManager = services.m_AssetManager;
+		auto* assetManager = services.m_TextureAssets;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 
 		auto* renderResRegistry = services.m_Resources;

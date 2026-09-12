@@ -14,6 +14,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
+#include "GGLabRuntime/Graphics/RenderTextureAssetAccess.h"
 #include "GGLabRuntime/Graphics/Resource/RenderTextureIndex.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
@@ -22,14 +23,13 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace gglab
 {
-	class AssetManager;
 	class DynamicConstantBufferAllocator;
 	class RenderPipelineOverlayExtensionBase;
-	class ShaderManager;
 	class RHIDevice;
 	class RHISwapChain;
 	template <typename T>
@@ -67,6 +67,7 @@ namespace gglab
 		virtual ~RenderShaderProgramAccess() = default;
 
 		virtual ShaderID LoadProgram(const ShaderProgramRef& programRef) noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetGeneration(ShaderID shaderId) const noexcept = 0;
 	};
 
 	class RenderSamplerAccess
@@ -235,31 +236,27 @@ namespace gglab
 	};
 
 	// Explicit services borrowed for one frame or pipeline invocation. The
-	// interface fields are stable for the renderer lifetime; the transitional
-	// concrete fields remain until F5b migrates the content and diagnostics
-	// callers.
+	// interface fields are stable for the renderer lifetime.
 	struct RenderServices
 	{
 		RenderPipelineResolver* m_PipelineResolver = nullptr;
 		RenderShaderProgramAccess* m_ShaderPrograms = nullptr;
 		RenderSamplerAccess* m_Samplers = nullptr;
 		RenderResourceRegistryAccess* m_Resources = nullptr;
+		RenderTextureAssetAccess* m_TextureAssets = nullptr;
 		RenderFrameBufferAccess* m_FrameBuffers = nullptr;
 		RenderEnvironmentAccess* m_Environment = nullptr;
 		RenderPresentationAccess* m_Presentation = nullptr;
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
 		AssetUploadControl* m_AssetUpload = nullptr;
-
-		AssetManager* m_AssetManager = nullptr;
-		ShaderManager* m_ShaderManager = nullptr;
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_PipelineResolver && m_ShaderPrograms && m_Samplers && m_Resources &&
 				m_FrameBuffers && m_Environment && m_Presentation && m_BindingLayout &&
-				m_Temporal && m_AssetUpload && m_AssetManager && m_ShaderManager;
+				m_Temporal && m_AssetUpload;
 		}
 	};
 }

@@ -55,7 +55,7 @@ namespace gglab
 			return;
 		}
 
-		auto* assetManager = services.m_AssetManager;
+		auto* assetManager = services.m_TextureAssets;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
 		GGLAB_ASSERT_NOT_NULL(services.m_Environment);
 		const EnvironmentLightingSettings& environmentSettings =

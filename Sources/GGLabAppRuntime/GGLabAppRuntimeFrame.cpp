@@ -156,8 +156,7 @@ namespace gglab
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
-		services.m_AssetManager = m_AssetManager.get();
-		services.m_ShaderManager = m_ShaderManager.get();
+		services.m_TextureAssets = m_AssetManager.get();
 		services.m_OverlayExtension = toolingFrame.GetOverlayExtension();
 		// The RAII frame handle may retire RenderGraph resources from its abort
 		// path. Keep the graph alive until after the frame has ended.

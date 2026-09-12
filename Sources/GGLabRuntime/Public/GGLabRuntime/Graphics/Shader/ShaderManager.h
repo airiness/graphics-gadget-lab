@@ -130,7 +130,7 @@ namespace gglab
 		ShaderBytecode GetBytecode(ShaderID shaderId) const noexcept;
 		ShaderHash128 GetHash(ShaderID shaderId) const noexcept;
 		std::string GetDebugName(ShaderID shaderId) const noexcept;
-		uint64_t GetGeneration(ShaderID shaderId) const noexcept;
+		uint64_t GetGeneration(ShaderID shaderId) const noexcept override;
 		void CapturePipelineSnapshots(std::span<const ShaderID> shaderIds,
 			std::span<ShaderPipelineSnapshot> outSnapshots) const noexcept;
 
