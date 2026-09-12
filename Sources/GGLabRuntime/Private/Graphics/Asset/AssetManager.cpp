@@ -163,19 +163,19 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_IsPreparedForShutdown,
 			"AssetManager destroyed without explicit shutdown preparation.");
 		GGLAB_ASSERT_MSG(
-			!m_State->m_AssetInterestTracker.HasLeases() && !m_State->m_AssetInterestTracker.HasInterests(),
+			!m_State->m_AssetResidencyCoordinator.HasLeases() && !m_State->m_AssetResidencyCoordinator.HasInterests(),
 			"AssetManager destroyed while asset leases are still active.");
-		GGLAB_ASSERT_MSG(m_ModelDependencyOwners.empty() && m_ModelDependencyLeaseTokens.empty(),
+		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasModelDependencyOwnership(),
 			"AssetManager destroyed while model dependency ownership is still active.");
-		GGLAB_ASSERT_MSG(!m_State->m_AssetInterestTracker.HasOwners(),
+		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasOwners(),
 			"AssetManager destroyed while asset owner scopes are still registered.");
-		GGLAB_ASSERT_MSG(!m_State->m_AssetInterestTracker.HasPublicationRetains(),
+		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasPublicationRetains(),
 			"AssetManager destroyed while publication retains are still active.");
 		GGLAB_ASSERT_MSG(m_PublicationOrphanedMeshes.empty(),
 			"AssetManager destroyed while publication mesh rollback is pending GPU completion.");
-		GGLAB_ASSERT_MSG(m_PendingRuntimeRetirements.empty(),
+		GGLAB_ASSERT_MSG(m_State->m_AssetResidencyCoordinator.PendingRetirements().empty(),
 			"AssetManager destroyed while runtime entry retirements are pending.");
-		GGLAB_ASSERT_MSG(m_PendingResidencyEvictions.empty(),
+		GGLAB_ASSERT_MSG(m_State->m_AssetResidencyCoordinator.PendingEvictions().empty(),
 			"AssetManager destroyed while residency eviction commands are pending.");
 		GGLAB_ASSERT_MSG(!m_State->m_AssetLoadCoordinator.HasActiveOperations() &&
 			!m_State->m_AssetLoadCoordinator.HasPendingCompletions(),
@@ -354,7 +354,7 @@ namespace gglab
 	AssetOwnershipStatistics AssetManager::GetOwnershipStatistics() const
 	{
 		const AssetInterestTrackerStatistics trackerStatistics =
-			m_State->m_AssetInterestTracker.GetStatistics();
+			m_State->m_AssetResidencyCoordinator.GetInterestStatistics();
 		AssetOwnershipStatistics statistics{};
 		statistics.m_OwnerCount = trackerStatistics.m_OwnerCount;
 		statistics.m_LeaseCount = trackerStatistics.m_LeaseCount;
@@ -367,7 +367,7 @@ namespace gglab
 		statistics.m_RuntimeRetirementCancellationCount = m_RuntimeRetirementCancellationCount;
 		statistics.m_RuntimeRetirementCount = m_RuntimeRetirementCount;
 		statistics.m_PendingRuntimeRetirementCount =
-			static_cast<uint32_t>(m_PendingRuntimeRetirements.size());
+			static_cast<uint32_t>(m_State->m_AssetResidencyCoordinator.PendingRetirements().size());
 		statistics.m_PublicationRetainCount = trackerStatistics.m_PublicationRetainCount;
 		statistics.m_PublicationProtectedCancellationCount =
 			m_PublicationProtectedCancellationCount;
@@ -461,12 +461,12 @@ namespace gglab
 						*operationLifecycle, *event.m_Operation);
 				if (!currentOperation)
 				{
-					m_State->m_AssetResidencyController.RecordStaleStateEvent();
+					m_State->m_AssetResidencyCoordinator.Controller().RecordStaleStateEvent();
 					continue;
 				}
 			}
 
-			m_State->m_AssetDependencyGraph.ApplyStatus(event.m_Status, changes);
+			m_State->m_AssetResidencyCoordinator.ApplyStatus(event.m_Status, changes);
 			for (const AssetDependencyChange& change : changes)
 			{
 				if (change.m_Model.m_Key.m_Kind != AssetKind::Model)
@@ -505,7 +505,7 @@ namespace gglab
 							*operationLifecycle, *event.m_Operation);
 					}
 				}
-				m_State->m_AssetResidencyController.RecordAcceptedStateEvent(completesOperation);
+				m_State->m_AssetResidencyCoordinator.Controller().RecordAcceptedStateEvent(completesOperation);
 			}
 		}
 	}
@@ -518,9 +518,9 @@ namespace gglab
 		}
 		m_AcceptingCommands = false;
 
-		AssetResidencyConfig shutdownConfig = m_State->m_AssetResidencyController.GetConfig();
+		AssetResidencyConfig shutdownConfig = m_State->m_AssetResidencyCoordinator.Controller().GetConfig();
 		shutdownConfig.m_EnableAutomaticEviction = false;
-		m_State->m_AssetResidencyController.SetConfig(shutdownConfig);
+		m_State->m_AssetResidencyCoordinator.Controller().SetConfig(shutdownConfig);
 	}
 
 	void AssetManager::PrepareForShutdown(const RHIFencePoint& lastSubmittedFence) noexcept
@@ -535,9 +535,9 @@ namespace gglab
 		// them before classifying pending evictions as current or stale.
 		DrainStateEvents();
 
-		const size_t pendingEvictionCount = m_PendingResidencyEvictions.size();
+		const size_t pendingEvictionCount = m_State->m_AssetResidencyCoordinator.PendingEvictions().size();
 		uint32_t cancelledCurrentEvictionCount = 0;
-		for (const PendingResidencyEviction& eviction : m_PendingResidencyEvictions)
+		for (const AssetResidencyCoordinator::PendingEviction& eviction : m_State->m_AssetResidencyCoordinator.PendingEvictions())
 		{
 			const AssetResidencyOperation operation = eviction.m_Operation;
 			const AssetContentVersion contentVersion = operation.m_Token.m_ContentVersion;
@@ -551,8 +551,8 @@ namespace gglab
 				AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
 			if (!currentOperation)
 			{
-				m_State->m_AssetResidencyController.RecordStaleCompletion();
-				m_State->m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
+				m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
+				m_State->m_AssetResidencyCoordinator.Controller().RecordEviction(true, eviction.m_ResidentBytes);
 				continue;
 			}
 
@@ -588,28 +588,20 @@ namespace gglab
 				}
 			}
 			++cancelledCurrentEvictionCount;
-			m_State->m_AssetResidencyController.RecordEviction(true, eviction.m_ResidentBytes);
+			m_State->m_AssetResidencyCoordinator.Controller().RecordEviction(true, eviction.m_ResidentBytes);
 		}
-		m_PendingResidencyEvictions.clear();
+		m_State->m_AssetResidencyCoordinator.PendingEvictions().clear();
 
 		// Runtime retention is bypassed during terminal shutdown, so explicitly
 		// perform the model-retirement teardown before discarding pending requests.
 		std::unordered_set<ModelID> dependencyModels;
-		dependencyModels.reserve(
-			m_ModelDependencyOwners.size() + m_ModelDependencyLeaseTokens.size());
-		for (const ModelID modelId : m_ModelDependencyOwners | std::views::keys)
-		{
-			dependencyModels.insert(modelId);
-		}
-		for (const ModelID modelId : m_ModelDependencyLeaseTokens | std::views::keys)
-		{
-			dependencyModels.insert(modelId);
-		}
+		m_State->m_AssetResidencyCoordinator.ForEachTrackedModel(
+			[&dependencyModels](ModelID modelId) noexcept { dependencyModels.insert(modelId); });
 		for (const ModelID modelId : dependencyModels)
 		{
 			ReleaseModelDependencyInterests(modelId);
 		}
-		m_PendingRuntimeRetirements.clear();
+		m_State->m_AssetResidencyCoordinator.PendingRetirements().clear();
 
 		// Completion events retire the operation serial only after their restored
 		// state has passed the same stale-token validation as normal frame events.
@@ -622,13 +614,13 @@ namespace gglab
 				pendingEvictionCount, cancelledCurrentEvictionCount,
 				pendingEvictionCount - cancelledCurrentEvictionCount);
 		}
-		GGLAB_ASSERT(m_PendingResidencyEvictions.empty());
-		GGLAB_ASSERT_MSG(!m_State->m_AssetInterestTracker.HasOwners() &&
-			!m_State->m_AssetInterestTracker.HasLeases() &&
-			!m_State->m_AssetInterestTracker.HasInterests() &&
-			!m_State->m_AssetInterestTracker.HasPublicationRetains(),
+		GGLAB_ASSERT(m_State->m_AssetResidencyCoordinator.PendingEvictions().empty());
+		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasOwners() &&
+			!m_State->m_AssetResidencyCoordinator.HasLeases() &&
+			!m_State->m_AssetResidencyCoordinator.HasInterests() &&
+			!m_State->m_AssetResidencyCoordinator.HasPublicationRetains(),
 			"AssetManager shutdown requires all external asset ownership to be released.");
-		GGLAB_ASSERT_MSG(m_ModelDependencyOwners.empty() && m_ModelDependencyLeaseTokens.empty(),
+		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasModelDependencyOwnership(),
 			"AssetManager shutdown requires model dependency ownership to be released.");
 		GGLAB_ASSERT_MSG(!m_State->m_AssetLoadCoordinator.HasActiveOperations() &&
 			!m_State->m_AssetLoadCoordinator.HasPendingCompletions(),
@@ -655,18 +647,18 @@ namespace gglab
 
 	void AssetManager::SetResidencyConfig(const AssetResidencyConfig& config) noexcept
 	{
-		m_State->m_AssetResidencyController.SetConfig(config);
+		m_State->m_AssetResidencyCoordinator.Controller().SetConfig(config);
 	}
 
 	const AssetResidencyConfig& AssetManager::GetResidencyConfig() const noexcept
 	{
-		return m_State->m_AssetResidencyController.GetConfig();
+		return m_State->m_AssetResidencyCoordinator.Controller().GetConfig();
 	}
 
 	AssetResidencyStatistics AssetManager::GetResidencyStatistics() const noexcept
 	{
 		uint64_t pendingEvictionBytes = 0;
-		for (const PendingResidencyEviction& eviction : m_PendingResidencyEvictions)
+		for (const AssetResidencyCoordinator::PendingEviction& eviction : m_State->m_AssetResidencyCoordinator.PendingEvictions())
 		{
 			pendingEvictionBytes += eviction.m_ResidentBytes;
 		}
@@ -677,19 +669,19 @@ namespace gglab
 			reloadingAssetCount += mesh->m_IsReloading ? 1u : 0u;
 		}
 		reloadingAssetCount += m_State->m_TextureAssets->GetReloadingTextureCount();
-		return m_State->m_AssetResidencyController.GetStatistics(m_LogicalResidentBytes,
-			pendingEvictionBytes, static_cast<uint32_t>(m_PendingResidencyEvictions.size()),
+		return m_State->m_AssetResidencyCoordinator.Controller().GetStatistics(m_State->m_AssetResidencyCoordinator.GetLogicalResidentBytes(),
+			pendingEvictionBytes, static_cast<uint32_t>(m_State->m_AssetResidencyCoordinator.PendingEvictions().size()),
 			reloadingAssetCount);
 	}
 
 	AssetOwnerId AssetManager::RegisterAssetOwner() noexcept
 	{
-		return m_State->m_AssetInterestTracker.RegisterOwner();
+		return m_State->m_AssetResidencyCoordinator.RegisterOwner();
 	}
 
 	void AssetManager::UnregisterAssetOwner(AssetOwnerId owner) noexcept
 	{
-		m_State->m_AssetInterestTracker.UnregisterOwner(owner);
+		m_State->m_AssetResidencyCoordinator.UnregisterOwner(owner);
 	}
 
 	AssetLease AssetManager::AcquireAssetLease(AssetOwnerId owner, AssetKind kind,
@@ -699,7 +691,7 @@ namespace gglab
 		{
 			return {};
 		}
-		const AssetLeaseAcquireResult result = m_State->m_AssetInterestTracker.AcquireLease(
+		const AssetLeaseAcquireResult result = m_State->m_AssetResidencyCoordinator.AcquireLease(
 			owner, MakeAssetContentVersion(kind, stableId, generation), priority);
 		if (!result.IsValid())
 		{
@@ -728,7 +720,7 @@ namespace gglab
 	AssetPublicationRetain AssetManager::AcquirePublicationRetain(
 		AssetKind kind, uint64_t stableId, uint64_t generation) noexcept
 	{
-		if (!IsInterestAssetKind(kind) || !m_State->m_AssetInterestTracker.AcquirePublicationRetain(
+		if (!IsInterestAssetKind(kind) || !m_State->m_AssetResidencyCoordinator.AcquirePublicationRetain(
 			MakeAssetContentVersion(kind, stableId, generation)))
 		{
 			return {};
@@ -745,7 +737,7 @@ namespace gglab
 	void AssetManager::ReleasePublicationRetain(
 		AssetKind kind, uint64_t stableId, uint64_t generation) noexcept
 	{
-		m_State->m_AssetInterestTracker.ReleasePublicationRetain(
+		m_State->m_AssetResidencyCoordinator.ReleasePublicationRetain(
 			MakeAssetContentVersion(kind, stableId, generation));
 		const AssetKey key{
 			.m_Kind = kind,
@@ -759,14 +751,14 @@ namespace gglab
 
 	bool AssetManager::HasPublicationRetain(AssetKey key, uint64_t generation) const noexcept
 	{
-		return m_State->m_AssetInterestTracker.HasPublicationRetain(
+		return m_State->m_AssetResidencyCoordinator.HasPublicationRetain(
 			MakeAssetContentVersion(key, generation));
 	}
 
 	void AssetManager::ReleaseAssetLease(uint64_t leaseToken) noexcept
 	{
 		const std::optional<AssetInterestChange> change =
-			m_State->m_AssetInterestTracker.ReleaseLease(leaseToken);
+			m_State->m_AssetResidencyCoordinator.ReleaseLease(leaseToken);
 		if (!change)
 		{
 			return;
@@ -801,7 +793,7 @@ namespace gglab
 	void AssetManager::UpdateAssetLeasePriority(uint64_t leaseToken, TaskPriority priority) noexcept
 	{
 		const std::optional<AssetInterestChange> change =
-			m_State->m_AssetInterestTracker.UpdateLeasePriority(leaseToken, priority);
+			m_State->m_AssetResidencyCoordinator.UpdateLeasePriority(leaseToken, priority);
 		if (change)
 		{
 			HandleInterestChange(*change);
@@ -861,33 +853,30 @@ namespace gglab
 	TaskPriority AssetManager::GetEffectivePriority(
 		AssetKey key, TaskPriority fallback) const noexcept
 	{
-		return m_State->m_AssetInterestTracker.GetEffectivePriority(key, fallback);
+		return m_State->m_AssetResidencyCoordinator.GetEffectivePriority(key, fallback);
 	}
 
 	bool AssetManager::HasActiveInterest(AssetKey key) const noexcept
 	{
-		return m_State->m_AssetInterestTracker.HasActiveInterest(key);
+		return m_State->m_AssetResidencyCoordinator.HasActiveInterest(key);
 	}
 
 	bool AssetManager::HasResidencyProtectingInterest(AssetKey key) const noexcept
 	{
 		// Model dependency leases retain runtime entries until their parent model is
 		// retired. Ignore owners of inactive cached models for GPU residency policy.
-		return m_State->m_AssetInterestTracker.HasActiveInterestMatchingOwner(key,
+		return m_State->m_AssetResidencyCoordinator.HasActiveInterestMatchingOwner(key,
 			[this](AssetOwnerId owner) noexcept
 			{
-				for (const auto& [modelId, dependencyOwner] : m_ModelDependencyOwners)
-				{
-					if (dependencyOwner == owner)
+				return m_State->m_AssetResidencyCoordinator.IsDependencyOwnerProtecting(owner,
+					[this](ModelID modelId) noexcept
 					{
 						const Model* model = GetModel(modelId);
 						return model && (HasActiveInterest(MakeAssetKey(modelId)) ||
 							HasPublicationRetain(
 								MakeAssetKey(modelId), model->m_ContentGeneration) ||
 							model->m_ResidencyPolicy == AssetResidencyPolicy::Pinned);
-					}
-				}
-				return true;
+					});
 			});
 	}
 
@@ -895,7 +884,7 @@ namespace gglab
 		AssetKind kind, uint64_t stableId, uint64_t generation) const noexcept
 	{
 		const std::span<const AssetContentVersion> dependents =
-			m_State->m_AssetDependencyGraph.FindDependents(
+			m_State->m_AssetResidencyCoordinator.FindDependents(
 				MakeAssetContentVersion(kind, stableId, generation));
 		return std::ranges::any_of(dependents,
 			[this](AssetContentVersion dependent) noexcept
@@ -915,7 +904,8 @@ namespace gglab
 		ModelID modelId, uint64_t generation) noexcept
 	{
 		const AssetKey modelKey = MakeAssetKey(modelId);
-		if (!HasActiveInterest(modelKey) || m_ModelDependencyLeaseTokens.contains(modelId))
+		if (!HasActiveInterest(modelKey) ||
+			m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(modelId))
 		{
 			return;
 		}
@@ -926,8 +916,7 @@ namespace gglab
 		}
 
 		const AssetOwnerId owner = RegisterAssetOwner();
-		m_ModelDependencyOwners.emplace(modelId, owner);
-		auto& tokens = m_ModelDependencyLeaseTokens[modelId];
+		m_State->m_AssetResidencyCoordinator.SetModelDependencyOwner(modelId, owner);
 		const TaskPriority priority = GetEffectivePriority(modelKey);
 		std::unordered_set<MeshID> meshIds;
 		std::unordered_set<TextureID> textureIds;
@@ -946,13 +935,14 @@ namespace gglab
 			}
 		}
 
-		const auto retainLeaseToken = [&tokens](AssetLease&& lease) noexcept
+		const auto retainLeaseToken = [this, modelId](AssetLease&& lease) noexcept
 			{
 				if (!lease.IsValid())
 				{
 					return;
 				}
-				tokens.push_back(lease.m_LeaseToken);
+				m_State->m_AssetResidencyCoordinator.RecordModelDependencyLease(
+					modelId, lease.m_LeaseToken);
 				lease.m_Manager = nullptr;
 				lease.m_LeaseToken = 0;
 			};
@@ -976,36 +966,27 @@ namespace gglab
 
 	void AssetManager::ReleaseModelDependencyInterests(ModelID modelId) noexcept
 	{
-		if (auto leases = m_ModelDependencyLeaseTokens.find(modelId);
-			leases != m_ModelDependencyLeaseTokens.end())
+		const std::vector<uint64_t> tokens =
+			m_State->m_AssetResidencyCoordinator.TakeModelDependencyLeases(modelId);
+		for (uint64_t token : tokens)
 		{
-			std::vector<uint64_t> tokens = std::move(leases->second);
-			m_ModelDependencyLeaseTokens.erase(leases);
-			for (uint64_t token : tokens)
-			{
-				ReleaseAssetLease(token);
-			}
+			ReleaseAssetLease(token);
 		}
-		if (const auto owner = m_ModelDependencyOwners.find(modelId);
-			owner != m_ModelDependencyOwners.end())
+		if (const std::optional<AssetOwnerId> owner =
+			m_State->m_AssetResidencyCoordinator.TakeModelDependencyOwner(modelId))
 		{
-			UnregisterAssetOwner(owner->second);
-			m_ModelDependencyOwners.erase(owner);
+			UnregisterAssetOwner(*owner);
 		}
 	}
 
 	void AssetManager::UpdateModelDependencyPriorities(
 		ModelID modelId, TaskPriority priority) noexcept
 	{
-		const auto leases = m_ModelDependencyLeaseTokens.find(modelId);
-		if (leases == m_ModelDependencyLeaseTokens.end())
-		{
-			return;
-		}
-		for (uint64_t token : leases->second)
-		{
-			UpdateAssetLeasePriority(token, priority);
-		}
+		m_State->m_AssetResidencyCoordinator.ForEachModelDependencyLease(modelId,
+			[this, priority](uint64_t leaseToken) noexcept
+			{
+				UpdateAssetLeasePriority(leaseToken, priority);
+			});
 	}
 
 	void AssetManager::QueueRuntimeRetirement(AssetContentVersion contentVersion) noexcept
@@ -1027,23 +1008,23 @@ namespace gglab
 			return;
 		}
 
-		const auto pending = std::ranges::find(m_PendingRuntimeRetirements, contentVersion,
-			&PendingRuntimeRetirement::m_ContentVersion);
-		if (pending != m_PendingRuntimeRetirements.end())
+		const auto pending = std::ranges::find(m_State->m_AssetResidencyCoordinator.PendingRetirements(), contentVersion,
+			&AssetResidencyCoordinator::PendingRetirement::m_ContentVersion);
+		if (pending != m_State->m_AssetResidencyCoordinator.PendingRetirements().end())
 		{
 			return;
 		}
-		m_PendingRuntimeRetirements.push_back({
+		m_State->m_AssetResidencyCoordinator.PendingRetirements().push_back({
 			.m_ContentVersion = contentVersion,
-			.m_QueuedFrame = m_AssetUsageFrame,
+			.m_QueuedFrame = m_State->m_AssetResidencyCoordinator.GetUsageFrame(),
 			});
 		++m_RuntimeRetirementRequestCount;
 	}
 
 	void AssetManager::CancelRuntimeRetirement(AssetContentVersion contentVersion) noexcept
 	{
-		const size_t removed = std::erase_if(m_PendingRuntimeRetirements,
-			[contentVersion](const PendingRuntimeRetirement& pending) noexcept
+		const size_t removed = std::erase_if(m_State->m_AssetResidencyCoordinator.PendingRetirements(),
+			[contentVersion](const AssetResidencyCoordinator::PendingRetirement& pending) noexcept
 			{ return pending.m_ContentVersion == contentVersion; });
 		m_RuntimeRetirementCancellationCount += removed;
 	}
@@ -1131,7 +1112,7 @@ namespace gglab
 
 	void AssetManager::FinalizeRuntimeRetirements() noexcept
 	{
-		const AssetResidencyConfig& config = m_State->m_AssetResidencyController.GetConfig();
+		const AssetResidencyConfig& config = m_State->m_AssetResidencyCoordinator.Controller().GetConfig();
 		if (config.m_MaxRuntimeRetirementsPerFrame == 0)
 		{
 			return;
@@ -1162,8 +1143,8 @@ namespace gglab
 			}
 		}
 
-		std::ranges::stable_sort(m_PendingRuntimeRetirements,
-			[](const PendingRuntimeRetirement& lhs, const PendingRuntimeRetirement& rhs) noexcept
+		std::ranges::stable_sort(m_State->m_AssetResidencyCoordinator.PendingRetirements(),
+			[](const AssetResidencyCoordinator::PendingRetirement& lhs, const AssetResidencyCoordinator::PendingRetirement& rhs) noexcept
 			{
 				const auto priority = [](AssetKind kind) noexcept
 					{
@@ -1177,22 +1158,22 @@ namespace gglab
 		uint32_t retiredModelCount = 0;
 		uint32_t retiredMeshCount = 0;
 		uint32_t retiredTextureCount = 0;
-		for (size_t pendingIndex = 0; pendingIndex < m_PendingRuntimeRetirements.size() &&
+		for (size_t pendingIndex = 0; pendingIndex < m_State->m_AssetResidencyCoordinator.PendingRetirements().size() &&
 			retiredCount < config.m_MaxRuntimeRetirementsPerFrame;)
 		{
-			const PendingRuntimeRetirement pending = m_PendingRuntimeRetirements[pendingIndex];
+			const AssetResidencyCoordinator::PendingRetirement pending = m_State->m_AssetResidencyCoordinator.PendingRetirements()[pendingIndex];
 			const AssetContentVersion contentVersion = pending.m_ContentVersion;
 			const AssetKey key = contentVersion.m_Key;
 			if (HasActiveInterest(key) ||
 				HasPublicationRetain(key, contentVersion.m_ContentGeneration))
 			{
 				++m_RuntimeRetirementCancellationCount;
-				m_PendingRuntimeRetirements.erase(
-					m_PendingRuntimeRetirements.begin() + pendingIndex);
+				m_State->m_AssetResidencyCoordinator.PendingRetirements().erase(
+					m_State->m_AssetResidencyCoordinator.PendingRetirements().begin() + pendingIndex);
 				continue;
 			}
-			if (m_AssetUsageFrame < pending.m_QueuedFrame ||
-				m_AssetUsageFrame - pending.m_QueuedFrame < config.m_RuntimeEntryRetentionFrames)
+			if (m_State->m_AssetResidencyCoordinator.GetUsageFrame() < pending.m_QueuedFrame ||
+				m_State->m_AssetResidencyCoordinator.GetUsageFrame() - pending.m_QueuedFrame < config.m_RuntimeEntryRetentionFrames)
 			{
 				++pendingIndex;
 				continue;
@@ -1214,8 +1195,8 @@ namespace gglab
 			}
 			if (!lifecycle || lifecycle->m_ContentGeneration != contentVersion.m_ContentGeneration)
 			{
-				m_PendingRuntimeRetirements.erase(
-					m_PendingRuntimeRetirements.begin() + pendingIndex);
+				m_State->m_AssetResidencyCoordinator.PendingRetirements().erase(
+					m_State->m_AssetResidencyCoordinator.PendingRetirements().begin() + pendingIndex);
 				continue;
 			}
 			if (lifecycle->m_ResidencyPolicy == AssetResidencyPolicy::Pinned ||
@@ -1240,14 +1221,14 @@ namespace gglab
 			retiredMeshCount += key.m_Kind == AssetKind::Mesh ? 1u : 0u;
 			retiredTextureCount += key.m_Kind == AssetKind::Texture ? 1u : 0u;
 			++m_RuntimeRetirementCount;
-			m_PendingRuntimeRetirements.erase(m_PendingRuntimeRetirements.begin() + pendingIndex);
+			m_State->m_AssetResidencyCoordinator.PendingRetirements().erase(m_State->m_AssetResidencyCoordinator.PendingRetirements().begin() + pendingIndex);
 		}
 		if (retiredCount != 0)
 		{
 			GGLAB_LOG_GRAPHICS_INFO(
 				"Retired unreferenced runtime entries (models={}, meshes={}, textures={}, pending={}).",
 				retiredModelCount, retiredMeshCount, retiredTextureCount,
-				m_PendingRuntimeRetirements.size());
+				m_State->m_AssetResidencyCoordinator.PendingRetirements().size());
 		}
 	}
 
@@ -1319,7 +1300,7 @@ namespace gglab
 			return;
 		}
 		if (model->m_ContentState == AssetContentState::Ready && !model->m_MeshInstance.empty() &&
-			m_State->m_AssetDependencyGraph.FindModel(MakeAssetContentVersion(modelId, generation)))
+			m_State->m_AssetResidencyCoordinator.FindModel(MakeAssetContentVersion(modelId, generation)))
 		{
 			model->m_CancelRequested = false;
 			m_PendingModels.insert(modelId);
@@ -1522,7 +1503,7 @@ namespace gglab
 		// Owner-thread phase 2: apply dependency events from previous work.
 		DrainStateEvents();
 		// Owner-thread phase 3: snapshot, plan, revalidate, and apply residency commands.
-		++m_AssetUsageFrame;
+		m_State->m_AssetResidencyCoordinator.AdvanceUsageFrame();
 		TickResidencyPhase();
 		// Owner-thread phase 4: apply dependency events emitted by residency work.
 		// Events emitted while this batch runs remain deferred to the next tick.
@@ -1530,7 +1511,7 @@ namespace gglab
 		// Owner-thread phase 5: project dependency outcomes onto facade-visible models.
 		std::erase_if(m_PendingModels,
 			[this](ModelID modelId) noexcept { return RefreshModelState(modelId); });
-		m_State->m_AssetResidencyController.EndFrame();
+		m_State->m_AssetResidencyCoordinator.Controller().EndFrame();
 	}
 
 	void AssetManager::TickResidencyPhase() noexcept
@@ -1538,16 +1519,16 @@ namespace gglab
 		FinalizeResidencyEvictions();
 		FinalizeRuntimeRetirements();
 		const AssetResidencyInventorySnapshot inventory = BuildResidencyInventorySnapshot();
-		m_LogicalResidentBytes = inventory.m_LogicalResidentBytes;
-		AssetResidencyPlan plan = m_State->m_AssetResidencyController.BuildPlan(inventory);
-		m_State->m_AssetResidencyController.RecordPlan(plan);
+		m_State->m_AssetResidencyCoordinator.SetLogicalResidentBytes(inventory.m_LogicalResidentBytes);
+		AssetResidencyPlan plan = m_State->m_AssetResidencyCoordinator.Controller().BuildPlan(inventory);
+		m_State->m_AssetResidencyCoordinator.Controller().RecordPlan(plan);
 		ApplyResidencyPlan(plan);
 	}
 
 	AssetResidencyInventorySnapshot AssetManager::BuildResidencyInventorySnapshot() const noexcept
 	{
 		AssetResidencyInventorySnapshot snapshot{
-			.m_Frame = m_AssetUsageFrame,
+			.m_Frame = m_State->m_AssetResidencyCoordinator.GetUsageFrame(),
 		};
 		snapshot.m_Entries.reserve(
 			m_State->m_MeshStore.Entries().size() + m_State->m_TextureAssets->GetTextureCount());
@@ -1657,11 +1638,11 @@ namespace gglab
 
 	void AssetManager::FinalizeResidencyEvictions() noexcept
 	{
-		for (auto iterator = m_PendingResidencyEvictions.begin();
-			iterator != m_PendingResidencyEvictions.end();)
+		for (auto iterator = m_State->m_AssetResidencyCoordinator.PendingEvictions().begin();
+			iterator != m_State->m_AssetResidencyCoordinator.PendingEvictions().end();)
 		{
-			const PendingResidencyEviction eviction = *iterator;
-			if (eviction.m_QuiescedFrame >= m_AssetUsageFrame)
+			const AssetResidencyCoordinator::PendingEviction eviction = *iterator;
+			if (eviction.m_QuiescedFrame >= m_State->m_AssetResidencyCoordinator.GetUsageFrame())
 			{
 				++iterator;
 				continue;
@@ -1684,7 +1665,7 @@ namespace gglab
 				AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
 			if (!currentOperation)
 			{
-				m_State->m_AssetResidencyController.RecordStaleCompletion();
+				m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
 				cancelled = true;
 				finalized = true;
 			}
@@ -1737,8 +1718,8 @@ namespace gglab
 				++iterator;
 				continue;
 			}
-			m_State->m_AssetResidencyController.RecordEviction(cancelled, eviction.m_ResidentBytes);
-			iterator = m_PendingResidencyEvictions.erase(iterator);
+			m_State->m_AssetResidencyCoordinator.Controller().RecordEviction(cancelled, eviction.m_ResidentBytes);
+			iterator = m_State->m_AssetResidencyCoordinator.PendingEvictions().erase(iterator);
 		}
 	}
 
@@ -1756,22 +1737,22 @@ namespace gglab
 			: lifecycle != nullptr;
 		AssetResidencyInventoryEntry currentEntry;
 		if (!assetExists || !BuildResidencyInventoryEntry(contentVersion.m_Key, currentEntry) ||
-			!m_State->m_AssetResidencyController.StillEligible(
-				action, currentEntry, m_AssetUsageFrame, projectedResidentBytes))
+			!m_State->m_AssetResidencyCoordinator.Controller().StillEligible(
+				action, currentEntry, m_State->m_AssetResidencyCoordinator.GetUsageFrame(), projectedResidentBytes))
 		{
-			m_State->m_AssetResidencyController.RecordRevalidationRejection();
+			m_State->m_AssetResidencyCoordinator.Controller().RecordRevalidationRejection();
 			return false;
 		}
 
 		const AssetResidencyOperation operation =
 			contentVersion.m_Key.m_Kind == AssetKind::Texture
 			? m_State->m_TextureAssets->BeginResidencyOperation(contentVersion,
-				AssetResidencyOperationKind::Evict, m_State->m_AssetResidencyController)
-			: m_State->m_AssetResidencyController.BeginResidencyOperation(
+				AssetResidencyOperationKind::Evict, m_State->m_AssetResidencyCoordinator.Controller())
+			: m_State->m_AssetResidencyCoordinator.Controller().BeginResidencyOperation(
 				*lifecycle, contentVersion, AssetResidencyOperationKind::Evict);
 		if (!operation.IsValid())
 		{
-			m_State->m_AssetResidencyController.RecordRevalidationRejection();
+			m_State->m_AssetResidencyCoordinator.Controller().RecordRevalidationRejection();
 			return false;
 		}
 
@@ -1792,17 +1773,17 @@ namespace gglab
 			return false;
 		}
 
-		m_PendingResidencyEvictions.push_back({
+		m_State->m_AssetResidencyCoordinator.PendingEvictions().push_back({
 			.m_Operation = operation,
 			.m_ResidentBytes = action.m_EstimatedBytes,
-			.m_QuiescedFrame = m_AssetUsageFrame,
+			.m_QuiescedFrame = m_State->m_AssetResidencyCoordinator.GetUsageFrame(),
 			});
 		return true;
 	}
 
 	void AssetManager::ApplyResidencyPlan(const AssetResidencyPlan& plan) noexcept
 	{
-		if (plan.m_SnapshotFrame != m_AssetUsageFrame)
+		if (plan.m_SnapshotFrame != m_State->m_AssetResidencyCoordinator.GetUsageFrame())
 		{
 			return;
 		}
@@ -1825,13 +1806,14 @@ namespace gglab
 		{
 			return;
 		}
-		const bool dependenciesRetained = m_ModelDependencyLeaseTokens.contains(modelId);
+		const bool dependenciesRetained =
+			m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(modelId);
 		RefreshModelDependencyInterests(modelId, generation);
 		if (dependenciesRetained)
 		{
 			RequestModelDependencyResidency(*model, GetEffectivePriority(MakeAssetKey(modelId)));
 		}
-		if (m_State->m_AssetDependencyGraph.FindModel(MakeAssetContentVersion(modelId, generation)))
+		if (m_State->m_AssetResidencyCoordinator.FindModel(MakeAssetContentVersion(modelId, generation)))
 		{
 			m_PendingModels.insert(modelId);
 		}
@@ -1877,7 +1859,7 @@ namespace gglab
 		TextureID textureId, uint64_t generation, TaskPriority priority) noexcept
 	{
 		return m_State->m_TextureAssets->RequestResidency(
-			textureId, generation, priority, m_State->m_AssetResidencyController);
+			textureId, generation, priority, m_State->m_AssetResidencyCoordinator.Controller());
 	}
 
 	void AssetManager::RequestMeshResidency(
@@ -1890,9 +1872,9 @@ namespace gglab
 		}
 		if (mesh->m_State == AssetState::Evicting)
 		{
-			m_State->m_AssetResidencyController.RecordReloadRequest(false);
+			m_State->m_AssetResidencyCoordinator.Controller().RecordReloadRequest(false);
 			const AssetResidencyOperation operation =
-				m_State->m_AssetResidencyController.BeginResidencyOperation(*mesh,
+				m_State->m_AssetResidencyCoordinator.Controller().BeginResidencyOperation(*mesh,
 					MakeAssetContentVersion(meshId, generation),
 					AssetResidencyOperationKind::Reload);
 			SetMeshState(
@@ -1911,7 +1893,7 @@ namespace gglab
 			return;
 		}
 
-		m_State->m_AssetResidencyController.RecordReloadRequest(mesh->m_IsReloading);
+		m_State->m_AssetResidencyCoordinator.Controller().RecordReloadRequest(mesh->m_IsReloading);
 		if (mesh->m_IsReloading)
 		{
 			return;
@@ -1919,7 +1901,7 @@ namespace gglab
 		mesh->m_CancelRequested = false;
 		mesh->m_IsReloading = true;
 		const AssetResidencyOperation operation =
-			m_State->m_AssetResidencyController.BeginResidencyOperation(*mesh,
+			m_State->m_AssetResidencyCoordinator.Controller().BeginResidencyOperation(*mesh,
 				MakeAssetContentVersion(meshId, generation), AssetResidencyOperationKind::Reload);
 		if (!operation.IsValid())
 		{
@@ -1929,7 +1911,7 @@ namespace gglab
 		if (m_State->m_AssetLoadCoordinator.HasMeshReload(
 			MakeAssetContentVersion(mesh->m_SourceModelId, sourceModel->m_ContentGeneration)))
 		{
-			m_State->m_AssetResidencyController.RecordReloadCoalesced();
+			m_State->m_AssetResidencyCoordinator.Controller().RecordReloadCoalesced();
 			return;
 		}
 		QueueMeshResidencyReload(mesh->m_SourceModelId, priority);
@@ -1977,7 +1959,7 @@ namespace gglab
 	{
 		if (Model* model = EditModel(modelId))
 		{
-			AssetResidencyController::MarkAssetUsed(*model, m_AssetUsageFrame);
+			AssetResidencyController::MarkAssetUsed(*model, m_State->m_AssetResidencyCoordinator.GetUsageFrame());
 		}
 	}
 
@@ -1985,13 +1967,13 @@ namespace gglab
 	{
 		if (Mesh* mesh = EditMesh(meshId))
 		{
-			AssetResidencyController::MarkAssetUsed(*mesh, m_AssetUsageFrame);
+			AssetResidencyController::MarkAssetUsed(*mesh, m_State->m_AssetResidencyCoordinator.GetUsageFrame());
 		}
 	}
 
 	void AssetManager::MarkTextureUsed(TextureID textureId) noexcept
 	{
-		m_State->m_TextureAssets->MarkUsed(textureId, m_AssetUsageFrame);
+		m_State->m_TextureAssets->MarkUsed(textureId, m_State->m_AssetResidencyCoordinator.GetUsageFrame());
 	}
 
 	void AssetManager::SetMeshState(Mesh& mesh, AssetState state,
@@ -2067,13 +2049,13 @@ namespace gglab
 			}
 		}
 
-		GGLAB_UNUSED(m_State->m_AssetDependencyGraph.RegisterModel(
+		GGLAB_UNUSED(m_State->m_AssetResidencyCoordinator.RegisterModel(
 			MakeAssetContentVersion(modelId, generation), dependencies, structuralFailureCount));
 	}
 
 	void AssetManager::UnregisterModelDependencies(ModelID modelId, uint64_t generation) noexcept
 	{
-		m_State->m_AssetDependencyGraph.UnregisterModel(MakeAssetContentVersion(modelId, generation));
+		m_State->m_AssetResidencyCoordinator.UnregisterModel(MakeAssetContentVersion(modelId, generation));
 	}
 
 	void AssetManager::QueueDependencyStateChange(AssetContentVersion contentVersion,
@@ -2528,7 +2510,7 @@ namespace gglab
 			(residencyOperation.m_Kind != AssetResidencyOperationKind::Reload ||
 				!AssetResidencyController::IsCurrentOperation(*mesh, residencyOperation)))
 		{
-			m_State->m_AssetResidencyController.RecordStaleCompletion();
+			m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
 			return false;
 		}
 
@@ -2569,7 +2551,7 @@ namespace gglab
 				if (residencyOperation.IsValid() &&
 					!AssetResidencyController::IsCurrentOperation(*currentMesh, residencyOperation))
 				{
-					m_State->m_AssetResidencyController.RecordStaleCompletion();
+					m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
 					return;
 				}
 				if (currentMesh->m_CancelRequested)
@@ -2626,7 +2608,7 @@ namespace gglab
 		if (residencyOperation.IsValid() &&
 			!AssetResidencyController::IsCurrentOperation(*mesh, residencyOperation))
 		{
-			m_State->m_AssetResidencyController.RecordStaleCompletion();
+			m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
 			return;
 		}
 		const bool residencyReload = mesh->m_IsReloading;
@@ -2857,7 +2839,7 @@ namespace gglab
 			};
 			if (!AssetResidencyController::IsCurrentOperation(*mesh, residencyOperation))
 			{
-				m_State->m_AssetResidencyController.RecordStaleCompletion();
+				m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
 				continue;
 			}
 			if (completion.m_Status != TaskStatus::Succeeded || !importedModel ||
@@ -3003,18 +2985,19 @@ namespace gglab
 	void AssetManager::VerifyModelDependencyState(
 		ModelID modelId, uint64_t generation, ModelDependencyOutcome traversalOutcome) noexcept
 	{
-		++m_DependencyValidationCount;
 		const AssetContentVersion modelVersion = MakeAssetContentVersion(modelId, generation);
-		const bool hasMatchingState = m_State->m_AssetDependencyGraph.FindModel(modelVersion) != nullptr;
+		const bool hasMatchingState =
+			m_State->m_AssetResidencyCoordinator.FindModel(modelVersion) != nullptr;
 		const ModelDependencyOutcome eventOutcome =
-			hasMatchingState ? m_State->m_AssetDependencyGraph.EvaluateModel(modelVersion)
+			hasMatchingState ? m_State->m_AssetResidencyCoordinator.EvaluateModel(modelVersion)
 			: ModelDependencyOutcome::Failed;
-		if (hasMatchingState && eventOutcome == traversalOutcome)
+		const bool matched = hasMatchingState && eventOutcome == traversalOutcome;
+		m_State->m_AssetResidencyCoordinator.RecordDependencyValidation(matched);
+		if (matched)
 		{
 			return;
 		}
 
-		++m_DependencyValidationMismatchCount;
 		GGLAB_LOG_GRAPHICS_ERROR(
 			"Model {} dependency tracking mismatch (generation={}, graph={}, traversal={}, graphPresent={}).",
 			modelId.Value(), generation, static_cast<uint32_t>(eventOutcome),
@@ -3041,8 +3024,8 @@ namespace gglab
 		{
 			const AssetContentVersion modelVersion =
 				MakeAssetContentVersion(modelId, model->m_ContentGeneration);
-			if (!m_State->m_AssetDependencyGraph.FindModel(modelVersion) ||
-				m_State->m_AssetDependencyGraph.EvaluateModel(modelVersion) == ModelDependencyOutcome::Ready)
+			if (!m_State->m_AssetResidencyCoordinator.FindModel(modelVersion) ||
+				m_State->m_AssetResidencyCoordinator.EvaluateModel(modelVersion) == ModelDependencyOutcome::Ready)
 			{
 				return true;
 			}

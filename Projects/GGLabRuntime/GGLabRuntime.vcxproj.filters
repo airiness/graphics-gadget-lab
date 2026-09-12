@@ -97,6 +97,9 @@
     <Filter Include="Private\Graphics\Asset\Publication">
       <UniqueIdentifier>{563454E4-A515-D5A0-4657-33D10F251184}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\Asset\Residency">
+      <UniqueIdentifier>{E4038CB4-56BA-7638-DC88-A84F2E7FC8F8}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\Buffer">
       <UniqueIdentifier>{2AF2C9C1-5356-2606-7F42-2544F45EC7AC}</UniqueIdentifier>
     </Filter>
@@ -566,6 +569,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp">
       <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.cpp">
+      <Filter>Private\Graphics\Asset\Residency</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureArtifact.cpp">
       <Filter>Private\Graphics\Asset</Filter>
@@ -1252,6 +1258,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h">
       <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.h">
+      <Filter>Private\Graphics\Asset\Residency</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h">
       <Filter>Private\Graphics\DebugDraw</Filter>

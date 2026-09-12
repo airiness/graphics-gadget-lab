@@ -310,8 +310,10 @@ namespace gglab
 			}
 
 			const ModelID modelId = ToModelId(commit.m_Model);
-			if (m_AssetManager->m_ModelDependencyOwners.contains(modelId) ||
-				m_AssetManager->m_ModelDependencyLeaseTokens.contains(modelId))
+			if (m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyOwner(
+					modelId) ||
+				m_AssetManager->m_State->m_AssetResidencyCoordinator.HasModelDependencyLeases(
+					modelId))
 			{
 				return "Model already owns dependency interests before publication commit";
 			}
@@ -330,9 +332,9 @@ namespace gglab
 			model->m_Name = StringID(commit.m_Name);
 			model->m_Type = commit.m_Type;
 			model->m_MeshInstance = std::move(commit.m_MeshInstances);
-			m_AssetManager->m_ModelDependencyOwners.emplace(
+			m_AssetManager->m_State->m_AssetResidencyCoordinator.SetModelDependencyOwner(
 				modelId, AssetOwnerId{ commit.m_DependencyOwner.m_Value });
-			m_AssetManager->m_ModelDependencyLeaseTokens.emplace(
+			m_AssetManager->m_State->m_AssetResidencyCoordinator.SetModelDependencyLeases(
 				modelId, std::move(dependencyLeaseTokens));
 			SetAssetState(*model, AssetState::UploadQueued);
 			m_AssetManager->RegisterModelDependencies(modelId, commit.m_Model.m_ContentGeneration);

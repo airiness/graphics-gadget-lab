@@ -235,19 +235,6 @@ namespace gglab
 		void ReleaseModelDependencyInterests(ModelID modelId) noexcept;
 		void UpdateModelDependencyPriorities(ModelID modelId, TaskPriority priority) noexcept;
 
-		struct PendingResidencyEviction
-		{
-			AssetResidencyOperation m_Operation{};
-			uint64_t m_ResidentBytes = 0;
-			uint64_t m_QuiescedFrame = 0;
-		};
-
-		struct PendingRuntimeRetirement
-		{
-			AssetContentVersion m_ContentVersion{};
-			uint64_t m_QueuedFrame = 0;
-		};
-
 		AssetOwnerId RegisterAssetOwner() noexcept;
 		void UnregisterAssetOwner(AssetOwnerId owner) noexcept;
 		AssetLease AcquireAssetLease(AssetOwnerId owner, AssetKind kind, uint64_t stableId,
@@ -332,8 +319,6 @@ namespace gglab
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
 		std::unordered_set<ModelID> m_PendingModels;
-		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
-		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
@@ -342,12 +327,6 @@ namespace gglab
 		uint64_t m_RuntimeRetirementCancellationCount = 0;
 		uint64_t m_RuntimeRetirementCount = 0;
 		uint64_t m_PublicationProtectedCancellationCount = 0;
-		uint64_t m_AssetUsageFrame = 0;
-		std::vector<PendingResidencyEviction> m_PendingResidencyEvictions;
-		std::vector<PendingRuntimeRetirement> m_PendingRuntimeRetirements;
-		uint64_t m_LogicalResidentBytes = 0;
-		uint64_t m_DependencyValidationCount = 0;
-		uint64_t m_DependencyValidationMismatchCount = 0;
 		bool m_AcceptingCommands = true;
 		bool m_IsPreparedForShutdown = false;
 		std::unique_ptr<AssetManagerState> m_State;

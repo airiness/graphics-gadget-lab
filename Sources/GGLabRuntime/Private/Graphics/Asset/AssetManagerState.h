@@ -1,11 +1,9 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
-#include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
-#include "Graphics/Asset/Residency/AssetResidencyController.h"
+#include "Graphics/Asset/Residency/AssetResidencyCoordinator.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -33,8 +31,6 @@ namespace gglab
 		MeshStore m_MeshStore;
 		MaterialStore m_MaterialStore;
 		ModelStore m_ModelStore;
-		AssetInterestTracker m_AssetInterestTracker;
-		AssetResidencyController m_AssetResidencyController;
-		AssetDependencyGraph m_AssetDependencyGraph;
+		AssetResidencyCoordinator m_AssetResidencyCoordinator;
 	};
 }

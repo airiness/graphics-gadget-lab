@@ -12,17 +12,20 @@ namespace gglab
 	AssetSnapshot BuildAssetSnapshot(const AssetManager& assetManager) noexcept
 	{
 		AssetSnapshot snapshot{};
-		snapshot.m_AssetUsageFrame = assetManager.m_AssetUsageFrame;
+		snapshot.m_AssetUsageFrame =
+			assetManager.m_State->m_AssetResidencyCoordinator.GetUsageFrame();
 		const AssetDependencyGraphStatistics dependencyStatistics =
-			assetManager.m_State->m_AssetDependencyGraph.GetStatistics();
+			assetManager.m_State->m_AssetResidencyCoordinator.GetDependencyStatistics();
 		snapshot.m_TrackedModelDependencyCount = dependencyStatistics.m_TrackedModelCount;
 		snapshot.m_ReverseDependencyCount = dependencyStatistics.m_ReverseDependencyCount;
 		snapshot.m_ReverseDependencyEdgeCount = dependencyStatistics.m_ReverseDependencyEdgeCount;
 		snapshot.m_DependencyGraphBuildCount = dependencyStatistics.m_GraphBuildCount;
 		snapshot.m_DependencyEventUpdateCount = dependencyStatistics.m_EventUpdateCount;
-		snapshot.m_DependencyValidationCount = assetManager.m_DependencyValidationCount;
+		snapshot.m_DependencyValidationCount =
+			assetManager.m_State->m_AssetResidencyCoordinator.GetDependencyValidationCount();
 		snapshot.m_DependencyValidationMismatchCount =
-			assetManager.m_DependencyValidationMismatchCount;
+			assetManager.m_State->m_AssetResidencyCoordinator
+				.GetDependencyValidationMismatchCount();
 		const AssetResidencyStatistics residency = assetManager.GetResidencyStatistics();
 		snapshot.m_AutomaticResidencyEvictionEnabled = residency.m_Config.m_EnableAutomaticEviction;
 		snapshot.m_ResidencyHighWatermarkBytes = residency.m_Config.m_HighWatermarkBytes;
@@ -161,7 +164,7 @@ namespace gglab
 					model->m_ImportArtifactContentDigest);
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
 			if (const AssetDependencyModelState* dependencyState =
-				assetManager.m_State->m_AssetDependencyGraph.FindModel(
+				assetManager.m_State->m_AssetResidencyCoordinator.FindModel(
 					MakeAssetContentVersion(modelId, model->m_ContentGeneration)))
 			{
 				const AssetDependencyModelState& state = *dependencyState;

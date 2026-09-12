@@ -84,6 +84,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\StringIdFormatting.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManager.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetPaths.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImporter.cpp" />
@@ -513,6 +514,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ModelImporter.h" />
