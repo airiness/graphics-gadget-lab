@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 
 namespace gglab
 {
@@ -21,6 +22,9 @@ namespace gglab
 		// Optional Runtime host handle for AppRuntime-owned hosting code. Content
 		// keeps using the concrete service surfaces it already receives.
 		RenderHost* m_RenderHost = nullptr;
+		// Stable explicit pass/content service bundle for content that no longer
+		// needs the concrete renderer.
+		RenderServices m_RenderServices{};
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		TaskSystem* m_TaskSystem = nullptr;

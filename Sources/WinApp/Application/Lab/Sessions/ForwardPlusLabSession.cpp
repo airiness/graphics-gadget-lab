@@ -193,8 +193,8 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnEnter() noexcept
 	{
-		auto* profilingView = m_Services.m_Renderer->GetGpuProfilingView();
-		auto* profilingControl = m_Services.m_Renderer->GetGpuProfilingControl();
+		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
+		auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl();
 		if (profilingView && profilingControl)
 		{
 			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
@@ -205,7 +205,7 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnExit() noexcept
 	{
-		if (auto* profilingControl = m_Services.m_Renderer->GetGpuProfilingControl())
+		if (auto* profilingControl = m_Services.m_RenderHost->GetGpuProfilingControl())
 		{
 			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
@@ -430,7 +430,7 @@ namespace gglab
 
 	void ForwardPlusLabSession::CaptureGpuTimings() noexcept
 	{
-		auto* profilingView = m_Services.m_Renderer->GetGpuProfilingView();
+		auto* profilingView = m_Services.m_RenderHost->GetGpuProfilingView();
 		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;

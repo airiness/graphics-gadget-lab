@@ -182,6 +182,7 @@ namespace gglab
 				{
 					.m_Renderer = &legacyRenderer,
 					.m_RenderHost = m_RenderHost.get(),
+					.m_RenderServices = m_RenderServices,
 					.m_AssetManager = m_AssetManager.get(),
 					.m_ShaderManager = m_ShaderManager.get(),
 					.m_TaskSystem = m_TaskSystem.get(),

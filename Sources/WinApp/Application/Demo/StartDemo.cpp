@@ -133,8 +133,8 @@ namespace gglab
 
 	void StartDemo::OnEnter() noexcept
 	{
-		auto* environmentView = m_Services.m_Renderer->GetEnvironmentLightingView();
-		auto* environmentControl = m_Services.m_Renderer->GetEnvironmentLightingControl();
+		auto* environmentView = m_Services.m_RenderHost->GetEnvironmentLightingView();
+		auto* environmentControl = m_Services.m_RenderHost->GetEnvironmentLightingControl();
 		if (environmentView && environmentControl)
 		{
 			m_PreviousSkyboxEnabled =
@@ -173,7 +173,7 @@ namespace gglab
 	{
 		if (m_HasSkyboxOverride)
 		{
-			if (auto* environmentControl = m_Services.m_Renderer->GetEnvironmentLightingControl())
+			if (auto* environmentControl = m_Services.m_RenderHost->GetEnvironmentLightingControl())
 			{
 				environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
 			}
