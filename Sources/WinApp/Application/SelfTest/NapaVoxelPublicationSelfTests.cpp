@@ -1,5 +1,6 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"

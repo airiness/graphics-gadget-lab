@@ -1,13 +1,13 @@
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+
+#include "Graphics/Asset/Publication/AssetResourcePublication.h"
 
 namespace gglab
 {
@@ -380,7 +380,7 @@ namespace gglab
 		}
 
 		m_State->m_ElapsedSeconds += deltaTime;
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		const uint64_t processed = statistics.m_ResourcePublicationQueue.m_ProcessedCount;
 		if (processed > m_State->m_LastProcessed)
@@ -524,7 +524,7 @@ namespace gglab
 	void AssetPublicationLabSession::StartScenario() noexcept
 	{
 		StopScenario();
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		if (!m_HasOriginalBudget)
 		{
 			m_OriginalBudget = scheduler->GetFrameBudget();
@@ -546,7 +546,7 @@ namespace gglab
 	void AssetPublicationLabSession::StartModelScenario(
 		Scenario scenario, uint32_t faultOccurrence) noexcept
 	{
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		scheduler->ClearResourcePublicationFault();
 		ResetAssetInterests();
 		m_State = std::make_unique<ScenarioState>();
@@ -598,7 +598,7 @@ namespace gglab
 	{
 		if (m_Services.m_RenderHost)
 		{
-			AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+			AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 			scheduler->ClearResourcePublicationFault();
 			scheduler->ClearGpuCompletionHold();
 			if (m_HasOriginalBudget)
@@ -703,7 +703,7 @@ namespace gglab
 
 	void AssetPublicationLabSession::StartAcceptanceSuite() noexcept
 	{
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		m_Suite = std::make_unique<AcceptanceSuiteState>();
 		m_Suite->m_BaselineOwnership = m_Services.m_AssetManager->GetOwnershipStatistics();
 		m_Suite->m_BaselineUpload = scheduler->GetStatistics();
@@ -713,7 +713,7 @@ namespace gglab
 	void AssetPublicationLabSession::StartAcceptanceCase() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		scheduler->ClearResourcePublicationFault();
 		scheduler->ClearGpuCompletionHold();
@@ -955,7 +955,7 @@ namespace gglab
 			return;
 		}
 
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		switch (m_Suite->m_Phase)
@@ -1206,7 +1206,7 @@ namespace gglab
 			.m_Errors = std::move(errors),
 			});
 
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		scheduler->ClearResourcePublicationFault();
 		scheduler->ClearGpuCompletionHold();
 		ResetAssetInterests();
@@ -1231,7 +1231,7 @@ namespace gglab
 	void AssetPublicationLabSession::CompleteAcceptanceSuite() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadScheduler* scheduler = GetLegacyRenderer(m_Services.m_RenderHost)->GetAssetUploadScheduler();
+		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		const AssetOwnershipStatistics ownership =
 			m_Services.m_AssetManager->GetOwnershipStatistics();

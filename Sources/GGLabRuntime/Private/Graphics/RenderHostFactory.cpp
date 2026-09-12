@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -40,6 +41,7 @@ namespace gglab
 		instance.m_Services.m_Presentation = renderer.get();
 		instance.m_Services.m_BindingLayout = renderer.get();
 		instance.m_Services.m_Temporal = renderer.get();
+		instance.m_Services.m_AssetUpload = renderer->GetAssetUploadScheduler();
 		instance.m_Services.m_ShaderManager = createInfo.m_ShaderManager;
 		instance.m_Host = std::move(renderer);
 		return instance;

@@ -5,8 +5,6 @@
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/LegacyRenderHostAccess.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
@@ -298,12 +296,9 @@ namespace gglab
 	{
 		m_WindowWidth = createInfo.m_WindowWidth;
 		m_WindowHeight = createInfo.m_WindowHeight;
-		auto* renderer = m_Services.m_RenderHost
-			? GetLegacyRenderer(m_Services.m_RenderHost)
-			: nullptr;
 		m_PublicationSession = std::make_unique<NapaVoxelPublicationSession>(
-			renderer ? renderer->GetDevice() : nullptr,
-			renderer ? renderer->GetAssetUploadScheduler() : nullptr, &m_CommandQueue);
+			m_Services.m_RenderServices.m_Presentation->GetDevice(),
+			m_Services.m_RenderServices.m_AssetUpload, &m_CommandQueue);
 
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
