@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Asset/AssetContentFingerprint.h"
-#include "Graphics/Asset/TextureAssetViews.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 

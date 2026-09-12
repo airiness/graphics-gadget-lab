@@ -887,7 +887,8 @@ $legacyRuntimeGraphicsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/Geometry.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Geometry.cpp"),
-    (Join-Path $runtimeSourcesDir "Graphics/VertexData.h")
+    (Join-Path $runtimeSourcesDir "Graphics/VertexData.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureAssetViews.h")
 )
 foreach ($legacyPath in $legacyRuntimeGraphicsContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -895,6 +896,20 @@ foreach ($legacyPath in $legacyRuntimeGraphicsContractPaths) {
             Rule   = "runtime-public-private-layout"
             Target = ConvertTo-RepoRelativePath $legacyPath
             Reason = "migrated foundational Graphics contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
+$legacyRuntimeEnvironmentPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/EnvironmentAssetController.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/EnvironmentAssetController.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeEnvironmentPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated environment controller contracts must live under Public/GGLabRuntime or Private"
         })
     }
 }
@@ -1237,7 +1252,8 @@ $legacyRuntimeGraphicsContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:GraphicsTypes\.h|ShadowSettings\.h|' +
     'SamplerTypes\.h|IBLBakeTypes\.h|RenderPass[\\/]RenderPassInfo\.h|' +
     'Asset[\\/]ArtifactContentDigest\.h|PostProcess[\\/]PostProcessDebug\.h|' +
-    'Geometry\.h|VertexData\.h)[>"]'
+    'Geometry\.h|VertexData\.h|Asset[\\/]TextureAssetViews\.h|' +
+    'EnvironmentAssetController\.h)[>"]'
 $legacyRuntimeCameraIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Camera(?:Controller|Rig)?\.h[>"]'
 $legacyRuntimeViewContractIncludeRegex =

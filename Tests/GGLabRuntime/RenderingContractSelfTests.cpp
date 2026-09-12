@@ -6,7 +6,7 @@
 #include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
 #endif
 #include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
-#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"

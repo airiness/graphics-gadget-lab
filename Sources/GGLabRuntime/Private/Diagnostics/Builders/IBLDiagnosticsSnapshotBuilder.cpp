@@ -1,7 +1,7 @@
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

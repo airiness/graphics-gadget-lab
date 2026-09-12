@@ -15,7 +15,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
-#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"

@@ -345,9 +345,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.cpp">
       <Filter>Graphics\Buffer</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -638,6 +635,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp">
       <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\EnvironmentAssetController.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp">
       <Filter>Private\Graphics</Filter>
@@ -1034,9 +1034,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetValidation.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetViews.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\Buffer.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
@@ -1054,9 +1051,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.h">
       <Filter>Graphics</Filter>
@@ -1787,6 +1781,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataIdentity.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Camera.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
@@ -1810,6 +1807,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentAssetController.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingControlBase.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

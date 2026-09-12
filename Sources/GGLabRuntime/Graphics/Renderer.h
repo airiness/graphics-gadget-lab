@@ -21,6 +21,7 @@
 namespace gglab
 {
 	class PipelineCache;
+	class AssetManager;
 	class AssetUploadScheduler;
 	class EnvironmentLightingSystem;
 	class IBLBakeScheduler;
@@ -206,6 +207,10 @@ namespace gglab
 		[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept;
 		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept;
 		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept;
+		// Composition-time asset lease wiring for the IBL bake scheduler. The
+		// scheduler and its derived-data ownership remain Runtime-internal.
+		void AttachAssetManager(AssetManager& assetManager) noexcept;
+		void DetachAssetManager() noexcept;
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept
 		{
 			return m_BackBufferClearColor;

@@ -210,7 +210,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGArenaAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\EnvironmentAssetController.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.cpp" />
@@ -539,7 +539,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.h" />
@@ -555,7 +555,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\SamplerTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentAssetController.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\IBLBakeConfig.h" />

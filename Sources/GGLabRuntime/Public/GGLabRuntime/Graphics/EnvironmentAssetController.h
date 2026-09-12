@@ -1,15 +1,24 @@
 #pragma once
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/EnvironmentLightingSystem.h"
 
+#include <cstdint>
+#include <filesystem>
 #include <limits>
+#include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
 {
+	class AssetManager;
+	class AssetOwnerScope;
+	class EnvironmentLightingSystem;
+	struct RHITextureDesc;
+
 	enum class EnvironmentAssetEntryState : uint8_t
 	{
 		Unrequested,
@@ -87,8 +96,10 @@ namespace gglab
 		EnvironmentLightingSystem* m_EnvironmentLighting = nullptr;
 		std::filesystem::path m_AssetRoot;
 		std::vector<EnvironmentMapEntry> m_Entries;
-		AssetOwnerScope m_ActiveOwner;
-		AssetOwnerScope m_PendingOwner;
+		// Owner leases stay opaque so the Public header does not expose the asset
+		// subsystem's ownership implementation.
+		std::unique_ptr<AssetOwnerScope> m_ActiveOwner;
+		std::unique_ptr<AssetOwnerScope> m_PendingOwner;
 		PendingSelection m_PendingSelection{};
 		size_t m_ActiveEntryIndex = InvalidEntryIndex;
 		uint64_t m_SelectionSerial = 0;

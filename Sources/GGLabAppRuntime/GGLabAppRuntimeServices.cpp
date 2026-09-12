@@ -12,8 +12,7 @@
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
@@ -162,7 +161,7 @@ namespace gglab
 			m_Paths.m_TextureDerivedDataRoot;
 		assetManagerCreateInfo.m_AssetRoot = m_Paths.m_AssetRoot;
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
-		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
+		m_Renderer->AttachAssetManager(*m_AssetManager);
 
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
@@ -351,7 +350,7 @@ namespace gglab
 				m_RenderFrameBuilder.reset();
 				m_DemoManager.reset();
 				m_DebugDrawService.reset();
-				m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
+				m_Renderer->DetachAssetManager();
 				m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
 			}
 			m_AssetManager.reset();

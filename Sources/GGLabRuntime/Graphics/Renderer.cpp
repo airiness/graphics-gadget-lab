@@ -682,4 +682,20 @@ namespace gglab
 		GpuProfiler* profiler = m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
 		return profiler;
 	}
+
+	void Renderer::AttachAssetManager(AssetManager& assetManager) noexcept
+	{
+		if (m_IBLBakeScheduler)
+		{
+			m_IBLBakeScheduler->AttachAssetManager(assetManager);
+		}
+	}
+
+	void Renderer::DetachAssetManager() noexcept
+	{
+		if (m_IBLBakeScheduler)
+		{
+			m_IBLBakeScheduler->DetachAssetManager();
+		}
+	}
 }

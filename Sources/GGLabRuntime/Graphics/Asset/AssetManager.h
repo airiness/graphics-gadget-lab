@@ -7,7 +7,7 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
-#include "Graphics/Asset/TextureAssetViews.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "Graphics/Asset/Store/MaterialStore.h"

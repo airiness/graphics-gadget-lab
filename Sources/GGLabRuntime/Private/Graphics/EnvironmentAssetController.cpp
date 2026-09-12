@@ -1,7 +1,9 @@
-#include "Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 
 #include <algorithm>
@@ -88,12 +90,10 @@ namespace gglab
 		}
 
 		CommitFallback();
-		AssetOwnerScope oldActive = std::move(m_ActiveOwner);
-		AssetOwnerScope oldPending = std::move(m_PendingOwner);
+		m_PendingOwner.reset();
+		m_ActiveOwner.reset();
 		m_ActiveEntryIndex = InvalidEntryIndex;
 		m_PendingSelection = {};
-		oldPending.Reset();
-		oldActive.Reset();
 	}
 
 	void EnvironmentAssetController::Tick() noexcept
@@ -174,7 +174,7 @@ namespace gglab
 
 		// A new selection command supersedes the previous candidate even when the
 		// replacement fails before an asynchronous load can be submitted.
-		AssetOwnerScope supersededOwner = std::move(m_PendingOwner);
+		std::unique_ptr<AssetOwnerScope> supersededOwner = std::move(m_PendingOwner);
 		if (m_PendingSelection.m_EntryIndex < m_Entries.size())
 		{
 			auto& superseded = m_Entries[m_PendingSelection.m_EntryIndex];
@@ -184,12 +184,13 @@ namespace gglab
 			}
 		}
 		m_PendingSelection = {};
-		supersededOwner.Reset();
+		supersededOwner.reset();
 		auto& entry = m_Entries[entryIndex];
 		entry.m_LastSelectionSerial = m_SelectionSerial;
 
-		AssetOwnerScope pendingOwner = m_AssetManager->CreateOwnerScope();
-		const AssetManager::TextureLoadRequest request = pendingOwner.LoadTextureAsync(
+		auto pendingOwner =
+			std::make_unique<AssetOwnerScope>(m_AssetManager->CreateOwnerScope());
+		const AssetManager::TextureLoadRequest request = pendingOwner->LoadTextureAsync(
 			entry.m_Path, TextureSemantic::Environment, TaskPriority::High);
 		if (!request.IsValid())
 		{
@@ -281,7 +282,7 @@ namespace gglab
 				EnvironmentAssetEntryState::Failed, "decoded-content fingerprint unavailable");
 			return;
 		}
-		AssetOwnerScope oldActive = std::move(m_ActiveOwner);
+		std::unique_ptr<AssetOwnerScope> oldActive = std::move(m_ActiveOwner);
 
 		// The candidate lease becomes active before the visible source changes.
 		m_ActiveOwner = std::move(m_PendingOwner);
@@ -296,7 +297,7 @@ namespace gglab
 			});
 
 		// Release the previous source only after the new source and lease are committed.
-		oldActive.Reset();
+		oldActive.reset();
 		GGLAB_LOG_GRAPHICS_INFO(
 			"EnvironmentAssetController: committed HDR environment '{}'.", entry.m_Path.string());
 	}
@@ -313,7 +314,7 @@ namespace gglab
 				entry.m_Path.string(), reason);
 		}
 		m_PendingSelection = {};
-		m_PendingOwner = {};
+		m_PendingOwner.reset();
 	}
 
 	bool EnvironmentAssetController::ValidateEnvironmentShape(
