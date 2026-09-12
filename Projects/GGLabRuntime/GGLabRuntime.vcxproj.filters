@@ -7,9 +7,6 @@
     <Filter Include="Diagnostics\Builders">
       <UniqueIdentifier>{B816D142-0FC3-8951-5005-040C329965CB}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Diagnostics\Snapshots">
-      <UniqueIdentifier>{A66E6013-DD97-0E0F-77E0-D625968E6E15}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics">
       <UniqueIdentifier>{6642D0F7-FF51-7E46-BE41-E8BD8CBF8935}</UniqueIdentifier>
     </Filter>
@@ -947,9 +944,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
       <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h">
-      <Filter>Diagnostics\Snapshots</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
@@ -1736,6 +1730,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
@@ -1791,6 +1788,12 @@
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublicationTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetStreamingTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetToolingControlBase.h">

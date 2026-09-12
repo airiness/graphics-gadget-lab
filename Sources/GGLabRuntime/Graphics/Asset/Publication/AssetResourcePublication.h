@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublicationTypes.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -9,19 +10,6 @@
 
 namespace gglab
 {
-	enum class AssetResourcePublicationStage : uint8_t
-	{
-		Unknown,
-		Textures,
-		Materials,
-		Meshes,
-		MeshInstances,
-		Dependencies,
-		Commit,
-		ReleaseRetains,
-		Count,
-	};
-
 	enum class AssetResourcePublicationStepStatus : uint8_t
 	{
 		Continue,

@@ -1,9 +1,18 @@
 #pragma once
+#include "GGLabFoundation/Async/ProgressChannel.h"
+#include "GGLabFoundation/Task/TaskTypes.h"
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/AssetStreamingTypes.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataIdentity.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 namespace gglab
 {

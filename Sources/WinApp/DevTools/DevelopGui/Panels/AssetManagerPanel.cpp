@@ -12,7 +12,7 @@
 #include <format>
 #include <string>
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
-#include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 
 #include <algorithm>

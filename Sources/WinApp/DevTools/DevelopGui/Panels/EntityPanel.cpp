@@ -15,7 +15,7 @@
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
-#include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 
 #include <algorithm>
 #include <vector>

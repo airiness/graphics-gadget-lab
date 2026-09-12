@@ -984,7 +984,8 @@ $legacyRuntimeDiagnosticsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/LabSnapshot.h"),
     (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/RenderGraphSnapshot.h"),
-    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h")
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Diagnostics/Snapshots/AssetSnapshot.h")
 )
 foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -992,6 +993,19 @@ foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
             Rule   = "runtime-public-private-layout"
             Target = ConvertTo-RepoRelativePath $legacyPath
             Reason = "migrated Diagnostics contracts must live under Public/GGLabRuntime"
+        })
+    }
+}
+
+# The legacy Diagnostics snapshot root is fully migrated; it may no longer own files.
+$legacyRuntimeDiagnosticsSnapshotsDir = Join-Path $runtimeSourcesDir "Diagnostics/Snapshots"
+if (Test-Path -LiteralPath $legacyRuntimeDiagnosticsSnapshotsDir -PathType Container) {
+    foreach ($legacyFile in @(Get-ChildItem -LiteralPath $legacyRuntimeDiagnosticsSnapshotsDir `
+            -Recurse -File)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyFile.FullName
+            Reason = "migrated Diagnostics snapshot contracts must live under Public/GGLabRuntime"
         })
     }
 }
@@ -1197,7 +1211,7 @@ $legacyRuntimeDiagnosticsContractIncludeRegex =
     'TaskSystemSnapshot|ShadowDiagnosticsSnapshot|ForwardPlusDiagnosticsSnapshot|' +
     'GTAODiagnosticsSnapshot|PostProcessDiagnosticsSnapshot|' +
     'TemporalAADiagnosticsSnapshot|LabSnapshot|RenderGraphSnapshot|' +
-    'TransientResourcePoolSnapshot)\.h)[>"]'
+    'TransientResourcePoolSnapshot|AssetSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

@@ -16,7 +16,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
-#include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
