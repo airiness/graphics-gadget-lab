@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 namespace gglab

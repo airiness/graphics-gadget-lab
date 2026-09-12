@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
-#include "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 
 namespace gglab
 {

@@ -914,6 +914,25 @@ foreach ($legacyPath in $legacyRuntimeEnvironmentPaths) {
     }
 }
 
+$legacyRuntimeFrameContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/GPUStructures.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGResourceHandle.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGCompileDiagnostic.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h")
+)
+foreach ($legacyPath in $legacyRuntimeFrameContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated frame, graph and pipeline contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeCameraPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Camera.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Camera.cpp"),
@@ -1276,6 +1295,11 @@ $legacyRuntimeDiagnosticsContractIncludeRegex =
     'TransientResourcePoolSnapshot|AssetSnapshot)\.h)[>"]'
 $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
+$legacyRuntimeFrameContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:GPUStructures\.h|' +
+    'RenderGraph[\\/]RG(?:ResourceHandle|CompileDiagnostic)\.h|' +
+    'RenderPipeline[\\/](?:DepthCoverageFramePlan|RenderPipelineOverlayExtensionBase|' +
+    'RenderPipelineSceneExtensionBase)\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1286,6 +1310,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeRenderQueueContractIncludeRegex -or
         $content -match $legacyRuntimeDebugDrawContractIncludeRegex -or
         $content -match $legacyRuntimeDiagnosticsContractIncludeRegex -or
+        $content -match $legacyRuntimeFrameContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

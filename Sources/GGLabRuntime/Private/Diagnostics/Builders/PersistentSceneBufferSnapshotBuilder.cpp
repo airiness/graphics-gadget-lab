@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
-#include "Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/Renderer.h"
 
 namespace gglab

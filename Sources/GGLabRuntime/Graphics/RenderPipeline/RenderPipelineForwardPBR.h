@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
-#include "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -16,7 +16,7 @@
 #include "Graphics/RenderPass/RenderPassSkybox.h"
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
-#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 
 #include <memory>
 #include <utility>

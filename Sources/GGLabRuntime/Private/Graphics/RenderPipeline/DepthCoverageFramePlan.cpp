@@ -1,4 +1,4 @@
-#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 
 #include <format>
 #include <memory>

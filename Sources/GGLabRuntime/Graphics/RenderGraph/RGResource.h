@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
-#include "Graphics/RenderGraph/RGResourceHandle.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceHandle.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 

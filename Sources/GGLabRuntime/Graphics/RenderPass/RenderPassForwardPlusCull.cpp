@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"

@@ -3,7 +3,7 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
-#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 
 #include <imgui.h>
 

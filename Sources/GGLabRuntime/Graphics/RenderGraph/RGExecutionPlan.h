@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Core/StringId.h"
-#include "Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"

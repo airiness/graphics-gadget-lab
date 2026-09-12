@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"

@@ -8,7 +8,7 @@
 #include "Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RenderGraph/RGPass.h"
 #include "Graphics/RenderGraph/RGBlackboard.h"
-#include "Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <memory>

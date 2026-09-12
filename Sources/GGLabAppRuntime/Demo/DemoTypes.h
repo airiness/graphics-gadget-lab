@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
-#include "Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 
 namespace gglab
 {
