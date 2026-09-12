@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Async/ProgressChannel.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 
 #include <cstdint>
 #include <filesystem>

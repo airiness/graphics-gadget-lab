@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstdint>

@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/ReservedTexture.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"

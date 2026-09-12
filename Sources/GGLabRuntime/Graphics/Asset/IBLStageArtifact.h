@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 
 #include <array>

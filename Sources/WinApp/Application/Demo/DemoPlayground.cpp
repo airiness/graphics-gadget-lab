@@ -6,7 +6,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
 
 namespace gglab

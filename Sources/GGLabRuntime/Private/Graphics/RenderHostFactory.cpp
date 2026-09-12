@@ -1,5 +1,5 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

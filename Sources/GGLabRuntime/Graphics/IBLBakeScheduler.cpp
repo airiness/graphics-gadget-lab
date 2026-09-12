@@ -9,7 +9,7 @@
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
 #include <array>

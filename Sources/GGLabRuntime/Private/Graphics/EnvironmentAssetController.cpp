@@ -1,6 +1,6 @@
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/EnvironmentLightingSystem.h"

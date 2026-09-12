@@ -11,7 +11,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -28,7 +28,7 @@
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <atomic>
 #include <cstdint>

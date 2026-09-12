@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataPlatform.h"
 

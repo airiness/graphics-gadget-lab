@@ -1,4 +1,4 @@
-#include "Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 
 namespace gglab

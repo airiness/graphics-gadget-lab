@@ -1,4 +1,4 @@
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 
 #include <string>
 #include <string_view>

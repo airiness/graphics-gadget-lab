@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 
 #include <filesystem>
 #include <string>

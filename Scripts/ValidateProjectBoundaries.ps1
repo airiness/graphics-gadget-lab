@@ -1017,6 +1017,36 @@ foreach ($legacyPath in $legacyRuntimeShaderContractPaths) {
     }
 }
 
+$legacyRuntimeAssetContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetIdentity.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Residency/AssetResidencyTypes.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ReservedTexture.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetPaths.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetPaths.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/AssetLoadProgress.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/AssetLoadProgress.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Publication/AssetResourcePublication.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/DerivedDataKey.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/DerivedDataKey.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureAsset.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureAsset.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/TransferManager.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/TransferManager.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeAssetContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated asset identity, value and transfer contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeCameraPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Camera.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Camera.cpp"),
@@ -1399,6 +1429,12 @@ $legacyRuntimeServiceContractIncludeRegex =
     'Shader[\\/]ShaderPipelineSnapshot\.h)[>"]'
 $legacyRuntimeShaderContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Shader[\\/](?:ShaderManager|ShaderProgramCatalog)\.h[>"]'
+$legacyRuntimeAssetContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:' +
+    'Asset[\\/](?:AssetIdentity|ReservedTexture|AssetPaths|AssetLoadProgress|' +
+    'AssetResourcePublication|DerivedDataKey|TextureAsset|AssetUploadScheduler)\.h|' +
+    'Asset[\\/]Residency[\\/]AssetResidencyTypes\.h|' +
+    'TransferBatch\.h|TransferManager\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1412,6 +1448,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeFrameContractIncludeRegex -or
         $content -match $legacyRuntimeServiceContractIncludeRegex -or
         $content -match $legacyRuntimeShaderContractIncludeRegex -or
+        $content -match $legacyRuntimeAssetContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

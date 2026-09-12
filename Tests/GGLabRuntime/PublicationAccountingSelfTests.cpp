@@ -1,5 +1,5 @@
 #include "PublicationAccountingSelfTests.h"
-#include "Graphics/Asset/Publication/AssetResourcePublication.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 
 namespace gglab
 {

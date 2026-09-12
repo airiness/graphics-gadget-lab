@@ -1,7 +1,7 @@
 #pragma once
-#include "Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
-#include "Graphics/Asset/Publication/AssetResourcePublication.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <compare>

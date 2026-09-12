@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "GGLabRuntime/Graphics/Asset/AssetContentFingerprint.h"
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 #include "Graphics/Asset/TextureArtifact.h"
 

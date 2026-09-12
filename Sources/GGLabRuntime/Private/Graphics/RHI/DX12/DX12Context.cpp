@@ -15,7 +15,7 @@
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorHeap.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorManager.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <memory>
 #include <utility>

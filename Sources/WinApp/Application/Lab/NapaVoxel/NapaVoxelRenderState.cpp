@@ -3,7 +3,7 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/TransferBatch.h"
 
 #include "NapaVoxelCore/Edit/VoxelMutation.h"
 

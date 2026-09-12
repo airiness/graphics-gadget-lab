@@ -1,6 +1,6 @@
 #include "AssetUploadSchedulerSelfTests.h"
 
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
@@ -10,7 +10,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
 #include <cstdint>

@@ -7,7 +7,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
-#include "Graphics/Asset/Publication/AssetResourcePublication.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 
 namespace gglab
 {

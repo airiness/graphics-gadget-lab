@@ -1,11 +1,11 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/Asset/AssetIdentity.h"
-#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Asset/ModelImportArtifact.h"
 

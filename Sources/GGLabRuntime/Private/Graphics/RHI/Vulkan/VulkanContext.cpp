@@ -7,7 +7,7 @@
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 #include "Graphics/RHI/Vulkan/VulkanTransferContext.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <format>
 #include <string>

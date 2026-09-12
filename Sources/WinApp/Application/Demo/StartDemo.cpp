@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Core/Time.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"

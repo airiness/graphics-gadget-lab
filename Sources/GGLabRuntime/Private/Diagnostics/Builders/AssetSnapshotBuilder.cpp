@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 
 #include <algorithm>
 

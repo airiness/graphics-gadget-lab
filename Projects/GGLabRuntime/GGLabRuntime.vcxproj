@@ -84,8 +84,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\StringIdFormatting.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Time.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetPaths.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
@@ -205,7 +205,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp" />
@@ -218,7 +218,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedDataKey.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp" />
@@ -227,7 +227,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAsset.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAsset.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetValidation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifact.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.cpp" />
@@ -239,8 +239,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\ShaderProgramCatalog.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\ShaderManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\TransferBatch.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\TransferManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanUtility.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSurface.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -507,17 +507,17 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetLoadProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadScheduler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassInfo.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentity.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentityConversions.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetContentFingerprint.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ArtifactContentDigest.h" />
@@ -526,7 +526,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadControl.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublicationTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetStreamingTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataKey.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h" />
@@ -542,18 +542,18 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interest\AssetInterestTracker.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyController.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResidencyTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MaterialStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MeshStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\TextureStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\ModelStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\AssetPublicationServices.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\AssetResourcePublication.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublication.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJob.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJournal.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interop\AssimpMathInterop.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h" />
@@ -588,7 +588,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAsset.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAsset.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetValidation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifact.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.h" />
@@ -601,8 +601,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderPipelineSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderProgramCatalog.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\TransferBatch.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\TransferManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\VertexData.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h" />
   </ItemGroup>

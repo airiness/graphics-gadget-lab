@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
 #include <cstdint>

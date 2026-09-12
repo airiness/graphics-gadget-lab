@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/TransferBatch.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 
 #include <memory>
 

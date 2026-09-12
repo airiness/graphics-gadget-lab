@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
 
 #include <cstdint>
 

@@ -15,7 +15,7 @@
 #endif
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "RuntimePaths.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"

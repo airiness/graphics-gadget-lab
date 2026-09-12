@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/ArtifactCacheCore.h"
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 
 #include <cstdint>

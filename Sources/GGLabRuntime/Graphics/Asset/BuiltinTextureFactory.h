@@ -1,6 +1,6 @@
 #pragma once
-#include "Graphics/Asset/ReservedTexture.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 
 #include <string_view>
 #include <vector>

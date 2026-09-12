@@ -1,9 +1,9 @@
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "Graphics/TransferBatch.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
 #include <chrono>

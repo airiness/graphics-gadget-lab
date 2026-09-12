@@ -37,9 +37,6 @@
     <Filter Include="Graphics\Asset\Store">
       <UniqueIdentifier>{8D112DE7-7B9A-C494-EDD9-22E26C9C5446}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\Asset\Streaming">
-      <UniqueIdentifier>{1BF22639-49A8-0B99-B5C9-84F230EAFD94}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\Buffer">
       <UniqueIdentifier>{410A6D68-F3E0-CD91-88A2-F847D21EE116}</UniqueIdentifier>
     </Filter>
@@ -252,9 +249,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -263,9 +257,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetStateEventQueue.cpp">
       <Filter>Graphics\Asset\Dependency</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
@@ -306,9 +297,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.cpp">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.cpp">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
@@ -345,16 +333,10 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\TextureStore.cpp">
       <Filter>Graphics\Asset\Store</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.cpp">
-      <Filter>Graphics\Asset\Streaming</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifact.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAsset.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.cpp">
@@ -461,12 +443,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp">
       <Filter>Graphics\Resource</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.cpp">
-      <Filter>Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.cpp">
       <Filter>Graphics\Utility</Filter>
@@ -577,6 +553,21 @@
       <Filter>Private\Diagnostics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ArtifactContentDigest.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetPaths.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedDataKey.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAsset.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp">
@@ -915,6 +906,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\ShaderProgramCatalog.cpp">
       <Filter>Private\Graphics\Shader</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\TransferBatch.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\TransferManager.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Private\Graphics\Utility</Filter>
     </ClCompile>
@@ -929,16 +926,10 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentity.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentityConversions.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.h">
@@ -949,9 +940,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetStateEventQueue.h">
       <Filter>Graphics\Asset\Dependency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\DerivedDataKey.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
@@ -995,9 +983,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.h">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.h">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\ModelImporter.h">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
@@ -1013,22 +998,13 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\AssetPublicationServices.h">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\AssetResourcePublication.h">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJob.h">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJournal.h">
       <Filter>Graphics\Asset\Publication</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ReservedTexture.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyController.h">
-      <Filter>Graphics\Asset\Residency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyTypes.h">
       <Filter>Graphics\Asset\Residency</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MaterialStore.h">
@@ -1043,16 +1019,10 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\TextureStore.h">
       <Filter>Graphics\Asset\Store</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Streaming\AssetUploadScheduler.h">
-      <Filter>Graphics\Asset\Streaming</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifact.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAsset.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h">
@@ -1210,12 +1180,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h">
       <Filter>Graphics\Resource</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.h">
       <Filter>Graphics\Utility</Filter>
@@ -1709,6 +1673,21 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetContentFingerprint.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetIdentity.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetLoadProgress.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetPaths.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResidencyTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublication.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublicationTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
@@ -1724,7 +1703,19 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadControlTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetUploadScheduler.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataIdentity.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\DerivedDataKey.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ReservedTexture.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAsset.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h">
@@ -2082,6 +2073,12 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\TransferBatch.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\TransferManager.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\VertexData.h">

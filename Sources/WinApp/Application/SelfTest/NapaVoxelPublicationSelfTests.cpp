@@ -1,6 +1,6 @@
 #include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
 
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Lab/LabRuntime.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
@@ -14,7 +14,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Edit/VoxelDamage.h"

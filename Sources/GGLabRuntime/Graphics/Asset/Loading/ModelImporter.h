@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Async/ProgressChannel.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "GGLabRuntime/Graphics/VertexData.h"
 
 #include <array>

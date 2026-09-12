@@ -4,8 +4,8 @@
 #include "GGLabRuntime/Graphics/Asset/AssetStreamingTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadControlTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
-#include "Graphics/Asset/AssetIdentity.h"
-#include "Graphics/Asset/Publication/AssetResourcePublication.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 #include <array>

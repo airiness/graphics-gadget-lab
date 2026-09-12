@@ -1,6 +1,7 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadControlTypes.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"

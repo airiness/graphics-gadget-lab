@@ -4,15 +4,15 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
-#include "Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 #include "Graphics/Utility/TextureUtils.h"
 
 #include <algorithm>

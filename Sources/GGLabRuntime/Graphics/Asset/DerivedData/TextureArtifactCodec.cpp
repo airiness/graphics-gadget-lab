@@ -1,5 +1,5 @@
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
-#include "Graphics/Asset/DerivedData/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 
 #include <cstddef>
 #include <cstdint>

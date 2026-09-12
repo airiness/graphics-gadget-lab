@@ -5,7 +5,7 @@
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
-#include "Graphics/Asset/ReservedTexture.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"

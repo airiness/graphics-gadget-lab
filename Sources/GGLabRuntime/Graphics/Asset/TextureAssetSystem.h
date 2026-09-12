@@ -1,14 +1,14 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/Asset/ReservedTexture.h"
-#include "Graphics/Asset/Residency/AssetResidencyTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
 #include "Graphics/Asset/Store/TextureStore.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
-#include "Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 
 #include <cstddef>
 #include <cstdint>

@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 
 #include <compare>
 #include <cstddef>
