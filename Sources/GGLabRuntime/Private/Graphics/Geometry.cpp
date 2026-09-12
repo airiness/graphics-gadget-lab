@@ -1,4 +1,4 @@
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/MathConstants.h"
 #include "GGLabRuntime/Core/World.h"

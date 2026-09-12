@@ -13,7 +13,7 @@
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"
-#include "Graphics/VertexData.h"
+#include "GGLabRuntime/Graphics/VertexData.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/Asset/Loading/ModelImporter.h"
 

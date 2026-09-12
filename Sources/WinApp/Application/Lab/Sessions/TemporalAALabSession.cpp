@@ -6,7 +6,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"

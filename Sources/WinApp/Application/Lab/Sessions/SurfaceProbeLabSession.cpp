@@ -4,7 +4,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/SamplerRegistry.h"

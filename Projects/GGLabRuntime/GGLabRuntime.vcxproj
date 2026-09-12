@@ -202,7 +202,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.cpp" />
@@ -497,7 +497,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetPaths.h" />
@@ -587,7 +587,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Shader\ShaderTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferBatch.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\TransferManager.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\VertexData.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\VertexData.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h" />
   </ItemGroup>
   <ItemGroup>

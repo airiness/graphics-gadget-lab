@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/VertexData.h"
+#include "GGLabRuntime/Graphics/VertexData.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 #include <entt/entity/entity.hpp>

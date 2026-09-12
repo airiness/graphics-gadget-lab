@@ -351,9 +351,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -641,6 +638,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp">
       <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
@@ -1061,9 +1061,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentLightingSystem.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Geometry.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\GPUStructures.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1330,9 +1327,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\TextureUtils.h">
       <Filter>Graphics\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\VertexData.h">
-      <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h">
       <Filter>Private\Core\Allocator</Filter>
@@ -1829,6 +1823,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentSelectionControlBase.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Geometry.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
@@ -2016,6 +2013,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\VertexData.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\Components.h">

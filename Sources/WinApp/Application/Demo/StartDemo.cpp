@@ -9,7 +9,7 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"

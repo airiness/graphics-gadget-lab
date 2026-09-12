@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"
 #include "Graphics/Asset/TextureAsset.h"
-#include "Graphics/VertexData.h"
+#include "GGLabRuntime/Graphics/VertexData.h"
 
 #include <array>
 #include <cstddef>

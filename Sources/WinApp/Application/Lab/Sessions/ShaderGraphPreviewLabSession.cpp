@@ -5,7 +5,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderGraph/RenderGraph.h"

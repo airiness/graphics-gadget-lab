@@ -3,7 +3,7 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "Graphics/Renderer.h"

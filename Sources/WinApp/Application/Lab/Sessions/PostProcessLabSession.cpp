@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"

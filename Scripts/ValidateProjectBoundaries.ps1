@@ -884,7 +884,10 @@ $legacyRuntimeGraphicsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/GraphicsTypes.h"),
     (Join-Path $runtimeSourcesDir "Graphics/ShadowSettings.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.cpp")
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactContentDigest.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Geometry.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Geometry.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/VertexData.h")
 )
 foreach ($legacyPath in $legacyRuntimeGraphicsContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1212,7 +1215,8 @@ foreach ($legacyFile in $legacyRuntimeSceneFiles) {
 $legacyRuntimeGraphicsContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:GraphicsTypes\.h|ShadowSettings\.h|' +
     'SamplerTypes\.h|IBLBakeTypes\.h|RenderPass[\\/]RenderPassInfo\.h|' +
-    'Asset[\\/]ArtifactContentDigest\.h|PostProcess[\\/]PostProcessDebug\.h)[>"]'
+    'Asset[\\/]ArtifactContentDigest\.h|PostProcess[\\/]PostProcessDebug\.h|' +
+    'Geometry\.h|VertexData\.h)[>"]'
 $legacyRuntimeCameraIncludeRegex =
     '#include\s*[<"]Graphics[\\/]Camera(?:Controller|Rig)?\.h[>"]'
 $legacyRuntimeViewContractIncludeRegex =
