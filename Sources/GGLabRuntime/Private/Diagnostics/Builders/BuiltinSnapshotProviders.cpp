@@ -1,5 +1,5 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
-#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/IBLDiagnosticsSnapshotBuilder.h"

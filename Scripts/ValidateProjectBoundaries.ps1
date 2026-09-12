@@ -94,7 +94,7 @@ function ConvertTo-RepoRelativePath {
 
 # Runtime candidate directories (portable candidates; private backend leaves included).
 # Migrated Core and Scene files are validated through the Public/Private ownership rules below.
-$candidateDirs = @("Graphics", "Diagnostics", "Private/Graphics/RHI")
+$candidateDirs = @("Graphics", "Private/Graphics/RHI", "Private/Diagnostics")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
@@ -1018,15 +1018,15 @@ foreach ($legacyPath in $legacyRuntimeDiagnosticsContractPaths) {
     }
 }
 
-# The legacy Diagnostics snapshot root is fully migrated; it may no longer own files.
-$legacyRuntimeDiagnosticsSnapshotsDir = Join-Path $runtimeSourcesDir "Diagnostics/Snapshots"
-if (Test-Path -LiteralPath $legacyRuntimeDiagnosticsSnapshotsDir -PathType Container) {
-    foreach ($legacyFile in @(Get-ChildItem -LiteralPath $legacyRuntimeDiagnosticsSnapshotsDir `
+# The legacy Runtime Diagnostics tree is fully migrated; it may no longer own files.
+$legacyRuntimeDiagnosticsRoot = Join-Path $runtimeSourcesDir "Diagnostics"
+if (Test-Path -LiteralPath $legacyRuntimeDiagnosticsRoot -PathType Container) {
+    foreach ($legacyFile in @(Get-ChildItem -LiteralPath $legacyRuntimeDiagnosticsRoot `
             -Recurse -File)) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-private-layout"
             Target = ConvertTo-RepoRelativePath $legacyFile.FullName
-            Reason = "migrated Diagnostics snapshot contracts must live under Public/GGLabRuntime"
+            Reason = "migrated Runtime diagnostics engine, providers, builders and snapshots must live under Public/GGLabRuntime or Private"
         })
     }
 }

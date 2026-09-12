@@ -1,4 +1,4 @@
-#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/AssetManager.h"

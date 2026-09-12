@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Diagnostics">
-      <UniqueIdentifier>{F6A745A9-98F8-EDCE-A637-F1F393156953}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Diagnostics\Builders">
-      <UniqueIdentifier>{B816D142-0FC3-8951-5005-040C329965CB}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics">
       <UniqueIdentifier>{6642D0F7-FF51-7E46-BE41-E8BD8CBF8935}</UniqueIdentifier>
     </Filter>
@@ -233,45 +227,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>ThirdParty\D3D12MemoryAllocator\src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderQueueSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
-      <Filter>Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetManager.cpp">
       <Filter>Graphics\Asset</Filter>
@@ -606,13 +561,52 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\AssetToolingControl.cpp">
       <Filter>Private\Diagnostics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BackendSnapshotProviders.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BuiltinSnapshotProviders.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderQueueSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\CameraTooling.cpp">
@@ -901,45 +895,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h">
       <Filter>ThirdParty\VulkanMemoryAllocator\include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\AssetSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\RenderQueueSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
-      <Filter>Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ArtifactCacheCore.h">
       <Filter>Graphics\Asset</Filter>
@@ -1400,7 +1355,43 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BuiltinSnapshotProviders.h">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderQueueSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TaskSystemSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\CameraTooling.h">
@@ -1711,6 +1702,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h">
       <Filter>Public\GGLabRuntime\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\AssetSnapshotRead.h">
+      <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\DiagnosticsControl.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>

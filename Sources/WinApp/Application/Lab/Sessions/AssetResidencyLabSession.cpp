@@ -1,7 +1,7 @@
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"

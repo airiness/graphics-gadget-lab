@@ -1,6 +1,6 @@
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "AppRuntimeLog.h"
-#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
