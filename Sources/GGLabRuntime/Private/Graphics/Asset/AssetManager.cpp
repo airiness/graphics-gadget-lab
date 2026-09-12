@@ -137,7 +137,8 @@ namespace gglab
 			.m_StateEvents = &m_AssetStateEventQueue,
 			.m_ArtifactCache = &m_TextureArtifactCache,
 			.m_AssetRoot = createInfo.m_AssetRoot,
-			}))
+			})),
+		m_AssetPublicationCoordinator(m_AssetResidencyCoordinator)
 	{
 	}
 
@@ -171,7 +172,8 @@ namespace gglab
 			"AssetManager destroyed while asset owner scopes are still registered.");
 		GGLAB_ASSERT_MSG(!m_State->m_AssetResidencyCoordinator.HasPublicationRetains(),
 			"AssetManager destroyed while publication retains are still active.");
-		GGLAB_ASSERT_MSG(m_PublicationOrphanedMeshes.empty(),
+		GGLAB_ASSERT_MSG(
+			!m_State->m_AssetPublicationCoordinator.HasPendingMeshRollbacks(),
 			"AssetManager destroyed while publication mesh rollback is pending GPU completion.");
 		GGLAB_ASSERT_MSG(m_State->m_AssetResidencyCoordinator.PendingRetirements().empty(),
 			"AssetManager destroyed while runtime entry retirements are pending.");
@@ -370,7 +372,7 @@ namespace gglab
 			static_cast<uint32_t>(m_State->m_AssetResidencyCoordinator.PendingRetirements().size());
 		statistics.m_PublicationRetainCount = trackerStatistics.m_PublicationRetainCount;
 		statistics.m_PublicationProtectedCancellationCount =
-			m_PublicationProtectedCancellationCount;
+			m_State->m_AssetPublicationCoordinator.GetProtectedCancellationCount();
 		statistics.m_ActiveInterests.reserve(trackerStatistics.m_ActiveInterests.size());
 		for (const TrackedAssetInterestActivity& interest : trackerStatistics.m_ActiveInterests)
 		{
@@ -720,8 +722,9 @@ namespace gglab
 	AssetPublicationRetain AssetManager::AcquirePublicationRetain(
 		AssetKind kind, uint64_t stableId, uint64_t generation) noexcept
 	{
-		if (!IsInterestAssetKind(kind) || !m_State->m_AssetResidencyCoordinator.AcquirePublicationRetain(
-			MakeAssetContentVersion(kind, stableId, generation)))
+		if (!IsInterestAssetKind(kind) ||
+			!m_State->m_AssetPublicationCoordinator.AcquireRetain(
+				MakeAssetContentVersion(kind, stableId, generation)))
 		{
 			return {};
 		}
@@ -737,7 +740,7 @@ namespace gglab
 	void AssetManager::ReleasePublicationRetain(
 		AssetKind kind, uint64_t stableId, uint64_t generation) noexcept
 	{
-		m_State->m_AssetResidencyCoordinator.ReleasePublicationRetain(
+		m_State->m_AssetPublicationCoordinator.ReleaseRetain(
 			MakeAssetContentVersion(kind, stableId, generation));
 		const AssetKey key{
 			.m_Kind = kind,
@@ -751,7 +754,7 @@ namespace gglab
 
 	bool AssetManager::HasPublicationRetain(AssetKey key, uint64_t generation) const noexcept
 	{
-		return m_State->m_AssetResidencyCoordinator.HasPublicationRetain(
+		return m_State->m_AssetPublicationCoordinator.HasRetain(
 			MakeAssetContentVersion(key, generation));
 	}
 
@@ -1237,7 +1240,7 @@ namespace gglab
 	{
 		if (HasPublicationRetain(key, generation))
 		{
-			++m_PublicationProtectedCancellationCount;
+			m_State->m_AssetPublicationCoordinator.RecordProtectedCancellation();
 			return;
 		}
 		if (key.m_Kind == AssetKind::Model)
@@ -2243,7 +2246,7 @@ namespace gglab
 
 	bool AssetManager::RemoveMesh(MeshID meshId) noexcept
 	{
-		m_PublicationOrphanedMeshes.erase(meshId);
+		m_State->m_AssetPublicationCoordinator.CompleteMeshRollback(meshId);
 		return m_State->m_MeshStore.Remove(meshId);
 	}
 
@@ -2265,7 +2268,7 @@ namespace gglab
 			m_AssetUploadScheduler->CancelReadyWork(MakeAssetContentVersion(meshId, generation)));
 		if ((mesh->m_VertexBuffer || mesh->m_IndexBuffer) && mesh->m_State != AssetState::Ready)
 		{
-			m_PublicationOrphanedMeshes.insert(meshId);
+			m_State->m_AssetPublicationCoordinator.BeginMeshRollback(meshId);
 			SetMeshState(*mesh, AssetState::GpuProcessing);
 			ProgressReporter(mesh->m_LoadProgress)
 				.Report(0.96f, "Mesh publication rollback pending GPU completion");
@@ -2612,7 +2615,8 @@ namespace gglab
 			return;
 		}
 		const bool residencyReload = mesh->m_IsReloading;
-		const bool publicationOrphan = m_PublicationOrphanedMeshes.contains(meshId);
+		const bool publicationOrphan =
+			m_State->m_AssetPublicationCoordinator.IsMeshRollbackPending(meshId);
 		const bool cancelled = mesh->m_CancelRequested || publicationOrphan;
 		const bool publishSucceeded = succeeded && !cancelled;
 		SetMeshState(*mesh,

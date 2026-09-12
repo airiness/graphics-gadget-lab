@@ -319,14 +319,12 @@ namespace gglab
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
 		std::unordered_set<ModelID> m_PendingModels;
-		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;
 		uint64_t m_RuntimeRetirementRequestCount = 0;
 		uint64_t m_RuntimeRetirementCancellationCount = 0;
 		uint64_t m_RuntimeRetirementCount = 0;
-		uint64_t m_PublicationProtectedCancellationCount = 0;
 		bool m_AcceptingCommands = true;
 		bool m_IsPreparedForShutdown = false;
 		std::unique_ptr<AssetManagerState> m_State;

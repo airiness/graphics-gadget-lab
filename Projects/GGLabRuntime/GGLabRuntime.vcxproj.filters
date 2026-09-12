@@ -570,6 +570,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetManagerPublicationServices.cpp">
       <Filter>Private\Graphics\Asset\Publication</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.cpp">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.cpp">
       <Filter>Private\Graphics\Asset\Residency</Filter>
     </ClCompile>
@@ -1258,6 +1261,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h">
       <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.h">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.h">
       <Filter>Private\Graphics\Asset\Residency</Filter>
