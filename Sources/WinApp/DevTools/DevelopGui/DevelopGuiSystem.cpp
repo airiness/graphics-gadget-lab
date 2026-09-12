@@ -6,7 +6,7 @@
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
 #include "Graphics/RenderContexts.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"

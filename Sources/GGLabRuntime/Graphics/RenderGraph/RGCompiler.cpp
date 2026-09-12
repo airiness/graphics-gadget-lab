@@ -1,6 +1,6 @@
 #include "Graphics/RenderGraph/RGCompiler.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGBarrierPlanner.h"
 
 #include <algorithm>

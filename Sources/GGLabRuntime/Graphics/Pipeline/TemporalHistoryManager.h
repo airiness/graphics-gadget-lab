@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 
 #include <array>

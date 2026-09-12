@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 
 namespace gglab

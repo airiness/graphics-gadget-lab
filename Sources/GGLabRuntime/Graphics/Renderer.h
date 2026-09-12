@@ -7,9 +7,9 @@
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalFrameTransaction.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/RenderContexts.h"
 #include "Graphics/RenderScene.h"
 

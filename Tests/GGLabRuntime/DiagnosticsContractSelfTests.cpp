@@ -28,7 +28,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 
 #include <concepts>

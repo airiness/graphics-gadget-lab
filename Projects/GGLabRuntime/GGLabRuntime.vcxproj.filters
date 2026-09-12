@@ -115,6 +115,9 @@
     <Filter Include="Private\Graphics\RenderPipeline">
       <UniqueIdentifier>{B7560A72-DFCD-B211-2BD7-F4FD1CCF1492}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\Resource">
+      <UniqueIdentifier>{16D460A4-54AC-041B-F48F-B20357D1AF5A}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\RHI">
       <UniqueIdentifier>{ED1647C5-3056-E812-9A61-FC4A35E8B42C}</UniqueIdentifier>
     </Filter>
@@ -390,9 +393,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RenderGraph.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -484,9 +484,6 @@
       <Filter>Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.cpp">
-      <Filter>Graphics\Resource</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.cpp">
       <Filter>Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.cpp">
@@ -648,6 +645,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp">
       <Filter>Private\Graphics\PostProcess</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RenderGraph.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -662,6 +662,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\TransientResourcePool.cpp">
+      <Filter>Private\Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.cpp">
       <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
@@ -1124,9 +1127,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.h">
       <Filter>Graphics</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1263,9 +1263,6 @@
       <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\RenderResourceRegistry.h">
-      <Filter>Graphics\Resource</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\TransientResourcePool.h">
       <Filter>Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\SamplerRegistry.h">
@@ -1871,6 +1868,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h">
       <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraphTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1918,6 +1918,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourcePool.h">
+      <Filter>Public\GGLabRuntime\Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourceTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Resource</Filter>

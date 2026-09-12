@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"

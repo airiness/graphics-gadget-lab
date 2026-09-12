@@ -1,7 +1,7 @@
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
 
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 
 namespace gglab

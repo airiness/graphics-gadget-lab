@@ -2,7 +2,7 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"

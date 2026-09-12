@@ -30,7 +30,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 
 #include <memory>
 #include <string_view>

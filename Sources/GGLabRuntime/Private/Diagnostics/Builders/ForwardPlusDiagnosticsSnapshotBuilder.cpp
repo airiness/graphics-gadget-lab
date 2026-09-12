@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"

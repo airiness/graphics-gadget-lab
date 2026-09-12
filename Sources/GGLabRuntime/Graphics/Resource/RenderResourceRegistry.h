@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"

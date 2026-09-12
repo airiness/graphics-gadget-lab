@@ -1,7 +1,7 @@
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 
 #include <unordered_set>
 

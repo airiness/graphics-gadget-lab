@@ -5,7 +5,7 @@
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 
 #include <cstdint>
 #include <span>

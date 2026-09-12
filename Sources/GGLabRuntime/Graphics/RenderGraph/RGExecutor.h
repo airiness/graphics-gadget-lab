@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 
 namespace gglab
 {

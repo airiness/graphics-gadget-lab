@@ -2,7 +2,7 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"

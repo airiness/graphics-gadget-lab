@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGArenaAllocator.h"
-#include "Graphics/Resource/TransientResourcePool.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGBlackboard.h"

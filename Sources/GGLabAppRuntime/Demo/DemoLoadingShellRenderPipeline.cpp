@@ -1,7 +1,7 @@
 #include "Demo/DemoLoadingShellRenderPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
