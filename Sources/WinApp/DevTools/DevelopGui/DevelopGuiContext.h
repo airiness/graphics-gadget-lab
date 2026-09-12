@@ -30,7 +30,8 @@ namespace gglab
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
-	class DebugDrawSystem;
+	class DebugDrawChannelControlBase;
+	class DebugDrawChannelViewBase;
 	struct ViewRenderSettingsOverrides;
 
 	class DevelopGuiStateStore;
@@ -62,7 +63,8 @@ namespace gglab
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
-		DebugDrawSystem* m_DebugDrawSystem = nullptr;
+		const DebugDrawChannelViewBase* m_DebugDrawChannels = nullptr;
+		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;

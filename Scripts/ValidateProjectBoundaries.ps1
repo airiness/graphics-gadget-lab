@@ -950,9 +950,10 @@ foreach ($legacyPath in $legacyRuntimeRenderQueueContractPaths) {
 }
 
 $legacyRuntimeDebugDrawContractPaths = @(
-    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDraw.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawShapes.cpp"),
-    (Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawSystem.cpp")
+(Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDraw.h"),
+(Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawShapes.cpp"),
+(Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawSystem.cpp"),
+(Join-Path $runtimeSourcesDir "Graphics/DebugDraw/DebugDrawSystem.h")
 )
 foreach ($legacyPath in $legacyRuntimeDebugDrawContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -960,6 +961,26 @@ foreach ($legacyPath in $legacyRuntimeDebugDrawContractPaths) {
             Rule   = "runtime-public-private-layout"
             Target = ConvertTo-RepoRelativePath $legacyPath
             Reason = "migrated DebugDraw contracts and implementations must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
+# Debug draw is composed through the Public service factory; ordinary consumers
+# receive only the channel view/control capabilities.
+$debugDrawServiceConsumerRegex =
+    '\bDebugDrawSystem\b|#include\s*[<"]Graphics[\\/]DebugDraw[\\/]DebugDrawSystem\.h[>"]'
+foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) +
+        @($appRuntimeTestsSourceItems)) {
+    $extension = [System.IO.Path]::GetExtension($itemPath).ToLowerInvariant()
+    if ($extension -notin $firstPartySourceExtensions) {
+        continue
+    }
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $debugDrawServiceConsumerRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "debug-draw-service-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "ordinary consumers must compose the Public DebugDraw service and consume channel capabilities without the live system type"
         })
     }
 }

@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <mutex>
@@ -11,30 +11,33 @@ namespace gglab
 {
 	class RHIDevice;
 
-	class DebugDrawSystem
+	class DebugDrawSystem final :
+		public DebugDrawService,
+		public DebugDrawChannelViewBase,
+		public DebugDrawChannelControlBase
 	{
 	public:
-		static constexpr uint32_t DefaultMaxVertexCount = 131'072;
-
-		struct CreateInfo
-		{
-			RHIDevice* m_Device = nullptr;
-			uint32_t m_FrameSlotCount = 0;
-			uint32_t m_MaxVertexCountPerFrame = DefaultMaxVertexCount;
-		};
-
-		explicit DebugDrawSystem(const CreateInfo& createInfo) noexcept;
+		explicit DebugDrawSystem(const DebugDrawServiceCreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DebugDrawSystem);
-		~DebugDrawSystem() noexcept;
+		~DebugDrawSystem() noexcept override;
 
-		DebugDrawContext& GetContext() noexcept { return m_Context; }
-		const DebugDrawFrameView& SealFrame(
-			uint32_t frameSlot, float deltaTime, const DebugDrawCullContext& cullContext) noexcept;
-		void Clear() noexcept;
-		void ClearChannel(StringID channel) noexcept;
-		void SetChannelEnabled(StringID channel, bool enabled) noexcept;
+		[[nodiscard]] DebugDrawContext& GetContext() noexcept override { return m_Context; }
+		[[nodiscard]] const DebugDrawFrameView& SealFrame(uint32_t frameSlot,
+			float deltaTime, const DebugDrawCullContext& cullContext) noexcept override;
+		void Clear() noexcept override;
+		void ClearChannel(StringID channel) noexcept override;
+		void SetChannelEnabled(StringID channel, bool enabled) noexcept override;
 		[[nodiscard]] bool IsChannelEnabled(StringID channel) const noexcept;
-		[[nodiscard]] std::vector<DebugDrawChannelState> GetChannelStates() const noexcept;
+		[[nodiscard]] std::vector<DebugDrawChannelState> GetChannelStates()
+			const noexcept override;
+		[[nodiscard]] DebugDrawChannelViewBase* GetChannelView() noexcept override
+		{
+			return this;
+		}
+		[[nodiscard]] DebugDrawChannelControlBase* GetChannelControl() noexcept override
+		{
+			return this;
+		}
 
 	private:
 		friend class DebugDrawContext;

@@ -9,9 +9,9 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/RenderFrameBuilder.h"
@@ -147,7 +147,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
 
-		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
+		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = m_Renderer->GetDevice(),
 			.m_FrameSlotCount = m_Renderer->GetRHIContext()->GetFrameSlotCount(),
 			});
@@ -183,7 +183,7 @@ namespace gglab
 					.m_TaskSystem = m_TaskSystem.get(),
 					.m_Input = m_Input,
 					.m_Time = m_Time.get(),
-					.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
+					.m_DebugDraw = &m_DebugDrawService->GetContext(),
 					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				},
 			.m_WindowWidth = m_WindowWidth,
@@ -350,7 +350,7 @@ namespace gglab
 				m_Diagnostics.reset();
 				m_RenderFrameBuilder.reset();
 				m_DemoManager.reset();
-				m_DebugDrawSystem.reset();
+				m_DebugDrawService.reset();
 				m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
 				m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
 			}
@@ -367,7 +367,7 @@ namespace gglab
 		m_Diagnostics.reset();
 		m_RenderFrameBuilder.reset();
 		m_DemoManager.reset();
-		m_DebugDrawSystem.reset();
+		m_DebugDrawService.reset();
 		if (m_Renderer)
 		{
 			m_Renderer->Finalize();

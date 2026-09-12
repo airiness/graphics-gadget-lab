@@ -79,7 +79,7 @@ namespace gglab
 	class ApplicationInput;
 	class ApplicationToolingIntegrationBase;
 	class AssetManager;
-	class DebugDrawSystem;
+	class DebugDrawService;
 	class DemoManager;
 	class DiagnosticsControl;
 	class DiagnosticsSession;
@@ -187,9 +187,9 @@ namespace gglab
 		{
 			return m_RenderFrameBuilder.get();
 		}
-		[[nodiscard]] DebugDrawSystem* GetDebugDrawSystem() const noexcept
+		[[nodiscard]] DebugDrawService* GetDebugDrawService() const noexcept
 		{
-			return m_DebugDrawSystem.get();
+			return m_DebugDrawService.get();
 		}
 		// Non-owning; null unless optional diagnostics were composed with runtime services.
 		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
@@ -220,7 +220,7 @@ namespace gglab
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
 		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
-		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
+		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;

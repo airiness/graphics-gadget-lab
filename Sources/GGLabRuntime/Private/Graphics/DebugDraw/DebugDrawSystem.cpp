@@ -19,7 +19,7 @@
 
 namespace gglab
 {
-	DebugDrawSystem::DebugDrawSystem(const CreateInfo& createInfo) noexcept :
+	DebugDrawSystem::DebugDrawSystem(const DebugDrawServiceCreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device), m_Context(this),
 		m_FrameSlotCount(createInfo.m_FrameSlotCount),
 		m_MaxVertexCountPerFrame(createInfo.m_MaxVertexCountPerFrame)
@@ -502,5 +502,11 @@ namespace gglab
 	void DebugDrawContext::Aabb(const math::Aabb& bounds, const DebugDrawStyle& style) noexcept
 	{
 		Box(bounds.m_Center, bounds.m_Extents, style);
+	}
+
+	std::unique_ptr<DebugDrawService> CreateDebugDrawService(
+		const DebugDrawServiceCreateInfo& createInfo) noexcept
+	{
+		return std::make_unique<DebugDrawSystem>(createInfo);
 	}
 }

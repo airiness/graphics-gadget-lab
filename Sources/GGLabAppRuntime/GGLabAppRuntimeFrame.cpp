@@ -14,7 +14,7 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "Graphics/EnvironmentAssetController.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -238,8 +238,8 @@ namespace gglab
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
-		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
-		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
+		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawService->GetContext());
+		frame.m_DebugDrawFrame = m_DebugDrawService->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
@@ -318,7 +318,8 @@ namespace gglab
 				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
 				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
 				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),
-				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
+				.m_DebugDrawChannels = m_DebugDrawService->GetChannelView(),
+				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};

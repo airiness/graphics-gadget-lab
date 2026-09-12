@@ -49,9 +49,6 @@
     <Filter Include="Graphics\Buffer">
       <UniqueIdentifier>{410A6D68-F3E0-CD91-88A2-F847D21EE116}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\DebugDraw">
-      <UniqueIdentifier>{8081B448-6644-768D-11F2-E200485C4C48}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\Pipeline">
       <UniqueIdentifier>{9B9C8ACD-D635-9D2B-6B51-DA8C000568C1}</UniqueIdentifier>
     </Filter>
@@ -1103,9 +1100,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Graphics\Buffer</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\DebugDraw\DebugDrawSystem.h">
-      <Filter>Graphics\DebugDraw</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\EnvironmentAssetController.h">
       <Filter>Graphics</Filter>
     </ClInclude>
@@ -1426,6 +1420,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.h">
       <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h">
+      <Filter>Private\Graphics\DebugDraw</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
@@ -1821,6 +1818,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
+      <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentLightingControlBase.h">

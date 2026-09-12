@@ -10,7 +10,8 @@ namespace gglab
 	class CameraToolingViewBase;
 	class CameraToolingControlBase;
 	class CameraRenderViewQueryBase;
-	class DebugDrawSystem;
+	class DebugDrawChannelControlBase;
+	class DebugDrawChannelViewBase;
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class EnvironmentSelectionControlBase;
@@ -70,7 +71,8 @@ namespace gglab
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
-		DebugDrawSystem* m_DebugDrawSystem = nullptr;
+		const DebugDrawChannelViewBase* m_DebugDrawChannels = nullptr;
+		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
 	};
