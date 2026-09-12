@@ -1,9 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
-#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 
+#include <filesystem>
 #include <memory>
 #include <stop_token>
 #include <string>
@@ -12,6 +12,7 @@ namespace gglab
 {
 	struct TextureDerivedDataCoordinatorCore;
 	struct TextureDerivedDataRequestState;
+	struct TextureDerivedDataStoreState;
 
 	enum class ArtifactRequestDisposition : uint8_t
 	{
@@ -121,18 +122,12 @@ namespace gglab
 
 		[[nodiscard]] TextureDerivedDataCoordinatorStatistics GetCoordinatorStatistics()
 			const noexcept;
-		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept
-		{
-			return m_Store.GetStatistics();
-		}
-		[[nodiscard]] bool Contains(const DerivedDataKey& key) const noexcept
-		{
-			return m_Store.Contains(key);
-		}
-		[[nodiscard]] bool Clear() noexcept { return m_Store.Clear(); }
+		[[nodiscard]] LocalDerivedDataStoreStatistics GetStoreStatistics() const noexcept;
+		[[nodiscard]] bool Contains(const DerivedDataKey& key) const noexcept;
+		[[nodiscard]] bool Clear() noexcept;
 
 	private:
 		std::shared_ptr<TextureDerivedDataCoordinatorCore> m_Core;
-		LocalDerivedDataStore m_Store;
+		std::unique_ptr<TextureDerivedDataStoreState> m_Store;
 	};
 }

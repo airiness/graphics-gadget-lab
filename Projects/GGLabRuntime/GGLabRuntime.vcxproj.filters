@@ -115,6 +115,9 @@
     <Filter Include="Private\Graphics\RenderGraph">
       <UniqueIdentifier>{1F02624B-E1F5-9E78-83DC-401B4551FF0A}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\RenderPass">
+      <UniqueIdentifier>{B73F1B20-8C3F-FF02-0688-4566B7F3F2EA}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\RenderPipeline">
       <UniqueIdentifier>{B7560A72-DFCD-B211-2BD7-F4FD1CCF1492}</UniqueIdentifier>
     </Filter>
@@ -282,9 +285,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureDerivedDataSystem.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
@@ -298,9 +298,6 @@
       <Filter>Graphics\Asset\Interop</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\TextureLoader.cpp">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ModelImportArtifactCache.cpp">
@@ -385,9 +382,6 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.cpp">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBL.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp">
@@ -585,6 +579,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAsset.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataSystem.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureLoader.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp">
       <Filter>Private\Graphics\Buffer</Filter>
     </ClCompile>
@@ -653,6 +653,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
       <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp">
       <Filter>Private\Graphics\RenderPipeline</Filter>
@@ -974,9 +977,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.h">
       <Filter>Graphics\Asset\DerivedData</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureDerivedDataSystem.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
@@ -990,9 +990,6 @@
       <Filter>Graphics\Asset\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.h">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\TextureLoader.h">
       <Filter>Graphics\Asset\Loading</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ModelImportArtifactCache.h">
@@ -1122,9 +1119,6 @@
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.h">
@@ -1294,6 +1288,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h">
       <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
       <Filter>Private\Graphics\RenderPipeline</Filter>
@@ -1754,6 +1751,12 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataSystem.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureLoader.h">
+      <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\Buffer.h">
       <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
     </ClInclude>
@@ -1941,6 +1944,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\IBLGraphSetupPass.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassBase.h">

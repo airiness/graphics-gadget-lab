@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
-#include "Graphics/Asset/Loading/TextureLoader.h"
+#include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 

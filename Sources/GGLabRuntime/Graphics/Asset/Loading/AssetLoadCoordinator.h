@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
-#include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
+#include "GGLabRuntime/Graphics/Asset/TextureDerivedDataSystem.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"

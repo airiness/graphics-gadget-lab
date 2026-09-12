@@ -1,6 +1,7 @@
-#include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
+#include "GGLabRuntime/Graphics/Asset/TextureDerivedDataSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 
 #include <cstddef>
@@ -17,6 +18,15 @@
 
 namespace gglab
 {
+	struct TextureDerivedDataStoreState
+	{
+		explicit TextureDerivedDataStoreState(std::filesystem::path cacheDirectory) noexcept :
+			m_Store(std::move(cacheDirectory))
+		{
+		}
+
+		LocalDerivedDataStore m_Store;
+	};
 	struct TextureDerivedDataRequestState
 	{
 		DerivedDataKey m_Key{};
@@ -209,7 +219,7 @@ namespace gglab
 	TextureDerivedDataSystem::TextureDerivedDataSystem(
 		std::filesystem::path cacheDirectory) noexcept :
 		m_Core(std::make_shared<TextureDerivedDataCoordinatorCore>()),
-		m_Store(std::move(cacheDirectory))
+		m_Store(std::make_unique<TextureDerivedDataStoreState>(std::move(cacheDirectory)))
 	{
 	}
 
@@ -314,7 +324,7 @@ namespace gglab
 				TextureArtifactType, TextureArtifactCodec::GetMaximumSerializedBytes()),
 		};
 		DerivedDataReadResult cached =
-			m_Store.Read(key, TextureArtifactType, TextureArtifactSchemaVersion, readOptions);
+			m_Store->m_Store.Read(key, TextureArtifactType, TextureArtifactSchemaVersion, readOptions);
 		if (cached.m_Disposition != DerivedDataReadDisposition::Hit)
 		{
 			return {};
@@ -323,7 +333,7 @@ namespace gglab
 			TextureArtifactCodec::Deserialize(cached.m_Payload, cached.m_ArtifactContentDigest);
 		if (!decoded.Succeeded())
 		{
-			m_Store.DiscardObservedCorrupt(key, TextureArtifactType, TextureArtifactSchemaVersion,
+			m_Store->m_Store.DiscardObservedCorrupt(key, TextureArtifactType, TextureArtifactSchemaVersion,
 				cached.m_ArtifactContentDigest, cached.m_PayloadDigest, readOptions);
 			GGLAB_LOG_GRAPHICS_WARN("Texture DDC entry '{}' failed codec validation: {}",
 				DerivedDataKeyText(key), decoded.m_Error);
@@ -344,7 +354,7 @@ namespace gglab
 	{
 		const std::vector<std::byte> payload = TextureArtifactCodec::Serialize(artifact);
 		return !payload.empty() &&
-			m_Store.Write(key, TextureArtifactType, TextureArtifactSchemaVersion,
+			m_Store->m_Store.Write(key, TextureArtifactType, TextureArtifactSchemaVersion,
 				artifact.m_ContentDigest, payload);
 	}
 
@@ -353,5 +363,20 @@ namespace gglab
 	{
 		std::scoped_lock lock(m_Core->m_Mutex);
 		return m_Core->m_Statistics;
+	}
+
+	LocalDerivedDataStoreStatistics TextureDerivedDataSystem::GetStoreStatistics() const noexcept
+	{
+		return m_Store->m_Store.GetStatistics();
+	}
+
+	bool TextureDerivedDataSystem::Contains(const DerivedDataKey& key) const noexcept
+	{
+		return m_Store->m_Store.Contains(key);
+	}
+
+	bool TextureDerivedDataSystem::Clear() noexcept
+	{
+		return m_Store->m_Store.Clear();
 	}
 }

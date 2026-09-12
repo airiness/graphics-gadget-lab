@@ -1,7 +1,7 @@
 #include "Demo/DemoLoadingShellRenderPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/RenderPassIBL.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -27,6 +27,11 @@ namespace gglab
 		class RenderPipelineLoadingShell final : public RenderPipelineBase
 		{
 		public:
+			RenderPipelineLoadingShell() noexcept :
+				m_IBLPass(CreateIBLGraphSetupPass())
+			{
+			}
+
 			std::string_view GetName() const noexcept override
 			{
 				return "RenderPipeline.LoadingShell";
@@ -127,12 +132,12 @@ namespace gglab
 						}
 					});
 
-				m_IBLPass.AddPass(rg, context, services);
+				m_IBLPass->AddPass(rg, context, services);
 				if (services.m_OverlayExtension)
 				{
 					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 				}
-				m_IBLPass.AddFinishPass(rg);
+				m_IBLPass->AddFinishPass(rg);
 
 				rg.AddPass<LoadingShellFinishPassData>("LoadingShell.Finish",
 					[displayViewId](
@@ -156,7 +161,7 @@ namespace gglab
 			}
 
 		private:
-			RenderPassIBL m_IBLPass;
+			std::unique_ptr<IBLGraphSetupPass> m_IBLPass;
 		};
 	}
 

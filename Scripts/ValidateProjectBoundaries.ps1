@@ -948,7 +948,9 @@ $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/IBLGraphResources.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/SceneDepthGraphResources.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalFrameTransaction.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalFrameTransaction.cpp")
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalFrameTransaction.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassIBL.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassIBL.cpp")
 )
 foreach ($legacyPath in $legacyRuntimeFrameContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1046,7 +1048,11 @@ $legacyRuntimeAssetContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/ModelImporter.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/ModelImporter.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/ModelImportArtifact.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Asset/ModelImportArtifact.cpp")
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ModelImportArtifact.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/TextureLoader.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/TextureLoader.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/TextureDerivedDataSystem.cpp")
 )
 foreach ($legacyPath in $legacyRuntimeAssetContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1445,7 +1451,7 @@ $legacyRuntimeAssetContractIncludeRegex =
     'Asset[\\/](?:AssetIdentity|ReservedTexture|AssetPaths|AssetLoadProgress|' +
     'AssetResourcePublication|DerivedDataKey|TextureAsset|AssetUploadScheduler|' +
     'AssetManager|TextureAssetValidation|ArtifactCacheCore|TextureArtifact|' +
-    'ModelImportArtifact)\.h|' +
+    'ModelImportArtifact|TextureLoader|TextureDerivedDataSystem)\.h|' +
     'Asset[\\/](?:Residency[\\/]AssetResidencyTypes|Loading[\\/]ModelImporter)\.h|' +
     'TransferBatch\.h|TransferManager\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

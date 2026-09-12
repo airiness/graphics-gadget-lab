@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
 #include "Graphics/RenderPass/RenderPassIBLClear.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
@@ -11,7 +12,7 @@
 
 namespace gglab
 {
-	class RenderPassIBL : public RenderPassBase
+	class RenderPassIBL final : public RenderPassBase, public IBLGraphSetupPass
 	{
 	public:
 		RenderPassIBL() noexcept :
@@ -31,7 +32,7 @@ namespace gglab
 
 		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
-		void AddFinishPass(RenderGraph& rg) noexcept;
+		void AddFinishPass(RenderGraph& rg) noexcept override;
 
 	private:
 		static RGTextureId ImportRuntimeTexture(RenderGraph::RGBuilder& builder,

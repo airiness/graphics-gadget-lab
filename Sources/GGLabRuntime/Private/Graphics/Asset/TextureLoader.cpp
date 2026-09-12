@@ -1,4 +1,4 @@
-#include "Graphics/Asset/Loading/TextureLoader.h"
+#include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"

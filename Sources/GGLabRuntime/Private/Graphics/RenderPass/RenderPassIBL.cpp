@@ -166,4 +166,9 @@ namespace gglab
 			: registry.GetTextureHandle(texIndex),
 			*desc, importContract.m_InitialState, importContract.m_InitialContentValidity);
 	}
+
+	std::unique_ptr<IBLGraphSetupPass> CreateIBLGraphSetupPass() noexcept
+	{
+		return std::make_unique<RenderPassIBL>();
+	}
 }
