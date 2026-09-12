@@ -164,6 +164,10 @@ namespace gglab
 			return m_ServicesInitialized;
 		}
 		[[nodiscard]] RenderHost* GetRenderHost() const noexcept { return m_RenderHost.get(); }
+		[[nodiscard]] const RenderServices& GetRenderServices() const noexcept
+		{
+			return m_RenderServices;
+		}
 		[[nodiscard]] AssetManager* GetAssetManager() const noexcept
 		{
 			return m_AssetManager.get();

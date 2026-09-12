@@ -1,9 +1,7 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
@@ -224,7 +222,7 @@ namespace gglab
 		floorMaterial.m_Properties.m_MetallicFactor = 0.15f;
 		GGLAB_UNUSED(primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = floorTransform,
 			.m_MaterialInstance = floorMaterial,
@@ -259,7 +257,7 @@ namespace gglab
 			material.m_Properties.m_RoughnessFactor = 0.25f;
 			const entt::entity emitter = primitive::Sphere::Create({
 				.m_AssetManager = m_Services.m_AssetManager,
-				.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+				.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,

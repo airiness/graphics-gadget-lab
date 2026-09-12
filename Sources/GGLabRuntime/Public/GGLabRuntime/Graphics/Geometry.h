@@ -12,7 +12,7 @@
 namespace gglab
 {
 	class AssetManager;
-	class SamplerRegistry;
+	class RenderSamplerAccess;
 	class World;
 
 	namespace primitive
@@ -23,7 +23,7 @@ namespace gglab
 			struct CreateInfo
 			{
 				AssetManager* m_AssetManager = nullptr;
-				SamplerRegistry* m_SamplerRegistry = nullptr;
+				RenderSamplerAccess* m_SamplerRegistry = nullptr;
 				World* m_World = nullptr;
 				components::TransformComponent m_Transform{};
 				std::optional<components::MaterialInstanceComponent> m_MaterialInstance;

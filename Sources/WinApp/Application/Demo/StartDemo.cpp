@@ -1,4 +1,5 @@
 #include "Application/Demo/StartDemo.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "ApplicationCameraInput.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
@@ -11,8 +12,6 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/LegacyRenderHostAccess.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
@@ -220,8 +219,7 @@ namespace gglab
 	{
 		auto* assetManager = m_Services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		auto* samplerRegistry =
-			GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry();
+		auto* samplerRegistry = m_Services.m_RenderServices.m_Samplers;
 
 		components::TransformComponent platformTransform{};
 		platformTransform.m_Position = Vector3(0.0f, -1.25f, 6.0f);

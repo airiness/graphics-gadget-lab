@@ -1,5 +1,7 @@
 #include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabFoundation/Base/MathUtils.h"
@@ -8,7 +10,6 @@
 #include "Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -889,7 +890,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 		sphereTransform.m_Scale = Vector3::One * 1.25f;
 		m_SphereEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =
@@ -901,7 +902,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 		planeTransform.m_Scale = Vector3::One * 1.35f;
 		m_PlaneEntity = primitive::Plane::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = planeTransform,
 			.m_MaterialInstance =
@@ -913,7 +914,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 		cubeTransform.m_Scale = Vector3::One * 1.15f;
 		m_CubeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = cubeTransform,
 			.m_MaterialInstance =
@@ -1034,7 +1035,7 @@ auto* swapChain = services.m_Presentation->GetSwapChain();
 		const uint32_t expectedTextureIndex = m_Services.m_AssetManager->ResolveSrvIndex(
 			ResolvePreviewTextureId(textureFixture), ReservedTextureIDIndex::BaseColorWhite);
 		const uint32_t expectedSamplerIndex =
-			GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearWrap);
+			m_Services.m_RenderServices.m_Samplers->GetSamplerIndex(SamplerPreset::LinearWrap);
 		const bool textureBindingMatches = contract == PreviewInputContract::NumericV1 ||
 			(m_State->m_LastTextureIndex.load(std::memory_order_relaxed) == expectedTextureIndex &&
 				m_State->m_LastSamplerIndex.load(std::memory_order_relaxed) ==

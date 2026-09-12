@@ -1,7 +1,8 @@
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderPass.h"
+#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderExtension.h"
 
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"

@@ -5,7 +5,6 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Asset/Loading/AssetLoadProgress.h"
 #include "Graphics/Asset/AssetManager.h"

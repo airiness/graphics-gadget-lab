@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/MathConstants.h"
 #include "GGLabRuntime/Core/World.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/SamplerRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <array>
 #include <cmath>

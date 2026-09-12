@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -220,6 +221,9 @@ namespace gglab
 		virtual ~RenderTemporalAccess() = default;
 
 		virtual void PublishTemporalAAResolvePipelineClosure(bool available) noexcept = 0;
+		virtual void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept = 0;
+		[[nodiscard]] virtual TemporalHistoryManagerDiagnostics GetTemporalHistoryDiagnostics()
+			const = 0;
 	};
 
 	// Explicit services borrowed for one frame or pipeline invocation. The

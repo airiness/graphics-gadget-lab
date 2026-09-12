@@ -16,7 +16,6 @@
 #include "ApplicationInput.h"
 #include "Application/Platform/Windows/Input/InputManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "Lab/LabRuntime.h"
 
 #include <optional>
@@ -228,7 +227,6 @@ namespace gglab
 		}
 
 		RenderHost* renderHost = m_AppRuntime->GetRenderHost();
-		Renderer* renderer = renderHost ? &GetLegacyRenderer(*renderHost) : nullptr;
 		TaskSystem* taskSystem = m_AppRuntime->GetTaskSystem();
 		ShaderManager* shaderManager = m_AppRuntime->GetShaderManager();
 		DemoManager* demoManager = m_AppRuntime->GetDemoManager();
@@ -270,7 +268,7 @@ namespace gglab
 					.m_BuildRequest = shaderBuildRequest,
 					.m_TaskSystem = taskSystem,
 					.m_ShaderManager = shaderManager,
-					.m_Renderer = renderer,
+					.m_RenderTemporal = m_AppRuntime->GetRenderServices().m_Temporal,
 				});
 				if (!m_ShaderHotReload->Initialize())
 				{

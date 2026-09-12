@@ -1,7 +1,6 @@
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"

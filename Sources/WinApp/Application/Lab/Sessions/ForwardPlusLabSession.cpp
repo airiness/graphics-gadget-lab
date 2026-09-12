@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -8,7 +8,6 @@
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -287,7 +286,7 @@ namespace gglab
 		wallTransform.m_Scale = Vector3(7.5f, 4.2f, 0.35f);
 		const entt::entity wall = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = wallTransform,
 			.m_MaterialInstance =
@@ -299,7 +298,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 1.4f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =

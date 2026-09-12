@@ -1,5 +1,5 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "AppRuntimeLog.h"
 
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -11,7 +11,6 @@
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -321,7 +320,7 @@ namespace gglab
 			{
 				return primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+					.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 					.m_World = &m_World,
 					.m_Transform = components::TransformComponent{
 						.m_Position = position, .m_Scale = scale },
@@ -355,7 +354,7 @@ namespace gglab
 		distantReferenceTransform.m_Scale = Vector3::One * 2.25f;
 		const entt::entity distantReference = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World, .m_Transform = distantReferenceTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.distant_reference",
 				Color(0.95f, 0.72f, 0.08f, 1.0f), 0.28f, 0.15f),
@@ -405,7 +404,7 @@ namespace gglab
 		movingTransform.m_Scale = Vector3::One * 1.25f;
 		m_MovingEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World, .m_Transform = movingTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.moving_rigid",
 				Color(0.7f, 0.12f, 0.5f, 1.0f), 0.22f),
@@ -549,7 +548,7 @@ namespace gglab
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		const auto history =
-			GetLegacyRenderer(m_Services.m_RenderHost)->GetTemporalHistoryManager()->GetDiagnostics();
+			m_Services.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 		const auto& camera = GetCamera();
 		const auto& taa = GetViewRenderProfile().m_TemporalAA;

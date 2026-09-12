@@ -1,5 +1,4 @@
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "AppRuntimeLog.h"
 #include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
@@ -7,7 +6,6 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
@@ -453,7 +451,7 @@ namespace gglab
 
 			const entt::entity sphere = primitive::Sphere::Create({
 				.m_AssetManager = m_Services.m_AssetManager,
-				.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+				.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,

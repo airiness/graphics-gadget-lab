@@ -559,6 +559,12 @@ namespace gglab
 		return m_IBLBakeScheduler->GetBakingSource();
 	}
 
+	TemporalHistoryManagerDiagnostics Renderer::GetTemporalHistoryDiagnostics() const
+	{
+		return m_TemporalHistoryManager ? m_TemporalHistoryManager->GetDiagnostics()
+										: TemporalHistoryManagerDiagnostics{};
+	}
+
 	void Renderer::RetireSceneGpuAllocations(
 		RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept
 	{

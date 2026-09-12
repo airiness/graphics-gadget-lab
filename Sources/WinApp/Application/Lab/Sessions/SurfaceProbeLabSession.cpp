@@ -1,12 +1,10 @@
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -224,7 +222,7 @@ namespace gglab
 		transform.m_Scale = Vector3::One * 1.5f;
 		m_ProbeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = transform,
 			.m_MaterialInstance = MakeProbeMaterial(),
