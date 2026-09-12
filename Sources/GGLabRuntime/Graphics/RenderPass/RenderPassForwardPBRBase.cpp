@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"

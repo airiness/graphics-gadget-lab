@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/RenderPassDebugDraw.h"

@@ -135,8 +135,6 @@ namespace gglab
 			.m_FrameSlotIndex = m_FrameSlotIndex,
 			.m_BackBufferIndex = m_BackBufferIndex,
 			.m_FrameSerial = m_FrameSerial,
-			.m_UploadFencePoint = m_UploadFencePoint,
-			.m_SceneGpuAllocations = &m_SceneGpuAllocations,
 			.m_RenderSceneStatus = m_RenderSceneStatus,
 		};
 	}

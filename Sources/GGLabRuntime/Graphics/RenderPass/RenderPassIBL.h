@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/RenderPassIBLBrdfLUT.h"
 #include "Graphics/RenderPass/RenderPassIBLClear.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"

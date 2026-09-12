@@ -17,8 +17,9 @@
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "Graphics/RenderFrameBuilder.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
@@ -227,7 +228,8 @@ namespace gglab
 			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
-		m_Renderer->AdoptFrameBuildResources(rendererFrame, validationContext);
+		m_Renderer->AdoptFrameGpuResources(
+			rendererFrame, frame.m_SceneGpuAllocations, frame.m_UploadFencePoint);
 		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
 		{
 			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);

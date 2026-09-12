@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 
 namespace gglab
 {

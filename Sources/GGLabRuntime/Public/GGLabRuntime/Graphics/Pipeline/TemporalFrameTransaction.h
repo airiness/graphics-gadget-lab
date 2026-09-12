@@ -5,7 +5,8 @@
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <cstdint>
@@ -15,6 +16,7 @@
 namespace gglab
 {
 	struct RenderView;
+	class TemporalHistoryManager;
 
 	struct TemporalCommittedViewState
 	{

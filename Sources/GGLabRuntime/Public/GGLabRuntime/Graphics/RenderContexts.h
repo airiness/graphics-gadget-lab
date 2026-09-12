@@ -1,11 +1,13 @@
 #pragma once
-#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "GGLabRuntime/Graphics/RenderQueue.h"
-#include "Graphics/RenderScene.h"
-#include "GGLabRuntime/Graphics/RenderView.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderSceneTypes.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
@@ -21,19 +23,6 @@ namespace gglab
 	class TemporalFrameTransaction;
 	class RenderPipelineOverlayExtensionBase;
 	struct RenderFrameContext;
-
-	struct RenderFrameGpuResources
-	{
-		RHIFencePoint m_UploadFencePoint{};
-		RenderSceneGpuAllocations m_SceneGpuAllocations{};
-
-		void AdoptFrom(const RenderFrameContext& context) noexcept;
-		bool IsEmpty() const noexcept
-		{
-			return !m_UploadFencePoint.IsValid() && m_SceneGpuAllocations.IsEmpty();
-		}
-		void Reset() noexcept { *this = {}; }
-	};
 
 	struct RenderFrameContext
 	{
@@ -53,8 +42,6 @@ namespace gglab
 		uint32_t m_BackBufferIndex = 0;
 		uint64_t m_FrameSerial = 0;
 
-		RHIFencePoint m_UploadFencePoint{}; // TODO: multi fence points support
-		RenderSceneGpuAllocations* m_SceneGpuAllocations = nullptr;
 		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
 
 		bool IsRenderSceneReady() const noexcept
@@ -114,30 +101,6 @@ namespace gglab
 				(m_RenderQueues.size() >= utils::ToIndex(RenderViewID::Count));
 		}
 	};
-
-	inline void RenderFrameGpuResources::AdoptFrom(const RenderFrameContext& context) noexcept
-	{
-		if (context.m_UploadFencePoint.IsValid())
-		{
-			GGLAB_ASSERT_MSG(!m_UploadFencePoint.IsValid() ||
-				m_UploadFencePoint == context.m_UploadFencePoint,
-				"A render frame cannot adopt resources from different upload submissions.");
-			m_UploadFencePoint = context.m_UploadFencePoint;
-		}
-		if (!context.m_SceneGpuAllocations || context.m_SceneGpuAllocations->IsEmpty())
-		{
-			return;
-		}
-
-		GGLAB_ASSERT_MSG(m_SceneGpuAllocations.IsEmpty(),
-			"A render frame cannot replace scene GPU allocations before retirement.");
-		if (!m_SceneGpuAllocations.IsEmpty())
-		{
-			return;
-		}
-		m_SceneGpuAllocations = *context.m_SceneGpuAllocations;
-		*context.m_SceneGpuAllocations = {};
-	}
 
 	struct RenderServices
 	{

@@ -5,7 +5,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 #include <filesystem>
 #include <vector>

@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
@@ -51,6 +52,35 @@ namespace gglab
 		Vector2 m_JitterUV = Vector2::Zero;
 		uint32_t m_JitterIndex = 0;
 		RHIFencePoint m_GraphicsFence{};
+	};
+
+	struct TemporalHistoryFrameState
+	{
+		uint64_t m_AllocationGeneration = 0;
+		uint32_t m_ReadIndex = 0;
+		uint32_t m_WriteIndex = 1;
+		bool m_Active = false;
+		bool m_PreviousValid = false;
+		bool m_RenderGraphImported = false;
+		bool m_RenderGraphExported = false;
+		bool m_Ended = false;
+	};
+
+	struct TemporalHistoryRenderGraphResources
+	{
+		RGTextureId m_PreviousColor;
+		RGTextureId m_PreviousDepth;
+		RGTextureId m_NextColor;
+		RGTextureId m_NextDepth;
+		uint32_t m_ReadIndex = 0;
+		uint32_t m_WriteIndex = 1;
+		bool m_PreviousValid = false;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_PreviousColor.IsValid() && m_PreviousDepth.IsValid() &&
+				m_NextColor.IsValid() && m_NextDepth.IsValid();
+		}
 	};
 
 	struct TemporalHistoryManagerDiagnostics

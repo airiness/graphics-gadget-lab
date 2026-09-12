@@ -5,7 +5,7 @@
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
-#include "Graphics/RenderContexts.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"

@@ -2,7 +2,7 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
-#include "Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 
 #include <functional>
 

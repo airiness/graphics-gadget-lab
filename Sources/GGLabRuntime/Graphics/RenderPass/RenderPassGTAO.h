@@ -2,7 +2,7 @@
 
 #include "Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 
 #include <array>
 

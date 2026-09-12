@@ -2,16 +2,16 @@
 #include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
-#include "Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
-#include "Graphics/RenderContexts.h"
-#include "Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
 
 #include <array>
 #include <filesystem>
@@ -41,6 +41,9 @@ namespace gglab
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
 	class ShadowPreviewViewBase;
+	class TemporalHistoryManager;
+	struct RenderFrameGpuResources;
+	struct RenderSceneGpuAllocations;
 
 	class Renderer
 	{
@@ -107,7 +110,6 @@ namespace gglab
 			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
 			RHIFrameContext* m_RHIFrame = nullptr;
 			RenderGraph* m_RenderGraph = nullptr;
-			RenderFrameGpuResources m_GpuResources{};
 			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
 			TemporalFrameTransaction m_TemporalTransaction{};
 		};
@@ -141,8 +143,9 @@ namespace gglab
 		[[nodiscard]] Frame BeginFrame() noexcept;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
-		void AdoptFrameBuildResources(
-			Frame& frame, const RenderFrameContext& renderContext) noexcept;
+		void AdoptFrameGpuResources(Frame& frame,
+			RenderSceneGpuAllocations& sceneGpuAllocations,
+			const RHIFencePoint& uploadFencePoint) noexcept;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept;
 		void Render(
@@ -327,6 +330,7 @@ namespace gglab
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
+		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;

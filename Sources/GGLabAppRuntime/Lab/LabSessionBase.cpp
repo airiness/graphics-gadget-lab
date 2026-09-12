@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
 {

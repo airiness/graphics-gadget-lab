@@ -25,7 +25,7 @@
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
-#include "Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
@@ -35,6 +35,7 @@
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameBuilder.h"
+#include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -1498,18 +1499,18 @@ namespace gglab
 				RHIFencePoint{ RHIFenceHandle{ 9, 1 }, 23 };
 			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes = 64;
 			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_SizeInBytes = 128;
-			const RenderFrameContext lateValidationContext =
-				lateValidationFrame.MakeRenderFrameContext();
 			RenderFrameGpuResources frameGpuResources{};
-			frameGpuResources.AdoptFrom(lateValidationContext);
+			frameGpuResources.AdoptFrom(lateValidationFrame.m_SceneGpuAllocations,
+				lateValidationFrame.m_UploadFencePoint);
 			const uint64_t adoptedSceneConstantOffset =
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes;
-			frameGpuResources.AdoptFrom(lateValidationContext);
+			frameGpuResources.AdoptFrom(lateValidationFrame.m_SceneGpuAllocations,
+				lateValidationFrame.m_UploadFencePoint);
 			context.Check(lateValidationFrame.m_SceneGpuAllocations.IsEmpty() &&
 				frameGpuResources.m_UploadFencePoint == lateValidationFrame.m_UploadFencePoint &&
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
 				adoptedSceneConstantOffset == 64,
-				"Frame-build GPU resources transfer before late validation and remain owned on early return");
+				"Frame GPU resources transfer before late validation and remain owned on early return");
 
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
 			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);

@@ -16,8 +16,11 @@
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
+#include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
+#include "Graphics/RenderFrameGpuResources.h"
+#include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
@@ -250,6 +253,7 @@ namespace gglab
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
 		m_HasActiveFrame = true;
+		m_FrameGpuResources = std::make_unique<RenderFrameGpuResources>();
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
 		return Frame(this, rhiFrame, frameSerial);
@@ -266,15 +270,14 @@ namespace gglab
 		return frame.m_TemporalTransaction;
 	}
 
-	void Renderer::AdoptFrameBuildResources(
-		Frame& frame, const RenderFrameContext& renderContext) noexcept
+	void Renderer::AdoptFrameGpuResources(Frame& frame,
+		RenderSceneGpuAllocations& sceneGpuAllocations,
+		const RHIFencePoint& uploadFencePoint) noexcept
 	{
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
-			"Frame-build resource adoption requires the active begun Renderer::Frame.");
-		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == frame.m_FrameSlotIndex);
-		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
-		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
-		frame.m_GpuResources.AdoptFrom(renderContext);
+			"Frame GPU resource adoption requires the active begun Renderer::Frame.");
+		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
+		m_FrameGpuResources->AdoptFrom(sceneGpuAllocations, uploadFencePoint);
 	}
 
 	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
@@ -315,7 +318,7 @@ namespace gglab
 		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
 
 		frame.m_RenderGraph = &rg;
-		AdoptFrameBuildResources(frame, renderContext);
+		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 
 		// Window suspended do nothing
 		if (m_IsSuspended.load(std::memory_order_relaxed))
@@ -329,10 +332,10 @@ namespace gglab
 		}
 
 		// Wait Structured Buffer upload
-		if (frame.m_GpuResources.m_UploadFencePoint.IsValid())
+		if (m_FrameGpuResources->m_UploadFencePoint.IsValid())
 		{
 			m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
+				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint);
 		}
 
 		RGExecuteContext executeContext{ RGBackendExecuteContext{
@@ -389,8 +392,9 @@ namespace gglab
 			submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
 		if (retirementFence.IsValid())
 		{
+			GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 			RetireSceneGpuAllocations(
-				&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
+				&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
 			frame.m_RenderGraph->Retire(retirementFence);
 		}
 
@@ -411,10 +415,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
 			"Renderer::AbortFrame received a frame created by another Renderer.");
 
-		if (m_RHIContext && frame.m_GpuResources.m_UploadFencePoint.IsValid())
+		if (m_RHIContext && m_FrameGpuResources &&
+			m_FrameGpuResources->m_UploadFencePoint.IsValid())
 		{
 			m_RHIContext->WaitForFence(
-				RHIQueueType::Graphics, frame.m_GpuResources.m_UploadFencePoint);
+				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint);
 		}
 
 		if (m_RHIContext && frame.m_RHIFrame)
@@ -429,8 +434,11 @@ namespace gglab
 			frame.m_TemporalTransaction.Abort(retirementFence);
 			if (retirementFence.IsValid())
 			{
-				RetireSceneGpuAllocations(
-					&frame.m_GpuResources.m_SceneGpuAllocations, retirementFence);
+				if (m_FrameGpuResources)
+				{
+					RetireSceneGpuAllocations(
+						&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
+				}
 
 				if (frame.m_RenderGraph)
 				{
@@ -451,7 +459,7 @@ namespace gglab
 		frame.m_State = Frame::State::Ended;
 		frame.m_RHIFrame = nullptr;
 		frame.m_RenderGraph = nullptr;
-		frame.m_GpuResources.Reset();
+		m_FrameGpuResources.reset();
 		frame.m_Renderer = nullptr;
 		m_HasActiveFrame = false;
 	}
