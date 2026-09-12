@@ -4,7 +4,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 

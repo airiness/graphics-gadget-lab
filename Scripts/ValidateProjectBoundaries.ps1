@@ -932,7 +932,11 @@ $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h")
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineBlackboard.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/ShadowGraphResources.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/IBLGraphResources.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderPass/SceneDepthGraphResources.h")
 )
 foreach ($legacyPath in $legacyRuntimeFrameContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1311,8 +1315,10 @@ $legacyRuntimeFrameContractIncludeRegex =
     'RenderGraph[\\/](?:RG(?:ResourceHandle|CompileDiagnostic|Pass|Resource|' +
     'ResourceUtils|Blackboard|ArenaAllocator)|RenderGraph)\.h|' +
     'Resource[\\/]TransientResourcePool\.h|' +
+    'RenderPass[\\/](?:ShadowGraphResources|IBLGraphResources|' +
+    'SceneDepthGraphResources)\.h|' +
     'RenderPipeline[\\/](?:DepthCoverageFramePlan|RenderPipelineOverlayExtensionBase|' +
-    'RenderPipelineSceneExtensionBase)\.h)[>"]'
+    'RenderPipelineSceneExtensionBase|RenderPipelineBlackboard)\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {

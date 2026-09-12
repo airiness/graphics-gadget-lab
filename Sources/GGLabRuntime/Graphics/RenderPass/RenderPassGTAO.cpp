@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"

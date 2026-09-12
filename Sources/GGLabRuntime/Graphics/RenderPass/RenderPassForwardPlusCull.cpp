@@ -6,7 +6,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"

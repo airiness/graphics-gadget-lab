@@ -1151,9 +1151,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\GTAOGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBase.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1229,12 +1226,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h">
-      <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1245,9 +1236,6 @@
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBase.h">
-      <Filter>Graphics\RenderPipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h">
       <Filter>Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
@@ -1898,10 +1886,22 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\RenderPassInfo.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\DepthCoverageFramePlan.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderPipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h">

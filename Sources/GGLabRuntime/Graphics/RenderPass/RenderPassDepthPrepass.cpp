@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 

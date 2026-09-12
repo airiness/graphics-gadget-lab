@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"

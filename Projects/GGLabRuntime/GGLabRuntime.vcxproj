@@ -439,7 +439,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassFinalColor.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
@@ -486,12 +486,12 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ScreenSpace\ScreenSpaceTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBlackboard.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\IBLGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourcePool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\TransientResourceTypes.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\ShadowGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GPUStructures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\GraphicsTypes.h" />

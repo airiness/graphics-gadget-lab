@@ -29,7 +29,7 @@
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/ShadowGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 
 #include <concepts>
 #include <cstdint>

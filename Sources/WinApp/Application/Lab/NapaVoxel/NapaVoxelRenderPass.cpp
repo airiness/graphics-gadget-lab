@@ -3,8 +3,8 @@
 
 #include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
-#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"

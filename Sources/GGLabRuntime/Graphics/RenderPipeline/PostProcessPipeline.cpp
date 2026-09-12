@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 

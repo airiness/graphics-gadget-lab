@@ -5,7 +5,7 @@
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
 

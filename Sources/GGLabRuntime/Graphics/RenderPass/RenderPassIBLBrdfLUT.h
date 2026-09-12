@@ -1,7 +1,7 @@
 #pragma once
 #include "Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/Pipeline/PipelineCache.h"
-#include "Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 
 namespace gglab
 {

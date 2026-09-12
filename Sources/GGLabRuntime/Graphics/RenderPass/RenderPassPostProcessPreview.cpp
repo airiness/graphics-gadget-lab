@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
-#include "Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/Renderer.h"
