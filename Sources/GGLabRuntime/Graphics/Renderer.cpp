@@ -1,12 +1,23 @@
 #include "Graphics/Renderer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
+#include "Graphics/Profiling/GpuProfiler.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
@@ -618,5 +629,57 @@ namespace gglab
 			m_ViewSB =
 				std::make_unique<DynamicStructuredBufferAllocator<ViewGPU>>(viewSBCreateInfo);
 		}
+	}
+
+	EnvironmentLightingViewBase* Renderer::GetEnvironmentLightingView() const noexcept
+	{
+		return m_EnvironmentLightingSystem.get();
+	}
+
+	EnvironmentLightingControlBase* Renderer::GetEnvironmentLightingControl() const noexcept
+	{
+		return m_EnvironmentLightingSystem.get();
+	}
+
+	IBLCacheControlBase* Renderer::GetIBLCacheControl() const noexcept
+	{
+		return m_IBLBakeScheduler ? &m_IBLBakeScheduler->GetCacheControl() : nullptr;
+	}
+
+	IBLPreviewViewBase* Renderer::GetIBLPreviewView() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	IBLPreviewControlBase* Renderer::GetIBLPreviewControl() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	PostProcessPreviewViewBase* Renderer::GetPostProcessPreviewView() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	PostProcessPreviewControlBase* Renderer::GetPostProcessPreviewControl() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	ShadowPreviewViewBase* Renderer::GetShadowPreviewView() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	GpuProfilingViewBase* Renderer::GetGpuProfilingView() const noexcept
+	{
+		GpuProfiler* profiler = m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
+		return profiler;
+	}
+
+	GpuProfilingControlBase* Renderer::GetGpuProfilingControl() const noexcept
+	{
+		GpuProfiler* profiler = m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
+		return profiler;
 	}
 }

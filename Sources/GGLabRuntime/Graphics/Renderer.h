@@ -30,6 +30,16 @@ namespace gglab
 	class TaskSystem;
 	class TransferManager;
 	class GpuProfiler;
+	class EnvironmentLightingControlBase;
+	class EnvironmentLightingViewBase;
+	class GpuProfilingControlBase;
+	class GpuProfilingViewBase;
+	class IBLCacheControlBase;
+	class IBLPreviewControlBase;
+	class IBLPreviewViewBase;
+	class PostProcessPreviewControlBase;
+	class PostProcessPreviewViewBase;
+	class ShadowPreviewViewBase;
 
 	class Renderer
 	{
@@ -182,6 +192,20 @@ namespace gglab
 		{
 			return m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
 		}
+		// Narrow capability access for tooling and content. The concrete
+		// environment, IBL, preview and profiling services remain Runtime-internal.
+		[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView() const noexcept;
+		[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl()
+			const noexcept;
+		[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept;
+		[[nodiscard]] IBLPreviewViewBase* GetIBLPreviewView() const noexcept;
+		[[nodiscard]] IBLPreviewControlBase* GetIBLPreviewControl() const noexcept;
+		[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView() const noexcept;
+		[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
+			const noexcept;
+		[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept;
+		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept;
+		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept;
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept
 		{
 			return m_BackBufferClearColor;

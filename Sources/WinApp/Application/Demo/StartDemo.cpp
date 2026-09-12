@@ -8,7 +8,8 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/EnvironmentLightingSystem.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
@@ -132,11 +133,14 @@ namespace gglab
 
 	void StartDemo::OnEnter() noexcept
 	{
-		if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
+		auto* environmentView = m_Services.m_Renderer->GetEnvironmentLightingView();
+		auto* environmentControl = m_Services.m_Renderer->GetEnvironmentLightingControl();
+		if (environmentView && environmentControl)
 		{
-			m_PreviousSkyboxEnabled = environmentSystem->GetSettings().m_EnableSkybox;
+			m_PreviousSkyboxEnabled =
+				environmentView->GetEnvironmentLightingSettings().m_EnableSkybox;
 			m_HasSkyboxOverride = true;
-			environmentSystem->SetSkyboxEnabled(false);
+			environmentControl->SetSkyboxEnabled(false);
 		}
 
 		auto* debugDraw = m_Services.m_DebugDraw;
@@ -169,9 +173,9 @@ namespace gglab
 	{
 		if (m_HasSkyboxOverride)
 		{
-			if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
+			if (auto* environmentControl = m_Services.m_Renderer->GetEnvironmentLightingControl())
 			{
-				environmentSystem->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
+				environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
 			}
 			m_HasSkyboxOverride = false;
 		}

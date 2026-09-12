@@ -5,7 +5,8 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
-#include "Graphics/Profiling/GpuProfiler.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
@@ -192,20 +193,21 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnEnter() noexcept
 	{
-		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
-		if (gpuProfiler)
+		auto* profilingView = m_Services.m_Renderer->GetGpuProfilingView();
+		auto* profilingControl = m_Services.m_Renderer->GetGpuProfilingControl();
+		if (profilingView && profilingControl)
 		{
-			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->RequestEnabled(true);
+			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
+			profilingControl->RequestEnabled(true);
 		}
 		ArmGpuTimingCaptureWarmup();
 	}
 
 	void ForwardPlusLabSession::OnExit() noexcept
 	{
-		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		if (auto* profilingControl = m_Services.m_Renderer->GetGpuProfilingControl())
 		{
-			gpuProfiler->RequestEnabled(m_GpuProfilerWasEnabled);
+			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
 		m_DebugReadback->InvalidateResults();
 	}
@@ -428,12 +430,12 @@ namespace gglab
 
 	void ForwardPlusLabSession::CaptureGpuTimings() noexcept
 	{
-		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
-		if (!gpuProfiler || !gpuProfiler->IsEnabled())
+		auto* profilingView = m_Services.m_Renderer->GetGpuProfilingView();
+		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;
 		}
-		const GpuProfileFrameSnapshot frame = gpuProfiler->GetLatestFrame();
+		const GpuProfileFrameSnapshot frame = profilingView->GetLatestFrame();
 		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
 		{
 			return;

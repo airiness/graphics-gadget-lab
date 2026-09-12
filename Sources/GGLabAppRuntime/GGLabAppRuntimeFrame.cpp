@@ -16,12 +16,8 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -307,17 +303,16 @@ namespace gglab
 				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
-				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
-				.m_EnvironmentLightingControl = m_Renderer->GetEnvironmentLightingSystem(),
-				.m_GpuProfiling = m_Renderer->GetGpuProfiler(),
-				.m_GpuProfilingControl = m_Renderer->GetGpuProfiler(),
-				.m_IBLCacheControl = m_Renderer->GetIBLBakeScheduler()
-					? &m_Renderer->GetIBLBakeScheduler()->GetCacheControl() : nullptr,
-				.m_IBLPreview = m_Renderer->GetRenderResourceRegistry(),
-				.m_IBLPreviewControl = m_Renderer->GetRenderResourceRegistry(),
-				.m_PostProcessPreview = m_Renderer->GetRenderResourceRegistry(),
-				.m_PostProcessPreviewControl = m_Renderer->GetRenderResourceRegistry(),
-				.m_ShadowPreview = m_Renderer->GetRenderResourceRegistry(),
+				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingView(),
+				.m_EnvironmentLightingControl = m_Renderer->GetEnvironmentLightingControl(),
+				.m_GpuProfiling = m_Renderer->GetGpuProfilingView(),
+				.m_GpuProfilingControl = m_Renderer->GetGpuProfilingControl(),
+				.m_IBLCacheControl = m_Renderer->GetIBLCacheControl(),
+				.m_IBLPreview = m_Renderer->GetIBLPreviewView(),
+				.m_IBLPreviewControl = m_Renderer->GetIBLPreviewControl(),
+				.m_PostProcessPreview = m_Renderer->GetPostProcessPreviewView(),
+				.m_PostProcessPreviewControl = m_Renderer->GetPostProcessPreviewControl(),
+				.m_ShadowPreview = m_Renderer->GetShadowPreviewView(),
 				.m_DebugDrawChannels = m_DebugDrawService->GetChannelView(),
 				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,

@@ -988,6 +988,27 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) +
     }
 }
 
+# Tooling and content consume environment/IBL/profiling services through the
+# narrow Renderer capabilities instead of the concrete service getters.
+$rendererCapabilityConsumerPaths = @(
+    (Join-Path $root "Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp"),
+    (Join-Path $winAppSourcesDir "Application/Demo/StartDemo.cpp"),
+    (Join-Path $winAppSourcesDir "Application/Lab/Sessions/ForwardPlusLabSession.cpp"),
+    (Join-Path $winAppSourcesDir "Application/Lab/Sessions/TemporalAALabSession.cpp")
+)
+$rendererConcreteCapabilityGetterRegex =
+    '\bGetEnvironmentLightingSystem\b|\bGetIBLBakeScheduler\b|\bGetGpuProfiler\b'
+foreach ($itemPath in $rendererCapabilityConsumerPaths) {
+    $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
+    if ($content -match $rendererConcreteCapabilityGetterRegex) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "renderer-capability-access-boundary"
+            Target = ConvertTo-RepoRelativePath $itemPath
+            Reason = "tooling and content must use narrow Renderer capability access instead of concrete environment, IBL or profiling getters"
+        })
+    }
+}
+
 $legacyRuntimeDiagnosticsContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/SamplerTypes.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassInfo.h"),
