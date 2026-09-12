@@ -1,7 +1,7 @@
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 #include "Graphics/Utility/TextureUtils.h"
 
 #include <algorithm>

@@ -1,4 +1,4 @@
-#include "Graphics/Asset/Loading/ModelImporter.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"

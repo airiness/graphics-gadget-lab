@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"

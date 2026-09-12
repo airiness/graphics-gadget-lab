@@ -2,7 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Math/Culling.h"
 #include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"

@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
-#include "Graphics/Asset/ModelImportArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 

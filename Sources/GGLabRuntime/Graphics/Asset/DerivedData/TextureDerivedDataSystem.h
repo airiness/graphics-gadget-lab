@@ -1,7 +1,8 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 
 #include <memory>
 #include <stop_token>
@@ -97,20 +98,6 @@ namespace gglab
 		ArtifactWaitDisposition m_Disposition = ArtifactWaitDisposition::Failed;
 		TextureDerivedDataArtifact m_Artifact;
 		std::string m_Error;
-	};
-
-	struct TextureDerivedDataCoordinatorStatistics
-	{
-		uint32_t m_ActiveBuildCount = 0;
-		uint32_t m_ActiveWaiterCount = 0;
-		uint64_t m_RequestCount = 0;
-		uint64_t m_ImmediateHitCount = 0;
-		uint64_t m_WaitCount = 0;
-		uint64_t m_BuildRequiredCount = 0;
-		uint64_t m_PublishCount = 0;
-		uint64_t m_BuildFailureCount = 0;
-		uint64_t m_CancelledWaiterCount = 0;
-		uint64_t m_FanoutDeliveryCount = 0;
 	};
 
 	class TextureDerivedDataSystem final

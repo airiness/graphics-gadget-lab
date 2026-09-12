@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 
 #include <cstddef>
 #include <cstdint>

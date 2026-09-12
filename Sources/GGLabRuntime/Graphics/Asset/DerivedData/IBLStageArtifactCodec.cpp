@@ -1,6 +1,6 @@
 #include "Graphics/Asset/DerivedData/IBLStageArtifactCodec.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 
 #include <algorithm>
 #include <cstddef>

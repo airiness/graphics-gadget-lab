@@ -1,21 +1,18 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
-#include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
-#include "Graphics/Asset/Interest/AssetInterestTracker.h"
-#include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheConfig.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
+#include "GGLabRuntime/Graphics/Asset/AssetDependencyTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
+#include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
-#include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
-#include "Graphics/Asset/TextureArtifactCache.h"
-#include "Graphics/Asset/ModelImportArtifactCache.h"
-#include "Graphics/Asset/Store/MaterialStore.h"
-#include "Graphics/Asset/Store/MeshStore.h"
-#include "Graphics/Asset/Store/ModelStore.h"
-#include "GGLabRuntime/Graphics/VertexData.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "Graphics/Asset/Loading/ModelImporter.h"
+#include "GGLabRuntime/Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/VertexData.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -65,9 +62,9 @@ namespace gglab
 	class AssetOwnerScope;
 	class RenderSamplerAccess;
 	class TaskSystem;
-	class TextureAssetSystem;
-	class TransferBatch;
 	class TransferManager;
+	struct AssetInterestChange;
+	struct AssetManagerState;
 	struct AssetSnapshot;
 
 	class AssetManager;
@@ -153,10 +150,7 @@ namespace gglab
 		void PrepareForShutdown(const RHIFencePoint& lastSubmittedFence) noexcept;
 		[[nodiscard]] bool IsAcceptingCommands() const noexcept { return m_AcceptingCommands; }
 		void SetResidencyConfig(const AssetResidencyConfig& config) noexcept;
-		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept
-		{
-			return m_AssetResidencyController.GetConfig();
-		}
+		[[nodiscard]] const AssetResidencyConfig& GetResidencyConfig() const noexcept;
 		[[nodiscard]] AssetResidencyStatistics GetResidencyStatistics() const noexcept;
 		void Tick() noexcept;
 		void MarkModelUsed(ModelID modelId) noexcept;
@@ -334,25 +328,12 @@ namespace gglab
 		TransferManager* m_TransferManager = nullptr;
 		AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
 		std::filesystem::path m_AssetRoot;
-		TextureArtifactCache m_TextureArtifactCache;
-		ModelImportArtifactCache m_ModelImportArtifactCache;
-		AssetLoadCoordinator m_AssetLoadCoordinator;
-		// State events outlive TextureAssetSystem so the injected sink remains valid
-		// through texture-domain shutdown and destruction.
-		AssetStateEventQueue m_AssetStateEventQueue;
-		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
 		RenderSamplerAccess* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
-		MeshStore m_MeshStore;
-		MaterialStore m_MaterialStore;
-		ModelStore m_ModelStore;
 		std::unordered_set<ModelID> m_PendingModels;
-		AssetInterestTracker m_AssetInterestTracker;
-		AssetResidencyController m_AssetResidencyController;
 		std::unordered_map<ModelID, AssetOwnerId> m_ModelDependencyOwners;
 		std::unordered_map<ModelID, std::vector<uint64_t>> m_ModelDependencyLeaseTokens;
-		AssetDependencyGraph m_AssetDependencyGraph;
 		std::unordered_set<MeshID> m_PublicationOrphanedMeshes;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
@@ -369,6 +350,7 @@ namespace gglab
 		uint64_t m_DependencyValidationMismatchCount = 0;
 		bool m_AcceptingCommands = true;
 		bool m_IsPreparedForShutdown = false;
+		std::unique_ptr<AssetManagerState> m_State;
 	};
 
 	class AssetPublicationRetain

@@ -1,7 +1,8 @@
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "Graphics/Asset/AssetManagerState.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 
 #include <algorithm>
@@ -13,7 +14,7 @@ namespace gglab
 		AssetSnapshot snapshot{};
 		snapshot.m_AssetUsageFrame = assetManager.m_AssetUsageFrame;
 		const AssetDependencyGraphStatistics dependencyStatistics =
-			assetManager.m_AssetDependencyGraph.GetStatistics();
+			assetManager.m_State->m_AssetDependencyGraph.GetStatistics();
 		snapshot.m_TrackedModelDependencyCount = dependencyStatistics.m_TrackedModelCount;
 		snapshot.m_ReverseDependencyCount = dependencyStatistics.m_ReverseDependencyCount;
 		snapshot.m_ReverseDependencyEdgeCount = dependencyStatistics.m_ReverseDependencyEdgeCount;
@@ -137,7 +138,7 @@ namespace gglab
 				snapshot.m_EvictionCandidateCount += evictionCandidate ? 1u : 0u;
 			};
 
-		const ModelStore::EntryMap& models = assetManager.m_ModelStore.Entries();
+		const ModelStore::EntryMap& models = assetManager.m_State->m_ModelStore.Entries();
 		snapshot.m_Models.reserve(models.size());
 		for (const auto& [modelId, model] : models)
 		{
@@ -156,11 +157,11 @@ namespace gglab
 			modelSnapshot.m_Name = model->m_Name;
 			modelSnapshot.m_ImportArtifactContentDigest = model->m_ImportArtifactContentDigest;
 			modelSnapshot.m_IsImportArtifactCached =
-				assetManager.m_ModelImportArtifactCache.Contains(
+				assetManager.m_State->m_ModelImportArtifactCache.Contains(
 					model->m_ImportArtifactContentDigest);
 			modelSnapshot.m_MeshInstanceCount = static_cast<uint32_t>(model->m_MeshInstance.size());
 			if (const AssetDependencyModelState* dependencyState =
-				assetManager.m_AssetDependencyGraph.FindModel(
+				assetManager.m_State->m_AssetDependencyGraph.FindModel(
 					MakeAssetContentVersion(modelId, model->m_ContentGeneration)))
 			{
 				const AssetDependencyModelState& state = *dependencyState;
@@ -190,7 +191,7 @@ namespace gglab
 			[](const AssetSnapshot::Model& lhs, const AssetSnapshot::Model& rhs)
 			{ return lhs.m_Id.Value() < rhs.m_Id.Value(); });
 
-		const MeshStore::EntryMap& meshes = assetManager.m_MeshStore.Entries();
+		const MeshStore::EntryMap& meshes = assetManager.m_State->m_MeshStore.Entries();
 		snapshot.m_Meshes.reserve(meshes.size());
 		for (const auto& [meshId, mesh] : meshes)
 		{

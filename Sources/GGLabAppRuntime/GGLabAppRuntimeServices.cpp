@@ -10,7 +10,7 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"

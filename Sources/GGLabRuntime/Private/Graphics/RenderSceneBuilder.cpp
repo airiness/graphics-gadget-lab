@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Core/World.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"

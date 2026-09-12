@@ -1035,7 +1035,18 @@ $legacyRuntimeAssetContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.h"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferManager.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/TransferManager.cpp")
+    (Join-Path $runtimeSourcesDir "Graphics/TransferManager.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetManager.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetManager.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Publication/AssetManagerPublicationServices.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureAssetValidation.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ArtifactCacheCore.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureArtifact.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/TextureArtifact.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/ModelImporter.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/Loading/ModelImporter.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ModelImportArtifact.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/ModelImportArtifact.cpp")
 )
 foreach ($legacyPath in $legacyRuntimeAssetContractPaths) {
     if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
@@ -1432,8 +1443,10 @@ $legacyRuntimeShaderContractIncludeRegex =
 $legacyRuntimeAssetContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:' +
     'Asset[\\/](?:AssetIdentity|ReservedTexture|AssetPaths|AssetLoadProgress|' +
-    'AssetResourcePublication|DerivedDataKey|TextureAsset|AssetUploadScheduler)\.h|' +
-    'Asset[\\/]Residency[\\/]AssetResidencyTypes\.h|' +
+    'AssetResourcePublication|DerivedDataKey|TextureAsset|AssetUploadScheduler|' +
+    'AssetManager|TextureAssetValidation|ArtifactCacheCore|TextureArtifact|' +
+    'ModelImportArtifact)\.h|' +
+    'Asset[\\/](?:Residency[\\/]AssetResidencyTypes|Loading[\\/]ModelImporter)\.h|' +
     'TransferBatch\.h|TransferManager\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |

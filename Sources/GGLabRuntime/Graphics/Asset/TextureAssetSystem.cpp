@@ -10,7 +10,7 @@
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 #include "Graphics/Utility/TextureUtils.h"

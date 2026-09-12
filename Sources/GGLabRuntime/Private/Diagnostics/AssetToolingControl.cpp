@@ -1,5 +1,5 @@
 #include "Diagnostics/AssetToolingControl.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 namespace gglab
 {

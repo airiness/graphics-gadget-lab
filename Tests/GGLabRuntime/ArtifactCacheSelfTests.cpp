@@ -1,5 +1,5 @@
 #include "ArtifactCacheSelfTests.h"
-#include "Graphics/Asset/ArtifactCacheCore.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactCacheCore.h"
 
 namespace gglab
 {

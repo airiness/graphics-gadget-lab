@@ -13,22 +13,6 @@
 
 namespace gglab
 {
-	struct AssetOwnerId
-	{
-		uint64_t m_Value = 0;
-
-		[[nodiscard]] constexpr bool IsValid() const noexcept { return m_Value != 0; }
-		friend constexpr auto operator<=>(const AssetOwnerId&, const AssetOwnerId&) = default;
-	};
-
-	struct AssetOwnerIdHash
-	{
-		size_t operator()(AssetOwnerId owner) const noexcept
-		{
-			return std::hash<uint64_t>{}(owner.m_Value);
-		}
-	};
-
 	struct AssetInterestChange
 	{
 		AssetContentVersion m_ContentVersion{};

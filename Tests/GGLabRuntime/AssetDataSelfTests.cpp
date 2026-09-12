@@ -12,7 +12,7 @@
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"

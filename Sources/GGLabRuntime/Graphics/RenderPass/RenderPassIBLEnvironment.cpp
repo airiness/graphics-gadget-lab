@@ -1,6 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/SamplerRegistry.h"

@@ -3,11 +3,11 @@
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
-#include "Graphics/Asset/Loading/ModelImporter.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
-#include "Graphics/Asset/TextureArtifact.h"
-#include "Graphics/Asset/ModelImportArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
 
 #include <cstdint>
 #include <filesystem>

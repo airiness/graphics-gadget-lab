@@ -3,7 +3,7 @@
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 #if GGLAB_ENABLE_VULKAN

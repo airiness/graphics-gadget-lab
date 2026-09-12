@@ -1,5 +1,5 @@
 #include "Graphics/MaterialGpuEncoder.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <cstdint>

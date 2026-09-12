@@ -1,6 +1,6 @@
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 

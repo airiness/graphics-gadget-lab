@@ -2,7 +2,7 @@
 #include "Demo/DemoBase.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"

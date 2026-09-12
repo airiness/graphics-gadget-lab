@@ -1,18 +1,14 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/ArtifactCacheCore.h"
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheConfig.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactCacheCore.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 
 #include <cstdint>
 #include <mutex>
 
 namespace gglab
 {
-	struct TextureArtifactCacheConfig
-	{
-		uint64_t m_BudgetBytes = 512ull * 1024ull * 1024ull;
-	};
-
 	using TextureArtifactCacheStatistics = ArtifactCacheCoreStatistics;
 
 	class TextureArtifactCache final

@@ -1,4 +1,5 @@
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "Graphics/Asset/AssetManagerState.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Asset/AssetIdentityConversions.h"
 #include "Graphics/Asset/Publication/AssetPublicationServices.h"
@@ -65,7 +66,7 @@ namespace gglab
 				return fail(result, "Imported texture semantic does not match its import settings");
 			}
 
-			TextureAssetSystem& textureAssets = *m_AssetManager->m_TextureAssets;
+			TextureAssetSystem& textureAssets = *m_AssetManager->m_State->m_TextureAssets;
 			TextureID textureId = textureAssets.FindTexture(
 				importedTexture.m_CanonicalPath, importedTexture.m_ImportSettings);
 			const Texture* texture = textureAssets.GetTexture(textureId);
@@ -391,7 +392,7 @@ namespace gglab
 			{
 				if (claim.m_ContentVersion.m_Key.m_Kind == AssetKind::Texture)
 				{
-					m_AssetManager->m_TextureAssets->RollbackPublicationTexture(
+					m_AssetManager->m_State->m_TextureAssets->RollbackPublicationTexture(
 						TextureID{ static_cast<uint32_t>(claim.m_ContentVersion.m_Key.m_StableId) },
 						claim.m_ContentVersion.m_ContentGeneration);
 				}

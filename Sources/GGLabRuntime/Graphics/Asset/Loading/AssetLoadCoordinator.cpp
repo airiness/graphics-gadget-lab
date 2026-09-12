@@ -5,7 +5,7 @@
 #include "Graphics/Asset/DerivedData/SourceSnapshot.h"
 #include "Graphics/Asset/Loading/TextureLoader.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 
 #include <filesystem>
 #include <format>

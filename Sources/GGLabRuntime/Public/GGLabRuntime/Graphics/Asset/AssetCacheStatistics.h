@@ -36,4 +36,21 @@ namespace gglab
 		uint64_t m_CatalogReconciliationFailureCount = 0;
 		bool m_IsCatalogApproximate = true;
 	};
+
+	struct TextureDerivedDataCoordinatorStatistics
+	{
+		uint32_t m_ActiveBuildCount = 0;
+		uint32_t m_ActiveWaiterCount = 0;
+		uint64_t m_RequestCount = 0;
+		uint64_t m_ImmediateHitCount = 0;
+		uint64_t m_WaitCount = 0;
+		uint64_t m_BuildRequiredCount = 0;
+		uint64_t m_PublishCount = 0;
+		uint64_t m_BuildFailureCount = 0;
+		uint64_t m_CancelledWaiterCount = 0;
+		uint64_t m_FanoutDeliveryCount = 0;
+	};
+
+	using TextureArtifactCacheStatistics = ArtifactCacheCoreStatistics;
+	using ModelImportArtifactCacheStatistics = ArtifactCacheCoreStatistics;
 }

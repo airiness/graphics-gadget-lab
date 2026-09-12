@@ -1,6 +1,6 @@
 #include "AssetPreparationTracker.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 #include <algorithm>
 #include <utility>

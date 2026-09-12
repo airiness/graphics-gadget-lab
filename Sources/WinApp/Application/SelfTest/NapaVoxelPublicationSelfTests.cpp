@@ -9,7 +9,7 @@
 #include "ApplicationInput.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Core/Time.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"

@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Asset/IBLStageArtifact.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 
 #include <span>
 #include <string>

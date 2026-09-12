@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"

@@ -1,6 +1,6 @@
 #pragma once
 #include "Graphics/Asset/Publication/ModelPublicationJournal.h"
-#include "Graphics/Asset/ModelImportArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
 
 #include <cstddef>
 #include <cstdint>

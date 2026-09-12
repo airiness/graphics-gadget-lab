@@ -1,7 +1,7 @@
 #include "Lab/LabSessionBase.h"
 #include "ApplicationCameraInput.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 

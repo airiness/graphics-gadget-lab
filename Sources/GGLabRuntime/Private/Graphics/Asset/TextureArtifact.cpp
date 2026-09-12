@@ -1,4 +1,4 @@
-#include "Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 

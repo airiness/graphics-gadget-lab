@@ -1,7 +1,7 @@
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/Asset/TextureAssetValidation.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 
 #include <cstddef>
 #include <cstdint>

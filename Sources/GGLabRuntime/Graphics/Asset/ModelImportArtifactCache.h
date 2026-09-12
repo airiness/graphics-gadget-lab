@@ -1,17 +1,13 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/ArtifactCacheCore.h"
-#include "Graphics/Asset/ModelImportArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheConfig.h"
+#include "GGLabRuntime/Graphics/Asset/ArtifactCacheCore.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
 
 #include <cstdint>
 
 namespace gglab
 {
-	struct ModelImportArtifactCacheConfig
-	{
-		uint64_t m_BudgetBytes = 512ull * 1024ull * 1024ull;
-	};
-
 	using ModelImportArtifactCacheStatistics = ArtifactCacheCoreStatistics;
 
 	class ModelImportArtifactCache final
