@@ -338,14 +338,14 @@ namespace gglab
 				modelId, std::move(dependencyLeaseTokens));
 			SetAssetState(*model, AssetState::UploadQueued);
 			m_AssetManager->RegisterModelDependencies(modelId, commit.m_Model.m_ContentGeneration);
-			m_AssetManager->m_PendingModels.insert(modelId);
+			m_AssetManager->m_State->m_ModelAssets.AddPendingModel(modelId);
 			ProgressReporter(model->m_LoadProgress)
 				.Report(0.66f, "Waiting for model dependency uploads",
 					std::format("{} texture uploads, {} mesh uploads",
 						commit.m_QueuedTextureUploads, commit.m_QueuedMeshUploads));
 			if (m_AssetManager->RefreshModelState(modelId))
 			{
-				m_AssetManager->m_PendingModels.erase(modelId);
+				m_AssetManager->m_State->m_ModelAssets.RemovePendingModel(modelId);
 			}
 			return {};
 		}
@@ -446,7 +446,7 @@ namespace gglab
 			SetAssetState(*model, reason == AssetResourcePublicationAbortReason::Failed
 				? AssetState::Failed
 				: AssetState::Cancelled);
-			m_AssetManager->m_PendingModels.erase(modelId);
+			m_AssetManager->m_State->m_ModelAssets.RemovePendingModel(modelId);
 			ProgressReporter(model->m_LoadProgress)
 				.Report(0.62f, reason == AssetResourcePublicationAbortReason::Failed
 					? "Model publication failed"

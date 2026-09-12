@@ -561,6 +561,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedDataKey.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImportArtifact.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
@@ -1260,6 +1263,9 @@
       <Filter>Private\Diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.h">

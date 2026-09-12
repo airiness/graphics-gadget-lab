@@ -318,7 +318,6 @@ namespace gglab
 		RenderSamplerAccess* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
-		std::unordered_set<ModelID> m_PendingModels;
 		uint64_t m_CpuCancellationCount = 0;
 		uint64_t m_ReadyCancellationCount = 0;
 		uint64_t m_GpuDeferredCancellationCount = 0;

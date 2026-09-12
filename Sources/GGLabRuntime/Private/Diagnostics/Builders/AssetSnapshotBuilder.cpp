@@ -141,7 +141,7 @@ namespace gglab
 				snapshot.m_EvictionCandidateCount += evictionCandidate ? 1u : 0u;
 			};
 
-		const ModelStore::EntryMap& models = assetManager.m_State->m_ModelStore.Entries();
+		const ModelStore::EntryMap& models = assetManager.m_State->m_ModelAssets.ModelEntries();
 		snapshot.m_Models.reserve(models.size());
 		for (const auto& [modelId, model] : models)
 		{
@@ -194,7 +194,7 @@ namespace gglab
 			[](const AssetSnapshot::Model& lhs, const AssetSnapshot::Model& rhs)
 			{ return lhs.m_Id.Value() < rhs.m_Id.Value(); });
 
-		const MeshStore::EntryMap& meshes = assetManager.m_State->m_MeshStore.Entries();
+		const MeshStore::EntryMap& meshes = assetManager.m_State->m_ModelAssets.MeshEntries();
 		snapshot.m_Meshes.reserve(meshes.size());
 		for (const auto& [meshId, mesh] : meshes)
 		{

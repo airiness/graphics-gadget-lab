@@ -2,12 +2,10 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/Dependency/AssetStateEventQueue.h"
 #include "Graphics/Asset/Loading/AssetLoadCoordinator.h"
+#include "Graphics/Asset/ModelAssetSystem.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
 #include "Graphics/Asset/Publication/AssetPublicationCoordinator.h"
 #include "Graphics/Asset/Residency/AssetResidencyCoordinator.h"
-#include "Graphics/Asset/Store/MaterialStore.h"
-#include "Graphics/Asset/Store/MeshStore.h"
-#include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
 #include "Graphics/Asset/TextureAssetSystem.h"
 
@@ -29,9 +27,7 @@ namespace gglab
 		// through texture-domain shutdown and destruction.
 		AssetStateEventQueue m_AssetStateEventQueue;
 		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
-		MeshStore m_MeshStore;
-		MaterialStore m_MaterialStore;
-		ModelStore m_ModelStore;
+		ModelAssetSystem m_ModelAssets;
 		AssetResidencyCoordinator m_AssetResidencyCoordinator;
 		AssetPublicationCoordinator m_AssetPublicationCoordinator;
 	};

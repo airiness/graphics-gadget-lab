@@ -486,7 +486,7 @@ namespace gglab
 				{
 					SetAssetState(*model, AssetState::GpuProcessing);
 				}
-				m_PendingModels.insert(modelId);
+				m_State->m_ModelAssets.AddPendingModel(modelId);
 			}
 
 			if (event.m_Operation)
@@ -666,7 +666,7 @@ namespace gglab
 		}
 
 		uint32_t reloadingAssetCount = 0;
-		for (const auto& mesh : m_State->m_MeshStore.Entries() | std::views::values)
+		for (const auto& mesh : m_State->m_ModelAssets.MeshEntries() | std::views::values)
 		{
 			reloadingAssetCount += mesh->m_IsReloading ? 1u : 0u;
 		}
@@ -1090,15 +1090,15 @@ namespace gglab
 		ReleaseModelDependencyInterests(modelId);
 		UnregisterModelDependencies(modelId, contentVersion.m_ContentGeneration);
 		m_State->m_AssetLoadCoordinator.DiscardModelImport(key);
-		m_PendingModels.erase(modelId);
-		if (!m_State->m_ModelStore.Remove(modelId))
+		m_State->m_ModelAssets.RemovePendingModel(modelId);
+		if (!m_State->m_ModelAssets.RemoveModel(modelId))
 		{
 			return false;
 		}
 
 		for (MaterialID materialId : materials)
 		{
-			const bool referenced = std::ranges::any_of(m_State->m_ModelStore.Entries() | std::views::values,
+			const bool referenced = std::ranges::any_of(m_State->m_ModelAssets.ModelEntries() | std::views::values,
 				[materialId](const std::unique_ptr<Model>& candidate) noexcept
 				{
 					return std::ranges::any_of(candidate->m_MeshInstance,
@@ -1129,11 +1129,11 @@ namespace gglab
 					QueueRuntimeRetirement(contentVersion);
 				}
 			};
-		for (const auto& [modelId, model] : m_State->m_ModelStore.Entries())
+		for (const auto& [modelId, model] : m_State->m_ModelAssets.ModelEntries())
 		{
 			queueIfUnreferenced(MakeAssetContentVersion(modelId, model->m_ContentGeneration));
 		}
-		for (const auto& [meshId, mesh] : m_State->m_MeshStore.Entries())
+		for (const auto& [meshId, mesh] : m_State->m_ModelAssets.MeshEntries())
 		{
 			queueIfUnreferenced(MakeAssetContentVersion(meshId, mesh->m_ContentGeneration));
 		}
@@ -1306,7 +1306,7 @@ namespace gglab
 			m_State->m_AssetResidencyCoordinator.FindModel(MakeAssetContentVersion(modelId, generation)))
 		{
 			model->m_CancelRequested = false;
-			m_PendingModels.insert(modelId);
+			m_State->m_ModelAssets.AddPendingModel(modelId);
 			return;
 		}
 		model->m_CancelRequested = true;
@@ -1329,7 +1329,7 @@ namespace gglab
 		}
 		UnregisterModelDependencies(modelId, generation);
 		SetAssetState(*model, AssetState::Cancelled);
-		m_PendingModels.erase(modelId);
+		m_State->m_ModelAssets.RemovePendingModel(modelId);
 		ProgressReporter(model->m_LoadProgress)
 			.Report(0.96f, "Model loading cancelled",
 				std::format("Model {} has no active owners", modelId.Value()));
@@ -1512,7 +1512,7 @@ namespace gglab
 		// Events emitted while this batch runs remain deferred to the next tick.
 		DrainStateEvents();
 		// Owner-thread phase 5: project dependency outcomes onto facade-visible models.
-		std::erase_if(m_PendingModels,
+		m_State->m_ModelAssets.RemovePendingModelsIf(
 			[this](ModelID modelId) noexcept { return RefreshModelState(modelId); });
 		m_State->m_AssetResidencyCoordinator.Controller().EndFrame();
 	}
@@ -1534,7 +1534,7 @@ namespace gglab
 			.m_Frame = m_State->m_AssetResidencyCoordinator.GetUsageFrame(),
 		};
 		snapshot.m_Entries.reserve(
-			m_State->m_MeshStore.Entries().size() + m_State->m_TextureAssets->GetTextureCount());
+			m_State->m_ModelAssets.MeshEntries().size() + m_State->m_TextureAssets->GetTextureCount());
 		const auto appendEntry = [this, &snapshot](AssetKey key) noexcept
 			{
 				AssetResidencyInventoryEntry entry;
@@ -1551,7 +1551,7 @@ namespace gglab
 				}
 				snapshot.m_Entries.push_back(std::move(entry));
 			};
-		for (const MeshID meshId : m_State->m_MeshStore.Entries() | std::views::keys)
+		for (const MeshID meshId : m_State->m_ModelAssets.MeshEntries() | std::views::keys)
 		{
 			appendEntry(MakeAssetKey(meshId));
 		}
@@ -1818,7 +1818,7 @@ namespace gglab
 		}
 		if (m_State->m_AssetResidencyCoordinator.FindModel(MakeAssetContentVersion(modelId, generation)))
 		{
-			m_PendingModels.insert(modelId);
+			m_State->m_ModelAssets.AddPendingModel(modelId);
 		}
 	}
 
@@ -1939,7 +1939,7 @@ namespace gglab
 			});
 		if (!submission.IsValid())
 		{
-			for (const auto& [meshId, mesh] : m_State->m_MeshStore.Entries())
+			for (const auto& [meshId, mesh] : m_State->m_ModelAssets.MeshEntries())
 			{
 				if (mesh->m_SourceModelId == sourceModelId)
 				{
@@ -2120,7 +2120,7 @@ namespace gglab
 					textureId, texture->m_ContentGeneration, TaskPriority::Normal));
 			}
 		}
-		m_PendingModels.insert(modelId);
+		m_State->m_ModelAssets.AddPendingModel(modelId);
 		return true;
 	}
 
@@ -2221,38 +2221,38 @@ namespace gglab
 
 	Mesh* AssetManager::EditMesh(MeshID meshId) noexcept
 	{
-		return m_State->m_MeshStore.Edit(meshId);
+		return m_State->m_ModelAssets.EditMesh(meshId);
 	}
 
 	const Mesh* AssetManager::GetMesh(MeshID meshId) const noexcept
 	{
-		return m_State->m_MeshStore.Find(meshId);
+		return m_State->m_ModelAssets.FindMesh(meshId);
 	}
 
 	const Material* AssetManager::GetMaterial(MaterialID materialId) const noexcept
 	{
-		return m_State->m_MaterialStore.Find(materialId);
+		return m_State->m_ModelAssets.FindMaterial(materialId);
 	}
 
 	Model* AssetManager::EditModel(ModelID modelId) noexcept
 	{
-		return m_State->m_ModelStore.Edit(modelId);
+		return m_State->m_ModelAssets.EditModel(modelId);
 	}
 
 	const Model* AssetManager::GetModel(ModelID modelId) const noexcept
 	{
-		return m_State->m_ModelStore.Find(modelId);
+		return m_State->m_ModelAssets.FindModel(modelId);
 	}
 
 	bool AssetManager::RemoveMesh(MeshID meshId) noexcept
 	{
 		m_State->m_AssetPublicationCoordinator.CompleteMeshRollback(meshId);
-		return m_State->m_MeshStore.Remove(meshId);
+		return m_State->m_ModelAssets.RemoveMesh(meshId);
 	}
 
 	bool AssetManager::RemoveMaterial(MaterialID materialId) noexcept
 	{
-		return m_State->m_MaterialStore.Remove(materialId);
+		return m_State->m_ModelAssets.RemoveMaterial(materialId);
 	}
 
 	void AssetManager::RollbackPublicationMesh(MeshID meshId, uint64_t generation) noexcept
@@ -2282,7 +2282,7 @@ namespace gglab
 		std::unique_ptr<Mesh>&& mesh, MeshUploadData& meshUploadData) noexcept
 	{
 		GGLAB_ASSERT(mesh);
-		const MeshStore::InsertResult insertion = m_State->m_MeshStore.Insert(std::move(mesh));
+		const MeshStore::InsertResult insertion = m_State->m_ModelAssets.InsertMesh(std::move(mesh));
 		const MeshID meshId = insertion.m_Id;
 		Mesh* storedMesh = EditMesh(meshId);
 		if (!meshId.IsValid() || !storedMesh)
@@ -2326,7 +2326,7 @@ namespace gglab
 
 	MaterialID AssetManager::AddMaterial(std::unique_ptr<Material>&& material) noexcept
 	{
-		return m_State->m_MaterialStore.Insert(std::move(material)).m_Id;
+		return m_State->m_ModelAssets.InsertMaterial(std::move(material));
 	}
 
 	MaterialID AssetManager::AddProceduralMaterial(std::unique_ptr<Material>&& material) noexcept
@@ -2337,7 +2337,7 @@ namespace gglab
 	ModelID AssetManager::AddProceduralModel(std::unique_ptr<Model>&& model) noexcept
 	{
 		GGLAB_ASSERT(model);
-		const ModelStore::InsertResult insertion = m_State->m_ModelStore.Insert(std::move(model));
+		const ModelStore::InsertResult insertion = m_State->m_ModelAssets.InsertModel(std::move(model));
 		const ModelID modelId = insertion.m_Id;
 		Model* storedModel = EditModel(modelId);
 		if (!modelId.IsValid() || !storedModel)
@@ -2366,10 +2366,10 @@ namespace gglab
 		SetAssetState(*storedModel, AssetState::CpuReady);
 
 		RegisterModelDependencies(modelId, storedModel->m_ContentGeneration);
-		m_PendingModels.insert(modelId);
+		m_State->m_ModelAssets.AddPendingModel(modelId);
 		if (RefreshModelState(modelId))
 		{
-			m_PendingModels.erase(modelId);
+			m_State->m_ModelAssets.RemovePendingModel(modelId);
 		}
 
 		return modelId;
@@ -2828,7 +2828,7 @@ namespace gglab
 		}
 		const ModelImportArtifact* importedModel = artifact.get();
 
-		for (const auto& [meshId, meshOwner] : m_State->m_MeshStore.Entries())
+		for (const auto& [meshId, meshOwner] : m_State->m_ModelAssets.MeshEntries())
 		{
 			Mesh* mesh = meshOwner.get();
 			if (!mesh->m_IsReloading || mesh->m_SourceModelId != sourceModelId)
@@ -2875,7 +2875,7 @@ namespace gglab
 
 	MeshID AssetManager::CreateMesh() noexcept
 	{
-		const MeshID meshId = m_State->m_MeshStore.Create();
+		const MeshID meshId = m_State->m_ModelAssets.CreateMesh();
 		Mesh* mesh = EditMesh(meshId);
 		GGLAB_ASSERT_NOT_NULL(mesh);
 		BeginAssetContentGeneration(*mesh, 1, AssetState::LoadingCpu);
@@ -2887,7 +2887,7 @@ namespace gglab
 	ModelID AssetManager::CreateModel(
 		const std::filesystem::path& canonicalPath, AssetState initialState) noexcept
 	{
-		const ModelID modelId = m_State->m_ModelStore.Create(canonicalPath);
+		const ModelID modelId = m_State->m_ModelAssets.CreateModel(canonicalPath);
 		Model* model = EditModel(modelId);
 		GGLAB_ASSERT_NOT_NULL(model);
 		if (!model)
@@ -2907,19 +2907,19 @@ namespace gglab
 
 	ModelID AssetManager::FindModel(const std::filesystem::path& canonicalPath) const noexcept
 	{
-		return m_State->m_ModelStore.FindByPath(canonicalPath);
+		return m_State->m_ModelAssets.FindModelByPath(canonicalPath);
 	}
 
 	bool AssetManager::DetachTerminalModelPath(
 		const std::filesystem::path& canonicalPath, ModelID modelId) noexcept
 	{
-		if (!m_State->m_ModelStore.DetachPath(canonicalPath, modelId))
+		if (!m_State->m_ModelAssets.DetachModelPath(canonicalPath, modelId))
 		{
 			return false;
 		}
 
 		m_State->m_AssetLoadCoordinator.DiscardModelImport(MakeAssetKey(modelId));
-		m_PendingModels.erase(modelId);
+		m_State->m_ModelAssets.RemovePendingModel(modelId);
 		GGLAB_LOG_GRAPHICS_INFO(
 			"Detached terminal model {} from cache path '{}' so a later request can retry.",
 			modelId.Value(), canonicalPath.string());
