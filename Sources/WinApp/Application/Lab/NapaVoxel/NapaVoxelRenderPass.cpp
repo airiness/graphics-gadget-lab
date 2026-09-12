@@ -145,9 +145,7 @@ namespace gglab
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
-				auto* renderer = servicesPtr->m_Renderer;
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
-				GGLAB_ASSERT_NOT_NULL(renderer);
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const RHITextureViewHandle dsv = executeContext.GetViewHandle(data.m_Dsv);
@@ -158,18 +156,18 @@ namespace gglab
 					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = dsv },
 				});
 				const size_t pipelineIndex = static_cast<size_t>(surfaceMode);
-				graphicsContext->SetPipeline(renderer->GetPipelineCache()->Resolve(
+				graphicsContext->SetPipeline(servicesPtr->m_PipelineResolver->Resolve(
 					m_PipelineSlots[pipelineIndex], m_PipelineKeys[pipelineIndex], GetInfo()));
 				graphicsContext->SetViewport(data.m_RasterDomain.m_Viewport);
 				graphicsContext->SetScissorRect(data.m_RasterDomain.m_Scissor);
 				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 				graphicsContext->SetConstantBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					renderer->GetSceneConstantBuffer()->GetBufferHandle(),
+					servicesPtr->m_FrameBuffers->GetSceneConstantBuffer()->GetBufferHandle(),
 					frameContextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 				graphicsContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					renderer->GetViewStructuredBuffer()->GetBufferHandle());
+					servicesPtr->m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 
 				for (const NapaVoxelPassChunk& chunk : data.m_Chunks)
 				{
@@ -213,13 +211,13 @@ namespace gglab
 		{
 			return;
 		}
-		GGLAB_ASSERT_NOT_NULL(services.m_Renderer);
-		GGLAB_ASSERT_NOT_NULL(services.m_ShaderManager);
+		GGLAB_ASSERT_NOT_NULL(services.m_BindingLayout);
+		GGLAB_ASSERT_NOT_NULL(services.m_ShaderPrograms);
 
 		const ShaderID vertexShader =
-			services.m_ShaderManager->LoadProgram(shader_programs::NapaVoxelVertex);
+			services.m_ShaderPrograms->LoadProgram(shader_programs::NapaVoxelVertex);
 		const ShaderID pixelShader =
-			services.m_ShaderManager->LoadProgram(shader_programs::NapaVoxelPixel);
+			services.m_ShaderPrograms->LoadProgram(shader_programs::NapaVoxelPixel);
 		if (!vertexShader.IsValid() || !pixelShader.IsValid())
 		{
 			return;
@@ -230,7 +228,7 @@ namespace gglab
 			auto& key = m_PipelineKeys[index];
 			key.m_VSId = vertexShader;
 			key.m_PSId = pixelShader;
-			key.m_BindingLayout = services.m_Renderer->GetCommonBindingLayout();
+			key.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
 			key.m_InputLayoutId = InputLayoutID::P3N3;
 			key.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 			key.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;

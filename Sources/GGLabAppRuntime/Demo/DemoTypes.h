@@ -10,7 +10,6 @@ namespace gglab
 	class DebugDrawContext;
 	class EnvironmentAssetController;
 	class ApplicationInput;
-	class Renderer;
 	class RenderHost;
 	class ShaderManager;
 	class TaskSystem;
@@ -18,7 +17,6 @@ namespace gglab
 
 	struct DemoServices
 	{
-		Renderer* m_Renderer = nullptr;
 		// Optional Runtime host handle for AppRuntime-owned hosting code. Content
 		// keeps using the concrete service surfaces it already receives.
 		RenderHost* m_RenderHost = nullptr;
@@ -35,7 +33,7 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager && m_TaskSystem &&
+			return m_RenderHost && m_AssetManager && m_ShaderManager && m_TaskSystem &&
 				m_Input && m_Time && m_DebugDraw && m_EnvironmentAssetController;
 		}
 	};

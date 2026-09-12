@@ -119,6 +119,11 @@ namespace gglab
 		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest() noexcept = 0;
 		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection()
 			const noexcept = 0;
+		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept = 0;
+		virtual void RequestPostProcessPreview() noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetPostProcessPreviewUpdateCount() const noexcept = 0;
+		[[nodiscard]] virtual PostProcessDebugSelection GetPublishedPostProcessPreviewSelection()
+			const noexcept = 0;
 		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV() const noexcept = 0;
 		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(

@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "AppRuntimeLog.h"
 
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -162,7 +163,7 @@ namespace gglab
 			profilingControl->RequestEnabled(true);
 		}
 		ResetEvidenceCapture();
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
 		m_IsEntered = true;
 		ApplySelectedPreviewSelection();
@@ -175,7 +176,7 @@ namespace gglab
 		{
 			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
 			registry->RequestPostProcessPreview();
@@ -320,7 +321,7 @@ namespace gglab
 			{
 				return primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 					.m_World = &m_World,
 					.m_Transform = components::TransformComponent{
 						.m_Position = position, .m_Scale = scale },
@@ -354,7 +355,7 @@ namespace gglab
 		distantReferenceTransform.m_Scale = Vector3::One * 2.25f;
 		const entt::entity distantReference = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World, .m_Transform = distantReferenceTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.distant_reference",
 				Color(0.95f, 0.72f, 0.08f, 1.0f), 0.28f, 0.15f),
@@ -404,7 +405,7 @@ namespace gglab
 		movingTransform.m_Scale = Vector3::One * 1.25f;
 		m_MovingEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World, .m_Transform = movingTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.moving_rigid",
 				Color(0.7f, 0.12f, 0.5f, 1.0f), 0.22f),
@@ -438,7 +439,7 @@ namespace gglab
 
 	void TemporalAALabSession::ApplySelectedPreviewSelection() noexcept
 	{
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap });
 			registry->RequestPostProcessPreview();
@@ -447,7 +448,7 @@ namespace gglab
 
 	void TemporalAALabSession::RequestPreviewRefresh() noexcept
 	{
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->RequestPostProcessPreview();
 		}
@@ -507,7 +508,7 @@ namespace gglab
 		++m_GpuTimingSampleCount;
 		if (m_GpuTimingSampleCount == TemporalAAGpuTimingSampleTarget)
 		{
-			const auto* device = m_Services.m_Renderer->GetDevice();
+			const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 			const std::string_view adapterIdentity = device
 				? device->GetAdapterCompatibilityIdentity() : "unavailable";
 			const auto& taa = GetViewRenderProfile().m_TemporalAA;
@@ -538,9 +539,9 @@ namespace gglab
 
 	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-		const auto* rhiContext = m_Services.m_Renderer
-			? m_Services.m_Renderer->GetRHIContext()
-			: nullptr;
+	const auto* rhiContext = m_Services.m_RenderHost
+		? m_Services.m_RenderServices.m_Presentation->GetRHIContext()
+		: nullptr;
 		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
 			rhiContext ? rhiContext->GetFrameSlotCount() : 3u);
 	}
@@ -548,8 +549,8 @@ namespace gglab
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		const auto history =
-			m_Services.m_Renderer->GetTemporalHistoryManager()->GetDiagnostics();
-		const auto* device = m_Services.m_Renderer->GetDevice();
+			GetLegacyRenderer(m_Services.m_RenderHost)->GetTemporalHistoryManager()->GetDiagnostics();
+		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 		const auto& camera = GetCamera();
 		const auto& taa = GetViewRenderProfile().m_TemporalAA;
 		const float saturationAge =

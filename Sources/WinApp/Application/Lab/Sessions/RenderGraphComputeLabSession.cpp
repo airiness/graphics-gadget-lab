@@ -156,8 +156,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 				EnsureInitialized(services);
 
-				auto* renderer = services.m_Renderer;
-				auto* swapChain = renderer->GetSwapChain();
+				auto* swapChain = m_Presentation->GetSwapChain();
 				GGLAB_ASSERT_NOT_NULL(swapChain);
 
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
@@ -452,11 +451,11 @@ namespace gglab
 					return;
 				}
 
-				auto* renderer = services.m_Renderer;
-				auto* shaderManager = services.m_ShaderManager;
-				GGLAB_ASSERT_NOT_NULL(renderer);
+				auto* shaderManager = services.m_ShaderPrograms;
 				GGLAB_ASSERT_NOT_NULL(shaderManager);
-				m_Renderer = renderer;
+				m_PipelineResolver = services.m_PipelineResolver;
+				m_Presentation = services.m_Presentation;
+				m_BindingLayout = services.m_BindingLayout;
 
 				m_ComputeWriteRecipe.m_CSId =
 					shaderManager->LoadProgram(shader_programs::RenderGraphComputeWrite);
@@ -467,7 +466,7 @@ namespace gglab
 				m_PreviewRecipe.m_PSId = shaderManager->LoadProgram(
 					shader_programs::RenderGraphComputePreviewPixel);
 
-				const auto bindingLayout = renderer->GetCommonBindingLayout();
+				const auto bindingLayout = m_BindingLayout->GetCommonBindingLayout();
 				m_ComputeWriteRecipe.m_BindingLayout = bindingLayout;
 				m_ComputeReadWriteRecipe.m_BindingLayout = bindingLayout;
 
@@ -476,7 +475,7 @@ namespace gglab
 				m_PreviewRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 				m_PreviewRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 				m_PreviewRecipe.m_Formats.m_RenderTargetFormats[0] =
-					renderer->GetSwapChain()->GetFormat();
+					m_Presentation->GetSwapChain()->GetFormat();
 				m_PreviewRecipe.m_Formats.m_RenderTargetCount = 1;
 				m_PreviewRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
 				m_PreviewRecipe.m_Formats.m_SampleCount = 1;
@@ -488,7 +487,7 @@ namespace gglab
 
 			RHIPipelineHandle GetOrCreateComputeWritePSO() noexcept
 			{
-				auto* pipelineCache = m_Renderer->GetPipelineCache();
+				auto* pipelineCache = m_PipelineResolver;
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				return pipelineCache->Resolve(
 					m_ComputeWriteSlot, m_ComputeWriteRecipe, ComputeWritePassInfo);
@@ -496,7 +495,7 @@ namespace gglab
 
 			RHIPipelineHandle GetOrCreateComputeReadWritePSO() noexcept
 			{
-				auto* pipelineCache = m_Renderer->GetPipelineCache();
+				auto* pipelineCache = m_PipelineResolver;
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				return pipelineCache->Resolve(
 					m_ComputeReadWriteSlot, m_ComputeReadWriteRecipe, ComputeReadWritePassInfo);
@@ -504,13 +503,15 @@ namespace gglab
 
 			RHIPipelineHandle GetOrCreatePreviewPSO() noexcept
 			{
-				auto* pipelineCache = m_Renderer->GetPipelineCache();
+				auto* pipelineCache = m_PipelineResolver;
 				GGLAB_ASSERT_NOT_NULL(pipelineCache);
 				return pipelineCache->Resolve(m_PreviewSlot, m_PreviewRecipe, PreviewPassInfo);
 			}
 
 			std::shared_ptr<RenderGraphComputeLabState> m_State;
-			Renderer* m_Renderer = nullptr;
+			RenderPipelineResolver* m_PipelineResolver = nullptr;
+			RenderPresentationAccess* m_Presentation = nullptr;
+			RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 			ComputePipelineRecipe m_ComputeWriteRecipe{};
 			ComputePipelineRecipe m_ComputeReadWriteRecipe{};
 			GraphicsPhysicalPipelineKey m_PreviewRecipe{};

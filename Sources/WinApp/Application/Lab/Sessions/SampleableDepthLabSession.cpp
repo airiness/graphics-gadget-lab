@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "Graphics/Asset/AssetManager.h"
@@ -107,7 +108,7 @@ namespace gglab
 
 	void SampleableDepthLabSession::OnEnter() noexcept
 	{
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
 		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount();
@@ -119,7 +120,7 @@ namespace gglab
 
 	void SampleableDepthLabSession::OnExit() noexcept
 	{
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		if (registry)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
@@ -137,7 +138,7 @@ namespace gglab
 		{
 			GetCamera().Update();
 		}
-		m_Services.m_Renderer->GetRenderResourceRegistry()->RequestPostProcessPreview();
+		m_Services.m_RenderServices.m_Resources->RequestPostProcessPreview();
 	}
 
 	void SampleableDepthLabSession::OnResize(uint32_t width, uint32_t height) noexcept
@@ -197,7 +198,7 @@ namespace gglab
 		floorTransform.m_Scale = Vector3(8.0f, 0.2f, 10.0f);
 		const entt::entity floorEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = floorTransform,
 			.m_MaterialInstance = MakeMaterial(
@@ -209,7 +210,7 @@ namespace gglab
 		cubeTransform.m_Scale = Vector3(1.8f, 1.8f, 1.8f);
 		const entt::entity cubeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = cubeTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.sampleable_depth.intersection.cube",
@@ -221,7 +222,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 2.0f;
 		const entt::entity sphereEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.sampleable_depth.intersection.sphere",
@@ -237,7 +238,7 @@ namespace gglab
 		farTransform.m_Scale = Vector3::One * (m_FarPlane * 0.008f);
 		const entt::entity farEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = farTransform,
 			.m_MaterialInstance = MakeMaterial(
@@ -305,7 +306,7 @@ namespace gglab
 			std::abs(camera.GetFar() - m_FarPlane) <= 1.0e-3f &&
 			m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
 			std::abs(camera.GetAspect() - expectedAspect) <= 1.0e-6f;
-		const auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		const auto* registry = m_Services.m_RenderServices.m_Resources;
 		const bool depthPreviewExecuted =
 			registry && registry->HasPublishedPostProcessPreview() &&
 			registry->GetPostProcessPreviewUpdateCount() > m_PreviewUpdateCountOnEnter &&

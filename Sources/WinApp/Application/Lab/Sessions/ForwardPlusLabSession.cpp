@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -286,7 +287,7 @@ namespace gglab
 		wallTransform.m_Scale = Vector3(7.5f, 4.2f, 0.35f);
 		const entt::entity wall = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = wallTransform,
 			.m_MaterialInstance =
@@ -298,7 +299,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 1.4f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =
@@ -480,10 +481,10 @@ namespace gglab
 
 	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-		const auto* rhiContext = m_Services.m_Renderer
-			? m_Services.m_Renderer->GetRHIContext()
-			: nullptr;
-		m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
+	const auto* rhiContext = m_Services.m_RenderHost
+		? m_Services.m_RenderServices.m_Presentation->GetRHIContext()
+		: nullptr;
+	m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
 	}
 
 	void ForwardPlusLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
@@ -544,7 +545,9 @@ namespace gglab
 		const bool hdrDiffRequested =
 			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
 			forwardPlus.m_EnableHdrDiffValidation;
-		const RHIDevice* device = m_Services.m_Renderer ? m_Services.m_Renderer->GetDevice() : nullptr;
+		const RHIDevice* device = m_Services.m_RenderHost
+		? m_Services.m_RenderServices.m_Presentation->GetDevice()
+		: nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =
 			device ? device->GetShaderWaveCapabilities() : RHIShaderWaveCapabilities{};
 		const std::string waveLaneRange =

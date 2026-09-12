@@ -135,8 +135,7 @@ namespace gglab
 				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 				EnsureInitialized(services);
 
-				auto* renderer = services.m_Renderer;
-				auto* swapChain = renderer->GetSwapChain();
+auto* swapChain = services.m_Presentation->GetSwapChain();
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
@@ -387,9 +386,12 @@ namespace gglab
 				{
 					return;
 				}
-				m_Renderer = services.m_Renderer;
-				m_Device = m_Renderer->GetDevice();
-				auto* shaderManager = services.m_ShaderManager;
+				m_PipelineResolver = services.m_PipelineResolver;
+				m_Presentation = services.m_Presentation;
+				m_BindingLayout = services.m_BindingLayout;
+				m_ShaderPrograms = services.m_ShaderPrograms;
+				m_Device = m_Presentation->GetDevice();
+				auto* shaderManager = services.m_ShaderPrograms;
 				GGLAB_ASSERT_NOT_NULL(m_Device);
 				GGLAB_ASSERT_NOT_NULL(shaderManager);
 
@@ -402,8 +404,8 @@ namespace gglab
 				const ShaderID conformancePS =
 					shaderManager->LoadProgram(shader_programs::CoordinateConformancePixel);
 
-				const RHIBindingLayoutHandle bindingLayout = m_Renderer->GetCommonBindingLayout();
-				const RHIFormat backBufferFormat = m_Renderer->GetSwapChain()->GetFormat();
+				const RHIBindingLayoutHandle bindingLayout = m_BindingLayout->GetCommonBindingLayout();
+				const RHIFormat backBufferFormat = m_Presentation->GetSwapChain()->GetFormat();
 				const auto initializeRecipe = [bindingLayout](GraphicsPhysicalPipelineKey& recipe,
 					ShaderID vertexShader, ShaderID pixelShader, InputLayoutID inputLayout,
 					RHIFormat colorFormat, RHIFormat depthFormat, DepthPreset depthPreset) noexcept
@@ -481,36 +483,39 @@ namespace gglab
 
 			RHIPipelineHandle GetOrCreateMarkerPipeline() noexcept
 			{
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_MarkerSlot, m_MarkerRecipe, MarkerPassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreateGeometryPipeline() noexcept
 			{
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_GeometrySlot, m_GeometryRecipe, ConformancePassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreateDepthPipeline() noexcept
 			{
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_DepthSlot, m_DepthRecipe, ConformancePassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreateBackCullPipeline() noexcept
 			{
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_BackCullSlot, m_BackCullRecipe, ConformancePassInfo);
 			}
 
 			RHIPipelineHandle GetOrCreatePositionPipeline() noexcept
 			{
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_PositionSlot, m_PositionRecipe, ConformancePassInfo);
 			}
 
 			std::shared_ptr<CoordinateConformanceLabState> m_State;
-			Renderer* m_Renderer = nullptr;
+			RenderPipelineResolver* m_PipelineResolver = nullptr;
+			RenderPresentationAccess* m_Presentation = nullptr;
+			RenderBindingLayoutAccess* m_BindingLayout = nullptr;
+			RenderShaderProgramAccess* m_ShaderPrograms = nullptr;
 			RHIDevice* m_Device = nullptr;
 			RHIBufferOwner m_VertexBuffer;
 			RHIBufferOwner m_IndexBuffer;

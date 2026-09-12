@@ -48,7 +48,7 @@ namespace gglab
 			"Camera input is derived once from the neutral application state");
 
 		DemoServices services{};
-		services.m_Renderer = reinterpret_cast<Renderer*>(1);
+		services.m_RenderHost = reinterpret_cast<RenderHost*>(1);
 		services.m_AssetManager = reinterpret_cast<AssetManager*>(1);
 		services.m_ShaderManager = reinterpret_cast<ShaderManager*>(1);
 		services.m_TaskSystem = reinterpret_cast<TaskSystem*>(1);

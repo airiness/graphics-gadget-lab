@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabFoundation/Base/MathUtils.h"
@@ -297,8 +298,7 @@ namespace gglab
 					return;
 				}
 
-				auto* renderer = services.m_Renderer;
-				auto* swapChain = renderer->GetSwapChain();
+auto* swapChain = services.m_Presentation->GetSwapChain();
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
 				const uint32_t width = swapChain->GetBufferWidth();
 				const uint32_t height = swapChain->GetBufferHeight();
@@ -390,10 +390,15 @@ namespace gglab
 					return;
 				}
 
-				m_Renderer = services.m_Renderer;
-				m_Device = m_Renderer->GetDevice();
-				auto* rhiContext = m_Renderer->GetRHIContext();
-				auto* shaderManager = services.m_ShaderManager;
+				m_PipelineResolver = services.m_PipelineResolver;
+				m_Presentation = services.m_Presentation;
+				m_BindingLayout = services.m_BindingLayout;
+				m_ShaderPrograms = services.m_ShaderPrograms;
+				m_Samplers = services.m_Samplers;
+				m_FrameBuffers = services.m_FrameBuffers;
+				m_Device = m_Presentation->GetDevice();
+				auto* rhiContext = m_Presentation->GetRHIContext();
+				auto* shaderManager = services.m_ShaderPrograms;
 				GGLAB_ASSERT_NOT_NULL(m_Device);
 				GGLAB_ASSERT_NOT_NULL(rhiContext);
 				GGLAB_ASSERT_NOT_NULL(shaderManager);
@@ -403,7 +408,7 @@ namespace gglab
 				m_PixelShader = shaderManager->LoadProgram(ResolvePreviewProgramRef(m_Contract));
 
 				RHIBindingLayoutDesc bindingLayoutDesc =
-					Renderer::BuildCommonRHIBindingLayoutDesc();
+					services.m_BindingLayout->GetCommonBindingLayoutDesc();
 				const size_t passSlot =
 					static_cast<size_t>(CommonRSRootParamIndex::PassConstants);
 				GGLAB_ASSERT(passSlot < bindingLayoutDesc.m_SlotCount);
@@ -426,7 +431,7 @@ namespace gglab
 				m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
 				m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
 				m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] =
-					m_Renderer->GetSwapChain()->GetFormat();
+					m_Presentation->GetSwapChain()->GetFormat();
 				m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
 				m_BaseRecipe.m_Formats.m_DepthStencilFormat = PreviewDepthFormat;
 				m_BaseRecipe.m_Formats.m_SampleCount = 1;
@@ -480,7 +485,7 @@ namespace gglab
 						m_State->m_TextureFixture.load(std::memory_order_relaxed));
 					parameters.TextureIndex = services.m_AssetManager->ResolveSrvIndex(
 						ResolvePreviewTextureId(fixture), ReservedTextureIDIndex::BaseColorWhite);
-					parameters.SamplerIndex = services.m_Renderer->GetSamplerRegistry()->GetSamplerIndex(
+					parameters.SamplerIndex = services.m_Samplers->GetSamplerIndex(
 						SamplerPreset::LinearWrap);
 				}
 
@@ -561,25 +566,25 @@ namespace gglab
 							renderQueue->m_CoverageRasterDomain.m_Scissor);
 						commandContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-						const auto* sceneBuffer = m_Renderer->GetSceneConstantBuffer();
+						const auto* sceneBuffer = m_FrameBuffers->GetSceneConstantBuffer();
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
 							sceneBuffer->GetBufferHandle(),
 							context.m_RenderScene.m_SceneConstantBufferOffset);
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-							m_Renderer->GetObjectStructuredBuffer()->GetBufferHandle(
+							m_FrameBuffers->GetObjectStructuredBuffer()->GetBufferHandle(
 								context.m_FrameSlotIndex));
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-							m_Renderer->GetMaterialStructuredBuffer()->GetBufferHandle(
+							m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(
 								context.m_FrameSlotIndex));
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-							m_Renderer->GetViewStructuredBuffer()->GetBufferHandle());
+							m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
 						commandContext->SetReadOnlyBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
-							m_Renderer->GetLightStructuredBuffer()->GetBufferHandle(
+							m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(
 								context.m_FrameSlotIndex));
 						commandContext->SetConstantBuffer(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
@@ -656,13 +661,18 @@ namespace gglab
 					: RasterizerPreset::Default;
 				const size_t slotIndex =
 					static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
-				return m_Renderer->GetPipelineCache()->Resolve(
+				return m_PipelineResolver->Resolve(
 					m_PipelineSlots[slotIndex], recipe, PreviewPassInfo);
 			}
 
 			std::shared_ptr<ShaderGraphPreviewLabState> m_State;
 			PreviewInputContract m_Contract = PreviewInputContract::NumericV1;
-			Renderer* m_Renderer = nullptr;
+			RenderPipelineResolver* m_PipelineResolver = nullptr;
+			RenderPresentationAccess* m_Presentation = nullptr;
+			RenderBindingLayoutAccess* m_BindingLayout = nullptr;
+			RenderShaderProgramAccess* m_ShaderPrograms = nullptr;
+			RenderSamplerAccess* m_Samplers = nullptr;
+			RenderFrameBufferAccess* m_FrameBuffers = nullptr;
 			RHIDevice* m_Device = nullptr;
 			ShaderID m_VertexShader{};
 			ShaderID m_PixelShader{};
@@ -879,7 +889,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 1.25f;
 		m_SphereEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =
@@ -891,7 +901,7 @@ namespace gglab
 		planeTransform.m_Scale = Vector3::One * 1.35f;
 		m_PlaneEntity = primitive::Plane::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = planeTransform,
 			.m_MaterialInstance =
@@ -903,7 +913,7 @@ namespace gglab
 		cubeTransform.m_Scale = Vector3::One * 1.15f;
 		m_CubeEntity = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = cubeTransform,
 			.m_MaterialInstance =
@@ -1024,7 +1034,7 @@ namespace gglab
 		const uint32_t expectedTextureIndex = m_Services.m_AssetManager->ResolveSrvIndex(
 			ResolvePreviewTextureId(textureFixture), ReservedTextureIDIndex::BaseColorWhite);
 		const uint32_t expectedSamplerIndex =
-			m_Services.m_Renderer->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearWrap);
+			GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry()->GetSamplerIndex(SamplerPreset::LinearWrap);
 		const bool textureBindingMatches = contract == PreviewInputContract::NumericV1 ||
 			(m_State->m_LastTextureIndex.load(std::memory_order_relaxed) == expectedTextureIndex &&
 				m_State->m_LastSamplerIndex.load(std::memory_order_relaxed) ==

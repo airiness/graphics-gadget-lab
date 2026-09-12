@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -218,10 +219,9 @@ namespace gglab
 	void StartDemo::BuildScene() noexcept
 	{
 		auto* assetManager = m_Services.m_AssetManager;
-		auto* renderer = m_Services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* samplerRegistry = renderer->GetSamplerRegistry();
+		auto* samplerRegistry =
+			GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry();
 
 		components::TransformComponent platformTransform{};
 		platformTransform.m_Position = Vector3(0.0f, -1.25f, 6.0f);

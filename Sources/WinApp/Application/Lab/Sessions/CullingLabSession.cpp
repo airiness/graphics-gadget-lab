@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -341,7 +342,7 @@ namespace gglab
 		materialInstance.m_Key = RuntimeMaterialKey("gglab.lab.culling.material.cube");
 		GGLAB_UNUSED(primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 			.m_World = &m_World,
 			.m_Transform = modelTransform,
 			.m_MaterialInstance = materialInstance,
@@ -367,7 +368,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 					.m_World = &m_World,
 					.m_Transform = candidateTransform,
 					.m_MaterialInstance = materialInstance,
@@ -377,7 +378,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(primitive::Sphere::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = GetLegacyRenderer(m_Services.m_RenderHost)->GetSamplerRegistry(),
 					.m_World = &m_World,
 					.m_Transform = candidateTransform,
 					.m_MaterialInstance = materialInstance,

@@ -180,7 +180,6 @@ namespace gglab
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
 				{
-					.m_Renderer = &legacyRenderer,
 					.m_RenderHost = m_RenderHost.get(),
 					.m_RenderServices = m_RenderServices,
 					.m_AssetManager = m_AssetManager.get(),
