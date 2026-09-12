@@ -1648,6 +1648,15 @@ namespace gglab
 				&GetLegacyRenderer(host) == &renderer &&
 				GetLegacyRenderer(constHost) == &renderer,
 				"the legacy bridge returns the concrete renderer from the host");
+
+			RenderHostInstance defaultHostInstance{};
+			context.Check(!defaultHostInstance.m_Host && !defaultHostInstance.m_Composition,
+				"render host instances default to no host and no composition access");
+			RenderHostInstance hostInstance{};
+			hostInstance.m_Composition = reinterpret_cast<RenderCompositionAccess*>(1);
+			context.Check(hostInstance.m_Composition ==
+				reinterpret_cast<RenderCompositionAccess*>(1),
+				"render host instances carry the composition access alongside the host and services");
 		}
 
 		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept

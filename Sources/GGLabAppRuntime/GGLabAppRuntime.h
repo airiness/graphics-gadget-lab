@@ -165,6 +165,11 @@ namespace gglab
 			return m_ServicesInitialized;
 		}
 		[[nodiscard]] RenderHost* GetRenderHost() const noexcept { return m_RenderHost.get(); }
+		// Non-owning; null before composition and after shutdown.
+		[[nodiscard]] RenderCompositionAccess* GetRenderComposition() const noexcept
+		{
+			return m_RenderComposition;
+		}
 		[[nodiscard]] const RenderServices& GetRenderServices() const noexcept
 		{
 			return m_RenderServices;

@@ -146,7 +146,13 @@ namespace gglab
 		}
 		m_RenderHost = std::move(renderHostInstance.m_Host);
 		m_RenderServices = renderHostInstance.m_Services;
-	
+		m_RenderComposition = renderHostInstance.m_Composition;
+		if (!m_RenderComposition)
+		{
+			GGLAB_LOG_ERROR("Render host instance is missing its composition access.");
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
+		}
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -371,6 +377,7 @@ namespace gglab
 			m_RenderHost->Finalize();
 			m_RenderHost.reset();
 		}
+		m_RenderComposition = nullptr;
 		m_EnvironmentAssetController.reset();
 		m_ShaderManager.reset();
 		m_Time.reset();

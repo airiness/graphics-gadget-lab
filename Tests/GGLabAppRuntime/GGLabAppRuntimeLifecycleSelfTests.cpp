@@ -649,8 +649,14 @@ namespace gglab
 				}) == AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed &&
 				rendererFailureRuntime.GetLifecycleState() ==
 				AppRuntimeLifecycleState::Failed &&
-				!rendererFailureRuntime.AreServicesInitialized(),
+				!rendererFailureRuntime.AreServicesInitialized() &&
+				rendererFailureRuntime.GetRenderHost() == nullptr &&
+				rendererFailureRuntime.GetRenderComposition() == nullptr,
 				"Missing host shader artifact inputs fail before renderer composition");
+			rendererFailureRuntime.Shutdown();
+			context.Check(rendererFailureRuntime.GetRenderHost() == nullptr &&
+				rendererFailureRuntime.GetRenderComposition() == nullptr,
+				"AppRuntime shutdown clears the non-owning render host and composition access");
 		}
 	}
 }
