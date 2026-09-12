@@ -13,7 +13,6 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
@@ -155,7 +154,6 @@ namespace gglab
 				? AppRuntimeTickResult::Continue
 				: AppRuntimeTickResult::Exit;
 		}
-		Renderer* const legacyRenderer = GetLegacyRenderer(m_RenderHost.get());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
 		services.m_AssetManager = m_AssetManager.get();
@@ -258,7 +256,7 @@ namespace gglab
 				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
 				: nullptr;
 			const DiagnosticsFrameContext diagnosticsContext{
-				.m_Renderer = legacyRenderer,
+				.m_RenderHost = m_RenderHost.get(),
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				.m_LabSnapshotSource = labRuntime,

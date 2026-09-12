@@ -1629,7 +1629,8 @@ namespace gglab
 				"assigning a frame handle transfers the abort obligation");
 
 			const RenderHostInstance missingFactory = CreateRenderHost({});
-			context.Check(!missingFactory.m_Host && !missingFactory.m_Services.m_Renderer &&
+			context.Check(!missingFactory.m_Host &&
+				!missingFactory.m_Services.m_PipelineResolver &&
 				!missingFactory.m_Services.m_Presentation,
 				"render host factory rejects a missing host context factory");
 			RenderHostCreateInfo missingPaths{};

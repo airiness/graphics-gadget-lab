@@ -3023,6 +3023,18 @@ foreach ($file in $runtimeOwnedFiles) {
     }
 }
 
+$renderServicesHeaderPath = Join-Path $runtimePublicDir "GGLabRuntime/Graphics/RenderServices.h"
+if (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf) {
+    $renderServicesContent = Get-Content -LiteralPath $renderServicesHeaderPath -Raw -ErrorAction Stop
+    if ($renderServicesContent -cmatch '\bRenderer\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-render-services-boundary"
+            Target = ConvertTo-RepoRelativePath $renderServicesHeaderPath
+            Reason = "the Public pass service bundle must not expose the concrete renderer"
+        })
+    }
+}
+
 $napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'
 foreach ($header in Get-ChildItem -LiteralPath $napaPublicDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {

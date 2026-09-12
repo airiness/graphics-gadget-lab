@@ -1,4 +1,5 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
@@ -103,9 +104,9 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PersistentSceneBufferSnapshot>();
-				if (context.m_Renderer)
+				if (context.m_RenderHost)
 				{
-					BuildPersistentSceneBufferSnapshot(*context.m_Renderer, snapshot);
+					BuildPersistentSceneBufferSnapshot(GetLegacyRenderer(*context.m_RenderHost), snapshot);
 				}
 				else
 				{
@@ -125,7 +126,7 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
-				snapshot = context.m_Renderer ? BuildIBLDiagnosticsSnapshot(*context.m_Renderer,
+				snapshot = context.m_RenderHost ? BuildIBLDiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
 					context.m_EnvironmentAssetController)
 					: IBLDiagnosticsSnapshot{};
 			}
@@ -180,10 +181,10 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PostProcessDiagnosticsSnapshot>();
-				if (context.m_Renderer && context.m_RenderGraph)
+				if (context.m_RenderHost && context.m_RenderGraph)
 				{
 					snapshot = BuildPostProcessDiagnosticsSnapshot(
-						*context.m_Renderer, *context.m_RenderGraph);
+						GetLegacyRenderer(*context.m_RenderHost), *context.m_RenderGraph);
 				}
 				else
 				{
@@ -203,10 +204,10 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<ForwardPlusDiagnosticsSnapshot>();
-				if (context.m_Renderer && context.m_RenderGraph)
+				if (context.m_RenderHost && context.m_RenderGraph)
 				{
 					snapshot = BuildForwardPlusDiagnosticsSnapshot(
-						*context.m_Renderer, *context.m_RenderGraph);
+						GetLegacyRenderer(*context.m_RenderHost), *context.m_RenderGraph);
 				}
 				else
 				{
@@ -226,7 +227,7 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<GTAODiagnosticsSnapshot>();
-				if (!context.m_Renderer || !context.m_RenderGraph)
+				if (!context.m_RenderHost || !context.m_RenderGraph)
 				{
 					snapshot = {};
 					return;
@@ -237,7 +238,7 @@ namespace gglab
 				const GTAOSettings* requestedSettings = context.m_EffectiveViewRenderProfile
 					? &context.m_EffectiveViewRenderProfile->m_Lighting.m_GTAO
 					: nullptr;
-				snapshot = BuildGTAODiagnosticsSnapshot(*context.m_Renderer,
+				snapshot = BuildGTAODiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
 					*context.m_RenderGraph, authoringSettings, requestedSettings,
 					context.m_GTAOOverrideActive);
 			}
@@ -254,7 +255,7 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TemporalAADiagnosticsSnapshot>();
-				if (!context.m_Renderer || !context.m_RenderGraph)
+				if (!context.m_RenderHost || !context.m_RenderGraph)
 				{
 					snapshot = {};
 					return;
@@ -277,7 +278,7 @@ namespace gglab
 					context.m_EffectiveViewRenderProfile
 					? &context.m_EffectiveViewRenderProfile->m_TemporalAA
 					: nullptr;
-				snapshot = BuildTemporalAADiagnosticsSnapshot(*context.m_Renderer,
+				snapshot = BuildTemporalAADiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
 					*context.m_RenderGraph, context.m_TemporalFramePlan, displayView,
 					authoringSettings, requestedSettings);
 			}
@@ -295,7 +296,7 @@ namespace gglab
 			{
 				auto& snapshot = store.GetOrCreate<TransientResourcePoolSnapshot>();
 				const auto* pool =
-					context.m_Renderer ? context.m_Renderer->GetTransientResourcePool() : nullptr;
+					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetTransientResourcePool() : nullptr;
 				if (pool)
 				{
 					BuildTransientResourcePoolSnapshot(*pool, snapshot);
@@ -319,7 +320,7 @@ namespace gglab
 			{
 				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
 				const SamplerRegistry* registry =
-					context.m_Renderer ? context.m_Renderer->GetSamplerRegistry() : nullptr;
+					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetSamplerRegistry() : nullptr;
 				if (registry)
 				{
 					BuildSamplerRegistrySnapshot(*registry, snapshot);

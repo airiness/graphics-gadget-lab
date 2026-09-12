@@ -675,7 +675,7 @@ namespace gglab
 		Renderer resourceSource;
 		DiagnosticsRuntime resourceDiagnostics;
 		RegisterBuiltinSnapshotProviders(resourceDiagnostics);
-		resourceDiagnostics.BeginFrame({ .m_Renderer = &resourceSource });
+				resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource });
 		const auto* persistentSnapshot =
 			resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();
 		const auto* transientSnapshot =

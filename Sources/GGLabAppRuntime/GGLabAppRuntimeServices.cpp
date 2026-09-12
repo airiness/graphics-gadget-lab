@@ -226,7 +226,7 @@ namespace gglab
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
 		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
 		{
-			m_Diagnostics = CreateDiagnosticsSession(legacyRenderer, {
+			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
 				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value(),
 				});
 		}

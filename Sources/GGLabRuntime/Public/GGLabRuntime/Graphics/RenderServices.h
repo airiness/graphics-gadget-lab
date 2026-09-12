@@ -25,7 +25,6 @@ namespace gglab
 {
 	class AssetManager;
 	class DynamicConstantBufferAllocator;
-	class Renderer;
 	class RenderPipelineOverlayExtensionBase;
 	class ShaderManager;
 	class RHIDevice;
@@ -239,14 +238,13 @@ namespace gglab
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
 
-		Renderer* m_Renderer = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_Renderer && m_AssetManager && m_ShaderManager;
+			return m_PipelineResolver && m_AssetManager && m_ShaderManager;
 		}
 	};
 }

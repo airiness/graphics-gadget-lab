@@ -13,7 +13,7 @@ namespace gglab
 	class AssetManager;
 	class EnvironmentAssetController;
 	class LabSnapshotSourceBase;
-	class Renderer;
+	class RenderHost;
 	class RenderGraph;
 	class TaskSystem;
 	class World;
@@ -25,7 +25,7 @@ namespace gglab
 	// remain valid; published snapshots own no part of them.
 	struct DiagnosticsFrameContext
 	{
-		Renderer* m_Renderer = nullptr;
+		RenderHost* m_RenderHost = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		const EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
 		const LabSnapshotSourceBase* m_LabSnapshotSource = nullptr;
@@ -67,5 +67,5 @@ namespace gglab
 	// active backend provider set. Returns null when no initialized RHI
 	// context is available.
 	[[nodiscard]] std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
-		Renderer& renderer, DiagnosticsSessionCreateInfo createInfo = {}) noexcept;
+		RenderHost& host, DiagnosticsSessionCreateInfo createInfo = {}) noexcept;
 }
