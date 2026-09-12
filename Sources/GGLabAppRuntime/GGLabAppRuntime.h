@@ -87,6 +87,7 @@ namespace gglab
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class LabRuntimeLocatorBase;
+	class RenderCompositionAccess;
 	class RenderHost;
 	class RHIContextFactoryBase;
 	class ShaderManager;
@@ -214,6 +215,7 @@ namespace gglab
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
 		RenderServices m_RenderServices{};
+		RenderCompositionAccess* m_RenderComposition = nullptr;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
 		std::unique_ptr<AssetManager> m_AssetManager;

@@ -49,7 +49,8 @@ namespace gglab
 
 	class Renderer : public RenderHost, public RenderFrameBufferAccess,
 		public RenderEnvironmentAccess, public RenderPresentationAccess,
-		public RenderBindingLayoutAccess, public RenderTemporalAccess
+		public RenderBindingLayoutAccess, public RenderTemporalAccess,
+		public RenderCompositionAccess
 	{
 	public:
 		// Transitional alias for the Public RAII frame handle. The nested frame
@@ -102,16 +103,16 @@ namespace gglab
 		{
 			return m_RHIContext ? &m_RHIContext->GetSwapChain() : nullptr;
 		}
-		TransferManager* GetTransferManager() const noexcept
+		TransferManager* GetTransferManager() const noexcept override
 		{
 			return m_RHIContext ? &m_RHIContext->GetTransferManager() : nullptr;
 		}
-		AssetUploadScheduler* GetAssetUploadScheduler() const noexcept
+		AssetUploadScheduler* GetAssetUploadScheduler() const noexcept override
 		{
 			return m_AssetUploadScheduler.get();
 		}
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
-		EnvironmentLightingSystem* GetEnvironmentLightingSystem() const noexcept
+		EnvironmentLightingSystem* GetEnvironmentLightingSystem() const noexcept override
 		{
 			return m_EnvironmentLightingSystem.get();
 		}
@@ -132,7 +133,10 @@ namespace gglab
 		{
 			return m_TemporalHistoryManager.get();
 		}
-		SamplerRegistry* GetSamplerRegistry() const noexcept { return m_SamplerRegistry.get(); }
+		SamplerRegistry* GetSamplerRegistry() const noexcept override
+		{
+			return m_SamplerRegistry.get();
+		}
 		GpuProfiler* GetGpuProfiler() const noexcept
 		{
 			return m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
@@ -155,8 +159,8 @@ namespace gglab
 		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept override;
 		// Composition-time asset lease wiring for the IBL bake scheduler. The
 		// scheduler and its derived-data ownership remain Runtime-internal.
-		void AttachAssetManager(AssetManager& assetManager) noexcept;
-		void DetachAssetManager() noexcept;
+		void AttachAssetManager(AssetManager& assetManager) noexcept override;
+		void DetachAssetManager() noexcept override;
 		const std::array<float, 4>& GetBackBufferClearColor() const noexcept override
 		{
 			return m_BackBufferClearColor;

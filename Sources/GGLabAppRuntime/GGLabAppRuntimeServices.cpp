@@ -14,7 +14,6 @@
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
@@ -148,8 +147,7 @@ namespace gglab
 		}
 		m_RenderHost = std::move(renderHostInstance.m_Host);
 		m_RenderServices = renderHostInstance.m_Services;
-		Renderer& legacyRenderer = GetLegacyRenderer(*m_RenderHost);
-
+	
 		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
 			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
 			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
@@ -158,19 +156,19 @@ namespace gglab
 		AssetManager::CreateInfo assetManagerCreateInfo{};
 		assetManagerCreateInfo.m_Device = &m_RenderHost->GetRHIContext()->GetDevice();
 		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
-		assetManagerCreateInfo.m_TransferManager = legacyRenderer.GetTransferManager();
-		assetManagerCreateInfo.m_AssetUploadScheduler = legacyRenderer.GetAssetUploadScheduler();
-		assetManagerCreateInfo.m_SamplerRegistry = legacyRenderer.GetSamplerRegistry();
+		assetManagerCreateInfo.m_TransferManager = m_RenderComposition->GetTransferManager();
+		assetManagerCreateInfo.m_AssetUploadScheduler = m_RenderComposition->GetAssetUploadScheduler();
+		assetManagerCreateInfo.m_SamplerRegistry = m_RenderComposition->GetSamplerRegistry();
 		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
 			m_Paths.m_TextureDerivedDataRoot;
 		assetManagerCreateInfo.m_AssetRoot = m_Paths.m_AssetRoot;
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
-		legacyRenderer.AttachAssetManager(*m_AssetManager);
+		m_RenderComposition->AttachAssetManager(*m_AssetManager);
 
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentLighting = legacyRenderer.GetEnvironmentLightingSystem(),
+				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentLightingSystem(),
 				.m_AssetRoot = m_Paths.m_AssetRoot,
 				});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
@@ -342,20 +340,19 @@ namespace gglab
 				"App runtime asset lifetime requires an initialized render host.");
 			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
-				Renderer& legacyRenderer = GetLegacyRenderer(*m_RenderHost);
-				legacyRenderer.GetAssetUploadScheduler()->DrainReadyWork();
+							m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
 				m_RenderHost->GetRHIContext()->WaitIdle();
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at
 				// this quiescent point, while all borrowed runtime services remain alive.
 				prepareApplicationTooling();
-				legacyRenderer.GetAssetUploadScheduler()->Finalize();
+				m_RenderComposition->GetAssetUploadScheduler()->Finalize();
 
 				m_Diagnostics.reset();
 				m_DemoManager.reset();
 				m_DebugDrawService.reset();
-				legacyRenderer.DetachAssetManager();
-				m_AssetManager->PrepareForShutdown(legacyRenderer.GetLastSubmittedFencePoint());
+				m_RenderComposition->DetachAssetManager();
+				m_AssetManager->PrepareForShutdown(m_RenderComposition->GetLastSubmittedFencePoint());
 			}
 			m_AssetManager.reset();
 		}

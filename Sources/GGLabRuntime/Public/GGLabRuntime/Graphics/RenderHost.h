@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/RenderCompositionAccess.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
@@ -243,6 +244,7 @@ namespace gglab
 	{
 		std::unique_ptr<RenderHost> m_Host;
 		RenderServices m_Services;
+		RenderCompositionAccess* m_Composition = nullptr;
 	};
 
 	// Creates and initializes the Runtime render host and its explicit service
