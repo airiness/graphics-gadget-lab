@@ -559,6 +559,18 @@ namespace gglab
 		return m_IBLBakeScheduler->GetBakingSource();
 	}
 
+	ArtifactCacheCoreStatistics Renderer::GetArtifactCacheStatistics() const noexcept
+	{
+		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetArtifactCacheStatistics()
+								  : ArtifactCacheCoreStatistics{};
+	}
+
+	LocalDerivedDataStoreStatistics Renderer::GetDerivedDataStoreStatistics() const noexcept
+	{
+		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetDerivedDataStoreStatistics()
+								  : LocalDerivedDataStoreStatistics{};
+	}
+
 	TemporalHistoryManagerDiagnostics Renderer::GetTemporalHistoryDiagnostics() const
 	{
 		return m_TemporalHistoryManager ? m_TemporalHistoryManager->GetDiagnostics()

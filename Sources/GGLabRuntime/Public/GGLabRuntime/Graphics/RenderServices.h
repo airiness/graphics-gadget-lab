@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
@@ -189,6 +190,10 @@ namespace gglab
 		virtual void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept = 0;
 		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetBakingSource()
+			const noexcept = 0;
+		[[nodiscard]] virtual ArtifactCacheCoreStatistics GetArtifactCacheStatistics()
+			const noexcept = 0;
+		[[nodiscard]] virtual LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics()
 			const noexcept = 0;
 	};
 

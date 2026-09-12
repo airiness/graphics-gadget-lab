@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataCatalog.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataPlatform.h"
@@ -44,23 +45,6 @@ namespace gglab
 
 	[[nodiscard]] uint64_t ComputeLocalDerivedDataContainerByteLimit(
 		std::string_view artifactType, uint64_t maximumPayloadBytes) noexcept;
-
-	struct LocalDerivedDataStoreStatistics
-	{
-		uint64_t m_StoredBytes = 0;
-		uint64_t m_StoredEntryCount = 0;
-		uint64_t m_HitCount = 0;
-		uint64_t m_MissCount = 0;
-		uint64_t m_CorruptionCount = 0;
-		uint64_t m_ReadBytes = 0;
-		uint64_t m_WriteCount = 0;
-		uint64_t m_WriteFailureCount = 0;
-		uint64_t m_WrittenBytes = 0;
-		uint64_t m_CatalogLastReconciledAtUnixMilliseconds = 0;
-		uint64_t m_CatalogReconciliationCount = 0;
-		uint64_t m_CatalogReconciliationFailureCount = 0;
-		bool m_IsCatalogApproximate = true;
-	};
 
 	class LocalDerivedDataStore final
 	{

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
 
 #include <atomic>
 #include <cstdint>
@@ -11,21 +12,6 @@
 
 namespace gglab
 {
-	struct ArtifactCacheCoreStatistics
-	{
-		uint64_t m_BudgetBytes = 0;
-		uint64_t m_CachedBytes = 0;
-		uint64_t m_ExternallyRetainedBytes = 0;
-		uint64_t m_TotalLiveBytes = 0;
-		uint32_t m_CachedEntryCount = 0;
-		uint64_t m_HitCount = 0;
-		uint64_t m_MissCount = 0;
-		uint64_t m_AdmissionCount = 0;
-		uint64_t m_AdmissionRejectedCount = 0;
-		uint64_t m_EvictionCount = 0;
-		uint64_t m_EvictedBytes = 0;
-	};
-
 	// Wrappers own artifact validation and key selection. The core derives the
 	// physical allocation size from the immutable artifact, then keeps cache
 	// entries and allocation records on the same lifetime model. Records remain
