@@ -4,7 +4,6 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "Graphics/Renderer.h"
 
 #include <algorithm>
@@ -160,7 +159,7 @@ namespace gglab
 	std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
 		RenderHost& host, DiagnosticsSessionCreateInfo createInfo) noexcept
 	{
-		Renderer& renderer = GetLegacyRenderer(host);
+		Renderer& renderer = static_cast<Renderer&>(host);
 		RHIContext* context = host.GetRHIContext();
 		GGLAB_ASSERT_MSG(context,
 			"Diagnostics session creation requires an initialized RHI context.");
@@ -170,7 +169,7 @@ namespace gglab
 		}
 
 		auto runtime = std::make_unique<DiagnosticsRuntime>();
-		RegisterBuiltinSnapshotProviders(*runtime);
+		RegisterBuiltinSnapshotProviders(*runtime, &renderer);
 		RegisterBackendSnapshotProviders(*runtime, *context, renderer.GetPipelineCache());
 		if (createInfo.m_RegisterLabSnapshotProvider)
 		{

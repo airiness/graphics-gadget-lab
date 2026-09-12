@@ -210,7 +210,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RenderGraph.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGArenaAllocator.cpp" />
@@ -427,7 +426,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderHost.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderServices.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\RenderTextureIndex.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />

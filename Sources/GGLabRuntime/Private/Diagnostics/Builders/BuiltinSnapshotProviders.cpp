@@ -1,5 +1,4 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
@@ -97,6 +96,10 @@ namespace gglab
 			: public TypedSnapshotProviderBase<PersistentSceneBufferSnapshot>
 		{
 		public:
+			explicit PersistentSceneBufferSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Persistent Scene Buffers";
@@ -104,21 +107,26 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PersistentSceneBufferSnapshot>();
-				if (context.m_RenderHost)
-				{
-					BuildPersistentSceneBufferSnapshot(GetLegacyRenderer(*context.m_RenderHost), snapshot);
-				}
-				else
+				if (!context.m_RenderHost || !m_Renderer)
 				{
 					snapshot = {};
+					return;
 				}
+				BuildPersistentSceneBufferSnapshot(*m_Renderer, snapshot);
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class IBLDiagnosticsSnapshotProvider final
 			: public TypedSnapshotProviderBase<IBLDiagnosticsSnapshot>
 		{
 		public:
+			explicit IBLDiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "IBL Diagnostics";
@@ -126,10 +134,14 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<IBLDiagnosticsSnapshot>();
-				snapshot = context.m_RenderHost ? BuildIBLDiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
-					context.m_EnvironmentAssetController)
+				snapshot = (context.m_RenderHost && m_Renderer)
+					? BuildIBLDiagnosticsSnapshot(
+						*m_Renderer, context.m_EnvironmentAssetController)
 					: IBLDiagnosticsSnapshot{};
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class RenderGraphSnapshotProvider final : public TypedSnapshotProviderBase<RGSnapshot>
@@ -174,6 +186,10 @@ namespace gglab
 			: public TypedSnapshotProviderBase<PostProcessDiagnosticsSnapshot>
 		{
 		public:
+			explicit PostProcessDiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Post Process Diagnostics";
@@ -181,22 +197,29 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<PostProcessDiagnosticsSnapshot>();
-				if (context.m_RenderHost && context.m_RenderGraph)
+				if (context.m_RenderHost && m_Renderer && context.m_RenderGraph)
 				{
 					snapshot = BuildPostProcessDiagnosticsSnapshot(
-						GetLegacyRenderer(*context.m_RenderHost), *context.m_RenderGraph);
+						*m_Renderer, *context.m_RenderGraph);
 				}
 				else
 				{
 					snapshot = {};
 				}
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class ForwardPlusDiagnosticsSnapshotProvider final
 			: public TypedSnapshotProviderBase<ForwardPlusDiagnosticsSnapshot>
 		{
 		public:
+			explicit ForwardPlusDiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Forward+ Diagnostics";
@@ -204,22 +227,29 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<ForwardPlusDiagnosticsSnapshot>();
-				if (context.m_RenderHost && context.m_RenderGraph)
+				if (context.m_RenderHost && m_Renderer && context.m_RenderGraph)
 				{
 					snapshot = BuildForwardPlusDiagnosticsSnapshot(
-						GetLegacyRenderer(*context.m_RenderHost), *context.m_RenderGraph);
+						*m_Renderer, *context.m_RenderGraph);
 				}
 				else
 				{
 					snapshot = {};
 				}
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class GTAODiagnosticsSnapshotProvider final
 			: public TypedSnapshotProviderBase<GTAODiagnosticsSnapshot>
 		{
 		public:
+			explicit GTAODiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "GTAO Diagnostics";
@@ -227,7 +257,7 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<GTAODiagnosticsSnapshot>();
-				if (!context.m_RenderHost || !context.m_RenderGraph)
+				if (!context.m_RenderHost || !m_Renderer || !context.m_RenderGraph)
 				{
 					snapshot = {};
 					return;
@@ -238,16 +268,23 @@ namespace gglab
 				const GTAOSettings* requestedSettings = context.m_EffectiveViewRenderProfile
 					? &context.m_EffectiveViewRenderProfile->m_Lighting.m_GTAO
 					: nullptr;
-				snapshot = BuildGTAODiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
+				snapshot = BuildGTAODiagnosticsSnapshot(*m_Renderer,
 					*context.m_RenderGraph, authoringSettings, requestedSettings,
 					context.m_GTAOOverrideActive);
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class TemporalAADiagnosticsSnapshotProvider final
 			: public TypedSnapshotProviderBase<TemporalAADiagnosticsSnapshot>
 		{
 		public:
+			explicit TemporalAADiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Temporal AA Diagnostics";
@@ -255,7 +292,7 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TemporalAADiagnosticsSnapshot>();
-				if (!context.m_RenderHost || !context.m_RenderGraph)
+				if (!context.m_RenderHost || !m_Renderer || !context.m_RenderGraph)
 				{
 					snapshot = {};
 					return;
@@ -278,16 +315,23 @@ namespace gglab
 					context.m_EffectiveViewRenderProfile
 					? &context.m_EffectiveViewRenderProfile->m_TemporalAA
 					: nullptr;
-				snapshot = BuildTemporalAADiagnosticsSnapshot(GetLegacyRenderer(*context.m_RenderHost),
+				snapshot = BuildTemporalAADiagnosticsSnapshot(*m_Renderer,
 					*context.m_RenderGraph, context.m_TemporalFramePlan, displayView,
 					authoringSettings, requestedSettings);
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class TransientResourcePoolSnapshotProvider final
 			: public TypedSnapshotProviderBase<TransientResourcePoolSnapshot>
 		{
 		public:
+			explicit TransientResourcePoolSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Transient Resource Pool";
@@ -295,8 +339,12 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<TransientResourcePoolSnapshot>();
-				const auto* pool =
-					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetTransientResourcePool() : nullptr;
+				if (!context.m_RenderHost || !m_Renderer)
+				{
+					snapshot = {};
+					return;
+				}
+				const auto* pool = m_Renderer->GetTransientResourcePool();
 				if (pool)
 				{
 					BuildTransientResourcePoolSnapshot(*pool, snapshot);
@@ -306,12 +354,19 @@ namespace gglab
 					snapshot = {};
 				}
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class SamplerRegistrySnapshotProvider final
 			: public TypedSnapshotProviderBase<SamplerRegistrySnapshot>
 		{
 		public:
+			explicit SamplerRegistrySnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
 			[[nodiscard]] std::string_view GetName() const noexcept override
 			{
 				return "Sampler Registry";
@@ -319,8 +374,12 @@ namespace gglab
 			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
 			{
 				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
-				const SamplerRegistry* registry =
-					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetSamplerRegistryService() : nullptr;
+				if (!context.m_RenderHost || !m_Renderer)
+				{
+					snapshot = {};
+					return;
+				}
+				const SamplerRegistry* registry = m_Renderer->GetSamplerRegistryService();
 				if (registry)
 				{
 					BuildSamplerRegistrySnapshot(*registry, snapshot);
@@ -330,10 +389,14 @@ namespace gglab
 					snapshot = {};
 				}
 			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 	}
 
-	void RegisterBuiltinSnapshotProviders(DiagnosticsRuntime& runtime) noexcept
+	void RegisterBuiltinSnapshotProviders(
+		DiagnosticsRuntime& runtime, Renderer* renderer) noexcept
 	{
 		runtime.RegisterProvider(
 			std::make_unique<RenderViewSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
@@ -344,24 +407,26 @@ namespace gglab
 		runtime.RegisterProvider(
 			std::make_unique<TaskSystemSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
-			std::make_unique<IBLDiagnosticsSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(),
+			std::make_unique<IBLDiagnosticsSnapshotProvider>(renderer),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<PersistentSceneBufferSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<ShadowDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(),
+		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(),
+		runtime.RegisterProvider(std::make_unique<ForwardPlusDiagnosticsSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<GTAODiagnosticsSnapshotProvider>(),
+		runtime.RegisterProvider(std::make_unique<GTAODiagnosticsSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<TemporalAADiagnosticsSnapshotProvider>(),
+		runtime.RegisterProvider(std::make_unique<TemporalAADiagnosticsSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
-		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(),
+		runtime.RegisterProvider(std::make_unique<TransientResourcePoolSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
-			std::make_unique<SamplerRegistrySnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
+			std::make_unique<SamplerRegistrySnapshotProvider>(renderer),
+			SnapshotUpdatePolicy::EveryFrame);
 	}
 }

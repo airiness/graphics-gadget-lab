@@ -512,7 +512,7 @@ namespace gglab
 			source.m_CameraPosition = Vector3(1.0f, 2.0f, 3.0f);
 			source.m_IsValid = true;
 			DiagnosticsRuntime viewDiagnostics;
-			RegisterBuiltinSnapshotProviders(viewDiagnostics);
+			RegisterBuiltinSnapshotProviders(viewDiagnostics, nullptr);
 			context.Check(viewDiagnostics.GetSnapshot<RenderViewSnapshot>() == nullptr,
 				"Render view diagnostics require an open frame for initial capture");
 			viewDiagnostics.BeginFrame({ .m_RenderViews = std::span<RenderView>(&source, 1) });
@@ -550,7 +550,7 @@ namespace gglab
 			queue.m_BucketDrawRanges[0] = { 1, std::numeric_limits<uint32_t>::max() };
 			queue.m_BucketDrawRanges[1] = { 99, 4 };
 			DiagnosticsRuntime queueDiagnostics;
-			RegisterBuiltinSnapshotProviders(queueDiagnostics);
+			RegisterBuiltinSnapshotProviders(queueDiagnostics, nullptr);
 			context.Check(queueDiagnostics.GetSnapshot<RenderQueueSnapshot>() == nullptr,
 				"Render queue diagnostics do not capture outside a live frame");
 			queueDiagnostics.BeginFrame({ .m_RenderQueues = std::span<const RenderQueue>(&queue, 1) });
@@ -674,7 +674,7 @@ namespace gglab
 
 		Renderer resourceSource;
 		DiagnosticsRuntime resourceDiagnostics;
-		RegisterBuiltinSnapshotProviders(resourceDiagnostics);
+		RegisterBuiltinSnapshotProviders(resourceDiagnostics, &resourceSource);
 				resourceDiagnostics.BeginFrame({ .m_RenderHost = &resourceSource });
 		const auto* persistentSnapshot =
 			resourceDiagnostics.GetSnapshot<PersistentSceneBufferSnapshot>();

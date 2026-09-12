@@ -1066,6 +1066,20 @@ foreach ($legacyPath in $legacyRuntimeAssetContractPaths) {
     }
 }
 
+$removedRuntimeBridgePaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/LegacyRenderHostAccess.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/LegacyRenderHostAccess.cpp")
+)
+foreach ($legacyPath in $removedRuntimeBridgePaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "the legacy render host bridge was deleted; Runtime diagnostics resolve the renderer directly"
+        })
+    }
+}
+
 $legacyRuntimeCameraPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Camera.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Camera.cpp"),
@@ -1458,6 +1472,8 @@ $legacyRuntimeAssetContractIncludeRegex =
     'TransferBatch\.h|TransferManager\.h)[>"]'
 $removedPublicAssetIncludeRegex =
     '#include\s*[<"]GGLabRuntime[\\/]Graphics[\\/]Asset[\\/]AssetUploadScheduler\.h[>"]'
+$removedRuntimeBridgeIncludeRegex =
+    '#include\s*[<"]Graphics[\\/]LegacyRenderHostAccess\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1473,6 +1489,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeShaderContractIncludeRegex -or
         $content -match $legacyRuntimeAssetContractIncludeRegex -or
         $content -match $removedPublicAssetIncludeRegex -or
+        $content -match $removedRuntimeBridgeIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

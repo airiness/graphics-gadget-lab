@@ -36,7 +36,6 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/LegacyRenderHostAccess.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -1641,14 +1640,6 @@ namespace gglab
 			context.Check(!missingPathsInstance.m_Host &&
 				!missingPathsInstance.m_Services.m_PipelineResolver,
 				"render host factory rejects missing runtime paths");
-
-			Renderer renderer;
-			RenderHost& host = renderer;
-			const RenderHost* constHost = &host;
-			context.Check(GetLegacyRenderer(&host) == &renderer &&
-				&GetLegacyRenderer(host) == &renderer &&
-				GetLegacyRenderer(constHost) == &renderer,
-				"the legacy bridge returns the concrete renderer from the host");
 
 			RenderHostInstance defaultHostInstance{};
 			context.Check(!defaultHostInstance.m_Host && !defaultHostInstance.m_Composition,
