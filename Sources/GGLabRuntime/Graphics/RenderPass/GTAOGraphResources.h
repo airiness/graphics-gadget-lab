@@ -2,7 +2,7 @@
 
 #include "Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
 

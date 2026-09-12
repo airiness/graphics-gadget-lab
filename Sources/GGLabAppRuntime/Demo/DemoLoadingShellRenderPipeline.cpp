@@ -7,7 +7,7 @@
 #include "Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 namespace gglab

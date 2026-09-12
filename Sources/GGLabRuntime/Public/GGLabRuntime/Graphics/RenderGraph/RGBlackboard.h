@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "Graphics/RenderGraph/RGArenaAllocator.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGArenaAllocator.h"
 
 namespace gglab
 {

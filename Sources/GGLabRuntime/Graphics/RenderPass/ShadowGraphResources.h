@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 namespace gglab

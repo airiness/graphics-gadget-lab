@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Graphics/Pipeline/ForwardPlus.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <array>
 #include <memory>

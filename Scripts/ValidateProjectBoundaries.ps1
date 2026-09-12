@@ -918,6 +918,13 @@ $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/GPUStructures.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGResourceHandle.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGCompileDiagnostic.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGPass.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGResource.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGResourceUtils.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGBlackboard.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGBlackboard.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGArenaAllocator.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderGraph/RGArenaAllocator.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/DepthCoverageFramePlan.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"),
@@ -1297,7 +1304,8 @@ $legacyRuntimeSceneIncludeRegex =
     '#include\s*[<"]Scene[\\/]Components\.h[>"]'
 $legacyRuntimeFrameContractIncludeRegex =
     '#include\s*[<"]Graphics[\\/](?:GPUStructures\.h|' +
-    'RenderGraph[\\/]RG(?:ResourceHandle|CompileDiagnostic)\.h|' +
+    'RenderGraph[\\/](?:RG(?:ResourceHandle|CompileDiagnostic|Pass|Resource|' +
+    'ResourceUtils|Blackboard|ArenaAllocator)\.h)|' +
     'RenderPipeline[\\/](?:DepthCoverageFramePlan|RenderPipelineOverlayExtensionBase|' +
     'RenderPipelineSceneExtensionBase)\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `

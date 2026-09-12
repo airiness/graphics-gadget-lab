@@ -1,8 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
-#include "Graphics/RenderGraph/RGPass.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstdint>

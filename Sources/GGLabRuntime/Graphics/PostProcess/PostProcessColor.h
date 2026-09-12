@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
 

@@ -2,7 +2,7 @@
 
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
-#include "Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
 
