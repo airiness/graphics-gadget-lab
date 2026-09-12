@@ -13,12 +13,12 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "Graphics/Asset/AssetManager.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
-#include "Graphics/RenderFrameBuilder.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Lab/LabInterfaces.h"
@@ -148,23 +148,24 @@ namespace gglab
 		m_EnvironmentAssetController->Tick();
 
 		World& world = demo->GetWorld();
-		Renderer::Frame rendererFrame = m_Renderer->BeginFrame();
+		RenderFrame rendererFrame = m_RenderHost->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
 			return rendererFrame.IsUnavailable()
 				? AppRuntimeTickResult::Continue
 				: AppRuntimeTickResult::Exit;
 		}
+		Renderer* const legacyRenderer = GetLegacyRenderer(m_RenderHost.get());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		const RenderServices services{
-			.m_Renderer = m_Renderer.get(),
+			.m_Renderer = legacyRenderer,
 			.m_AssetManager = m_AssetManager.get(),
 			.m_ShaderManager = m_ShaderManager.get(),
 			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
 		};
-		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
-		// Keep the graph alive until after the frame has ended.
-		RenderGraph renderGraph(m_Renderer->CreateRenderGraphCreateInfo());
+		// The RAII frame handle may retire RenderGraph resources from its abort
+		// path. Keep the graph alive until after the frame has ended.
+		RenderGraph renderGraph(m_RenderHost->CreateRenderGraphCreateInfo());
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 
@@ -197,24 +198,22 @@ namespace gglab
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,
-				.m_Capabilities = m_Renderer->GetTemporalAACapabilityStatus(),
+				.m_Capabilities = m_RenderHost->GetTemporalAACapabilityStatus(),
 				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 				.m_ResetIdentity = displayCameraSlot->m_Camera->GetTemporalResetSerial(),
 				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 			});
-		TemporalFrameTransaction& temporalFrameTransaction = m_Renderer->BeginTemporalFrame(
+		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight);
-		const RenderFrameBuilder::BuildInfo frameBuildInfo{
+		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
-			.m_Renderer = *m_Renderer,
-			.m_AssetManager = *m_AssetManager,
-			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
+			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_TemporalFramePlan = temporalFramePlan,
-			.m_TemporalFrameTransaction = &temporalFrameTransaction,
+			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
@@ -222,17 +221,15 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
-		RenderFrameBuilder::BuildResult frame;
+		RenderFrameBuildResult frame;
 		{
-			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
-			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
+			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
+			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
-		m_Renderer->AdoptFrameGpuResources(
-			rendererFrame, frame.m_SceneGpuAllocations, frame.m_UploadFencePoint);
 		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
 		{
-			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
+			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
@@ -263,7 +260,7 @@ namespace gglab
 				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
 				: nullptr;
 			const DiagnosticsFrameContext diagnosticsContext{
-				.m_Renderer = m_Renderer.get(),
+				.m_Renderer = legacyRenderer,
 				.m_AssetManager = m_AssetManager.get(),
 				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				.m_LabSnapshotSource = labRuntime,
@@ -305,16 +302,16 @@ namespace gglab
 				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
 				.m_Diagnostics = diagnosticsFrame.GetView(),
 				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
-				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingView(),
-				.m_EnvironmentLightingControl = m_Renderer->GetEnvironmentLightingControl(),
-				.m_GpuProfiling = m_Renderer->GetGpuProfilingView(),
-				.m_GpuProfilingControl = m_Renderer->GetGpuProfilingControl(),
-				.m_IBLCacheControl = m_Renderer->GetIBLCacheControl(),
-				.m_IBLPreview = m_Renderer->GetIBLPreviewView(),
-				.m_IBLPreviewControl = m_Renderer->GetIBLPreviewControl(),
-				.m_PostProcessPreview = m_Renderer->GetPostProcessPreviewView(),
-				.m_PostProcessPreviewControl = m_Renderer->GetPostProcessPreviewControl(),
-				.m_ShadowPreview = m_Renderer->GetShadowPreviewView(),
+				.m_EnvironmentLighting = m_RenderHost->GetEnvironmentLightingView(),
+				.m_EnvironmentLightingControl = m_RenderHost->GetEnvironmentLightingControl(),
+				.m_GpuProfiling = m_RenderHost->GetGpuProfilingView(),
+				.m_GpuProfilingControl = m_RenderHost->GetGpuProfilingControl(),
+				.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
+				.m_IBLPreview = m_RenderHost->GetIBLPreviewView(),
+				.m_IBLPreviewControl = m_RenderHost->GetIBLPreviewControl(),
+				.m_PostProcessPreview = m_RenderHost->GetPostProcessPreviewView(),
+				.m_PostProcessPreviewControl = m_RenderHost->GetPostProcessPreviewControl(),
+				.m_ShadowPreview = m_RenderHost->GetShadowPreviewView(),
 				.m_DebugDrawChannels = m_DebugDrawService->GetChannelView(),
 				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
@@ -325,12 +322,12 @@ namespace gglab
 
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
-			m_Renderer->Render(rendererFrame, renderGraph, renderContext);
+			m_RenderHost->Render(rendererFrame, renderGraph, renderContext);
 		}
 		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
-			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
-			frameEndResult = m_Renderer->EndFrame(rendererFrame);
+			GGLAB_CPU_PROFILE_SCOPE("RenderHost EndFrame");
+			frameEndResult = m_RenderHost->EndFrame(rendererFrame);
 		}
 		if (!frameEndResult.IsCompleted())
 		{

@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
+#include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
@@ -19,6 +20,7 @@
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/Profiling/GpuProfiler.h"
+#include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
@@ -31,6 +33,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <utility>
 
 namespace gglab
 {
@@ -175,6 +178,7 @@ namespace gglab
 				coverageVertex.IsValid() && velocityOpaque.IsValid() && velocityAlphaTest.IsValid();
 		}
 
+		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_IsInitialized = true;
 		return true;
 	}
@@ -206,6 +210,7 @@ namespace gglab
 		m_AssetUploadScheduler.reset();
 
 		m_SceneCB.reset();
+		m_FrameBuilder.reset();
 		m_ObjectTable.reset();
 		m_MaterialTable.reset();
 		m_LightTable.reset();
@@ -269,15 +274,53 @@ namespace gglab
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 
-	void Renderer::AdoptFrameGpuResources(Frame& frame,
-		RenderSceneGpuAllocations& sceneGpuAllocations,
-		const RHIFencePoint& uploadFencePoint) noexcept
+	RenderFrameBuildResult Renderer::BuildFrame(
+		const RenderFrameBuildRequest& request) noexcept
 	{
-		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && request.m_FrameSerial == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
-			"Frame GPU resource adoption requires the active begun render host frame.");
+			"Frame building requires the active begun render host frame.");
+		GGLAB_ASSERT_NOT_NULL(m_FrameBuilder.get());
+		GGLAB_ASSERT_NOT_NULL(m_AttachedAssetManager);
+
+		const RenderFrameBuilder::BuildInfo buildInfo{
+			.m_World = request.m_World,
+			.m_CameraRig = request.m_CameraRig,
+			.m_Renderer = *this,
+			.m_AssetManager = *m_AttachedAssetManager,
+			.m_ShadowVisualizationSettings = request.m_ShadowVisualizationSettings,
+			.m_ViewRenderProfile = request.m_ViewRenderProfile,
+			.m_TemporalFramePlan = request.m_TemporalFramePlan,
+			.m_TemporalFrameTransaction = &request.m_TemporalFrameTransaction,
+			.m_DisplayViewId = request.m_DisplayViewId,
+			.m_WindowWidth = request.m_WindowWidth,
+			.m_WindowHeight = request.m_WindowHeight,
+			.m_FrameSlotIndex = request.m_FrameSlotIndex,
+			.m_BackBufferIndex = request.m_BackBufferIndex,
+			.m_FrameSerial = request.m_FrameSerial,
+		};
+		RenderFrameBuilder::BuildResult built = m_FrameBuilder->Build(buildInfo);
 		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
-		m_FrameGpuResources->AdoptFrom(sceneGpuAllocations, uploadFencePoint);
+		m_FrameGpuResources->AdoptFrom(built.m_SceneGpuAllocations, built.m_UploadFencePoint);
+
+		RenderFrameBuildResult result{};
+		result.m_RenderViews = std::move(built.m_RenderViews);
+		result.m_ViewRenderSettings = built.m_ViewRenderSettings;
+		result.m_TemporalFramePlan = built.m_TemporalFramePlan;
+		result.m_TemporalFrameTransaction = built.m_TemporalFrameTransaction;
+		result.m_RenderScene = std::move(built.m_RenderScene);
+		result.m_RenderQueues = built.m_RenderQueues;
+		result.m_DebugDrawFrame = built.m_DebugDrawFrame;
+		result.m_DebugDrawCullContext = built.m_DebugDrawCullContext;
+		result.m_RenderSceneStatus = built.m_RenderSceneStatus;
+		result.m_DisplayViewId = built.m_DisplayViewId;
+		result.m_DirectionalShadowSettings =
+			built.m_WorldData.GetMainDirectionalShadowSettings();
+		result.m_ShadowVisualizationSettings = built.m_ShadowVisualizationSettings;
+		result.m_FrameSlotIndex = built.m_FrameSlotIndex;
+		result.m_BackBufferIndex = built.m_BackBufferIndex;
+		result.m_FrameSerial = built.m_FrameSerial;
+		return result;
 	}
 
 	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
@@ -693,6 +736,7 @@ namespace gglab
 
 	void Renderer::AttachAssetManager(AssetManager& assetManager) noexcept
 	{
+		m_AttachedAssetManager = &assetManager;
 		if (m_IBLBakeScheduler)
 		{
 			m_IBLBakeScheduler->AttachAssetManager(assetManager);
@@ -701,6 +745,7 @@ namespace gglab
 
 	void Renderer::DetachAssetManager() noexcept
 	{
+		m_AttachedAssetManager = nullptr;
 		if (m_IBLBakeScheduler)
 		{
 			m_IBLBakeScheduler->DetachAssetManager();

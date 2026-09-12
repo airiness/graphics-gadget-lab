@@ -4,7 +4,8 @@
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/Asset/AssetToolingControlBase.h"
 #include "Diagnostics/DirectionalLightTooling.h"
-#include "Graphics/RenderFrameBuilder.h"
+#include "Graphics/RenderWorldExtractor.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
@@ -470,8 +471,9 @@ namespace gglab
 				control.SetDirection(id, Vector3(std::numeric_limits<float>::infinity(), 0.0f, 0.0f));
 				context.Check(view.GetLight()->m_Direction.m_Y < -0.999f,
 					"Zero and non-finite directions leave the light orientation unchanged");
-				RenderFrameBuilder::BuildResult builtFrame{};
-				builtFrame.m_WorldData = RenderWorldExtractor().Extract(world);
+				RenderFrameBuildResult builtFrame{};
+				builtFrame.m_DirectionalShadowSettings =
+					RenderWorldExtractor().Extract(world).GetMainDirectionalShadowSettings();
 				const auto renderContext = builtFrame.MakeRenderFrameContext();
 				control.SetShadowSettings(id, std::nullopt);
 				context.Check(renderContext.m_DirectionalShadowSettings.m_ShadowMapSize == 2048 &&

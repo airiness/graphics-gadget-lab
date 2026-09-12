@@ -10,6 +10,7 @@ namespace gglab
 	class EnvironmentAssetController;
 	class ApplicationInput;
 	class Renderer;
+	class RenderHost;
 	class ShaderManager;
 	class TaskSystem;
 	class Time;
@@ -17,6 +18,9 @@ namespace gglab
 	struct DemoServices
 	{
 		Renderer* m_Renderer = nullptr;
+		// Optional Runtime host handle for AppRuntime-owned hosting code. Content
+		// keeps using the concrete service surfaces it already receives.
+		RenderHost* m_RenderHost = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
 		TaskSystem* m_TaskSystem = nullptr;

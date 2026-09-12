@@ -15,7 +15,8 @@
 #include "ApplicationToolingIntegration.h"
 #include "ApplicationInput.h"
 #include "Application/Platform/Windows/Input/InputManager.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "Lab/LabRuntime.h"
 
 #include <optional>
@@ -226,7 +227,8 @@ namespace gglab
 			return FailInitialization();
 		}
 
-		Renderer* renderer = m_AppRuntime->GetRenderer();
+		RenderHost* renderHost = m_AppRuntime->GetRenderHost();
+		Renderer* renderer = renderHost ? &GetLegacyRenderer(*renderHost) : nullptr;
 		TaskSystem* taskSystem = m_AppRuntime->GetTaskSystem();
 		ShaderManager* shaderManager = m_AppRuntime->GetShaderManager();
 		DemoManager* demoManager = m_AppRuntime->GetDemoManager();
@@ -287,7 +289,7 @@ namespace gglab
 #endif
 			m_ApplicationTooling = CreateApplicationToolingIntegration({
 				.m_Window = &mainWindow,
-				.m_RHIContext = renderer->GetRHIContext(),
+				.m_RHIContext = renderHost->GetRHIContext(),
 				.m_DemoManager = demoManager,
 				.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 				.m_SettingsRoot = m_RuntimePaths.m_SettingsRoot,

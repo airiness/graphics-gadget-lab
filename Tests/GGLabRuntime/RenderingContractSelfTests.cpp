@@ -35,7 +35,6 @@
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/LegacyRenderHostAccess.h"
-#include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -1481,7 +1480,7 @@ namespace gglab
 
 			constexpr uint32_t FrameSlotCount = 2;
 			constexpr uint32_t SwapChainImageCount = 3;
-			RenderFrameBuilder::BuildResult syntheticFrame{};
+			RenderFrameBuildResult syntheticFrame{};
 			syntheticFrame.m_FrameSlotIndex = 1;
 			syntheticFrame.m_BackBufferIndex = 2;
 			syntheticFrame.m_FrameSerial = 17;
@@ -1496,20 +1495,17 @@ namespace gglab
 				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
 				"Frame context preserves independent frame-slot and swapchain-image indices");
 
-			RenderFrameBuilder::BuildResult lateValidationFrame{};
-			lateValidationFrame.m_UploadFencePoint =
-				RHIFencePoint{ RHIFenceHandle{ 9, 1 }, 23 };
-			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes = 64;
-			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			RenderSceneGpuAllocations lateValidationAllocations{};
+			lateValidationAllocations.m_SceneConstants.m_OffsetInBytes = 64;
+			lateValidationAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			const RHIFencePoint lateValidationFence{ RHIFenceHandle{ 9, 1 }, 23 };
 			RenderFrameGpuResources frameGpuResources{};
-			frameGpuResources.AdoptFrom(lateValidationFrame.m_SceneGpuAllocations,
-				lateValidationFrame.m_UploadFencePoint);
+			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
 			const uint64_t adoptedSceneConstantOffset =
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes;
-			frameGpuResources.AdoptFrom(lateValidationFrame.m_SceneGpuAllocations,
-				lateValidationFrame.m_UploadFencePoint);
-			context.Check(lateValidationFrame.m_SceneGpuAllocations.IsEmpty() &&
-				frameGpuResources.m_UploadFencePoint == lateValidationFrame.m_UploadFencePoint &&
+			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
+			context.Check(lateValidationAllocations.IsEmpty() &&
+				frameGpuResources.m_UploadFencePoint == lateValidationFence &&
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
 				adoptedSceneConstantOffset == 64,
 				"Frame GPU resources transfer before late validation and remain owned on early return");
@@ -6419,7 +6415,7 @@ namespace gglab
 				"Submitted object history commits atomically, rejects stale identities, and "
 				"retires only on committed disappearance");
 
-			RenderFrameBuilder::BuildResult frameResult{};
+			RenderFrameBuildResult frameResult{};
 			frameResult.m_TemporalFramePlan = activePlan;
 			const RenderFrameContext frameContext = frameResult.MakeRenderFrameContext();
 			context.Check(frameContext.GetTemporalFramePlan() == activePlan,

@@ -195,7 +195,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp" />
@@ -480,7 +480,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessResolution.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderFrameBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfileFrameSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingControlBase.h" />

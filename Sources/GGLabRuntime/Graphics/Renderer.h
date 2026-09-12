@@ -41,6 +41,7 @@ namespace gglab
 	class IBLPreviewViewBase;
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
+	class RenderFrameBuilder;
 	class ShadowPreviewViewBase;
 	class TemporalHistoryManager;
 	struct RenderFrameGpuResources;
@@ -80,11 +81,10 @@ namespace gglab
 		bool IsInitialized() const noexcept override { return m_IsInitialized; }
 
 		[[nodiscard]] Frame BeginFrame() noexcept override;
+		[[nodiscard]] RenderFrameBuildResult BuildFrame(
+			const RenderFrameBuildRequest& request) noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept override;
-		void AdoptFrameGpuResources(Frame& frame,
-			RenderSceneGpuAllocations& sceneGpuAllocations,
-			const RHIFencePoint& uploadFencePoint) noexcept;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
 		void Render(
@@ -290,6 +290,7 @@ namespace gglab
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
+		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
@@ -318,6 +319,7 @@ namespace gglab
 		RHIFencePoint m_LastSubmittedFencePoint = {};
 		uint64_t m_NextFrameSerial = 1;
 		ActiveFrameState m_ActiveFrame{};
+		AssetManager* m_AttachedAssetManager = nullptr;
 		bool m_HasActiveFrame = false;
 	};
 }

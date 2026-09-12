@@ -5,14 +5,14 @@
 
 namespace gglab
 {
-	class Renderer;
+	class RenderHost;
 
 	class DemoManager
 	{
 	public:
 		using DemoFactory = std::function<std::unique_ptr<DemoBase>()>;
 
-		explicit DemoManager(Renderer* renderer) noexcept;
+		explicit DemoManager(RenderHost* renderHost) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DemoManager);
 		~DemoManager();
 
@@ -69,7 +69,7 @@ namespace gglab
 			RHIFencePoint m_RetireFence{};
 		};
 
-		Renderer* m_Renderer = nullptr;
+		RenderHost* m_RenderHost = nullptr;
 		std::vector<DemoSlot> m_DemoSlots;
 		std::unique_ptr<DemoBase> m_ActiveInstance;
 		DemoBase* m_ActiveDemo = nullptr;

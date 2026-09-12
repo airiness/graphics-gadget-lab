@@ -939,6 +939,8 @@ $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineBlackboard.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPipeline/RenderPipelineBase.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/RenderPassBase.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderFrameBuilder.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/RenderFrameBuilder.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/ShadowGraphResources.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/IBLGraphResources.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderPass/SceneDepthGraphResources.h"),
@@ -2110,6 +2112,7 @@ $appRuntimeForbiddenDependencyRegex = `
     'Windows[.]h|\bHWND\b|\bHINSTANCE\b|\bGameInput\b|\bIGameInput\b|' +
     '#include\s*[<"]GGLabFoundation[\\/]Platform[\\/]Win[\\/]|' +
     '#include\s*[<"](?:Application[\\/]|DevTools[\\/]|Compiler[\\/]|NapaVoxelCore[\\/])|' +
+    '#include\s*[<"]Graphics[\\/]RenderFrameBuilder[.]h|' +
     '\bImGui\b|\bDevelopGui\w*\b|\bDXC\b|dxcapi[.]h|GetModuleFileName|' +
     'GetExecutableDirectory|GetExeOutDir|\bwin32::|\bLantern\b'
 $appRuntimeWideTextRegex = '\bwchar_t\b|\bstd::wstring(?:_view)?\b'

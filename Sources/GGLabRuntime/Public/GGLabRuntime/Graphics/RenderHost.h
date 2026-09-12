@@ -16,18 +16,23 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace gglab
 {
+	class CameraRig;
 	class ShaderManager;
 	class TaskSystem;
+	class World;
 
 	// Move-only handle for one active render host frame. The handle aborts the
 	// frame when it is destroyed before the host has ended it, so every
@@ -90,6 +95,70 @@ namespace gglab
 		RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
 	};
 
+	// Owned frame values published by a host frame build. The GPU allocation and
+	// upload-fence handoff stays inside the host; the result carries only the
+	// Public CPU frame values a caller needs for validation, graph authoring and
+	// tooling.
+	struct RenderFrameBuildResult
+	{
+		std::vector<RenderView> m_RenderViews;
+		std::array<ResolvedViewRenderSettings, utils::ToIndex(RenderViewID::Count)>
+			m_ViewRenderSettings{};
+		ResolvedTemporalFramePlan m_TemporalFramePlan{};
+		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
+		RenderScene m_RenderScene{};
+		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
+		DebugDrawFrameView m_DebugDrawFrame{};
+		DebugDrawCullContext m_DebugDrawCullContext{};
+		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
+		RenderViewID m_DisplayViewId = RenderViewID::Main;
+		DirectionalShadowSettings m_DirectionalShadowSettings =
+			DisabledDirectionalShadowSettings();
+		const ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
+		uint32_t m_FrameSlotIndex = 0;
+		uint32_t m_BackBufferIndex = 0;
+		uint64_t m_FrameSerial = 0;
+
+		[[nodiscard]] RenderFrameContext MakeRenderFrameContext() noexcept
+		{
+			return RenderFrameContext{
+				.m_RenderViews = std::span<RenderView>(m_RenderViews),
+				.m_ViewRenderSettings =
+					std::span<const ResolvedViewRenderSettings>(m_ViewRenderSettings),
+				.m_TemporalFramePlan = m_TemporalFramePlan,
+				.m_TemporalFrameTransaction = m_TemporalFrameTransaction,
+				.m_DisplayViewId = m_DisplayViewId,
+				.m_RenderScene = m_RenderScene,
+				.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
+				.m_DebugDrawFrame = m_DebugDrawFrame,
+				.m_DirectionalShadowSettings = m_DirectionalShadowSettings,
+				.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
+				.m_FrameSlotIndex = m_FrameSlotIndex,
+				.m_BackBufferIndex = m_BackBufferIndex,
+				.m_FrameSerial = m_FrameSerial,
+				.m_RenderSceneStatus = m_RenderSceneStatus,
+			};
+		}
+	};
+
+	// Borrowed frame-build inputs. The host owns the renderer, asset manager and
+	// GPU resources; the caller supplies only session content and frame identity.
+	struct RenderFrameBuildRequest
+	{
+		World& m_World;
+		CameraRig& m_CameraRig;
+		const ViewRenderProfile& m_ViewRenderProfile;
+		ShadowVisualizationSettings& m_ShadowVisualizationSettings;
+		ResolvedTemporalFramePlan m_TemporalFramePlan{};
+		TemporalFrameTransaction& m_TemporalFrameTransaction;
+		RenderViewID m_DisplayViewId = RenderViewID::Main;
+		uint32_t m_WindowWidth = 0;
+		uint32_t m_WindowHeight = 0;
+		uint32_t m_FrameSlotIndex = 0;
+		uint32_t m_BackBufferIndex = 0;
+		uint64_t m_FrameSerial = 0;
+	};
+
 	// Narrow Runtime render host contract used by the application runtime to
 	// drive lifecycle and frame orchestration. It intentionally exposes no
 	// concrete renderer accessor and no pass or content service locator; the
@@ -111,6 +180,8 @@ namespace gglab
 		[[nodiscard]] virtual RHIContext* GetRHIContext() const noexcept = 0;
 
 		[[nodiscard]] virtual RenderFrame BeginFrame() noexcept = 0;
+		[[nodiscard]] virtual RenderFrameBuildResult BuildFrame(
+			const RenderFrameBuildRequest& request) noexcept = 0;
 		[[nodiscard]] virtual TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept = 0;
 		virtual void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept = 0;

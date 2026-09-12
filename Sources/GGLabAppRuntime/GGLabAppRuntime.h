@@ -86,8 +86,7 @@ namespace gglab
 	class DiagnosticsView;
 	class EnvironmentAssetController;
 	class LabRuntimeLocatorBase;
-	class RenderFrameBuilder;
-	class Renderer;
+	class RenderHost;
 	class RHIContextFactoryBase;
 	class ShaderManager;
 	class TaskSystem;
@@ -163,7 +162,7 @@ namespace gglab
 		{
 			return m_ServicesInitialized;
 		}
-		[[nodiscard]] Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
+		[[nodiscard]] RenderHost* GetRenderHost() const noexcept { return m_RenderHost.get(); }
 		[[nodiscard]] AssetManager* GetAssetManager() const noexcept
 		{
 			return m_AssetManager.get();
@@ -182,10 +181,6 @@ namespace gglab
 		[[nodiscard]] DemoManager* GetDemoManager() const noexcept
 		{
 			return m_DemoManager.get();
-		}
-		[[nodiscard]] RenderFrameBuilder* GetRenderFrameBuilder() const noexcept
-		{
-			return m_RenderFrameBuilder.get();
 		}
 		[[nodiscard]] DebugDrawService* GetDebugDrawService() const noexcept
 		{
@@ -212,14 +207,13 @@ namespace gglab
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
 		ApplicationContentRegistration m_ContentRegistration{};
-		std::unique_ptr<Renderer> m_Renderer;
+		std::unique_ptr<RenderHost> m_RenderHost;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
 		std::unique_ptr<AssetManager> m_AssetManager;
 		std::unique_ptr<EnvironmentAssetController> m_EnvironmentAssetController;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
-		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
 		std::unique_ptr<DebugDrawService> m_DebugDrawService;
 		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		ApplicationInput* m_Input = nullptr;
