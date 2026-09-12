@@ -56,7 +56,8 @@ namespace gglab
 
 	ForwardPlusLabSession::ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR({.m_ForwardPlusDebugReadback = std::move(debugReadback)})),
+		LabSessionBase(GetDescriptor(), createInfo,
+			CreateRenderPipelineForwardPBR({.m_ForwardPlusDebugReadback = debugReadback})),
 		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
 		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
