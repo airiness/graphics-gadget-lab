@@ -173,7 +173,7 @@ namespace gglab
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentLightingSystem(),
+				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentSourceControl(),
 				.m_AssetRoot = m_Paths.m_AssetRoot,
 				});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);

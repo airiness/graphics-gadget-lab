@@ -232,7 +232,7 @@ namespace gglab
 			.m_SamplerRegistry = *info.m_Renderer.GetSamplerRegistry(),
 			.m_TransferManager = *info.m_Renderer.GetTransferManager(),
 			.m_RenderResourceRegistry = *info.m_Renderer.GetRenderResourceRegistry(),
-			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystem(),
+			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystemService(),
 			.m_RenderViews = std::span<RenderView>(result.m_RenderViews),
 			.m_SceneCB = *info.m_Renderer.GetSceneConstantBuffer(),
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),

@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentSourceControl.h"
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 
 namespace gglab
@@ -8,7 +9,8 @@ namespace gglab
 	class RenderResourceRegistry;
 
 	class EnvironmentLightingSystem : public EnvironmentLightingViewBase,
-		public EnvironmentLightingControlBase
+		public EnvironmentLightingControlBase,
+		public EnvironmentSourceControl
 	{
 	public:
 		struct CreateInfo
@@ -20,7 +22,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(EnvironmentLightingSystem);
 		~EnvironmentLightingSystem() override = default;
 
-		void CommitEnvironmentSource(EnvironmentTextureSource source) noexcept;
+		void CommitEnvironmentSource(EnvironmentTextureSource source) noexcept override;
 		[[nodiscard]] const EnvironmentTextureSource& GetBakeSource() const noexcept
 		{
 			return m_Source;

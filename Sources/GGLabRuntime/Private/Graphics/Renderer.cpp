@@ -68,6 +68,11 @@ namespace gglab
 		return m_SamplerRegistry.get();
 	}
 
+	EnvironmentSourceControl* Renderer::GetEnvironmentSourceControl() const noexcept
+	{
+		return m_EnvironmentLightingSystem.get();
+	}
+
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (createInfo.m_RHIContextFactory == nullptr)

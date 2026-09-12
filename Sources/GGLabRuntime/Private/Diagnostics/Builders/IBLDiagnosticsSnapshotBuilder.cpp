@@ -34,7 +34,7 @@ namespace gglab
 		const Renderer& renderer, const EnvironmentAssetController* environmentAssets) noexcept
 	{
 		IBLDiagnosticsSnapshot snapshot{};
-		const auto* environmentSystem = renderer.GetEnvironmentLightingSystem();
+		const auto* environmentSystem = renderer.GetEnvironmentLightingSystemService();
 		const auto* registry = renderer.GetRenderResourceRegistry();
 		const auto* bakeScheduler = renderer.GetIBLBakeScheduler();
 		if (!environmentSystem || !registry || !bakeScheduler)

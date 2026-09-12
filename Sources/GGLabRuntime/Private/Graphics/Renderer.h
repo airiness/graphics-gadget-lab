@@ -112,7 +112,8 @@ namespace gglab
 			return m_AssetUploadScheduler.get();
 		}
 		PipelineCache* GetPipelineCache() const noexcept { return m_PipelineCache.get(); }
-		EnvironmentLightingSystem* GetEnvironmentLightingSystem() const noexcept override
+		EnvironmentSourceControl* GetEnvironmentSourceControl() const noexcept override;
+		EnvironmentLightingSystem* GetEnvironmentLightingSystemService() const noexcept
 		{
 			return m_EnvironmentLightingSystem.get();
 		}

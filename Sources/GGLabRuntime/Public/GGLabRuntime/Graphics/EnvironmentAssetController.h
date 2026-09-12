@@ -16,7 +16,7 @@ namespace gglab
 {
 	class AssetManager;
 	class AssetOwnerScope;
-	class EnvironmentLightingSystem;
+	class EnvironmentSourceControl;
 	struct RHITextureDesc;
 
 	enum class EnvironmentAssetEntryState : uint8_t
@@ -45,7 +45,7 @@ namespace gglab
 		struct CreateInfo
 		{
 			AssetManager* m_AssetManager = nullptr;
-			EnvironmentLightingSystem* m_EnvironmentLighting = nullptr;
+			EnvironmentSourceControl* m_EnvironmentLighting = nullptr;
 			std::filesystem::path m_AssetRoot;
 		};
 
@@ -93,7 +93,7 @@ namespace gglab
 		[[nodiscard]] bool ValidateEnvironmentShape(const RHITextureDesc& desc) const noexcept;
 
 		AssetManager* m_AssetManager = nullptr;
-		EnvironmentLightingSystem* m_EnvironmentLighting = nullptr;
+		EnvironmentSourceControl* m_EnvironmentLighting = nullptr;
 		std::filesystem::path m_AssetRoot;
 		std::vector<EnvironmentMapEntry> m_Entries;
 		// Owner leases stay opaque so the Public header does not expose the asset

@@ -255,7 +255,9 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_PipelineResolver && m_AssetManager && m_ShaderManager;
+			return m_PipelineResolver && m_ShaderPrograms && m_Samplers && m_Resources &&
+				m_FrameBuffers && m_Environment && m_Presentation && m_BindingLayout &&
+				m_Temporal && m_AssetUpload && m_AssetManager && m_ShaderManager;
 		}
 	};
 }
