@@ -234,7 +234,7 @@ namespace gglab
 				return;
 			}
 			if (!controller.SelectEnvironmentFile(
-				"Shaders/Passes/PassForwardPBR.hlsl", "Decode Failure Probe"))
+				"Assets/Textures/Probes/InvalidDecode.hdr", "Decode Failure Probe"))
 			{
 				Fail("Decode-failure probe was rejected before asynchronous loading.");
 				return;
@@ -295,7 +295,7 @@ namespace gglab
 
 			controller.Reset();
 			const EnvironmentTextureSource& source =
-				m_Services.m_RenderServices.m_Environment->GetBakingSource();
+				m_Services.m_RenderServices.m_Environment->GetCommittedEnvironmentSource();
 			if (controller.GetActiveEnvironment() ||
 				source.m_Type != EnvironmentTextureSourceType::Cubemap ||
 				!IsReservedTextureId(source.m_Content.m_Id))
@@ -320,7 +320,7 @@ namespace gglab
 				break;
 			}
 			if (!controller.GetActiveEnvironment() ||
-				m_Services.m_RenderServices.m_Environment->GetBakingSource().m_Type !=
+				m_Services.m_RenderServices.m_Environment->GetCommittedEnvironmentSource().m_Type !=
 				EnvironmentTextureSourceType::Equirectangular)
 			{
 				Fail("Environment reselection did not replace the fallback.");

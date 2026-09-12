@@ -183,6 +183,8 @@ namespace gglab
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept override;
 		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept override;
 		[[nodiscard]] const EnvironmentTextureSource& GetBakingSource() const noexcept override;
+		[[nodiscard]] const EnvironmentTextureSource& GetCommittedEnvironmentSource()
+			const noexcept override;
 		[[nodiscard]] ArtifactCacheCoreStatistics GetArtifactCacheStatistics()
 			const noexcept override;
 		[[nodiscard]] LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics()

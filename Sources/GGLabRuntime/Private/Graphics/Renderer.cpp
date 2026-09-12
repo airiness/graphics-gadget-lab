@@ -569,6 +569,12 @@ namespace gglab
 		return m_IBLBakeScheduler->GetBakingSource();
 	}
 
+	const EnvironmentTextureSource& Renderer::GetCommittedEnvironmentSource() const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem.get());
+		return m_EnvironmentLightingSystem->GetBakeSource();
+	}
+
 	ArtifactCacheCoreStatistics Renderer::GetArtifactCacheStatistics() const noexcept
 	{
 		return m_IBLBakeScheduler ? m_IBLBakeScheduler->GetArtifactCacheStatistics()

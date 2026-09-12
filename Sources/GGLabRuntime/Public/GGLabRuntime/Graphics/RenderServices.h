@@ -192,6 +192,8 @@ namespace gglab
 		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetBakingSource()
 			const noexcept = 0;
+		[[nodiscard]] virtual const EnvironmentTextureSource& GetCommittedEnvironmentSource()
+			const noexcept = 0;
 		[[nodiscard]] virtual ArtifactCacheCoreStatistics GetArtifactCacheStatistics()
 			const noexcept = 0;
 		[[nodiscard]] virtual LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics()
