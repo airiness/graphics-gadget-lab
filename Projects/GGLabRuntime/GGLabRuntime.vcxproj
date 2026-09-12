@@ -205,7 +205,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadProgress.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RenderGraph.cpp" />
@@ -552,7 +552,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interop\AssimpMathInterop.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGCompileDiagnostic.h" />

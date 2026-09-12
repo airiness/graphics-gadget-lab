@@ -916,6 +916,8 @@ foreach ($legacyPath in $legacyRuntimeEnvironmentPaths) {
 
 $legacyRuntimeFrameContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/GPUStructures.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Renderer.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Renderer.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderContexts.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderScene.h"),
     (Join-Path $runtimeSourcesDir "Graphics/RenderScene.cpp"),
@@ -2113,6 +2115,7 @@ $appRuntimeForbiddenDependencyRegex = `
     '#include\s*[<"]GGLabFoundation[\\/]Platform[\\/]Win[\\/]|' +
     '#include\s*[<"](?:Application[\\/]|DevTools[\\/]|Compiler[\\/]|NapaVoxelCore[\\/])|' +
     '#include\s*[<"]Graphics[\\/]RenderFrameBuilder[.]h|' +
+    '#include\s*[<"]Graphics[\\/]Renderer[.]h|' +
     '\bImGui\b|\bDevelopGui\w*\b|\bDXC\b|dxcapi[.]h|GetModuleFileName|' +
     'GetExecutableDirectory|GetExeOutDir|\bwin32::|\bLantern\b'
 $appRuntimeWideTextRegex = '\bwchar_t\b|\bstd::wstring(?:_view)?\b'

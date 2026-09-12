@@ -4,7 +4,7 @@
 #include "Demo/DemoManager.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 
 #include <exception>
 
@@ -12,6 +12,86 @@ namespace gglab
 {
 	namespace
 	{
+		class StubRenderHost final : public RenderHost
+		{
+		public:
+			[[nodiscard]] bool IsInitialized() const noexcept override { return false; }
+			void Finalize() noexcept override {}
+			void OnResize(uint32_t, uint32_t) noexcept override {}
+			void OnSuspend() noexcept override {}
+			void OnResume() noexcept override {}
+			[[nodiscard]] bool IsSuspended() const noexcept override { return false; }
+			[[nodiscard]] RHIContext* GetRHIContext() const noexcept override { return nullptr; }
+			[[nodiscard]] RenderFrame BeginFrame() noexcept override
+			{
+				return RenderFrame(RHIFrameBeginStatus::Fatal);
+			}
+			[[nodiscard]] RenderFrameBuildResult BuildFrame(
+				const RenderFrameBuildRequest&) noexcept override
+			{
+				return {};
+			}
+			[[nodiscard]] TemporalFrameTransaction& BeginTemporalFrame(RenderFrame&,
+				const ResolvedTemporalFramePlan&, uint32_t, uint32_t) noexcept override
+			{
+				return m_Transaction;
+			}
+			void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame&) noexcept override {}
+			void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override {}
+			[[nodiscard]] RenderGraph::CreateInfo CreateRenderGraphCreateInfo()
+				const noexcept override
+			{
+				return {};
+			}
+			[[nodiscard]] const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus()
+				const noexcept override
+			{
+				return m_Capabilities;
+			}
+			void Render(RenderFrame&, RenderGraph&, const RenderFrameContext&) noexcept override {}
+			[[nodiscard]] RHIFrameEndResult EndFrame(RenderFrame&) noexcept override
+			{
+				return RHIFrameEndResult::Fatal();
+			}
+			[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView()
+				const noexcept override { return nullptr; }
+			[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl()
+				const noexcept override { return nullptr; }
+			[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] IBLPreviewViewBase* GetIBLPreviewView() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] IBLPreviewControlBase* GetIBLPreviewControl() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView()
+				const noexcept override { return nullptr; }
+			[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
+				const noexcept override { return nullptr; }
+			[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override
+			{
+				return nullptr;
+			}
+			[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept override
+			{
+				return nullptr;
+			}
+
+		private:
+			void AbortFrame(uint64_t) noexcept override {}
+			TemporalFrameTransaction m_Transaction{};
+			TemporalAACapabilityStatus m_Capabilities{};
+		};
+
 		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabId&,
 			std::span<const LabRegistration>) noexcept
 		{
@@ -90,7 +170,7 @@ namespace gglab
 
 		void RunDemoTransitionSynchronizationSelfTests(SelfTestContext& context) noexcept
 		{
-			Renderer renderer;
+			StubRenderHost renderer;
 			DemoManager manager(&renderer);
 			TransitionTestState state{};
 			const uint32_t demoIndex = manager.RegisterDemo("test.demo.transition",

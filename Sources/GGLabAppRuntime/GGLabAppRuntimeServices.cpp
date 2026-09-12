@@ -14,7 +14,6 @@
 #include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/Renderer.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"

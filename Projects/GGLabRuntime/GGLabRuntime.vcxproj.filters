@@ -387,9 +387,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalHistoryManager.cpp">
       <Filter>Graphics\Pipeline</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.cpp">
       <Filter>Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -641,6 +638,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp">
       <Filter>Private\Graphics\PostProcess</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.cpp">
       <Filter>Private\Graphics</Filter>
@@ -1124,9 +1124,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h">
       <Filter>Graphics\Profiling</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Renderer.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.h">
       <Filter>Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -1357,6 +1354,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h">
       <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h">
+      <Filter>Private\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h">
       <Filter>Private\Graphics</Filter>
