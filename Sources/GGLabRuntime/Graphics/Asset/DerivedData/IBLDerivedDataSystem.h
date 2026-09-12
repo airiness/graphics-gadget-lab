@@ -1,6 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/AssetContentFingerprint.h"
+#include "GGLabRuntime/Graphics/Asset/AssetContentFingerprint.h"
 #include "Graphics/Asset/DerivedData/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/IBLStageArtifactCache.h"

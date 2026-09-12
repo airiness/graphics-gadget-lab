@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 

@@ -63,7 +63,7 @@ namespace gglab
 	class AssetLease;
 	class AssetPublicationRetain;
 	class AssetOwnerScope;
-	class SamplerRegistry;
+	class RenderSamplerAccess;
 	class TaskSystem;
 	class TextureAssetSystem;
 	class TransferBatch;
@@ -102,7 +102,7 @@ namespace gglab
 			TaskSystem* m_TaskSystem = nullptr;
 			TransferManager* m_TransferManager = nullptr;
 			AssetUploadScheduler* m_AssetUploadScheduler = nullptr;
-			SamplerRegistry* m_SamplerRegistry = nullptr;
+			RenderSamplerAccess* m_SamplerRegistry = nullptr;
 			MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 			TextureArtifactCacheConfig m_TextureArtifactCache{};
 			ModelImportArtifactCacheConfig m_ModelImportArtifactCache{};
@@ -341,7 +341,7 @@ namespace gglab
 		// through texture-domain shutdown and destruction.
 		AssetStateEventQueue m_AssetStateEventQueue;
 		std::unique_ptr<TextureAssetSystem> m_TextureAssets;
-		SamplerRegistry* m_SamplerRegistry = nullptr;
+		RenderSamplerAccess* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
 		MeshStore m_MeshStore;

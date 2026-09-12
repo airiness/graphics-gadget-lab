@@ -5,12 +5,12 @@
 namespace gglab
 {
 	class AssetManager;
-	class SamplerRegistry;
+	class RenderSamplerAccess;
 
 	class MaterialGpuEncoder
 	{
 	public:
 		[[nodiscard]] static MaterialGPU Encode(const MaterialProperties& material,
-			const AssetManager& assetManager, const SamplerRegistry& samplerRegistry) noexcept;
+			const AssetManager& assetManager, const RenderSamplerAccess& samplerRegistry) noexcept;
 	};
 }

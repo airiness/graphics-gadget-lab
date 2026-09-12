@@ -1,6 +1,6 @@
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
-#include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "Graphics/Renderer.h"

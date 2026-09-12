@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 namespace gglab

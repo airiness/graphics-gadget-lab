@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <array>

@@ -1,10 +1,10 @@
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
-#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
-#include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -53,7 +53,7 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
 		EnsureInitialized(services);
 
-		using TextureIndex = RenderResourceRegistry::TextureIndex;
+		using TextureIndex = RenderTextureIndex;
 		using PreviewType = IBLPreviewType;
 		using PreviewLayout = IBLPreviewLayout;
 		const auto* contextPtr = &context;

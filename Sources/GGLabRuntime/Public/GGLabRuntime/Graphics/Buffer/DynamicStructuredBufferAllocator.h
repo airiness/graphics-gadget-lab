@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Buffer/DynamicBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicBufferAllocator.h"
 
 namespace gglab
 {

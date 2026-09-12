@@ -960,6 +960,45 @@ foreach ($legacyPath in $legacyRuntimeFrameContractPaths) {
     }
 }
 
+$legacyRuntimeServiceContractPaths = @(
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/PipelineCache.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/PipelineCache.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/PipelinePresets.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalHistoryManager.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/TemporalHistoryManager.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/GTAO.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/GTAO.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/ForwardPlus.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/ForwardPlus.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/ForwardPlusDebugReadback.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Pipeline/ForwardPlusDebugReadback.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Shader/ShaderPipelineSnapshot.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Resource/RenderResourceRegistry.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Resource/RenderResourceRegistry.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/SamplerRegistry.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/SamplerRegistry.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/EnvironmentLightingSystem.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/EnvironmentLightingSystem.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Asset/AssetContentFingerprint.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/Buffer.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/DynamicBufferAllocator.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/DynamicBufferAllocator.cpp"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/DynamicConstantBufferAllocator.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/DynamicStructuredBufferAllocator.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Buffer/PersistentStructuredBuffer.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Utility/DXGIFormatUtils.h"),
+    (Join-Path $runtimeSourcesDir "Graphics/Utility/DXGIFormatUtils.cpp")
+)
+foreach ($legacyPath in $legacyRuntimeServiceContractPaths) {
+    if (Test-Path -LiteralPath $legacyPath -PathType Leaf) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-public-private-layout"
+            Target = ConvertTo-RepoRelativePath $legacyPath
+            Reason = "migrated pipeline, resource, buffer and environment service contracts must live under Public/GGLabRuntime or Private"
+        })
+    }
+}
+
 $legacyRuntimeCameraPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Camera.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Camera.cpp"),
@@ -1333,6 +1372,13 @@ $legacyRuntimeFrameContractIncludeRegex =
     'RenderPipeline[\\/](?:DepthCoverageFramePlan|RenderPipelineOverlayExtensionBase|' +
     'RenderPipelineSceneExtensionBase|RenderPipelineBlackboard|RenderPipelineBase)\.h|' +
     'Pipeline[\\/]TemporalFrameTransaction\.h)[>"]'
+$legacyRuntimeServiceContractIncludeRegex =
+    '#include\s*[<"]Graphics[\\/](?:' +
+    'Asset[\\/]AssetContentFingerprint\.h|' +
+    'Buffer[\\/](?:Buffer|DynamicBufferAllocator|DynamicConstantBufferAllocator|' +
+    'DynamicStructuredBufferAllocator|PersistentStructuredBuffer)\.h|' +
+    'Pipeline[\\/](?:PipelinePresets|GTAO|ForwardPlus|ForwardPlusDebugReadback)\.h|' +
+    'Shader[\\/]ShaderPipelineSnapshot\.h)[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
         -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
@@ -1344,6 +1390,7 @@ foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $rep
         $content -match $legacyRuntimeDebugDrawContractIncludeRegex -or
         $content -match $legacyRuntimeDiagnosticsContractIncludeRegex -or
         $content -match $legacyRuntimeFrameContractIncludeRegex -or
+        $content -match $legacyRuntimeServiceContractIncludeRegex -or
         $content -match $legacyRuntimeSceneIncludeRegex) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-public-include-prefix"

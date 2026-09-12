@@ -73,7 +73,7 @@ namespace gglab
 					IBLPreviewResourcesName);
 				auto importPreview =
 					[&builder, renderResRegistry, activeResourcesInitialized](
-						RenderResourceRegistry::TextureIndex index, const char* name) noexcept
+						RenderTextureIndex index, const char* name) noexcept
 					{
 						const auto* desc = renderResRegistry->GetTextureDesc(index);
 						GGLAB_ASSERT_NOT_NULL(desc);

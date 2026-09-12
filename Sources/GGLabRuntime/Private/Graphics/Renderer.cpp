@@ -63,6 +63,11 @@ namespace gglab
 			!m_HasActiveFrame, "Renderer destroyed while a render frame is still active.");
 	}
 
+	RenderSamplerAccess* Renderer::GetSamplerRegistry() const noexcept
+	{
+		return m_SamplerRegistry.get();
+	}
+
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (createInfo.m_RHIContextFactory == nullptr)

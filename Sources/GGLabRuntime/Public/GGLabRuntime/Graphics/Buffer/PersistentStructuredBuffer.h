@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Buffer/Buffer.h"
+#include "GGLabRuntime/Graphics/Buffer/Buffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 

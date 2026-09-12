@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
-#include "Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"

@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
-#include "Graphics/Shader/ShaderPipelineSnapshot.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderPipelineSnapshot.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 

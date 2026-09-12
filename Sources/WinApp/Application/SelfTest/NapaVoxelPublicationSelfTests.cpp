@@ -13,7 +13,6 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
-#include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/TransferManager.h"
 
@@ -113,6 +112,29 @@ namespace gglab
 			void AbortFrame(uint64_t) noexcept override {}
 			TemporalFrameTransaction m_Transaction{};
 			TemporalAACapabilityStatus m_Capabilities{};
+		};
+
+		class NapaVoxelPublicationTestSamplerAccess final : public RenderSamplerAccess
+		{
+		public:
+			SamplerID GetOrCreateSampler(const SamplerKey&) noexcept override { return {}; }
+			[[nodiscard]] SamplerID GetPresetSamplerId(SamplerPreset) const noexcept override
+			{
+				return {};
+			}
+			[[nodiscard]] uint32_t GetSamplerIndex(SamplerPreset) const noexcept override
+			{
+				return 0;
+			}
+			[[nodiscard]] uint32_t GetSamplerIndex(const SamplerID&) const noexcept override
+			{
+				return 0;
+			}
+			[[nodiscard]] uint32_t ResolveSamplerIndex(
+				SamplerID, SamplerPreset) const noexcept override
+			{
+				return 0;
+			}
 		};
 
 		class NapaVoxelPublicationTestDevice final : public RHIDevice
@@ -1709,7 +1731,7 @@ namespace gglab
 			// LabSessionBase needs an Asset owner scope, but this fixture has no file assets.
 			// Close background submission before AssetManager queues its optional test textures.
 			taskSystem.Shutdown();
-			SamplerRegistry samplerRegistry({ .m_Device = &device });
+			NapaVoxelPublicationTestSamplerAccess samplerAccess;
 			const std::filesystem::path injectedRoot =
 				std::filesystem::temp_directory_path() / "gglab-napa-lifecycle-self-test";
 			AssetManager assetManager({
@@ -1717,7 +1739,7 @@ namespace gglab
 				.m_TaskSystem = &taskSystem,
 				.m_TransferManager = &transferManager,
 				.m_AssetUploadScheduler = &scheduler,
-				.m_SamplerRegistry = &samplerRegistry,
+				.m_SamplerRegistry = &samplerAccess,
 				.m_AssetRoot = injectedRoot / "Assets",
 				});
 			StubRenderHost renderer;

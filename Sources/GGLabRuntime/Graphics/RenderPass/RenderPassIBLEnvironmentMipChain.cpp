@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/Shader/ShaderManager.h"

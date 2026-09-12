@@ -1,24 +1,19 @@
 #pragma once
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
-#include "Graphics/Pipeline/PipelinePresets.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelinePresets.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
-#include "GGLabRuntime/Graphics/RenderPass/RenderPassInfo.h"
-#include "GGLabRuntime/Graphics/RenderServices.h"
-#include "Graphics/Shader/ShaderPipelineSnapshot.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderPipelineSnapshot.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 #include <array>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
-#include <shared_mutex>
-#include <unordered_map>
-#include <vector>
 
 namespace gglab
 {
-	class RHIPipelineSystem;
-	class ShaderManager;
-
 	struct GraphicsPipelineFormats
 	{
 		std::array<RHIFormat, RHIGraphicsPipelineDesc::MaxRenderTargets> m_RenderTargetFormats{};
@@ -82,6 +77,8 @@ namespace gglab
 		constexpr bool operator==(const ComputePipelineRecipe&) const noexcept = default;
 	};
 
+	// Opaque cache slots filled by the pipeline resolver. The internal
+	// dependency and pipeline state stay owned by the Runtime resolver.
 	struct GraphicsPipelineSlot
 	{
 	public:
@@ -111,38 +108,5 @@ namespace gglab
 		ShaderPipelineDependencyIdentity m_ShaderDependency{};
 		RHIPipelineHandle m_Pipeline{};
 		uint64_t m_PipelineSystemRevision = 0;
-	};
-
-	class PipelineCache : public RenderPipelineResolver
-	{
-	public:
-		struct CreateInfo
-		{
-			RHIPipelineSystem* m_PipelineSystem = nullptr;
-			ShaderManager* m_ShaderManager = nullptr;
-		};
-
-		explicit PipelineCache(const CreateInfo& createInfo) noexcept;
-		GGLAB_DELETE_COPYABLE_MOVABLE(PipelineCache);
-		~PipelineCache() = default;
-
-		RHIPipelineHandle Resolve(GraphicsPipelineSlot& slot,
-			const GraphicsPhysicalPipelineKey& physicalKey,
-			const RenderPassInfo& renderPassInfo) noexcept;
-		RHIPipelineHandle Resolve(ComputePipelineSlot& slot, const ComputePipelineRecipe& recipe,
-			const RenderPassInfo& renderPassInfo) noexcept;
-		ShaderManager* GetShaderManager() const noexcept { return m_ShaderManager; }
-		void GetPipelineUsages(
-			RHIPipelineHandle pipeline, std::vector<RenderPassInfo>& outUsages) const noexcept;
-
-	private:
-		void RecordPipelineUsage(
-			RHIPipelineHandle pipeline, const RenderPassInfo& renderPassInfo) noexcept;
-
-		ShaderManager* m_ShaderManager = nullptr;
-		RHIPipelineSystem* m_PipelineSystem = nullptr;
-		mutable std::shared_mutex m_UsageMutex;
-		std::unordered_map<RHIPipelineHandle, std::vector<RenderPassInfo>> m_PipelineUsages;
-		uint64_t m_UsagePipelineSystemRevision = 0;
 	};
 }

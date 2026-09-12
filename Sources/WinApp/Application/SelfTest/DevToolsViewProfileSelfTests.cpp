@@ -2,7 +2,6 @@
 
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "DevTools/DevToolsRuntime.h"
-#include "Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 
 namespace gglab

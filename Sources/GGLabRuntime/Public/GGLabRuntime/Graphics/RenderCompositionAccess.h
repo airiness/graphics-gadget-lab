@@ -6,7 +6,7 @@ namespace gglab
 	class AssetManager;
 	class AssetUploadScheduler;
 	class EnvironmentLightingSystem;
-	class SamplerRegistry;
+	class RenderSamplerAccess;
 	class TransferManager;
 
 	// Explicit composition-time service contract for the application runtime.
@@ -20,7 +20,7 @@ namespace gglab
 
 		[[nodiscard]] virtual TransferManager* GetTransferManager() const noexcept = 0;
 		[[nodiscard]] virtual AssetUploadScheduler* GetAssetUploadScheduler() const noexcept = 0;
-		[[nodiscard]] virtual SamplerRegistry* GetSamplerRegistry() const noexcept = 0;
+		[[nodiscard]] virtual RenderSamplerAccess* GetSamplerRegistry() const noexcept = 0;
 		[[nodiscard]] virtual EnvironmentLightingSystem* GetEnvironmentLightingSystem()
 			const noexcept = 0;
 

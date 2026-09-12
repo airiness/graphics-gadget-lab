@@ -1,6 +1,6 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 
 #include <algorithm>
 

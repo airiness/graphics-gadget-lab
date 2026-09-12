@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"

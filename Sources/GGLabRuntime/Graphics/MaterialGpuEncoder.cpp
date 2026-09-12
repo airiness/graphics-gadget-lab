@@ -1,6 +1,6 @@
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/AssetManager.h"
-#include "Graphics/SamplerRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <cstdint>
 
@@ -11,7 +11,7 @@ namespace gglab
 		[[nodiscard]] MaterialTextureBindingGPU EncodeTextureBinding(
 			const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback,
 			SamplerPreset fallbackSampler, const AssetManager& assetManager,
-			const SamplerRegistry& samplerRegistry) noexcept
+			const RenderSamplerAccess& samplerRegistry) noexcept
 		{
 			return {
 				.TextureSamplerBinding =
@@ -27,7 +27,7 @@ namespace gglab
 	}
 
 	MaterialGPU MaterialGpuEncoder::Encode(const MaterialProperties& material,
-		const AssetManager& assetManager, const SamplerRegistry& samplerRegistry) noexcept
+		const AssetManager& assetManager, const RenderSamplerAccess& samplerRegistry) noexcept
 	{
 		MaterialGPU gpu{};
 		gpu.BaseColorBinding = EncodeTextureBinding(material.m_BaseColorBinding,

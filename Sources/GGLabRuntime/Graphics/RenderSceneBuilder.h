@@ -4,9 +4,9 @@
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
-#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
-#include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 
 #include <cstdint>
@@ -18,7 +18,7 @@ namespace gglab
 	class EnvironmentLightingSystem;
 	class World;
 	class AssetManager;
-	class SamplerRegistry;
+	class RenderSamplerAccess;
 	class TransferManager;
 	class RenderResourceRegistry;
 	class TemporalFrameTransaction;
@@ -38,7 +38,7 @@ namespace gglab
 		{
 			const World& m_World;
 			AssetManager& m_AssetManager;
-			SamplerRegistry& m_SamplerRegistry;
+			RenderSamplerAccess& m_SamplerRegistry;
 			TransferManager& m_TransferManager;
 			RenderResourceRegistry& m_RenderResourceRegistry;
 			EnvironmentLightingSystem& m_EnvironmentLightingSystem;

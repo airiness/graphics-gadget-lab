@@ -1,4 +1,4 @@
-#include "Graphics/Buffer/DynamicBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicBufferAllocator.h"
 #include "Core/Allocator/RingSpanAllocator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"

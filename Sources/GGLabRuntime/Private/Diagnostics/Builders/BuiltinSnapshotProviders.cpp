@@ -320,7 +320,7 @@ namespace gglab
 			{
 				auto& snapshot = store.GetOrCreate<SamplerRegistrySnapshot>();
 				const SamplerRegistry* registry =
-					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetSamplerRegistry() : nullptr;
+					context.m_RenderHost ? GetLegacyRenderer(context.m_RenderHost)->GetSamplerRegistryService() : nullptr;
 				if (registry)
 				{
 					BuildSamplerRegistrySnapshot(*registry, snapshot);

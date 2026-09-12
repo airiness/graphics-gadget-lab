@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "Graphics/Profiling/GpuProfiler.h"
+#include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "Graphics/Renderer.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"

@@ -5,7 +5,6 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab

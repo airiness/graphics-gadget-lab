@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Shader/ShaderManager.h"
 #include "Graphics/Shader/ShaderProgramCatalog.h"
 

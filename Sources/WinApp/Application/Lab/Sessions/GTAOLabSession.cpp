@@ -4,10 +4,9 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab

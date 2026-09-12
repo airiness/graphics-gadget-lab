@@ -1,7 +1,7 @@
 #pragma once
-#include "Graphics/Buffer/DynamicConstantBufferAllocator.h"
-#include "Graphics/Buffer/DynamicStructuredBufferAllocator.h"
-#include "Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
+#include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -133,7 +133,8 @@ namespace gglab
 		{
 			return m_TemporalHistoryManager.get();
 		}
-		SamplerRegistry* GetSamplerRegistry() const noexcept override
+		RenderSamplerAccess* GetSamplerRegistry() const noexcept override;
+		SamplerRegistry* GetSamplerRegistryService() const noexcept
 		{
 			return m_SamplerRegistry.get();
 		}

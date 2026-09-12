@@ -1,32 +1,11 @@
 #pragma once
-#include "Graphics/Asset/AssetContentFingerprint.h"
-#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
-
-#include <filesystem>
+#include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 
 namespace gglab
 {
 	class RenderResourceRegistry;
-
-	enum class EnvironmentTextureSourceType : uint8_t
-	{
-		Equirectangular,
-		Cubemap,
-	};
-
-	struct EnvironmentTextureSource
-	{
-		TextureContentRef m_Content{};
-		EnvironmentTextureSourceType m_Type = EnvironmentTextureSourceType::Equirectangular;
-		AssetContentFingerprint m_ContentFingerprint{};
-
-		[[nodiscard]] bool IsValid() const noexcept
-		{
-			return m_Content.IsValid() && m_ContentFingerprint.IsValid();
-		}
-	};
 
 	class EnvironmentLightingSystem : public EnvironmentLightingViewBase,
 		public EnvironmentLightingControlBase

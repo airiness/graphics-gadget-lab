@@ -3,7 +3,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/IBLBakeScheduler.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <span>
@@ -39,7 +39,7 @@ namespace gglab
 				auto& resources = builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName);
 				auto& previewResources =
 					builder.GetBlackboard().Get<RGIBLPreviewResources>(IBLPreviewResourcesName);
-				using TextureIndex = RenderResourceRegistry::TextureIndex;
+				using TextureIndex = RenderTextureIndex;
 				struct Target
 				{
 					TextureIndex m_Index;
@@ -117,7 +117,7 @@ namespace gglab
 			{
 				builder.SideEffect();
 				auto& resources = builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName);
-				using TextureIndex = RenderResourceRegistry::TextureIndex;
+				using TextureIndex = RenderTextureIndex;
 				struct Target
 				{
 					TextureIndex m_Index;

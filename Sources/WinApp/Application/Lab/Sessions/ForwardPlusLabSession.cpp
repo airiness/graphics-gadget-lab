@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"

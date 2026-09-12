@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Application/Lab/NapaVoxel/NapaVoxelRenderState.h"
-#include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 
 #include <array>

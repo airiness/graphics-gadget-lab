@@ -1,5 +1,5 @@
 #pragma once
-#include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"

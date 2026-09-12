@@ -8,7 +8,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
-#include "Graphics/EnvironmentLightingSystem.h"
+#include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab

@@ -1,7 +1,6 @@
 #include "DevTools/DevelopGui/Panels/IBLViewerPanel.h"
-#include "Graphics/Utility/DXGIFormatUtils.h"
-#include "DevTools/EnumText/EnumTextDXGI.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
+#include "DevTools/EnumText/EnumTextRHI.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
@@ -487,7 +486,7 @@ namespace gglab
 
 				ImGui::Text("MipLevels: %u", brdfLutDesc->m_MipLevels);
 				ImGui::Text(
-					"Format: %s", devtools::EnumText(ToDXGIFormat(brdfLutDesc->m_Format)).data());
+					"Format: %s", devtools::EnumText(brdfLutDesc->m_Format).data());
 				ImGui::Text("Shader Visible SRV Index: %u", srvIndex);
 			}
 
@@ -617,7 +616,7 @@ namespace gglab
 					static_cast<unsigned long long>(environmentDesc->m_Width),
 					environmentDesc->m_Height, environmentDesc->m_ArraySize);
 				ImGui::Text("Environment Format: %s",
-					devtools::EnumText(ToDXGIFormat(environmentDesc->m_Format)).data());
+					devtools::EnumText(environmentDesc->m_Format).data());
 				ImGui::Text("Environment MipLevels: %u", environmentMipLevels);
 				ImGui::Text("Environment Shader Visible SRV Index: %u", environmentSrvIndex);
 
@@ -625,7 +624,7 @@ namespace gglab
 					static_cast<unsigned long long>(environmentPreviewDesc->m_Width),
 					environmentPreviewDesc->m_Height);
 				ImGui::Text("Preview Format: %s",
-					devtools::EnumText(ToDXGIFormat(environmentPreviewDesc->m_Format)).data());
+					devtools::EnumText(environmentPreviewDesc->m_Format).data());
 				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 			}
 
@@ -717,7 +716,7 @@ namespace gglab
 					static_cast<unsigned long long>(irradianceDesc->m_Width),
 					irradianceDesc->m_Height, irradianceDesc->m_ArraySize);
 				ImGui::Text("Cubemap Format: %s",
-					devtools::EnumText(ToDXGIFormat(irradianceDesc->m_Format)).data());
+					devtools::EnumText(irradianceDesc->m_Format).data());
 				ImGui::Text("Cubemap Shader Visible SRV Index: %u",
 					resources.m_Irradiance.m_ShaderVisibleSrvIndex);
 			}
@@ -838,7 +837,7 @@ namespace gglab
 					prefilteredSpecularDesc->m_ArraySize);
 				ImGui::Text("Cubemap MipLevels: %u", mipLevels);
 				ImGui::Text("Cubemap Format: %s",
-					devtools::EnumText(ToDXGIFormat(prefilteredSpecularDesc->m_Format)).data());
+					devtools::EnumText(prefilteredSpecularDesc->m_Format).data());
 				ImGui::Text("Cubemap Shader Visible SRV Index: %u", prefilteredSpecularSrvIndex);
 
 				ImGui::Text("Preview Canvas Size: %llu x %u",
@@ -846,8 +845,7 @@ namespace gglab
 						prefilteredSpecularPreviewDesc->m_Width),
 					prefilteredSpecularPreviewDesc->m_Height);
 				ImGui::Text("Preview Format: %s",
-					devtools::EnumText(ToDXGIFormat(prefilteredSpecularPreviewDesc->m_Format))
-					.data());
+					devtools::EnumText(prefilteredSpecularPreviewDesc->m_Format).data());
 				ImGui::Text("Preview Shader Visible SRV Index: %u", previewSrvIndex);
 			}
 

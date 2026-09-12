@@ -6,7 +6,7 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/MaterialGpuEncoder.h"
-#include "Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"

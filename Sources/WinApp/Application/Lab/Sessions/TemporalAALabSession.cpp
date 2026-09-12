@@ -8,11 +8,9 @@
 #include "Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 #include <algorithm>
