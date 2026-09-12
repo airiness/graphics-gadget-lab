@@ -363,6 +363,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.cpp">
+      <Filter>Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp">
       <Filter>Graphics</Filter>
     </ClCompile>
@@ -650,6 +653,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBlackboard.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp">
       <Filter>Private\Graphics\RenderPipeline</Filter>
@@ -1068,6 +1074,9 @@
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h">
+      <Filter>Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\LegacyRenderHostAccess.h">
       <Filter>Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h">
@@ -1879,6 +1888,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGResourceUtils.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderHost.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

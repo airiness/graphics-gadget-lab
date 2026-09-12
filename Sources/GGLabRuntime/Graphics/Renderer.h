@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
@@ -45,74 +46,12 @@ namespace gglab
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
-	class Renderer
+	class Renderer : public RenderHost
 	{
 	public:
-		class Frame
-		{
-		public:
-			GGLAB_DELETE_COPYABLE_MOVABLE(Frame);
-			~Frame() noexcept;
-			[[nodiscard]] RHIFrameBeginStatus GetBeginStatus() const noexcept
-			{
-				return m_BeginStatus;
-			}
-			[[nodiscard]] bool IsReady() const noexcept
-			{
-				return m_BeginStatus == RHIFrameBeginStatus::Ready;
-			}
-			[[nodiscard]] bool IsUnavailable() const noexcept
-			{
-				return m_BeginStatus == RHIFrameBeginStatus::Unavailable;
-			}
-			[[nodiscard]] bool IsFatal() const noexcept
-			{
-				return m_BeginStatus == RHIFrameBeginStatus::Fatal;
-			}
-			[[nodiscard]] uint64_t GetSerial() const noexcept { return m_FrameSerial; }
-			[[nodiscard]] uint32_t GetFrameSlotIndex() const noexcept
-			{
-				return m_FrameSlotIndex;
-			}
-			[[nodiscard]] uint32_t GetBackBufferIndex() const noexcept
-			{
-				return m_BackBufferIndex;
-			}
-
-		private:
-			enum class State : uint8_t
-			{
-				Begun,
-				Recorded,
-				Ended,
-			};
-
-			Frame(Renderer* renderer, RHIFrameContext* rhiFrame, uint64_t frameSerial) noexcept :
-				m_Renderer(renderer), m_FrameSerial(frameSerial),
-				m_FrameSlotIndex(rhiFrame ? rhiFrame->GetFrameSlotIndex() : 0),
-				m_BackBufferIndex(rhiFrame ? rhiFrame->GetBackBufferIndex() : 0),
-				m_RHIFrame(rhiFrame),
-				m_BeginStatus(RHIFrameBeginStatus::Ready)
-			{
-			}
-			explicit Frame(RHIFrameBeginStatus beginStatus) noexcept :
-				m_State(State::Ended), m_BeginStatus(beginStatus)
-			{
-				GGLAB_ASSERT(beginStatus != RHIFrameBeginStatus::Ready);
-			}
-
-			friend class Renderer;
-
-			Renderer* m_Renderer = nullptr;
-			State m_State = State::Begun;
-			uint64_t m_FrameSerial = 0;
-			uint32_t m_FrameSlotIndex = std::numeric_limits<uint32_t>::max();
-			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
-			RHIFrameContext* m_RHIFrame = nullptr;
-			RenderGraph* m_RenderGraph = nullptr;
-			RHIFrameBeginStatus m_BeginStatus = RHIFrameBeginStatus::Fatal;
-			TemporalFrameTransaction m_TemporalTransaction{};
-		};
+		// Transitional alias for the Public RAII frame handle. The nested frame
+		// type was replaced by RenderFrame when the render host contract landed.
+		using Frame = RenderFrame;
 
 		struct CreateInfo
 		{
@@ -134,25 +73,25 @@ namespace gglab
 	public:
 		Renderer() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(Renderer);
-		~Renderer();
+		~Renderer() override;
 
 		[[nodiscard]] bool Initialize(const CreateInfo& createInfo) noexcept;
-		void Finalize() noexcept;
-		bool IsInitialized() const noexcept { return m_IsInitialized; }
+		void Finalize() noexcept override;
+		bool IsInitialized() const noexcept override { return m_IsInitialized; }
 
-		[[nodiscard]] Frame BeginFrame() noexcept;
+		[[nodiscard]] Frame BeginFrame() noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept;
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept override;
 		void AdoptFrameGpuResources(Frame& frame,
 			RenderSceneGpuAllocations& sceneGpuAllocations,
 			const RHIFencePoint& uploadFencePoint) noexcept;
-		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept;
-		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept;
+		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept override;
+		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
 		void Render(
-			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept;
-		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept;
+			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
+		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept override;
 
-		RHIContext* GetRHIContext() const noexcept { return m_RHIContext.get(); }
+		RHIContext* GetRHIContext() const noexcept override { return m_RHIContext.get(); }
 		RHIDevice* GetDevice() const noexcept
 		{
 			return m_RHIContext ? &m_RHIContext->GetDevice() : nullptr;
@@ -198,18 +137,20 @@ namespace gglab
 		}
 		// Narrow capability access for tooling and content. The concrete
 		// environment, IBL, preview and profiling services remain Runtime-internal.
-		[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView() const noexcept;
+		[[nodiscard]] EnvironmentLightingViewBase* GetEnvironmentLightingView()
+			const noexcept override;
 		[[nodiscard]] EnvironmentLightingControlBase* GetEnvironmentLightingControl()
-			const noexcept;
-		[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept;
-		[[nodiscard]] IBLPreviewViewBase* GetIBLPreviewView() const noexcept;
-		[[nodiscard]] IBLPreviewControlBase* GetIBLPreviewControl() const noexcept;
-		[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView() const noexcept;
+			const noexcept override;
+		[[nodiscard]] IBLCacheControlBase* GetIBLCacheControl() const noexcept override;
+		[[nodiscard]] IBLPreviewViewBase* GetIBLPreviewView() const noexcept override;
+		[[nodiscard]] IBLPreviewControlBase* GetIBLPreviewControl() const noexcept override;
+		[[nodiscard]] PostProcessPreviewViewBase* GetPostProcessPreviewView()
+			const noexcept override;
 		[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
-			const noexcept;
-		[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept;
-		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept;
-		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept;
+			const noexcept override;
+		[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept override;
+		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override;
+		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept override;
 		// Composition-time asset lease wiring for the IBL bake scheduler. The
 		// scheduler and its derived-data ownership remain Runtime-internal.
 		void AttachAssetManager(AssetManager& assetManager) noexcept;
@@ -218,7 +159,7 @@ namespace gglab
 		{
 			return m_BackBufferClearColor;
 		}
-		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept
+		const TemporalAACapabilityStatus& GetTemporalAACapabilityStatus() const noexcept override
 		{
 			return m_TemporalAACapabilityStatus;
 		}
@@ -304,12 +245,12 @@ namespace gglab
 			return m_ViewSB.get();
 		}
 
-		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept;
+		RenderGraph::CreateInfo CreateRenderGraphCreateInfo() const noexcept override;
 
-		void OnResize(uint32_t width, uint32_t height) noexcept;
-		void OnSuspend() noexcept;
-		void OnResume() noexcept;
-		bool IsSuspended() const noexcept;
+		void OnResize(uint32_t width, uint32_t height) noexcept override;
+		void OnSuspend() noexcept override;
+		void OnResume() noexcept override;
+		bool IsSuspended() const noexcept override;
 
 		RHIFencePoint GetLastSubmittedFencePoint() const noexcept
 		{
@@ -317,10 +258,28 @@ namespace gglab
 		}
 
 	private:
+		enum class FramePhase : uint8_t
+		{
+			Begun,
+			Recorded,
+		};
+
+		struct ActiveFrameState
+		{
+			RHIFrameContext* m_RHIFrame = nullptr;
+			RenderGraph* m_RenderGraph = nullptr;
+			uint64_t m_Serial = 0;
+			uint32_t m_FrameSlotIndex = std::numeric_limits<uint32_t>::max();
+			uint32_t m_BackBufferIndex = std::numeric_limits<uint32_t>::max();
+			FramePhase m_Phase = FramePhase::Begun;
+			TemporalFrameTransaction m_TemporalTransaction{};
+		};
+
 		void CreateCommonBindingLayout() noexcept;
 		void InitializeGpuBuffers() noexcept;
-		[[nodiscard]] RHIFencePoint AbortFrame(Frame& frame) noexcept;
-		void EndFrameLifetime(Frame& frame) noexcept;
+		void AbortFrame(uint64_t frameSerial) noexcept override;
+		[[nodiscard]] RHIFencePoint AbortActiveFrame(uint64_t frameSerial) noexcept;
+		void EndFrameLifetime() noexcept;
 		void RetireSceneGpuAllocations(
 			RenderSceneGpuAllocations* allocations, const RHIFencePoint& fencePoint) noexcept;
 
@@ -358,6 +317,7 @@ namespace gglab
 
 		RHIFencePoint m_LastSubmittedFencePoint = {};
 		uint64_t m_NextFrameSerial = 1;
+		ActiveFrameState m_ActiveFrame{};
 		bool m_HasActiveFrame = false;
 	};
 }

@@ -54,18 +54,10 @@ namespace gglab
 		}
 	}
 
-	Renderer::Frame::~Frame() noexcept
-	{
-		if (m_Renderer && m_State != State::Ended)
-		{
-			GGLAB_UNUSED(m_Renderer->AbortFrame(*this));
-		}
-	}
-
 	Renderer::~Renderer()
 	{
 		GGLAB_ASSERT_MSG(
-			!m_HasActiveFrame, "Renderer destroyed while a Renderer::Frame is still active.");
+			!m_HasActiveFrame, "Renderer destroyed while a render frame is still active.");
 	}
 
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
@@ -230,7 +222,7 @@ namespace gglab
 		m_IsInitialized = false;
 	}
 
-	Renderer::Frame Renderer::BeginFrame() noexcept
+	RenderFrame Renderer::BeginFrame() noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
 		GGLAB_ASSERT_MSG(
@@ -239,7 +231,7 @@ namespace gglab
 		const RHIFrameBeginResult beginResult = m_RHIContext->BeginFrame();
 		if (!beginResult.IsReady())
 		{
-			return Frame(beginResult.GetStatus());
+			return RenderFrame(beginResult.GetStatus());
 		}
 		RHIFrameContext* rhiFrame = beginResult.GetFrame();
 		GGLAB_ASSERT_NOT_NULL(rhiFrame);
@@ -256,35 +248,44 @@ namespace gglab
 		m_FrameGpuResources = std::make_unique<RenderFrameGpuResources>();
 		const uint64_t frameSerial = m_NextFrameSerial++;
 		GGLAB_ASSERT_MSG(frameSerial != 0, "Renderer frame serial overflowed its valid range.");
-		return Frame(this, rhiFrame, frameSerial);
+		m_ActiveFrame = {};
+		m_ActiveFrame.m_RHIFrame = rhiFrame;
+		m_ActiveFrame.m_Serial = frameSerial;
+		m_ActiveFrame.m_FrameSlotIndex = rhiFrame->GetFrameSlotIndex();
+		m_ActiveFrame.m_BackBufferIndex = rhiFrame->GetBackBufferIndex();
+		return MakeReadyFrame(this, frameSerial, m_ActiveFrame.m_FrameSlotIndex,
+			m_ActiveFrame.m_BackBufferIndex);
 	}
 
 	TemporalFrameTransaction& Renderer::BeginTemporalFrame(Frame& frame,
 		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
 	{
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
-			"Temporal frame planning requires the active begun Renderer::Frame.");
-		frame.m_TemporalTransaction.Begin(
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
+			m_ActiveFrame.m_Phase == FramePhase::Begun,
+			"Temporal frame planning requires the active begun render host frame.");
+		m_ActiveFrame.m_TemporalTransaction.Begin(
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
 			m_TemporalHistoryManager.get());
-		return frame.m_TemporalTransaction;
+		return m_ActiveFrame.m_TemporalTransaction;
 	}
 
 	void Renderer::AdoptFrameGpuResources(Frame& frame,
 		RenderSceneGpuAllocations& sceneGpuAllocations,
 		const RHIFencePoint& uploadFencePoint) noexcept
 	{
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
-			"Frame GPU resource adoption requires the active begun Renderer::Frame.");
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
+			m_ActiveFrame.m_Phase == FramePhase::Begun,
+			"Frame GPU resource adoption requires the active begun render host frame.");
 		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 		m_FrameGpuResources->AdoptFrom(sceneGpuAllocations, uploadFencePoint);
 	}
 
 	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
 	{
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this && frame.m_State == Frame::State::Begun,
-			"Late temporal contract invalidation requires the active begun Renderer::Frame.");
-		frame.m_TemporalTransaction.Abort(m_LastSubmittedFencePoint);
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
+			m_ActiveFrame.m_Phase == FramePhase::Begun,
+			"Late temporal contract invalidation requires the active begun render host frame.");
+		m_ActiveFrame.m_TemporalTransaction.Abort(m_LastSubmittedFencePoint);
 		m_TemporalHistoryManager->Invalidate(
 			TemporalHistoryResetReason::AvailabilityChanged, m_LastSubmittedFencePoint);
 		m_TemporalViewHistory.Invalidate();
@@ -309,15 +310,15 @@ namespace gglab
 		Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::Render called before initialization.");
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
-			"Renderer::Render received a frame created by another Renderer.");
-		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State == Frame::State::Begun,
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,
+			"Renderer::Render received a frame that is not the active render host frame.");
+		GGLAB_ASSERT_MSG(m_ActiveFrame.m_Phase == FramePhase::Begun,
 			"Renderer::Render requires an active frame begun by Renderer::BeginFrame.");
-		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == frame.m_FrameSlotIndex);
-		GGLAB_ASSERT(renderContext.m_BackBufferIndex == frame.m_BackBufferIndex);
-		GGLAB_ASSERT(renderContext.m_FrameSerial == frame.m_FrameSerial);
+		GGLAB_ASSERT(renderContext.m_FrameSlotIndex == m_ActiveFrame.m_FrameSlotIndex);
+		GGLAB_ASSERT(renderContext.m_BackBufferIndex == m_ActiveFrame.m_BackBufferIndex);
+		GGLAB_ASSERT(renderContext.m_FrameSerial == m_ActiveFrame.m_Serial);
 
-		frame.m_RenderGraph = &rg;
+		m_ActiveFrame.m_RenderGraph = &rg;
 		GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 
 		// Window suspended do nothing
@@ -339,40 +340,38 @@ namespace gglab
 		}
 
 		RGExecuteContext executeContext{ RGBackendExecuteContext{
-			.m_GraphicsCommandContext = &frame.m_RHIFrame->GetGraphicsContext(),
-			.m_DirectComputeCommandContext = &frame.m_RHIFrame->GetDirectComputeContext(),
+			.m_GraphicsCommandContext = &m_ActiveFrame.m_RHIFrame->GetGraphicsContext(),
+			.m_DirectComputeCommandContext = &m_ActiveFrame.m_RHIFrame->GetDirectComputeContext(),
 			.m_AsyncComputeCommandContext = nullptr,
 		} };
 		rg.Execute(executeContext);
 
-		frame.m_State = Frame::State::Recorded;
+		m_ActiveFrame.m_Phase = FramePhase::Recorded;
 	}
 
 	RHIFrameEndResult Renderer::EndFrame(Frame& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::EndFrame called before initialization.");
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
-			"Renderer::EndFrame received a frame created by another Renderer.");
-		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.m_State != Frame::State::Ended,
-			"Renderer::EndFrame called without a matching Renderer::BeginFrame.");
+		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,
+			"Renderer::EndFrame called without the matching active render host frame.");
 
-		if (frame.m_State != Frame::State::Recorded)
+		if (m_ActiveFrame.m_Phase != FramePhase::Recorded)
 		{
-			return RHIFrameEndResult::Fatal(AbortFrame(frame));
+			return RHIFrameEndResult::Fatal(AbortActiveFrame(frame.GetSerial()));
 		}
 
-		GGLAB_ASSERT_NOT_NULL(frame.m_RHIFrame);
-		GGLAB_ASSERT_NOT_NULL(frame.m_RenderGraph);
+		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RHIFrame);
+		GGLAB_ASSERT_NOT_NULL(m_ActiveFrame.m_RenderGraph);
 
-		const RHIFrameEndResult result = m_RHIContext->EndFrame(*frame.m_RHIFrame);
+		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
 		if (result.IsCompleted() && submittedFence.IsValid())
 		{
-			frame.m_TemporalTransaction.CommitCompleted(submittedFence);
+			m_ActiveFrame.m_TemporalTransaction.CommitCompleted(submittedFence);
 		}
 		else
 		{
-			frame.m_TemporalTransaction.InvalidateAfterFatal(submittedFence);
+			m_ActiveFrame.m_TemporalTransaction.InvalidateAfterFatal(submittedFence);
 			m_TemporalHistoryManager->Invalidate(
 				TemporalHistoryResetReason::FatalSubmission, submittedFence);
 			m_TemporalViewHistory.Invalidate();
@@ -395,16 +394,21 @@ namespace gglab
 			GGLAB_ASSERT_NOT_NULL(m_FrameGpuResources.get());
 			RetireSceneGpuAllocations(
 				&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
-			frame.m_RenderGraph->Retire(retirementFence);
+			m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 		}
 
-		EndFrameLifetime(frame);
+		EndFrameLifetime();
 		return result;
 	}
 
-	RHIFencePoint Renderer::AbortFrame(Frame& frame) noexcept
+	void Renderer::AbortFrame(uint64_t frameSerial) noexcept
 	{
-		if (frame.m_State == Frame::State::Ended)
+		GGLAB_UNUSED(AbortActiveFrame(frameSerial));
+	}
+
+	RHIFencePoint Renderer::AbortActiveFrame(uint64_t frameSerial) noexcept
+	{
+		if (!m_HasActiveFrame || m_ActiveFrame.m_Serial != frameSerial)
 		{
 			return {};
 		}
@@ -412,8 +416,6 @@ namespace gglab
 		{
 			m_IBLBakeScheduler->OnFrameAborted();
 		}
-		GGLAB_ASSERT_MSG(frame.m_Renderer == this,
-			"Renderer::AbortFrame received a frame created by another Renderer.");
 
 		if (m_RHIContext && m_FrameGpuResources &&
 			m_FrameGpuResources->m_UploadFencePoint.IsValid())
@@ -422,16 +424,17 @@ namespace gglab
 				RHIQueueType::Graphics, m_FrameGpuResources->m_UploadFencePoint);
 		}
 
-		if (m_RHIContext && frame.m_RHIFrame)
+		if (m_RHIContext && m_ActiveFrame.m_RHIFrame)
 		{
-			const RHIFencePoint submittedFence = m_RHIContext->AbortFrame(*frame.m_RHIFrame);
+			const RHIFencePoint submittedFence =
+				m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
 			if (submittedFence.IsValid())
 			{
 				m_LastSubmittedFencePoint = submittedFence;
 			}
 			const RHIFencePoint retirementFence =
 				submittedFence.IsValid() ? submittedFence : m_LastSubmittedFencePoint;
-			frame.m_TemporalTransaction.Abort(retirementFence);
+			m_ActiveFrame.m_TemporalTransaction.Abort(retirementFence);
 			if (retirementFence.IsValid())
 			{
 				if (m_FrameGpuResources)
@@ -440,27 +443,24 @@ namespace gglab
 						&m_FrameGpuResources->m_SceneGpuAllocations, retirementFence);
 				}
 
-				if (frame.m_RenderGraph)
+				if (m_ActiveFrame.m_RenderGraph)
 				{
-					frame.m_RenderGraph->Retire(retirementFence);
+					m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 				}
 			}
-			EndFrameLifetime(frame);
+			EndFrameLifetime();
 			return submittedFence;
 		}
 
-		frame.m_TemporalTransaction.Abort();
-		EndFrameLifetime(frame);
+		m_ActiveFrame.m_TemporalTransaction.Abort();
+		EndFrameLifetime();
 		return {};
 	}
 
-	void Renderer::EndFrameLifetime(Frame& frame) noexcept
+	void Renderer::EndFrameLifetime() noexcept
 	{
-		frame.m_State = Frame::State::Ended;
-		frame.m_RHIFrame = nullptr;
-		frame.m_RenderGraph = nullptr;
+		m_ActiveFrame = {};
 		m_FrameGpuResources.reset();
-		frame.m_Renderer = nullptr;
 		m_HasActiveFrame = false;
 	}
 

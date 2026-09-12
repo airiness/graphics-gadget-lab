@@ -2991,6 +2991,18 @@ foreach ($header in Get-ChildItem -LiteralPath $runtimePublicDir -Recurse -File 
     }
 }
 
+$renderHostHeaderPath = Join-Path $runtimePublicDir "GGLabRuntime/Graphics/RenderHost.h"
+if (Test-Path -LiteralPath $renderHostHeaderPath -PathType Leaf) {
+    $renderHostContent = Get-Content -LiteralPath $renderHostHeaderPath -Raw -ErrorAction Stop
+    if ($renderHostContent -cmatch '\bRenderer\b') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-render-host-boundary"
+            Target = ConvertTo-RepoRelativePath $renderHostHeaderPath
+            Reason = "the Public render host contract must not expose the concrete renderer"
+        })
+    }
+}
+
 $napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'
 foreach ($header in Get-ChildItem -LiteralPath $napaPublicDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {

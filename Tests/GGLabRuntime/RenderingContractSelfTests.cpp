@@ -34,6 +34,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/LegacyRenderHostAccess.h"
 #include "Graphics/RenderFrameBuilder.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -55,6 +56,7 @@
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
@@ -1586,6 +1588,50 @@ namespace gglab
 			context.Check(matchingSignature && rejectsColorMismatch && rejectsDepthMismatch &&
 				rejectsSampleMismatch,
 				"Graphics pipeline compatibility covers active color, depth, and sample signature");
+		}
+
+		void RunRenderHostContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(std::is_abstract_v<RenderHost>,
+				"the Public render host contract stays an interface");
+			static_assert(std::is_base_of_v<RenderHost, Renderer>,
+				"the concrete renderer implements the Public render host contract");
+			static_assert(!std::is_copy_constructible_v<RenderFrame> &&
+				std::is_move_constructible_v<RenderFrame>,
+				"the Public frame handle is a move-only RAII owner");
+
+			const RenderFrame unavailable(RHIFrameBeginStatus::Unavailable);
+			const RenderFrame fatal(RHIFrameBeginStatus::Fatal);
+			context.Check(!unavailable.IsValid() && !unavailable.IsReady() &&
+				unavailable.GetBeginStatus() == RHIFrameBeginStatus::Unavailable &&
+				unavailable.IsUnavailable() && !fatal.IsValid() && fatal.IsFatal(),
+				"non-ready begin results carry no active render frame");
+
+			RenderFrame source(RHIFrameBeginStatus::Unavailable);
+			RenderFrame moved(std::move(source));
+			context.Check(!source.IsValid() && !source.IsReady() && moved.IsUnavailable(),
+				"moving a frame handle transfers the abort obligation");
+
+			RenderFrame assigned(RHIFrameBeginStatus::Fatal);
+			assigned = std::move(moved);
+			context.Check(!moved.IsValid() && !assigned.IsReady() && assigned.IsUnavailable(),
+				"assigning a frame handle transfers the abort obligation");
+
+			context.Check(!CreateRenderHost({}),
+				"render host factory rejects a missing host context factory");
+			RenderHostCreateInfo missingPaths{};
+			missingPaths.m_RHIContextFactory =
+				reinterpret_cast<const RHIContextFactoryBase*>(1);
+			context.Check(!CreateRenderHost(missingPaths),
+				"render host factory rejects missing runtime paths");
+
+			Renderer renderer;
+			RenderHost& host = renderer;
+			const RenderHost* constHost = &host;
+			context.Check(GetLegacyRenderer(&host) == &renderer &&
+				&GetLegacyRenderer(host) == &renderer &&
+				GetLegacyRenderer(constHost) == &renderer,
+				"the legacy bridge returns the concrete renderer from the host");
 		}
 
 		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept
@@ -6402,6 +6448,7 @@ namespace gglab
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);
+		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
