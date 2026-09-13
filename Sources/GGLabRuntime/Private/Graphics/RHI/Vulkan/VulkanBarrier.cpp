@@ -4,6 +4,28 @@
 
 namespace gglab
 {
+	namespace
+	{
+		// Vulkan requires vertex-attribute and index reads to be synchronized at
+		// the input-assembly stages. The RHI stage vocabulary follows the DX12
+		// synchronization scopes, where vertex buffer fetch belongs to the
+		// vertex-shading scope, so the backend legalizes the native stage mask
+		// from the access mask.
+		[[nodiscard]] VkPipelineStageFlags2 IncludeInputAssemblyStages(
+			VkPipelineStageFlags2 stages, VkAccessFlags2 access) noexcept
+		{
+			if ((access & VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT) != 0)
+			{
+				stages |= VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
+			}
+			if ((access & VK_ACCESS_2_INDEX_READ_BIT) != 0)
+			{
+				stages |= VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+			}
+			return stages;
+		}
+	}
+
 	VkPipelineStageFlags2 ToVulkanPipelineStages(RHIStage stages) noexcept
 	{
 		VkPipelineStageFlags2 result = VK_PIPELINE_STAGE_2_NONE;
@@ -183,12 +205,16 @@ namespace gglab
 			return std::nullopt;
 		}
 
+		const VkAccessFlags2 sourceAccess = ToVulkanAccessFlags(barrier.m_Before.m_Access);
+		const VkAccessFlags2 destinationAccess = ToVulkanAccessFlags(barrier.m_After.m_Access);
 		return VkBufferMemoryBarrier2{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
-			.srcStageMask = ToVulkanPipelineStages(barrier.m_Before.m_Stages),
-			.srcAccessMask = ToVulkanAccessFlags(barrier.m_Before.m_Access),
-			.dstStageMask = ToVulkanPipelineStages(barrier.m_After.m_Stages),
-			.dstAccessMask = ToVulkanAccessFlags(barrier.m_After.m_Access),
+			.srcStageMask = IncludeInputAssemblyStages(
+				ToVulkanPipelineStages(barrier.m_Before.m_Stages), sourceAccess),
+			.srcAccessMask = sourceAccess,
+			.dstStageMask = IncludeInputAssemblyStages(
+				ToVulkanPipelineStages(barrier.m_After.m_Stages), destinationAccess),
+			.dstAccessMask = destinationAccess,
 			.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 			.buffer = buffer,

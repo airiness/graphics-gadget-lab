@@ -490,6 +490,37 @@ namespace gglab
 				sameLayoutBuffer->buffer == buffer && sameLayoutBuffer->offset == 0 &&
 				sameLayoutBuffer->size == VK_WHOLE_SIZE,
 				"Vulkan buffer barriers preserve graphics-compute and same-layout dependencies");
+
+			constexpr RHIResourceState commonBufferState{
+				.m_Stages = RHIStage::All,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState vertexBufferReadState{
+				.m_Stages = RHIStage::VertexShader,
+				.m_Access = RHIAccess::VertexBuffer,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState indexBufferReadState{
+				.m_Stages = RHIStage::IndexInput,
+				.m_Access = RHIAccess::IndexBuffer,
+				.m_Layout = RHILayout::Common,
+			};
+			const auto vertexBufferRead = BuildVulkanBufferBarrier(
+				{ {}, commonBufferState, vertexBufferReadState }, buffer);
+			const auto vertexBufferRelease = BuildVulkanBufferBarrier(
+				{ {}, vertexBufferReadState, commonBufferState }, buffer);
+			const auto indexBufferRead = BuildVulkanBufferBarrier(
+				{ {}, commonBufferState, indexBufferReadState }, buffer);
+			context.Check(vertexBufferRead && vertexBufferRelease && indexBufferRead &&
+				(vertexBufferRead->dstStageMask &
+					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				vertexBufferRead->dstAccessMask == VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT &&
+				(vertexBufferRelease->srcStageMask &
+					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				(indexBufferRead->dstStageMask & VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT) != 0 &&
+				indexBufferRead->dstAccessMask == VK_ACCESS_2_INDEX_READ_BIT,
+				"Vulkan buffer barriers synchronize vertex and index reads at input-assembly stages");
 			context.Check(!BuildVulkanTextureBarrier(
 				{ {}, renderTargetState, UndefinedRHITextureState() }, image, colorDesc) &&
 				!BuildVulkanBufferBarrier(
