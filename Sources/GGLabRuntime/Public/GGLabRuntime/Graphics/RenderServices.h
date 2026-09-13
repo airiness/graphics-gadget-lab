@@ -1,6 +1,5 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/AssetCacheStatistics.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
@@ -29,6 +28,7 @@
 namespace gglab
 {
 	class DynamicConstantBufferAllocator;
+	class AssetUploadScheduling;
 	class RenderPipelineOverlayExtensionBase;
 	class RHIDevice;
 	class RHISwapChain;
@@ -249,7 +249,7 @@ namespace gglab
 		RenderPresentationAccess* m_Presentation = nullptr;
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
-		AssetUploadControl* m_AssetUpload = nullptr;
+		AssetUploadScheduling* m_AssetUpload = nullptr;
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 
 		[[nodiscard]] bool IsValid() const noexcept

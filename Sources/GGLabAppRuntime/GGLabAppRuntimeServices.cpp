@@ -189,6 +189,7 @@ namespace gglab
 					.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
 					.m_GpuProfiling = m_RenderHost->GetGpuProfilingView(),
 					.m_GpuProfilingControl = m_RenderHost->GetGpuProfilingControl(),
+					.m_AssetUploadControl = m_RenderComposition->GetAssetUploadControl(),
 					.m_RHIContext = m_RenderHost->GetRHIContext(),
 					.m_AssetManager = m_AssetManager.get(),
 					.m_ShaderManager = m_ShaderManager.get(),

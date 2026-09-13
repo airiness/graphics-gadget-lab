@@ -381,7 +381,7 @@ namespace gglab
 		}
 
 		m_State->m_ElapsedSeconds += deltaTime;
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		const uint64_t processed = statistics.m_ResourcePublicationQueue.m_ProcessedCount;
 		if (processed > m_State->m_LastProcessed)
@@ -525,17 +525,18 @@ namespace gglab
 	void AssetPublicationLabSession::StartScenario() noexcept
 	{
 		StopScenario();
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		GGLAB_ASSERT_NOT_NULL(control);
 		if (!m_HasOriginalBudget)
 		{
-			m_OriginalBudget = scheduler->GetFrameBudget();
+			m_OriginalBudget = control->GetFrameBudget();
 			m_HasOriginalBudget = true;
 		}
 		AssetStreamingFrameBudget stressBudget = m_OriginalBudget;
 		stressBudget.m_MaxResourcePublicationSteps = 1;
 		stressBudget.m_MaxResourcePublicationCreations = 1;
 		stressBudget.m_MaxResourcePublicationMilliseconds = 0.05;
-		scheduler->SetFrameBudget(stressBudget);
+		control->SetFrameBudget(stressBudget);
 		if (m_Scenario == Scenario::AcceptanceSuite)
 		{
 			StartAcceptanceSuite();
@@ -547,8 +548,9 @@ namespace gglab
 	void AssetPublicationLabSession::StartModelScenario(
 		Scenario scenario, uint32_t faultOccurrence) noexcept
 	{
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
-		scheduler->ClearResourcePublicationFault();
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		control->ClearResourcePublicationFault();
 		ResetAssetInterests();
 		m_State = std::make_unique<ScenarioState>();
 		m_State->m_Scenario = scenario;
@@ -584,7 +586,7 @@ namespace gglab
 		const AssetResourcePublicationFaultAction action = FaultAction(scenario);
 		if (action != AssetResourcePublicationFaultAction::None)
 		{
-			scheduler->ArmResourcePublicationFault({
+			control->ArmResourcePublicationFault({
 				.m_Identity = m_State->m_Identity,
 				.m_Stage = FaultStage(scenario),
 				.m_Action = action,
@@ -598,9 +600,9 @@ namespace gglab
 
 	void AssetPublicationLabSession::StopScenario() noexcept
 	{
-		if (m_Services.m_RenderServices.m_AssetUpload)
+		if (m_Services.m_AssetUploadControl)
 		{
-			AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+			AssetUploadControl* scheduler = m_Services.m_AssetUploadControl;
 			scheduler->ClearResourcePublicationFault();
 			scheduler->ClearGpuCompletionHold();
 			if (m_HasOriginalBudget)
@@ -738,7 +740,7 @@ namespace gglab
 
 	void AssetPublicationLabSession::StartAcceptanceSuite() noexcept
 	{
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		m_Suite = std::make_unique<AcceptanceSuiteState>();
 		m_Suite->m_BaselineOwnership = m_Services.m_AssetManager->GetOwnershipStatistics();
 		m_Suite->m_BaselineUpload = scheduler->GetStatistics();
@@ -748,10 +750,12 @@ namespace gglab
 	void AssetPublicationLabSession::StartAcceptanceCase() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		GGLAB_ASSERT_NOT_NULL(control);
 		AssetManager* assetManager = m_Services.m_AssetManager;
-		scheduler->ClearResourcePublicationFault();
-		scheduler->ClearGpuCompletionHold();
+		control->ClearResourcePublicationFault();
+		control->ClearGpuCompletionHold();
 		m_Suite->m_CaseBaselineOwnership = assetManager->GetOwnershipStatistics();
 		m_Suite->m_CaseBaselineUpload = scheduler->GetStatistics();
 		m_Suite->m_CaseElapsedSeconds = 0.0f;
@@ -922,7 +926,7 @@ namespace gglab
 			};
 			m_Suite->m_StartGpuDeferredCancellations =
 				m_Suite->m_CaseBaselineOwnership.m_GpuDeferredCancellationCount;
-			scheduler->ArmGpuCompletionHold(m_Suite->m_TextureIdentity);
+			control->ArmGpuCompletionHold(m_Suite->m_TextureIdentity);
 			m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingGpuSubmission;
 			break;
 		}
@@ -990,7 +994,8 @@ namespace gglab
 			return;
 		}
 
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadControl* control = m_Services.m_AssetUploadControl;
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		switch (m_Suite->m_Phase)
@@ -1079,7 +1084,7 @@ namespace gglab
 					.m_StableId = m_Suite->m_ModelRequest.m_ModelId.Value(),
 					.m_Generation = m_Suite->m_ModelRequest.m_Generation,
 				};
-				scheduler->ArmResourcePublicationFault({
+				control->ArmResourcePublicationFault({
 					.m_Identity = m_Suite->m_ModelIdentity,
 					.m_Stage = AssetResourcePublicationStage::Materials,
 					.m_Action = AssetResourcePublicationFaultAction::Fail,
@@ -1168,11 +1173,11 @@ namespace gglab
 				}
 				if (!errors.empty())
 				{
-					scheduler->ClearGpuCompletionHold();
+					control->ClearGpuCompletionHold();
 					CompleteAcceptanceCase("GPU submitted cancellation", std::move(errors));
 					return;
 				}
-				scheduler->ClearGpuCompletionHold();
+				control->ClearGpuCompletionHold();
 				m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingGpuCancellation;
 			}
 			break;
@@ -1241,9 +1246,9 @@ namespace gglab
 			.m_Errors = std::move(errors),
 			});
 
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
-		scheduler->ClearResourcePublicationFault();
-		scheduler->ClearGpuCompletionHold();
+		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		control->ClearResourcePublicationFault();
+		control->ClearGpuCompletionHold();
 		ResetAssetInterests();
 		m_State.reset();
 		m_Suite->m_PrimaryOwner.Reset();
@@ -1266,7 +1271,7 @@ namespace gglab
 	void AssetPublicationLabSession::CompleteAcceptanceSuite() noexcept
 	{
 		GGLAB_ASSERT(m_Suite);
-		AssetUploadControl* scheduler = m_Services.m_RenderServices.m_AssetUpload;
+		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		const AssetOwnershipStatistics ownership =
 			m_Services.m_AssetManager->GetOwnershipStatistics();

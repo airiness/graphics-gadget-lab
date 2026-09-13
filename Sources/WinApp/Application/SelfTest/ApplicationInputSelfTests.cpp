@@ -56,10 +56,23 @@ namespace gglab
 		services.m_DebugDraw = reinterpret_cast<DebugDrawContext*>(1);
 		services.m_EnvironmentAssetController =
 			reinterpret_cast<EnvironmentAssetController*>(1);
+		services.m_EnvironmentLighting = reinterpret_cast<EnvironmentLightingViewBase*>(1);
+		services.m_EnvironmentLightingControl =
+			reinterpret_cast<EnvironmentLightingControlBase*>(1);
+		services.m_IBLCacheControl = reinterpret_cast<IBLCacheControlBase*>(1);
+		services.m_RHIContext = reinterpret_cast<RHIContext*>(1);
 		context.Check(services.IsValid(),
 			"DemoServices accepts the neutral application input contract");
 		services.m_Input = nullptr;
 		context.Check(!services.IsValid(),
 			"DemoServices still rejects a missing required input service");
+		services.m_Input = &input;
+		services.m_RHIContext = nullptr;
+		context.Check(!services.IsValid(),
+			"DemoServices rejects a missing required RHI context");
+		services.m_RHIContext = reinterpret_cast<RHIContext*>(1);
+		services.m_GpuProfiling = nullptr;
+		context.Check(services.IsValid(),
+			"DemoServices keeps GPU profiling and asset upload control optional");
 	}
 }

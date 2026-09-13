@@ -2,13 +2,15 @@
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/Asset/AssetStreamingTypes.h"
-#include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadControlTypes.h"
 
 #include <cstdint>
 #include <memory>
 
 namespace gglab
 {
+	class AssetUploadControl;
+	class IResourcePublicationJob;
 	class RHIDevice;
 	class TransferManager;
 
@@ -63,23 +65,41 @@ namespace gglab
 		};
 	}
 
-	// Production scheduling capability for the asset upload owner. The concrete
-	// scheduler stays Runtime-internal; developer and acceptance tooling consume
-	// the AssetUploadControl vocabulary instead of this scheduling surface.
-	class AssetUploadScheduling : public AssetUploadControl
+	// Production scheduling and submission capability for the asset upload
+	// owner. The concrete scheduler stays Runtime-internal. Fault injection,
+	// frame budget and GPU completion hold belong to the sibling
+	// AssetUploadControl contract, so production consumers never receive the
+	// developer/acceptance authority.
+	class AssetUploadScheduling
 	{
 	public:
+		virtual ~AssetUploadScheduling() = default;
+
+		[[nodiscard]] virtual AssetUploadStatistics GetStatistics() const = 0;
+		virtual void EnqueueResourcePublication(AssetStreamingWorkDesc desc,
+			std::unique_ptr<IResourcePublicationJob>&& job) noexcept = 0;
+		virtual void EnqueueUploadRecording(AssetStreamingWorkDesc desc,
+			AssetStreamingWork work) noexcept = 0;
 		virtual void EnqueueCpuPayload(
 			AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept = 0;
+		[[nodiscard]] virtual AssetUploadHandle RecordUpload(AssetUploadDesc desc,
+			AssetUploadRecord record, AssetUploadCompletion completion = {}) noexcept = 0;
 		virtual uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept = 0;
+		virtual uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept = 0;
 		virtual uint32_t UpdateWorkPriority(
 			const AssetContentVersion& contentVersion, TaskPriority priority) noexcept = 0;
 		virtual uint32_t UpdateWorkPriority(
 			const AssetStreamingIdentity& identity, TaskPriority priority) noexcept = 0;
 		virtual uint32_t Tick() noexcept = 0;
+		virtual void DrainReadyWork() noexcept = 0;
 		virtual void Finalize() noexcept = 0;
 		[[nodiscard]] virtual bool IsOwnerThread() const noexcept = 0;
 	};
+
+	// Borrowed developer/acceptance view of a scheduler created by the factory.
+	// Returns nullptr when the instance does not implement the control contract.
+	[[nodiscard]] AssetUploadControl* GetAssetUploadControl(
+		AssetUploadScheduling& scheduler) noexcept;
 
 	struct AssetUploadSchedulerCreateInfo
 	{

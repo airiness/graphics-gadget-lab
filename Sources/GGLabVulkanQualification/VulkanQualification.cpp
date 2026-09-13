@@ -3,6 +3,7 @@
 #include "Graphics/Asset/BuiltinTextureFactory.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
@@ -1137,6 +1138,7 @@ namespace gglab
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
+			AssetUploadControl* uploadControl = GetAssetUploadControl(*scheduler);
 			const AssetStreamingIdentity streamingIdentity{
 				.m_Kind = AssetStreamingWorkKind::Texture,
 				.m_StableId = 8,
@@ -1144,7 +1146,7 @@ namespace gglab
 			};
 			// Hold completion so the test observes the unpublished interval
 			// deterministically instead of racing a fast graphics queue.
-			scheduler->ArmGpuCompletionHold(streamingIdentity);
+			uploadControl->ArmGpuCompletionHold(streamingIdentity);
 			const auto streamingPayload = std::make_shared<const TextureAssetData>(textureData);
 			RHITextureOwner streamingTexture;
 			RHITextureViewHandle streamingView;
@@ -1245,13 +1247,13 @@ namespace gglab
 				: VK_ERROR_INITIALIZATION_FAILED;
 			if (transferWaitResult != VK_SUCCESS)
 			{
-				scheduler->ClearGpuCompletionHold();
+				uploadControl->ClearGpuCompletionHold();
 				scheduler->Finalize();
 				GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
 					"qualify transfer: transfer timeline wait failed after scheduler upload.");
 				return 1;
 			}
-			scheduler->ClearGpuCompletionHold();
+			uploadControl->ClearGpuCompletionHold();
 			GGLAB_UNUSED(scheduler->Tick());
 			const AssetUploadStatistics statistics = scheduler->GetStatistics();
 			const bool descriptorPublished = publishedDescriptor.IsValid() &&

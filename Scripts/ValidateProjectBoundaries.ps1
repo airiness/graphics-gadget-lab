@@ -3194,6 +3194,21 @@ if (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf) {
     }
 }
 
+$assetUploadSchedulingHeaderPath =
+    Join-Path $runtimePublicDir "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+if (Test-Path -LiteralPath $assetUploadSchedulingHeaderPath -PathType Leaf) {
+    $assetUploadSchedulingContent =
+        Get-Content -LiteralPath $assetUploadSchedulingHeaderPath -Raw -ErrorAction Stop
+    if ($assetUploadSchedulingContent -cmatch
+        'class\s+AssetUploadScheduling\s*:\s*public\s+AssetUploadControl') {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule   = "runtime-asset-upload-authority-boundary"
+            Target = ConvertTo-RepoRelativePath $assetUploadSchedulingHeaderPath
+            Reason = "the production asset upload scheduling contract must not inherit the developer/acceptance control authority"
+        })
+    }
+}
+
 $napaPublicIncludeRegex = '#include\s*[<"](?<Path>NapaVoxelCore(?:/|\\)[^>"]+)[>"]'
 foreach ($header in Get-ChildItem -LiteralPath $napaPublicDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {

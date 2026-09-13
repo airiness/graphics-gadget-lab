@@ -75,7 +75,7 @@ namespace gglab
 
 	AssetUploadControl* Renderer::GetAssetUploadControl() const noexcept
 	{
-		return m_AssetUploadScheduler.get();
+		return m_AssetUploadControl;
 	}
 
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
@@ -111,6 +111,7 @@ namespace gglab
 			.m_Device = device,
 			.m_TransferManager = GetTransferManager(),
 			});
+		m_AssetUploadControl = gglab::GetAssetUploadControl(*m_AssetUploadScheduler);
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
@@ -222,6 +223,7 @@ namespace gglab
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
+		m_AssetUploadControl = nullptr;
 
 		m_SceneCB.reset();
 		m_FrameBuilder.reset();

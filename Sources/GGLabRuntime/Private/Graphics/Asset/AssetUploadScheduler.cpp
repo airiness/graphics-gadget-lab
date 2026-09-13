@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadControl.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -30,7 +31,10 @@ namespace gglab
 	// Owns the graphics-owner-thread boundaries around resource publication and
 	// transfer work. Workers may enqueue immutable CPU payload handoffs, but jobs
 	// advance and all RHI calls occur only at explicit owner-thread boundaries.
-	class AssetUploadScheduler final : public AssetUploadScheduling
+	// The class implements the production scheduling contract and the sibling
+	// developer/acceptance control contract; only the factory exposes the
+	// control view.
+	class AssetUploadScheduler final : public AssetUploadScheduling, public AssetUploadControl
 	{
 	public:
 		using CreateInfo = AssetUploadSchedulerCreateInfo;
@@ -43,7 +47,7 @@ namespace gglab
 		void EnqueueResourcePublication(
 			AssetStreamingWorkDesc desc, std::unique_ptr<IResourcePublicationJob>&& job) noexcept override;
 		void EnqueueUploadRecording(AssetStreamingWorkDesc desc, AssetStreamingWork work) noexcept override;
-		uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept;
+		uint32_t CancelReadyWork(const AssetContentVersion& contentVersion) noexcept override;
 		uint32_t CancelReadyWork(const AssetStreamingIdentity& identity) noexcept override;
 		uint32_t UpdateWorkPriority(
 			const AssetContentVersion& contentVersion, TaskPriority priority) noexcept override;
@@ -226,6 +230,11 @@ namespace gglab
 		const AssetUploadSchedulerCreateInfo& createInfo) noexcept
 	{
 		return std::make_unique<AssetUploadScheduler>(createInfo);
+	}
+
+	AssetUploadControl* GetAssetUploadControl(AssetUploadScheduling& scheduler) noexcept
+	{
+		return dynamic_cast<AssetUploadControl*>(&scheduler);
 	}
 
 	namespace

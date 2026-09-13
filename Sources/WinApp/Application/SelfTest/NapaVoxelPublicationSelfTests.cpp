@@ -1756,6 +1756,14 @@ namespace gglab
 
 			const LabSessionCreateInfo createInfo{
 				.m_Services = {
+					// The lifecycle-only fixture never dereferences these required
+					// capabilities; placeholder pointers satisfy the service contract.
+					.m_EnvironmentLighting =
+						reinterpret_cast<EnvironmentLightingViewBase*>(&renderer),
+					.m_EnvironmentLightingControl =
+						reinterpret_cast<EnvironmentLightingControlBase*>(&renderer),
+					.m_IBLCacheControl = reinterpret_cast<IBLCacheControlBase*>(&renderer),
+					.m_RHIContext = reinterpret_cast<RHIContext*>(&renderer),
 					.m_AssetManager = &assetManager,
 					.m_ShaderManager = &shaderManager,
 					.m_TaskSystem = &taskSystem,

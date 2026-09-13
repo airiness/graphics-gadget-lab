@@ -986,7 +986,7 @@ namespace gglab
 	}
 
 	NapaVoxelMeshReplacementUploadSession::NapaVoxelMeshReplacementUploadSession(
-		RHIDevice* device, AssetUploadControl* scheduler,
+			RHIDevice* device, AssetUploadScheduling* scheduler,
 		NapaVoxelCommandQueue* commandQueue,
 		NapaVoxelPublicationSerialState serialState) noexcept :
 		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue),
@@ -1093,7 +1093,7 @@ namespace gglab
 		const std::shared_ptr<GGLabMeshPublicationBatch> publication = m_Publication;
 		const AssetStreamingIdentity identity = publication->GetUploadIdentity();
 		const AssetStreamingWorkEstimate estimate = publication->GetUploadEstimate();
-		AssetUploadControl* scheduler = m_Scheduler;
+		AssetUploadScheduling* scheduler = m_Scheduler;
 		scheduler->EnqueueUploadRecording({
 			.m_Name = "Napa Voxel Mesh Replacement Upload",
 			.m_Identity = identity,
@@ -1138,7 +1138,7 @@ namespace gglab
 	}
 
 	NapaVoxelPublicationSession::NapaVoxelPublicationSession(
-		RHIDevice* device, AssetUploadControl* scheduler,
+			RHIDevice* device, AssetUploadScheduling* scheduler,
 		NapaVoxelCommandQueue* commandQueue) noexcept :
 		m_Device(device), m_Scheduler(scheduler), m_CommandQueue(commandQueue)
 	{
@@ -1376,7 +1376,7 @@ namespace gglab
 		const std::shared_ptr<NapaVoxelInitialPublicationOwner> publication = m_Publication;
 		const AssetStreamingIdentity identity = publication->GetUploadIdentity();
 		const AssetStreamingWorkEstimate estimate = publication->GetUploadEstimate();
-		AssetUploadControl* scheduler = m_Scheduler;
+		AssetUploadScheduling* scheduler = m_Scheduler;
 		scheduler->EnqueueUploadRecording({
 			.m_Name = "Napa Voxel Initial Mesh Upload",
 			.m_Identity = identity,
