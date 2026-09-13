@@ -53,7 +53,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -64,7 +64,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;GGLAB_ENABLE_STRING_ID_REGISTRY;NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabRuntime;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Externals\include;$(GGLabRepositoryRoot)Externals\Vender\entt\src;$(GGLabRepositoryRoot)Externals\Vender\D3D12MemoryAllocator\include;$(GGLabRepositoryRoot)Externals\Vender\DirectXTex\DirectXTex;$(GGLabRepositoryRoot)Externals\Vender\VulkanMemoryAllocator\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -91,20 +91,20 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImporter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDirectionalShadowMap.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassClearViewTargets.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDepthPrepass.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusCull.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLClear.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLClear.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLEnvironment.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLIrradiance.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassSkybox.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBlackboard.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Camera.cpp" />
@@ -174,16 +174,16 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\CubemapUtils.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBloom.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassFinalColor.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassPostProcessPreview.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFinalColor.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLBrdfLUT.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\ForwardPlus.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAO.cpp" />
@@ -291,7 +291,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\World.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\Components.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineOverlayExtensionBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDirectionalShadowMap.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\Buffer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicBufferAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\DynamicConstantBufferAllocator.h" />
@@ -299,13 +299,13 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\PersistentStructuredBuffer.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLClear.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassClearViewTargets.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassSkybox.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLClear.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassClearViewTargets.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLEnvironment.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLEnvironmentMipChain.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLIrradiance.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPrefilteredSpecular.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassSkybox.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraphTypes.h" />
@@ -428,31 +428,31 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderTextureAssetAccess.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Resource\RenderTextureIndex.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDebugDraw.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassDepthPrepass.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPlusGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPlusValidationGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\GTAOGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassGTAO.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPBRShaderSet.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardOpaque.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassForwardTransparent.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLPreview.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBloom.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassFinalColor.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDepthPrepass.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPlusGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPlusValidationGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GTAOGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusCull.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPBRShaderSet.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassPostProcessPreview.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFinalColor.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLBrdfLUT.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPass\SceneDepthGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalAAGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalGeometryGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\TemporalAAGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\DepthCoverage.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ForwardPlusTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\PipelineTypes.h" />

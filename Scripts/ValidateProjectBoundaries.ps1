@@ -94,13 +94,13 @@ function ConvertTo-RepoRelativePath {
 
 # Runtime candidate directories (portable candidates; private backend leaves included).
 # Migrated Core and Scene files are validated through the Public/Private ownership rules below.
-$candidateDirs = @("Graphics", "Private/Graphics/RHI", "Private/Diagnostics")
+$candidateDirs = @("Private/Graphics/RHI", "Private/Diagnostics")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
 $platformLeafPrefixes = @(
     "Core/Platform/Win", # Windows implementation leaves
-    "Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
+        "Private/Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
     "Private/Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
 )
 $platformLeafFiles = @(
@@ -688,7 +688,6 @@ function Test-ProjectIncludeVisibility {
     }
 }
 
-$runtimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime'
 $runtimePublicIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public'
 $runtimePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private'
 $winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
@@ -714,10 +713,10 @@ $napaProjectPublicIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore
 $napaProjectPrivateIncludeRoot = '$(NapaVoxelRepositoryRoot)Sources\NapaVoxelCore\Private'
 Test-ProjectIncludeVisibility $runtimeProject $namespace `
     "Projects/GGLabRuntime/GGLabRuntime.vcxproj" `
-    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot) `
-    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+    @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot)
 # Native host/GUI adapters use Public contracts. WinApp must not receive Runtime
@@ -735,10 +734,10 @@ Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
 Test-ProjectIncludeVisibility $vulkanQualificationProject `
     $vulkanQualificationNamespace `
     "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" `
-    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
-    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
+    @($vulkanQualificationIncludeRoot, $runtimePublicIncludeRoot, $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 # AppRuntime consumes Runtime Public contracts only. DynamicBufferAllocator
@@ -764,11 +763,11 @@ Test-ProjectIncludeVisibility $testCoreProject $testCoreNamespace `
 Test-ProjectIncludeVisibility $runtimeTestsProject $runtimeTestsNamespace `
     "Projects/GGLabRuntimeTests/GGLabRuntimeTests.vcxproj" `
     @($runtimeTestsIncludeRoot, $runtimePrivateIncludeRoot,
-        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $runtimePublicIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot) `
     @($runtimeTestsIncludeRoot, $runtimePrivateIncludeRoot,
-        $runtimePublicIncludeRoot, $runtimeIncludeRoot,
+        $runtimePublicIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
         $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $shaderToolchainTestsProject `
@@ -784,11 +783,11 @@ Test-ProjectIncludeVisibility $shaderRuntimeIntegrationTestsProject `
     $shaderRuntimeIntegrationTestsNamespace `
     "Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj" `
     @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
-        $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
+        $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot) `
     @($shaderRuntimeIntegrationTestsIncludeRoot, $runtimePublicIncludeRoot,
-        $runtimePrivateIncludeRoot, $runtimeIncludeRoot,
+        $runtimePrivateIncludeRoot,
         $shaderToolchainIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot, $testCorePublicIncludeRoot)
 Test-ProjectIncludeVisibility $appRuntimeTestsProject $appRuntimeTestsNamespace `
@@ -3349,7 +3348,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
-Write-Host "Platform: $($candidateFiles.Count) candidate files (legacy Graphics/Diagnostics and Private RHI)"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (Private RHI and Diagnostics platform leaves)"
 Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
