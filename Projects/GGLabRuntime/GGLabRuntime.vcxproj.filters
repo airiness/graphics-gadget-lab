@@ -4,39 +4,6 @@
     <Filter Include="Graphics">
       <UniqueIdentifier>{6642D0F7-FF51-7E46-BE41-E8BD8CBF8935}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\Asset">
-      <UniqueIdentifier>{0C0EF1EC-0868-9BB0-BE85-791653F3D976}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Dependency">
-      <UniqueIdentifier>{8DA4413A-0152-E4D9-6E15-BFF948DC528A}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\DerivedData">
-      <UniqueIdentifier>{6366A420-B1D0-BCEC-4C16-0618DCDF7347}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\DerivedData\Platform">
-      <UniqueIdentifier>{EB1AE33F-98A8-1FF4-6E1F-52D70B93D382}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\DerivedData\Platform\Win">
-      <UniqueIdentifier>{4109B204-F142-301F-5937-98B4316A3905}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Interest">
-      <UniqueIdentifier>{1BB258B9-B03B-EA6D-467B-E3319B75CFBA}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Interop">
-      <UniqueIdentifier>{8AF7CA27-9259-54E7-5697-19D5A74ED642}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Loading">
-      <UniqueIdentifier>{2B115FB2-1B4F-8CED-E07A-FE69FE6A38BF}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Publication">
-      <UniqueIdentifier>{E4EB4C42-4DCC-B0E9-F611-FFDF18D9C669}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Residency">
-      <UniqueIdentifier>{75F6FB66-CE8F-28A2-1855-04B463177972}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Asset\Store">
-      <UniqueIdentifier>{8D112DE7-7B9A-C494-EDD9-22E26C9C5446}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\RenderPass">
       <UniqueIdentifier>{BD2D436E-D8AB-4BCD-62B3-533B7D8A29CC}</UniqueIdentifier>
     </Filter>
@@ -70,11 +37,35 @@
     <Filter Include="Private\Graphics\Asset">
       <UniqueIdentifier>{D2FD5874-BBF7-ABEA-BC99-794ACD7E28CE}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\Asset\Dependency">
+      <UniqueIdentifier>{690BA556-EC4E-085F-CD41-3ADBABB203E6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\DerivedData">
+      <UniqueIdentifier>{D0E34FC8-0883-0678-5FEF-CD0437396C57}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\DerivedData\Platform">
+      <UniqueIdentifier>{5F61614A-9DAC-FFDA-5C8A-A82A36A7FB0F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\DerivedData\Platform\Win">
+      <UniqueIdentifier>{A69EFF4A-C19D-B18B-B43B-7AFA09D88AC1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\Interest">
+      <UniqueIdentifier>{743CFF5D-E669-204C-C4E2-C5CCF2C0F3C3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\Interop">
+      <UniqueIdentifier>{435C0DDB-3CF4-5B6D-9A33-50568CDA20BA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\Loading">
+      <UniqueIdentifier>{304ACCB8-829A-4D26-A079-F00EAE118A92}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\Asset\Publication">
       <UniqueIdentifier>{563454E4-A515-D5A0-4657-33D10F251184}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private\Graphics\Asset\Residency">
       <UniqueIdentifier>{E4038CB4-56BA-7638-DC88-A84F2E7FC8F8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Asset\Store">
+      <UniqueIdentifier>{000205E8-FC6D-6C1B-7FD5-57F38E840DC5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private\Graphics\Buffer">
       <UniqueIdentifier>{2AF2C9C1-5356-2606-7F42-2544F45EC7AC}</UniqueIdentifier>
@@ -233,84 +224,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\Externals\Vender\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>ThirdParty\D3D12MemoryAllocator\src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetDependencyGraph.cpp">
-      <Filter>Graphics\Asset\Dependency</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetStateEventQueue.cpp">
-      <Filter>Graphics\Asset\Dependency</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.cpp">
-      <Filter>Graphics\Asset\DerivedData\Platform\Win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interest\AssetInterestTracker.cpp">
-      <Filter>Graphics\Asset\Interest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interop\AssimpMathInterop.cpp">
-      <Filter>Graphics\Asset\Interop</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ModelImportArtifactCache.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJob.cpp">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJournal.cpp">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyController.cpp">
-      <Filter>Graphics\Asset\Residency</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MaterialStore.cpp">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MeshStore.cpp">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\ModelStore.cpp">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\TextureStore.cpp">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.cpp">
-      <Filter>Graphics\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetValidation.cpp">
-      <Filter>Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBloom.cpp">
       <Filter>Graphics\RenderPass</Filter>
@@ -495,13 +408,61 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetUploadScheduler.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\BuiltinTextureFactory.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetDependencyGraph.cpp">
+      <Filter>Private\Graphics\Asset\Dependency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetStateEventQueue.cpp">
+      <Filter>Private\Graphics\Asset\Dependency</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedDataKey.cpp">
       <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\IBLDerivedDataSystem.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\IBLStageArtifactCodec.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\LocalDerivedDataStore.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData\Platform\Win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\SourceSnapshot.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\TextureArtifactCodec.cpp">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\IBLStageArtifact.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\IBLStageArtifactCache.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interest\AssetInterestTracker.cpp">
+      <Filter>Private\Graphics\Asset\Interest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.cpp">
+      <Filter>Private\Graphics\Asset\Interop</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Loading\AssetLoadCoordinator.cpp">
+      <Filter>Private\Graphics\Asset\Loading</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImportArtifact.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImportArtifactCache.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImporter.cpp">
@@ -513,13 +474,43 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.cpp">
       <Filter>Private\Graphics\Asset\Publication</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJob.cpp">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJournal.cpp">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyController.cpp">
+      <Filter>Private\Graphics\Asset\Residency</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.cpp">
       <Filter>Private\Graphics\Asset\Residency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MaterialStore.cpp">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MeshStore.cpp">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\ModelStore.cpp">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\TextureStore.cpp">
+      <Filter>Private\Graphics\Asset\Store</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureArtifact.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureArtifactCache.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAsset.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAssetSystem.cpp">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAssetValidation.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataSystem.cpp">
@@ -917,90 +908,6 @@
     <ClInclude Include="..\..\Externals\Vender\VulkanMemoryAllocator\include\vk_mem_alloc.h">
       <Filter>ThirdParty\VulkanMemoryAllocator\include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\AssetIdentityConversions.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\BuiltinTextureFactory.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetDependencyGraph.h">
-      <Filter>Graphics\Asset\Dependency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetStateEventQueue.h">
-      <Filter>Graphics\Asset\Dependency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataPlatform.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h">
-      <Filter>Graphics\Asset\DerivedData\Platform\Win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.h">
-      <Filter>Graphics\Asset\DerivedData</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifact.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\IBLStageArtifactCache.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interest\AssetInterestTracker.h">
-      <Filter>Graphics\Asset\Interest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interop\AssimpMathInterop.h">
-      <Filter>Graphics\Asset\Interop</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Loading\AssetLoadCoordinator.h">
-      <Filter>Graphics\Asset\Loading</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\ModelImportArtifactCache.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\AssetPublicationServices.h">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJob.h">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Publication\ModelPublicationJournal.h">
-      <Filter>Graphics\Asset\Publication</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Residency\AssetResidencyController.h">
-      <Filter>Graphics\Asset\Residency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MaterialStore.h">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\MeshStore.h">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\ModelStore.h">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Store\TextureStore.h">
-      <Filter>Graphics\Asset\Store</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureArtifactCache.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h">
-      <Filter>Graphics\Asset</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPBRShaderSet.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1166,17 +1073,101 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.h">
       <Filter>Private\Diagnostics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetIdentityConversions.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\BuiltinTextureFactory.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetDependencyGraph.h">
+      <Filter>Private\Graphics\Asset\Dependency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetStateEventQueue.h">
+      <Filter>Private\Graphics\Asset\Dependency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\IBLDerivedDataSystem.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\IBLStageArtifactCodec.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\LocalDerivedDataCatalog.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\LocalDerivedDataPlatform.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\LocalDerivedDataStore.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h">
+      <Filter>Private\Graphics\Asset\DerivedData\Platform\Win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\SourceSnapshot.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\TextureArtifactCodec.h">
+      <Filter>Private\Graphics\Asset\DerivedData</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\IBLStageArtifact.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\IBLStageArtifactCache.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interest\AssetInterestTracker.h">
+      <Filter>Private\Graphics\Asset\Interest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.h">
+      <Filter>Private\Graphics\Asset\Interop</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Loading\AssetLoadCoordinator.h">
+      <Filter>Private\Graphics\Asset\Loading</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelImportArtifactCache.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.h">
       <Filter>Private\Graphics\Asset\Publication</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationServices.h">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJob.h">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJournal.h">
+      <Filter>Private\Graphics\Asset\Publication</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyController.h">
+      <Filter>Private\Graphics\Asset\Residency</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.h">
       <Filter>Private\Graphics\Asset\Residency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MaterialStore.h">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MeshStore.h">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\ModelStore.h">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\TextureStore.h">
+      <Filter>Private\Graphics\Asset\Store</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureArtifactCache.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureAssetSystem.h">
+      <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h">
       <Filter>Private\Graphics\Asset</Filter>

@@ -2555,7 +2555,7 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($app
 function Test-RuntimePrivateImports {
     param(
         [string[]]$SourceItems,
-        [string]$AllowedPrivateDirectory = ""
+        [string[]]$AllowedPrivatePaths = @()
     )
 
     foreach ($itemPath in $SourceItems) {
@@ -2577,8 +2577,15 @@ function Test-RuntimePrivateImports {
                     -not (Test-Path -LiteralPath $resolvedPath -PathType Leaf)) {
                     continue
                 }
-                if ($AllowedPrivateDirectory -and
-                    (Test-IsPathUnderRoot $resolvedPath $AllowedPrivateDirectory)) {
+                $isClassifiedAccess = $false
+                foreach ($allowedPath in $AllowedPrivatePaths) {
+                    if ((Test-IsPathUnderRoot $resolvedPath $allowedPath) -or
+                        ($resolvedPath -ieq [System.IO.Path]::GetFullPath($allowedPath))) {
+                        $isClassifiedAccess = $true
+                        break
+                    }
+                }
+                if ($isClassifiedAccess) {
                     continue
                 }
                 $projectContractFindings.Add([pscustomobject]@{
@@ -2594,7 +2601,11 @@ function Test-RuntimePrivateImports {
 
 Test-RuntimePrivateImports (@($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems))
 Test-RuntimePrivateImports (@($vulkanQualificationSourceItems) + @($shaderRuntimeIntegrationTestsSourceItems)) `
-    (Join-Path $runtimePrivateDir "Graphics/RHI")
+    @(
+        (Join-Path $runtimePrivateDir "Graphics/RHI"),
+        (Join-Path $runtimePrivateDir "Graphics/Asset/BuiltinTextureFactory.h"),
+        (Join-Path $runtimePrivateDir "Graphics/Asset/IBLStageArtifact.h")
+    )
 
 # Native object creation stays in Runtime; host selection uses Public creation
 # contracts and device backend identity rather than complete backend classes.
@@ -2962,7 +2973,7 @@ $shaderRuntimeIdentityBoundaryPaths = @(
     (Join-Path $runtimeSourcesDir "Private/Graphics/Shader/Shader.h"),
     (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Shader/ShaderManager.h"),
     (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"),
-    (Join-Path $runtimeSourcesDir "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"),
+    (Join-Path $runtimeSourcesDir "Private/Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"),
     (Join-Path $appRuntimeSourcesDir "RuntimePaths.h"),
     (Join-Path $appRuntimeSourcesDir "ApplicationContentRegistration.h"),
     (Join-Path $appRuntimeSourcesDir "GGLabAppRuntime.h"),
