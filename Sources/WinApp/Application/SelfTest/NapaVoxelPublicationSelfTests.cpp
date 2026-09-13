@@ -1758,6 +1758,25 @@ namespace gglab
 				.m_Services = {
 					// The lifecycle-only fixture never dereferences these required
 					// capabilities; placeholder pointers satisfy the service contract.
+					.m_RenderServices = {
+						.m_PipelineResolver =
+							reinterpret_cast<RenderPipelineResolver*>(&renderer),
+						.m_ShaderPrograms =
+							reinterpret_cast<RenderShaderProgramAccess*>(&renderer),
+						.m_Samplers = reinterpret_cast<RenderSamplerAccess*>(&renderer),
+						.m_Resources =
+							reinterpret_cast<RenderResourceRegistryAccess*>(&renderer),
+						.m_FrameBuffers =
+							reinterpret_cast<RenderFrameBufferAccess*>(&renderer),
+						.m_Environment =
+							reinterpret_cast<RenderEnvironmentAccess*>(&renderer),
+						.m_Presentation =
+							reinterpret_cast<RenderPresentationAccess*>(&renderer),
+						.m_BindingLayout =
+							reinterpret_cast<RenderBindingLayoutAccess*>(&renderer),
+						.m_Temporal = reinterpret_cast<RenderTemporalAccess*>(&renderer),
+						.m_AssetUpload = scheduler.m_Scheduling.get(),
+					},
 					.m_EnvironmentLighting =
 						reinterpret_cast<EnvironmentLightingViewBase*>(&renderer),
 					.m_EnvironmentLightingControl =

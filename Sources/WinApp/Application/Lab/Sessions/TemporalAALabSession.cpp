@@ -536,9 +536,10 @@ namespace gglab
 
 	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-	const auto* rhiContext = m_Services.m_RHIContext;
+		const auto* rhiContext = m_Services.m_RHIContext;
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
 		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
-			rhiContext ? rhiContext->GetFrameSlotCount() : 3u);
+			rhiContext->GetFrameSlotCount());
 	}
 
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept

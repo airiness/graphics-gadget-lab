@@ -44,14 +44,15 @@ namespace gglab
 
 		[[nodiscard]] bool IsValid() const noexcept
 		{
-			// Required: every content path consumes these. The renderer always
-			// provides the RHI context, environment lighting and IBL cache when
-			// composition succeeds. Optional: GPU profiling depends on backend
-			// profiler availability; the asset upload control is a
-			// developer/acceptance capability.
-			return m_RHIContext && m_EnvironmentLighting && m_EnvironmentLightingControl &&
-				m_IBLCacheControl && m_AssetManager && m_ShaderManager && m_TaskSystem &&
-				m_Input && m_Time && m_DebugDraw && m_EnvironmentAssetController;
+			// Required: the explicit render service bundle plus every content
+			// service below. The renderer always provides the RHI context,
+			// environment lighting and IBL cache when composition succeeds.
+			// Optional: GPU profiling depends on backend profiler availability;
+			// the asset upload control is a developer/acceptance capability.
+			return m_RenderServices.IsValid() && m_RHIContext && m_EnvironmentLighting &&
+				m_EnvironmentLightingControl && m_IBLCacheControl && m_AssetManager &&
+				m_ShaderManager && m_TaskSystem && m_Input && m_Time && m_DebugDraw &&
+				m_EnvironmentAssetController;
 		}
 	};
 

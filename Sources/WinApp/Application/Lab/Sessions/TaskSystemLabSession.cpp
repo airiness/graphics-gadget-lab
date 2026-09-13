@@ -466,12 +466,11 @@ namespace gglab
 			m_State->m_GateReleasePermits.store(
 				std::max(m_State->m_WorkerCount, 1u), std::memory_order_release);
 		}
-		if (m_Services.m_TaskSystem)
+		TaskSystem* taskSystem = m_Services.m_TaskSystem;
+		GGLAB_ASSERT_NOT_NULL(taskSystem);
+		for (const TaskHandle handle : m_Handles)
 		{
-			for (const TaskHandle handle : m_Handles)
-			{
-				GGLAB_UNUSED(m_Services.m_TaskSystem->Cancel(handle));
-			}
+			GGLAB_UNUSED(taskSystem->Cancel(handle));
 		}
 		m_Handles.clear();
 		m_State.reset();

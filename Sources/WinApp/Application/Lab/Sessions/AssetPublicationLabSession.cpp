@@ -526,7 +526,12 @@ namespace gglab
 	{
 		StopScenario();
 		AssetUploadControl* control = m_Services.m_AssetUploadControl;
-		GGLAB_ASSERT_NOT_NULL(control);
+		if (control == nullptr)
+		{
+			GGLAB_LOG_ERROR(
+				"Asset publication Lab requires the asset upload control capability.");
+			return;
+		}
 		if (!m_HasOriginalBudget)
 		{
 			m_OriginalBudget = control->GetFrameBudget();
@@ -550,6 +555,12 @@ namespace gglab
 	{
 		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		if (control == nullptr)
+		{
+			GGLAB_LOG_ERROR(
+				"Asset publication Lab cannot start a scenario without the asset upload control.");
+			return;
+		}
 		control->ClearResourcePublicationFault();
 		ResetAssetInterests();
 		m_State = std::make_unique<ScenarioState>();
@@ -752,7 +763,10 @@ namespace gglab
 		GGLAB_ASSERT(m_Suite);
 		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		AssetUploadControl* control = m_Services.m_AssetUploadControl;
-		GGLAB_ASSERT_NOT_NULL(control);
+		if (control == nullptr)
+		{
+			return;
+		}
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		control->ClearResourcePublicationFault();
 		control->ClearGpuCompletionHold();
@@ -996,6 +1010,10 @@ namespace gglab
 
 		AssetUploadScheduling* scheduler = m_Services.m_RenderServices.m_AssetUpload;
 		AssetUploadControl* control = m_Services.m_AssetUploadControl;
+		if (control == nullptr)
+		{
+			return;
+		}
 		AssetManager* assetManager = m_Services.m_AssetManager;
 		const AssetUploadStatistics statistics = scheduler->GetStatistics();
 		switch (m_Suite->m_Phase)
@@ -1247,8 +1265,11 @@ namespace gglab
 			});
 
 		AssetUploadControl* control = m_Services.m_AssetUploadControl;
-		control->ClearResourcePublicationFault();
-		control->ClearGpuCompletionHold();
+		if (control != nullptr)
+		{
+			control->ClearResourcePublicationFault();
+			control->ClearGpuCompletionHold();
+		}
 		ResetAssetInterests();
 		m_State.reset();
 		m_Suite->m_PrimaryOwner.Reset();

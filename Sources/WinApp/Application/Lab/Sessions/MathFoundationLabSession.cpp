@@ -108,10 +108,9 @@ namespace gglab
 
 	void MathFoundationLabSession::OnExit() noexcept
 	{
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(MathChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(MathChannel);
 	}
 
 	void MathFoundationLabSession::Update(float deltaTime) noexcept

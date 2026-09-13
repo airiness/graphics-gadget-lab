@@ -97,10 +97,9 @@ namespace gglab
 
 	void CullingLabSession::OnExit() noexcept
 	{
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(DebugDrawShapeChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(DebugDrawShapeChannel);
 	}
 
 	CullingLabSession::CullingLabSession(const LabSessionCreateInfo& createInfo) noexcept :

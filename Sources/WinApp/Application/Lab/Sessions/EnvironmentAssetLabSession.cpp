@@ -96,16 +96,16 @@ namespace gglab
 					m_State->m_OriginalSpecularSampleCount);
 			}
 		}
-		if (m_Services.m_EnvironmentAssetController)
+		EnvironmentAssetController* environmentController =
+			m_Services.m_EnvironmentAssetController;
+		GGLAB_ASSERT_NOT_NULL(environmentController);
+		if (m_Services.m_AssetManager->IsAcceptingCommands())
 		{
-			if (m_Services.m_AssetManager->IsAcceptingCommands())
-			{
-				m_Services.m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
-			}
-			else
-			{
-				m_Services.m_EnvironmentAssetController->Reset();
-			}
+			environmentController->Initialize("Assets/Textures/Skybox");
+		}
+		else
+		{
+			environmentController->Reset();
 		}
 		m_State.reset();
 	}

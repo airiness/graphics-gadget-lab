@@ -505,15 +505,14 @@ namespace gglab
 
 	void NapaVoxelLabSession::OnEnter() noexcept
 	{
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->SetChannelEnabled(ChunkBoundsChannel, m_ShowChunkBounds);
-			debugDraw->SetChannelEnabled(DirtyChunksChannel, m_ShowDirtyChunks);
-			debugDraw->SetChannelEnabled(EditBoundsChannel, true);
-			debugDraw->SetChannelEnabled(BrushChannel, true);
-			debugDraw->SetChannelEnabled(DamageChannel, m_ShowDamageMarkers);
-			debugDraw->SetChannelEnabled(SeamFailureChannel, true);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->SetChannelEnabled(ChunkBoundsChannel, m_ShowChunkBounds);
+		debugDraw->SetChannelEnabled(DirtyChunksChannel, m_ShowDirtyChunks);
+		debugDraw->SetChannelEnabled(EditBoundsChannel, true);
+		debugDraw->SetChannelEnabled(BrushChannel, true);
+		debugDraw->SetChannelEnabled(DamageChannel, m_ShowDamageMarkers);
+		debugDraw->SetChannelEnabled(SeamFailureChannel, true);
 	}
 
 	void NapaVoxelLabSession::OnExit() noexcept
@@ -528,15 +527,14 @@ namespace gglab
 		{
 			m_FrameSource->ClearFrameView();
 		}
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(ChunkBoundsChannel);
-			debugDraw->ClearChannel(DirtyChunksChannel);
-			debugDraw->ClearChannel(EditBoundsChannel);
-			debugDraw->ClearChannel(BrushChannel);
-			debugDraw->ClearChannel(DamageChannel);
-			debugDraw->ClearChannel(SeamFailureChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(ChunkBoundsChannel);
+		debugDraw->ClearChannel(DirtyChunksChannel);
+		debugDraw->ClearChannel(EditBoundsChannel);
+		debugDraw->ClearChannel(BrushChannel);
+		debugDraw->ClearChannel(DamageChannel);
+		debugDraw->ClearChannel(SeamFailureChannel);
 	}
 
 	void NapaVoxelLabSession::Update(float deltaTime) noexcept
@@ -574,12 +572,12 @@ namespace gglab
 	void NapaVoxelLabSession::CaptureInputCommands() noexcept
 	{
 		if (m_RuntimeState == NapaVoxelRuntimeState::Failed ||
-			m_RuntimeState == NapaVoxelRuntimeState::Exiting ||
-			!m_Services.m_Input)
+			m_RuntimeState == NapaVoxelRuntimeState::Exiting)
 		{
 			return;
 		}
 
+		GGLAB_ASSERT_NOT_NULL(m_Services.m_Input);
 		const ApplicationInput& input = *m_Services.m_Input;
 		const bool keyboardCapturedByUI = input.IsKeyboardCapturedByUI();
 		if (!keyboardCapturedByUI)
@@ -845,7 +843,8 @@ namespace gglab
 
 	bool NapaVoxelLabSession::BuildCursorRay(NapaVoxelRay& ray) const noexcept
 	{
-		if (!m_Services.m_Input || m_WindowWidth == 0 || m_WindowHeight == 0)
+		GGLAB_ASSERT_NOT_NULL(m_Services.m_Input);
+		if (m_WindowWidth == 0 || m_WindowHeight == 0)
 		{
 			return false;
 		}

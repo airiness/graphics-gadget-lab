@@ -135,13 +135,12 @@ namespace gglab
 	{
 		auto* environmentView = m_Services.m_EnvironmentLighting;
 		auto* environmentControl = m_Services.m_EnvironmentLightingControl;
-		if (environmentView && environmentControl)
-		{
-			m_PreviousSkyboxEnabled =
-				environmentView->GetEnvironmentLightingSettings().m_EnableSkybox;
-			m_HasSkyboxOverride = true;
-			environmentControl->SetSkyboxEnabled(false);
-		}
+		GGLAB_ASSERT_NOT_NULL(environmentView);
+		GGLAB_ASSERT_NOT_NULL(environmentControl);
+		m_PreviousSkyboxEnabled =
+			environmentView->GetEnvironmentLightingSettings().m_EnableSkybox;
+		m_HasSkyboxOverride = true;
+		environmentControl->SetSkyboxEnabled(false);
 
 		auto* debugDraw = m_Services.m_DebugDraw;
 		GGLAB_ASSERT_NOT_NULL(debugDraw);
@@ -173,17 +172,15 @@ namespace gglab
 	{
 		if (m_HasSkyboxOverride)
 		{
-			if (auto* environmentControl = m_Services.m_EnvironmentLightingControl)
-			{
-				environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
-			}
+			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+			GGLAB_ASSERT_NOT_NULL(environmentControl);
+			environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
 			m_HasSkyboxOverride = false;
 		}
 
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(StartDemoDebugChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(StartDemoDebugChannel);
 	}
 
 	void StartDemo::Update() noexcept

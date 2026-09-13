@@ -61,6 +61,26 @@ namespace gglab
 			reinterpret_cast<EnvironmentLightingControlBase*>(1);
 		services.m_IBLCacheControl = reinterpret_cast<IBLCacheControlBase*>(1);
 		services.m_RHIContext = reinterpret_cast<RHIContext*>(1);
+		context.Check(!services.IsValid(),
+			"DemoServices rejects an empty required render service bundle");
+		services.m_RenderServices.m_PipelineResolver =
+			reinterpret_cast<RenderPipelineResolver*>(1);
+		services.m_RenderServices.m_ShaderPrograms =
+			reinterpret_cast<RenderShaderProgramAccess*>(1);
+		services.m_RenderServices.m_Samplers = reinterpret_cast<RenderSamplerAccess*>(1);
+		services.m_RenderServices.m_Resources =
+			reinterpret_cast<RenderResourceRegistryAccess*>(1);
+		services.m_RenderServices.m_FrameBuffers =
+			reinterpret_cast<RenderFrameBufferAccess*>(1);
+		services.m_RenderServices.m_Environment =
+			reinterpret_cast<RenderEnvironmentAccess*>(1);
+		services.m_RenderServices.m_Presentation =
+			reinterpret_cast<RenderPresentationAccess*>(1);
+		services.m_RenderServices.m_BindingLayout =
+			reinterpret_cast<RenderBindingLayoutAccess*>(1);
+		services.m_RenderServices.m_Temporal = reinterpret_cast<RenderTemporalAccess*>(1);
+		services.m_RenderServices.m_AssetUpload =
+			reinterpret_cast<AssetUploadScheduling*>(1);
 		context.Check(services.IsValid(),
 			"DemoServices accepts the neutral application input contract");
 		services.m_Input = nullptr;

@@ -546,11 +546,8 @@ namespace gglab
 	void LabRuntime::PollRetiringSessions() noexcept
 	{
 		RHIContext* rhiContext = m_CreateInfo.m_Services.m_RHIContext;
-		RHIDevice* device = rhiContext ? &rhiContext->GetDevice() : nullptr;
-		if (!device)
-		{
-			return;
-		}
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
+		RHIDevice* device = &rhiContext->GetDevice();
 		std::erase_if(m_RetiringSessions,
 			[device](const RetiringSession& retiring) noexcept
 			{

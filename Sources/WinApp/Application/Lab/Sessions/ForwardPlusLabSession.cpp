@@ -481,8 +481,9 @@ namespace gglab
 
 	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-	const auto* rhiContext = m_Services.m_RHIContext;
-	m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
+		const auto* rhiContext = m_Services.m_RHIContext;
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
+		m_GpuTimingWarmupFrames = rhiContext->GetFrameSlotCount();
 	}
 
 	void ForwardPlusLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
