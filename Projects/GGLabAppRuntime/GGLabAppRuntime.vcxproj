@@ -104,7 +104,6 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabCommandQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabInterfaces.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h" />
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabPresetSchema.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h" />

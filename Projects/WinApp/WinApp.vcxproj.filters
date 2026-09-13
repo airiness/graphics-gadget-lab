@@ -767,9 +767,6 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextDXGI.h">
-      <Filter>DevTools\EnumText</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h">
       <Filter>DevTools\EnumText</Filter>
     </ClInclude>

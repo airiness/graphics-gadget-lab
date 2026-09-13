@@ -1,6 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Buffer/DynamicBufferAllocator.h"
 
+#include <span>
+
 namespace gglab
 {
 	template <typename T> class DynamicStructuredBufferAllocator

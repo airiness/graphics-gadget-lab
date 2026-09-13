@@ -85,13 +85,11 @@ namespace gglab
 	template <typename RESOURCE> struct RGVirtualResource : RGVirtualResourceBase
 	{
 		using Desc = typename RESOURCE::Descriptor;
-		using SubresourceDesc = typename RESOURCE::SubresourceDescriptor;
 		using Access = typename RESOURCE::Access;
 		using Handle = typename RGResourceTraits<RESOURCE>::Handle;
 		using PhysicalAllocation = typename RGResourceTraits<RESOURCE>::PhysicalAllocation;
 
 		Desc m_Desc = {};
-		SubresourceDesc m_SubresourceDesc = {};
 		PhysicalAllocation m_PhysicalAllocation{};
 		Handle m_ImportedHandle{};
 

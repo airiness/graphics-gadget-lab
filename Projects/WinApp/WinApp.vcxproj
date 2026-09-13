@@ -294,7 +294,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumText.h" />
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextDXGI.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextGraphics.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextLab.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\EnumText\EnumTextRHI.h" />

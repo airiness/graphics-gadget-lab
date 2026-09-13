@@ -41,13 +41,6 @@ namespace gglab
 		RHIResourceState m_After{};
 	};
 
-	struct RHISubmitInfo
-	{
-		RHIQueueType m_QueueType = RHIQueueType::Graphics;
-		std::span<RHICommandContext* const> m_Contexts{};
-		bool m_WaitForCompletion = false;
-	};
-
 	struct RHIVertexBufferBinding
 	{
 		RHIBufferHandle m_Buffer{};

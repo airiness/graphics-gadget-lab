@@ -87,17 +87,6 @@ namespace gglab
 		MarkProjDirty();
 	}
 
-	void Camera::SetAspect(float aspect) noexcept
-	{
-		if (!math::IsFinite(aspect) || aspect <= 0.0f)
-		{
-			return;
-		}
-
-		m_Aspect = aspect;
-		MarkProjDirty();
-	}
-
 	float Camera::GetExposureMultiplier() const noexcept
 	{
 		return std::exp2(m_ExposureCompensationEV);

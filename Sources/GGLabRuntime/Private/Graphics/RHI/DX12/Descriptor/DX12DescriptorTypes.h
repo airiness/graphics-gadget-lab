@@ -45,15 +45,6 @@ namespace gglab
 		explicit operator bool() const noexcept { return IsValid(); }
 	};
 
-	struct DX12DescriptorID
-	{
-		static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-		uint32_t m_Index = InvalidIndex; //  Heap global index
-		uint32_t m_Generation = 0;
-
-		bool IsValid() const noexcept { return m_Index != InvalidIndex; }
-	};
-
 	class DX12DescriptorHandle
 	{
 	public:
@@ -80,7 +71,6 @@ namespace gglab
 		DX12DescriptorAllocatorBase* OwnerAllocator() const noexcept { return m_OwnerAllocator; }
 
 		DX12DescriptorView ToDescriptorView(uint32_t offset = 0) const noexcept;
-		DX12DescriptorID ToDescriptorId() const noexcept;
 
 		void Free() noexcept;
 		void Retire(const DX12FencePoint& fencePoint) noexcept;

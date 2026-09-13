@@ -40,8 +40,6 @@ namespace gglab
 		struct StateTracker
 		{
 			State m_LastState;
-			bool m_ButtonPressed[MouseButtonCount] = {};
-			bool m_ButtonReleased[MouseButtonCount] = {};
 			bool m_ButtonHeld[MouseButtonCount] = {};
 
 			int64_t m_ScrollWheelDeltaY = 0;
@@ -64,16 +62,12 @@ namespace gglab
 
 		void SetWindowHandle(HWND window) noexcept;
 
-		Vector2 GetMouseCoord() const noexcept;
 		Vector2 GetAbsolutePosition() const noexcept;
 		Vector2 GetRelativeDelta() const noexcept;
 		int64_t GetScrollWheelDeltaY() const noexcept;
 
-		bool IsMouseButtonPressed(MouseButton button) const noexcept;
-		bool IsMouseButtonReleased(MouseButton button) const noexcept;
 		bool IsMouseButtonHeld(MouseButton button) const noexcept;
 
-		MouseMode GetMouseMode() const noexcept;
 		void SetMouseMode(MouseMode mode) noexcept;
 
 		bool IsCursorVisible() const noexcept;

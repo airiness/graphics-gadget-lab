@@ -335,45 +335,6 @@ namespace gglab
 			});
 	}
 
-	void TransientResourcePool::TrimPerKey(uint32_t maxCachedPerKey) noexcept
-	{
-		m_MaxCachedPerKey = maxCachedPerKey;
-		if (maxCachedPerKey == 0)
-		{
-			return;
-		}
-
-		auto trim = [&](auto& map, auto& storeVec)
-			{
-				for (auto& keyValue : map)
-				{
-					auto& list = keyValue.second;
-					while (list.size() > maxCachedPerKey)
-					{
-						const auto poolSlot = list.front();
-						list.pop_front();
-						if (poolSlot.Value() < storeVec.size() &&
-							storeVec[poolSlot.Value()].m_Buffer.IsValid())
-						{
-							DestroyBuffer(poolSlot);
-						}
-					}
-				}
-			};
-		trim(m_FreeBuffers, m_Buffers);
-
-		for (auto& keyValue : m_FreeTextures)
-		{
-			auto& list = keyValue.second;
-			while (list.size() > maxCachedPerKey)
-			{
-				const auto poolSlot = list.front();
-				list.pop_front();
-				DestroyTexture(poolSlot);
-			}
-		}
-	}
-
 	bool TransientResourcePool::IsCompatibleTexture(
 		const TransientTextureAllocation& allocation, const RHITextureDesc& desc) const noexcept
 	{

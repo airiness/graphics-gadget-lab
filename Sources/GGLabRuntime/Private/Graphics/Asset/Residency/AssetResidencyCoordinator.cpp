@@ -102,12 +102,6 @@ namespace gglab
 		return !m_ModelDependencyOwners.empty() || !m_ModelDependencyLeaseTokens.empty();
 	}
 
-	AssetOwnerId AssetResidencyCoordinator::GetModelDependencyOwner(ModelID modelId) const noexcept
-	{
-		const auto found = m_ModelDependencyOwners.find(modelId);
-		return found != m_ModelDependencyOwners.end() ? found->second : AssetOwnerId{};
-	}
-
 	void AssetResidencyCoordinator::SetModelDependencyOwner(
 		ModelID modelId, AssetOwnerId owner) noexcept
 	{
@@ -231,16 +225,6 @@ namespace gglab
 		AssetResidencyCoordinator::PendingRetirements() const noexcept
 	{
 		return m_PendingRetirements;
-	}
-
-	void AssetResidencyCoordinator::AddLogicalResidentBytes(uint64_t bytes) noexcept
-	{
-		m_LogicalResidentBytes += bytes;
-	}
-
-	void AssetResidencyCoordinator::SubtractLogicalResidentBytes(uint64_t bytes) noexcept
-	{
-		m_LogicalResidentBytes = bytes > m_LogicalResidentBytes ? 0 : m_LogicalResidentBytes - bytes;
 	}
 
 	uint64_t AssetResidencyCoordinator::GetLogicalResidentBytes() const noexcept

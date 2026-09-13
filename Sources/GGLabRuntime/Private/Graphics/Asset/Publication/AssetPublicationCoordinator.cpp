@@ -18,11 +18,6 @@ namespace gglab
 		return m_Residency.HasPublicationRetain(contentVersion);
 	}
 
-	bool AssetPublicationCoordinator::HasRetains() const noexcept
-	{
-		return m_Residency.HasPublicationRetains();
-	}
-
 	void AssetPublicationCoordinator::BeginMeshRollback(MeshID meshId) noexcept
 	{
 		m_OrphanedRollbackMeshes.insert(meshId);

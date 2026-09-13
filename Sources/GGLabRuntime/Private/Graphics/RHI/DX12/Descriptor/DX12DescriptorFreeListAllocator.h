@@ -33,12 +33,6 @@ namespace gglab
 
 		DX12DescriptorHandle AllocateHandle(uint32_t count = 1) noexcept;
 		DX12DescriptorView AllocateView() noexcept;
-		DX12DescriptorID AllocateId() noexcept;
-
-		bool IsIdAlive(const DX12DescriptorID& descriptorId) const noexcept;
-		DX12DescriptorView ViewAtId(const DX12DescriptorID& descriptorId) const noexcept;
-
-		void RetireId(const DX12DescriptorID& descriptorId, const DX12FencePoint& fencePoint) noexcept;
 
 		void DeferFreeFromCpuHandleInFrame(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle) noexcept;
 		void DeferFreeFromGpuHandleInFrame(D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) noexcept;

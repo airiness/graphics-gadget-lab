@@ -89,7 +89,6 @@ namespace gglab
 		void Reset() noexcept;
 
 		[[nodiscard]] VulkanDescriptorPublicationState GetState(uint32_t index) const noexcept;
-		[[nodiscard]] uint64_t GetPublicationGeneration(uint32_t index) const noexcept;
 		[[nodiscard]] uint64_t GetLastReachableGeneration(uint32_t index) const noexcept;
 		[[nodiscard]] bool IsRetirementRequested(uint32_t index) const noexcept;
 		[[nodiscard]] uint32_t GetCapacity() const noexcept { return m_Indices.GetCapacity(); }

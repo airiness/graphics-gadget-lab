@@ -237,16 +237,6 @@ namespace gglab
 		return baseHistoryWeight * velocityConfidence * luminanceConfidence;
 	}
 
-	enum class TemporalAAHistoryRejectionReason : uint32_t
-	{
-		None,
-		HistoryUnavailable,
-		PreviousUVOutOfBounds,
-		NonFinite,
-		DepthMismatch,
-		BackgroundMismatch,
-	};
-
 	[[nodiscard]] inline bool IsTemporalSkyHistoryCompatible(
 		float previousRawDepth, DepthConvention previousDepthConvention) noexcept
 	{

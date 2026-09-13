@@ -73,11 +73,6 @@ namespace gglab
 		return m_DemoSlots[index].m_Name;
 	}
 
-	bool DemoManager::IsDemoCreated(uint32_t index) const noexcept
-	{
-		return GetDemo(index) != nullptr;
-	}
-
 	uint32_t DemoManager::RegisterDemo(std::string name, DemoFactory factory) noexcept
 	{
 		if (name.empty() || !factory)

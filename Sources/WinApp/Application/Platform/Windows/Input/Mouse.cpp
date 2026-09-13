@@ -37,21 +37,6 @@ namespace gglab
 		m_WindowHandle = window;
 	}
 
-	Vector2 Mouse::GetMouseCoord() const noexcept
-	{
-		switch (m_Mode)
-		{
-		case MouseMode::Absolute:
-			return Vector2(static_cast<float>(m_StateTracker.m_AbsoluteX),
-				static_cast<float>(m_StateTracker.m_AbsoluteY));
-		case MouseMode::Relative:
-			return Vector2(static_cast<float>(m_StateTracker.m_RelativeX),
-				static_cast<float>(m_StateTracker.m_RelativeY));
-		default:
-			GGLAB_UNREACHABLE("Invalid Mouse Mode.");
-		}
-	}
-
 	Vector2 Mouse::GetAbsolutePosition() const noexcept
 	{
 		return Vector2(static_cast<float>(m_StateTracker.m_AbsoluteX),
@@ -69,24 +54,9 @@ namespace gglab
 		return m_StateTracker.m_ScrollWheelDeltaY;
 	}
 
-	bool Mouse::IsMouseButtonPressed(MouseButton button) const noexcept
-	{
-		return m_StateTracker.m_ButtonPressed[button];
-	}
-
-	bool Mouse::IsMouseButtonReleased(MouseButton button) const noexcept
-	{
-		return m_StateTracker.m_ButtonReleased[button];
-	}
-
 	bool Mouse::IsMouseButtonHeld(MouseButton button) const noexcept
 	{
 		return m_StateTracker.m_ButtonHeld[button];
-	}
-
-	Mouse::MouseMode Mouse::GetMouseMode() const noexcept
-	{
-		return m_Mode;
 	}
 
 	void Mouse::SetMouseMode(MouseMode mode) noexcept
@@ -205,10 +175,6 @@ namespace gglab
 	{
 		for (int32_t buttonIndex = 0; buttonIndex < (int32_t)MouseButtonCount; buttonIndex++)
 		{
-			m_ButtonPressed[buttonIndex] =
-				state.m_Buttons[buttonIndex] && !m_LastState.m_Buttons[buttonIndex];
-			m_ButtonReleased[buttonIndex] =
-				!state.m_Buttons[buttonIndex] && m_LastState.m_Buttons[buttonIndex];
 			m_ButtonHeld[buttonIndex] = state.m_Buttons[buttonIndex];
 		}
 

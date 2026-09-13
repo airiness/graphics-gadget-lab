@@ -66,7 +66,6 @@ namespace gglab
 		[[nodiscard]] bool HasModelDependencyLeases(ModelID modelId) const noexcept;
 		[[nodiscard]] bool HasModelDependencyOwner(ModelID modelId) const noexcept;
 		[[nodiscard]] bool HasModelDependencyOwnership() const noexcept;
-		[[nodiscard]] AssetOwnerId GetModelDependencyOwner(ModelID modelId) const noexcept;
 		void SetModelDependencyOwner(ModelID modelId, AssetOwnerId owner) noexcept;
 		void SetModelDependencyLeases(ModelID modelId, std::vector<uint64_t> leases) noexcept;
 		void RecordModelDependencyLease(ModelID modelId, uint64_t leaseToken) noexcept;
@@ -141,8 +140,6 @@ namespace gglab
 		[[nodiscard]] const std::vector<PendingEviction>& PendingEvictions() const noexcept;
 		[[nodiscard]] std::vector<PendingRetirement>& PendingRetirements() noexcept;
 		[[nodiscard]] const std::vector<PendingRetirement>& PendingRetirements() const noexcept;
-		void AddLogicalResidentBytes(uint64_t bytes) noexcept;
-		void SubtractLogicalResidentBytes(uint64_t bytes) noexcept;
 		void SetLogicalResidentBytes(uint64_t bytes) noexcept { m_LogicalResidentBytes = bytes; }
 		[[nodiscard]] uint64_t GetLogicalResidentBytes() const noexcept;
 

@@ -18,7 +18,6 @@ namespace gglab
 
 		DemoBase* GetDemo(uint32_t index) const noexcept;
 		std::string_view GetDemoName(uint32_t index) const noexcept;
-		bool IsDemoCreated(uint32_t index) const noexcept;
 		DemoBase* GetActiveDemo() const noexcept { return m_ActiveDemo; }
 		uint32_t RegisterDemo(std::string name, DemoFactory factory) noexcept;
 		void SetBootstrapDemo(std::unique_ptr<DemoBase> demo) noexcept;

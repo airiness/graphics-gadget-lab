@@ -49,11 +49,6 @@ namespace gglab
 		return m_MaterialStore.Remove(materialId);
 	}
 
-	const MaterialStore::EntryMap& ModelAssetSystem::MaterialEntries() const noexcept
-	{
-		return m_MaterialStore.Entries();
-	}
-
 	const Model* ModelAssetSystem::FindModel(ModelID modelId) const noexcept
 	{
 		return m_ModelStore.Find(modelId);
@@ -104,15 +99,5 @@ namespace gglab
 	void ModelAssetSystem::RemovePendingModel(ModelID modelId) noexcept
 	{
 		m_PendingModels.erase(modelId);
-	}
-
-	bool ModelAssetSystem::IsModelPending(ModelID modelId) const noexcept
-	{
-		return m_PendingModels.contains(modelId);
-	}
-
-	bool ModelAssetSystem::HasPendingModels() const noexcept
-	{
-		return !m_PendingModels.empty();
 	}
 }

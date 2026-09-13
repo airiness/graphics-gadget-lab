@@ -521,23 +521,6 @@ namespace gglab
 		return m_Bootstrap->m_FrameRuntime->GetSwapChain();
 	}
 
-	const VulkanAdapterCapabilitySnapshot&
-		VulkanContext::GetAdapterCapabilitySnapshot() const noexcept
-	{
-		return m_Bootstrap->m_SelectedSnapshot;
-	}
-
-	bool VulkanContext::IsValidationEnabled() const noexcept
-	{
-		return m_Bootstrap && m_Bootstrap->m_HasDebugMessenger;
-	}
-
-	bool VulkanContext::IsFrameRuntimeFatal() const noexcept
-	{
-		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&
-			m_Bootstrap->m_FrameRuntime->IsFatal();
-	}
-
 	bool VulkanContext::IsDeviceLost() const noexcept
 	{
 		return m_Bootstrap && m_Bootstrap->m_FrameRuntime &&

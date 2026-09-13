@@ -136,16 +136,6 @@ namespace gglab
 		return { m_GpuStart, static_cast<INT>(globalIndex), static_cast<UINT>(m_IncrementSize) };
 	}
 
-	DX12DescriptorView DX12DescriptorAllocatorBase::ViewAtGlobalIndex(
-		uint32_t globalIndex) const noexcept
-	{
-		return {
-			.m_CpuHandle = CpuHandleAtGlobalIndex(globalIndex),
-			.m_GpuHandle = GpuHandleAtGlobalIndex(globalIndex),
-			.m_Index = globalIndex,
-		};
-	}
-
 	DX12DescriptorHandle DX12DescriptorAllocatorBase::CreateHandleFromGlobalSpan(
 		const DX12DescriptorSpan& globalSpan, uint32_t generation) noexcept
 	{

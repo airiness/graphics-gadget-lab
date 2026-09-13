@@ -279,19 +279,6 @@ namespace gglab
 		return true;
 	}
 
-	DX12DescriptorView DX12DescriptorCache::ResolveBufferView(
-		RHIBufferViewHandle view) const noexcept
-	{
-		std::shared_lock lock(m_Mutex);
-		const BufferViewSlot* slot = m_RHIBufferViews.Resolve(view);
-		if (!slot || !slot->m_Descriptor.IsValid())
-		{
-			return {};
-		}
-
-		return slot->m_Descriptor.ToDescriptorView();
-	}
-
 	RHIDescriptorHandle DX12DescriptorCache::ResolveTextureViewDescriptor(
 		RHITextureViewHandle view) const noexcept
 	{

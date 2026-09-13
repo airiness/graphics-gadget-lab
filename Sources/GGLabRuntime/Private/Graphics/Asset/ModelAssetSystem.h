@@ -31,7 +31,6 @@ namespace gglab
 		[[nodiscard]] const Material* FindMaterial(MaterialID materialId) const noexcept;
 		[[nodiscard]] MaterialID InsertMaterial(std::unique_ptr<Material>&& material) noexcept;
 		[[nodiscard]] bool RemoveMaterial(MaterialID materialId) noexcept;
-		[[nodiscard]] const MaterialStore::EntryMap& MaterialEntries() const noexcept;
 
 		[[nodiscard]] const Model* FindModel(ModelID modelId) const noexcept;
 		[[nodiscard]] Model* EditModel(ModelID modelId) noexcept;
@@ -46,8 +45,6 @@ namespace gglab
 
 		void AddPendingModel(ModelID modelId) noexcept;
 		void RemovePendingModel(ModelID modelId) noexcept;
-		[[nodiscard]] bool IsModelPending(ModelID modelId) const noexcept;
-		[[nodiscard]] bool HasPendingModels() const noexcept;
 		template <typename Predicate> void RemovePendingModelsIf(Predicate&& predicate)
 		{
 			std::erase_if(m_PendingModels, std::forward<Predicate>(predicate));

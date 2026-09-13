@@ -36,11 +36,6 @@ namespace gglab
 		}
 	}
 
-	Vector3 GetCubemapFaceRight(CubemapFace face) noexcept
-	{
-		return GetCubemapFaceUp(face).Cross(GetCubemapFaceDirection(face)).Normalized();
-	}
-
 	CubemapFaceBasis GetCubemapFaceBasis(CubemapFace face) noexcept
 	{
 		const Vector3 direction = GetCubemapFaceDirection(face);

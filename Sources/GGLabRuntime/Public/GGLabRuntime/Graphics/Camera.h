@@ -52,7 +52,6 @@ namespace gglab
 		void SetYawPitch(float yawRadians, float pitchRadians) noexcept;
 		void SetNearFar(float nearZ, float farZ) noexcept;
 		void SetFov(float fovDegrees) noexcept;
-		void SetAspect(float aspect) noexcept;
 		void SetExposureCompensationEV(float ev) noexcept;
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;

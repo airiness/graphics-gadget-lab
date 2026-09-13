@@ -95,7 +95,6 @@ namespace gglab
 		}
 		void AddTextureBarrier(const CD3DX12_TEXTURE_BARRIER& textureBarrier) noexcept;
 		void AddBufferBarrier(const CD3DX12_BUFFER_BARRIER& bufferBarrier) noexcept;
-		void AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept;
 		void FlushBarriers() noexcept;
 		void ClearRenderTarget(
 			const DX12DescriptorView& rtDescriptor, const Color& clearColor) const noexcept;
@@ -117,6 +116,5 @@ namespace gglab
 
 		std::vector<CD3DX12_TEXTURE_BARRIER> m_TextureBarriers;
 		std::vector<CD3DX12_BUFFER_BARRIER> m_BufferBarriers;
-		std::vector<CD3DX12_GLOBAL_BARRIER> m_GlobalBarriers;
 	};
 }

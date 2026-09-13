@@ -262,12 +262,6 @@ namespace gglab
 			: VulkanDescriptorPublicationState::Free;
 	}
 
-	uint64_t VulkanDescriptorPublicationArena::GetPublicationGeneration(
-		uint32_t index) const noexcept
-	{
-		return IsIndexInRange(index) ? m_Slots[index].m_PublicationGeneration : 0;
-	}
-
 	uint64_t VulkanDescriptorPublicationArena::GetLastReachableGeneration(
 		uint32_t index) const noexcept
 	{

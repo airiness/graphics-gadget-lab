@@ -41,7 +41,6 @@ namespace gglab
 		[[nodiscard]] bool AcquireRetain(AssetContentVersion contentVersion) noexcept;
 		void ReleaseRetain(AssetContentVersion contentVersion) noexcept;
 		[[nodiscard]] bool HasRetain(AssetContentVersion contentVersion) const noexcept;
-		[[nodiscard]] bool HasRetains() const noexcept;
 
 		void BeginMeshRollback(MeshID meshId) noexcept;
 		void CompleteMeshRollback(MeshID meshId) noexcept;

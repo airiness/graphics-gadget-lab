@@ -227,11 +227,6 @@ namespace gglab
 		m_BufferBarriers.push_back(bufferBarrier);
 	}
 
-	void DX12CommandList::AddGlobalBarrier(const CD3DX12_GLOBAL_BARRIER& globalBarrier) noexcept
-	{
-		m_GlobalBarriers.push_back(globalBarrier);
-	}
-
 	void DX12CommandList::FlushBarriers() noexcept
 	{
 		std::vector<CD3DX12_BARRIER_GROUP> barrierGroups;
@@ -249,13 +244,6 @@ namespace gglab
 			barrierGroups.push_back(group);
 		}
 
-		if (!m_GlobalBarriers.empty())
-		{
-			CD3DX12_BARRIER_GROUP group(
-				static_cast<UINT32>(m_GlobalBarriers.size()), m_GlobalBarriers.data());
-			barrierGroups.push_back(group);
-		}
-
 		if (!barrierGroups.empty())
 		{
 			m_D3D12GraphicsCommandList->Barrier(
@@ -264,7 +252,6 @@ namespace gglab
 
 		m_TextureBarriers.clear();
 		m_BufferBarriers.clear();
-		m_GlobalBarriers.clear();
 	}
 
 	void DX12CommandList::ClearRenderTarget(

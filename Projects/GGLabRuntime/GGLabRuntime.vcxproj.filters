@@ -741,9 +741,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12SwapChain.cpp">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Texture.cpp">
-      <Filter>Private\Graphics\RHI\DX12</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12TransferContext.cpp">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -760,9 +757,6 @@
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12PipelineDescUtils.cpp">
-      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12QueueUtils.cpp">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.cpp">
@@ -1377,9 +1371,6 @@
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12PortabilityUtils.h">
-      <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12QueueUtils.h">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ResourceDescUtils.h">

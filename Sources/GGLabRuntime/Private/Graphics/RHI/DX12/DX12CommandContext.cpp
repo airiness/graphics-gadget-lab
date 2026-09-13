@@ -701,12 +701,6 @@ namespace gglab
 		}
 	}
 
-	void DX12GraphicsCommandContext::SetRootSignature(
-		const DX12RootSignature& rootSignature) noexcept
-	{
-		m_Backend.GetCommandList()->SetGraphicsRootSignature(rootSignature);
-	}
-
 	void DX12GraphicsCommandContext::SetPipelineState(
 		const DX12PipelineState& pipelineState) noexcept
 	{

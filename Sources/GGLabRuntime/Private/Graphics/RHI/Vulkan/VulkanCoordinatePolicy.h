@@ -1,5 +1,4 @@
 #pragma once
-#include "GGLabRuntime/Graphics/RHI/RHICoordinatePolicy.h"
 
 namespace gglab
 {
@@ -10,7 +9,6 @@ namespace gglab
 	// compile with Y inversion applied.
 	struct VulkanCoordinatePolicy
 	{
-		RHICoordinatePolicy m_RHIPolicy = GGLabCoordinatePolicy;
 		bool m_UsePositiveViewportHeight = true;
 		bool m_BackendAppliesAdditionalReversedZ = false;
 	};

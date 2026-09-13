@@ -171,7 +171,6 @@ namespace gglab
 		[[nodiscard]] bool TryEnd(uint32_t slot) noexcept;
 		[[nodiscard]] bool TryAbort(uint32_t slot) noexcept;
 		[[nodiscard]] bool IsActive(uint32_t slot) const noexcept;
-		[[nodiscard]] VulkanFrameSlotPhase GetPhase(uint32_t slot) const noexcept;
 		[[nodiscard]] uint32_t GetSlotCount() const noexcept
 		{
 			return static_cast<uint32_t>(m_Phases.size());

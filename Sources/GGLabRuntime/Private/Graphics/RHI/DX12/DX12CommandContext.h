@@ -153,7 +153,6 @@ namespace gglab
 		void EndGpuProfileScope() noexcept override;
 		void SetGpuProfiler(DX12GpuProfiler* profiler) noexcept { m_GpuProfiler = profiler; }
 
-		void SetRootSignature(const DX12RootSignature& rootSignature) noexcept;
 		void SetPipelineState(const DX12PipelineState& pipelineState) noexcept;
 		void SetDescriptor(uint32_t parameterIndex, const DX12DescriptorView& descriptor) noexcept;
 

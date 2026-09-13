@@ -533,16 +533,4 @@ namespace gglab
 
 		return { .m_Supported = true };
 	}
-
-	std::string_view ToVulkanFormatName(VkFormat format) noexcept
-	{
-		for (const VulkanFormatInfo& info : VulkanFormatInfos)
-		{
-			if (info.m_ResourceFormat == format)
-			{
-				return GetRHIFormatInfo(info.m_RHIFormat).m_Name;
-			}
-		}
-		return "VK_FORMAT_UNDEFINED";
-	}
 }

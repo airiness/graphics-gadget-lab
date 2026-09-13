@@ -20,7 +20,6 @@ namespace gglab
 	class VulkanSet0DynamicUniformFrames;
 	class VulkanDevice;
 	class VulkanSwapChain;
-	struct VulkanAdapterCapabilitySnapshot;
 	struct VulkanBackendSnapshot;
 
 	class VulkanFrameContext final : public RHIFrameContext
@@ -79,8 +78,6 @@ namespace gglab
 		[[nodiscard]] VulkanDevice& GetVulkanDevice() noexcept;
 		[[nodiscard]] const VulkanDevice& GetVulkanDevice() const noexcept;
 		[[nodiscard]] const VulkanSwapChain& GetVulkanSwapChain() const noexcept;
-		[[nodiscard]] const VulkanAdapterCapabilitySnapshot&
-			GetAdapterCapabilitySnapshot() const noexcept;
 		[[nodiscard]] uint64_t GetSwapChainGeneration() const noexcept
 		{
 			return m_SwapChainGeneration;
@@ -89,8 +86,6 @@ namespace gglab
 		{
 			return m_ValidationRequested;
 		}
-		[[nodiscard]] bool IsValidationEnabled() const noexcept;
-		[[nodiscard]] bool IsFrameRuntimeFatal() const noexcept;
 		[[nodiscard]] bool IsDeviceLost() const noexcept;
 		[[nodiscard]] uint64_t GetSubmittedTimelineValue() const noexcept;
 		[[nodiscard]] bool TryGetCompletedTimelineValue(uint64_t& outValue) const noexcept;

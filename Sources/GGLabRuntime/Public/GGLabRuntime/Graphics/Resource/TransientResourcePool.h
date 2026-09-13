@@ -187,8 +187,6 @@ namespace gglab
 
 		void Tick() noexcept;
 
-		void TrimPerKey(uint32_t maxCachedPerKey) noexcept;
-
 		[[nodiscard]] bool IsCompatibleTexture(const TransientTextureAllocation& allocation,
 			const RHITextureDesc& desc) const noexcept;
 

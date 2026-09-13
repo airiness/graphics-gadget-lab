@@ -245,11 +245,6 @@ namespace gglab
 		return slot < m_Phases.size() && m_Phases[slot] == VulkanFrameSlotPhase::Begun;
 	}
 
-	VulkanFrameSlotPhase VulkanFrameSlotStateMachine::GetPhase(uint32_t slot) const noexcept
-	{
-		return slot < m_Phases.size() ? m_Phases[slot] : VulkanFrameSlotPhase::Idle;
-	}
-
 	VulkanFrameRuntime::~VulkanFrameRuntime()
 	{
 		// Quiesce and drain frame-scoped descriptor state while the graphics

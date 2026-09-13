@@ -9,7 +9,6 @@
 namespace gglab
 {
 	class RingSpanAllocator;
-	class DX12DescriptorAllocator;
 	class DX12DescriptorRingAllocator : public DX12DescriptorAllocatorBase
 	{
 	public:

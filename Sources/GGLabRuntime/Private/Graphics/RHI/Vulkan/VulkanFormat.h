@@ -134,7 +134,4 @@ namespace gglab
 	// callers see backend-neutral reasons.
 	[[nodiscard]] RHITextureSupportResult QueryVulkanTextureSupport(
 		VkPhysicalDevice physicalDevice, const RHITextureDesc& desc) noexcept;
-
-	// Native format name for diagnostics; falls back to a numeric label.
-	[[nodiscard]] std::string_view ToVulkanFormatName(VkFormat format) noexcept;
 }
