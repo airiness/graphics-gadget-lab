@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="..\..\Tests\ShaderToolchain\PublicationTransactionSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.cpp" />
@@ -8,6 +9,7 @@
     <ClCompile Include="..\..\Tests\ShaderToolchain\ShaderToolchainTestsMain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Tests\ShaderToolchain\PublicationTransactionSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderCompilerCliContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderGraphPreviewProgramContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderToolchain\ShaderPreviewPublicationContractSelfTests.h" />

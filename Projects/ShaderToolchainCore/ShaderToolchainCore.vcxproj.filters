@@ -21,6 +21,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\PublicationTransaction.cpp">
+      <Filter>Artifact</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.cpp">
       <Filter>Artifact</Filter>
     </ClCompile>
@@ -33,6 +36,9 @@
     <ClCompile Include="..\..\Sources\ShaderToolchain\DevelopmentShaderPaths.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\PublicationTransaction.h">
+      <Filter>Artifact</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\ShaderToolchain\Artifact\ShaderArtifactManifestIO.h">
       <Filter>Artifact</Filter>
     </ClInclude>
