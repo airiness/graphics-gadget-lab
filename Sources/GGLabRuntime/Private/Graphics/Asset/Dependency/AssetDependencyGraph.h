@@ -2,7 +2,6 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/AssetDependencyTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
 #include <cstdint>
 #include <span>

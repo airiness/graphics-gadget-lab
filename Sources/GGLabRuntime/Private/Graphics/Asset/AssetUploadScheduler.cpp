@@ -922,9 +922,7 @@ namespace gglab
 	uint32_t AssetUploadScheduler::DrainResourcePublicationQueue(bool ignoreBudget) noexcept
 	{
 		uint32_t processedCount = 0;
-		AssetResourcePublicationContext context{
-			.m_Scheduler = this,
-		};
+		AssetResourcePublicationContext context{};
 		while (!m_ResourcePublicationQueue.empty())
 		{
 			const bool budgetExhausted = m_LastFrameUsage.m_ResourcePublicationSteps >=
@@ -1244,9 +1242,7 @@ namespace gglab
 	uint32_t AssetUploadScheduler::CancelResourcePublication(
 		const AssetStreamingIdentity& identity, AssetResourcePublicationAbortReason reason) noexcept
 	{
-		AssetResourcePublicationContext context{
-			.m_Scheduler = this,
-		};
+		AssetResourcePublicationContext context{};
 		uint32_t cancelledCount = 0;
 		for (auto iterator = m_ResourcePublicationQueue.begin();
 			iterator != m_ResourcePublicationQueue.end();)

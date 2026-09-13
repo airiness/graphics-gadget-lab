@@ -1641,6 +1641,16 @@ namespace gglab
 				!missingPathsInstance.m_Services.m_PipelineResolver,
 				"render host factory rejects missing runtime paths");
 
+			RenderHostCreateInfo missingShaderManager{};
+			missingShaderManager.m_RHIContextFactory =
+				reinterpret_cast<const RHIContextFactoryBase*>(1);
+			missingShaderManager.m_IblDerivedDataCacheDirectory = "cache";
+			const RenderHostInstance missingShaderManagerInstance =
+				CreateRenderHost(missingShaderManager);
+			context.Check(!missingShaderManagerInstance.m_Host &&
+				!missingShaderManagerInstance.m_Services.m_PipelineResolver,
+				"render host factory rejects a missing host shader manager");
+
 			RenderHostInstance defaultHostInstance{};
 			context.Check(!defaultHostInstance.m_Host && !defaultHostInstance.m_Composition,
 				"render host instances default to no host and no composition access");

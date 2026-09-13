@@ -163,8 +163,9 @@ namespace gglab
 
 	// Narrow Runtime render host contract used by the application runtime to
 	// drive lifecycle and frame orchestration. It intentionally exposes no
-	// concrete renderer accessor and no pass or content service locator; the
-	// transitional concrete access path lives in the legacy bridge.
+	// concrete renderer accessor and no pass or content service locator;
+	// development tooling observes runtime state through diagnostics snapshots
+	// and explicit control seams.
 	class RenderHost
 	{
 	public:
@@ -248,8 +249,8 @@ namespace gglab
 	};
 
 	// Creates and initializes the Runtime render host and its explicit service
-	// bundle. The host is null when the host-supplied context factory or runtime
-	// paths are missing, or when host initialization fails.
+	// bundle. The host is null when the host-supplied context factory, shader
+	// manager or runtime paths are missing, or when host initialization fails.
 	[[nodiscard]] RenderHostInstance CreateRenderHost(
 		const RenderHostCreateInfo& createInfo) noexcept;
 

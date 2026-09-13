@@ -45,11 +45,11 @@ namespace gglab
 
 	void AssetPublicationCoordinator::RecordProtectedCancellation() noexcept
 	{
-		++m_ProtectedCancellationCount;
+		++m_Accounting.m_ProtectedCancellationCount;
 	}
 
 	uint64_t AssetPublicationCoordinator::GetProtectedCancellationCount() const noexcept
 	{
-		return m_ProtectedCancellationCount;
+		return m_Accounting.m_ProtectedCancellationCount;
 	}
 }

@@ -324,12 +324,6 @@ namespace gglab
 		RenderSamplerAccess* m_SamplerRegistry = nullptr;
 		MaterialTextureSamplingSettings m_MaterialTextureSampling{};
 
-		uint64_t m_CpuCancellationCount = 0;
-		uint64_t m_ReadyCancellationCount = 0;
-		uint64_t m_GpuDeferredCancellationCount = 0;
-		uint64_t m_RuntimeRetirementRequestCount = 0;
-		uint64_t m_RuntimeRetirementCancellationCount = 0;
-		uint64_t m_RuntimeRetirementCount = 0;
 		bool m_AcceptingCommands = true;
 		bool m_IsPreparedForShutdown = false;
 		std::unique_ptr<AssetManagerState> m_State;

@@ -8,7 +8,6 @@ namespace gglab
 {
 	struct RenderView;
 	struct RenderScene;
-	class Renderer;
 	class RenderGraph;
 
 	class RenderPipelineBase

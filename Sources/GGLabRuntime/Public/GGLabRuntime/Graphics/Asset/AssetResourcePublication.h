@@ -66,11 +66,8 @@ namespace gglab
 		std::string m_Error;
 	};
 
-	class AssetUploadScheduler;
-
 	struct AssetResourcePublicationContext
 	{
-		AssetUploadScheduler* m_Scheduler = nullptr;
 		TaskPriority m_Priority = TaskPriority::Normal;
 	};
 

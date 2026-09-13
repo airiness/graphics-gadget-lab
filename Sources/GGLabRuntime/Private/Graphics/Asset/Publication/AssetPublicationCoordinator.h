@@ -10,10 +10,25 @@ namespace gglab
 {
 	class AssetResidencyCoordinator;
 
+	// Owner-thread cancellation, protected-publication and runtime-retirement
+	// accounting reported through AssetOwnershipStatistics. AssetManager updates
+	// the counters; the publication coordinator owns the storage.
+	struct AssetPublicationAccounting
+	{
+		uint64_t m_CpuCancellationCount = 0;
+		uint64_t m_ReadyCancellationCount = 0;
+		uint64_t m_GpuDeferredCancellationCount = 0;
+		uint64_t m_ProtectedCancellationCount = 0;
+		uint64_t m_RuntimeRetirementRequestCount = 0;
+		uint64_t m_RuntimeRetirementCancellationCount = 0;
+		uint64_t m_RuntimeRetirementCount = 0;
+	};
+
 	// Owner-thread publication-protection state: publication retains, meshes
-	// whose publication was rolled back while GPU work may still complete, and
-	// the protected-cancellation accounting. The upload scheduler keeps the
-	// upload queue and AssetManager keeps the publication state transitions.
+	// whose publication was rolled back while GPU work may still complete, the
+	// protected-cancellation accounting and the shared cancellation/retirement
+	// counters. The upload scheduler keeps the upload queue and AssetManager
+	// keeps the publication state transitions.
 	class AssetPublicationCoordinator final
 	{
 	public:
@@ -36,9 +51,10 @@ namespace gglab
 		void RecordProtectedCancellation() noexcept;
 		[[nodiscard]] uint64_t GetProtectedCancellationCount() const noexcept;
 
+		AssetPublicationAccounting m_Accounting{};
+
 	private:
 		AssetResidencyCoordinator& m_Residency;
 		std::unordered_set<MeshID> m_OrphanedRollbackMeshes;
-		uint64_t m_ProtectedCancellationCount = 0;
 	};
 }

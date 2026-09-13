@@ -243,6 +243,10 @@ namespace gglab
 		RenderShaderProgramAccess* m_ShaderPrograms = nullptr;
 		RenderSamplerAccess* m_Samplers = nullptr;
 		RenderResourceRegistryAccess* m_Resources = nullptr;
+		// Injected by the application content host from its asset manager before
+		// pipeline execution. Passes that consume texture assets require a
+		// non-null value; IsValid() validates only the stable owner-provided
+		// bundle below.
 		RenderTextureAssetAccess* m_TextureAssets = nullptr;
 		RenderFrameBufferAccess* m_FrameBuffers = nullptr;
 		RenderEnvironmentAccess* m_Environment = nullptr;
@@ -250,8 +254,13 @@ namespace gglab
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
 		AssetUploadScheduling* m_AssetUpload = nullptr;
+		// Deliberate per-frame application injection; null when no developer
+		// overlay pass participates in the frame.
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 
+		// Validates the stable owner-provided services. The application-injected
+		// m_TextureAssets is required for pass execution but is not part of this
+		// owner-provided validation.
 		[[nodiscard]] bool IsValid() const noexcept
 		{
 			return m_PipelineResolver && m_ShaderPrograms && m_Samplers && m_Resources &&

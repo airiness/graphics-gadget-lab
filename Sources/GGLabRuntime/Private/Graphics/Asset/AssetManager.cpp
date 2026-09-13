@@ -362,12 +362,16 @@ namespace gglab
 		statistics.m_LeaseCount = trackerStatistics.m_LeaseCount;
 		statistics.m_ManagedAssetCount = trackerStatistics.m_ManagedAssetCount;
 		statistics.m_PriorityUpdateCount = trackerStatistics.m_PriorityUpdateCount;
-		statistics.m_CpuCancellationCount = m_CpuCancellationCount;
-		statistics.m_ReadyCancellationCount = m_ReadyCancellationCount;
-		statistics.m_GpuDeferredCancellationCount = m_GpuDeferredCancellationCount;
-		statistics.m_RuntimeRetirementRequestCount = m_RuntimeRetirementRequestCount;
-		statistics.m_RuntimeRetirementCancellationCount = m_RuntimeRetirementCancellationCount;
-		statistics.m_RuntimeRetirementCount = m_RuntimeRetirementCount;
+		const AssetPublicationAccounting& accounting =
+			m_State->m_AssetPublicationCoordinator.m_Accounting;
+		statistics.m_CpuCancellationCount = accounting.m_CpuCancellationCount;
+		statistics.m_ReadyCancellationCount = accounting.m_ReadyCancellationCount;
+		statistics.m_GpuDeferredCancellationCount = accounting.m_GpuDeferredCancellationCount;
+		statistics.m_RuntimeRetirementRequestCount =
+			accounting.m_RuntimeRetirementRequestCount;
+		statistics.m_RuntimeRetirementCancellationCount =
+			accounting.m_RuntimeRetirementCancellationCount;
+		statistics.m_RuntimeRetirementCount = accounting.m_RuntimeRetirementCount;
 		statistics.m_PendingRuntimeRetirementCount =
 			static_cast<uint32_t>(m_State->m_AssetResidencyCoordinator.PendingRetirements().size());
 		statistics.m_PublicationRetainCount = trackerStatistics.m_PublicationRetainCount;
@@ -1021,7 +1025,7 @@ namespace gglab
 			.m_ContentVersion = contentVersion,
 			.m_QueuedFrame = m_State->m_AssetResidencyCoordinator.GetUsageFrame(),
 			});
-		++m_RuntimeRetirementRequestCount;
+		++m_State->m_AssetPublicationCoordinator.m_Accounting.m_RuntimeRetirementRequestCount;
 	}
 
 	void AssetManager::CancelRuntimeRetirement(AssetContentVersion contentVersion) noexcept
@@ -1029,7 +1033,7 @@ namespace gglab
 		const size_t removed = std::erase_if(m_State->m_AssetResidencyCoordinator.PendingRetirements(),
 			[contentVersion](const AssetResidencyCoordinator::PendingRetirement& pending) noexcept
 			{ return pending.m_ContentVersion == contentVersion; });
-		m_RuntimeRetirementCancellationCount += removed;
+		m_State->m_AssetPublicationCoordinator.m_Accounting.m_RuntimeRetirementCancellationCount += removed;
 	}
 
 	bool AssetManager::RetireRuntimeEntry(AssetContentVersion contentVersion) noexcept
@@ -1170,7 +1174,7 @@ namespace gglab
 			if (HasActiveInterest(key) ||
 				HasPublicationRetain(key, contentVersion.m_ContentGeneration))
 			{
-				++m_RuntimeRetirementCancellationCount;
+				++m_State->m_AssetPublicationCoordinator.m_Accounting.m_RuntimeRetirementCancellationCount;
 				m_State->m_AssetResidencyCoordinator.PendingRetirements().erase(
 					m_State->m_AssetResidencyCoordinator.PendingRetirements().begin() + pendingIndex);
 				continue;
@@ -1223,7 +1227,7 @@ namespace gglab
 			retiredModelCount += key.m_Kind == AssetKind::Model ? 1u : 0u;
 			retiredMeshCount += key.m_Kind == AssetKind::Mesh ? 1u : 0u;
 			retiredTextureCount += key.m_Kind == AssetKind::Texture ? 1u : 0u;
-			++m_RuntimeRetirementCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_RuntimeRetirementCount;
 			m_State->m_AssetResidencyCoordinator.PendingRetirements().erase(m_State->m_AssetResidencyCoordinator.PendingRetirements().begin() + pendingIndex);
 		}
 		if (retiredCount != 0)
@@ -1266,15 +1270,15 @@ namespace gglab
 			if (texture->m_State == AssetState::Queued ||
 				texture->m_State == AssetState::LoadingCpu)
 			{
-				++m_CpuCancellationCount;
+				++m_State->m_AssetPublicationCoordinator.m_Accounting.m_CpuCancellationCount;
 			}
 			else if (texture->m_Gpu.m_Texture.IsValid())
 			{
-				++m_GpuDeferredCancellationCount;
+				++m_State->m_AssetPublicationCoordinator.m_Accounting.m_GpuDeferredCancellationCount;
 			}
 			else
 			{
-				++m_ReadyCancellationCount;
+				++m_State->m_AssetPublicationCoordinator.m_Accounting.m_ReadyCancellationCount;
 			}
 			m_State->m_TextureAssets->CancelTextureIfUnreferenced(textureId, generation);
 		}
@@ -1317,15 +1321,15 @@ namespace gglab
 			m_AssetUploadScheduler->CancelReadyWork(MakeAssetContentVersion(modelId, generation));
 		if (model->m_State == AssetState::Queued || model->m_State == AssetState::LoadingCpu)
 		{
-			++m_CpuCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_CpuCancellationCount;
 		}
 		else if (cancelledReadyWork > 0)
 		{
-			++m_ReadyCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_ReadyCancellationCount;
 		}
 		else
 		{
-			++m_GpuDeferredCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_GpuDeferredCancellationCount;
 		}
 		UnregisterModelDependencies(modelId, generation);
 		SetAssetState(*model, AssetState::Cancelled);
@@ -1363,7 +1367,7 @@ namespace gglab
 			mesh->m_IsReloading = false;
 			AssetResidencyController::InvalidateResidencyOperation(*mesh);
 			SetMeshState(*mesh, AssetState::CpuReady);
-			++m_ReadyCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_ReadyCancellationCount;
 			return;
 		}
 		mesh->m_CancelRequested = true;
@@ -1371,12 +1375,12 @@ namespace gglab
 			m_AssetUploadScheduler->CancelReadyWork(MakeAssetContentVersion(meshId, generation));
 		if (mesh->m_VertexBuffer || mesh->m_IndexBuffer)
 		{
-			++m_GpuDeferredCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_GpuDeferredCancellationCount;
 		}
 		else
 		{
 			GGLAB_UNUSED(cancelledReadyWork);
-			++m_ReadyCancellationCount;
+			++m_State->m_AssetPublicationCoordinator.m_Accounting.m_ReadyCancellationCount;
 		}
 		SetMeshState(*mesh, mesh->m_VertexBuffer || mesh->m_IndexBuffer ? AssetState::GpuProcessing
 			: AssetState::Cancelled);

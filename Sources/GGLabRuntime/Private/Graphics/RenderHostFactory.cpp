@@ -11,7 +11,9 @@ namespace gglab
 	RenderHostInstance CreateRenderHost(const RenderHostCreateInfo& createInfo) noexcept
 	{
 		RenderHostInstance instance{};
-		if (createInfo.m_RHIContextFactory == nullptr || !createInfo.HasRequiredRuntimePaths())
+		if (createInfo.m_RHIContextFactory == nullptr ||
+			createInfo.m_ShaderManager == nullptr ||
+			!createInfo.HasRequiredRuntimePaths())
 		{
 			return instance;
 		}

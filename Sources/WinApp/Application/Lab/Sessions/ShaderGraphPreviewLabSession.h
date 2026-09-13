@@ -1,7 +1,6 @@
 #pragma once
 #include "AssetPreparationTracker.h"
 #include "Application/Shader/ShaderPreviewRuntimeSession.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Lab/LabSessionBase.h"
 
 #include <memory>
