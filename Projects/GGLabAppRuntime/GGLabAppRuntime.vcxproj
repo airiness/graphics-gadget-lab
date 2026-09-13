@@ -108,7 +108,6 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRuntime.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h" />
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\LoadingProgress.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />
