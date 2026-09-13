@@ -96,10 +96,14 @@ namespace gglab
 		[[nodiscard]] virtual bool IsOwnerThread() const noexcept = 0;
 	};
 
-	// Borrowed developer/acceptance view of a scheduler created by the factory.
-	// Returns nullptr when the instance does not implement the control contract.
-	[[nodiscard]] AssetUploadControl* GetAssetUploadControl(
-		AssetUploadScheduling& scheduler) noexcept;
+	// Composition result of the scheduler factory. m_Scheduling owns the
+	// concrete scheduler; m_Control borrows the sibling developer/acceptance
+	// view and stays valid for the lifetime of m_Scheduling.
+	struct AssetUploadSchedulerInstance
+	{
+		std::unique_ptr<AssetUploadScheduling> m_Scheduling;
+		AssetUploadControl* m_Control = nullptr;
+	};
 
 	struct AssetUploadSchedulerCreateInfo
 	{
@@ -109,6 +113,6 @@ namespace gglab
 		AssetStreamingFrameBudget m_FrameBudget{};
 	};
 
-	[[nodiscard]] std::unique_ptr<AssetUploadScheduling> CreateAssetUploadScheduler(
+	[[nodiscard]] AssetUploadSchedulerInstance CreateAssetUploadScheduler(
 		const AssetUploadSchedulerCreateInfo& createInfo) noexcept;
 }

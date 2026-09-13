@@ -107,11 +107,13 @@ namespace gglab
 		}
 
 		auto* device = &m_RHIContext->GetDevice();
-		m_AssetUploadScheduler = CreateAssetUploadScheduler(AssetUploadSchedulerCreateInfo{
-			.m_Device = device,
-			.m_TransferManager = GetTransferManager(),
-			});
-		m_AssetUploadControl = gglab::GetAssetUploadControl(*m_AssetUploadScheduler);
+		AssetUploadSchedulerInstance uploadSchedulerInstance =
+			CreateAssetUploadScheduler(AssetUploadSchedulerCreateInfo{
+				.m_Device = device,
+				.m_TransferManager = GetTransferManager(),
+				});
+		m_AssetUploadScheduler = std::move(uploadSchedulerInstance.m_Scheduling);
+		m_AssetUploadControl = uploadSchedulerInstance.m_Control;
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);

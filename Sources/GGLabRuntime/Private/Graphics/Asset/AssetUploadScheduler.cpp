@@ -226,15 +226,15 @@ namespace gglab
 		bool m_IsRecordingUploadBatch = false;
 	};
 
-	std::unique_ptr<AssetUploadScheduling> CreateAssetUploadScheduler(
+	AssetUploadSchedulerInstance CreateAssetUploadScheduler(
 		const AssetUploadSchedulerCreateInfo& createInfo) noexcept
 	{
-		return std::make_unique<AssetUploadScheduler>(createInfo);
-	}
-
-	AssetUploadControl* GetAssetUploadControl(AssetUploadScheduling& scheduler) noexcept
-	{
-		return dynamic_cast<AssetUploadControl*>(&scheduler);
+		auto scheduler = std::make_unique<AssetUploadScheduler>(createInfo);
+		AssetUploadControl* control = scheduler.get();
+		return {
+			.m_Scheduling = std::move(scheduler),
+			.m_Control = control,
+		};
 	}
 
 	namespace

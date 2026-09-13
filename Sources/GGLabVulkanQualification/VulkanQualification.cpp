@@ -1134,11 +1134,12 @@ namespace gglab
 			// Workers only enqueue immutable payloads. Resource creation, upload
 			// recording, queue submission, completion polling and descriptor
 			// publication all execute on the captured graphics owner thread.
-			auto scheduler = CreateAssetUploadScheduler({
+			AssetUploadSchedulerInstance uploadSchedulerInstance = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
-			AssetUploadControl* uploadControl = GetAssetUploadControl(*scheduler);
+			AssetUploadScheduling* scheduler = uploadSchedulerInstance.m_Scheduling.get();
+			AssetUploadControl* uploadControl = uploadSchedulerInstance.m_Control;
 			const AssetStreamingIdentity streamingIdentity{
 				.m_Kind = AssetStreamingWorkKind::Texture,
 				.m_StableId = 8,
