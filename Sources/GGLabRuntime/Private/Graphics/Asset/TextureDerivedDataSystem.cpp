@@ -1,4 +1,4 @@
-#include "GGLabRuntime/Graphics/Asset/TextureDerivedDataSystem.h"
+#include "Graphics/Asset/TextureDerivedDataCoordinator.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
@@ -378,5 +378,11 @@ namespace gglab
 	bool TextureDerivedDataSystem::Clear() noexcept
 	{
 		return m_Store->m_Store.Clear();
+	}
+
+	std::unique_ptr<TextureDerivedDataAcceptance>
+		CreateTextureDerivedDataAcceptance(std::filesystem::path cacheDirectory) noexcept
+	{
+		return std::make_unique<TextureDerivedDataSystem>(std::move(cacheDirectory));
 	}
 }

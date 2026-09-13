@@ -515,6 +515,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Residency\AssetResidencyCoordinator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\ModelAssetSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationCoordinator.h" />
@@ -545,7 +546,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataSystem.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataAcceptance.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Dependency\AssetStateEventQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\Interest\AssetInterestTracker.h" />

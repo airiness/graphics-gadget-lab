@@ -1036,6 +1036,7 @@ $legacyRuntimeAssetContractPaths = @(
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.h"),
     (Join-Path $runtimeSourcesDir "Graphics/Asset/Streaming/AssetUploadScheduler.cpp"),
     (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Asset/AssetUploadScheduler.h"),
+    (Join-Path $runtimeSourcesDir "Public/GGLabRuntime/Graphics/Asset/TextureDerivedDataSystem.h"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.h"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferBatch.cpp"),
     (Join-Path $runtimeSourcesDir "Graphics/TransferManager.h"),
@@ -1471,7 +1472,8 @@ $legacyRuntimeAssetContractIncludeRegex =
     'Asset[\\/](?:Residency[\\/]AssetResidencyTypes|Loading[\\/]ModelImporter)\.h|' +
     'TransferBatch\.h|TransferManager\.h)[>"]'
 $removedPublicAssetIncludeRegex =
-    '#include\s*[<"]GGLabRuntime[\\/]Graphics[\\/]Asset[\\/]AssetUploadScheduler\.h[>"]'
+    '#include\s*[<"]GGLabRuntime[\\/]Graphics[\\/]Asset[\\/](?:AssetUploadScheduler|' +
+    'TextureDerivedDataSystem)\.h[>"]'
 $removedRuntimeBridgeIncludeRegex =
     '#include\s*[<"]Graphics[\\/]LegacyRenderHostAccess\.h[>"]'
 foreach ($sourceFile in Get-ChildItem -LiteralPath @($repositorySourcesDir, $repositoryTestsDir) `
