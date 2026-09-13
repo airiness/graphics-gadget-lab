@@ -19,7 +19,10 @@ namespace gglab
 
 	enum class PublicationCommit : uint8_t
 	{
-		// Plain rename: an existing destination is never replaced by this mode.
+		// Plain std::filesystem::rename. The name records the original
+		// exclusive-create intent, but the C++ filesystem contract replaces an
+		// existing non-directory destination, so concurrent producers converge
+		// through post-commit observation instead of a create guarantee.
 		ExclusiveRename,
 		// MoveFileExW with MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH.
 		ReplaceExisting,
