@@ -1,14 +1,13 @@
 #include "Demo/DemoManager.h"
 #include "AppRuntimeLog.h"
-#include "Core/Log/LogMacros.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {
-	DemoManager::DemoManager(Renderer* renderer) noexcept : m_Renderer(renderer)
+	DemoManager::DemoManager(RHIContext* rhiContext) noexcept : m_RHIContext(rhiContext)
 	{
-		GGLAB_ASSERT_NOT_NULL(m_Renderer);
 	}
 
 	DemoManager::~DemoManager()
@@ -286,7 +285,8 @@ namespace gglab
 
 	void DemoManager::PollRetiringDemos() noexcept
 	{
-		RHIDevice* device = m_Renderer ? m_Renderer->GetDevice() : nullptr;
+		RHIContext* rhiContext = m_RHIContext;
+		RHIDevice* device = rhiContext ? &rhiContext->GetDevice() : nullptr;
 		if (!device)
 		{
 			return;

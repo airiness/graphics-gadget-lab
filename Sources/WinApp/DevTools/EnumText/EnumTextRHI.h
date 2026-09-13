@@ -1,8 +1,8 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/RHI/RHIBindingLayout.h"
-#include "Graphics/RHI/RHIPipeline.h"
-#include "Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipeline.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 
 namespace gglab::devtools
 {

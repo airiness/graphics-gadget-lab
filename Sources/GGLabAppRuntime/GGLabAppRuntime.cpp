@@ -1,7 +1,7 @@
 #include "GGLabAppRuntime.h"
 
 #include "Demo/DemoManager.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 
 namespace gglab
 {
@@ -48,9 +48,9 @@ namespace gglab
 		case AppHostEventType::Suspended:
 			if (m_LifecycleState == AppRuntimeLifecycleState::Running)
 			{
-				if (m_Renderer)
+				if (m_RenderHost)
 				{
-					m_Renderer->OnSuspend();
+					m_RenderHost->OnSuspend();
 				}
 				m_LifecycleState = AppRuntimeLifecycleState::Suspended;
 			}
@@ -58,13 +58,13 @@ namespace gglab
 		case AppHostEventType::Resumed:
 			if (m_LifecycleState == AppRuntimeLifecycleState::Suspended)
 			{
-				if (m_Renderer)
+				if (m_RenderHost)
 				{
-					m_Renderer->OnResume();
+					m_RenderHost->OnResume();
 				}
 				if (m_ResizePending)
 				{
-					m_Renderer->OnResize(m_WindowWidth, m_WindowHeight);
+					m_RenderHost->OnResize(m_WindowWidth, m_WindowHeight);
 					m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 					m_ResizePending = false;
 				}
@@ -104,7 +104,7 @@ namespace gglab
 			return;
 		}
 
-		m_Renderer->OnResize(width, height);
+		m_RenderHost->OnResize(width, height);
 		m_DemoManager->OnResize(width, height);
 		m_ResizePending = false;
 	}

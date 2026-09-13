@@ -2,7 +2,7 @@
 
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
 
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include "NapaVoxelCore/Meshing/MeshValidation.h"
 #include "NapaVoxelCore/Validation/CheckedArithmetic.h"

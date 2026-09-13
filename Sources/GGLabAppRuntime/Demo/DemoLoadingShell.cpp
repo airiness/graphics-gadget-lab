@@ -1,9 +1,9 @@
 #include "Demo/DemoLoadingShell.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Demo/DemoLoadingShellRenderPipeline.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
 {

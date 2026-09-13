@@ -1,8 +1,8 @@
 #pragma once
 #include "DevTools/EnumText/EnumText.h"
-#include "Graphics/RenderGraph/RGPass.h"
-#include "Graphics/RenderGraph/RGResource.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 
 namespace gglab::devtools
 {

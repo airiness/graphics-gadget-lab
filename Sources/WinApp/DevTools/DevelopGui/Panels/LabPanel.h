@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
 
 #include <optional>

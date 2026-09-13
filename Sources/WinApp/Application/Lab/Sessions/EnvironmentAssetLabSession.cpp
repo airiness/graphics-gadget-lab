@@ -1,11 +1,15 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
 {
@@ -49,20 +53,21 @@ namespace gglab
 
 	EnvironmentAssetLabSession::EnvironmentAssetLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 	}
 
 	void EnvironmentAssetLabSession::OnEnter() noexcept
 	{
 		m_State = std::make_unique<State>();
-		IBLBakeScheduler* scheduler = m_Services.m_Renderer->GetIBLBakeScheduler();
+		IBLCacheControlBase* cacheControl = m_Services.m_IBLCacheControl;
+		GGLAB_ASSERT_NOT_NULL(cacheControl);
 		// The acceptance sequence needs deterministic stage misses even when a
 		// previous run populated the same sample-count variants. DDC entries are
 		// recoverable derived data, so start this cache-focused Lab from a clean set.
-		scheduler->ClearArtifactCache();
-		GGLAB_UNUSED(scheduler->ClearDerivedDataStore());
-		const auto& settings = m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetSettings();
+		cacheControl->ClearArtifactCache();
+		GGLAB_UNUSED(cacheControl->ClearDerivedDataStore());
+		const auto& settings = m_Services.m_EnvironmentLighting->GetEnvironmentLightingSettings();
 		m_State->m_OriginalQualityPreset = settings.m_QualityPreset;
 		m_State->m_OriginalSpecularSampleCount =
 			settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
@@ -79,8 +84,8 @@ namespace gglab
 	{
 		if (m_State)
 		{
-			EnvironmentLightingSystem* environment =
-				m_Services.m_Renderer->GetEnvironmentLightingSystem();
+			EnvironmentLightingControlBase* environment =
+				m_Services.m_EnvironmentLightingControl;
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
@@ -91,16 +96,16 @@ namespace gglab
 					m_State->m_OriginalSpecularSampleCount);
 			}
 		}
-		if (m_Services.m_EnvironmentAssetController)
+		EnvironmentAssetController* environmentController =
+			m_Services.m_EnvironmentAssetController;
+		GGLAB_ASSERT_NOT_NULL(environmentController);
+		if (m_Services.m_AssetManager->IsAcceptingCommands())
 		{
-			if (m_Services.m_AssetManager->IsAcceptingCommands())
-			{
-				m_Services.m_EnvironmentAssetController->Initialize("Assets/Textures/Skybox");
-			}
-			else
-			{
-				m_Services.m_EnvironmentAssetController->Reset();
-			}
+			environmentController->Initialize("Assets/Textures/Skybox");
+		}
+		else
+		{
+			environmentController->Reset();
 		}
 		m_State.reset();
 	}
@@ -229,7 +234,7 @@ namespace gglab
 				return;
 			}
 			if (!controller.SelectEnvironmentFile(
-				"Shaders/Passes/PassForwardPBR.hlsl", "Decode Failure Probe"))
+				"Assets/Textures/Probes/InvalidDecode.hdr", "Decode Failure Probe"))
 			{
 				Fail("Decode-failure probe was rejected before asynchronous loading.");
 				return;
@@ -290,7 +295,7 @@ namespace gglab
 
 			controller.Reset();
 			const EnvironmentTextureSource& source =
-				m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetBakeSource();
+				m_Services.m_RenderServices.m_Environment->GetCommittedEnvironmentSource();
 			if (controller.GetActiveEnvironment() ||
 				source.m_Type != EnvironmentTextureSourceType::Cubemap ||
 				!IsReservedTextureId(source.m_Content.m_Id))
@@ -315,7 +320,7 @@ namespace gglab
 				break;
 			}
 			if (!controller.GetActiveEnvironment() ||
-				m_Services.m_Renderer->GetEnvironmentLightingSystem()->GetBakeSource().m_Type !=
+				m_Services.m_RenderServices.m_Environment->GetCommittedEnvironmentSource().m_Type !=
 				EnvironmentTextureSourceType::Equirectangular)
 			{
 				Fail("Environment reselection did not replace the fallback.");
@@ -327,8 +332,8 @@ namespace gglab
 
 		case State::Phase::WaitForInitialStageSet:
 		{
-			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
-			const IBLBakeStatus& status = scheduler.GetStatus();
+			RenderEnvironmentAccess& scheduler = *m_Services.m_RenderServices.m_Environment;
+			const IBLBakeStatus& status = scheduler.GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("The final environment IBL stage set failed to bake or load.");
@@ -361,15 +366,15 @@ namespace gglab
 				m_State->m_IBLArtifactDigests[index] = status.m_Artifacts[index].m_ContentDigest;
 			}
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()->RequestRebake(false);
+			m_Services.m_EnvironmentLightingControl->RequestRebake(false);
 			m_State->m_Phase = State::Phase::WaitForCpuCacheHit;
 			break;
 		}
 
 		case State::Phase::WaitForCpuCacheHit:
 		{
-			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
-			const IBLBakeStatus& status = scheduler.GetStatus();
+			RenderEnvironmentAccess& scheduler = *m_Services.m_RenderServices.m_Environment;
+			const IBLBakeStatus& status = scheduler.GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("The IBL CPU cache reload failed.");
@@ -406,7 +411,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			scheduler.ClearArtifactCache();
+			m_Services.m_IBLCacheControl->ClearArtifactCache();
 			if (scheduler.GetArtifactCacheStatistics().m_CachedEntryCount != 0)
 			{
 				Fail("Clearing the IBL CPU cache left cached stage entries behind.");
@@ -414,15 +419,15 @@ namespace gglab
 			}
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()->RequestRebake(false);
+			m_Services.m_EnvironmentLightingControl->RequestRebake(false);
 			m_State->m_Phase = State::Phase::WaitForDerivedDataCacheHit;
 			break;
 		}
 
 		case State::Phase::WaitForDerivedDataCacheHit:
 		{
-			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
-			const IBLBakeStatus& status = scheduler.GetStatus();
+			RenderEnvironmentAccess& scheduler = *m_Services.m_RenderServices.m_Environment;
+			const IBLBakeStatus& status = scheduler.GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("The IBL local DDC reload failed.");
@@ -461,7 +466,7 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()
+			m_Services.m_EnvironmentLightingControl
 				->SetPrefilteredSpecularSampleCount(m_State->m_CpuPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForCpuPartialHit;
 			break;
@@ -469,8 +474,8 @@ namespace gglab
 
 		case State::Phase::WaitForCpuPartialHit:
 		{
-			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
-			const IBLBakeStatus& status = scheduler.GetStatus();
+			RenderEnvironmentAccess& scheduler = *m_Services.m_RenderServices.m_Environment;
+			const IBLBakeStatus& status = scheduler.GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("The IBL CPU partial-hit bake failed.");
@@ -520,10 +525,10 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			scheduler.ClearArtifactCache();
+			m_Services.m_IBLCacheControl->ClearArtifactCache();
 			m_State->m_DerivedDataHitCountBaseline =
 				scheduler.GetDerivedDataStoreStatistics().m_HitCount;
-			m_Services.m_Renderer->GetEnvironmentLightingSystem()
+			m_Services.m_EnvironmentLightingControl
 				->SetPrefilteredSpecularSampleCount(m_State->m_DdcPartialSpecularSampleCount);
 			m_State->m_Phase = State::Phase::WaitForDerivedDataPartialHit;
 			break;
@@ -531,8 +536,8 @@ namespace gglab
 
 		case State::Phase::WaitForDerivedDataPartialHit:
 		{
-			IBLBakeScheduler& scheduler = *m_Services.m_Renderer->GetIBLBakeScheduler();
-			const IBLBakeStatus& status = scheduler.GetStatus();
+			RenderEnvironmentAccess& scheduler = *m_Services.m_RenderServices.m_Environment;
+			const IBLBakeStatus& status = scheduler.GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("The IBL local DDC partial-hit bake failed.");
@@ -583,8 +588,8 @@ namespace gglab
 			}
 
 			m_State->m_PreviousIBLGeneration = status.m_ActiveGeneration;
-			EnvironmentLightingSystem* environment =
-				m_Services.m_Renderer->GetEnvironmentLightingSystem();
+			EnvironmentLightingControlBase* environment =
+				m_Services.m_EnvironmentLightingControl;
 			if (m_State->m_OriginalQualityPreset != IBLQualityPreset::Custom)
 			{
 				environment->SetQualityPreset(m_State->m_OriginalQualityPreset);
@@ -600,7 +605,7 @@ namespace gglab
 
 		case State::Phase::WaitForRestore:
 		{
-			const IBLBakeStatus& status = m_Services.m_Renderer->GetIBLBakeScheduler()->GetStatus();
+			const IBLBakeStatus& status = m_Services.m_RenderServices.m_Environment->GetBakingStatus();
 			if (status.m_Stage == IBLBakeStage::Failed)
 			{
 				Fail("Restoring the original IBL configuration failed.");

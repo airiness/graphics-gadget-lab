@@ -1,14 +1,13 @@
 #include "Demo/DemoLoadingShellRenderPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/RenderPassIBL.h"
-#include "Graphics/RenderPass/ShadowGraphResources.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
-#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
-#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/RenderGraph/RGResourceUtils.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphSetupPass.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
+#include "GGLabRuntime/Graphics/Resource/RenderTextureIndex.h"
 
 namespace gglab
 {
@@ -28,6 +27,11 @@ namespace gglab
 		class RenderPipelineLoadingShell final : public RenderPipelineBase
 		{
 		public:
+			RenderPipelineLoadingShell() noexcept :
+				m_IBLPass(CreateIBLGraphSetupPass())
+			{
+			}
+
 			std::string_view GetName() const noexcept override
 			{
 				return "RenderPipeline.LoadingShell";
@@ -36,16 +40,16 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
 				const RenderServices& services) noexcept override
 			{
-				auto* renderer = services.m_Renderer;
-				GGLAB_ASSERT_NOT_NULL(renderer);
-				auto* swapChain = renderer->GetSwapChain();
-				auto* resourceRegistry = renderer->GetRenderResourceRegistry();
+				auto* swapChain = services.m_Presentation->GetSwapChain();
+				auto* resourceRegistry = services.m_Resources;
 				GGLAB_ASSERT_NOT_NULL(swapChain);
 				GGLAB_ASSERT_NOT_NULL(resourceRegistry);
 				resourceRegistry->EnsureShadowPreviewResources();
-				const auto shadowIndex = RenderResourceRegistry::TextureIndex::
-					Preview_Shadow_DirectionalShadowMap;
+				const auto shadowIndex =
+					RenderTextureIndex::Preview_Shadow_DirectionalShadowMap;
 				const bool shadowPreviewInitialized = !resourceRegistry->IsDirty(shadowIndex);
+				const std::array<float, 4> backBufferClearColor =
+					services.m_Presentation->GetBackBufferClearColor();
 
 				const uint32_t backBufferIndex = context.m_BackBufferIndex;
 				const RenderViewID displayViewId = context.GetDisplayViewId();
@@ -98,7 +102,7 @@ namespace gglab
 									shadow.m_DirectionalShadowMapPreview);
 						}
 					},
-					[renderer, resourceRegistry, shadowIndex](
+					[backBufferClearColor, resourceRegistry, shadowIndex](
 						RGExecuteContext& executeContext, LoadingShellSetupPassData& data)
 					{
 						auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -109,7 +113,7 @@ namespace gglab
 						};
 						commandContext->BeginRendering({ .m_ColorAttachments =
 							std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
-						commandContext->ClearColorAttachment(0, renderer->GetBackBufferClearColor());
+						commandContext->ClearColorAttachment(0, backBufferClearColor);
 						commandContext->EndRendering();
 
 						if (data.m_ShadowPreviewRtv.IsValid())
@@ -128,12 +132,12 @@ namespace gglab
 						}
 					});
 
-				m_IBLPass.AddPass(rg, context, services);
+				m_IBLPass->AddPass(rg, context, services);
 				if (services.m_OverlayExtension)
 				{
 					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 				}
-				m_IBLPass.AddFinishPass(rg);
+				m_IBLPass->AddFinishPass(rg);
 
 				rg.AddPass<LoadingShellFinishPassData>("LoadingShell.Finish",
 					[displayViewId](
@@ -157,7 +161,7 @@ namespace gglab
 			}
 
 		private:
-			RenderPassIBL m_IBLPass;
+			std::unique_ptr<IBLGraphSetupPass> m_IBLPass;
 		};
 	}
 

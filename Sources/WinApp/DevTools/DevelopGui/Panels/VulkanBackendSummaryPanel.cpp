@@ -1,7 +1,7 @@
 #include "DevTools/DevelopGui/Panels/VulkanBackendSummaryPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
-#include "Diagnostics/Snapshots/VulkanBackendSnapshot.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/VulkanBackendSnapshot.h"
 
 #include <imgui.h>
 #include <vulkan/vulkan.h>

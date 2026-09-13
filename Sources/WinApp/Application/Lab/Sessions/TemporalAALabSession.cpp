@@ -1,18 +1,17 @@
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "AppRuntimeLog.h"
 
-#include "Core/Math/MathFunctions.h"
-#include "Core/Math/Quaternion.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Pipeline/TemporalHistoryManager.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 #include <algorithm>
 #include <cmath>
@@ -55,7 +54,7 @@ namespace gglab
 	}
 
 	TemporalAALabSession::TemporalAALabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>()),
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR()),
 		m_ViewportWidth(createInfo.m_WindowWidth), m_ViewportHeight(createInfo.m_WindowHeight)
 	{
 		auto& profile = GetMutableViewRenderProfile();
@@ -153,13 +152,15 @@ namespace gglab
 
 	void TemporalAALabSession::OnEnter() noexcept
 	{
-		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		auto* profilingView = m_Services.m_GpuProfiling;
+		auto* profilingControl = m_Services.m_GpuProfilingControl;
+		if (profilingView && profilingControl)
 		{
-			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->SetEnabled(true);
+			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
+			profilingControl->RequestEnabled(true);
 		}
 		ResetEvidenceCapture();
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
 		m_IsEntered = true;
 		ApplySelectedPreviewSelection();
@@ -168,11 +169,11 @@ namespace gglab
 	void TemporalAALabSession::OnExit() noexcept
 	{
 		m_IsEntered = false;
-		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		if (auto* profilingControl = m_Services.m_GpuProfilingControl)
 		{
-			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
 			registry->RequestPostProcessPreview();
@@ -317,7 +318,7 @@ namespace gglab
 			{
 				return primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 					.m_World = &m_World,
 					.m_Transform = components::TransformComponent{
 						.m_Position = position, .m_Scale = scale },
@@ -351,7 +352,7 @@ namespace gglab
 		distantReferenceTransform.m_Scale = Vector3::One * 2.25f;
 		const entt::entity distantReference = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World, .m_Transform = distantReferenceTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.distant_reference",
 				Color(0.95f, 0.72f, 0.08f, 1.0f), 0.28f, 0.15f),
@@ -401,7 +402,7 @@ namespace gglab
 		movingTransform.m_Scale = Vector3::One * 1.25f;
 		m_MovingEntity = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World, .m_Transform = movingTransform,
 			.m_MaterialInstance = MakeMaterial("gglab.lab.temporal_aa.moving_rigid",
 				Color(0.7f, 0.12f, 0.5f, 1.0f), 0.22f),
@@ -435,7 +436,7 @@ namespace gglab
 
 	void TemporalAALabSession::ApplySelectedPreviewSelection() noexcept
 	{
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap });
 			registry->RequestPostProcessPreview();
@@ -444,7 +445,7 @@ namespace gglab
 
 	void TemporalAALabSession::RequestPreviewRefresh() noexcept
 	{
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->RequestPostProcessPreview();
 		}
@@ -456,12 +457,12 @@ namespace gglab
 		{
 			return;
 		}
-		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
-		if (!gpuProfiler || !gpuProfiler->IsEnabled())
+		auto* profilingView = m_Services.m_GpuProfiling;
+		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;
 		}
-		const GpuProfileFrameSnapshot frame = gpuProfiler->GetLatestFrame();
+		const GpuProfileFrameSnapshot frame = profilingView->GetLatestFrame();
 		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
 		{
 			return;
@@ -504,7 +505,7 @@ namespace gglab
 		++m_GpuTimingSampleCount;
 		if (m_GpuTimingSampleCount == TemporalAAGpuTimingSampleTarget)
 		{
-			const auto* device = m_Services.m_Renderer->GetDevice();
+			const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 			const std::string_view adapterIdentity = device
 				? device->GetAdapterCompatibilityIdentity() : "unavailable";
 			const auto& taa = GetViewRenderProfile().m_TemporalAA;
@@ -535,18 +536,17 @@ namespace gglab
 
 	void TemporalAALabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-		const auto* rhiContext = m_Services.m_Renderer
-			? m_Services.m_Renderer->GetRHIContext()
-			: nullptr;
+		const auto* rhiContext = m_Services.m_RHIContext;
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
 		m_GpuTimingWarmupFrames = std::max(TemporalAAEvidenceWarmupFrameCount,
-			rhiContext ? rhiContext->GetFrameSlotCount() : 3u);
+			rhiContext->GetFrameSlotCount());
 	}
 
 	void TemporalAALabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
 		const auto history =
-			m_Services.m_Renderer->GetTemporalHistoryManager()->GetDiagnostics();
-		const auto* device = m_Services.m_Renderer->GetDevice();
+			m_Services.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
+		const auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
 		const auto& camera = GetCamera();
 		const auto& taa = GetViewRenderProfile().m_TemporalAA;
 		const float saturationAge =

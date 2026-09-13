@@ -1,15 +1,13 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12GuiInterop.h"
 
 #include <backends/imgui_impl_dx12.h>
 #include <d3d12.h>
 
 namespace gglab
 {
-	class DX12DescriptorManager;
-	class DX12Device;
-
 	class DevelopGuiDX12RenderBackend final : public DevelopGuiRenderBackend
 	{
 	public:
@@ -33,8 +31,7 @@ namespace gglab
 			D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle);
 
 	private:
-		DX12Device* m_DX12Device = nullptr;
-		DX12DescriptorManager* m_DescriptorManager = nullptr;
+		std::unique_ptr<DX12GuiInteropBase> m_Interop;
 		bool m_IsInitialized = false;
 	};
 }

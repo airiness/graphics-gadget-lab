@@ -1,4 +1,5 @@
 #include "Artifact/ShaderArtifactManifestIO.h"
+#include "Artifact/PublicationTransaction.h"
 #include "Testing/ShaderArtifactManifestIOTestAccess.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
@@ -8,10 +9,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include <process.h>
-
-#include <atomic>
-#include <chrono>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -22,7 +20,6 @@
 #include <string>
 #include <string_view>
 #include <system_error>
-#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -92,35 +89,6 @@ namespace gglab
 			}
 			return binary;
 		}
-
-		[[nodiscard]] std::optional<BinaryContentDigest> ComputeFileContentDigest(
-			const std::filesystem::path& path) noexcept
-		{
-			const std::optional<ShaderBinary> binary = ReadFileBinary(path);
-			if (!binary.has_value())
-			{
-				return std::nullopt;
-			}
-			BinaryContentDigest digest{};
-			digest.m_Digest = ComputeSha256(std::span(
-				static_cast<const std::byte*>(binary->Data()), binary->SizeInBytes()));
-			return digest;
-		}
-
-		[[nodiscard]] std::filesystem::path MakeUniqueTempPath(
-			const std::filesystem::path& destination) noexcept
-		{
-			static std::atomic_uint64_t counter = 0;
-			return destination.wstring() + L".tmp." +
-				std::to_wstring(static_cast<uint32_t>(::_getpid())) + L"." +
-				std::to_wstring(counter.fetch_add(1, std::memory_order_relaxed));
-		}
-
-		void RemoveFileBestEffort(const std::filesystem::path& path) noexcept
-		{
-			std::error_code ignored;
-			std::filesystem::remove(path, ignored);
-		}
 	}
 
 	namespace
@@ -161,19 +129,6 @@ namespace gglab
 
 	namespace
 	{
-		[[nodiscard]] bool PublishFile(
-			const std::filesystem::path& source, const std::filesystem::path& destination) noexcept
-		{
-			if (g_PublishFileFailureInjector != nullptr &&
-				g_PublishFileFailureInjector(destination))
-			{
-				return false;
-			}
-			std::error_code errorCode;
-			std::filesystem::rename(source, destination, errorCode);
-			return !errorCode;
-		}
-
 		[[nodiscard]] nlohmann::json MakeManifestDocument(
 			const ShaderArtifactManifest& manifest)
 		{
@@ -248,47 +203,66 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		[[nodiscard]] std::optional<std::string> MakeCacheRecordJsonString(
+			const ShaderArtifactCacheRecord& record) noexcept
+		{
+			try
+			{
+				nlohmann::json localDocument;
+				localDocument["physicalSource"] =
+					utils::ToString(utils::Canonical(record.m_PhysicalSourcePath).wstring());
+				localDocument["physicalIncludeDirs"] = nlohmann::json::array();
+				for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
+				{
+					localDocument["physicalIncludeDirs"].push_back(
+						utils::ToString(utils::Canonical(includeDir).wstring()));
+				}
+				localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
+				for (const std::filesystem::path& dependencyPhysicalPath :
+					record.m_DependencyPhysicalPaths)
+				{
+					localDocument["dependencyPhysicalPaths"].push_back(
+						utils::ToString(utils::Canonical(dependencyPhysicalPath).wstring()));
+				}
+
+				nlohmann::json document;
+				document["recordSchemaVersion"] =
+					static_cast<std::int64_t>(ShaderArtifactCacheRecordSchemaVersion);
+				document["manifest"] = MakeManifestDocument(record.m_Manifest);
+				document["local"] = std::move(localDocument);
+				return document.dump();
+			}
+			catch (...)
+			{
+				return std::nullopt;
+			}
+		}
+	}
+
 	bool WriteShaderArtifactCacheRecord(const std::filesystem::path& recordPath,
 		const ShaderArtifactCacheRecord& record) noexcept
 	{
-		const bool created = utils::CreateParentDirectoryIfNotExist(recordPath);
-		if (!created)
+		if (!utils::CreateParentDirectoryIfNotExist(recordPath))
+		{
+			return false;
+		}
+
+		const std::optional<std::string> serialized = MakeCacheRecordJsonString(record);
+		if (!serialized.has_value())
 		{
 			return false;
 		}
 
 		try
 		{
-			nlohmann::json localDocument;
-			localDocument["physicalSource"] =
-				utils::ToString(utils::Canonical(record.m_PhysicalSourcePath).wstring());
-			localDocument["physicalIncludeDirs"] = nlohmann::json::array();
-			for (const std::filesystem::path& includeDir : record.m_PhysicalIncludeDirs)
-			{
-				localDocument["physicalIncludeDirs"].push_back(
-					utils::ToString(utils::Canonical(includeDir).wstring()));
-			}
-			localDocument["dependencyPhysicalPaths"] = nlohmann::json::array();
-			for (const std::filesystem::path& dependencyPhysicalPath :
-				record.m_DependencyPhysicalPaths)
-			{
-				localDocument["dependencyPhysicalPaths"].push_back(
-					utils::ToString(utils::Canonical(dependencyPhysicalPath).wstring()));
-			}
-
-			nlohmann::json document;
-			document["recordSchemaVersion"] =
-				static_cast<std::int64_t>(ShaderArtifactCacheRecordSchemaVersion);
-			document["manifest"] = MakeManifestDocument(record.m_Manifest);
-			document["local"] = std::move(localDocument);
-
 			std::ofstream out(recordPath, std::ios::binary);
 			if (!out)
 			{
 				return false;
 			}
-			const std::string content = document.dump();
-			out.write(content.data(), static_cast<std::streamsize>(content.size()));
+			out.write(serialized->data(), static_cast<std::streamsize>(serialized->size()));
 			return static_cast<bool>(out);
 		}
 		catch (...)
@@ -891,106 +865,107 @@ namespace gglab
 		return record;
 	}
 
+	namespace
+	{
+		struct CacheRecordObservationContext
+		{
+			std::filesystem::path m_RecordPath;
+			std::filesystem::path m_BinaryPath;
+			std::optional<ShaderArtifactCacheRecord> m_Observed;
+		};
+
+		[[nodiscard]] bool ObserveCacheRecord(void* context) noexcept
+		{
+			auto* observation = static_cast<CacheRecordObservationContext*>(context);
+			// Load validates the record and hashes the exact binary bytes once,
+			// so a positive observation is a complete committed-entry check.
+			observation->m_Observed = LoadShaderArtifactCacheRecord(
+				observation->m_RecordPath, observation->m_BinaryPath);
+			return observation->m_Observed.has_value();
+		}
+	}
+
 	ShaderPublicationResult PublishShaderArtifactCacheRecord(
 		const std::filesystem::path& binaryPath,
 		const std::filesystem::path& recordPath,
 		const ShaderArtifactCacheRecord& record) noexcept
 	{
 		ShaderPublicationResult result{};
-
-		const bool parentsReady = utils::CreateParentDirectoryIfNotExist(binaryPath) &&
-			utils::CreateParentDirectoryIfNotExist(recordPath);
-		if (!parentsReady)
+		try
 		{
-			return result;
-		}
-
-		const std::filesystem::path tempBinaryPath = MakeUniqueTempPath(binaryPath);
-		const std::filesystem::path tempRecordPath = MakeUniqueTempPath(recordPath);
-
-		const bool binaryWritten = utils::WriteFileBinary(tempBinaryPath, std::span(
-			static_cast<const std::byte*>(record.m_Binary.Data()), record.m_Binary.SizeInBytes()));
-		if (!binaryWritten)
-		{
-			RemoveFileBestEffort(tempBinaryPath);
-			return result;
-		}
-
-		// Validate the complete result before publication: the manifest digest
-		// must equal SHA-256 of the exact bytes about to be published.
-		const std::optional<BinaryContentDigest> publishedDigest =
-			ComputeFileContentDigest(tempBinaryPath);
-		if (!publishedDigest.has_value() ||
-			publishedDigest->m_Digest != record.m_Manifest.m_BinaryContentDigest.m_Digest)
-		{
-			RemoveFileBestEffort(tempBinaryPath);
-			return result;
-		}
-
-		if (!WriteShaderArtifactCacheRecord(tempRecordPath, record))
-		{
-			RemoveFileBestEffort(tempBinaryPath);
-			RemoveFileBestEffort(tempRecordPath);
-			return result;
-		}
-
-		// Own submission attempt: the immutable binary first, the cache record
-		// last as the commit marker. Rename failures do not pre-judge the
-		// winner; the final observation classifies the outcome.
-		bool binaryPublished = PublishFile(tempBinaryPath, binaryPath);
-		if (!binaryPublished)
-		{
-			std::error_code errorCode;
-			if (!std::filesystem::exists(recordPath, errorCode))
+			const std::optional<std::string> serializedRecord =
+				MakeCacheRecordJsonString(record);
+			if (!serializedRecord.has_value())
 			{
-				// Orphaned binary (no commit marker): recover by removing it
-				// and retrying once; derived data is safe to discard.
-				RemoveFileBestEffort(binaryPath);
-				binaryPublished = PublishFile(tempBinaryPath, binaryPath);
+				return result;
 			}
-		}
-		if (binaryPublished)
-		{
-			(void)PublishFile(tempRecordPath, recordPath);
-		}
-		RemoveFileBestEffort(tempBinaryPath);
-		RemoveFileBestEffort(tempRecordPath);
 
-		// Final committed-entry observation: load and structurally validate
-		// the slot entry. Classification is based on this observation alone.
-		// A concurrent producer commits record-last, so an observation can
-		// land inside its commit window (no record yet, or a record whose
-		// binary has not landed). The observation therefore retries for a
-		// bounded window before the slot is classified as having no committed
-		// entry.
-		std::optional<ShaderArtifactCacheRecord> observed;
-		constexpr int MaxObservationAttempts = 64;
-		for (int attempt = 0; attempt < MaxObservationAttempts; ++attempt)
-		{
-			observed = LoadShaderArtifactCacheRecord(recordPath, binaryPath);
-			if (observed.has_value())
+			const auto binaryBytes = std::span(
+				static_cast<const std::byte*>(record.m_Binary.Data()),
+				record.m_Binary.SizeInBytes());
+			const auto recordBytes = std::span(
+				reinterpret_cast<const std::byte*>(serializedRecord->data()),
+				serializedRecord->size());
+
+			// Validate the complete result before publication: the manifest
+			// digest must equal SHA-256 of the exact binary bytes about to be
+			// published. Own submission commits the immutable binary first and
+			// the cache record last as the commit marker; rename failures do
+			// not pre-judge the winner, because the final committed-entry
+			// observation classifies the outcome alone.
+			CacheRecordObservationContext observation{
+				.m_RecordPath = recordPath,
+				.m_BinaryPath = binaryPath,
+			};
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = binaryPath,
+					.m_Content = binaryBytes,
+					.m_Verification = PublicationVerification::ContentDigest,
+					.m_ExpectedDigest = record.m_Manifest.m_BinaryContentDigest.m_Digest,
+				},
+				PublicationFileSpec{
+					.m_Destination = recordPath,
+					.m_Content = recordBytes,
+					.m_Verification = PublicationVerification::None,
+				},
+			};
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files,
+				{
+					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_RecoverOrphanedPrimary = true,
+					.m_MaxAttempts = 1,
+					.m_ObservationAttempts = 64,
+					.m_RenameFailureInjector = g_PublishFileFailureInjector,
+					.m_Observer = {
+						.m_Context = &observation,
+						.m_Observe = &ObserveCacheRecord,
+					},
+				});
+			if (!transaction.m_Observed || !observation.m_Observed.has_value())
 			{
-				break;
+				return result; // Failed
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		}
-		if (!observed.has_value())
-		{
-			return result; // Failed
-		}
-		// Structural binding beyond the load: the observed entry must belong
-		// to this slot's recipe/producer identity. A non-equivalent entry can
-		// never be disguised as a winner.
-		if (observed->m_Manifest.m_RecipeId != record.m_Manifest.m_RecipeId ||
-			observed->m_Manifest.m_BuildKey != record.m_Manifest.m_BuildKey)
-		{
-			return result; // Failed
-		}
+			// Structural binding beyond the load: the observed entry must belong
+			// to this slot's recipe/producer identity. A non-equivalent entry can
+			// never be disguised as a winner.
+			const ShaderArtifactCacheRecord& observed = *observation.m_Observed;
+			if (observed.m_Manifest.m_RecipeId != record.m_Manifest.m_RecipeId ||
+				observed.m_Manifest.m_BuildKey != record.m_Manifest.m_BuildKey)
+			{
+				return result; // Failed
+			}
 
-		result.m_CommittedRecord = *observed;
-		result.m_Outcome = (observed->m_Manifest == record.m_Manifest)
-			? ShaderPublicationOutcome::Published
-			: ShaderPublicationOutcome::CommittedByOther;
-		return result;
+			result.m_CommittedRecord = observed;
+			result.m_Outcome = (observed.m_Manifest == record.m_Manifest)
+				? ShaderPublicationOutcome::Published
+				: ShaderPublicationOutcome::CommittedByOther;
+			return result;
+		}
+		catch (...)
+		{
+			return result;
+		}
 	}
 }

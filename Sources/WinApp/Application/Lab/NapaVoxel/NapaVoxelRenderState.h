@@ -2,9 +2,9 @@
 
 #include "Application/Lab/NapaVoxel/NapaVoxelMeshAdapter.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include "NapaVoxelCore/Edit/VoxelDamage.h"
 #include "NapaVoxelCore/Meshing/CpuMeshBatch.h"
@@ -241,7 +241,7 @@ namespace gglab
 	{
 	public:
 		NapaVoxelMeshReplacementUploadSession(RHIDevice* device,
-			AssetUploadScheduler* scheduler, NapaVoxelCommandQueue* commandQueue,
+			AssetUploadScheduling* scheduler, NapaVoxelCommandQueue* commandQueue,
 			NapaVoxelPublicationSerialState serialState = {}) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(NapaVoxelMeshReplacementUploadSession);
 		~NapaVoxelMeshReplacementUploadSession();
@@ -270,7 +270,7 @@ namespace gglab
 		void FailHostPreparation(bool publicationSerialExhausted) noexcept;
 
 		RHIDevice* m_Device = nullptr;
-		AssetUploadScheduler* m_Scheduler = nullptr;
+		AssetUploadScheduling* m_Scheduler = nullptr;
 		NapaVoxelCommandQueue* m_CommandQueue = nullptr;
 		std::shared_ptr<GGLabMeshPublicationBatch> m_Publication;
 		uint64_t m_LastPublicationSerial = 0;
@@ -510,7 +510,7 @@ namespace gglab
 	class NapaVoxelPublicationSession final
 	{
 	public:
-		NapaVoxelPublicationSession(RHIDevice* device, AssetUploadScheduler* scheduler,
+		NapaVoxelPublicationSession(RHIDevice* device, AssetUploadScheduling* scheduler,
 			NapaVoxelCommandQueue* commandQueue) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(NapaVoxelPublicationSession);
 		~NapaVoxelPublicationSession();
@@ -589,7 +589,7 @@ namespace gglab
 		void ScheduleUpload() noexcept;
 
 		RHIDevice* m_Device = nullptr;
-		AssetUploadScheduler* m_Scheduler = nullptr;
+		AssetUploadScheduling* m_Scheduler = nullptr;
 		NapaVoxelCommandQueue* m_CommandQueue = nullptr;
 		std::shared_ptr<NapaVoxelInitialPublicationOwner> m_Publication;
 		std::unique_ptr<NapaVoxelMeshReplacementUploadSession> m_MeshUploadSession;

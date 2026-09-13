@@ -155,17 +155,16 @@ int main(int argc, char* argv[])
 #else
 	constexpr bool RequestRuntimeValidation = false;
 #endif
-	if (launchResult.m_Options.m_ListAdapters ||
-		launchResult.m_Options.m_RunVulkanQualification)
+	if (launchResult.m_Options.m_ListAdapters)
 	{
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 		std::fputs(
-			"Error: adapter listing and standalone Vulkan qualification are development-tool modes omitted from the artifact-only target.\n",
+			"Error: adapter listing is a development-tool mode omitted from the artifact-only target.\n",
 			stderr);
 		return EXIT_FAILURE;
 #else
-		return gglab::RunRenderingStartupPath(launchResult.m_Options, runtimePaths,
-			hInstance, RequestRuntimeValidation);
+		return gglab::RunRenderingStartupPath(
+			launchResult.m_Options, hInstance, RequestRuntimeValidation);
 #endif
 	}
 

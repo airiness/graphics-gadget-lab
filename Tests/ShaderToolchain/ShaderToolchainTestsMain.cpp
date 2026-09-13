@@ -1,6 +1,6 @@
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "ShaderCompileContractSelfTests.h"
+#include "PublicationTransactionSelfTests.h"
 #include "ShaderCompilerCliContractSelfTests.h"
 #include "ShaderGraphPreviewProgramContractSelfTests.h"
 #include "ShaderPreviewPublicationContractSelfTests.h"
@@ -12,10 +12,6 @@
 namespace
 {
 	constexpr gglab::SelfTestSuiteDesc RegisteredSuites[]{
-		gglab::SelfTestSuiteDesc{
-			.m_Id = "shader-compile-contracts",
-			.m_Run = &gglab::RunShaderCompileContractSelfTests,
-		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shaderc-cli-contracts",
 			.m_Run = &gglab::RunShaderCompilerCliContractSelfTests,
@@ -31,6 +27,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shader-artifact-publication",
 			.m_Run = &gglab::RunShaderRuntimeArtifactPublicationSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "shader-publication-transaction-contracts",
+			.m_Run = &gglab::RunPublicationTransactionSelfTests,
 		},
 	};
 

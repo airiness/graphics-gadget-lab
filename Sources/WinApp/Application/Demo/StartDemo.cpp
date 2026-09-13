@@ -1,18 +1,19 @@
 #include "Application/Demo/StartDemo.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "ApplicationCameraInput.h"
-#include "Core/Math/Quaternion.h"
-#include "Core/Math/Transform.h"
-#include "Core/Time.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Transform.h"
+#include "GGLabRuntime/Core/Time.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {
@@ -56,7 +57,7 @@ namespace gglab
 		controllerCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(controllerCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
-		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
+		m_RenderPipeline = CreateRenderPipelineForwardPBR();
 	}
 
 	void StartDemo::BeginPrepare() noexcept
@@ -132,12 +133,14 @@ namespace gglab
 
 	void StartDemo::OnEnter() noexcept
 	{
-		if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
-		{
-			m_PreviousSkyboxEnabled = environmentSystem->GetSettings().m_EnableSkybox;
-			m_HasSkyboxOverride = true;
-			environmentSystem->SetSkyboxEnabled(false);
-		}
+		auto* environmentView = m_Services.m_EnvironmentLighting;
+		auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+		GGLAB_ASSERT_NOT_NULL(environmentView);
+		GGLAB_ASSERT_NOT_NULL(environmentControl);
+		m_PreviousSkyboxEnabled =
+			environmentView->GetEnvironmentLightingSettings().m_EnableSkybox;
+		m_HasSkyboxOverride = true;
+		environmentControl->SetSkyboxEnabled(false);
 
 		auto* debugDraw = m_Services.m_DebugDraw;
 		GGLAB_ASSERT_NOT_NULL(debugDraw);
@@ -169,17 +172,15 @@ namespace gglab
 	{
 		if (m_HasSkyboxOverride)
 		{
-			if (auto* environmentSystem = m_Services.m_Renderer->GetEnvironmentLightingSystem())
-			{
-				environmentSystem->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
-			}
+			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+			GGLAB_ASSERT_NOT_NULL(environmentControl);
+			environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
 			m_HasSkyboxOverride = false;
 		}
 
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(StartDemoDebugChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(StartDemoDebugChannel);
 	}
 
 	void StartDemo::Update() noexcept
@@ -214,10 +215,8 @@ namespace gglab
 	void StartDemo::BuildScene() noexcept
 	{
 		auto* assetManager = m_Services.m_AssetManager;
-		auto* renderer = m_Services.m_Renderer;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		auto* samplerRegistry = renderer->GetSamplerRegistry();
+		auto* samplerRegistry = m_Services.m_RenderServices.m_Samplers;
 
 		components::TransformComponent platformTransform{};
 		platformTransform.m_Position = Vector3(0.0f, -1.25f, 6.0f);

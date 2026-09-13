@@ -1,14 +1,15 @@
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RHI/DX12/DX12Context.h"
-#include "Graphics/RHI/DX12/DX12Device.h"
-#include "Graphics/RHI/DX12/DX12CommandQueue.h"
-#include "Graphics/RHI/DX12/DX12QueueSystem.h"
-#include "Graphics/RHI/DX12/DX12ResourceManager.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
-#include "Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
+
+#include <cstdint>
+#include <format>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include <imgui.h>
 
@@ -16,31 +17,6 @@ namespace gglab
 {
 	namespace
 	{
-		enum class TestResourceType : uint8_t
-		{
-			Texture,
-			Buffer,
-		};
-
-		struct TestResourceEntry
-		{
-			uint64_t m_Id = 0;
-			TestResourceType m_Type = TestResourceType::Texture;
-			std::string m_Name;
-			RHITextureHandle m_Texture{};
-			RHIBufferHandle m_Buffer{};
-			bool m_DestroyRequested = false;
-		};
-
-		struct ResourceManagementPanelState
-		{
-			std::vector<TestResourceEntry> m_Resources;
-			std::string m_LastTestResult = "No lifecycle test has run.";
-			uint32_t m_TextureSerial = 0;
-			uint32_t m_BufferSerial = 0;
-			uint64_t m_NextEntryId = 1;
-		};
-
 		const char* SlotStateText(DX12ResourceSnapshotState state) noexcept
 		{
 			switch (state)
@@ -123,132 +99,23 @@ namespace gglab
 			}
 		}
 
-		RHITextureHandle CreateTestTexture(
-			DX12Device& device, uint32_t serial, std::string* outName = nullptr) noexcept
-		{
-			const std::string name = std::format("ResourceManagement.TestTexture.{}", serial);
-			if (outName)
-			{
-				*outName = name;
-			}
-			RHITextureDesc desc{};
-			desc.m_Format = RHIFormat::R8G8B8A8Unorm;
-			desc.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::CopyDest;
-			desc.m_Extent = { 16, 16, 1 };
-			const RHIResourceDebugIdentityDesc debugIdentity{
-				.m_Domain = RHIResourceDebugDomain::DevTools,
-				.m_Category = "TestTexture",
-				.m_Label = name,
-				.m_StableId = serial,
-			};
-			return device.CreateTexture({ .m_Desc = desc }, debugIdentity);
-		}
-
-		RHIBufferHandle CreateTestBuffer(
-			DX12Device& device, uint32_t serial, std::string* outName = nullptr) noexcept
-		{
-			const std::string name = std::format("ResourceManagement.TestBuffer.{}", serial);
-			if (outName)
-			{
-				*outName = name;
-			}
-			RHIBufferDesc desc{};
-			desc.m_SizeInBytes = 4096;
-			desc.m_StrideInBytes = 16;
-			desc.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::CopyDest;
-			const RHIResourceDebugIdentityDesc debugIdentity{
-				.m_Domain = RHIResourceDebugDomain::DevTools,
-				.m_Category = "TestBuffer",
-				.m_Label = name,
-				.m_StableId = serial,
-			};
-			return device.CreateBuffer(desc, debugIdentity);
-		}
-
-		void AddTestTexture(DX12Device& device, ResourceManagementPanelState& state) noexcept
-		{
-			TestResourceEntry entry{};
-			entry.m_Id = state.m_NextEntryId++;
-			entry.m_Type = TestResourceType::Texture;
-			entry.m_Texture = CreateTestTexture(device, ++state.m_TextureSerial, &entry.m_Name);
-			if (entry.m_Texture.IsValid())
-			{
-				state.m_Resources.push_back(std::move(entry));
-			}
-		}
-
-		void AddTestBuffer(DX12Device& device, ResourceManagementPanelState& state) noexcept
-		{
-			TestResourceEntry entry{};
-			entry.m_Id = state.m_NextEntryId++;
-			entry.m_Type = TestResourceType::Buffer;
-			entry.m_Buffer = CreateTestBuffer(device, ++state.m_BufferSerial, &entry.m_Name);
-			if (entry.m_Buffer.IsValid())
-			{
-				state.m_Resources.push_back(std::move(entry));
-			}
-		}
-
-		void DestroyTestResource(DX12Device& device, TestResourceEntry& entry) noexcept
-		{
-			if (entry.m_DestroyRequested)
-			{
-				return;
-			}
-
-			if (entry.m_Type == TestResourceType::Texture)
-			{
-				device.DestroyTexture(entry.m_Texture);
-			}
-			else
-			{
-				device.DestroyBuffer(entry.m_Buffer);
-			}
-			entry.m_DestroyRequested = true;
-		}
-
-		void RecordTestResourcesUse(DX12Device& device, DX12QueueSystem& queueSystem,
-			ResourceManagementPanelState& state) noexcept
-		{
-			const DX12FencePoint fencePoint =
-				queueSystem.GetQueue(DX12QueueType::Graphics).Signal();
-			for (const auto& entry : state.m_Resources)
-			{
-				if (entry.m_DestroyRequested)
-				{
-					continue;
-				}
-
-				if (entry.m_Type == TestResourceType::Texture)
-				{
-					device.RecordTextureUse(entry.m_Texture, fencePoint);
-				}
-				else
-				{
-					device.RecordBufferUse(entry.m_Buffer, fencePoint);
-				}
-			}
-		}
-
 		const DX12ResourceSlotSnapshot* FindSlot(
-			const TestResourceEntry& entry, const DX12ResourceManagerSnapshot& snapshot) noexcept
+			const DX12TestResourceSnapshot& entry, const DX12ResourceManagerSnapshot& snapshot) noexcept
 		{
-			if (entry.m_Type == TestResourceType::Texture)
+			if (entry.m_Type == DX12TestResourceType::Texture)
 			{
-				const uint32_t index = entry.m_Texture.Index();
+				const uint32_t index = entry.m_Index;
 				return index < snapshot.m_Textures.size() ? &snapshot.m_Textures[index] : nullptr;
 			}
 
-			const uint32_t index = entry.m_Buffer.Index();
+			const uint32_t index = entry.m_Index;
 			return index < snapshot.m_Buffers.size() ? &snapshot.m_Buffers[index] : nullptr;
 		}
 
-		const char* EntryStatusText(const TestResourceEntry& entry, const DX12Device& device,
+		const char* EntryStatusText(const DX12TestResourceSnapshot& entry,
 			const DX12ResourceManagerSnapshot& snapshot) noexcept
 		{
-			const bool alive = entry.m_Type == TestResourceType::Texture
-				? device.IsAlive(entry.m_Texture)
-				: device.IsAlive(entry.m_Buffer);
+			const bool alive = entry.m_Alive;
 			if (alive)
 			{
 				return "Alive";
@@ -274,26 +141,15 @@ namespace gglab
 			return "Slot Reused";
 		}
 
-		uint32_t EntryIndex(const TestResourceEntry& entry) noexcept
-		{
-			return entry.m_Type == TestResourceType::Texture ? entry.m_Texture.Index()
-				: entry.m_Buffer.Index();
-		}
-
-		uint32_t EntryGeneration(const TestResourceEntry& entry) noexcept
-		{
-			return entry.m_Type == TestResourceType::Texture ? entry.m_Texture.Generation()
-				: entry.m_Buffer.Generation();
-		}
-
-		void DrawTestResourcesTable(DX12Device& device, const DX12ResourceManagerSnapshot& snapshot,
-			ResourceManagementPanelState& state) noexcept
+		void DrawTestResourcesTable(DX12ResourceLifecycleControlBase* control,
+			const DX12ResourceManagerSnapshot& snapshot,
+			const DX12ResourceLifecycleSnapshot& state) noexcept
 		{
 			const ImGuiTableFlags flags =
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
 				ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY;
 
-			std::optional<size_t> removeIndex;
+			std::optional<uint64_t> removeId;
 			if (ImGui::BeginTable(
 				"ResourceManagementTestResources", 8, flags, ImVec2(0.0f, 260.0f)))
 			{
@@ -310,22 +166,22 @@ namespace gglab
 
 				for (size_t index = 0; index < state.m_Resources.size(); ++index)
 				{
-					auto& entry = state.m_Resources[index];
+					const auto& entry = state.m_Resources[index];
 					const auto* slot = FindSlot(entry, snapshot);
 
 					ImGui::PushID(static_cast<int>(entry.m_Id));
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
 					ImGui::TextUnformatted(
-						entry.m_Type == TestResourceType::Texture ? "Texture" : "Buffer");
+						entry.m_Type == DX12TestResourceType::Texture ? "Texture" : "Buffer");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::TextUnformatted(entry.m_Name.c_str());
 					ImGui::TableSetColumnIndex(2);
-					ImGui::Text("%u", EntryIndex(entry));
+					ImGui::Text("%u", entry.m_Index);
 					ImGui::TableSetColumnIndex(3);
-					ImGui::Text("%u", EntryGeneration(entry));
+					ImGui::Text("%u", entry.m_Generation);
 					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(EntryStatusText(entry, device, snapshot));
+					ImGui::TextUnformatted(EntryStatusText(entry, snapshot));
 					ImGui::TableSetColumnIndex(5);
 					if (slot)
 					{
@@ -337,11 +193,12 @@ namespace gglab
 						ImGui::TextUnformatted("-");
 					}
 					ImGui::TableSetColumnIndex(6);
+					ImGui::BeginDisabled(!control);
 					if (!entry.m_DestroyRequested)
 					{
-						if (ImGui::SmallButton("Destroy"))
+						if (ImGui::SmallButton("Destroy") && control)
 						{
-							DestroyTestResource(device, entry);
+							control->DestroyResource(entry.m_Id);
 						}
 					}
 					else
@@ -353,7 +210,7 @@ namespace gglab
 					{
 						if (ImGui::SmallButton("Remove Row"))
 						{
-							removeIndex = index;
+							removeId = entry.m_Id;
 						}
 					}
 					else
@@ -362,15 +219,16 @@ namespace gglab
 						ImGui::SmallButton("Remove Row");
 						ImGui::EndDisabled();
 					}
+					ImGui::EndDisabled();
 					ImGui::PopID();
 				}
 
 				ImGui::EndTable();
 			}
 
-			if (removeIndex.has_value())
+			if (removeId && control)
 			{
-				state.m_Resources.erase(state.m_Resources.begin() + removeIndex.value());
+				control->RemoveDestroyedRow(*removeId);
 			}
 		}
 
@@ -435,55 +293,17 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void RunLifecycleTest(DX12Device& device, DX12QueueSystem& queueSystem,
-			DX12ResourceManager& manager, ResourceManagementPanelState& state) noexcept
-		{
-			const RHITextureHandle first = CreateTestTexture(device, ++state.m_TextureSerial);
-			const bool created = first.IsValid() && device.IsAlive(first);
-			device.DestroyTexture(first);
-			const bool invalidatedImmediately = !device.IsAlive(first);
 
-			queueSystem.WaitIdle();
-			manager.RetireCompletedResources();
-
-			const RHITextureHandle replacement = CreateTestTexture(device, ++state.m_TextureSerial);
-			const bool reusedSlot = replacement.IsValid() && replacement.Index() == first.Index();
-			const bool generationChanged =
-				replacement.IsValid() && replacement.Generation() != first.Generation();
-
-			device.DestroyTexture(first);
-			device.DestroyTexture(replacement);
-			queueSystem.WaitIdle();
-			manager.RetireCompletedResources();
-
-			auto wrappedGeneration = std::numeric_limits<RHITextureHandle::GenerationType>::max();
-			++wrappedGeneration;
-			if (wrappedGeneration == RHITextureHandle::InvalidGeneration)
-			{
-				++wrappedGeneration;
-			}
-			const bool rolloverValid = wrappedGeneration != RHITextureHandle::InvalidGeneration;
-			const bool passed = created && invalidatedImmediately && reusedSlot &&
-				generationChanged && rolloverValid;
-
-			state.m_LastTestResult = std::format(
-				"{} | create={} immediate-invalidate={} slot-reuse={} generation-change={} rollover={}",
-				passed ? "PASS" : "FAIL", created, invalidatedImmediately, reusedSlot,
-				generationChanged, rolloverValid);
-		}
 	}
 
 	void ResourceManagementPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		auto& state = context.PanelState<ResourceManagementPanelState>();
-
 		ImGui::TextUnformatted("RHI Resource Management");
 		ImGui::Separator();
 
-		auto* dx12Context = context.m_Renderer
-			? dynamic_cast<DX12Context*>(context.m_Renderer->GetRHIContext())
-			: nullptr;
-		if (!dx12Context)
+		const auto* view = context.m_DX12ResourceLifecycle;
+		auto* control = context.m_DX12ResourceLifecycleControl;
+		if (!view)
 		{
 			ImGui::TextColored(devtools::style::ErrorTextColor,
 				"DX12 lifecycle mutation controls are disabled on this backend.");
@@ -494,38 +314,34 @@ namespace gglab
 			return;
 		}
 
-		auto& device = dx12Context->GetDX12Device();
-		auto& queueSystem = dx12Context->GetQueueSystem();
-		auto& manager = *device.GetResourceManager();
+		ImGui::BeginDisabled(!control);
+		if (ImGui::Button("Add Texture") && control)
+		{
+			control->AddTexture();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Add Buffer") && control)
+		{
+			control->AddBuffer();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Destroy All") && control)
+		{
+			control->DestroyAll();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Signal + Record Use") && control)
+		{
+			control->SignalAndRecordUse();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Clear Destroyed Rows") && control)
+		{
+			control->ClearDestroyedRows();
+		}
 
-		if (ImGui::Button("Add Texture"))
-		{
-			AddTestTexture(device, state);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Add Buffer"))
-		{
-			AddTestBuffer(device, state);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Destroy All"))
-		{
-			for (auto& entry : state.m_Resources)
-			{
-				DestroyTestResource(device, entry);
-			}
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Signal + Record Use"))
-		{
-			RecordTestResourcesUse(device, queueSystem, state);
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Clear Destroyed Rows"))
-		{
-			std::erase_if(state.m_Resources,
-				[](const TestResourceEntry& entry) { return entry.m_DestroyRequested; });
-		}
+		ImGui::EndDisabled();
+		auto state = view->GetSnapshot();
 
 		const auto* snapshot =
 			context.m_Diagnostics
@@ -536,38 +352,36 @@ namespace gglab
 			ImGui::TextDisabled("DX12 resource snapshot provider is not available.");
 			return;
 		}
-		DrawTestResourcesTable(device, *snapshot, state);
+		DrawTestResourcesTable(control, *snapshot, state);
 
 		ImGui::SeparatorText("Validation");
-		if (ImGui::Button("Invalid Destroy Probe"))
+		ImGui::BeginDisabled(!control);
+		if (ImGui::Button("Invalid Destroy Probe") && control)
 		{
-			device.DestroyTexture({});
-			device.DestroyBuffer({});
+			control->ProbeInvalidDestroy();
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Invalid Create Probe"))
+		if (ImGui::Button("Invalid Create Probe") && control)
 		{
-			RHITextureDesc invalidTexture{};
-			RHIBufferDesc invalidBuffer{};
-			GGLAB_UNUSED(device.CreateTexture({ .m_Desc = invalidTexture }));
-			GGLAB_UNUSED(device.CreateBuffer(invalidBuffer));
+			control->ProbeInvalidCreate();
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Collect Completed"))
+		if (ImGui::Button("Collect Completed") && control)
 		{
-			manager.RetireCompletedResources();
+			control->CollectCompleted();
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Flush + Collect"))
+		if (ImGui::Button("Flush + Collect") && control)
 		{
-			dx12Context->WaitIdle();
-			manager.RetireCompletedResources();
+			control->FlushAndCollect();
 		}
 
-		if (ImGui::Button("Run Lifecycle Test"))
+		if (ImGui::Button("Run Lifecycle Test") && control)
 		{
-			RunLifecycleTest(device, queueSystem, manager, state);
+			control->RunLifecycleTest();
+			state = view->GetSnapshot();
 		}
+		ImGui::EndDisabled();
 		ImGui::SameLine();
 		ImGui::TextUnformatted(state.m_LastTestResult.c_str());
 

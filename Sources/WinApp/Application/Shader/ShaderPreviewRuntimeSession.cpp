@@ -2,7 +2,7 @@
 
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/IO/PathUtils.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "ShaderArtifactRuntime/ShaderPreviewLooseIO.h"

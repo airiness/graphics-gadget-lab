@@ -3,21 +3,25 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
-#include "Core/Profiling/CpuProfiler.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Profiling/CpuProfiler.h"
+#include "GGLabRuntime/Core/Time.h"
 #include "Demo/DemoBase.h"
 #include "Demo/DemoManager.h"
 #include "Demo/DemoTypes.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
+#include "GGLabRuntime/Diagnostics/RuntimeToolingAdapters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/CameraRig.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
-#include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/RenderFrameBuilder.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
-#include "Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "Lab/LabInterfaces.h"
+#include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"
 
 #include <optional>
@@ -25,6 +29,44 @@
 
 namespace gglab
 {
+	namespace
+	{
+		class ScopedDiagnosticsFrame final
+		{
+		public:
+			ScopedDiagnosticsFrame(
+				DiagnosticsSession* session, const DiagnosticsFrameContext& context) noexcept :
+				m_Session(session)
+			{
+				if (m_Session)
+				{
+					m_Session->BeginFrame(context);
+				}
+			}
+			ScopedDiagnosticsFrame(const ScopedDiagnosticsFrame&) = delete;
+			ScopedDiagnosticsFrame& operator=(const ScopedDiagnosticsFrame&) = delete;
+			~ScopedDiagnosticsFrame() noexcept
+			{
+				if (m_Session)
+				{
+					m_Session->EndFrame();
+				}
+			}
+
+			[[nodiscard]] DiagnosticsView* GetView() const noexcept
+			{
+				return m_Session ? m_Session->GetView() : nullptr;
+			}
+			[[nodiscard]] DiagnosticsControl* GetControl() const noexcept
+			{
+				return m_Session ? m_Session->GetControl() : nullptr;
+			}
+
+		private:
+			DiagnosticsSession* m_Session = nullptr;
+		};
+	}
+
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
 	{
 		switch (m_LifecycleState)
@@ -105,8 +147,7 @@ namespace gglab
 		m_EnvironmentAssetController->Tick();
 
 		World& world = demo->GetWorld();
-		Camera& camera = demo->GetCamera();
-		Renderer::Frame rendererFrame = m_Renderer->BeginFrame();
+		RenderFrame rendererFrame = m_RenderHost->BeginFrame();
 		if (!rendererFrame.IsReady())
 		{
 			return rendererFrame.IsUnavailable()
@@ -114,15 +155,12 @@ namespace gglab
 				: AppRuntimeTickResult::Exit;
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
-		const RenderServices services{
-			.m_Renderer = m_Renderer.get(),
-			.m_AssetManager = m_AssetManager.get(),
-			.m_ShaderManager = m_ShaderManager.get(),
-			.m_OverlayExtension = toolingFrame.GetOverlayExtension(),
-		};
-		// Renderer::Frame may retire RenderGraph resources from its RAII abort path.
-		// Keep the graph alive until after the frame has ended.
-		RenderGraph renderGraph(m_Renderer->CreateRenderGraphCreateInfo());
+		RenderServices services = m_RenderServices;
+		services.m_TextureAssets = m_AssetManager.get();
+		services.m_OverlayExtension = toolingFrame.GetOverlayExtension();
+		// The RAII frame handle may retire RenderGraph resources from its abort
+		// path. Keep the graph alive until after the frame has ended.
+		RenderGraph renderGraph(m_RenderHost->CreateRenderGraphCreateInfo());
 		const uint32_t frameSlotIndex = rendererFrame.GetFrameSlotIndex();
 		const uint32_t backBufferIndex = rendererFrame.GetBackBufferIndex();
 
@@ -130,10 +168,12 @@ namespace gglab
 			DefaultShadowVisualizationSettings();
 		const ViewRenderProfile& authoringViewRenderProfile = demo->GetViewRenderProfile();
 		ViewRenderProfile effectiveViewRenderProfile = authoringViewRenderProfile;
+		ApplicationToolingFrameSettingsResolution toolingSettingsResolution{};
 		if (applicationTooling)
 		{
-			applicationTooling->ResolveFrameSettings(authoringViewRenderProfile,
-				shadowVisualizationSettings, effectiveViewRenderProfile);
+			toolingSettingsResolution = applicationTooling->ResolveFrameSettings(
+				authoringViewRenderProfile, shadowVisualizationSettings,
+				effectiveViewRenderProfile);
 		}
 		CameraRig& cameraRig = demo->GetCameraRig();
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
@@ -153,24 +193,22 @@ namespace gglab
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,
-				.m_Capabilities = m_Renderer->GetTemporalAACapabilityStatus(),
+				.m_Capabilities = m_RenderHost->GetTemporalAACapabilityStatus(),
 				.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 				.m_ResetIdentity = displayCameraSlot->m_Camera->GetTemporalResetSerial(),
 				.m_SessionIdentity = temporalSessionIdentity,
 				.m_DisplayViewEligible = IsTemporalAADisplayViewEligible(
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 			});
-		TemporalFrameTransaction& temporalFrameTransaction = m_Renderer->BeginTemporalFrame(
+		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight);
-		const RenderFrameBuilder::BuildInfo frameBuildInfo{
+		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
-			.m_Renderer = *m_Renderer,
-			.m_AssetManager = *m_AssetManager,
-			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
+			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
 			.m_TemporalFramePlan = temporalFramePlan,
-			.m_TemporalFrameTransaction = &temporalFrameTransaction,
+			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,
 			.m_WindowWidth = m_WindowWidth,
 			.m_WindowHeight = m_WindowHeight,
@@ -178,21 +216,20 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
-		RenderFrameBuilder::BuildResult frame;
+		RenderFrameBuildResult frame;
 		{
-			GGLAB_CPU_PROFILE_SCOPE("RenderFrameBuilder");
-			frame = m_RenderFrameBuilder->Build(frameBuildInfo);
+			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
+			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
-		m_Renderer->AdoptFrameBuildResources(rendererFrame, validationContext);
 		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
 		{
-			m_Renderer->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
+			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
-		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawSystem->GetContext());
-		frame.m_DebugDrawFrame = m_DebugDrawSystem->SealFrame(frameSlotIndex,
+		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawService->GetContext());
+		frame.m_DebugDrawFrame = m_DebugDrawService->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
 		RenderFrameContext renderContext = frame.MakeRenderFrameContext();
 
@@ -214,6 +251,27 @@ namespace gglab
 		if (toolingFrame.IsOpen())
 		{
 			GGLAB_CPU_PROFILE_SCOPE("ApplicationTooling");
+			const LabRuntime* labRuntime = tickInfo.m_LabRuntimeLocator
+				? tickInfo.m_LabRuntimeLocator->GetLabRuntimeIfCreated()
+				: nullptr;
+			const DiagnosticsFrameContext diagnosticsContext{
+				.m_RenderHost = m_RenderHost.get(),
+				.m_AssetManager = m_AssetManager.get(),
+				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
+				.m_LabSnapshotSource = labRuntime,
+				.m_TaskSystem = m_TaskSystem.get(),
+				.m_World = &world,
+				.m_RenderGraph = &renderGraph,
+				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
+				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
+				.m_MainRenderView =
+					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
+				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
+				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
+				.m_GTAOOverrideActive = toolingSettingsResolution.m_GTAOOverrideActive,
+			};
+			ScopedDiagnosticsFrame diagnosticsFrame(m_Diagnostics.get(), diagnosticsContext);
 			std::optional<LoadingProgress> loadingProgress;
 			if (!shaderPreload.IsReady())
 			{
@@ -224,26 +282,34 @@ namespace gglab
 				loadingProgress = m_DemoManager->GetLoadingProgress();
 			}
 
+			RuntimeToolingAdapters runtimeToolingAdapters(
+				world, *m_AssetManager, demo->GetCameraRig());
 			const ApplicationToolingFrameContext toolingContext{
-				.m_Camera = &camera,
-				.m_CameraController = &demo->GetCameraController(),
-				.m_CameraRig = &demo->GetCameraRig(),
-				.m_Renderer = m_Renderer.get(),
-				.m_World = &world,
-				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
-				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
-				.m_MainRenderView =
-					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
-				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
-				.m_RenderGraph = &renderGraph,
-				.m_DebugDrawSystem = m_DebugDrawSystem.get(),
+				.m_Cameras = &runtimeToolingAdapters.GetCameraView(),
+				.m_CameraControl = &runtimeToolingAdapters.GetCameraControl(),
+				.m_CameraRenderViewQuery = &demo->GetCameraRig(),
+				.m_WorldView = &runtimeToolingAdapters.GetWorldView(),
+				.m_WorldControl = &runtimeToolingAdapters.GetWorldControl(),
+				.m_DirectionalLight = &runtimeToolingAdapters.GetDirectionalLightView(),
+				.m_DirectionalLightControl =
+					&runtimeToolingAdapters.GetDirectionalLightControl(),
+				.m_AssetControl = &runtimeToolingAdapters.GetAssetControl(),
+				.m_EnvironmentSelectionControl = m_EnvironmentAssetController.get(),
+				.m_Diagnostics = diagnosticsFrame.GetView(),
+				.m_DiagnosticsControl = diagnosticsFrame.GetControl(),
+				.m_EnvironmentLighting = m_RenderHost->GetEnvironmentLightingView(),
+				.m_EnvironmentLightingControl = m_RenderHost->GetEnvironmentLightingControl(),
+				.m_GpuProfiling = m_RenderHost->GetGpuProfilingView(),
+				.m_GpuProfilingControl = m_RenderHost->GetGpuProfilingControl(),
+				.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
+				.m_IBLPreview = m_RenderHost->GetIBLPreviewView(),
+				.m_IBLPreviewControl = m_RenderHost->GetIBLPreviewControl(),
+				.m_PostProcessPreview = m_RenderHost->GetPostProcessPreviewView(),
+				.m_PostProcessPreviewControl = m_RenderHost->GetPostProcessPreviewControl(),
+				.m_ShadowPreview = m_RenderHost->GetShadowPreviewView(),
+				.m_DebugDrawChannels = m_DebugDrawService->GetChannelView(),
+				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
-				.m_DirectionalShadowSettings =
-					frame.m_WorldData.m_MainDirectionalLight.m_ShadowSettings,
-				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
-				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
-				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);
@@ -251,15 +317,16 @@ namespace gglab
 
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
-			m_Renderer->Render(rendererFrame, renderGraph, renderContext);
+			m_RenderHost->Render(rendererFrame, renderGraph, renderContext);
 		}
 		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
-			GGLAB_CPU_PROFILE_SCOPE("Renderer EndFrame");
-			frameEndResult = m_Renderer->EndFrame(rendererFrame);
+			GGLAB_CPU_PROFILE_SCOPE("RenderHost EndFrame");
+			frameEndResult = m_RenderHost->EndFrame(rendererFrame);
 		}
 		if (!frameEndResult.IsCompleted())
 		{
+			toolingFrame.Abort();
 			return AppRuntimeTickResult::Exit;
 		}
 

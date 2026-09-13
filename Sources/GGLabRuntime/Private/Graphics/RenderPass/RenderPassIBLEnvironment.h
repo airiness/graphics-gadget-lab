@@ -1,0 +1,39 @@
+#pragma once
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+
+namespace gglab
+{
+	class RenderPassIBLEnvironment : public RenderPassBase
+	{
+	public:
+		RenderPassIBLEnvironment() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "IBL.Environment",
+				  .m_DisplayName = "IBL Environment",
+				  .m_CategoryName = "IBL",
+				  .m_Description =
+					  "Converts the source environment texture into the runtime environment cubemap.",
+				  .m_Category = RenderPassCategory::IBL,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
+
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
+
+	private:
+		void EnsureInitialized(const RenderServices& services) noexcept;
+
+		RHIPipelineHandle GetOrCreatePSO(
+			const RenderServices& services, RHIFormat renderTargetFormat) noexcept;
+
+	private:
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
+		GraphicsPipelineSlot m_PipelineSlot{};
+		bool m_IsInitialized = false;
+	};
+}

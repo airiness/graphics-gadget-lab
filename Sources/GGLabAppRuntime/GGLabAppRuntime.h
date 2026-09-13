@@ -4,6 +4,7 @@
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "RuntimePaths.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
@@ -79,11 +80,15 @@ namespace gglab
 	class ApplicationInput;
 	class ApplicationToolingIntegrationBase;
 	class AssetManager;
-	class DebugDrawSystem;
+	class DebugDrawService;
 	class DemoManager;
+	class DiagnosticsControl;
+	class DiagnosticsSession;
+	class DiagnosticsView;
 	class EnvironmentAssetController;
-	class RenderFrameBuilder;
-	class Renderer;
+	class LabRuntimeLocatorBase;
+	class RenderCompositionAccess;
+	class RenderHost;
 	class RHIContextFactoryBase;
 	class ShaderManager;
 	class TaskSystem;
@@ -110,6 +115,8 @@ namespace gglab
 	struct AppRuntimeTickInfo
 	{
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
+		// Optional current-content adapter borrowed only for this frame's Lab snapshot.
+		const LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
 
 		struct PreContentUpdateHook final
 		{
@@ -157,7 +164,16 @@ namespace gglab
 		{
 			return m_ServicesInitialized;
 		}
-		[[nodiscard]] Renderer* GetRenderer() const noexcept { return m_Renderer.get(); }
+		[[nodiscard]] RenderHost* GetRenderHost() const noexcept { return m_RenderHost.get(); }
+		// Non-owning; null before composition and after shutdown.
+		[[nodiscard]] RenderCompositionAccess* GetRenderComposition() const noexcept
+		{
+			return m_RenderComposition;
+		}
+		[[nodiscard]] const RenderServices& GetRenderServices() const noexcept
+		{
+			return m_RenderServices;
+		}
 		[[nodiscard]] AssetManager* GetAssetManager() const noexcept
 		{
 			return m_AssetManager.get();
@@ -177,14 +193,13 @@ namespace gglab
 		{
 			return m_DemoManager.get();
 		}
-		[[nodiscard]] RenderFrameBuilder* GetRenderFrameBuilder() const noexcept
+		[[nodiscard]] DebugDrawService* GetDebugDrawService() const noexcept
 		{
-			return m_RenderFrameBuilder.get();
+			return m_DebugDrawService.get();
 		}
-		[[nodiscard]] DebugDrawSystem* GetDebugDrawSystem() const noexcept
-		{
-			return m_DebugDrawSystem.get();
-		}
+		// Non-owning; null unless optional diagnostics were composed with runtime services.
+		[[nodiscard]] DiagnosticsView* GetDiagnosticsView() const noexcept;
+		[[nodiscard]] DiagnosticsControl* GetDiagnosticsControl() const noexcept;
 		[[nodiscard]] Time* GetTime() const noexcept { return m_Time.get(); }
 		[[nodiscard]] std::optional<uint32_t> GetLabHostDemoIndex() const noexcept
 		{
@@ -203,15 +218,17 @@ namespace gglab
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
 		ApplicationContentRegistration m_ContentRegistration{};
-		std::unique_ptr<Renderer> m_Renderer;
+		std::unique_ptr<RenderHost> m_RenderHost;
+		RenderServices m_RenderServices{};
+		RenderCompositionAccess* m_RenderComposition = nullptr;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;
 		std::unique_ptr<AssetManager> m_AssetManager;
 		std::unique_ptr<EnvironmentAssetController> m_EnvironmentAssetController;
 		std::unique_ptr<ShaderManager> m_ShaderManager;
 		std::unique_ptr<DemoManager> m_DemoManager;
-		std::unique_ptr<RenderFrameBuilder> m_RenderFrameBuilder;
-		std::unique_ptr<DebugDrawSystem> m_DebugDrawSystem;
+		std::unique_ptr<DebugDrawService> m_DebugDrawService;
+		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 		ApplicationInput* m_Input = nullptr;
 		std::optional<uint32_t> m_LabHostDemoIndex;
 		uint32_t m_WindowWidth = 0;

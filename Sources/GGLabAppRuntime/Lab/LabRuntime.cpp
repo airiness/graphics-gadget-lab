@@ -1,8 +1,8 @@
 #include "Lab/LabRuntime.h"
 #include "AppRuntimeLog.h"
-#include "Core/Time.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Core/Time.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 namespace gglab
 {
@@ -545,13 +545,9 @@ namespace gglab
 
 	void LabRuntime::PollRetiringSessions() noexcept
 	{
-		auto* renderer = m_CreateInfo.m_Services.m_Renderer;
-		GGLAB_ASSERT_NOT_NULL(renderer);
-		RHIDevice* device = renderer ? renderer->GetDevice() : nullptr;
-		if (!device)
-		{
-			return;
-		}
+		RHIContext* rhiContext = m_CreateInfo.m_Services.m_RHIContext;
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
+		RHIDevice* device = &rhiContext->GetDevice();
 		std::erase_if(m_RetiringSessions,
 			[device](const RetiringSession& retiring) noexcept
 			{

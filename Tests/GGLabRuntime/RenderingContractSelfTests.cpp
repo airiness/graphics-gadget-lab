@@ -1,52 +1,204 @@
+#include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
-#include "Core/Math/MathFunctions.h"
-#include "Diagnostics/Snapshots/RenderGraphSnapshot.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ContextFactory.h"
+#if GGLAB_ENABLE_VULKAN
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32ContextFactory.h"
+#endif
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/Buffer/PersistentStructuredBufferTable.h"
-#include "Graphics/Pipeline/ForwardPlus.h"
-#include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
-#include "Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 #include "Graphics/Pipeline/RHIPipelineRecipeAdapter.h"
-#include "Graphics/Pipeline/TemporalAA.h"
+#include "Graphics/Pipeline/PipelineCache.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
-#include "Graphics/Pipeline/TemporalFrameTransaction.h"
+#include "Graphics/Pipeline/TemporalHistoryManager.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "Graphics/PostProcess/PostProcessColor.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
-#include "Graphics/RenderFrameBuilder.h"
+#include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
-#include "Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "Graphics/Resource/PersistentTexturePool.h"
-#include "Graphics/Resource/TransientResourcePool.h"
-#include "Graphics/RHI/RHICommandContext.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
+#include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
+#include "Graphics/SamplerRegistry.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12TextureSupportUtils.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
-#include "Graphics/RenderView.h"
-#include "Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
-#include "Graphics/ScreenSpace/ScreenSpaceTypes.h"
-#include "Graphics/TransferBatch.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
+#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
+#include "GGLabRuntime/Graphics/TransferBatch.h"
 
+#include <algorithm>
 #include <array>
+#include <concepts>
+#include <cmath>
 #include <filesystem>
 #include <limits>
+#include <numbers>
+#include <ranges>
 #include <type_traits>
 
 namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept CameraRoutingMutation = requires(T& value) { value.SetDisplayViewId(RenderViewID::Main); };
+		template <typename T>
+		concept CameraRoutingSlotAccess = requires(const T& value) { value.FindRenderViewSlot(RenderViewID::Main); };
+		static_assert(!CameraRoutingMutation<CameraRenderViewQueryBase>);
+		static_assert(!CameraRoutingSlotAccess<CameraRenderViewQueryBase>);
+		template <typename T>
+		concept ResourceLifecycleQuery = requires(const T& value) {
+			{ value.GetSnapshot() } -> std::same_as<DX12ResourceLifecycleSnapshot>;
+		};
+		template <typename T>
+		concept ResourceLifecycleMutation = requires(T& value) { value.AddTexture(); value.DestroyAll(); };
+		template <typename T>
+		concept ResourceLifecycleNativeAccess = requires(T& value) { value.GetDX12Device(); };
+		static_assert(ResourceLifecycleQuery<DX12ResourceLifecycleViewBase>);
+		static_assert(!ResourceLifecycleMutation<DX12ResourceLifecycleViewBase>);
+		static_assert(ResourceLifecycleMutation<DX12ResourceLifecycleControlBase>);
+		static_assert(!ResourceLifecycleQuery<DX12ResourceLifecycleControlBase>);
+		static_assert(!ResourceLifecycleNativeAccess<DX12ResourceLifecycleToolsBase>);
+
+		template <typename T>
+		concept EnvironmentCatalogAccess = requires(const T& value) { value.GetEntries(); };
+		template <typename T>
+		concept EnvironmentLifecycleControl = requires(T& value) { value.Tick(); value.Reset(); };
+		template <typename T>
+		concept EnvironmentFileSelection = requires(T& value, const std::filesystem::path& path) {
+			value.SelectEnvironmentFile(path);
+		};
+		static_assert(std::derived_from<EnvironmentAssetController, EnvironmentSelectionControlBase>);
+		static_assert(!std::is_abstract_v<EnvironmentAssetController>);
+		static_assert(requires(EnvironmentSelectionControlBase& control) {
+			{ control.SelectEnvironment(0) } noexcept -> std::same_as<bool>;
+		});
+		static_assert(!EnvironmentCatalogAccess<EnvironmentSelectionControlBase>);
+		static_assert(!EnvironmentLifecycleControl<EnvironmentSelectionControlBase>);
+		static_assert(!EnvironmentFileSelection<EnvironmentSelectionControlBase>);
+
+		template <typename T>
+		concept PostProcessPreviewQuery = requires(const T& value) {
+			{ value.GetPostProcessPreviewDiagnostics() } ->
+				std::same_as<PostProcessPreviewDiagnostics>;
+		};
+		template <typename T>
+		concept PostProcessPreviewRequest = requires(T& value) {
+			value.SetPostProcessPreviewSelection(PostProcessDebugSelection{});
+			value.SetPostProcessPreviewExposureEV(0.0f);
+			value.RequestPostProcessPreview();
+		};
+		template <typename T>
+		concept PostProcessPreviewConsumption = requires(T& value) {
+			value.ConsumePostProcessPreviewRequest();
+		};
+		template <typename T>
+		concept IBLPreviewQuery = requires(const T& value) {
+			{ value.GetIBLPreviewResourcesDiagnostics() } ->
+				std::same_as<IBLPreviewResourcesDiagnostics>;
+		};
+		template <typename T>
+		concept IBLPreviewRequest = requires(T& value) {
+			value.RequestIBLPreview(IBLPreviewType::Environment);
+			value.SetIBLEnvironmentPreviewMip(1);
+		};
+		template <typename T>
+		concept IBLPreviewConsumption = requires(T& value) {
+			value.ConsumeIBLPreviewRequest(IBLPreviewType::Environment);
+		};
+		template <typename T>
+		concept IBLPreviewAllocation = requires(T& value) {
+			value.EnsureIblResources();
+		};
+		static_assert(IBLPreviewQuery<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewRequest<IBLPreviewViewBase>);
+		static_assert(IBLPreviewRequest<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewQuery<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewConsumption<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewConsumption<IBLPreviewControlBase>);
+		static_assert(!IBLPreviewAllocation<IBLPreviewViewBase>);
+		static_assert(!IBLPreviewAllocation<IBLPreviewControlBase>);
+
+		static_assert(PostProcessPreviewQuery<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewRequest<PostProcessPreviewViewBase>);
+		static_assert(PostProcessPreviewRequest<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewQuery<PostProcessPreviewControlBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewViewBase>);
+		static_assert(!PostProcessPreviewConsumption<PostProcessPreviewControlBase>);
+
+		template <typename T>
+		concept ShadowPreviewAllocation = requires(T& value) {
+			value.EnsureShadowPreviewResources();
+		};
+		static_assert(requires(const ShadowPreviewViewBase& view) {
+			{ view.GetShadowPreviewDiagnostics() } noexcept -> std::same_as<ShadowPreviewDiagnostics>;
+		});
+		static_assert(!ShadowPreviewAllocation<ShadowPreviewViewBase>);
+		static_assert(ShadowPreviewAllocation<RenderResourceRegistry>);
+
+		template <typename T>
+		concept EnvironmentSettingsQuery = requires(const T& value) {
+			{ value.GetEnvironmentLightingSettings() } noexcept ->
+				std::same_as<EnvironmentLightingSettings>;
+		};
+		template <typename T>
+		concept EnvironmentSettingsControl = requires(T& value) {
+			value.SetIntensity(1.0f);
+			value.SetRotationRadians(0.0f);
+			value.SetQualityPreset(IBLQualityPreset::Medium);
+			value.SetPrefilteredSpecularSampleCount(512);
+			value.SetPrefilteredSpecularMaxSampleLuminance(1000.0f);
+			value.SetSkyboxEnabled(true);
+			value.RequestRebake();
+		};
+		template <typename T>
+		concept EnvironmentSourceCommit = requires(T& value) {
+			value.CommitEnvironmentSource(EnvironmentTextureSource{});
+		};
+		static_assert(EnvironmentSettingsQuery<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSettingsControl<EnvironmentLightingViewBase>);
+		static_assert(EnvironmentSettingsControl<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSettingsQuery<EnvironmentLightingControlBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingViewBase>);
+		static_assert(!EnvironmentSourceCommit<EnvironmentLightingControlBase>);
+
 		constexpr float ProjectionTolerance = 1.0e-4f;
 		constexpr float PositionTolerance = 2.0e-3f;
 
@@ -221,14 +373,19 @@ namespace gglab
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors
+					? RHITextureViewHandle{ m_NextTextureViewIndex++, 1 } : RHITextureViewHandle{};
 			}
 			RHIBufferViewHandle CreateBufferView(
 				RHIBufferHandle, const RHIBufferViewDesc&) noexcept override
 			{
 				return {};
 			}
-			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override { return {}; }
+			RHISamplerHandle CreateSampler(const RHISamplerDesc&) noexcept override
+			{
+				return m_CreateValidDescriptors
+					? RHISamplerHandle{ m_NextSamplerIndex++, 1 } : RHISamplerHandle{};
+			}
 			void DestroyTexture(RHITextureHandle) noexcept override
 			{
 				++m_DestroyTextureCount;
@@ -284,21 +441,26 @@ namespace gglab
 			}
 			void RecordBufferUse(RHIBufferHandle, const RHIFencePoint&) noexcept override {}
 			RHIDescriptorHandle GetTextureViewDescriptor(
-				RHITextureViewHandle) const noexcept override
+				RHITextureViewHandle view) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && view.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::CbvSrvUav, view.Index() }
+					: RHIDescriptorHandle{};
 			}
 			RHIDescriptorHandle GetBufferViewDescriptor(RHIBufferViewHandle) const noexcept override
 			{
 				return {};
 			}
-			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle) const noexcept override
+			RHIDescriptorHandle GetSamplerDescriptor(RHISamplerHandle sampler) const noexcept override
 			{
-				return {};
+				return m_CreateValidDescriptors && sampler.IsValid()
+					? RHIDescriptorHandle{ RHIDescriptorHeapType::Sampler, sampler.Index() }
+					: RHIDescriptorHandle{};
 			}
 			void RetireCompletedWork() noexcept override {}
 
 			bool m_TextureViewsSupported = false;
+			bool m_CreateValidDescriptors = false;
 			mutable RHITextureDesc m_LastTextureViewQueryTextureDesc{};
 			mutable RHITextureViewDesc m_LastTextureViewQueryDesc{};
 			mutable uint32_t m_TextureViewQueryCount = 0;
@@ -311,7 +473,429 @@ namespace gglab
 
 		private:
 			uint32_t m_NextTextureIndex = 1;
+			uint32_t m_NextTextureViewIndex = 1;
+			uint32_t m_NextSamplerIndex = 1;
 		};
+
+		void RunEnvironmentLightingSettingsTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			EnvironmentLightingSystem environment({ .m_RenderResourceRegistry = &registry });
+			const EnvironmentLightingViewBase& view = environment;
+			EnvironmentLightingControlBase& control = environment;
+			const auto initial = view.GetEnvironmentLightingSettings();
+			context.Check(initial.m_Intensity == 1.0f && initial.m_RotationRadians == 0.0f &&
+				initial.m_EnableSkybox && initial.m_QualityPreset == IBLQualityPreset::Medium &&
+				initial.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Medium) &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment query preserves initial settings without requesting a bake");
+
+			constexpr auto PreviewTypes = std::array{
+				IBLPreviewType::Environment,
+				IBLPreviewType::Irradiance,
+				IBLPreviewType::PrefilteredSpecular,
+				};
+			const auto clearPreviews = [&]() {
+				for (auto type : PreviewTypes)
+				{
+					registry.ClearIBLPreviewDirty(type);
+				}
+				};
+			const auto allPreviewsDirty = [&]() {
+				return std::ranges::all_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); });
+				};
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				initial.m_Intensity == 1.0f && allPreviewsDirty() &&
+				environment.GetBakeRequestGeneration() == 0,
+				"Environment intensity invalidates previews but not captured settings or bake generation");
+			clearPreviews();
+			control.SetIntensity(2.0f);
+			control.SetIntensity(std::numeric_limits<float>::quiet_NaN());
+			control.SetIntensity(std::numeric_limits<float>::infinity());
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 2.0f &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged and non-finite intensity inputs do not invalidate previews");
+			control.SetIntensity(-2.0f);
+			context.Check(view.GetEnvironmentLightingSettings().m_Intensity == 0.0f &&
+				allPreviewsDirty(), "Environment intensity remains clamped to nonnegative values");
+			clearPreviews();
+			constexpr float Rotation = 2.5f * std::numbers::pi_v<float>;
+			control.SetRotationRadians(Rotation);
+			const auto rotated = view.GetEnvironmentLightingSettings();
+			context.Check(std::abs(rotated.m_RotationRadians -
+				std::remainder(Rotation, 2.0f * std::numbers::pi_v<float>)) < 1.0e-6f &&
+				allPreviewsDirty() && environment.GetBakeRequestGeneration() == 0,
+				"Environment yaw wraps and invalidates previews without scheduling a bake");
+			clearPreviews();
+			control.SetRotationRadians(rotated.m_RotationRadians);
+			control.SetRotationRadians(std::numeric_limits<float>::quiet_NaN());
+			control.SetRotationRadians(std::numeric_limits<float>::infinity());
+			control.SetSkyboxEnabled(false);
+			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
+				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
+				environment.GetBakeRequestGeneration() == 0 &&
+				std::ranges::none_of(PreviewTypes,
+					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
+				"Unchanged or non-finite yaw and skybox toggles preserve bake and preview state");
+
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			const auto low = view.GetEnvironmentLightingSettings();
+			context.Check(low.m_QualityPreset == IBLQualityPreset::Low &&
+				low.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Low) &&
+				environment.GetBakeRequestGeneration() == 1,
+				"A concrete environment preset requests one bake with its unchanged configuration");
+			control.SetQualityPreset(IBLQualityPreset::Low);
+			control.SetQualityPreset(IBLQualityPreset::Custom);
+			control.SetQualityPreset(IBLQualityPreset::Count);
+			control.SetQualityPreset(static_cast<IBLQualityPreset>(255));
+			context.Check(environment.GetBakeRequestGeneration() == 1 &&
+				view.GetEnvironmentLightingSettings().m_BakeConfig == low.m_BakeConfig,
+				"Repeated and invalid environment presets leave the request unchanged");
+			control.SetPrefilteredSpecularSampleCount(0);
+			const auto custom = view.GetEnvironmentLightingSettings();
+			context.Check(custom.m_QualityPreset == IBLQualityPreset::Custom &&
+				custom.m_BakeConfig.m_PrefilteredSpecularSampleCount == 1 &&
+				environment.GetBakeRequestGeneration() == 2,
+				"Custom environment samples clamp at the lower bound and request a bake");
+			control.SetPrefilteredSpecularSampleCount(1);
+			context.Check(environment.GetBakeRequestGeneration() == 2,
+				"Repeated environment sample counts do not request redundant bakes");
+			control.SetPrefilteredSpecularSampleCount(std::numeric_limits<uint32_t>::max());
+			const auto maxSamples = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxSamples.m_PrefilteredSpecularSampleCount == 4096 &&
+				environment.GetBakeRequestGeneration() == 3,
+				"Custom environment samples preserve the upper bound");
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::quiet_NaN());
+			control.SetPrefilteredSpecularMaxSampleLuminance(std::numeric_limits<float>::infinity());
+			const auto nonFiniteLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(environment.GetBakeRequestGeneration() == 3 &&
+				nonFiniteLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1000.0f,
+				"Non-finite environment luminance inputs do not change requested settings");
+			control.SetPrefilteredSpecularMaxSampleLuminance(0.0f);
+			control.SetPrefilteredSpecularMaxSampleLuminance(1.0f);
+			const auto minLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(minLuminance.m_PrefilteredSpecularMaxSampleLuminance == 1.0f &&
+				environment.GetBakeRequestGeneration() == 4,
+				"Environment luminance clamps low and repeated effective values do not rebake");
+			control.SetPrefilteredSpecularMaxSampleLuminance(100000.0f);
+			const auto maxLuminance = view.GetEnvironmentLightingSettings().m_BakeConfig;
+			context.Check(maxLuminance.m_PrefilteredSpecularMaxSampleLuminance == 65000.0f &&
+				environment.GetBakeRequestGeneration() == 5 &&
+				low.m_BakeConfig.m_PrefilteredSpecularSampleCount == 128,
+				"Environment luminance clamps high while older copied settings remain unchanged");
+			control.RequestRebake(true);
+			context.Check(environment.GetBakeRequestGeneration() == 6 &&
+				environment.ShouldIgnoreCache(6),
+				"Forced environment rebuild bypasses the cache for its requested generation");
+			control.RequestRebake();
+			control.RequestRebake();
+			context.Check(environment.GetBakeRequestGeneration() == 8 &&
+				!environment.ShouldIgnoreCache(8) &&
+				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
+				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+		}
+
+		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const IBLPreviewViewBase& view = registry;
+			IBLPreviewControlBase& control = registry;
+			const auto empty = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(empty.m_Environment.m_BakeState == IBLBakeState::Unavailable &&
+				!empty.m_BrdfLut.m_SrvDescriptor.IsValid() &&
+				!empty.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				empty.m_EnvironmentPreview.m_UpdateCount == 0 && device.m_CreateTextureCount == 0,
+				"IBL preview queries before allocation neither allocate nor claim initialized content");
+
+			control.RequestIBLPreview(IBLPreviewType::Count);
+			control.RequestIBLPreview(static_cast<IBLPreviewType>(255));
+			context.Check(!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
+				"Invalid public preview requests are ignored");
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			context.Check(registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+				!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment),
+				"Repeated preview requests coalesce until the render pass consumes them");
+			registry.ClearIBLPreviewDirty(IBLPreviewType::Environment);
+			registry.ClearIBLPreviewDirty(IBLPreviewType::Irradiance);
+			registry.ClearIBLPreviewDirty(IBLPreviewType::PrefilteredSpecular);
+			control.RequestIBLPreview(IBLPreviewType::Environment);
+			context.Check(!registry.ConsumeIBLPreviewRequest(IBLPreviewType::Environment) &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Requested,
+				"A clean preview consumes its request without scheduling another update");
+			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Count);
+			control.SetIBLIrradiancePreviewLayout(static_cast<IBLPreviewLayout>(99));
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Count);
+			context.Check(!view.GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview.m_Dirty &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_IrradiancePreview.m_Dirty &&
+				!view.GetIBLPreviewResourcesDiagnostics().m_PrefilteredSpecularPreview.m_Dirty,
+				"Invalid layouts preserve clean preview state");
+			control.SetIBLEnvironmentPreviewLayout(IBLPreviewLayout::Cross);
+			control.SetIBLIrradiancePreviewLayout(IBLPreviewLayout::Cross);
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Cross);
+			const auto unchanged = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(unchanged.m_EnvironmentPreview.m_Dirty &&
+				!unchanged.m_IrradiancePreview.m_Dirty &&
+				!unchanged.m_PrefilteredSpecularPreview.m_Dirty,
+				"Same-layout controls preserve the established per-preview dirty semantics");
+			control.SetIBLIrradiancePreviewLayout(IBLPreviewLayout::Grid2x3);
+			control.SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout::Grid2x3);
+			control.SetIBLEnvironmentPreviewMip(1000);
+			control.SetIBLPrefilteredSpecularPreviewMip(2000);
+			const auto selected = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(selected.m_EnvironmentPreview.m_SelectedMip == 1000 &&
+				selected.m_PrefilteredSpecularPreview.m_SelectedMip == 2000 &&
+				selected.m_IrradiancePreview.m_Dirty &&
+				selected.m_PrefilteredSpecularPreview.m_Dirty &&
+				unchanged.m_PrefilteredSpecularPreview.m_SelectedMip == 0 &&
+				device.m_CreateTextureCount == 0,
+				"Controls preserve requested mips for pass-side clamping without allocating or rewriting copies");
+
+			RenderResourceRegistry::IBLResourceCreateInfo info;
+			registry.EnsureIblResources(info);
+			const auto allocated = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(device.m_CreateTextureCount == 7 &&
+				allocated.m_Environment.m_Width == 512 && allocated.m_Environment.m_ArraySize == 6 &&
+				allocated.m_Environment.m_MipLevels == 10 &&
+				allocated.m_PrefilteredSpecular.m_MipLevels == 5 &&
+				allocated.m_BrdfLut.m_SrvDescriptor.IsValid() &&
+				allocated.m_EnvironmentPreview.m_Texture.m_Width == 1024 &&
+				allocated.m_EnvironmentPreview.m_Texture.m_Height == 768 &&
+				allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				!registry.HasInitializedActiveIBL(),
+				"IBL preview queries expose active allocation metadata without initializing GPU content");
+			registry.EnsureIblResources(info);
+			context.Check(device.m_CreateTextureCount == 7 &&
+				view.GetIBLPreviewResourcesDiagnostics().m_Environment.m_SrvDescriptor.m_Index ==
+					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				"Compatible allocations and repeated queries preserve descriptor identity");
+
+			IBLBakeConfig config;
+			config.m_EnvironmentCubemapSize = 64;
+			registry.EnsureIBLBakeResources(config);
+			const auto staging = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(device.m_CreateTextureCount == 11 &&
+				staging.m_Environment.m_Width == allocated.m_Environment.m_Width &&
+				staging.m_Environment.m_SrvDescriptor.m_Index ==
+					allocated.m_Environment.m_SrvDescriptor.m_Index,
+				"Staging bake allocations remain hidden from the tooling view");
+			registry.PublishIBLBakeResources();
+			const auto published = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(published.m_Environment.m_Width == 64 &&
+				published.m_Environment.m_SrvDescriptor.m_Index !=
+					allocated.m_Environment.m_SrvDescriptor.m_Index &&
+				published.m_Environment.m_BakeState == IBLBakeState::Ready &&
+				published.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index ==
+					allocated.m_EnvironmentPreview.m_Texture.m_SrvDescriptor.m_Index &&
+				published.m_EnvironmentPreview.m_Dirty && registry.HasInitializedActiveIBL(),
+				"Runtime publication switches the active source while preserving preview ownership");
+
+			control.RequestIBLPreview(IBLPreviewType::Irradiance);
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetIBLPreviewResourcesDiagnostics();
+			context.Check(released.m_Environment.m_BakeState == IBLBakeState::Unavailable &&
+				!released.m_Environment.m_SrvDescriptor.IsValid() &&
+				!released.m_IrradiancePreview.m_Texture.m_SrvDescriptor.IsValid() &&
+				released.m_EnvironmentPreview.m_SelectedMip == 1000 &&
+				released.m_IrradiancePreview.m_Requested && device.m_CreateTextureCount == 11,
+				"Release empties borrowed resource metadata while retaining existing requested state");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 11 &&
+				retirement.m_TextureCounts.m_Available == 0 && device.m_DestroyTextureCount == 0,
+				"Active and staging IBL resources remain pending until the owner fence completes");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 11,
+				"IBL resources become reusable only after fence completion");
+		}
+
+		void RunShadowPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const ShadowPreviewViewBase& view = registry;
+			const auto empty = view.GetShadowPreviewDiagnostics();
+			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
+				empty.m_Width == 0 && empty.m_Height == 0 &&
+				empty.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 0,
+				"Shadow preview query is safe before pipeline allocation and does not allocate");
+
+			constexpr auto Index =
+				RenderResourceRegistry::TextureIndex::Preview_Shadow_DirectionalShadowMap;
+			registry.EnsureShadowPreviewResources();
+			const auto allocated = view.GetShadowPreviewDiagnostics();
+			context.Check(allocated.m_Allocated && allocated.m_SrvDescriptor.IsValid() &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Height == DefaultDirectionalShadowMapPreviewSize &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm && registry.IsDirty(Index),
+				"Shadow preview query exposes the pipeline allocation without initializing contents");
+			const auto repeated = view.GetShadowPreviewDiagnostics();
+			context.Check(repeated.m_SrvDescriptor.m_Index == allocated.m_SrvDescriptor.m_Index &&
+				device.m_CreateTextureCount == 1 && registry.IsDirty(Index),
+				"Repeated shadow queries leave allocation identity and pending initialization unchanged");
+			registry.ClearDirty(Index);
+			registry.EnsureShadowPreviewResources();
+			context.Check(view.GetShadowPreviewDiagnostics().m_SrvDescriptor.m_Index ==
+				allocated.m_SrvDescriptor.m_Index && !registry.IsDirty(Index) &&
+				device.m_CreateTextureCount == 1,
+				"Compatible pipeline allocation and tooling queries preserve initialized preview resources");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.EnsureShadowPreviewResources(256, &retireFence);
+			const auto resized = view.GetShadowPreviewDiagnostics();
+			context.Check(resized.m_Allocated && resized.m_Width == 256 && resized.m_Height == 256 &&
+				resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != allocated.m_SrvDescriptor.m_Index &&
+				allocated.m_Width == DefaultDirectionalShadowMapPreviewSize &&
+				registry.IsDirty(Index) && device.m_CreateTextureCount == 2,
+				"Shadow preview replacement changes live metadata without rewriting copied observations");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetShadowPreviewDiagnostics();
+			context.Check(!released.m_Allocated && !released.m_SrvDescriptor.IsValid() &&
+				released.m_Width == 0 && released.m_Height == 0 &&
+				released.m_Format == RHIFormat::Unknown && device.m_CreateTextureCount == 2,
+				"Shadow preview query after release stays empty instead of recreating a resource");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0 && device.m_DestroyTextureCount == 0,
+				"Shadow preview allocations remain pending until their owner's retirement fence completes");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Shadow preview allocations become reusable only after fence completion");
+		}
+
+		void RunPostProcessPreviewContractTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			device.m_CreateValidDescriptors = true;
+			device.m_UseControlledFenceCompletion = true;
+			TransientResourcePool pool(&device);
+			SamplerRegistry samplers({ .m_Device = &device });
+			RenderResourceRegistry registry({
+				.m_Device = &device,
+				.m_TransientResourcePool = &pool,
+				.m_SamplerRegistry = &samplers,
+				});
+			const PostProcessPreviewViewBase& view = registry;
+			PostProcessPreviewControlBase& control = registry;
+			const auto empty = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!empty.m_HasPublished && !empty.m_Requested &&
+				!empty.m_SrvDescriptor.IsValid() && empty.m_Width == 0 && empty.m_Height == 0,
+				"Preview query safely observes an unallocated source without a descriptor lookup");
+
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::BloomPyramid, 999 });
+			control.SetPostProcessPreviewExposureEV(20.0f);
+			const auto selected = view.GetPostProcessPreviewDiagnostics();
+			context.Check(selected.m_Selected.m_BloomPyramidLevel == MaxBloomPyramidLevels - 1 &&
+				selected.m_ExposureEV == 8.0f && !selected.m_Requested &&
+				device.m_CreateTextureCount == 0,
+				"Preview controls clamp requested values without allocating or scheduling GPU work");
+			control.SetPostProcessPreviewSelection({ PostProcessDebugTap::Count, 0 });
+			control.SetPostProcessPreviewExposureEV(-20.0f);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Selected == selected.m_Selected &&
+				view.GetPostProcessPreviewDiagnostics().m_ExposureEV == -8.0f,
+				"Preview controls ignore invalid taps and retain the existing exposure bounds");
+			control.RequestPostProcessPreview();
+			control.RequestPostProcessPreview();
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_Requested &&
+				registry.ConsumePostProcessPreviewRequest() &&
+				!registry.ConsumePostProcessPreviewRequest() && device.m_CreateTextureCount == 0,
+				"Repeated preview requests coalesce and only the Runtime owner consumes them");
+
+			registry.EnsurePostProcessPreviewResources(1024, 512);
+			const auto allocated = view.GetPostProcessPreviewDiagnostics();
+			context.Check(allocated.m_Width == 512 && allocated.m_Height == 256 &&
+				allocated.m_Format == RHIFormat::R8G8B8A8Unorm &&
+				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
+				device.m_CreateTextureCount == 1,
+				"Preview observation distinguishes allocated descriptors from recorded contents");
+			registry.PublishPostProcessPreview(selected.m_Selected);
+			const auto published = view.GetPostProcessPreviewDiagnostics();
+			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
+			control.SetPostProcessPreviewSelection(nextSelection);
+			control.RequestPostProcessPreview();
+			const auto pending = view.GetPostProcessPreviewDiagnostics();
+			context.Check(pending.m_Selected == nextSelection && pending.m_Requested &&
+				pending.m_HasPublished && pending.m_Published == selected.m_Selected &&
+				pending.m_UpdateCount == 1 && published.m_Selected == selected.m_Selected &&
+				!published.m_Requested && device.m_CreateTextureCount == 1,
+				"A new preview request preserves published identity and independently copied observations");
+			registry.InvalidatePostProcessPreview(nextSelection);
+			context.Check(view.GetPostProcessPreviewDiagnostics().m_HasPublished,
+				"Invalidating a different preview tap does not erase the published image");
+			registry.InvalidatePostProcessPreview(selected.m_Selected);
+			context.Check(!view.GetPostProcessPreviewDiagnostics().m_HasPublished &&
+				published.m_HasPublished,
+				"Preview invalidation changes live availability without rewriting copied metadata");
+
+			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
+			registry.PublishPostProcessPreview(nextSelection);
+			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
+			const auto resized = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
+				resized.m_Height == 512 && resized.m_SrvDescriptor.IsValid() &&
+				resized.m_SrvDescriptor.m_Index != published.m_SrvDescriptor.m_Index &&
+				published.m_Height == 256 && device.m_CreateTextureCount == 2,
+				"Resizing a preview publishes new metadata and invalidates the old content identity");
+			registry.ReleaseAll(retireFence);
+			const auto released = view.GetPostProcessPreviewDiagnostics();
+			context.Check(!released.m_HasPublished && !released.m_Requested &&
+				!released.m_SrvDescriptor.IsValid() && released.m_Width == 0 &&
+				released.m_Height == 0,
+				"Preview release removes descriptor availability and pending requests");
+			pool.Tick();
+			TransientResourcePoolSnapshot retirement;
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(device.m_DestroyTextureCount == 0 &&
+				retirement.m_TextureCounts.m_PendingRetirement == 2 &&
+				retirement.m_TextureCounts.m_Available == 0,
+				"Preview resource retirement waits for the owner's submission fence");
+			device.m_CompletedFenceValue = 9;
+			pool.Tick();
+			BuildTransientResourcePoolSnapshot(pool, retirement);
+			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
+				retirement.m_TextureCounts.m_Available == 2,
+				"Retired preview resources become reusable only after fence completion");
+		}
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
 		{
@@ -898,7 +1482,7 @@ namespace gglab
 
 			constexpr uint32_t FrameSlotCount = 2;
 			constexpr uint32_t SwapChainImageCount = 3;
-			RenderFrameBuilder::BuildResult syntheticFrame{};
+			RenderFrameBuildResult syntheticFrame{};
 			syntheticFrame.m_FrameSlotIndex = 1;
 			syntheticFrame.m_BackBufferIndex = 2;
 			syntheticFrame.m_FrameSerial = 17;
@@ -913,23 +1497,20 @@ namespace gglab
 				frameSlotStorage[1] == 11 && swapChainImageStorage[2] == 29,
 				"Frame context preserves independent frame-slot and swapchain-image indices");
 
-			RenderFrameBuilder::BuildResult lateValidationFrame{};
-			lateValidationFrame.m_UploadFencePoint =
-				RHIFencePoint{ RHIFenceHandle{ 9, 1 }, 23 };
-			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes = 64;
-			lateValidationFrame.m_SceneGpuAllocations.m_SceneConstants.m_SizeInBytes = 128;
-			const RenderFrameContext lateValidationContext =
-				lateValidationFrame.MakeRenderFrameContext();
+			RenderSceneGpuAllocations lateValidationAllocations{};
+			lateValidationAllocations.m_SceneConstants.m_OffsetInBytes = 64;
+			lateValidationAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			const RHIFencePoint lateValidationFence{ RHIFenceHandle{ 9, 1 }, 23 };
 			RenderFrameGpuResources frameGpuResources{};
-			frameGpuResources.AdoptFrom(lateValidationContext);
+			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
 			const uint64_t adoptedSceneConstantOffset =
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.m_OffsetInBytes;
-			frameGpuResources.AdoptFrom(lateValidationContext);
-			context.Check(lateValidationFrame.m_SceneGpuAllocations.IsEmpty() &&
-				frameGpuResources.m_UploadFencePoint == lateValidationFrame.m_UploadFencePoint &&
+			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
+			context.Check(lateValidationAllocations.IsEmpty() &&
+				frameGpuResources.m_UploadFencePoint == lateValidationFence &&
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
 				adoptedSceneConstantOffset == 64,
-				"Frame-build GPU resources transfer before late validation and remain owned on early return");
+				"Frame GPU resources transfer before late validation and remain owned on early return");
 
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
 			const auto& bgraSrgb = GetRHIFormatInfo(RHIFormat::B8G8R8A8UnormSrgb);
@@ -957,6 +1538,27 @@ namespace gglab
 			}
 			context.Check(locationsAreExplicit,
 				"Built-in RHI vertex layouts assign deterministic explicit attribute locations");
+			const auto shadowInput = BuildRHIVertexInputLayoutDesc(
+				InputLayoutID::MeshPositionUVs, ShaderBinaryFormat::SpirV);
+			context.Check(shadowInput.m_AttributeCount == 3 && shadowInput.m_VertexBufferCount == 1 &&
+				shadowInput.m_VertexBuffers[0].m_StrideInBytes == 56 &&
+				shadowInput.m_Attributes[0].m_AlignedByteOffset == 0 &&
+				shadowInput.m_Attributes[1].m_AlignedByteOffset == 24 &&
+				shadowInput.m_Attributes[2].m_AlignedByteOffset == 32 &&
+				shadowInput.m_Attributes[0].m_Location == 0 &&
+				shadowInput.m_Attributes[1].m_Location == 2 &&
+				shadowInput.m_Attributes[2].m_Location == 3 &&
+				shadowInput.m_Attributes[1].m_SemanticIndex == 0 &&
+				shadowInput.m_Attributes[2].m_SemanticIndex == 1,
+				"Shadow mesh input omits unused normal/tangent without repacking vertices or UV semantics");
+			GraphicsPhysicalPipelineKey shadowRecipe;
+			shadowRecipe.m_InputLayoutId = InputLayoutID::MeshPositionUVs;
+			const auto dxilShadow = BuildRHIGraphicsPipelineDesc(shadowRecipe, ShaderBinaryFormat::Dxil);
+			const auto spirvShadow = BuildRHIGraphicsPipelineDesc(shadowRecipe, ShaderBinaryFormat::SpirV);
+			context.Check(dxilShadow.m_VertexInput.m_AttributeCount == 5 &&
+				spirvShadow.m_VertexInput.m_AttributeCount == 3 &&
+				dxilShadow.m_VertexInput.m_VertexBuffers[0].m_StrideInBytes == 56,
+				"Shadow pipeline lowering preserves the full DXIL signature and prunes only SPIR-V inputs");
 
 			RHIRenderingSignature renderingSignature{};
 			renderingSignature.m_ColorFormats[0] = RHIFormat::R8G8B8A8Unorm;
@@ -984,6 +1586,69 @@ namespace gglab
 			context.Check(matchingSignature && rejectsColorMismatch && rejectsDepthMismatch &&
 				rejectsSampleMismatch,
 				"Graphics pipeline compatibility covers active color, depth, and sample signature");
+		}
+
+		void RunRenderHostContractTests(SelfTestContext& context) noexcept
+		{
+			static_assert(std::is_abstract_v<RenderHost>,
+				"the Public render host contract stays an interface");
+			static_assert(std::is_base_of_v<RenderHost, Renderer>,
+				"the concrete renderer implements the Public render host contract");
+			static_assert(!std::is_copy_constructible_v<RenderFrame> &&
+				std::is_move_constructible_v<RenderFrame>,
+				"the Public frame handle is a move-only RAII owner");
+			static_assert(std::is_base_of_v<RenderPipelineResolver, PipelineCache>,
+				"the pipeline cache implements the explicit pipeline resolver contract");
+			static_assert(std::is_base_of_v<RenderShaderProgramAccess, ShaderManager>,
+				"the shader manager implements the explicit program access contract");
+			static_assert(std::is_base_of_v<RenderSamplerAccess, SamplerRegistry>,
+				"the sampler registry implements the explicit sampler access contract");
+			static_assert(
+				std::is_base_of_v<RenderResourceRegistryAccess, RenderResourceRegistry>,
+				"the render resource registry implements the explicit resource contract");
+			static_assert(std::is_base_of_v<RenderFrameBufferAccess, Renderer> &&
+				std::is_base_of_v<RenderEnvironmentAccess, Renderer> &&
+				std::is_base_of_v<RenderPresentationAccess, Renderer>,
+				"the renderer implements the explicit frame, environment and presentation contracts");
+
+			const RenderFrame unavailable(RHIFrameBeginStatus::Unavailable);
+			const RenderFrame fatal(RHIFrameBeginStatus::Fatal);
+			context.Check(!unavailable.IsValid() && !unavailable.IsReady() &&
+				unavailable.GetBeginStatus() == RHIFrameBeginStatus::Unavailable &&
+				unavailable.IsUnavailable() && !fatal.IsValid() && fatal.IsFatal(),
+				"non-ready begin results carry no active render frame");
+
+			RenderFrame source(RHIFrameBeginStatus::Unavailable);
+			RenderFrame moved(std::move(source));
+			context.Check(!source.IsValid() && !source.IsReady() && moved.IsUnavailable(),
+				"moving a frame handle transfers the abort obligation");
+
+			RenderFrame assigned(RHIFrameBeginStatus::Fatal);
+			assigned = std::move(moved);
+			context.Check(!moved.IsValid() && !assigned.IsReady() && assigned.IsUnavailable(),
+				"assigning a frame handle transfers the abort obligation");
+
+			const RenderHostInstance missingFactory = CreateRenderHost({});
+			context.Check(!missingFactory.m_Host &&
+				!missingFactory.m_Services.m_PipelineResolver &&
+				!missingFactory.m_Services.m_Presentation,
+				"render host factory rejects a missing host context factory");
+			RenderHostCreateInfo missingPaths{};
+			missingPaths.m_RHIContextFactory =
+				reinterpret_cast<const RHIContextFactoryBase*>(1);
+			const RenderHostInstance missingPathsInstance = CreateRenderHost(missingPaths);
+			context.Check(!missingPathsInstance.m_Host &&
+				!missingPathsInstance.m_Services.m_PipelineResolver,
+				"render host factory rejects missing runtime paths");
+
+			RenderHostInstance defaultHostInstance{};
+			context.Check(!defaultHostInstance.m_Host && !defaultHostInstance.m_Composition,
+				"render host instances default to no host and no composition access");
+			RenderHostInstance hostInstance{};
+			hostInstance.m_Composition = reinterpret_cast<RenderCompositionAccess*>(1);
+			context.Check(hostInstance.m_Composition ==
+				reinterpret_cast<RenderCompositionAccess*>(1),
+				"render host instances carry the composition access alongside the host and services");
 		}
 
 		void RunDX12GraphicsContractLoweringTests(SelfTestContext& context) noexcept
@@ -3945,6 +4610,12 @@ namespace gglab
 
 			RecordingDevice reuseDevice;
 			TransientResourcePool reusePool(&reuseDevice);
+			TransientResourcePoolSnapshot emptyPoolSnapshot;
+			BuildTransientResourcePoolSnapshot(reusePool, emptyPoolSnapshot);
+			context.Check(emptyPoolSnapshot.m_SourceAvailable &&
+				emptyPoolSnapshot.m_TextureCounts.m_Total == 0 &&
+				emptyPoolSnapshot.m_BufferCounts.m_Total == 0,
+				"Transient pool diagnostics distinguish an available empty pool from no source");
 			auto discardAllocation = reusePool.AcquireTexture(graphTextureDesc, "Discardable");
 			const TransientResourcePoolSlot discardSlot = discardAllocation.m_PoolSlot;
 			reusePool.RetireTexture(std::move(discardAllocation), {});
@@ -5207,11 +5878,18 @@ namespace gglab
 				debugCameraSlot && cameraRig.SetDisplayViewId(debugCameraSlot->m_RenderViewId);
 			const CameraRig::EffectiveDisplayView debugDisplayView =
 				cameraRig.ResolveEffectiveDisplayView();
+			const CameraRenderViewQueryBase& routingQuery = cameraRig;
+			const auto copiedVisibility = routingQuery.GetRenderViewVisibilityMode(debugDisplayView.m_ViewId);
+			context.Check(routingQuery.GetDisplayViewId() == debugDisplayView.m_ViewId &&
+				copiedVisibility.has_value() &&
+				!routingQuery.GetRenderViewVisibilityMode(RenderViewID::Unknown).has_value(),
+				"Camera routing query observes selected views and distinguishes missing slots");
 			CameraRig::CameraSlot* mutableDebugCameraSlot =
 				cameraRig.GetCameraSlot(debugCameraIndex);
 			if (mutableDebugCameraSlot)
 			{
 				mutableDebugCameraSlot->m_EnableRenderView = false;
+				mutableDebugCameraSlot->m_VisibilityMode = RenderViewVisibilityMode::None;
 			}
 			const CameraRig::EffectiveDisplayView fallbackDisplayView =
 				cameraRig.ResolveEffectiveDisplayView();
@@ -5222,6 +5900,11 @@ namespace gglab
 				fallbackDisplayView.IsValid() &&
 				fallbackDisplayView.m_ViewId == RenderViewID::Main,
 				"CameraRig resolves the effective display view and fallback exactly once");
+			context.Check(copiedVisibility.has_value() &&
+				*copiedVisibility != RenderViewVisibilityMode::None &&
+				routingQuery.GetRenderViewVisibilityMode(debugDisplayView.m_ViewId) == RenderViewVisibilityMode::None &&
+				routingQuery.GetDisplayViewId() == debugDisplayView.m_ViewId,
+				"Camera routing observations are copied and preserve requested display selection during fallback");
 
 			const uint64_t initialResetSerial = rigCamera.GetTemporalResetSerial();
 			rigCamera.SetPosition(Vector3(1.0f, 2.0f, 3.0f));
@@ -5753,7 +6436,7 @@ namespace gglab
 				"Submitted object history commits atomically, rejects stale identities, and "
 				"retires only on committed disappearance");
 
-			RenderFrameBuilder::BuildResult frameResult{};
+			RenderFrameBuildResult frameResult{};
 			frameResult.m_TemporalFramePlan = activePlan;
 			const RenderFrameContext frameContext = frameResult.MakeRenderFrameContext();
 			context.Check(frameContext.GetTemporalFramePlan() == activePlan,
@@ -5763,10 +6446,26 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
+		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),
+			"DX12 composition rejects a missing window before creating backend objects");
+#if GGLAB_ENABLE_VULKAN
+		context.Check(!CreateVulkanWin32Context(nativeContextDesc, nullptr, nullptr, true),
+			"Vulkan Win32 composition rejects missing native handles before bootstrap");
+		// Sentinel handles must never reach WSI when host ABI suitability is false.
+		context.Check(!CreateVulkanWin32Context(nativeContextDesc,
+			reinterpret_cast<HINSTANCE>(1), reinterpret_cast<HWND>(1), false),
+			"Vulkan Win32 composition preserves the host ABI rejection before loader or WSI access");
+#endif
+		RunIBLPreviewContractTests(context);
+		RunPostProcessPreviewContractTests(context);
+		RunShadowPreviewContractTests(context);
+		RunEnvironmentLightingSettingsTests(context);
 		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);
+		RunRenderHostContractTests(context);
 		RunNapaVoxelRenderGraphContractTests(context);
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);

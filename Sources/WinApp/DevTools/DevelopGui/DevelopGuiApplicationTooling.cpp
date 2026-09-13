@@ -3,13 +3,12 @@
 #include "Demo/DemoManager.h"
 #include "Lab/LabRuntime.h"
 #include "ApplicationToolingIntegration.h"
+#include "GGLabRuntime/Graphics/RHI/DX12/DX12ResourceLifecycleTools.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
 #include "DevTools/DevelopGui/LoadingOverlay.h"
 #include "DevTools/DevelopGui/Panels/DemoPanel.h"
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
-#include "Diagnostics/Builders/LabSnapshotProvider.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
 
 #include <memory>
 
@@ -25,11 +24,12 @@ namespace gglab
 			DevelopGuiApplicationTooling& operator=(const DevelopGuiApplicationTooling&) = delete;
 			~DevelopGuiApplicationTooling() override
 			{
-				m_System.Finalize();
+				PrepareForShutdown();
 			}
 
 			void PrepareForShutdown() noexcept override
 			{
+				m_ResourceLifecycleTools.reset();
 				m_System.Finalize();
 			}
 
@@ -47,18 +47,12 @@ namespace gglab
 					return false;
 				}
 
+				m_ResourceLifecycleTools = CreateDX12ResourceLifecycleTools(*createInfo.m_RHIContext);
 				auto& runtime = m_System.GetDevToolsRuntime();
-				runtime.SetTaskSystem(createInfo.m_TaskSystem);
 				runtime.GetRegistry().RegisterPanel(
 					std::make_unique<DemoPanel>(createInfo.m_DemoManager));
 				if (createInfo.m_LabRuntimeLocator)
 				{
-					runtime.GetDiagnostics().RegisterProvider(
-						std::make_unique<LabSnapshotProvider>(
-							[runtimeLocator = createInfo.m_LabRuntimeLocator]() noexcept
-								-> const LabSnapshotSourceBase*
-							{ return runtimeLocator->GetLabRuntimeIfCreated(); }),
-						SnapshotUpdatePolicy::EveryFrame);
 					runtime.GetRegistry().RegisterPanel(
 						std::make_unique<LabPanel>(createInfo.m_LabRuntimeLocator));
 				}
@@ -74,7 +68,8 @@ namespace gglab
 				};
 			}
 
-			void ResolveFrameSettings(const ViewRenderProfile& authoringProfile,
+			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+				const ViewRenderProfile& authoringProfile,
 				ShadowVisualizationSettings& outShadowVisualizationSettings,
 				ViewRenderProfile& outEffectiveProfile) const noexcept override
 			{
@@ -82,6 +77,10 @@ namespace gglab
 				outShadowVisualizationSettings =
 					runtime.GetRenderVisualizationSettings().m_Shadow;
 				outEffectiveProfile = runtime.ResolveViewRenderProfile(authoringProfile);
+				return {
+					.m_GTAOOverrideActive =
+						runtime.GetViewRenderSettingsOverrides().m_GTAO.m_IsActive,
+				};
 			}
 
 			bool BeginFrame() noexcept override { return m_System.BeginFrame(); }
@@ -89,26 +88,34 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				DevelopGuiContext guiContext{};
-				guiContext.m_Camera = context.m_Camera;
-				guiContext.m_CameraController = context.m_CameraController;
-				guiContext.m_CameraRig = context.m_CameraRig;
-				guiContext.m_Renderer = context.m_Renderer;
-				guiContext.m_World = context.m_World;
-				guiContext.m_RenderViews = context.m_RenderViews;
-				guiContext.m_RenderQueues = context.m_RenderQueues;
-				guiContext.m_MainRenderView = context.m_MainRenderView;
-				guiContext.m_AssetManager = context.m_AssetManager;
-				guiContext.m_EnvironmentAssetController =
-					context.m_EnvironmentAssetController;
-				guiContext.m_RenderGraph = context.m_RenderGraph;
-				guiContext.m_DebugDrawSystem = context.m_DebugDrawSystem;
+				guiContext.m_Cameras = context.m_Cameras;
+				guiContext.m_CameraControl = context.m_CameraControl;
+				guiContext.m_CameraRenderViewQuery = context.m_CameraRenderViewQuery;
+				guiContext.m_DX12ResourceLifecycle = m_ResourceLifecycleTools.get();
+				guiContext.m_DX12ResourceLifecycleControl = m_ResourceLifecycleTools.get();
+				guiContext.m_WorldView = context.m_WorldView;
+				guiContext.m_WorldControl = context.m_WorldControl;
+				guiContext.m_DirectionalLight = context.m_DirectionalLight;
+				guiContext.m_DirectionalLightControl = context.m_DirectionalLightControl;
+				guiContext.m_AssetControl = context.m_AssetControl;
+				guiContext.m_EnvironmentSelectionControl =
+					context.m_EnvironmentSelectionControl;
+				guiContext.m_Diagnostics = context.m_Diagnostics;
+				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
+				guiContext.m_EnvironmentLighting = context.m_EnvironmentLighting;
+				guiContext.m_EnvironmentLightingControl = context.m_EnvironmentLightingControl;
+				guiContext.m_GpuProfiling = context.m_GpuProfiling;
+				guiContext.m_GpuProfilingControl = context.m_GpuProfilingControl;
+				guiContext.m_IBLCacheControl = context.m_IBLCacheControl;
+				guiContext.m_IBLPreview = context.m_IBLPreview;
+				guiContext.m_IBLPreviewControl = context.m_IBLPreviewControl;
+				guiContext.m_PostProcessPreview = context.m_PostProcessPreview;
+				guiContext.m_PostProcessPreviewControl = context.m_PostProcessPreviewControl;
+				guiContext.m_ShadowPreview = context.m_ShadowPreview;
+				guiContext.m_DebugDrawChannels = context.m_DebugDrawChannels;
+				guiContext.m_DebugDrawChannelControl = context.m_DebugDrawChannelControl;
 				guiContext.m_DebugDrawFrame =
 					context.m_DebugDrawFrame ? *context.m_DebugDrawFrame : DebugDrawFrameView{};
-				guiContext.m_DirectionalShadowSettings = context.m_DirectionalShadowSettings;
-				guiContext.m_AuthoringViewRenderProfile =
-					context.m_AuthoringViewRenderProfile;
-				guiContext.m_EffectiveViewRenderProfile = context.m_EffectiveViewRenderProfile;
-				guiContext.m_TemporalFramePlan = context.m_TemporalFramePlan;
 
 				m_System.Draw(guiContext);
 				if (context.m_LoadingProgress)
@@ -128,6 +135,7 @@ namespace gglab
 			}
 
 		private:
+			std::unique_ptr<DX12ResourceLifecycleToolsBase> m_ResourceLifecycleTools;
 			DevelopGuiSystem m_System;
 		};
 	}

@@ -1,0 +1,37 @@
+#pragma once
+#include "GGLabFoundation/Async/ProgressChannel.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLifecycleTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
+
+#include <cstdint>
+#include <string>
+
+namespace gglab
+{
+	enum class AssetLoadKind : uint8_t
+	{
+		Generic,
+		Model,
+		Texture,
+		Mesh,
+	};
+
+	struct AssetLoadProgress
+	{
+		AssetState m_State = AssetState::Unloaded;
+		float m_Fraction = 0.0f;
+		std::string m_Stage;
+		std::string m_Detail;
+
+		[[nodiscard]] bool IsReady() const noexcept { return m_State == AssetState::Ready; }
+
+		[[nodiscard]] bool HasFailed() const noexcept
+		{
+			return m_State == AssetState::Failed || m_State == AssetState::Cancelled;
+		}
+	};
+
+	[[nodiscard]] AssetLoadProgress GetAssetLoadProgress(AssetState state,
+		AssetLoadKind kind = AssetLoadKind::Generic,
+		const ProgressChannelPtr& progress = {}) noexcept;
+}

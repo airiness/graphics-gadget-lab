@@ -1,14 +1,13 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "ApplicationCameraInput.h"
-#include "Core/Math/Quaternion.h"
-#include "Core/Time.h"
-#include "Scene/Components.h"
-#include "Graphics/Camera.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Time.h"
+#include "GGLabRuntime/Scene/Components.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 namespace gglab
 {
@@ -39,7 +38,7 @@ namespace gglab
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
 
 		// RenderPipeline
-		m_RenderPipeline = std::make_unique<RenderPipelineForwardPBR>();
+		m_RenderPipeline = CreateRenderPipelineForwardPBR();
 	}
 
 	void DemoPlayground::BeginPrepare() noexcept

@@ -1,51 +1,72 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiStateStore.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/RenderQueue.h"
-#include "Graphics/RenderView.h"
-#include "Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 namespace gglab
 {
-	class World;
-	class Camera;
-	class CameraController;
-	class CameraRig;
-	class Renderer;
-	class AssetManager;
-	class EnvironmentAssetController;
-	class RenderGraph;
-	class DiagnosticsRuntime;
+	class WorldToolingViewBase;
+	class WorldToolingControlBase;
+	class DirectionalLightViewBase;
+	class DirectionalLightControlBase;
+	class CameraToolingViewBase;
+	class CameraToolingControlBase;
+	class CameraRenderViewQueryBase;
+	class DX12ResourceLifecycleViewBase;
+	class DX12ResourceLifecycleControlBase;
+	class AssetToolingControlBase;
+	class EnvironmentSelectionControlBase;
+	class EnvironmentLightingControlBase;
+	class EnvironmentLightingViewBase;
+	class GpuProfilingControlBase;
+	class GpuProfilingViewBase;
+	class IBLCacheControlBase;
+	class IBLPreviewViewBase;
+	class IBLPreviewControlBase;
+	class PostProcessPreviewControlBase;
+	class PostProcessPreviewViewBase;
+	class ShadowPreviewViewBase;
+	class DiagnosticsControl;
+	class DiagnosticsView;
 	class DevelopGuiSystem;
-	class DebugDrawSystem;
-	struct ViewRenderProfile;
+	class DebugDrawChannelControlBase;
+	class DebugDrawChannelViewBase;
 	struct ViewRenderSettingsOverrides;
-	struct ResolvedTemporalFramePlan;
 
 	class DevelopGuiStateStore;
 
 	struct DevelopGuiContext
 	{
-		Camera* m_Camera = nullptr;
-		CameraController* m_CameraController = nullptr;
-		CameraRig* m_CameraRig = nullptr;
-		Renderer* m_Renderer = nullptr;
-		World* m_World = nullptr;
-		std::span<RenderView> m_RenderViews;
-		std::span<const RenderQueue> m_RenderQueues;
-		RenderView* m_MainRenderView = nullptr;
-		AssetManager* m_AssetManager = nullptr;
-		EnvironmentAssetController* m_EnvironmentAssetController = nullptr;
-		RenderGraph* m_RenderGraph = nullptr;
-		DiagnosticsRuntime* m_Diagnostics = nullptr;
-		DebugDrawSystem* m_DebugDrawSystem = nullptr;
+		const CameraToolingViewBase* m_Cameras = nullptr;
+		CameraToolingControlBase* m_CameraControl = nullptr;
+		const CameraRenderViewQueryBase* m_CameraRenderViewQuery = nullptr;
+		// Borrowed from the host's optional DX12 tooling adapter for this draw.
+		const DX12ResourceLifecycleViewBase* m_DX12ResourceLifecycle = nullptr;
+		DX12ResourceLifecycleControlBase* m_DX12ResourceLifecycleControl = nullptr;
+		const WorldToolingViewBase* m_WorldView = nullptr;
+		WorldToolingControlBase* m_WorldControl = nullptr;
+		const DirectionalLightViewBase* m_DirectionalLight = nullptr;
+		DirectionalLightControlBase* m_DirectionalLightControl = nullptr;
+		AssetToolingControlBase* m_AssetControl = nullptr;
+		EnvironmentSelectionControlBase* m_EnvironmentSelectionControl = nullptr;
+		DiagnosticsView* m_Diagnostics = nullptr;
+		DiagnosticsControl* m_DiagnosticsControl = nullptr;
+		// Borrowed for this draw only; panels may retain copied timing values.
+		const EnvironmentLightingViewBase* m_EnvironmentLighting = nullptr;
+		EnvironmentLightingControlBase* m_EnvironmentLightingControl = nullptr;
+		const GpuProfilingViewBase* m_GpuProfiling = nullptr;
+		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
+		IBLCacheControlBase* m_IBLCacheControl = nullptr;
+		const IBLPreviewViewBase* m_IBLPreview = nullptr;
+		IBLPreviewControlBase* m_IBLPreviewControl = nullptr;
+		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
+		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
+		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
+		const DebugDrawChannelViewBase* m_DebugDrawChannels = nullptr;
+		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
-		DirectionalShadowSettings* m_DirectionalShadowSettings = nullptr;
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
-		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
-		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
-		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 

@@ -94,9 +94,6 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h">
       <Filter>Lab</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSnapshot.h">
-      <Filter>Lab</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabTypes.h">
       <Filter>Lab</Filter>
     </ClInclude>

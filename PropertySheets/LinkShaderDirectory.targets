@@ -11,7 +11,14 @@
     <MakeDir Directories="$(OutDir)" />
     <Exec Command="&quot;$(CmdExe)&quot; /D /C if exist &quot;$(ShaderOutDir)&quot; rmdir &quot;$(ShaderOutDir)&quot;"
           IgnoreExitCode="true" />
-    <Exec Command="&quot;$(CmdExe)&quot; /D /C if not exist &quot;$(ShaderOutDir)&quot; mklink /J &quot;$(ShaderOutDir)&quot; &quot;$(ShaderSrcDir)&quot;" />
+    <!-- Multiple application targets share OutDir and may reach this target
+         concurrently during a solution build. A losing mklink process may
+         report failure after another target created the same junction, so
+         validate the final filesystem state instead of the transient return. -->
+    <Exec Command="&quot;$(CmdExe)&quot; /D /C if not exist &quot;$(ShaderOutDir)&quot; mklink /J &quot;$(ShaderOutDir)&quot; &quot;$(ShaderSrcDir)&quot;"
+          IgnoreExitCode="true" />
+    <Error Condition="!Exists('$(ShaderOutDir)')"
+           Text="Failed to link shader directory '$(ShaderOutDir)' to '$(ShaderSrcDir)'." />
   </Target>
 
   <Target Name="UnlinkShadersFromOutDir"

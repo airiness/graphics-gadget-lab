@@ -1,7 +1,8 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
 

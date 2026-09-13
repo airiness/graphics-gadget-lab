@@ -1,5 +1,5 @@
 #include "LoadingProgress.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 
 #include <algorithm>
 #include <format>

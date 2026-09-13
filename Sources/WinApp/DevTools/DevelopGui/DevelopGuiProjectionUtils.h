@@ -1,6 +1,6 @@
 #pragma once
-#include "Core/Math/Vector.h"
-#include "Graphics/RenderView.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 
 #include <imgui.h>
 
