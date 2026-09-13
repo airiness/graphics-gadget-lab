@@ -196,6 +196,15 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Validate boundary rule self-tests
+        shell: pwsh
+        run: |
+          ./Scripts/ValidateProjectBoundaries.ps1 -SelfTest
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Validate project ownership and first-party boundaries
         shell: pwsh
         run: |

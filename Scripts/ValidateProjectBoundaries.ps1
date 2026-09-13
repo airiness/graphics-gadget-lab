@@ -1,6 +1,7 @@
 param(
     [string]$RootDir = "",
-    [switch]$ShowAll
+    [switch]$ShowAll,
+    [switch]$SelfTest
 )
 
 # Project ownership and first-party boundary validation.
@@ -31,6 +32,11 @@ param(
 #                      Win32 / GameInput / COM semantics.
 # Current known violations are enumerated as an explicit ledger; any
 # violation outside the ledger fails the validation.
+#
+# Rule self-tests: invoke with -SelfTest to execute the rule predicates against
+# synthetic fixtures. The negative fixtures keep a rule from silently going dead
+# after an ownership or physical-path migration while the repository still
+# reports PASS.
 #
 # Physical/project ownership scanning covers all first-party source roots.
 # Runtime dependency and platform scanning derives from actual GGLabRuntime
@@ -167,6 +173,120 @@ function Test-IsKnown {
         }
     }
     return $false
+}
+
+# Runtime pass/pipeline concrete-renderer regression guard.
+# The regex intentionally covers the concrete-renderer import and the common
+# coupling spellings, so a pass cannot reacquire a renderer handle or downcast
+# through any of the usual forms.
+$runtimePassServiceRegex = `
+    '#include\s*[<"][^">]*Graphics[\\/]Renderer[.]h|(?:->|\.)m_Renderer\b|\bRenderer\s*[&*>]|\bGetRenderer\s*\('
+
+function Test-IsRuntimePassOrPipelinePath {
+    param([string]$RelativePath)
+
+    $normalizedPath = $RelativePath.Replace('\', '/')
+    return $normalizedPath.StartsWith("Private/Graphics/RenderPass/") -or
+        $normalizedPath.StartsWith("Private/Graphics/RenderPipeline/") -or
+        $normalizedPath.StartsWith("Public/GGLabRuntime/Graphics/RenderPass/") -or
+        $normalizedPath.StartsWith("Public/GGLabRuntime/Graphics/RenderPipeline/")
+}
+
+function Test-RuntimePassServiceViolation {
+    param(
+        [string]$RelativePath,
+        [string]$Content
+    )
+
+    if (-not (Test-IsRuntimePassOrPipelinePath -RelativePath $RelativePath)) {
+        return $false
+    }
+    return $Content -match $runtimePassServiceRegex
+}
+
+function Invoke-BoundaryRuleSelfTests {
+    # Synthetic fixtures for rules that the current repository cannot exercise:
+    # without a deliberate violation the rule would keep reporting PASS even if
+    # its scope silently went dead during a physical-path migration.
+    $passServiceCases = @(
+        @{
+            Name     = "private pass includes the concrete renderer"
+            Path     = "Private/Graphics/RenderPass/RenderPassExample.cpp"
+            Content  = '#include "Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "private pipeline includes the renderer through a prefixed path"
+            Path     = "Private/Graphics/RenderPipeline/RenderPipelineExample.cpp"
+            Content  = '#include "../../Sources/GGLabRuntime/Private/Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "private pass reads the renderer member"
+            Path     = "Private/Graphics/RenderPass/RenderPassExample.cpp"
+            Content  = "m_Services.m_Renderer->BeginFrame();"
+            Expected = $true
+        },
+        @{
+            Name     = "private pass declares a renderer reference"
+            Path     = "Private/Graphics/RenderPass/RenderPassExample.cpp"
+            Content  = "Renderer& m_Renderer;"
+            Expected = $true
+        },
+        @{
+            Name     = "public pass stores a renderer pointer"
+            Path     = "Public/GGLabRuntime/Graphics/RenderPass/RenderPassExample.h"
+            Content  = "void Attach(Renderer* renderer);"
+            Expected = $true
+        },
+        @{
+            Name     = "public pipeline resolves the renderer through the host"
+            Path     = "Public/GGLabRuntime/Graphics/RenderPipeline/RenderPipelineExample.h"
+            Content  = "RenderHost::GetRenderer();"
+            Expected = $true
+        },
+        @{
+            Name     = "private pass consumes only the explicit service bundle"
+            Path     = "Private/Graphics/RenderPass/RenderPassExample.cpp"
+            Content  = "void Build(RenderGraph& graph, const RenderServices& services);"
+            Expected = $false
+        },
+        @{
+            Name     = "unrelated private file keeps its renderer include"
+            Path     = "Private/Graphics/Asset/AssetExample.cpp"
+            Content  = '#include "Graphics/Renderer.h"'
+            Expected = $false
+        },
+        @{
+            Name     = "public pass contract forward declaration stays allowed"
+            Path     = "Public/GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+            Content  = "class Renderer;"
+            Expected = $false
+        }
+    )
+
+    $failures = @()
+    foreach ($case in $passServiceCases) {
+        $actual = Test-RuntimePassServiceViolation -RelativePath $case.Path -Content $case.Content
+        if ($actual -ne $case.Expected) {
+            $failures += ("{0} (expected {1}, got {2})" -f
+                $case.Name, $case.Expected, $actual)
+        }
+    }
+    if ($failures.Count -gt 0) {
+        Write-Host "SELF-TEST FAIL - pass-service boundary rule:"
+        foreach ($failure in $failures) {
+            Write-Host ("  {0}" -f $failure)
+        }
+        exit 1
+    }
+
+    Write-Host "SELF-TEST PASS - boundary rule predicates ($($passServiceCases.Count) checks)."
+    exit 0
+}
+
+if ($SelfTest) {
+    Invoke-BoundaryRuleSelfTests
 }
 
 # Collect portable-platform candidates with Runtime-owner-root-relative paths.
@@ -3168,15 +3288,12 @@ if (Test-Path -LiteralPath $renderHostHeaderPath -PathType Leaf) {
     }
 }
 
-$runtimePassServiceRegex = `
-    '#include\s*[<"]Graphics[\\/]Renderer[.]h|(?:->|\.)m_Renderer\b'
 foreach ($file in $runtimeOwnedFiles) {
-    if (-not ($file.Path.StartsWith("Graphics/RenderPass/") -or
-        $file.Path.StartsWith("Graphics/RenderPipeline/"))) {
+    if (-not (Test-IsRuntimePassOrPipelinePath -RelativePath $file.Path)) {
         continue
     }
     $content = Get-Content -LiteralPath $file.FullPath -Raw -ErrorAction Stop
-    if ($content -match $runtimePassServiceRegex) {
+    if (Test-RuntimePassServiceViolation -RelativePath $file.Path -Content $content) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-pass-service-boundary"
             Target = ConvertTo-RepoRelativePath $file.FullPath
