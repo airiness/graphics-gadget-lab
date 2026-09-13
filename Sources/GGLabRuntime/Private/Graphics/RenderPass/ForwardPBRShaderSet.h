@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 namespace gglab
 {

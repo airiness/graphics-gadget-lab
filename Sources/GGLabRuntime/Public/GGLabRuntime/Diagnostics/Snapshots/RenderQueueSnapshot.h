@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <array>
 #include <cstddef>

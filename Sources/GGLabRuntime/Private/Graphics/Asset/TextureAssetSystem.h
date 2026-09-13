@@ -6,7 +6,9 @@
 #include "Graphics/Asset/Store/TextureStore.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLifecycleTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
 

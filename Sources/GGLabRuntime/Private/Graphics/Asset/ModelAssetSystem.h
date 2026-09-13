@@ -1,6 +1,8 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/MaterialTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 #include "Graphics/Asset/Store/MaterialStore.h"
 #include "Graphics/Asset/Store/MeshStore.h"
 #include "Graphics/Asset/Store/ModelStore.h"

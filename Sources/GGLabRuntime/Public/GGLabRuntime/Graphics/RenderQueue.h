@@ -1,7 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Core/Math/Culling.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
+#include "GGLabRuntime/Graphics/MaterialTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/DepthCoverage.h"
 
 #include <array>

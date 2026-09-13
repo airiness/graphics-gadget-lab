@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <optional>
 

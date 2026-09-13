@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/RHI/RHISampler.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"

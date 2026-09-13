@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetDependencyTypes.h"
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResidencyTypes.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "Graphics/Asset/Dependency/AssetDependencyGraph.h"
 #include "Graphics/Asset/Interest/AssetInterestTracker.h"
 #include "Graphics/Asset/Residency/AssetResidencyController.h"

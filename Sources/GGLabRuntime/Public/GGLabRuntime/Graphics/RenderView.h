@@ -2,7 +2,7 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"

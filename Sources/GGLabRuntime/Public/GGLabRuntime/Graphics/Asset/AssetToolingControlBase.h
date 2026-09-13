@@ -1,6 +1,7 @@
 #pragma once
 
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 
 #include <cstdint>
 #include <filesystem>

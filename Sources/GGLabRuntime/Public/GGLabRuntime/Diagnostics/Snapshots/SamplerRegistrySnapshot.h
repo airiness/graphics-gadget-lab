@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 #include "GGLabRuntime/Graphics/SamplerTypes.h"
 
 #include <cstdint>

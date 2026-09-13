@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderTypes.h"
 
 #include <cstdint>

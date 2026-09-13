@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/DerivedDataIdentity.h"
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 
 #include <array>
 #include <cstddef>

@@ -1,8 +1,13 @@
 #pragma once
+#include "GGLabFoundation/Async/ProgressChannel.h"
+#include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/Asset/AssetContentFingerprint.h"
 #include "GGLabRuntime/Graphics/Asset/ArtifactContentDigest.h"
 #include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLifecycleTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIHandles.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <cstddef>

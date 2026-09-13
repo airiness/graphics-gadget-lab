@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/CameraControllerSettings.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <cstdint>
 #include <optional>

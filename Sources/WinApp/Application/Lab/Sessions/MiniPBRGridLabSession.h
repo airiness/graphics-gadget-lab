@@ -1,6 +1,6 @@
 #pragma once
 #include "Lab/LabSessionBase.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 namespace gglab
 {

@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Async/ProgressChannel.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLifecycleTypes.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 
 #include <cstdint>
 #include <string>

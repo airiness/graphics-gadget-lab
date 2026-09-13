@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Core/Math/Vector.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <algorithm>

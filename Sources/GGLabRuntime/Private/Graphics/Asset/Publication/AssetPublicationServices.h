@@ -2,7 +2,8 @@
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImportArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 
 #include <compare>
 #include <cstdint>

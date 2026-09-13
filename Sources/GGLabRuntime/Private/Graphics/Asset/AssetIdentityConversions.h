@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Asset/AssetIdentity.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 
 namespace gglab
 {

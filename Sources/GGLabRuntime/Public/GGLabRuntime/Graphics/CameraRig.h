@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
-#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <cstddef>
 #include <cstdint>
