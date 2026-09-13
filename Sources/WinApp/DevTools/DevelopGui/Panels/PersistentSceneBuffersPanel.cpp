@@ -2,9 +2,12 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/RHIText.h"
-#include "Diagnostics/DiagnosticsRuntime.h"
-#include "Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
-#include "Graphics/Renderer.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
+
+#include <cstdint>
+#include <format>
+#include <string>
 
 #include <imgui.h>
 
@@ -128,12 +131,6 @@ namespace gglab
 
 	void PersistentSceneBuffersPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_Renderer)
-		{
-			ImGui::TextDisabled("Renderer is not available.");
-			return;
-		}
-
 		auto& state = context.PanelState<PersistentSceneBuffersPanelState>();
 		const auto* snapshot =
 			context.m_Diagnostics
@@ -142,6 +139,11 @@ namespace gglab
 		if (!snapshot)
 		{
 			ImGui::TextDisabled("Persistent buffer snapshot provider is not available.");
+			return;
+		}
+		if (!snapshot->m_SourceAvailable)
+		{
+			ImGui::TextDisabled("Persistent buffer source is not available.");
 			return;
 		}
 		ImGui::Checkbox("Hide Free Slots", &state.m_HideFreeSlots);

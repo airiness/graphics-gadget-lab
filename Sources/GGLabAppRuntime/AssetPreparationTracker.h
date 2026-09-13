@@ -1,6 +1,6 @@
 #pragma once
 #include "LoadingProgress.h"
-#include "Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 #include <string>
 #include <string_view>
@@ -15,7 +15,6 @@ namespace gglab
 	public:
 		void Reset() noexcept;
 		void TrackModel(ModelID modelId, std::string_view label, float weight = 1.0f) noexcept;
-		void TrackMesh(MeshID meshId, std::string_view label, float weight = 1.0f) noexcept;
 
 		[[nodiscard]] LoadingProgress BuildProgress(
 			const AssetManager& assetManager, std::string title = {}) const noexcept;
@@ -29,6 +28,5 @@ namespace gglab
 		};
 
 		std::vector<Dependency<ModelID>> m_Models;
-		std::vector<Dependency<MeshID>> m_Meshes;
 	};
 }

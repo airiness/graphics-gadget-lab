@@ -1,7 +1,7 @@
 #pragma once
-#include "Core/StringId.h"
-#include "Core/Math/Color.h"
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/StringId.h"
+#include "GGLabRuntime/Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 
 #include <optional>
 #include <span>

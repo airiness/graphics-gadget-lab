@@ -1,24 +1,23 @@
 #pragma once
 #include "Demo/DemoBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 
 namespace gglab
 {
-	class Renderer;
+	class RHIContext;
 
 	class DemoManager
 	{
 	public:
 		using DemoFactory = std::function<std::unique_ptr<DemoBase>()>;
 
-		explicit DemoManager(Renderer* renderer) noexcept;
+		explicit DemoManager(RHIContext* rhiContext) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(DemoManager);
 		~DemoManager();
 
 		DemoBase* GetDemo(uint32_t index) const noexcept;
 		std::string_view GetDemoName(uint32_t index) const noexcept;
-		bool IsDemoCreated(uint32_t index) const noexcept;
 		DemoBase* GetActiveDemo() const noexcept { return m_ActiveDemo; }
 		uint32_t RegisterDemo(std::string name, DemoFactory factory) noexcept;
 		void SetBootstrapDemo(std::unique_ptr<DemoBase> demo) noexcept;
@@ -69,7 +68,7 @@ namespace gglab
 			RHIFencePoint m_RetireFence{};
 		};
 
-		Renderer* m_Renderer = nullptr;
+		RHIContext* m_RHIContext = nullptr;
 		std::vector<DemoSlot> m_DemoSlots;
 		std::unique_ptr<DemoBase> m_ActiveInstance;
 		DemoBase* m_ActiveDemo = nullptr;

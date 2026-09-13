@@ -1,14 +1,13 @@
 #pragma once
 #include "Application/ApplicationLaunchOptions.h"
-#include "RuntimePaths.h"
 
 #include <windows.h>
 
 namespace gglab
 {
-	// Runs explicit Vulkan inspection and hardware qualification exit modes.
+	// Runs the explicit Vulkan adapter-inspection exit mode.
 	// Regular --rhi selection is handled by the Renderer/RHIContext factory.
 	[[nodiscard]] int RunRenderingStartupPath(
-		const ApplicationLaunchOptions& options, const RuntimePaths& runtimePaths,
-		HINSTANCE instance, bool requestValidation) noexcept;
+		const ApplicationLaunchOptions& options, HINSTANCE instance,
+		bool requestValidation) noexcept;
 }

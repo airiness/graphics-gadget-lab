@@ -1,15 +1,13 @@
 #include "Application/Lab/Sessions/GTAOLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Pipeline/GTAO.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/Resource/RenderResourceRegistry.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {
@@ -46,7 +44,7 @@ namespace gglab
 	}
 
 	GTAOLabSession::GTAOLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>()),
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR()),
 		m_ViewportWidth(createInfo.m_WindowWidth), m_ViewportHeight(createInfo.m_WindowHeight)
 	{
 		auto& profile = GetMutableViewRenderProfile();
@@ -258,7 +256,7 @@ namespace gglab
 
 	void GTAOLabSession::OnEnter() noexcept
 	{
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
 		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount();
@@ -267,7 +265,7 @@ namespace gglab
 
 	void GTAOLabSession::OnExit() noexcept
 	{
-		if (auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry())
+		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
 			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
 			registry->RequestPostProcessPreview();
@@ -351,7 +349,7 @@ namespace gglab
 				transform.m_Scale = scale;
 				return primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 					.m_World = &m_World,
 					.m_Transform = transform,
 					.m_MaterialInstance = MakeMaterial(key, color),
@@ -378,7 +376,7 @@ namespace gglab
 			Color(0.22f, 0.68f, 0.46f, 1.0f));
 		const entt::entity emissiveControl = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = components::TransformComponent{
 				.m_Position = Vector3(-3.0f, -0.3f, 4.8f),
@@ -390,7 +388,7 @@ namespace gglab
 			});
 		const entt::entity specularControl = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = components::TransformComponent{
 				.m_Position = Vector3(4.0f, -0.25f, 8.2f),
@@ -417,7 +415,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 1.5f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance = MakeMaterial(
@@ -463,11 +461,11 @@ namespace gglab
 
 	void GTAOLabSession::RequestSelectedPreview() noexcept
 	{
-		if (!m_Services.m_Renderer)
+		if (!m_Services.m_RenderServices.m_Resources)
 		{
 			return;
 		}
-		auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		auto* registry = m_Services.m_RenderServices.m_Resources;
 		if (!registry)
 		{
 			return;
@@ -481,7 +479,7 @@ namespace gglab
 		const GTAOExtent halfExtent =
 			MakeGTAOHalfResolutionExtent(m_ViewportWidth, m_ViewportHeight);
 		const GTAOSettings& settings = GetViewRenderProfile().m_Lighting.m_GTAO;
-		const auto* registry = m_Services.m_Renderer->GetRenderResourceRegistry();
+		const auto* registry = m_Services.m_RenderServices.m_Resources;
 		const bool previewExecuted = registry && registry->HasPublishedPostProcessPreview() &&
 			registry->GetPostProcessPreviewUpdateCount() > m_PreviewUpdateCountOnEnter &&
 			registry->GetPublishedPostProcessPreviewSelection().m_Tap == m_SelectedTap;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Math/Vector.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 
 #include "NapaVoxelCore/Meshing/ChunkMeshRecord.h"
 #include "NapaVoxelCore/World/VoxelWorldConfig.h"

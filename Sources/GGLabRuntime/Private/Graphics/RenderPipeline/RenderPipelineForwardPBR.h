@@ -1,0 +1,88 @@
+#pragma once
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
+#include "Graphics/RenderPass/RenderPassClearViewTargets.h"
+#include "Graphics/RenderPass/RenderPassDebugDraw.h"
+#include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
+#include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/RenderPassForwardPlusCull.h"
+#include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
+#include "Graphics/RenderPass/RenderPassForwardTransparent.h"
+#include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "Graphics/RenderPass/RenderPassIBL.h"
+#include "Graphics/RenderPass/RenderPassIBLPreview.h"
+#include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
+#include "Graphics/RenderPass/RenderPassSkybox.h"
+#include "Graphics/RenderPass/RenderPassTemporalAA.h"
+#include "Graphics/RenderPipeline/PostProcessPipeline.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+
+#include <memory>
+#include <utility>
+
+namespace gglab
+{
+	class RenderPipelineForwardPBR : public RenderPipelineBase
+	{
+	public:
+		struct CreateInfo
+		{
+			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
+			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		};
+
+		explicit RenderPipelineForwardPBR(
+			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
+			RenderPipelineForwardPBR(CreateInfo{
+				.m_ForwardPlusDebugReadback = std::move(forwardPlusDebugReadback),
+				})
+		{
+		}
+		explicit RenderPipelineForwardPBR(CreateInfo createInfo) noexcept :
+			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
+			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
+			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
+			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
+		{
+			m_ForwardOpaquePass.SetHdrDiffValidationAvailable(
+				m_ForwardPlusDebugReadback != nullptr);
+		}
+		~RenderPipelineForwardPBR() override = default;
+
+		std::string_view GetName() const noexcept override { return "ForwardPBR"; }
+		void PrepareTemporalFramePlanning(const RenderServices& services) noexcept override;
+		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
+			TemporalFramePlanResolveInfo info) const noexcept override;
+
+		void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
+		[[nodiscard]] bool ValidateRenderFrame(const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
+
+	private:
+		void PrepareForwardPasses(const RenderServices& services) noexcept;
+		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
+			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
+
+		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
+		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
+		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
+		RenderPassClearViewTargets m_ClearViewTargetsPass;
+		RenderPassDepthPrepass m_DepthPrepassPass;
+		RenderPassForwardPlusCull m_ForwardPlusCullPass;
+		RenderPassForwardPlusValidation m_ForwardPlusValidationPass;
+		RenderPassSkybox m_SkyboxPass;
+		RenderPassForwardOpaque m_ForwardOpaquePass;
+		RenderPassForwardTransparent m_ForwardTransparentPass;
+		RenderPassGTAO m_GTAOPass;
+		RenderPassTemporalAA m_TemporalAAPass;
+		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
+		PostProcessPipeline m_PostProcessPipeline;
+		RenderPassIBL m_IBLPass;
+		RenderPassIBLPreview m_IBLPreviewPass;
+		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
+		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
+	};
+}

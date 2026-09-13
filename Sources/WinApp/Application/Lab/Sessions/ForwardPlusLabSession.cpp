@@ -1,15 +1,16 @@
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
-#include "Core/Math/Quaternion.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
 
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Pipeline/ForwardPlusDebugReadback.h"
-#include "Graphics/Profiling/GpuProfiler.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Graphics/RHI/RHISwapChain.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RHI/RHISwapChain.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {
@@ -55,7 +56,8 @@ namespace gglab
 
 	ForwardPlusLabSession::ForwardPlusLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<ForwardPlusDebugReadback> debugReadback) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>(debugReadback)),
+		LabSessionBase(GetDescriptor(), createInfo,
+			CreateRenderPipelineForwardPBR({.m_ForwardPlusDebugReadback = debugReadback})),
 		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
 		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
@@ -192,20 +194,21 @@ namespace gglab
 
 	void ForwardPlusLabSession::OnEnter() noexcept
 	{
-		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
-		if (gpuProfiler)
+		auto* profilingView = m_Services.m_GpuProfiling;
+		auto* profilingControl = m_Services.m_GpuProfilingControl;
+		if (profilingView && profilingControl)
 		{
-			m_GpuProfilerWasEnabled = gpuProfiler->IsEnabled();
-			gpuProfiler->SetEnabled(true);
+			m_GpuProfilerWasEnabled = profilingView->IsEnabled();
+			profilingControl->RequestEnabled(true);
 		}
 		ArmGpuTimingCaptureWarmup();
 	}
 
 	void ForwardPlusLabSession::OnExit() noexcept
 	{
-		if (auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler())
+		if (auto* profilingControl = m_Services.m_GpuProfilingControl)
 		{
-			gpuProfiler->SetEnabled(m_GpuProfilerWasEnabled);
+			profilingControl->RequestEnabled(m_GpuProfilerWasEnabled);
 		}
 		m_DebugReadback->InvalidateResults();
 	}
@@ -284,7 +287,7 @@ namespace gglab
 		wallTransform.m_Scale = Vector3(7.5f, 4.2f, 0.35f);
 		const entt::entity wall = primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = wallTransform,
 			.m_MaterialInstance =
@@ -296,7 +299,7 @@ namespace gglab
 		sphereTransform.m_Scale = Vector3::One * 1.4f;
 		const entt::entity sphere = primitive::Sphere::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = sphereTransform,
 			.m_MaterialInstance =
@@ -428,12 +431,12 @@ namespace gglab
 
 	void ForwardPlusLabSession::CaptureGpuTimings() noexcept
 	{
-		auto* gpuProfiler = m_Services.m_Renderer->GetGpuProfiler();
-		if (!gpuProfiler || !gpuProfiler->IsEnabled())
+		auto* profilingView = m_Services.m_GpuProfiling;
+		if (!profilingView || !profilingView->IsEnabled())
 		{
 			return;
 		}
-		const GpuProfileFrameSnapshot frame = gpuProfiler->GetLatestFrame();
+		const GpuProfileFrameSnapshot frame = profilingView->GetLatestFrame();
 		if (!frame.IsValid() || frame.m_FrameIndex == m_LastGpuProfileFrame)
 		{
 			return;
@@ -478,10 +481,9 @@ namespace gglab
 
 	void ForwardPlusLabSession::ArmGpuTimingCaptureWarmup() noexcept
 	{
-		const auto* rhiContext = m_Services.m_Renderer
-			? m_Services.m_Renderer->GetRHIContext()
-			: nullptr;
-		m_GpuTimingWarmupFrames = rhiContext ? rhiContext->GetFrameSlotCount() : 3;
+		const auto* rhiContext = m_Services.m_RHIContext;
+		GGLAB_ASSERT_NOT_NULL(rhiContext);
+		m_GpuTimingWarmupFrames = rhiContext->GetFrameSlotCount();
 	}
 
 	void ForwardPlusLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
@@ -542,7 +544,9 @@ namespace gglab
 		const bool hdrDiffRequested =
 			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
 			forwardPlus.m_EnableHdrDiffValidation;
-		const RHIDevice* device = m_Services.m_Renderer ? m_Services.m_Renderer->GetDevice() : nullptr;
+		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
+		? m_Services.m_RenderServices.m_Presentation->GetDevice()
+		: nullptr;
 		const RHIShaderWaveCapabilities waveCapabilities =
 			device ? device->GetShaderWaveCapabilities() : RHIShaderWaveCapabilities{};
 		const std::string waveLaneRange =

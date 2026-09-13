@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanGuiInterop.h"
 
 #include <vulkan/vulkan.h>
 
@@ -10,10 +11,6 @@
 
 namespace gglab
 {
-	class VulkanContext;
-	class VulkanDescriptorBacking;
-	class VulkanDevice;
-
 	// The presentation inputs the ImGui Vulkan renderer actually pins at native
 	// initialization: the dynamic-rendering color attachment format and the
 	// swapchain image-count bookkeeping it uses to size per-frame state.
@@ -54,7 +51,7 @@ namespace gglab
 	private:
 		struct TextureBinding
 		{
-			std::shared_ptr<const VulkanDescriptorBacking> m_Backing;
+			std::shared_ptr<const VulkanImageViewLeaseBase> m_Backing;
 			VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
 			uint32_t m_SourceDescriptorIndex = 0;
 			uint64_t m_LastTouchedFrame = 0;
@@ -72,8 +69,8 @@ namespace gglab
 		[[nodiscard]] bool PresentationContractChanged() const noexcept;
 		static void CheckVkResult(VkResult result) noexcept;
 
-		VulkanContext* m_Context = nullptr;
-		VulkanDevice* m_Device = nullptr;
+		std::unique_ptr<VulkanGuiInteropBase> m_Interop;
+		VulkanGuiNativeInfo m_Native{};
 		VkSampler m_TextureSampler = VK_NULL_HANDLE;
 		mutable std::vector<TextureBinding> m_ActiveTextureBindings;
 		mutable std::vector<TextureBinding> m_RetiredTextureBindings;

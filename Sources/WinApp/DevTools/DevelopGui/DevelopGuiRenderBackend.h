@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <imgui.h>
 

@@ -1,9 +1,22 @@
+#include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
 #include "ApplicationFrameworkSelfTests.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
-#include "Graphics/RHI/RHIContext.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentSelectionControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
+#include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
+#include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
 
 #include <filesystem>
 
@@ -11,6 +24,13 @@ namespace gglab
 {
 	namespace
 	{
+		template <typename T>
+		concept ToolingRendererAccess = requires(T& value) { value.m_Renderer; };
+		static_assert(!ToolingRendererAccess<ApplicationToolingFrameContext>);
+		template <typename T>
+		concept ToolingLiveRenderViewAccess = requires(T& value) { value.m_RenderViews; };
+		static_assert(!ToolingLiveRenderViewAccess<ApplicationToolingFrameContext>);
+
 		class NullRHIContextFactory final : public RHIContextFactoryBase
 		{
 		public:
@@ -37,6 +57,101 @@ namespace gglab
 			return registration;
 		}
 
+		class TestEnvironmentSelectionControl final : public EnvironmentSelectionControlBase
+		{
+		public:
+			bool SelectEnvironment(size_t entryIndex) noexcept override
+			{
+				m_LastEntryIndex = entryIndex;
+				++m_RequestCount;
+				return m_AcceptSelection;
+			}
+
+			size_t m_LastEntryIndex = 0;
+			uint32_t m_RequestCount = 0;
+			bool m_AcceptSelection = true;
+		};
+
+		class TestEnvironmentLightingView final : public EnvironmentLightingViewBase
+		{
+		public:
+			EnvironmentLightingSettings GetEnvironmentLightingSettings()
+				const noexcept override { return {}; }
+		};
+
+		class TestEnvironmentLightingControl final : public EnvironmentLightingControlBase
+		{
+		public:
+			void SetIntensity(float) noexcept override {}
+			void SetRotationRadians(float) noexcept override {}
+			void SetQualityPreset(IBLQualityPreset) noexcept override {}
+			void SetPrefilteredSpecularSampleCount(uint32_t) noexcept override {}
+			void SetPrefilteredSpecularMaxSampleLuminance(float) noexcept override {}
+			void SetSkyboxEnabled(bool) noexcept override {}
+			void RequestRebake(bool) noexcept override {}
+		};
+
+		class TestIBLCacheControl final : public IBLCacheControlBase
+		{
+		public:
+			void ClearArtifactCache() noexcept override {}
+			bool ClearDerivedDataStore() noexcept override { return true; }
+		};
+
+		class TestGpuProfilingView final : public GpuProfilingViewBase
+		{
+		public:
+			bool IsEnabled() const noexcept override { return true; }
+			GpuProfileFrameSnapshot GetLatestFrame() const override { return {}; }
+		};
+
+		class TestGpuProfilingControl final : public GpuProfilingControlBase
+		{
+		public:
+			void RequestEnabled(bool) noexcept override {}
+		};
+
+		class TestPostProcessPreviewView final : public PostProcessPreviewViewBase
+		{
+		public:
+			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+				const noexcept override { return {}; }
+		};
+
+		class TestPostProcessPreviewControl final : public PostProcessPreviewControlBase
+		{
+		public:
+			void SetPostProcessPreviewSelection(PostProcessDebugSelection) noexcept override {}
+			void SetPostProcessPreviewExposureEV(float) noexcept override {}
+			void RequestPostProcessPreview() noexcept override {}
+		};
+
+		class TestShadowPreviewView final : public ShadowPreviewViewBase
+		{
+		public:
+			ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
+				const noexcept override { return {}; }
+		};
+
+
+		class TestIBLPreviewView final : public IBLPreviewViewBase
+		{
+		public:
+			IBLPreviewResourcesDiagnostics GetIBLPreviewResourcesDiagnostics()
+				const noexcept override { return {}; }
+		};
+
+		class TestIBLPreviewControl final : public IBLPreviewControlBase
+		{
+		public:
+			void SetIBLEnvironmentPreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLIrradiancePreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLPrefilteredSpecularPreviewLayout(IBLPreviewLayout) noexcept override {}
+			void SetIBLEnvironmentPreviewMip(uint32_t) noexcept override {}
+			void SetIBLPrefilteredSpecularPreviewMip(uint32_t) noexcept override {}
+			void RequestIBLPreview(IBLPreviewType) noexcept override {}
+		};
+
 		class RecordingApplicationTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
@@ -48,9 +163,11 @@ namespace gglab
 				return {};
 			}
 
-			void ResolveFrameSettings(const ViewRenderProfile&,
+			ApplicationToolingFrameSettingsResolution ResolveFrameSettings(
+				const ViewRenderProfile&,
 				ShadowVisualizationSettings&, ViewRenderProfile&) const noexcept override
 			{
+				return {};
 			}
 
 			bool BeginFrame() noexcept override
@@ -59,7 +176,21 @@ namespace gglab
 				return m_BeginSucceeds;
 			}
 
-			void Draw(const ApplicationToolingFrameContext&) noexcept override { ++m_DrawCount; }
+			void Draw(const ApplicationToolingFrameContext& context) noexcept override
+			{
+				++m_DrawCount;
+				m_LastEnvironmentSelectionControl = context.m_EnvironmentSelectionControl;
+				m_LastEnvironmentLighting = context.m_EnvironmentLighting;
+				m_LastEnvironmentLightingControl = context.m_EnvironmentLightingControl;
+				m_LastGpuProfiling = context.m_GpuProfiling;
+				m_LastGpuProfilingControl = context.m_GpuProfilingControl;
+				m_LastIBLCacheControl = context.m_IBLCacheControl;
+				m_LastIBLPreview = context.m_IBLPreview;
+				m_LastIBLPreviewControl = context.m_IBLPreviewControl;
+				m_LastPostProcessPreview = context.m_PostProcessPreview;
+				m_LastPostProcessPreviewControl = context.m_PostProcessPreviewControl;
+				m_LastShadowPreview = context.m_ShadowPreview;
+			}
 
 			void EndFrame(ApplicationToolingFrameEndReason reason) noexcept override
 			{
@@ -80,12 +211,164 @@ namespace gglab
 			uint32_t m_BeginCount = 0;
 			uint32_t m_DrawCount = 0;
 			uint32_t m_EndCount = 0;
+			EnvironmentSelectionControlBase* m_LastEnvironmentSelectionControl = nullptr;
+			const EnvironmentLightingViewBase* m_LastEnvironmentLighting = nullptr;
+			EnvironmentLightingControlBase* m_LastEnvironmentLightingControl = nullptr;
+			const GpuProfilingViewBase* m_LastGpuProfiling = nullptr;
+			GpuProfilingControlBase* m_LastGpuProfilingControl = nullptr;
+			IBLCacheControlBase* m_LastIBLCacheControl = nullptr;
+			const IBLPreviewViewBase* m_LastIBLPreview = nullptr;
+			IBLPreviewControlBase* m_LastIBLPreviewControl = nullptr;
+			const PostProcessPreviewViewBase* m_LastPostProcessPreview = nullptr;
+			PostProcessPreviewControlBase* m_LastPostProcessPreviewControl = nullptr;
+			const ShadowPreviewViewBase* m_LastShadowPreview = nullptr;
 			ApplicationToolingFrameEndReason m_LastEndReason =
 				ApplicationToolingFrameEndReason::Completed;
 		};
 
 		void RunApplicationToolingSelfTests(SelfTestContext& context) noexcept
 		{
+			{
+				RecordingApplicationTooling tooling;
+				TestEnvironmentSelectionControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentSelectionControl,
+					"Environment selection control is absent by default");
+				frame.Draw({ .m_EnvironmentSelectionControl = &control });
+				context.Check(tooling.m_LastEnvironmentSelectionControl == &control &&
+					!tooling.m_LastEnvironmentLighting && !tooling.m_LastIBLPreview,
+					"Tooling forwards selection independently of Renderer, settings and previews");
+				context.Check(tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(7) &&
+					control.m_LastEntryIndex == 7 && control.m_RequestCount == 1,
+					"The borrowed selection capability forwards the requested catalog index");
+				control.m_AcceptSelection = false;
+				context.Check(!tooling.m_LastEnvironmentSelectionControl->SelectEnvironment(9) &&
+					control.m_LastEntryIndex == 9 && control.m_RequestCount == 2,
+					"Selection rejection reaches tooling without being converted into success");
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentSelectionControl && control.m_RequestCount == 2,
+					"A later draw neither retains nor replays an omitted selection capability");
+				frame.Complete();
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				TestIBLPreviewView view;
+				TestIBLPreviewControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLPreview && !tooling.m_LastIBLPreviewControl,
+					"IBL preview capabilities are absent by default");
+				frame.Draw({ .m_IBLPreview = &view });
+				context.Check(tooling.m_LastIBLPreview == &view && !tooling.m_LastIBLPreviewControl,
+					"Tooling can query IBL previews without control or Renderer");
+				frame.Draw({ .m_IBLPreviewControl = &control });
+				context.Check(!tooling.m_LastIBLPreview && tooling.m_LastIBLPreviewControl == &control,
+					"Tooling can bind IBL preview controls independently");
+				frame.Draw({ .m_IBLPreview = &view, .m_IBLPreviewControl = &control });
+				context.Check(tooling.m_LastIBLPreview == &view &&
+					tooling.m_LastIBLPreviewControl == &control,
+					"Tooling forwards both borrowed IBL preview capabilities");
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLPreview && !tooling.m_LastIBLPreviewControl,
+					"A later draw does not retain omitted IBL preview capabilities");
+				frame.Complete();
+			}
+			{
+				RecordingApplicationTooling tooling;
+				TestIBLCacheControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLCacheControl,
+					"Tooling IBL cache control is absent by default");
+				frame.Draw({ .m_IBLCacheControl = &control });
+				context.Check(tooling.m_LastIBLCacheControl == &control &&
+					!tooling.m_LastEnvironmentLighting && !tooling.m_LastEnvironmentLightingControl,
+					"Tooling forwards IBL cache control without Renderer or environment settings");
+				frame.Draw({});
+				context.Check(!tooling.m_LastIBLCacheControl,
+					"A later tooling draw does not retain an omitted IBL cache capability");
+				frame.Complete();
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				TestEnvironmentLightingView view;
+				TestEnvironmentLightingControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastEnvironmentLighting &&
+					!tooling.m_LastEnvironmentLightingControl,
+					"Tooling environment settings capabilities are absent by default");
+				frame.Draw({ .m_EnvironmentLighting = &view });
+				context.Check(tooling.m_LastEnvironmentLighting == &view &&
+					!tooling.m_LastEnvironmentLightingControl,
+					"Tooling can query environment settings without a renderer or control capability");
+				frame.Draw({ .m_EnvironmentLightingControl = &control });
+				context.Check(!tooling.m_LastEnvironmentLighting &&
+					tooling.m_LastEnvironmentLightingControl == &control,
+					"Tooling can bind environment control independently of its query");
+				frame.Draw({ .m_EnvironmentLighting = &view, .m_EnvironmentLightingControl = &control });
+				context.Check(tooling.m_LastEnvironmentLighting == &view &&
+					tooling.m_LastEnvironmentLightingControl == &control,
+					"Tooling forwards separate environment settings query and control capabilities");
+				frame.Complete();
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				TestShadowPreviewView view;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastShadowPreview,
+					"Tooling shadow preview query is absent by default");
+				frame.Draw({ .m_ShadowPreview = &view });
+				context.Check(tooling.m_LastShadowPreview == &view &&
+					!tooling.m_LastPostProcessPreview && !tooling.m_LastPostProcessPreviewControl,
+					"Tooling forwards a shadow preview query without a renderer or unrelated capabilities");
+				frame.Complete();
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				TestPostProcessPreviewView view;
+				TestPostProcessPreviewControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastPostProcessPreview &&
+					!tooling.m_LastPostProcessPreviewControl,
+					"Tooling post-process preview capabilities are absent by default");
+				frame.Draw({ .m_PostProcessPreview = &view });
+				context.Check(tooling.m_LastPostProcessPreview == &view &&
+					!tooling.m_LastPostProcessPreviewControl,
+					"Tooling can observe post-process previews without a renderer or control capability");
+				frame.Draw({ .m_PostProcessPreview = &view, .m_PostProcessPreviewControl = &control });
+				context.Check(tooling.m_LastPostProcessPreview == &view &&
+					tooling.m_LastPostProcessPreviewControl == &control,
+					"Tooling forwards post-process preview query and control separately");
+				frame.Complete();
+			}
+
+			{
+				RecordingApplicationTooling tooling;
+				TestGpuProfilingView view;
+				TestGpuProfilingControl control;
+				ApplicationToolingFrame frame(&tooling);
+				frame.Draw({});
+				context.Check(!tooling.m_LastGpuProfiling && !tooling.m_LastGpuProfilingControl,
+					"Tooling GPU profiling capabilities are absent by default");
+				frame.Draw({ .m_GpuProfiling = &view });
+				context.Check(tooling.m_LastGpuProfiling == &view &&
+					!tooling.m_LastGpuProfilingControl,
+					"Tooling can observe GPU profiling without a renderer or control capability");
+				frame.Draw({ .m_GpuProfiling = &view, .m_GpuProfilingControl = &control });
+				context.Check(tooling.m_LastGpuProfiling == &view &&
+					tooling.m_LastGpuProfilingControl == &control,
+					"Tooling forwards GPU profiling query and control as separate capabilities");
+				frame.Complete();
+			}
+
 			{
 				ApplicationToolingFrame frame(nullptr);
 				frame.Draw({});
@@ -239,6 +522,9 @@ namespace gglab
 				context.Check(
 					runtime.GetLifecycleState() == AppRuntimeLifecycleState::Uninitialized,
 					"App runtime starts uninitialized");
+				context.Check(runtime.GetDiagnosticsView() == nullptr &&
+					runtime.GetDiagnosticsControl() == nullptr,
+					"Diagnostics session remains absent before runtime service composition");
 				context.Check(runtime.Initialize(MakeCreateInfo()) ==
 					AppRuntimeInitializeResult::Succeeded,
 					"Valid explicit config and paths initialize the app runtime");
@@ -363,8 +649,14 @@ namespace gglab
 				}) == AppRuntimeServiceInitializeResult::ShaderManagerInitializationFailed &&
 				rendererFailureRuntime.GetLifecycleState() ==
 				AppRuntimeLifecycleState::Failed &&
-				!rendererFailureRuntime.AreServicesInitialized(),
+				!rendererFailureRuntime.AreServicesInitialized() &&
+				rendererFailureRuntime.GetRenderHost() == nullptr &&
+				rendererFailureRuntime.GetRenderComposition() == nullptr,
 				"Missing host shader artifact inputs fail before renderer composition");
+			rendererFailureRuntime.Shutdown();
+			context.Check(rendererFailureRuntime.GetRenderHost() == nullptr &&
+				rendererFailureRuntime.GetRenderComposition() == nullptr,
+				"AppRuntime shutdown clears the non-owning render host and composition access");
 		}
 	}
 }

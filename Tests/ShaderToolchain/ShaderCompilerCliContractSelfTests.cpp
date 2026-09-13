@@ -676,7 +676,7 @@ namespace gglab
 				const CliRunResult bogusFlag = RunCli({ L"describe", L"--bogus" });
 				// (The original substring-based lambda was replaced by the
 				// parse-based CheckDescribeUsageError below.)
-				
+
 				// Each usage-error response must be a fully parsed describe document
 				// with the failure wire shape and no business-payload fields.
 				auto CheckDescribeUsageError = [&](

@@ -1,7 +1,7 @@
 #include "DevTools/DevelopGui/Panels/DebugDrawPanel.h"
-#include "Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 
 #include <imgui.h>
 
@@ -40,9 +40,10 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawChannels(DebugDrawSystem& debugDrawSystem) noexcept
+		void DrawChannels(const DebugDrawChannelViewBase& channelView,
+			DebugDrawChannelControlBase* channelControl) noexcept
 		{
-			std::vector<DebugDrawChannelState> channels = debugDrawSystem.GetChannelStates();
+			std::vector<DebugDrawChannelState> channels = channelView.GetChannelStates();
 			if (channels.empty())
 			{
 				ImGui::TextDisabled("No DebugDraw channels have been submitted yet.");
@@ -67,10 +68,17 @@ namespace gglab
 				ImGui::PushID(static_cast<int>(channel.m_Channel.Value() & 0x7fffffffu));
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
-				bool enabled = channel.m_Enabled;
-				if (ImGui::Checkbox("##Enabled", &enabled))
+				if (channelControl)
 				{
-					debugDrawSystem.SetChannelEnabled(channel.m_Channel, enabled);
+					bool enabled = channel.m_Enabled;
+					if (ImGui::Checkbox("##Enabled", &enabled))
+					{
+						channelControl->SetChannelEnabled(channel.m_Channel, enabled);
+					}
+				}
+				else
+				{
+					ImGui::TextUnformatted(channel.m_Enabled ? "On" : "Off");
 				}
 				ImGui::TableSetColumnIndex(1);
 				ImGui::TextUnformatted(name.c_str());
@@ -79,9 +87,16 @@ namespace gglab
 				ImGui::TableSetColumnIndex(3);
 				ImGui::Text("%u", channel.m_PersistentCommandCount);
 				ImGui::TableSetColumnIndex(4);
-				if (ImGui::SmallButton("Clear"))
+				if (channelControl)
 				{
-					debugDrawSystem.ClearChannel(channel.m_Channel);
+					if (ImGui::SmallButton("Clear"))
+					{
+						channelControl->ClearChannel(channel.m_Channel);
+					}
+				}
+				else
+				{
+					ImGui::TextDisabled("-");
 				}
 				ImGui::PopID();
 			}
@@ -92,9 +107,9 @@ namespace gglab
 
 	void DebugDrawPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		if (!context.m_DebugDrawSystem)
+		if (!context.m_DebugDrawChannels)
 		{
-			ImGui::TextDisabled("DebugDrawSystem is not available.");
+			ImGui::TextDisabled("DebugDraw channels are not available.");
 			return;
 		}
 
@@ -104,6 +119,6 @@ namespace gglab
 
 		ImGui::Spacing();
 		ImGui::SeparatorText("Channels");
-		DrawChannels(*context.m_DebugDrawSystem);
+		DrawChannels(*context.m_DebugDrawChannels, context.m_DebugDrawChannelControl);
 	}
 }

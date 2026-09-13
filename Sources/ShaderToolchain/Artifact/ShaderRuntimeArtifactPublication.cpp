@@ -1,22 +1,15 @@
 #include "Artifact/ShaderRuntimeArtifactPublication.h"
+#include "Artifact/PublicationTransaction.h"
 
 #include "GGLabFoundation/Hash/Sha256.h"
-#include "GGLabFoundation/IO/PathUtils.h"
 
-#include <process.h>
-#include <windows.h>
-
-#include <algorithm>
-#include <atomic>
-#include <chrono>
+#include <array>
 #include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <span>
 #include <string>
 #include <system_error>
-#include <thread>
-#include <vector>
+#include <utility>
 
 namespace gglab
 {
@@ -55,54 +48,6 @@ namespace gglab
 					artifact.m_Manifest.m_BinaryContentDigest.m_Digest &&
 				IsShaderBinaryFormat(
 					artifact.m_Binary, artifact.m_Manifest.m_BinaryFormat);
-		}
-
-		[[nodiscard]] std::filesystem::path MakeUniqueTempPath(
-			const std::filesystem::path& destination)
-		{
-			static std::atomic_uint64_t counter = 0;
-			return destination.wstring() + L".tmp." +
-				std::to_wstring(static_cast<uint32_t>(::_getpid())) + L"." +
-				std::to_wstring(counter.fetch_add(1, std::memory_order_relaxed));
-		}
-
-		void RemoveFileBestEffort(const std::filesystem::path& path) noexcept
-		{
-			std::error_code ignored;
-			std::filesystem::remove(path, ignored);
-		}
-
-		[[nodiscard]] bool PublishFile(
-			const std::filesystem::path& source,
-			const std::filesystem::path& destination) noexcept
-		{
-			std::error_code errorCode;
-			std::filesystem::rename(source, destination, errorCode);
-			return !errorCode;
-		}
-
-		[[nodiscard]] bool HasFile(const std::filesystem::path& path) noexcept
-		{
-			std::error_code errorCode;
-			return std::filesystem::is_regular_file(path, errorCode);
-		}
-
-		[[nodiscard]] bool FileEquals(
-			const std::filesystem::path& path,
-			std::span<const std::byte> expectedBytes)
-		{
-			std::ifstream input(path, std::ios::binary);
-			if (!input)
-			{
-				return false;
-			}
-			std::vector<std::byte> observed(expectedBytes.size());
-			input.read(
-				reinterpret_cast<char*>(observed.data()),
-				static_cast<std::streamsize>(observed.size()));
-			return input.gcount() == static_cast<std::streamsize>(observed.size()) &&
-				input.peek() == std::char_traits<char>::eof() &&
-				std::ranges::equal(observed, expectedBytes);
 		}
 
 		[[nodiscard]] bool ObservePublishedArtifact(
@@ -160,75 +105,62 @@ namespace gglab
 				return result;
 			}
 
-			if (!utils::CreateParentDirectoryIfNotExist(result.m_Paths.m_BinaryPath) ||
-				!utils::CreateParentDirectoryIfNotExist(result.m_Paths.m_ManifestPath))
-			{
-				return result;
-			}
-
 			const SerializedShaderRuntimeArtifactManifest serializedManifest =
 				SerializeShaderRuntimeArtifactManifest(runtimeArtifact.m_Manifest);
 			const auto binaryBytes = std::span(
 				static_cast<const std::byte*>(runtimeArtifact.m_Binary.Data()),
 				runtimeArtifact.m_Binary.SizeInBytes());
 
-			constexpr int MaxPublishAttempts = 2;
-			for (int publishAttempt = 0; publishAttempt < MaxPublishAttempts; ++publishAttempt)
+			struct RuntimeArtifactObservation
 			{
-				const std::filesystem::path tempBinaryPath =
-					MakeUniqueTempPath(result.m_Paths.m_BinaryPath);
-				const std::filesystem::path tempManifestPath =
-					MakeUniqueTempPath(result.m_Paths.m_ManifestPath);
-				const bool tempsWritten =
-					utils::WriteFileBinary(tempBinaryPath, binaryBytes) &&
-					utils::WriteFileBinary(tempManifestPath, serializedManifest);
-				if (!tempsWritten)
+				const ShaderLooseArtifactLocator* m_Locator = nullptr;
+				const ShaderArtifactRef* m_ArtifactRef = nullptr;
+				const ShaderArtifactCompatibilityRequest* m_Compatibility = nullptr;
+			};
+			RuntimeArtifactObservation observation{
+				.m_Locator = &locator,
+				.m_ArtifactRef = &result.m_ArtifactRef,
+				.m_Compatibility = &compatibility,
+			};
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = result.m_Paths.m_BinaryPath,
+					.m_Content = binaryBytes,
+				},
+				PublicationFileSpec{
+					.m_Destination = result.m_Paths.m_ManifestPath,
+					.m_Content = std::span<const std::byte>(serializedManifest),
+				},
+			};
+			// Runtime artifacts are derived data: a candidate that remains
+			// invalid after the observation window is repaired by removing
+			// the commit record first, then its orphan/corrupt binary.
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files,
 				{
-					RemoveFileBestEffort(tempBinaryPath);
-					RemoveFileBestEffort(tempManifestPath);
-					return result;
-				}
-				if (!FileEquals(tempBinaryPath, binaryBytes) ||
-					!FileEquals(tempManifestPath, serializedManifest))
-				{
-					RemoveFileBestEffort(tempBinaryPath);
-					RemoveFileBestEffort(tempManifestPath);
-					return result;
-				}
-
-				const bool binaryPublished =
-					PublishFile(tempBinaryPath, result.m_Paths.m_BinaryPath);
-				bool manifestPublished = false;
-				if (binaryPublished || HasFile(result.m_Paths.m_BinaryPath))
-				{
-					manifestPublished =
-						PublishFile(tempManifestPath, result.m_Paths.m_ManifestPath);
-				}
-				RemoveFileBestEffort(tempBinaryPath);
-				RemoveFileBestEffort(tempManifestPath);
-
-				constexpr int MaxObservationAttempts = 64;
-				for (int observationAttempt = 0;
-					observationAttempt < MaxObservationAttempts;
-					++observationAttempt)
-				{
-					if (ObservePublishedArtifact(
-						locator, result.m_ArtifactRef, compatibility))
-					{
-						result.m_Status = binaryPublished && manifestPublished
-							? ShaderRuntimeArtifactPublicationStatus::Published
-							: ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
-						return result;
-					}
-					std::this_thread::sleep_for(std::chrono::milliseconds(1));
-				}
-
-				// Runtime artifacts are derived data. A candidate that remains
-				// invalid after the observation window is recoverable: remove the
-				// commit record first, then its orphan/corrupt binary, and retry.
-				RemoveFileBestEffort(result.m_Paths.m_ManifestPath);
-				RemoveFileBestEffort(result.m_Paths.m_BinaryPath);
+					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_ContinueWhenPrimaryPresent = true,
+					.m_MaxAttempts = 2,
+					.m_RemoveDestinationsOnFailedObservation = true,
+					.m_ObservationAttempts = 64,
+					.m_Observer = {
+						.m_Context = &observation,
+						.m_Observe = [](void* context) noexcept -> bool
+						{
+							auto* state = static_cast<RuntimeArtifactObservation*>(context);
+							return ObservePublishedArtifact(
+								*state->m_Locator, *state->m_ArtifactRef, *state->m_Compatibility);
+						},
+					},
+				});
+			if (!transaction.m_Observed)
+			{
+				return result;
 			}
+			result.m_Status = transaction.m_PrimaryCommitted && transaction.m_MarkerCommitted
+				? ShaderRuntimeArtifactPublicationStatus::Published
+				: ShaderRuntimeArtifactPublicationStatus::AlreadyPresent;
+			return result;
 		}
 		catch (...)
 		{
@@ -263,10 +195,6 @@ namespace gglab
 				return result;
 			}
 
-			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path.m_Path))
-			{
-				return result;
-			}
 			const SerializedShaderProgramRegistryArtifact serializedArtifact =
 				SerializeShaderProgramRegistryArtifact(artifact);
 			if (serializedArtifact.empty())
@@ -276,41 +204,50 @@ namespace gglab
 				return result;
 			}
 
-			constexpr int MaxPublishAttempts = 2;
-			for (int publishAttempt = 0; publishAttempt < MaxPublishAttempts; ++publishAttempt)
+			struct ProgramRegistryObservation
 			{
-				const std::filesystem::path tempPath =
-					MakeUniqueTempPath(result.m_Path.m_Path);
-				if (!utils::WriteFileBinary(tempPath, serializedArtifact) ||
-					!FileEquals(tempPath, serializedArtifact))
+				const ShaderLooseProgramRegistryArtifactLocator* m_Locator = nullptr;
+				const ShaderProgramRegistryArtifactRef* m_RegistryRef = nullptr;
+			};
+			ProgramRegistryObservation observation{
+				.m_Locator = &locator,
+				.m_RegistryRef = &result.m_RegistryRef,
+			};
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = result.m_Path.m_Path,
+					.m_Content = std::span<const std::byte>(serializedArtifact),
+				},
+			};
+			// Content-addressed registry snapshots are immutable. Repair of a
+			// persistently corrupt destination is bounded to the retry loop;
+			// active-registry and arbitrary multi-writer policy belong to the
+			// development handoff contract.
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files,
 				{
-					RemoveFileBestEffort(tempPath);
-					return result;
-				}
-
-				const bool published = PublishFile(tempPath, result.m_Path.m_Path);
-				RemoveFileBestEffort(tempPath);
-				constexpr int MaxObservationAttempts = 64;
-				for (int observationAttempt = 0;
-					observationAttempt < MaxObservationAttempts;
-					++observationAttempt)
-				{
-					if (ObservePublishedProgramRegistryArtifact(
-						locator, result.m_RegistryRef))
-					{
-						result.m_Status = published
-							? ShaderProgramRegistryArtifactPublicationStatus::Published
-							: ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
-						return result;
-					}
-					std::this_thread::sleep_for(std::chrono::milliseconds(1));
-				}
-
-				// Content-addressed registry snapshots are immutable. Repair of a
-				// persistently corrupt destination is bounded here; active-registry and
-				// arbitrary multi-writer policy belong to the development handoff contract.
-				RemoveFileBestEffort(result.m_Path.m_Path);
+					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_MaxAttempts = 2,
+					.m_RemoveDestinationsOnFailedObservation = true,
+					.m_ObservationAttempts = 64,
+					.m_Observer = {
+						.m_Context = &observation,
+						.m_Observe = [](void* context) noexcept -> bool
+						{
+							auto* state = static_cast<ProgramRegistryObservation*>(context);
+							return ObservePublishedProgramRegistryArtifact(
+								*state->m_Locator, *state->m_RegistryRef);
+						},
+					},
+				});
+			if (!transaction.m_Observed)
+			{
+				return result;
 			}
+			result.m_Status = transaction.m_PrimaryCommitted
+				? ShaderProgramRegistryArtifactPublicationStatus::Published
+				: ShaderProgramRegistryArtifactPublicationStatus::AlreadyPresent;
+			return result;
 		}
 		catch (...)
 		{
@@ -357,25 +294,17 @@ namespace gglab
 				return result;
 			}
 
-			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path))
-			{
-				return result;
-			}
 			const SerializedActiveShaderProgramRegistry serialized =
 				SerializeActiveShaderProgramRegistry(registryRef);
-			const std::filesystem::path tempPath = MakeUniqueTempPath(result.m_Path);
-			if (!utils::WriteFileBinary(tempPath, serialized) ||
-				!FileEquals(tempPath, serialized))
-			{
-				RemoveFileBestEffort(tempPath);
-				return result;
-			}
-
-			const BOOL replaced = ::MoveFileExW(
-				tempPath.c_str(), result.m_Path.c_str(),
-				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
-			RemoveFileBestEffort(tempPath);
-			if (replaced == FALSE)
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = result.m_Path,
+					.m_Content = std::span<const std::byte>(serialized),
+				},
+			};
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files, { .m_Commit = PublicationCommit::ReplaceExisting });
+			if (!transaction.m_PrimaryCommitted)
 			{
 				return result;
 			}
@@ -422,38 +351,57 @@ namespace gglab
 
 			const SerializedShaderPreviewPublication serialized =
 				SerializeShaderPreviewPublication(artifact);
-			if (serialized.empty() ||
-				!utils::CreateParentDirectoryIfNotExist(result.m_Path.m_Path))
+			if (serialized.empty())
 			{
 				return result;
 			}
 
-			constexpr int MaxPublishAttempts = 2;
-			for (int publishAttempt = 0; publishAttempt < MaxPublishAttempts;
-				++publishAttempt)
+			struct PreviewPublicationObservation
 			{
-				const std::filesystem::path tempPath =
-					MakeUniqueTempPath(result.m_Path.m_Path);
-				if (!utils::WriteFileBinary(tempPath, serialized) ||
-					!FileEquals(tempPath, serialized))
+				const ShaderLoosePreviewPublicationLocator* m_Locator = nullptr;
+				const ShaderPreviewPublicationRef* m_PublicationRef = nullptr;
+				const ShaderPreviewPublicationArtifact* m_Artifact = nullptr;
+			};
+			PreviewPublicationObservation observation{
+				.m_Locator = &locator,
+				.m_PublicationRef = &result.m_PublicationRef,
+				.m_Artifact = &artifact,
+			};
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = result.m_Path.m_Path,
+					.m_Content = std::span<const std::byte>(serialized),
+				},
+			};
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files,
 				{
-					RemoveFileBestEffort(tempPath);
-					return result;
-				}
-				const bool published = PublishFile(tempPath, result.m_Path.m_Path);
-				RemoveFileBestEffort(tempPath);
-
-				const ShaderPreviewPublicationReadResult observed =
-					reader.ReadArtifact(result.m_PublicationRef);
-				if (observed.IsSuccess() && observed.m_Artifact == artifact)
-				{
-					result.m_Status = published
-						? ShaderPreviewPublicationArtifactPublicationStatus::Published
-						: ShaderPreviewPublicationArtifactPublicationStatus::AlreadyPresent;
-					return result;
-				}
-				RemoveFileBestEffort(result.m_Path.m_Path);
+					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_MaxAttempts = 2,
+					.m_RemoveDestinationsOnFailedObservation = true,
+					.m_ObservationAttempts = 1,
+					.m_ObservationIntervalMs = 0,
+					.m_Observer = {
+						.m_Context = &observation,
+						.m_Observe = [](void* context) noexcept -> bool
+						{
+							auto* state = static_cast<PreviewPublicationObservation*>(context);
+							ShaderLoosePreviewPublicationReader reader(*state->m_Locator);
+							const ShaderPreviewPublicationReadResult observed =
+								reader.ReadArtifact(*state->m_PublicationRef);
+							return observed.IsSuccess() &&
+								observed.m_Artifact == *state->m_Artifact;
+						},
+					},
+				});
+			if (!transaction.m_Observed)
+			{
+				return result;
 			}
+			result.m_Status = transaction.m_PrimaryCommitted
+				? ShaderPreviewPublicationArtifactPublicationStatus::Published
+				: ShaderPreviewPublicationArtifactPublicationStatus::AlreadyPresent;
+			return result;
 		}
 		catch (...)
 		{
@@ -532,25 +480,46 @@ namespace gglab
 				return result;
 			}
 
-			if (!utils::CreateParentDirectoryIfNotExist(result.m_Path))
-			{
-				return result;
-			}
 			const SerializedShaderPreviewActivePublication serialized =
 				SerializeShaderPreviewActivePublication(activePublication);
-			const std::filesystem::path tempPath = MakeUniqueTempPath(result.m_Path);
-			if (!utils::WriteFileBinary(tempPath, serialized) ||
-				!FileEquals(tempPath, serialized))
-			{
-				RemoveFileBestEffort(tempPath);
-				return result;
-			}
 
-			const BOOL replaced = ::MoveFileExW(
-				tempPath.c_str(), result.m_Path.c_str(),
-				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
-			RemoveFileBestEffort(tempPath);
-			if (replaced == FALSE)
+			struct PreviewActiveObservation
+			{
+				const ShaderLoosePreviewSessionLocator* m_Locator = nullptr;
+				const ShaderPreviewActivePublication* m_ActivePublication = nullptr;
+				bool m_PostCommitObservationSucceeded = false;
+			};
+			PreviewActiveObservation observation{
+				.m_Locator = &locator,
+				.m_ActivePublication = &activePublication,
+			};
+			const std::array files{
+				PublicationFileSpec{
+					.m_Destination = result.m_Path,
+					.m_Content = std::span<const std::byte>(serialized),
+				},
+			};
+			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
+				files,
+				{
+					.m_Commit = PublicationCommit::ReplaceExisting,
+					.m_ObservationAttempts = 1,
+					.m_ObservationIntervalMs = 0,
+					.m_Observer = {
+						.m_Context = &observation,
+						.m_Observe = [](void* context) noexcept -> bool
+						{
+							auto* state = static_cast<PreviewActiveObservation*>(context);
+							ShaderLoosePreviewSessionReader reader(*state->m_Locator);
+							const ShaderPreviewActivePublicationReadResult observed =
+								reader.ReadActivePublication();
+							state->m_PostCommitObservationSucceeded = observed.IsSuccess() &&
+								observed.m_ActivePublication == *state->m_ActivePublication;
+							return state->m_PostCommitObservationSucceeded;
+						},
+					},
+				});
+			if (!transaction.m_PrimaryCommitted)
 			{
 				return result;
 			}
@@ -559,10 +528,8 @@ namespace gglab
 			// committed active pointer was rejected by the publisher.
 			result.m_Status =
 				ShaderPreviewActivePublicationPublicationStatus::Published;
-			const ShaderPreviewActivePublicationReadResult observed =
-				reader.ReadActivePublication();
-			result.m_PostCommitObservationSucceeded = observed.IsSuccess() &&
-				observed.m_ActivePublication == activePublication;
+			result.m_PostCommitObservationSucceeded =
+				observation.m_PostCommitObservationSucceeded;
 		}
 		catch (...)
 		{

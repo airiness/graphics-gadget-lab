@@ -1,15 +1,15 @@
 #include "DevTools/DevelopGui/DevelopGuiSystem.h"
-#include "Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiBackendFactory.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiPanelCatalog.h"
 #include "DevTools/DevelopGui/DevelopGuiPlatformBackend.h"
 #include "DevTools/DevelopGui/DevelopGuiRenderBackend.h"
-#include "Graphics/RenderContexts.h"
-#include "Graphics/RenderGraph/RenderGraph.h"
-#include "Graphics/RenderPass/IBLGraphResources.h"
-#include "Graphics/RenderPass/ShadowGraphResources.h"
-#include "Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
 #include <imgui.h>
 

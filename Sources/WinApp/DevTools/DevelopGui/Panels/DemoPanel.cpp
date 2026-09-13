@@ -2,6 +2,11 @@
 #include "Demo/DemoManager.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 
+#include <algorithm>
+#include <cmath>
+#include <format>
+#include <string>
+
 #include <imgui.h>
 
 namespace gglab

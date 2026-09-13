@@ -1,11 +1,14 @@
 #include "DevTools/DevelopGui/Panels/RenderViewPanel.h"
-#include "Core/Math/Culling.h"
-#include "Core/Math/MathFunctions.h"
-#include "Core/StringIdFormatting.h"
+#include "GGLabRuntime/Core/Math/Culling.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/StringIdFormatting.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
-#include "Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 
 #include <algorithm>
 #include <string>
@@ -56,12 +59,12 @@ namespace gglab
 			{
 				return "Shadow Queue";
 			}
-			if (!context.m_CameraRig)
+			if (!context.m_CameraRenderViewQuery)
 			{
 				return devtools::EnumText(RenderViewID::Unknown);
 			}
-			const CameraRig::CameraSlot* slot = context.m_CameraRig->FindRenderViewSlot(viewId);
-			return slot ? devtools::EnumText(slot->m_VisibilityMode)
+			const auto visibility = context.m_CameraRenderViewQuery->GetRenderViewVisibilityMode(viewId);
+			return visibility ? devtools::EnumText(*visibility)
 				: devtools::EnumText(RenderViewVisibilityMode::None);
 		}
 
@@ -75,15 +78,15 @@ namespace gglab
 			return devtools::EnumText(view.m_ViewId);
 		}
 
-		const RenderQueue* FindRenderQueue(
-			std::span<const RenderQueue> queues, RenderViewID viewId) noexcept
+		const RenderQueueEntrySnapshot* FindRenderQueue(
+			std::span<const RenderQueueEntrySnapshot> queues, RenderViewID viewId) noexcept
 		{
 			const size_t index = utils::ToIndex(viewId);
 			if (index < queues.size() && queues[index].m_ViewId == viewId)
 			{
 				return &queues[index];
 			}
-			for (const RenderQueue& queue : queues)
+			for (const RenderQueueEntrySnapshot& queue : queues)
 			{
 				if (queue.m_ViewId == viewId)
 				{
@@ -113,7 +116,7 @@ namespace gglab
 
 		RenderViewID ResolveDisplayViewId(const DevelopGuiContext& context) noexcept
 		{
-			return context.m_CameraRig ? context.m_CameraRig->GetDisplayViewId()
+			return context.m_CameraRenderViewQuery ? context.m_CameraRenderViewQuery->GetDisplayViewId()
 				: RenderViewID::Main;
 		}
 
@@ -135,7 +138,7 @@ namespace gglab
 			return RenderViewID::Unknown;
 		}
 
-		float VisiblePercent(const RenderQueueStatistics& stats) noexcept
+		float VisiblePercent(const RenderQueueStatisticsSnapshot& stats) noexcept
 		{
 			if (stats.m_TotalInstanceCount == 0)
 			{
@@ -183,31 +186,11 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		template <typename T, typename Predicate>
-		uint32_t CountUniqueInRange(
-			std::span<const DrawItem> drawItems, const DrawItemsRange& range, Predicate predicate)
-		{
-			std::vector<T> values;
-			const uint32_t start =
-				std::min<uint32_t>(range.m_Start, static_cast<uint32_t>(drawItems.size()));
-			const uint32_t end =
-				std::min<uint32_t>(start + range.m_Count, static_cast<uint32_t>(drawItems.size()));
-			values.reserve(end - start);
-			for (uint32_t index = start; index < end; ++index)
-			{
-				T value = predicate(drawItems[index]);
-				if (std::find(values.begin(), values.end(), value) == values.end())
-				{
-					values.push_back(value);
-				}
-			}
-			return static_cast<uint32_t>(values.size());
-		}
-
-		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+		void DrawOverview(RenderViewPanelState& state, const DevelopGuiContext& context,
+			std::span<const RenderQueueEntrySnapshot> queues, std::span<const RenderView> views) noexcept
 		{
 			ImGui::SeparatorText("RenderView Overview");
-			if (context.m_RenderViews.empty())
+			if (views.empty())
 			{
 				ImGui::TextDisabled("No RenderViews are available.");
 				return;
@@ -248,11 +231,11 @@ namespace gglab
 			ImGui::TableSetupScrollFreeze(0, 1);
 			ImGui::TableHeadersRow();
 
-			for (const RenderView& view : context.m_RenderViews)
+			for (const RenderView& view : views)
 			{
-				const RenderQueue* queue = FindRenderQueue(context.m_RenderQueues, view.m_ViewId);
-				const RenderQueueStatistics stats =
-					queue ? queue->m_Statistics : RenderQueueStatistics{};
+				const auto* queue = FindRenderQueue(queues, view.m_ViewId);
+				const RenderQueueStatisticsSnapshot stats =
+					queue ? queue->m_Statistics : RenderQueueStatisticsSnapshot{};
 				const std::string name = RenderViewName(view);
 
 				ImGui::PushID(static_cast<int>(utils::ToIndex(view.m_ViewId)));
@@ -313,9 +296,9 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawQueueStatistics(const RenderQueue& queue) noexcept
+		void DrawQueueStatistics(const RenderQueueEntrySnapshot& queue) noexcept
 		{
-			const RenderQueueStatistics& stats = queue.m_Statistics;
+			const RenderQueueStatisticsSnapshot& stats = queue.m_Statistics;
 			if (!ImGui::BeginTable("RenderQueueStats", 2,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 				ImGuiTableFlags_SizingStretchProp))
@@ -351,7 +334,7 @@ namespace gglab
 			ImGui::EndTable();
 		}
 
-		void DrawBucketStatistics(const RenderQueue& queue) noexcept
+		void DrawBucketStatistics(const RenderQueueEntrySnapshot& queue) noexcept
 		{
 			if (!ImGui::BeginTable("RenderQueueBuckets", 5,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
@@ -371,13 +354,7 @@ namespace gglab
 				++bucketIndex)
 			{
 				const RenderBucket bucket = static_cast<RenderBucket>(bucketIndex);
-				const DrawItemsRange& range = queue.m_BucketDrawRanges[bucketIndex];
-				const uint32_t uniqueMeshes = CountUniqueInRange<MeshID>(queue.m_DrawItems, range,
-					[](const DrawItem& item) noexcept
-					{ return item.m_CoverageDrawPacket.m_Geometry.m_MeshId; });
-				const uint32_t uniqueMaterials =
-					CountUniqueInRange<RenderMaterialKey>(queue.m_DrawItems, range,
-						[](const DrawItem& item) noexcept { return item.m_MaterialKey; });
+				const auto& range = queue.m_Buckets[bucketIndex];
 
 				ImGui::TableNextRow();
 				ImGui::TableSetColumnIndex(0);
@@ -387,19 +364,20 @@ namespace gglab
 				ImGui::TableSetColumnIndex(2);
 				ImGui::Text("%u", range.m_Count);
 				ImGui::TableSetColumnIndex(3);
-				ImGui::Text("%u", uniqueMeshes);
+				ImGui::Text("%u", range.m_UniqueMeshes);
 				ImGui::TableSetColumnIndex(4);
-				ImGui::Text("%u", uniqueMaterials);
+				ImGui::Text("%u", range.m_UniqueMaterials);
 			}
 
 			ImGui::EndTable();
 		}
 
 		void DrawSelectedRenderView(
-			RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+			RenderViewPanelState& state, const DevelopGuiContext& context,
+			std::span<const RenderView> views) noexcept
 		{
-			state.m_SelectedViewId = ResolveSelectedViewId(state, context.m_RenderViews);
-			const RenderView* view = FindRenderView(context.m_RenderViews, state.m_SelectedViewId);
+			state.m_SelectedViewId = ResolveSelectedViewId(state, views);
+			const RenderView* view = FindRenderView(views, state.m_SelectedViewId);
 			if (!view)
 			{
 				ImGui::TextDisabled("No RenderView selected.");
@@ -455,10 +433,9 @@ namespace gglab
 		}
 
 		void DrawSelectedQueue(
-			const RenderViewPanelState& state, const DevelopGuiContext& context) noexcept
+			const RenderViewPanelState& state, std::span<const RenderQueueEntrySnapshot> queues) noexcept
 		{
-			const RenderQueue* queue =
-				FindRenderQueue(context.m_RenderQueues, state.m_SelectedViewId);
+			const auto* queue = FindRenderQueue(queues, state.m_SelectedViewId);
 			ImGui::SeparatorText("RenderQueue");
 			if (!queue)
 			{
@@ -475,10 +452,18 @@ namespace gglab
 	void RenderViewPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<RenderViewPanelState>();
-		DrawOverview(state, context);
+		const auto* viewSnapshot = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
+		const auto views = viewSnapshot ? std::span<const RenderView>(viewSnapshot->m_Views)
+			: std::span<const RenderView>{};
+		const auto* snapshot = context.m_Diagnostics
+			? context.m_Diagnostics->GetSnapshot<RenderQueueSnapshot>() : nullptr;
+		const auto queues = snapshot ? std::span<const RenderQueueEntrySnapshot>(snapshot->m_Queues)
+			: std::span<const RenderQueueEntrySnapshot>{};
+		DrawOverview(state, context, queues, views);
 		ImGui::Spacing();
-		DrawSelectedRenderView(state, context);
+		DrawSelectedRenderView(state, context, views);
 		ImGui::Spacing();
-		DrawSelectedQueue(state, context);
+		DrawSelectedQueue(state, queues);
 	}
 }

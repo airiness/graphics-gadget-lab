@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "ShaderArtifactRuntime/ShaderPreviewPublication.h"
 
 #include <chrono>

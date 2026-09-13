@@ -1,13 +1,13 @@
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Diagnostics/Builders/AssetSnapshotBuilder.h"
-#include "Diagnostics/Snapshots/AssetSnapshot.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/DerivedData/TextureDerivedDataSystem.h"
-#include "Graphics/Asset/Loading/TextureLoader.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/TextureDerivedDataAcceptance.h"
+#include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
 {
@@ -40,15 +40,16 @@ namespace gglab
 		[[nodiscard]] bool ValidateTextureDerivedDataCoordinatorContract(
 			std::string& error) noexcept
 		{
-			TextureDerivedDataSystem system(std::filesystem::path{});
+			const std::unique_ptr<TextureDerivedDataAcceptance> system =
+				CreateTextureDerivedDataAcceptance(std::filesystem::path{});
 			SourceDigest sourceDigest{};
 			sourceDigest.m_Value.front() = std::byte{ 0x5a };
 			TextureImportSettings importSettings{};
 			importSettings.m_Semantic = TextureSemantic::GenericColor;
 			const DerivedDataKey key =
 				BuildTextureDerivedDataKey(sourceDigest, "shared-request.png", importSettings);
-			TextureDerivedDataRequestResult producer = system.Request(key);
-			TextureDerivedDataRequestResult waiting = system.Request(key);
+			TextureDerivedDataRequestResult producer = system->Request(key);
+			TextureDerivedDataRequestResult waiting = system->Request(key);
 			if (producer.m_Disposition != ArtifactRequestDisposition::BuildRequired ||
 				!producer.m_BuildClaim.IsValid() || !producer.m_Waiter.IsValid() ||
 				waiting.m_Disposition != ArtifactRequestDisposition::Waiting ||
@@ -79,16 +80,16 @@ namespace gglab
 				.m_ContentFingerprint = contentFingerprint,
 			};
 			if (!published.IsValid() ||
-				!system.Publish(std::move(producer.m_BuildClaim), published))
+				!system->Publish(std::move(producer.m_BuildClaim), published))
 			{
 				error = "Texture shared request could not publish its artifact.";
 				return false;
 			}
 
-			TextureDerivedDataRequestResult immediate = system.Request(key);
-			TextureArtifactWaitResult waited = system.Wait(std::move(waiting.m_Waiter), {});
+			TextureDerivedDataRequestResult immediate = system->Request(key);
+			TextureArtifactWaitResult waited = system->Wait(std::move(waiting.m_Waiter), {});
 			const TextureDerivedDataCoordinatorStatistics statistics =
-				system.GetCoordinatorStatistics();
+				system->GetCoordinatorStatistics();
 			if (immediate.m_Disposition != ArtifactRequestDisposition::Hit ||
 				immediate.m_Artifact.m_Artifact != artifact ||
 				waited.m_Disposition != ArtifactWaitDisposition::Succeeded ||
@@ -106,7 +107,7 @@ namespace gglab
 			sourceDigest.m_Value.back() = std::byte{ 0xa5 };
 			const DerivedDataKey cancellationKey = BuildTextureDerivedDataKey(
 				sourceDigest, "cancelled-shared-request.png", importSettings);
-			TextureDerivedDataRequestResult cancelledProducer = system.Request(cancellationKey);
+			TextureDerivedDataRequestResult cancelledProducer = system->Request(cancellationKey);
 			if (cancelledProducer.m_Disposition != ArtifactRequestDisposition::BuildRequired ||
 				!cancelledProducer.m_Waiter.Cancel())
 			{
@@ -114,7 +115,7 @@ namespace gglab
 					"Texture cancellation contract could not create and release its producer participant.";
 				return false;
 			}
-			TextureDerivedDataRequestResult replacement = system.Request(cancellationKey);
+			TextureDerivedDataRequestResult replacement = system->Request(cancellationKey);
 			if (replacement.m_Disposition != ArtifactRequestDisposition::Waiting ||
 				replacement.m_BuildClaim.IsValid())
 			{
@@ -122,9 +123,9 @@ namespace gglab
 					"Texture participant cancellation allowed a second producer for an active key.";
 				return false;
 			}
-			GGLAB_UNUSED(system.Fail(std::move(cancelledProducer.m_BuildClaim),
+			GGLAB_UNUSED(system->Fail(std::move(cancelledProducer.m_BuildClaim),
 				"Expected cancellation-boundary validation failure."));
-			if (system.Wait(std::move(replacement.m_Waiter), {}).m_Disposition !=
+			if (system->Wait(std::move(replacement.m_Waiter), {}).m_Disposition !=
 				ArtifactWaitDisposition::Failed)
 			{
 				error = "Texture cancellation-boundary waiter did not observe producer completion.";
@@ -201,7 +202,7 @@ namespace gglab
 
 	AssetResidencyLabSession::AssetResidencyLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 	}
 

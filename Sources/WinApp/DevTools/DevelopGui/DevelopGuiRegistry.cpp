@@ -2,6 +2,10 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "GGLabFoundation/String/StringUtils.h"
 
+#include <algorithm>
+#include <format>
+#include <iterator>
+
 #include <imgui.h>
 
 namespace gglab

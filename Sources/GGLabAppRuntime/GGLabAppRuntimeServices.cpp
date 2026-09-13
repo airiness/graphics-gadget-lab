@@ -8,17 +8,16 @@
 #include "Demo/DemoTypes.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/DebugDraw/DebugDrawSystem.h"
-#include "Graphics/EnvironmentAssetController.h"
-#include "Graphics/IBLBakeScheduler.h"
-#include "Graphics/RenderFrameBuilder.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
+#include "GGLabRuntime/Graphics/RenderHost.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "LoadingProgress.h"
-#include "Core/Time.h"
+#include "GGLabRuntime/Core/Time.h"
 
 #include <optional>
 #include <span>
@@ -33,6 +32,16 @@ namespace gglab
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
 		Shutdown();
+	}
+
+	DiagnosticsView* GGLabAppRuntime::GetDiagnosticsView() const noexcept
+	{
+		return m_Diagnostics ? m_Diagnostics->GetView() : nullptr;
+	}
+
+	DiagnosticsControl* GGLabAppRuntime::GetDiagnosticsControl() const noexcept
+	{
+		return m_Diagnostics ? m_Diagnostics->GetControl() : nullptr;
 	}
 
 	namespace
@@ -119,60 +128,75 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::InvalidContentRegistration);
 		}
 
-		m_Renderer = std::make_unique<Renderer>();
-		Renderer::CreateInfo rendererCreateInfo{};
-		rendererCreateInfo.m_RHIContextFactory = createInfo.m_RHIContextFactory;
-		rendererCreateInfo.m_ShaderManager = m_ShaderManager.get();
-		rendererCreateInfo.m_TaskSystem = m_TaskSystem.get();
-		rendererCreateInfo.m_IblDerivedDataCacheDirectory = m_Paths.m_IblDerivedDataRoot;
-		rendererCreateInfo.m_Width = m_WindowWidth;
-		rendererCreateInfo.m_Height = m_WindowHeight;
-		rendererCreateInfo.m_AdapterSelector = m_Config.m_AdapterSelector;
-		rendererCreateInfo.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation;
-		if (!m_Renderer->Initialize(rendererCreateInfo))
+		RenderHostInstance renderHostInstance = CreateRenderHost(RenderHostCreateInfo{
+			.m_RHIContextFactory = createInfo.m_RHIContextFactory,
+			.m_ShaderManager = m_ShaderManager.get(),
+			.m_TaskSystem = m_TaskSystem.get(),
+			.m_IblDerivedDataCacheDirectory = m_Paths.m_IblDerivedDataRoot,
+			.m_Width = m_WindowWidth,
+			.m_Height = m_WindowHeight,
+			.m_AdapterSelector = m_Config.m_AdapterSelector,
+			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
+			});
+		if (!renderHostInstance.m_Host)
 		{
-			GGLAB_LOG_ERROR("Failed to initialize the renderer.");
+			GGLAB_LOG_ERROR("Failed to initialize the render host.");
 			return FailServiceInitialization(
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
-
-		m_DebugDrawSystem = std::make_unique<DebugDrawSystem>(DebugDrawSystem::CreateInfo{
-			.m_Device = m_Renderer->GetDevice(),
-			.m_FrameSlotCount = m_Renderer->GetRHIContext()->GetFrameSlotCount(),
+		m_RenderHost = std::move(renderHostInstance.m_Host);
+		m_RenderServices = renderHostInstance.m_Services;
+		m_RenderComposition = renderHostInstance.m_Composition;
+		if (!m_RenderComposition)
+		{
+			GGLAB_LOG_ERROR("Render host instance is missing its composition access.");
+			return FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
+		}
+		m_DebugDrawService = CreateDebugDrawService(DebugDrawServiceCreateInfo{
+			.m_Device = &m_RenderHost->GetRHIContext()->GetDevice(),
+			.m_FrameSlotCount = m_RenderHost->GetRHIContext()->GetFrameSlotCount(),
 			});
 
 		AssetManager::CreateInfo assetManagerCreateInfo{};
-		assetManagerCreateInfo.m_Device = m_Renderer->GetDevice();
+		assetManagerCreateInfo.m_Device = &m_RenderHost->GetRHIContext()->GetDevice();
 		assetManagerCreateInfo.m_TaskSystem = m_TaskSystem.get();
-		assetManagerCreateInfo.m_TransferManager = m_Renderer->GetTransferManager();
-		assetManagerCreateInfo.m_AssetUploadScheduler = m_Renderer->GetAssetUploadScheduler();
-		assetManagerCreateInfo.m_SamplerRegistry = m_Renderer->GetSamplerRegistry();
+		assetManagerCreateInfo.m_TransferManager = m_RenderComposition->GetTransferManager();
+		assetManagerCreateInfo.m_AssetUploadScheduler = m_RenderComposition->GetAssetUploadScheduler();
+		assetManagerCreateInfo.m_SamplerRegistry = m_RenderComposition->GetSamplerRegistry();
 		assetManagerCreateInfo.m_TextureDerivedDataCacheDirectory =
 			m_Paths.m_TextureDerivedDataRoot;
 		assetManagerCreateInfo.m_AssetRoot = m_Paths.m_AssetRoot;
 		m_AssetManager = std::make_unique<AssetManager>(assetManagerCreateInfo);
-		m_Renderer->GetIBLBakeScheduler()->AttachAssetManager(*m_AssetManager);
+		m_RenderComposition->AttachAssetManager(*m_AssetManager);
 
 		m_EnvironmentAssetController =
 			std::make_unique<EnvironmentAssetController>(EnvironmentAssetController::CreateInfo{
 				.m_AssetManager = m_AssetManager.get(),
-				.m_EnvironmentLighting = m_Renderer->GetEnvironmentLightingSystem(),
+				.m_EnvironmentLighting = m_RenderComposition->GetEnvironmentSourceControl(),
 				.m_AssetRoot = m_Paths.m_AssetRoot,
 				});
 		m_EnvironmentAssetController->Initialize(m_Paths.m_EnvironmentAssetRoot);
 
-		m_DemoManager = std::make_unique<DemoManager>(m_Renderer.get());
+		m_DemoManager = std::make_unique<DemoManager>(m_RenderHost->GetRHIContext());
 		m_DemoManager->OnResize(m_WindowWidth, m_WindowHeight);
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
 				{
-					.m_Renderer = m_Renderer.get(),
+					.m_RenderServices = m_RenderServices,
+					.m_EnvironmentLighting = m_RenderHost->GetEnvironmentLightingView(),
+					.m_EnvironmentLightingControl = m_RenderHost->GetEnvironmentLightingControl(),
+					.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
+					.m_GpuProfiling = m_RenderHost->GetGpuProfilingView(),
+					.m_GpuProfilingControl = m_RenderHost->GetGpuProfilingControl(),
+					.m_AssetUploadControl = m_RenderComposition->GetAssetUploadControl(),
+					.m_RHIContext = m_RenderHost->GetRHIContext(),
 					.m_AssetManager = m_AssetManager.get(),
 					.m_ShaderManager = m_ShaderManager.get(),
 					.m_TaskSystem = m_TaskSystem.get(),
 					.m_Input = m_Input,
 					.m_Time = m_Time.get(),
-					.m_DebugDraw = &m_DebugDrawSystem->GetContext(),
+					.m_DebugDraw = &m_DebugDrawService->GetContext(),
 					.m_EnvironmentAssetController = m_EnvironmentAssetController.get(),
 				},
 			.m_WindowWidth = m_WindowWidth,
@@ -209,7 +233,12 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::StartupContentUnavailable);
 		}
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
-		m_RenderFrameBuilder = std::make_unique<RenderFrameBuilder>();
+		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
+		{
+			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
+				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value(),
+				});
+		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_Config.m_StartupDemoId,
@@ -318,23 +347,23 @@ namespace gglab
 				m_AssetManager->DrainLoadCompletions();
 			}
 
-			GGLAB_ASSERT_MSG(m_Renderer && m_Renderer->IsInitialized(),
-				"App runtime asset lifetime requires an initialized renderer.");
-			if (m_Renderer && m_Renderer->IsInitialized())
+			GGLAB_ASSERT_MSG(m_RenderHost && m_RenderHost->IsInitialized(),
+				"App runtime asset lifetime requires an initialized render host.");
+			if (m_RenderHost && m_RenderHost->IsInitialized())
 			{
-				m_Renderer->GetAssetUploadScheduler()->DrainReadyWork();
-				m_Renderer->GetRHIContext()->WaitIdle();
+							m_RenderComposition->GetAssetUploadScheduler()->DrainReadyWork();
+				m_RenderHost->GetRHIContext()->WaitIdle();
 				// Host-owned tooling may retain backend pipelines, descriptors and user
 				// textures referenced by the last submitted frame. Retire them only at
 				// this quiescent point, while all borrowed runtime services remain alive.
 				prepareApplicationTooling();
-				m_Renderer->GetAssetUploadScheduler()->Finalize();
+				m_RenderComposition->GetAssetUploadScheduler()->Finalize();
 
-				m_RenderFrameBuilder.reset();
+				m_Diagnostics.reset();
 				m_DemoManager.reset();
-				m_DebugDrawSystem.reset();
-				m_Renderer->GetIBLBakeScheduler()->DetachAssetManager();
-				m_AssetManager->PrepareForShutdown(m_Renderer->GetLastSubmittedFencePoint());
+				m_DebugDrawService.reset();
+				m_RenderComposition->DetachAssetManager();
+				m_AssetManager->PrepareForShutdown(m_RenderComposition->GetLastSubmittedFencePoint());
 			}
 			m_AssetManager.reset();
 		}
@@ -346,14 +375,15 @@ namespace gglab
 		// Lifecycle-only and partial-initialization runtimes have no GPU work to
 		// quiesce, but still honor the tooling shutdown contract exactly once.
 		prepareApplicationTooling();
-		m_RenderFrameBuilder.reset();
+		m_Diagnostics.reset();
 		m_DemoManager.reset();
-		m_DebugDrawSystem.reset();
-		if (m_Renderer)
+		m_DebugDrawService.reset();
+		if (m_RenderHost)
 		{
-			m_Renderer->Finalize();
-			m_Renderer.reset();
+			m_RenderHost->Finalize();
+			m_RenderHost.reset();
 		}
+		m_RenderComposition = nullptr;
 		m_EnvironmentAssetController.reset();
 		m_ShaderManager.reset();
 		m_Time.reset();

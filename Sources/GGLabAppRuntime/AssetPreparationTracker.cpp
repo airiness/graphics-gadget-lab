@@ -1,6 +1,6 @@
 #include "AssetPreparationTracker.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 #include <algorithm>
 #include <utility>
@@ -10,7 +10,6 @@ namespace gglab
 	void AssetPreparationTracker::Reset() noexcept
 	{
 		m_Models.clear();
-		m_Meshes.clear();
 	}
 
 	void AssetPreparationTracker::TrackModel(
@@ -21,16 +20,6 @@ namespace gglab
 			return;
 		}
 		m_Models.push_back({ modelId, std::string(label), weight });
-	}
-
-	void AssetPreparationTracker::TrackMesh(
-		MeshID meshId, std::string_view label, float weight) noexcept
-	{
-		if (std::ranges::find(m_Meshes, meshId, &Dependency<MeshID>::m_Id) != m_Meshes.end())
-		{
-			return;
-		}
-		m_Meshes.push_back({ meshId, std::string(label), weight });
 	}
 
 	LoadingProgress AssetPreparationTracker::BuildProgress(
@@ -52,24 +41,6 @@ namespace gglab
 			}
 			progress.AddAssetStep(dependency.m_Weight,
 				GetAssetLoadProgress(model->m_State, AssetLoadKind::Model, model->m_LoadProgress),
-				dependency.m_Label);
-		}
-
-		for (const auto& dependency : m_Meshes)
-		{
-			const Mesh* mesh = assetManager.GetMesh(dependency.m_Id);
-			if (!mesh)
-			{
-				progress.AddStep(dependency.m_Weight, {
-														  .m_Status = LoadingStatus::Failed,
-														  .m_Fraction = 0.0f,
-														  .m_Stage = "Mesh request unavailable",
-														  .m_Detail = dependency.m_Label,
-					});
-				continue;
-			}
-			progress.AddAssetStep(dependency.m_Weight,
-				GetAssetLoadProgress(mesh->m_State, AssetLoadKind::Mesh, mesh->m_LoadProgress),
 				dependency.m_Label);
 		}
 		return progress.Build();

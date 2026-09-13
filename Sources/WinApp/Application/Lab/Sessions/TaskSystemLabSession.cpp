@@ -1,9 +1,9 @@
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
-#include "Graphics/Camera.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
 {
@@ -127,7 +127,7 @@ namespace gglab
 	};
 
 	TaskSystemLabSession::TaskSystemLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -466,12 +466,11 @@ namespace gglab
 			m_State->m_GateReleasePermits.store(
 				std::max(m_State->m_WorkerCount, 1u), std::memory_order_release);
 		}
-		if (m_Services.m_TaskSystem)
+		TaskSystem* taskSystem = m_Services.m_TaskSystem;
+		GGLAB_ASSERT_NOT_NULL(taskSystem);
+		for (const TaskHandle handle : m_Handles)
 		{
-			for (const TaskHandle handle : m_Handles)
-			{
-				GGLAB_UNUSED(m_Services.m_TaskSystem->Cancel(handle));
-			}
+			GGLAB_UNUSED(taskSystem->Cancel(handle));
 		}
 		m_Handles.clear();
 		m_State.reset();

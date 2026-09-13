@@ -1,7 +1,9 @@
 #include "VulkanContractSelfTests.h"
-#include "Graphics/RHI/RHIDescriptorCapacityContract.h"
-#include "Graphics/RHI/RHISampler.h"
-#include "Graphics/RHI/RHITextureValidation.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanWin32AdapterInspection.h"
+#include "GGLabRuntime/Graphics/RHI/Vulkan/VulkanImageViewLease.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptorCapacityContract.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
@@ -488,6 +490,37 @@ namespace gglab
 				sameLayoutBuffer->buffer == buffer && sameLayoutBuffer->offset == 0 &&
 				sameLayoutBuffer->size == VK_WHOLE_SIZE,
 				"Vulkan buffer barriers preserve graphics-compute and same-layout dependencies");
+
+			constexpr RHIResourceState commonBufferState{
+				.m_Stages = RHIStage::All,
+				.m_Access = RHIAccess::Common,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState vertexBufferReadState{
+				.m_Stages = RHIStage::VertexShader,
+				.m_Access = RHIAccess::VertexBuffer,
+				.m_Layout = RHILayout::Common,
+			};
+			constexpr RHIResourceState indexBufferReadState{
+				.m_Stages = RHIStage::IndexInput,
+				.m_Access = RHIAccess::IndexBuffer,
+				.m_Layout = RHILayout::Common,
+			};
+			const auto vertexBufferRead = BuildVulkanBufferBarrier(
+				{ {}, commonBufferState, vertexBufferReadState }, buffer);
+			const auto vertexBufferRelease = BuildVulkanBufferBarrier(
+				{ {}, vertexBufferReadState, commonBufferState }, buffer);
+			const auto indexBufferRead = BuildVulkanBufferBarrier(
+				{ {}, commonBufferState, indexBufferReadState }, buffer);
+			context.Check(vertexBufferRead && vertexBufferRelease && indexBufferRead &&
+				(vertexBufferRead->dstStageMask &
+					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				vertexBufferRead->dstAccessMask == VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT &&
+				(vertexBufferRelease->srcStageMask &
+					VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT) != 0 &&
+				(indexBufferRead->dstStageMask & VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT) != 0 &&
+				indexBufferRead->dstAccessMask == VK_ACCESS_2_INDEX_READ_BIT,
+				"Vulkan buffer barriers synchronize vertex and index reads at input-assembly stages");
 			context.Check(!BuildVulkanTextureBarrier(
 				{ {}, renderTargetState, UndefinedRHITextureState() }, image, colorDesc) &&
 				!BuildVulkanBufferBarrier(
@@ -1886,6 +1919,41 @@ namespace gglab
 
 	void RunVulkanContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			const auto instance = reinterpret_cast<HINSTANCE>(uintptr_t{ 1 });
+			const auto window = reinterpret_cast<HWND>(uintptr_t{ 1 });
+			context.Check(InspectVulkanWin32Adapters({}) != 0 &&
+				InspectVulkanWin32Adapters({ .m_Window = window, .m_IsHostAbiSupported = true }) != 0 &&
+				InspectVulkanWin32Adapters({ .m_Instance = instance, .m_IsHostAbiSupported = true }) != 0,
+				"Adapter inspection rejects absent instance or window before native work");
+			context.Check(InspectVulkanWin32Adapters({ .m_Instance = instance, .m_Window = window }) != 0,
+				"Adapter inspection rejects unsupported host ABI before touching sentinel native handles");
+		}
+		{
+			// Null device keeps this ownership test independent of Vulkan/driver work.
+			const auto imageView = reinterpret_cast<VkImageView>(uintptr_t{ 1 });
+			auto parent = std::make_shared<int>(7);
+			std::weak_ptr<int> parentLifetime = parent;
+			auto backing = std::make_shared<VulkanDescriptorBacking>(
+				VK_NULL_HANDLE, imageView, parent);
+			std::shared_ptr<const VulkanImageViewLeaseBase> first = backing;
+			std::shared_ptr<const VulkanImageViewLeaseBase> second = backing;
+			context.Check(first.get() == second.get() && first->GetImageView() == imageView &&
+				!first.owner_before(second) && !second.owner_before(first),
+				"Native image leases preserve publication identity and share the existing ownership block");
+			std::shared_ptr<const VulkanImageViewLeaseBase> replacement =
+				std::make_shared<VulkanDescriptorBacking>(VK_NULL_HANDLE, imageView, nullptr);
+			context.Check(replacement.get() != first.get() && replacement->GetImageView() == first->GetImageView(),
+				"Image-view handle reuse does not alias distinct publication identities");
+			backing.reset();
+			parent.reset();
+			first.reset();
+			context.Check(!parentLifetime.expired() && second->GetImageView() == imageView,
+				"A retained native image lease pins the parent after the publisher releases its reference");
+			second.reset();
+			context.Check(parentLifetime.expired(),
+				"Releasing the final native image lease destroys the retained parent exactly once");
+		}
 		RunDescriptorCapacityTests(context);
 		RunDeviceProfileTests(context);
 		RunVulkanQueueSelectionTests(context);

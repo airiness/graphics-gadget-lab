@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ApplicationInput.h"
-#include "Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
 
 namespace gglab
 {

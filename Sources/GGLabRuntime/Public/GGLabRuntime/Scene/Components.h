@@ -1,0 +1,39 @@
+#pragma once
+#include "GGLabRuntime/Graphics/GraphicsTypes.h"
+#include "GGLabRuntime/Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
+
+#include <optional>
+
+namespace gglab::components
+{
+	struct TransformComponent
+	{
+		Vector3 m_Position = Vector3::Zero;
+		Quaternion m_Rotation = Quaternion::Identity;
+		Vector3 m_Scale = Vector3::One;
+	};
+
+	struct ModelComponent
+	{
+		ModelID m_ModelId{};
+	};
+
+	struct MaterialInstanceComponent
+	{
+		RuntimeMaterialKey m_Key{};
+		MaterialProperties m_Properties{};
+	};
+
+	struct LightComponent
+	{
+		LightType m_Type = LightType::Directional;
+		Color m_Color = Color::White;
+		float m_Intensity = 1.0f;
+		float m_Range = 1000.0f;
+		float m_SpotAngle = 60.0f;
+		std::optional<DirectionalShadowSettings> m_DirectionalShadowSettings;
+	};
+}

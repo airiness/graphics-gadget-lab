@@ -1,9 +1,9 @@
 #include "Lab/LabSessionBase.h"
 #include "ApplicationCameraInput.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/CameraController.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 namespace gglab
 {

@@ -1,14 +1,13 @@
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "AppRuntimeLog.h"
-#include "Core/Math/BoundingVolumes.h"
-#include "Core/Math/Quaternion.h"
-#include "Graphics/Asset/Loading/AssetLoadProgress.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {
@@ -81,7 +80,7 @@ namespace gglab
 	}
 
 	MiniPBRGridLabSession::MiniPBRGridLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -452,7 +451,7 @@ namespace gglab
 
 			const entt::entity sphere = primitive::Sphere::Create({
 				.m_AssetManager = m_Services.m_AssetManager,
-				.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+				.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,

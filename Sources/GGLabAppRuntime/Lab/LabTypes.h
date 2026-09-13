@@ -1,5 +1,5 @@
 #pragma once
-#include "Core/StringId.h"
+#include "GGLabRuntime/Core/StringId.h"
 
 #include <string>
 #include <string_view>

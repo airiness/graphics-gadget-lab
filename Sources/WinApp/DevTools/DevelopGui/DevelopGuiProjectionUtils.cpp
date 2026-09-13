@@ -1,5 +1,5 @@
 #include "DevTools/DevelopGui/DevelopGuiProjectionUtils.h"
-#include "Core/Math/MathFunctions.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "DevTools/DevelopGui/Interop/ImGuiMathInterop.h"
 
 #include <algorithm>

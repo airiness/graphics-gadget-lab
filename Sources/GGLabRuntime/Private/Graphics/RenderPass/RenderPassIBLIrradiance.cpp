@@ -1,0 +1,190 @@
+#include "Graphics/RenderPass/RenderPassIBLIrradiance.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
+#include "Graphics/SamplerRegistry.h"
+
+#include <array>
+#include <cstdint>
+#include <span>
+
+namespace gglab
+{
+	namespace
+	{
+		struct IBLIrradiancePassParameters
+		{
+			uint32_t CubemapFaceIndex = 0;
+			uint32_t EnvironmentTextureIndex = 0;
+			uint32_t EnvironmentSamplerIndex = 0;
+			uint32_t EnvironmentResolution = 0;
+			uint32_t EnvironmentMipLevels = 0;
+			uint32_t SampleCount = 0;
+			uint32_t Padding[2]{};
+		};
+		static_assert(IsPassRootConstantStruct<IBLIrradiancePassParameters>);
+		static_assert(sizeof(IBLIrradiancePassParameters) == 32);
+
+		struct PassData
+		{
+			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_IrradianceCubemap{};
+			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
+
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			uint32_t m_EnvironmentTextureIndex = 0;
+			uint32_t m_EnvironmentSamplerIndex = 0;
+			uint32_t m_EnvironmentResolution = 0;
+			uint32_t m_EnvironmentMipLevels = 0;
+			uint32_t m_SampleCount = 0;
+			RHIFormat m_RenderTargetFormat = RHIFormat::Unknown;
+		};
+	}
+
+	void RenderPassIBLIrradiance::AddPass(
+		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
+	{
+		GGLAB_UNUSED(context);
+
+
+		auto* renderResRegistry = services.m_Resources;
+		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
+
+		auto* bakeScheduler = services.m_Environment;
+		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
+		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
+		const uint32_t sampleCount = bakeScheduler->GetBakingConfig().m_IrradianceSampleCount;
+
+		EnsureInitialized(services);
+
+		rg.AddPass<PassData>(
+			GetRenderGraphPassName(),
+			[services, renderResRegistry, sampleCount](
+				RenderGraph::RGBuilder& builder, PassData& data)
+			{
+				builder.SideEffect();
+
+				auto& blackboard = builder.GetBlackboard();
+				auto& iblRes = blackboard.Get<RGIBLResources>(IBLResourcesName);
+
+				data.m_EnvironmentCubemap =
+					builder.Read(iblRes.m_BakeEnvironmentCubemap, RGTextureAccess::Sample);
+				builder.WriteInPlace(iblRes.m_BakeIrradianceCubemap, RGTextureAccess::RenderTarget);
+				data.m_IrradianceCubemap = iblRes.m_BakeIrradianceCubemap;
+
+				const auto* textureDesc = renderResRegistry->GetIBLBakeTextureDesc(
+					RenderTextureIndex::IBL_IrradianceCubemap);
+				GGLAB_ASSERT_NOT_NULL(textureDesc);
+
+				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
+				{
+					const auto rtvDesc =
+						MakeRHITexture2DArrayViewDesc(textureDesc->m_Format, 0, face, 1);
+					data.m_Rtvs[face] = builder.CreateView<RHITextureViewType::RenderTarget>(
+						data.m_IrradianceCubemap, rtvDesc);
+				}
+
+				data.m_Width = textureDesc->m_Extent.m_Width;
+				data.m_Height = textureDesc->m_Extent.m_Height;
+				data.m_EnvironmentTextureIndex = renderResRegistry->GetIBLBakeShaderVisibleSrvIndex(
+					RenderTextureIndex::IBL_EnvironmentCubemap);
+				data.m_EnvironmentSamplerIndex =
+					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
+
+				const auto* environmentDesc = renderResRegistry->GetIBLBakeTextureDesc(
+					RenderTextureIndex::IBL_EnvironmentCubemap);
+				GGLAB_ASSERT_NOT_NULL(environmentDesc);
+				data.m_EnvironmentResolution =
+					static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
+				data.m_EnvironmentMipLevels = environmentDesc->m_MipLevels;
+				data.m_SampleCount = sampleCount;
+				data.m_RenderTargetFormat = textureDesc->m_Format;
+			},
+			[this, services, bakeScheduler, bakeGeneration](
+				RGExecuteContext& executeContext, PassData& data)
+			{
+				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_RenderTargetFormat));
+				commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(data.m_Width),
+					static_cast<float>(data.m_Height) });
+				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
+					static_cast<int32_t>(data.m_Height) });
+
+				for (uint32_t face = 0; face < CubemapFaceCount; ++face)
+				{
+					const auto rtv = executeContext.GetViewHandle(data.m_Rtvs[face]);
+					const RHIRenderingAttachment colorAttachment{
+						.m_View = rtv,
+						.m_LoadOp = RHIContentLoadOp::DontCare,
+					};
+					commandContext->BeginRendering({ .m_ColorAttachments =
+						std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+					commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+					const IBLIrradiancePassParameters passParameters{
+						.CubemapFaceIndex = face,
+						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
+						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
+						.EnvironmentResolution = data.m_EnvironmentResolution,
+						.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
+						.SampleCount = data.m_SampleCount,
+					};
+					commandContext->SetPushConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+						passParameters);
+
+					commandContext->DrawFullscreenTriangle();
+					commandContext->EndRendering();
+				}
+
+				bakeScheduler->NotifyStageExecuted(IBLBakeStage::Irradiance, bakeGeneration);
+			});
+	}
+
+	void RenderPassIBLIrradiance::EnsureInitialized(const RenderServices& services) noexcept
+	{
+
+		auto* shaderManager = services.m_ShaderPrograms;
+		GGLAB_ASSERT_NOT_NULL(shaderManager);
+
+		if (!m_IsInitialized)
+		{
+			const auto vsId = shaderManager->LoadProgram(shader_programs::IBLIrradianceVertex);
+			const auto psId = shaderManager->LoadProgram(shader_programs::IBLIrradiancePixel);
+
+			m_BaseRecipe.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+			m_BaseRecipe.m_InputLayoutId = InputLayoutID::None;
+			m_BaseRecipe.m_VSId = vsId;
+			m_BaseRecipe.m_PSId = psId;
+
+			m_BaseRecipe.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			m_BaseRecipe.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			m_BaseRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
+			m_BaseRecipe.m_Formats.m_RenderTargetCount = 1;
+			m_BaseRecipe.m_Formats.m_DepthStencilFormat = RHIFormat::Unknown;
+			m_BaseRecipe.m_Formats.m_SampleCount = 1;
+			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
+
+			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
+			m_BaseRecipe.m_DepthPreset = DepthPreset::DepthDisabled;
+
+			m_IsInitialized = true;
+		}
+	}
+
+	RHIPipelineHandle RenderPassIBLIrradiance::GetOrCreatePSO(
+		const RenderServices& services, RHIFormat renderTargetFormat) noexcept
+	{
+		auto* pipelineCache = services.m_PipelineResolver;
+		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		GraphicsPhysicalPipelineKey recipe = m_BaseRecipe;
+		recipe.m_Formats.m_RenderTargetFormats[0] = renderTargetFormat;
+		return pipelineCache->Resolve(m_PipelineSlot, recipe, GetInfo());
+	}
+}

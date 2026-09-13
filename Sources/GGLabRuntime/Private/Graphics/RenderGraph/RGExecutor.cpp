@@ -1,0 +1,314 @@
+#include "Graphics/RenderGraph/RGExecutor.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+
+#include <cstddef>
+#include <string_view>
+#include <vector>
+
+namespace gglab
+{
+	namespace
+	{
+		RHITextureHandle ResolveTextureHandle(const RGCompiledResource& resource) noexcept
+		{
+			GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGTexture,
+				"RenderGraph texture resolution requires a texture resource.");
+			const auto* texture =
+				static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
+			return texture->m_Imported ? texture->m_ImportedHandle
+				: texture->m_PhysicalAllocation.m_Texture;
+		}
+
+		RHIBufferHandle ResolveBufferHandle(const RGCompiledResource& resource) noexcept
+		{
+			GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGBuffer,
+				"RenderGraph buffer resolution requires a buffer resource.");
+			const auto* buffer =
+				static_cast<const RGVirtualResource<RGBufferResource>*>(resource.m_Resource);
+			return buffer->m_Imported ? buffer->m_ImportedHandle
+				: buffer->m_PhysicalAllocation.m_Buffer;
+		}
+
+		RHICommandContext* SelectPassCommandContext(
+			const RGBackendExecuteContext& backend, RGPassEncoderType encoderType) noexcept
+		{
+			switch (encoderType)
+			{
+			case RGPassEncoderType::Graphics:
+			case RGPassEncoderType::Copy:
+				return backend.m_GraphicsCommandContext;
+			case RGPassEncoderType::Compute:
+				return backend.m_DirectComputeCommandContext;
+			}
+			GGLAB_UNREACHABLE("Unhandled RenderGraph pass encoder type.");
+		}
+
+		void TrackPassResourceUses(RHICommandContext* commandContext, const RGExecutionPlan& plan,
+			const RGCompiledPass& pass) noexcept
+		{
+			GGLAB_ASSERT_NOT_NULL(commandContext);
+			if (!commandContext)
+			{
+				return;
+			}
+
+			for (const auto& access : pass.m_Accesses)
+			{
+				const auto& resource = plan.GetResources()[access.m_Resource.Value()];
+				if (resource.m_ResourceType == RGResourceType::RGTexture)
+				{
+					const RHITextureHandle handle = ResolveTextureHandle(resource);
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph texture access requires a live RHI handle.");
+					if (handle.IsValid())
+					{
+						commandContext->TrackTextureUse(handle);
+					}
+				}
+				else
+				{
+					const RHIBufferHandle handle = ResolveBufferHandle(resource);
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph buffer access requires a live RHI handle.");
+					if (handle.IsValid())
+					{
+						commandContext->TrackBufferUse(handle);
+					}
+				}
+			}
+		}
+
+		void EmitBarriers(RHICommandContext* commandContext, const RGExecutionPlan& plan,
+			const std::vector<RGBarrierIntent>& barriers) noexcept
+		{
+			if (barriers.empty())
+			{
+				return;
+			}
+			GGLAB_ASSERT_NOT_NULL(commandContext);
+			if (!commandContext)
+			{
+				return;
+			}
+
+			std::vector<RHITextureBarrier> textureBarriers;
+			std::vector<RHIBufferBarrier> bufferBarriers;
+			textureBarriers.reserve(barriers.size());
+			bufferBarriers.reserve(barriers.size());
+			for (const auto& intent : barriers)
+			{
+				GGLAB_ASSERT_MSG(intent.m_Resource.IsValid() &&
+					intent.m_Resource.Value() < plan.GetResources().size(),
+					"RenderGraph barrier references an invalid resource.");
+				GGLAB_ASSERT_MSG(
+					intent.m_Kind != RGBarrierKind::Uav ||
+					(HasUavAccess(intent.m_Before) && HasUavAccess(intent.m_After) &&
+						!NeedsRHIResourceTransition(intent.m_Before, intent.m_After)),
+					"RenderGraph UAV barriers require a stable UAV state.");
+				const auto& resource = plan.GetResources()[intent.m_Resource.Value()];
+				if (resource.m_ResourceType == RGResourceType::RGTexture)
+				{
+					const RHITextureHandle handle = ResolveTextureHandle(resource);
+					GGLAB_ASSERT_MSG(handle.IsValid(),
+						"RenderGraph texture barrier requires a live RHI handle.");
+					if (handle.IsValid())
+					{
+						intent.m_HasResolvedPhysicalHandle = true;
+						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
+						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
+						textureBarriers.push_back({
+							.m_Texture = handle,
+							.m_Before = intent.m_Before,
+							.m_After = intent.m_After,
+							.m_Subresources = intent.m_Subresources,
+							});
+					}
+				}
+				else
+				{
+					const RHIBufferHandle handle = ResolveBufferHandle(resource);
+					GGLAB_ASSERT_MSG(
+						handle.IsValid(), "RenderGraph buffer barrier requires a live RHI handle.");
+					if (handle.IsValid())
+					{
+						intent.m_HasResolvedPhysicalHandle = true;
+						intent.m_ResolvedPhysicalHandleIndex = handle.Index();
+						intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
+						bufferBarriers.push_back({ handle, intent.m_Before, intent.m_After });
+					}
+				}
+			}
+
+			commandContext->TextureBarrier(textureBarriers);
+			commandContext->BufferBarrier(bufferBarriers);
+			commandContext->FlushBarriers();
+		}
+	}
+
+	RHITextureViewHandle RGExecuteContext::GetViewHandle(RGTextureViewId viewId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ExecutionPlan);
+		GGLAB_ASSERT_NOT_NULL(m_Device);
+		if (!m_ExecutionPlan || !m_Device || !viewId.IsValid() ||
+			viewId.Value() >= m_ExecutionPlan->GetTextureViews().size())
+		{
+			return {};
+		}
+
+		const auto& view = m_ExecutionPlan->GetTextureViews()[viewId.Value()];
+		const auto& resource = m_ExecutionPlan->GetResources()[view.m_Resource.Value()];
+		const RHITextureHandle texture = ResolveTextureHandle(resource);
+		return texture.IsValid() ? m_Device->CreateTextureView(texture, view.m_Desc)
+			: RHITextureViewHandle{};
+	}
+
+	RHIDescriptorHandle RGExecuteContext::GetViewDescriptor(RGTextureViewId viewId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_Device);
+		const RHITextureViewHandle view = GetViewHandle(viewId);
+		if (!m_Device || !view.IsValid())
+		{
+			return {};
+		}
+		const bool descriptorPublished = m_Device->PublishTextureViewDescriptor(view);
+		GGLAB_ASSERT_MSG(
+			descriptorPublished, "RenderGraph failed to publish a texture-view descriptor.");
+		return descriptorPublished ? m_Device->GetTextureViewDescriptor(view)
+			: RHIDescriptorHandle{};
+	}
+
+	RHIBufferHandle RGExecuteContext::GetBufferHandle(RGBufferId bufferId) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_ExecutionPlan);
+		if (!m_ExecutionPlan || !bufferId.IsValid())
+		{
+			return {};
+		}
+
+		const size_t resourceIndex = bufferId.GetHandle().Value();
+		GGLAB_ASSERT_MSG(resourceIndex < m_ExecutionPlan->GetResources().size(),
+			"RenderGraph buffer id must resolve to a compiled resource.");
+		if (resourceIndex >= m_ExecutionPlan->GetResources().size())
+		{
+			return {};
+		}
+
+		const auto& resource = m_ExecutionPlan->GetResources()[resourceIndex];
+		GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGBuffer,
+			"RenderGraph buffer resolution requires a buffer resource.");
+		return resource.m_ResourceType == RGResourceType::RGBuffer ? ResolveBufferHandle(resource)
+			: RHIBufferHandle{};
+	}
+
+	RHIGraphicsCommandContext* RGExecuteContext::GetGraphicsCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Graphics;
+		GGLAB_ASSERT_MSG(
+			compatible, "Graphics command context access requires a Graphics RenderGraph pass.");
+		return compatible ? m_Backend.m_GraphicsCommandContext : nullptr;
+	}
+
+	RHIComputeCommandContext* RGExecuteContext::GetDirectComputeCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
+		GGLAB_ASSERT_MSG(compatible,
+			"Direct compute command context access requires a Compute RenderGraph pass.");
+		return compatible ? m_Backend.m_DirectComputeCommandContext : nullptr;
+	}
+
+	RHIComputeCommandContext* RGExecuteContext::GetAsyncComputeCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Compute;
+		GGLAB_ASSERT_MSG(compatible,
+			"Async compute command context access requires a Compute RenderGraph pass.");
+		return compatible ? m_Backend.m_AsyncComputeCommandContext : nullptr;
+	}
+
+	RHICommandContext* RGExecuteContext::GetCopyCommandContext() const noexcept
+	{
+		const bool compatible =
+			!m_ActiveEncoderType || *m_ActiveEncoderType == RGPassEncoderType::Copy;
+		GGLAB_ASSERT_MSG(
+			compatible, "Copy command context access requires a Copy RenderGraph pass.");
+		return compatible ? m_Backend.m_GraphicsCommandContext : nullptr;
+	}
+
+	void RGExecutor::Execute(const RGExecutionPlan& plan, const RGExecutorRuntime& runtime,
+		RGExecuteContext& executeContext) noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(runtime.m_Device);
+		GGLAB_ASSERT_NOT_NULL(runtime.m_TransientResourcePool);
+		GGLAB_ASSERT_NOT_NULL(runtime.m_RetireTextures);
+		GGLAB_ASSERT_NOT_NULL(runtime.m_RetireBuffers);
+		if (!runtime.m_Device || !runtime.m_TransientResourcePool ||
+			!runtime.m_RetireTextures || !runtime.m_RetireBuffers)
+		{
+			return;
+		}
+
+		const RGExecutionPlan* previousPlan = executeContext.m_ExecutionPlan;
+		RHIDevice* previousDevice = executeContext.m_Device;
+		executeContext.m_ExecutionPlan = &plan;
+		executeContext.m_Device = runtime.m_Device;
+
+		for (const auto passIndex : plan.GetExecutionOrder())
+		{
+			const auto& pass = plan.GetPasses()[passIndex.Value()];
+			const auto previousEncoderType = executeContext.m_ActiveEncoderType;
+			executeContext.m_ActiveEncoderType = pass.m_EncoderType;
+			RHICommandContext* passCommandContext =
+				SelectPassCommandContext(executeContext.m_Backend, pass.m_EncoderType);
+			GGLAB_ASSERT_MSG(passCommandContext,
+				"RenderGraph pass requires an available command context for its encoder type.");
+			const std::string_view passName = pass.m_NameId.Name();
+			if (passCommandContext)
+			{
+				passCommandContext->BeginGpuProfileScope(passName);
+			}
+			for (const auto resourceIndex : pass.m_AcquireResources)
+			{
+				const auto& resource = plan.GetResources()[resourceIndex.Value()];
+				resource.m_Resource->Devirtualize(
+					runtime.m_TransientResourcePool, resource.m_UsageBits);
+			}
+
+			TrackPassResourceUses(passCommandContext, plan, pass);
+			EmitBarriers(passCommandContext, plan, pass.m_PreBarriers);
+			if (pass.m_Executor)
+			{
+				pass.m_Executor->Execute(executeContext);
+			}
+			if (pass.m_EncoderType == RGPassEncoderType::Graphics)
+			{
+				// Passes may close scopes explicitly to encode multiple scopes. RenderGraph owns
+				// closure of only the final active scope before the pass boundary barriers.
+				auto* graphicsContext = executeContext.m_Backend.m_GraphicsCommandContext;
+				if (graphicsContext && graphicsContext->IsRendering())
+				{
+					graphicsContext->EndRendering();
+				}
+			}
+			EmitBarriers(passCommandContext, plan, pass.m_PostBarriers);
+			if (passCommandContext)
+			{
+				passCommandContext->EndGpuProfileScope();
+			}
+
+			for (const auto resourceIndex : pass.m_ReleaseResources)
+			{
+				plan.GetResources()[resourceIndex.Value()].m_Resource->Release(
+					*runtime.m_RetireTextures, *runtime.m_RetireBuffers);
+			}
+			executeContext.m_ActiveEncoderType = previousEncoderType;
+		}
+
+		executeContext.m_ExecutionPlan = previousPlan;
+		executeContext.m_Device = previousDevice;
+	}
+}

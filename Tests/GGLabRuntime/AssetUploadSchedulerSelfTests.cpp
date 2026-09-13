@@ -1,16 +1,16 @@
 #include "AssetUploadSchedulerSelfTests.h"
 
-#include "Graphics/Asset/Streaming/AssetUploadScheduler.h"
-#include "Graphics/RHI/RHIBuffer.h"
-#include "Graphics/RHI/RHICommandContext.h"
-#include "Graphics/RHI/RHIDescriptor.h"
-#include "Graphics/RHI/RHIDevice.h"
-#include "Graphics/RHI/RHIFence.h"
-#include "Graphics/RHI/RHISampler.h"
-#include "Graphics/RHI/RHITexture.h"
-#include "Graphics/RHI/RHITransferContext.h"
-#include "Graphics/RHI/RHITypes.h"
-#include "Graphics/TransferManager.h"
+#include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
+#include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "GGLabRuntime/Graphics/RHI/RHISampler.h"
+#include "GGLabRuntime/Graphics/RHI/RHITexture.h"
+#include "GGLabRuntime/Graphics/RHI/RHITransferContext.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -273,7 +273,7 @@ namespace gglab
 			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
 			TransferManager transferManager(std::move(transferContext));
 			NapaVoxelPublicationTestDevice device;
-			AssetUploadScheduler scheduler({
+			AssetUploadSchedulerInstance scheduler = CreateAssetUploadScheduler({
 				.m_Device = &device,
 				.m_TransferManager = &transferManager,
 				});
@@ -286,8 +286,8 @@ namespace gglab
 
 			std::thread worker([&]()
 				{
-					workerSawOwner = scheduler.IsOwnerThread();
-					scheduler.EnqueueCpuPayload({
+					workerSawOwner = scheduler.m_Scheduling->IsOwnerThread();
+					scheduler.m_Scheduling->EnqueueCpuPayload({
 						.m_Name = "Worker immutable payload handoff",
 						.m_Identity = {
 							.m_Kind = AssetStreamingWorkKind::Texture,
@@ -300,7 +300,7 @@ namespace gglab
 						{
 							cpuCallbackRan = true;
 							cpuCallbackThreadId = std::this_thread::get_id();
-							scheduler.EnqueueUploadRecording({
+							scheduler.m_Scheduling->EnqueueUploadRecording({
 								.m_Name = "Owner upload promotion",
 								.m_Identity = {
 									.m_Kind = AssetStreamingWorkKind::Texture,
@@ -319,8 +319,8 @@ namespace gglab
 
 			context.Check(!workerSawOwner && !cpuCallbackRan && !uploadCallbackRan,
 				"Worker enqueue hands off immutable payload without executing owner work inline");
-			scheduler.DrainReadyWork();
-			const AssetUploadStatistics statistics = scheduler.GetStatistics();
+			scheduler.m_Scheduling->DrainReadyWork();
+			const AssetUploadStatistics statistics = scheduler.m_Scheduling->GetStatistics();
 			context.Check(cpuCallbackRan && uploadCallbackRan &&
 				cpuCallbackThreadId == ownerThreadId && uploadCallbackThreadId == ownerThreadId &&
 				statistics.m_CpuPayloadQueue.m_EnqueuedCount == 1 &&
@@ -328,7 +328,7 @@ namespace gglab
 				statistics.m_UploadRecordingQueue.m_EnqueuedCount == 1 &&
 				statistics.m_UploadRecordingQueue.m_ProcessedCount == 1,
 				"Scheduler drains worker handoff and every publication/upload callback on its owner thread");
-			scheduler.Finalize();
+			scheduler.m_Scheduling->Finalize();
 		}
 
 	}

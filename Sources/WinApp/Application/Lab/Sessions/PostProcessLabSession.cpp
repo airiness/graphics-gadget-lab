@@ -1,10 +1,9 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
-#include "Core/Math/Quaternion.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
-#include "Scene/Components.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
 {
@@ -28,7 +27,7 @@ namespace gglab
 	}
 
 	PostProcessLabSession::PostProcessLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -223,7 +222,7 @@ namespace gglab
 		floorMaterial.m_Properties.m_MetallicFactor = 0.15f;
 		GGLAB_UNUSED(primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = floorTransform,
 			.m_MaterialInstance = floorMaterial,
@@ -258,7 +257,7 @@ namespace gglab
 			material.m_Properties.m_RoughnessFactor = 0.25f;
 			const entt::entity emitter = primitive::Sphere::Create({
 				.m_AssetManager = m_Services.m_AssetManager,
-				.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+				.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 				.m_World = &m_World,
 				.m_Transform = transform,
 				.m_MaterialInstance = material,

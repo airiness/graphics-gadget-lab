@@ -1,13 +1,12 @@
 #include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Core/Math/Quaternion.h"
-#include "Core/Math/Transform.h"
-#include "Scene/Components.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/Camera.h"
-#include "Graphics/Geometry.h"
-#include "Graphics/DebugDraw/DebugDraw.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Transform.h"
+#include "GGLabRuntime/Scene/Components.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 
 namespace gglab
 {
@@ -98,14 +97,13 @@ namespace gglab
 
 	void CullingLabSession::OnExit() noexcept
 	{
-		if (auto* debugDraw = m_Services.m_DebugDraw)
-		{
-			debugDraw->ClearChannel(DebugDrawShapeChannel);
-		}
+		auto* debugDraw = m_Services.m_DebugDraw;
+		GGLAB_ASSERT_NOT_NULL(debugDraw);
+		debugDraw->ClearChannel(DebugDrawShapeChannel);
 	}
 
 	CullingLabSession::CullingLabSession(const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, std::make_unique<RenderPipelineForwardPBR>())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -341,7 +339,7 @@ namespace gglab
 		materialInstance.m_Key = RuntimeMaterialKey("gglab.lab.culling.material.cube");
 		GGLAB_UNUSED(primitive::Cube::Create({
 			.m_AssetManager = m_Services.m_AssetManager,
-			.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 			.m_World = &m_World,
 			.m_Transform = modelTransform,
 			.m_MaterialInstance = materialInstance,
@@ -367,7 +365,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(primitive::Cube::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 					.m_World = &m_World,
 					.m_Transform = candidateTransform,
 					.m_MaterialInstance = materialInstance,
@@ -377,7 +375,7 @@ namespace gglab
 			{
 				GGLAB_UNUSED(primitive::Sphere::Create({
 					.m_AssetManager = m_Services.m_AssetManager,
-					.m_SamplerRegistry = m_Services.m_Renderer->GetSamplerRegistry(),
+					.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers,
 					.m_World = &m_World,
 					.m_Transform = candidateTransform,
 					.m_MaterialInstance = materialInstance,

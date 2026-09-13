@@ -4,7 +4,7 @@
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
 namespace gglab
 {

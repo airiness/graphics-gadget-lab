@@ -1,0 +1,37 @@
+#pragma once
+#include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+
+namespace gglab
+{
+
+	class RenderPassFinalColor final : public RenderPassBase
+	{
+	public:
+		RenderPassFinalColor() noexcept :
+			RenderPassBase({
+				  .m_TypeName = "PostProcess.FinalColor",
+				  .m_DisplayName = "Final Color",
+				  .m_CategoryName = "PostProcess",
+				  .m_Description = "Applies the final color transform to the presentation target.",
+				  .m_Category = RenderPassCategory::PostProcess,
+				  .m_Type = RenderPassType::Graphics,
+				})
+		{
+		}
+		~RenderPassFinalColor() override = default;
+
+		void AddPass(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services) noexcept override;
+
+	private:
+		void EnsureInitialized(const RenderServices& services) noexcept;
+
+		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
+
+	private:
+		GraphicsPhysicalPipelineKey m_BaseRecipe{};
+		GraphicsPipelineSlot m_PipelineSlot{};
+		bool m_IsInitialized = false;
+	};
+}

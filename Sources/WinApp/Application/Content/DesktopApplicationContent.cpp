@@ -21,7 +21,7 @@
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "Application/Shader/ShaderPreviewRuntimeSession.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "Lab/LabRuntime.h"
 
 #include <memory>

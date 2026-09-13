@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <chrono>
@@ -14,7 +14,7 @@
 
 namespace gglab
 {
-	class Renderer;
+	class RenderTemporalAccess;
 	class ShaderManager;
 	class TaskSystem;
 
@@ -68,7 +68,7 @@ namespace gglab
 			DevelopmentShaderBuildRequest m_BuildRequest{};
 			TaskSystem* m_TaskSystem = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
-			Renderer* m_Renderer = nullptr;
+			RenderTemporalAccess* m_RenderTemporal = nullptr;
 		};
 
 		explicit DevelopmentShaderHotReloadSystem(CreateInfo createInfo) noexcept;
@@ -92,7 +92,7 @@ namespace gglab
 		DevelopmentShaderBuildRequest m_BuildRequest{};
 		TaskSystem* m_TaskSystem = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
-		Renderer* m_Renderer = nullptr;
+		RenderTemporalAccess* m_RenderTemporal = nullptr;
 		ShaderID m_TemporalAAResolveShader{};
 		std::shared_ptr<BuildJob> m_BuildJob{};
 		TaskHandle m_BuildTask{};

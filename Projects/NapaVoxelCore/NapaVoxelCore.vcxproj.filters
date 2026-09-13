@@ -1,170 +1,198 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Edit">
-      <UniqueIdentifier>{B73BCC63-382C-8946-E3E3-67627A26B400}</UniqueIdentifier>
+    <Filter Include="Private">
+      <UniqueIdentifier>{1ABBF684-E31D-424B-2053-A377A076276B}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Field">
-      <UniqueIdentifier>{3075B895-CE63-1621-DD63-0961A5105361}</UniqueIdentifier>
+    <Filter Include="Private\Edit">
+      <UniqueIdentifier>{766D449E-0C08-C0C6-FB23-633ECE9C0BA0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Hash">
-      <UniqueIdentifier>{CB608ADB-E02E-AE71-D979-E74B4D78BC3A}</UniqueIdentifier>
+    <Filter Include="Private\Field">
+      <UniqueIdentifier>{AB5EEB2C-A723-F201-11CD-465D8311FF0C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Math">
-      <UniqueIdentifier>{ABBAAF69-F6D4-6BDD-4CFD-AAE41E9982AB}</UniqueIdentifier>
+    <Filter Include="Private\Hash">
+      <UniqueIdentifier>{EEE80EA0-B1D5-C2CB-B86B-203CEB64BFFE}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Meshing">
-      <UniqueIdentifier>{A0115B93-1EE6-C2E1-1D9A-AFB46C3F7F77}</UniqueIdentifier>
+    <Filter Include="Private\Meshing">
+      <UniqueIdentifier>{7A53E548-B8B1-2EFF-138A-3C4970658D0F}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Validation">
-      <UniqueIdentifier>{A1E1E70A-B709-8474-B7C5-0E887A40AA4B}</UniqueIdentifier>
+    <Filter Include="Private\World">
+      <UniqueIdentifier>{759FB127-3D23-49B3-0315-9ED4477923D0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="World">
-      <UniqueIdentifier>{1BB87F78-DA23-77F4-C83C-68C6A94EFE8A}</UniqueIdentifier>
+    <Filter Include="Public">
+      <UniqueIdentifier>{4426D7A2-D663-852B-1279-7BBD870F42CA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore">
+      <UniqueIdentifier>{3FAC031A-7BB6-AF7D-B034-5C6DD7EDF39A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Edit">
+      <UniqueIdentifier>{161E0ABF-FDF8-D45A-1E77-E1B648084D0F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Field">
+      <UniqueIdentifier>{F8D3A1E8-2AB9-AF3D-D339-7029DE90185C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Hash">
+      <UniqueIdentifier>{82987905-66C6-B151-F6AC-B313AB0A732E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Math">
+      <UniqueIdentifier>{ED4EDE00-9B9D-24C8-F8C0-649C9B3085C1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Meshing">
+      <UniqueIdentifier>{5F522791-D304-FE7B-6F82-85FB450B8B9A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\Validation">
+      <UniqueIdentifier>{7839D886-8596-26D3-987A-DA0E83EDFBC5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\NapaVoxelCore\World">
+      <UniqueIdentifier>{89782F6C-5711-B010-FB8F-F85336E80AC7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\BuildContract.cpp" />
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.cpp">
-      <Filter>Edit</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\BuildContract.cpp">
+      <Filter>Private</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.cpp">
-      <Filter>Edit</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\SphereEdit.cpp">
+      <Filter>Private\Edit</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.cpp">
-      <Filter>Edit</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelDamage.cpp">
+      <Filter>Private\Edit</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Edit\VoxelRestore.cpp">
-      <Filter>Edit</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelMutation.cpp">
+      <Filter>Private\Edit</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.cpp">
-      <Filter>Field</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Edit\VoxelRestore.cpp">
+      <Filter>Private\Edit</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Field\Primitive.cpp">
-      <Filter>Field</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Field\DensityQuantization.cpp">
+      <Filter>Private\Field</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.cpp">
-      <Filter>Hash</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Field\Primitive.cpp">
+      <Filter>Private\Field</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.cpp">
-      <Filter>Hash</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Hash\CanonicalHash.cpp">
+      <Filter>Private\Hash</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Hash\VoxelWorldHash.cpp">
+      <Filter>Private\Hash</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\BoundaryContour.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\CpuMeshBatch.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\DataOnlyPublication.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\MeshValidation.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.cpp">
-      <Filter>Meshing</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\ReferenceMesher.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\Coordinates.cpp">
-      <Filter>World</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\Meshing\WorldMeshHash.cpp">
+      <Filter>Private\Meshing</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.cpp">
-      <Filter>World</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\Coordinates.cpp">
+      <Filter>Private\World</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.cpp">
-      <Filter>World</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelChunk.cpp">
+      <Filter>Private\World</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.cpp">
-      <Filter>World</Filter>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelWorld.cpp">
+      <Filter>Private\World</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\NapaVoxelCore\Private\World\VoxelWorldConfig.cpp">
+      <Filter>Private\World</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\BuildContract.h" />
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\SphereEdit.h">
-      <Filter>Edit</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Private\Field\SignedDistance.h">
+      <Filter>Private\Field</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelDamage.h">
-      <Filter>Edit</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Private\Hash\CanonicalVoxelSerialization.h">
+      <Filter>Private\Hash</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelMutation.h">
-      <Filter>Edit</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\BuildContract.h">
+      <Filter>Public\NapaVoxelCore</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Edit\VoxelOperationDetail.h">
-      <Filter>Edit</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\SphereEdit.h">
+      <Filter>Public\NapaVoxelCore\Edit</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\DensityQuantization.h">
-      <Filter>Field</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelDamage.h">
+      <Filter>Public\NapaVoxelCore\Edit</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\Primitive.h">
-      <Filter>Field</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelMutation.h">
+      <Filter>Public\NapaVoxelCore\Edit</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Field\SignedDistance.h">
-      <Filter>Field</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Edit\VoxelOperationDetail.h">
+      <Filter>Public\NapaVoxelCore\Edit</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalHash.h">
-      <Filter>Hash</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Field\DensityQuantization.h">
+      <Filter>Public\NapaVoxelCore\Field</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\CanonicalVoxelSerialization.h">
-      <Filter>Hash</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Field\Primitive.h">
+      <Filter>Public\NapaVoxelCore\Field</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Hash\VoxelWorldHash.h">
-      <Filter>Hash</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Hash\CanonicalHash.h">
+      <Filter>Public\NapaVoxelCore\Hash</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Math\Vector.h">
-      <Filter>Math</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Hash\VoxelWorldHash.h">
+      <Filter>Public\NapaVoxelCore\Hash</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\BoundaryContour.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Math\Vector.h">
+      <Filter>Public\NapaVoxelCore\Math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ChunkMeshRecord.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\BoundaryContour.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\CpuMeshBatch.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\ChunkMeshRecord.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublication.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\CpuMeshBatch.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\DataOnlyPublicationDetail.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\DataOnlyPublication.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshData.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\DataOnlyPublicationDetail.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\MeshValidation.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\MeshData.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\ReferenceMesher.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\MeshValidation.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Meshing\WorldMeshHash.h">
-      <Filter>Meshing</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\ReferenceMesher.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\CheckedArithmetic.h">
-      <Filter>Validation</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Meshing\WorldMeshHash.h">
+      <Filter>Public\NapaVoxelCore\Meshing</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\Validation\ValidationResult.h">
-      <Filter>Validation</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Validation\CheckedArithmetic.h">
+      <Filter>Public\NapaVoxelCore\Validation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\Coordinates.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\Validation\ValidationResult.h">
+      <Filter>Public\NapaVoxelCore\Validation</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelChunk.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\Coordinates.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelRestore.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelChunk.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelSample.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelRestore.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorld.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelSample.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\NapaVoxelCore\World\VoxelWorldConfig.h">
-      <Filter>World</Filter>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelWorld.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\NapaVoxelCore\Public\NapaVoxelCore\World\VoxelWorldConfig.h">
+      <Filter>Public\NapaVoxelCore\World</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

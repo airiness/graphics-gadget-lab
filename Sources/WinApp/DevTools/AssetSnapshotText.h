@@ -1,5 +1,5 @@
 #pragma once
-#include "Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
 
 namespace gglab::devtools
 {

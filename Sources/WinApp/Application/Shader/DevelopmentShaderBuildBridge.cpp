@@ -2,9 +2,9 @@
 #include "Application/Shader/DevelopmentShaderBuildProcessClient.h"
 #include "AppRuntimeLog.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
-#include "Graphics/Renderer.h"
-#include "Graphics/Shader/ShaderManager.h"
-#include "Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 
 #include <algorithm>
@@ -102,7 +102,7 @@ namespace gglab
 		m_BuildRequest(std::move(createInfo.m_BuildRequest)),
 		m_TaskSystem(createInfo.m_TaskSystem),
 		m_ShaderManager(createInfo.m_ShaderManager),
-		m_Renderer(createInfo.m_Renderer)
+		m_RenderTemporal(createInfo.m_RenderTemporal)
 	{
 	}
 
@@ -117,7 +117,7 @@ namespace gglab
 		{
 			return true;
 		}
-		if (!m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager || !m_Renderer)
+		if (!m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager || !m_RenderTemporal)
 		{
 			return false;
 		}
@@ -298,7 +298,7 @@ namespace gglab
 			if (activation.m_Status == ShaderRegistryActivationStatus::Activated &&
 				temporalAAGenerationAfter != temporalAAGenerationBefore)
 			{
-				m_Renderer->InvalidateTemporalHistoryAfterResolveProgramChange();
+				m_RenderTemporal->InvalidateTemporalHistoryAfterResolveProgramChange();
 			}
 			GGLAB_LOG_INFO("Activated development shader registry (changedShaders={}).",
 				activation.m_ChangedShaderCount);

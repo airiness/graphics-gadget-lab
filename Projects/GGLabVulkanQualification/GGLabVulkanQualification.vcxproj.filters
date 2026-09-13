@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{5C045696-133F-5589-28A8-64F4D54B7083}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Windows">
+      <UniqueIdentifier>{B13B6FAD-663A-B5AE-EDC4-85B89AA0CAC5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SelfTest">
+      <UniqueIdentifier>{908CA9E0-1A41-F534-604B-FB2E3EC5AD8E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\Main.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\Platform\Windows\Win32QualificationHost.cpp">
+      <Filter>Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\QualificationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\SelfTest\SelfTestRunner.cpp">
+      <Filter>SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\SelfTest\VulkanQualificationSelfTests.cpp">
+      <Filter>SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabVulkanQualification\VulkanQualification.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\Platform\Windows\Win32QualificationHost.h">
+      <Filter>Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\QualificationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\SelfTest\SelfTestRunner.h">
+      <Filter>SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\SelfTest\VulkanQualificationSelfTests.h">
+      <Filter>SelfTest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabVulkanQualification\VulkanQualification.h" />
+  </ItemGroup>
+</Project>

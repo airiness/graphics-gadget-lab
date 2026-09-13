@@ -1,0 +1,57 @@
+#pragma once
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabFoundation/Platform/Win/ComTypes.h"
+
+#include <D3D12MemAlloc.h>
+#include <cstdint>
+#include <optional>
+
+#include <d3dx12.h>
+
+namespace gglab
+{
+	class DX12Device;
+	class DX12Resource
+	{
+	public:
+		struct CreateInfo
+		{
+			D3D12MA::Allocator* m_Allocator = nullptr;
+			D3D12MA::ALLOCATION_DESC m_AllocDesc = {};
+			CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
+			D3D12_RESOURCE_STATES m_InitStates = D3D12_RESOURCE_STATE_COMMON;
+			std::optional<D3D12_BARRIER_LAYOUT> m_EnhancedInitialLayout = std::nullopt;
+			std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
+		};
+
+	public:
+		DX12Resource() noexcept = default;
+		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12Resource);
+		virtual ~DX12Resource() = default;
+
+		void Create(const CreateInfo& createInfo) noexcept;
+
+		ID3D12Resource* Get() const noexcept;
+		D3D12_RESOURCE_DESC GetDesc() const noexcept;
+		D3D12_RESOURCE_STATES GetState() const noexcept;
+
+		void AdoptExternal(
+			ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES initStates) noexcept;
+		void Release() noexcept;
+		void SetDebugName(const wchar_t* name) noexcept;
+
+		bool IsValid() const noexcept;
+		bool IsExternal() const noexcept;
+		bool OwnsAllocation() const noexcept;
+
+		const D3D12_CLEAR_VALUE* GetClearValue() const noexcept;
+
+	protected:
+		D3D12MA::Allocator* m_Allocator = nullptr;
+		CD3DX12_RESOURCE_DESC m_ResourceDesc = {};
+		D3D12_RESOURCE_STATES m_ResourceState = D3D12_RESOURCE_STATE_COMMON;
+		std::optional<D3D12_CLEAR_VALUE> m_ClearValue = std::nullopt;
+		ComPtr<D3D12MA::Allocation> m_Allocation;
+		ComPtr<ID3D12Resource> m_Resource;
+	};
+}

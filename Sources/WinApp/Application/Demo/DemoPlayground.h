@@ -1,11 +1,11 @@
 #pragma once
 #include "Demo/DemoBase.h"
-#include "Core/World.h"
-#include "Graphics/CameraRig.h"
-#include "Graphics/Asset/AssetManager.h"
-#include "Graphics/GraphicsTypes.h"
-#include "Graphics/PostProcess/ViewRenderSettings.h"
-#include "Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
 #include <filesystem>
 #include <vector>

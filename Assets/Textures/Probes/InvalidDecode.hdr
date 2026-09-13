@@ -1,0 +1,4 @@
+# gglab invalid decode probe
+This file is intentionally not a valid Radiance HDR image.
+It exists so the environment acceptance Lab can verify that a failed
+asynchronous texture decode never replaces the active environment.

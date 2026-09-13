@@ -82,9 +82,6 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.h">
       <Filter>Lab</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabPresetSchema.h">
-      <Filter>Lab</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabRunConfig.h">
       <Filter>Lab</Filter>
     </ClInclude>
@@ -92,9 +89,6 @@
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSessionBase.h">
-      <Filter>Lab</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabSnapshot.h">
       <Filter>Lab</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Lab\LabTypes.h">
