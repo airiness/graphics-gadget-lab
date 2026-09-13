@@ -99,20 +99,19 @@ function ConvertTo-RepoRelativePath {
 }
 
 # Runtime candidate directories (portable candidates; private backend leaves included).
-# Migrated Core and Scene files are validated through the Public/Private ownership rules below.
-$candidateDirs = @("Private/Graphics/RHI", "Private/Diagnostics")
+# The migrated Private trees replace the retired legacy Core/Scene/Graphics roots.
+$candidateDirs = @("Private/Core", "Private/Graphics", "Private/Diagnostics")
 
 # Platform / backend leaf allowlists.
 # Permanent leaves are reviewed and need no removal condition.
 $platformLeafPrefixes = @(
-    "Core/Platform/Win", # Windows implementation leaves
-        "Private/Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
+    "Private/Graphics/Asset/DerivedData/Platform/Win", # Local DDC Windows platform leaf
     "Private/Graphics/RHI/DX12"  # DX12 backend leaf (Windows-native by design)
 )
 $platformLeafFiles = @(
     "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.h", # Win32 WSI leaf
     "Private/Graphics/RHI/Vulkan/VulkanWin32Surface.cpp", # Win32 WSI leaf
-    "Graphics/Asset/Loading/TextureLoader.cpp"  # DirectXTex (Windows third-party) consumer
+    "Private/Graphics/Asset/TextureLoader.cpp"  # DirectXTex (Windows third-party) consumer
 )
 
 # Transitional debt: allowed only with an explicit removal condition.
@@ -127,7 +126,7 @@ $knownViolations = @()
 $ownershipIncludeRegex = '#include\s*"(Application|DevTools|Core/Input)/'
 $ownershipSymbolRegex = '\bDevelopGuiSystem\b'
 $platformLeakRegex = 'Windows\.h|GameInput|IGameInput|\bHWND\b|\bHMODULE\b|\bHRESULT\b|CoInitializeEx|SetThreadDescription|MultiByteToWideChar|WideCharToMultiByte|GetModuleFileName|CreateSymbolicLink|GetCurrentProcessId|GetTickCount64|GetExeOutDir|bcrypt\.h'
-$platformLeafIncludeRegex = '#include\s*"(Core/Platform/Win/|GGLabFoundation/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h)'
+$platformLeafIncludeRegex = '#include\s*"(?:Private/)?Core/Platform/Win/|GGLabFoundation/Platform/Win/|Graphics/RHI/Vulkan/VulkanWin32Surface\.h'
 $platformNamespaceRegex = '\bwin32::'
 $platformTypeRegex = '\bVulkanWin32Surface(Factory)?\b'
 
@@ -204,10 +203,98 @@ function Test-RuntimePassServiceViolation {
     return $Content -match $runtimePassServiceRegex
 }
 
+# Runtime asset upload authority regression guard.
+# The production scheduling contract must remain a sibling of the developer/
+# acceptance control authority, so both inheritance directions are rejected.
+$assetUploadAuthorityRegex = `
+    'class\s+AssetUploadScheduling\b[^;{}]*:\s*[^;{}]*\bAssetUploadControl\b|' +
+    'class\s+AssetUploadControl\b[^;{}]*:\s*[^;{}]*\bAssetUploadScheduling\b'
+
+function Test-AssetUploadAuthorityViolation {
+    param([string]$Content)
+
+    return $Content -cmatch $assetUploadAuthorityRegex
+}
+
+# Shared include-path normalization. The helpers fold separator and relative
+# segment spellings before classification so "./Graphics/...", backslash
+# spellings and "Foo/../Graphics/..." cannot bypass a prefix rule.
+$firstPartyIncludeDirectiveRegex = '#\s*include\s*[<"](?<Path>[^>"\r\n]+)[>"]'
+
+function Get-NormalizedIncludePath {
+    param([string]$IncludePath)
+
+    $normalized = $IncludePath.Replace('\', '/')
+    while ($normalized.Contains('/./')) {
+        $normalized = $normalized.Replace('/./', '/')
+    }
+    while ($normalized.StartsWith('./')) {
+        $normalized = $normalized.Substring(2)
+    }
+    while ($true) {
+        $collapsed = [regex]::Replace($normalized, '(?:^|/)[^/]+/\.\./', '')
+        if ($collapsed -eq $normalized) {
+            break
+        }
+        $normalized = $collapsed
+    }
+    return $normalized
+}
+
+function Test-RuntimePrivateIncludeSpelling {
+    param([string]$NormalizedIncludePath)
+
+    return $NormalizedIncludePath -match '^(?:Graphics|Core|Scene|Diagnostics)/' -or
+        $NormalizedIncludePath -match '^(?:\.\./)+(?:Private|Core)/' -or
+        $NormalizedIncludePath -match '^Private/'
+}
+
+# Project include entries are classified by resolution, not by literal spelling:
+# an absolute, relative or differently-separated path into the first-party
+# Sources tree is first-party regardless of how the project file spells it.
+function Resolve-ProjectPathEntry {
+    param(
+        [string]$Entry,
+        [string]$ProjectDirectory
+    )
+
+    # Both repository-root properties expand with a trailing separator.
+    $repositoryRootWithSeparator = $root.TrimEnd('\', '/') + '/'
+    $expanded = $Entry
+    $expanded = $expanded.Replace('$(GGLabRepositoryRoot)', $repositoryRootWithSeparator)
+    $expanded = $expanded.Replace('$(NapaVoxelRepositoryRoot)', $repositoryRootWithSeparator)
+    $expanded = $expanded.Replace('\', '/')
+    if ([string]::IsNullOrWhiteSpace($expanded)) {
+        return ""
+    }
+    if (-not [System.IO.Path]::IsPathRooted($expanded)) {
+        $expanded = $ProjectDirectory.Replace('\', '/').TrimEnd('/') + '/' + $expanded
+    }
+    return [System.IO.Path]::GetFullPath($expanded)
+}
+
+function Test-IsUnexpectedFirstPartyIncludeRoot {
+    param(
+        [string]$Entry,
+        [string]$ProjectDirectory,
+        [string[]]$ResolvedAllowedRoots
+    )
+
+    $resolved = Resolve-ProjectPathEntry -Entry $Entry -ProjectDirectory $ProjectDirectory
+    if ([string]::IsNullOrWhiteSpace($resolved) -or
+        -not (Test-IsPathUnderRoot $resolved $repositorySourcesDir)) {
+        return $false
+    }
+    return $ResolvedAllowedRoots -notcontains $resolved
+}
+
 function Invoke-BoundaryRuleSelfTests {
     # Synthetic fixtures for rules that the current repository cannot exercise:
     # without a deliberate violation the rule would keep reporting PASS even if
     # its scope silently went dead during a physical-path migration.
+    $failures = @()
+    $checkCount = 0
+
     $passServiceCases = @(
         @{
             Name     = "private pass includes the concrete renderer"
@@ -264,24 +351,169 @@ function Invoke-BoundaryRuleSelfTests {
             Expected = $false
         }
     )
-
-    $failures = @()
     foreach ($case in $passServiceCases) {
         $actual = Test-RuntimePassServiceViolation -RelativePath $case.Path -Content $case.Content
+        ++$checkCount
         if ($actual -ne $case.Expected) {
             $failures += ("{0} (expected {1}, got {2})" -f
                 $case.Name, $case.Expected, $actual)
         }
     }
+
+    $assetUploadCases = @(
+        @{
+            Name     = "single-line control inheritance"
+            Content  = 'class AssetUploadScheduling : public AssetUploadControl'
+            Expected = $true
+        },
+        @{
+            Name     = "qualified and final control inheritance"
+            Content  = 'class AssetUploadScheduling final : public gglab::AssetUploadControl'
+            Expected = $true
+        },
+        @{
+            Name     = "multiline control inheritance"
+            Content  = "class AssetUploadScheduling :`r`n    public AssetUploadControl`r`n{"
+            Expected = $true
+        },
+        @{
+            Name     = "scheduling inherited from the control side"
+            Content  = 'class AssetUploadControl : public AssetUploadScheduling'
+            Expected = $true
+        },
+        @{
+            Name     = "sibling declarations stay allowed"
+            Content  = "class AssetUploadScheduling`r`n{`r`n};`r`nclass AssetUploadControl`r`n{`r`n};"
+            Expected = $false
+        },
+        @{
+            Name     = "forward declarations stay allowed"
+            Content  = "class AssetUploadControl;`r`nclass AssetUploadScheduling;"
+            Expected = $false
+        }
+    )
+    foreach ($case in $assetUploadCases) {
+        $actual = Test-AssetUploadAuthorityViolation -Content $case.Content
+        ++$checkCount
+        if ($actual -ne $case.Expected) {
+            $failures += ("{0} (expected {1}, got {2})" -f
+                $case.Name, $case.Expected, $actual)
+        }
+    }
+
+    $allowedPublicRoot = Resolve-ProjectPathEntry `
+        -Entry '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public' -ProjectDirectory $root
+    $includeRootCases = @(
+        @{
+            Name     = "canonical private root is first-party"
+            Entry    = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private'
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $true
+        },
+        @{
+            Name     = "forward-slash private root is first-party"
+            Entry    = '$(GGLabRepositoryRoot)/Sources/GGLabRuntime/Private'
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $true
+        },
+        @{
+            Name     = "absolute private root is first-party"
+            Entry    = (Join-Path $repositorySourcesDir 'GGLabRuntime/Private')
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $true
+        },
+        @{
+            Name     = "relative traversal into the private root is first-party"
+            Entry    = '..\..\Sources\GGLabRuntime\Private'
+            Project  = (Join-Path $root 'Projects/WinApp')
+            Allowed  = @($allowedPublicRoot)
+            Expected = $true
+        },
+        @{
+            Name     = "allowed public root stays allowed"
+            Entry    = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public'
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $false
+        },
+        @{
+            Name     = "unresolved macro stays unclassified"
+            Entry    = '$(SolutionDir)Sources\GGLabRuntime\Private'
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $false
+        }
+    )
+    foreach ($case in $includeRootCases) {
+        $actual = Test-IsUnexpectedFirstPartyIncludeRoot -Entry $case.Entry `
+            -ProjectDirectory $case.Project -ResolvedAllowedRoots $case.Allowed
+        ++$checkCount
+        if ($actual -ne $case.Expected) {
+            $failures += ("{0} (expected {1}, got {2})" -f
+                $case.Name, $case.Expected, $actual)
+        }
+    }
+
+    $privateIncludeCases = @(
+        @{
+            Name     = "direct private include spelling"
+            Content  = '#include "Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "dot-prefixed private include spelling"
+            Content  = '#include "./Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "relative folded private include spelling"
+            Content  = '#include "Foo/../Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "parent private include spelling"
+            Content  = '#include "../Private/Graphics/Renderer.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "spaced include directive is recognized"
+            Content  = '# include "Graphics/RHI/DX12/DX12Context.h"'
+            Expected = $true
+        },
+        @{
+            Name     = "angle include directive is recognized"
+            Content  = '#include <Graphics/RHI/Vulkan/VulkanContext.h>'
+            Expected = $true
+        },
+        @{
+            Name     = "public logical include stays allowed"
+            Content  = '#include "GGLabRuntime/Graphics/RHI/RHIContext.h"'
+            Expected = $false
+        }
+    )
+    foreach ($case in $privateIncludeCases) {
+        $match = [regex]::Match($case.Content, $firstPartyIncludeDirectiveRegex)
+        $actual = $match.Success -and (Test-RuntimePrivateIncludeSpelling `
+            (Get-NormalizedIncludePath $match.Groups["Path"].Value))
+        ++$checkCount
+        if ($actual -ne $case.Expected) {
+            $failures += ("{0} (expected {1}, got {2})" -f
+                $case.Name, $case.Expected, $actual)
+        }
+    }
+
     if ($failures.Count -gt 0) {
-        Write-Host "SELF-TEST FAIL - pass-service boundary rule:"
+        Write-Host "SELF-TEST FAIL - boundary rule predicates:"
         foreach ($failure in $failures) {
             Write-Host ("  {0}" -f $failure)
         }
         exit 1
     }
 
-    Write-Host "SELF-TEST PASS - boundary rule predicates ($($passServiceCases.Count) checks)."
+    Write-Host "SELF-TEST PASS - boundary rule predicates ($checkCount checks)."
     exit 0
 }
 
@@ -753,6 +985,11 @@ function Test-ProjectIncludeVisibility {
         [array]$AllowedFirstPartyRoots
     )
 
+    $projectDirectory = Join-Path $root (Split-Path -Parent $ProjectPath)
+    $resolvedAllowedRoots = @($AllowedFirstPartyRoots | ForEach-Object {
+            Resolve-ProjectPathEntry -Entry $_ -ProjectDirectory $projectDirectory
+        })
+
     $includeDirectoryNodes = @(
         $Project.SelectNodes(
             "//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalIncludeDirectories",
@@ -791,17 +1028,59 @@ function Test-ProjectIncludeVisibility {
         }
 
         foreach ($includeRoot in $includeRoots) {
-            $isFirstPartySourceRoot =
-                $includeRoot.StartsWith('$(GGLabRepositoryRoot)Sources',
-                    [System.StringComparison]::OrdinalIgnoreCase) -or
-                $includeRoot.StartsWith('$(NapaVoxelRepositoryRoot)Sources',
-                    [System.StringComparison]::OrdinalIgnoreCase)
-            if ($isFirstPartySourceRoot -and
-                $AllowedFirstPartyRoots -notcontains $includeRoot) {
+            if (Test-IsUnexpectedFirstPartyIncludeRoot -Entry $includeRoot `
+                -ProjectDirectory $projectDirectory `
+                -ResolvedAllowedRoots $resolvedAllowedRoots) {
                 $projectContractFindings.Add([pscustomobject]@{
                     Rule   = "include-visibility"
                     Target = $target
                     Reason = "unexpected first-party include root: $includeRoot"
+                })
+            }
+        }
+    }
+
+    # Forced includes and explicit /I options can bypass the include-directory
+    # contract, so they are classified through the same resolution.
+    $forcedIncludeNodes = @(
+        $Project.SelectNodes(
+            "//msb:ItemDefinitionGroup/msb:ClCompile/msb:ForcedIncludeFiles",
+            $Namespace)
+    )
+    foreach ($forcedIncludeNode in $forcedIncludeNodes) {
+        foreach ($entry in ([string]$forcedIncludeNode.InnerText).Split(';')) {
+            $trimmedEntry = $entry.Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmedEntry)) {
+                continue
+            }
+            $resolvedEntry = Resolve-ProjectPathEntry -Entry $trimmedEntry `
+                -ProjectDirectory $projectDirectory
+            if (Test-IsPathUnderRoot $resolvedEntry $runtimePrivateDir) {
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "include-visibility"
+                    Target = $ProjectPath
+                    Reason = "forced include must not inject Runtime Private implementation: $trimmedEntry"
+                })
+            }
+        }
+    }
+
+    $additionalOptionNodes = @(
+        $Project.SelectNodes(
+            "//msb:ItemDefinitionGroup/msb:ClCompile/msb:AdditionalOptions",
+            $Namespace)
+    )
+    foreach ($optionsNode in $additionalOptionNodes) {
+        foreach ($match in [regex]::Matches([string]$optionsNode.InnerText,
+                '/(?:external:)?I\s*(?<Path>"[^"]+"|[^;\s"]+)')) {
+            $optionPath = $match.Groups["Path"].Value.Trim('"')
+            if (Test-IsUnexpectedFirstPartyIncludeRoot -Entry $optionPath `
+                -ProjectDirectory $projectDirectory `
+                -ResolvedAllowedRoots $resolvedAllowedRoots) {
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "include-visibility"
+                    Target = $ProjectPath
+                    Reason = "unexpected first-party include root from AdditionalOptions: $optionPath"
                 })
             }
         }
@@ -2670,11 +2949,14 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($app
 
 # Private visibility is reserved for Runtime and explicitly privileged tests.
 # Qualification and shader integration may directly inspect RHI implementation,
-# but may not use that include root to reach unrelated Runtime internals.
+# but may not use that include root to reach unrelated Runtime internals. An
+# allowance that no source item actually uses is reported as stale so the
+# classified access list cannot silently accumulate dead privilege.
 function Test-RuntimePrivateImports {
     param(
         [string[]]$SourceItems,
-        [string[]]$AllowedPrivatePaths = @()
+        [string[]]$AllowedPrivatePaths = @(),
+        [System.Collections.Generic.HashSet[string]]$UsedAllowedPaths = $null
     )
 
     foreach ($itemPath in $SourceItems) {
@@ -2682,7 +2964,7 @@ function Test-RuntimePrivateImports {
             continue
         }
         $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
-        foreach ($match in [regex]::Matches($content, '#include\s*[<"](?<Path>[^>"\r\n]+)[>"]')) {
+        foreach ($match in [regex]::Matches($content, $firstPartyIncludeDirectiveRegex)) {
             $includePath = $match.Groups["Path"].Value.Replace('/', '\')
             $resolvedPaths = if ([System.IO.Path]::IsPathRooted($includePath)) {
                 @([System.IO.Path]::GetFullPath($includePath))
@@ -2701,6 +2983,9 @@ function Test-RuntimePrivateImports {
                     if ((Test-IsPathUnderRoot $resolvedPath $allowedPath) -or
                         ($resolvedPath -ieq [System.IO.Path]::GetFullPath($allowedPath))) {
                         $isClassifiedAccess = $true
+                        if ($null -ne $UsedAllowedPaths) {
+                            [void]$UsedAllowedPaths.Add($allowedPath)
+                        }
                         break
                     }
                 }
@@ -2718,13 +3003,51 @@ function Test-RuntimePrivateImports {
     }
 }
 
-Test-RuntimePrivateImports (@($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems))
-Test-RuntimePrivateImports (@($vulkanQualificationSourceItems) + @($shaderRuntimeIntegrationTestsSourceItems)) `
-    @(
-        (Join-Path $runtimePrivateDir "Graphics/RHI"),
-        (Join-Path $runtimePrivateDir "Graphics/Asset/BuiltinTextureFactory.h"),
-        (Join-Path $runtimePrivateDir "Graphics/Asset/IBLStageArtifact.h")
-    )
+Test-RuntimePrivateImports `
+    -SourceItems (@($winAppSourceItems) + @($appRuntimeSourceItems) + @($appRuntimeTestsSourceItems))
+
+$vulkanQualificationAllowedPrivatePaths = @(
+    (Join-Path $runtimePrivateDir "Graphics/RHI"),
+    (Join-Path $runtimePrivateDir "Graphics/Asset/BuiltinTextureFactory.h"),
+    (Join-Path $runtimePrivateDir "Graphics/Asset/IBLStageArtifact.h")
+)
+$vulkanQualificationUsedPrivatePaths = New-Object `
+    'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+Test-RuntimePrivateImports -SourceItems @($vulkanQualificationSourceItems) `
+    -AllowedPrivatePaths $vulkanQualificationAllowedPrivatePaths `
+    -UsedAllowedPaths $vulkanQualificationUsedPrivatePaths
+
+$shaderRuntimeIntegrationAllowedPrivatePaths = @(
+    (Join-Path $runtimePrivateDir "Graphics/RHI")
+)
+$shaderRuntimeIntegrationUsedPrivatePaths = New-Object `
+    'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+Test-RuntimePrivateImports -SourceItems @($shaderRuntimeIntegrationTestsSourceItems) `
+    -AllowedPrivatePaths $shaderRuntimeIntegrationAllowedPrivatePaths `
+    -UsedAllowedPaths $shaderRuntimeIntegrationUsedPrivatePaths
+
+foreach ($allowance in @(
+        @{
+            Target  = "GGLabVulkanQualification"
+            Allowed = $vulkanQualificationAllowedPrivatePaths
+            Used    = $vulkanQualificationUsedPrivatePaths
+        },
+        @{
+            Target  = "ShaderRuntimeIntegrationTests"
+            Allowed = $shaderRuntimeIntegrationAllowedPrivatePaths
+            Used    = $shaderRuntimeIntegrationUsedPrivatePaths
+        }
+    )) {
+    foreach ($allowedPath in $allowance.Allowed) {
+        if (-not $allowance.Used.Contains($allowedPath)) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule   = "runtime-private-import-scope"
+                Target = $allowance.Target
+                Reason = "classified Runtime Private access is no longer used and must be removed: $allowedPath"
+            })
+        }
+    }
+}
 
 # Native object creation stays in Runtime; host selection uses Public creation
 # contracts and device backend identity rather than complete backend classes.
@@ -3247,37 +3570,43 @@ foreach ($specification in $logicalIncludeSpecifications) {
     }
 }
 
-$runtimePublicIncludeRegex =
-    '#include\s*[<"](?<Path>GGLabRuntime(?:/|\\)[^>"]+)[>"]'
-$runtimePrivateIncludeRegex =
-    '#include\s*[<"](?:(?:Core|Graphics|Scene|Diagnostics)(?:/|\\)|' +
-    '(?:\.\.(?:/|\\))+(?:Private|Core)(?:/|\\))'
+$runtimePublicLogicalPrefix = 'GGLabRuntime/'
 foreach ($header in Get-ChildItem -LiteralPath $runtimePublicDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in $publicHeaderExtensions }) {
     $content = Get-Content -LiteralPath $header.FullName -Raw -ErrorAction Stop
-    if ($content -match $runtimePrivateIncludeRegex) {
-        $projectContractFindings.Add([pscustomobject]@{
-            Rule   = "runtime-public-closure"
-            Target = ConvertTo-RepoRelativePath $header.FullName
-            Reason = "Runtime Public header includes Runtime Private implementation"
-        })
-    }
-    foreach ($match in [regex]::Matches($content, $runtimePublicIncludeRegex)) {
-        $logicalPath = $match.Groups["Path"].Value.Replace('\', '/')
-        $logicalKey = $logicalPath.ToLowerInvariant()
-        if (-not $logicalIncludes.ContainsKey($logicalKey) -or
-            $logicalIncludes[$logicalKey].Owner -ne "GGLabRuntimePublic") {
+    foreach ($match in [regex]::Matches($content, $firstPartyIncludeDirectiveRegex)) {
+        $normalizedInclude = Get-NormalizedIncludePath $match.Groups["Path"].Value
+        if (Test-RuntimePrivateIncludeSpelling $normalizedInclude) {
             $projectContractFindings.Add([pscustomobject]@{
                 Rule   = "runtime-public-closure"
                 Target = ConvertTo-RepoRelativePath $header.FullName
-                Reason = "Runtime Public header includes a non-Public Runtime header: $logicalPath"
+                Reason = "Runtime Public header includes Runtime Private implementation: $($match.Groups["Path"].Value)"
             })
+            continue
+        }
+        if ($normalizedInclude.StartsWith($runtimePublicLogicalPrefix)) {
+            $logicalKey = $normalizedInclude.ToLowerInvariant()
+            if (-not $logicalIncludes.ContainsKey($logicalKey) -or
+                $logicalIncludes[$logicalKey].Owner -ne "GGLabRuntimePublic") {
+                $projectContractFindings.Add([pscustomobject]@{
+                    Rule   = "runtime-public-closure"
+                    Target = ConvertTo-RepoRelativePath $header.FullName
+                    Reason = "Runtime Public header includes a non-Public Runtime header: $normalizedInclude"
+                })
+            }
         }
     }
 }
 
 $renderHostHeaderPath = Join-Path $runtimePublicDir "GGLabRuntime/Graphics/RenderHost.h"
-if (Test-Path -LiteralPath $renderHostHeaderPath -PathType Leaf) {
+if (-not (Test-Path -LiteralPath $renderHostHeaderPath -PathType Leaf)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-render-host-boundary"
+        Target = ConvertTo-RepoRelativePath $renderHostHeaderPath
+        Reason = "the required Public render host contract header is missing"
+    })
+}
+else {
     $renderHostContent = Get-Content -LiteralPath $renderHostHeaderPath -Raw -ErrorAction Stop
     if ($renderHostContent -cmatch '\bRenderer\b') {
         $projectContractFindings.Add([pscustomobject]@{
@@ -3303,7 +3632,14 @@ foreach ($file in $runtimeOwnedFiles) {
 }
 
 $renderServicesHeaderPath = Join-Path $runtimePublicDir "GGLabRuntime/Graphics/RenderServices.h"
-if (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf) {
+if (-not (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-render-services-boundary"
+        Target = ConvertTo-RepoRelativePath $renderServicesHeaderPath
+        Reason = "the required Public pass service bundle header is missing"
+    })
+}
+else {
     $renderServicesContent = Get-Content -LiteralPath $renderServicesHeaderPath -Raw -ErrorAction Stop
     if ($renderServicesContent -cmatch '\bRenderer\b') {
         $projectContractFindings.Add([pscustomobject]@{
@@ -3323,11 +3659,17 @@ if (Test-Path -LiteralPath $renderServicesHeaderPath -PathType Leaf) {
 
 $assetUploadSchedulingHeaderPath =
     Join-Path $runtimePublicDir "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
-if (Test-Path -LiteralPath $assetUploadSchedulingHeaderPath -PathType Leaf) {
+if (-not (Test-Path -LiteralPath $assetUploadSchedulingHeaderPath -PathType Leaf)) {
+    $projectContractFindings.Add([pscustomobject]@{
+        Rule   = "runtime-asset-upload-authority-boundary"
+        Target = ConvertTo-RepoRelativePath $assetUploadSchedulingHeaderPath
+        Reason = "the required production asset upload scheduling contract header is missing"
+    })
+}
+else {
     $assetUploadSchedulingContent =
         Get-Content -LiteralPath $assetUploadSchedulingHeaderPath -Raw -ErrorAction Stop
-    if ($assetUploadSchedulingContent -cmatch
-        'class\s+AssetUploadScheduling\s*:\s*public\s+AssetUploadControl') {
+    if (Test-AssetUploadAuthorityViolation -Content $assetUploadSchedulingContent) {
         $projectContractFindings.Add([pscustomobject]@{
             Rule   = "runtime-asset-upload-authority-boundary"
             Target = ConvertTo-RepoRelativePath $assetUploadSchedulingHeaderPath
@@ -3372,7 +3714,8 @@ foreach ($file in $runtimeOwnedFiles) {
 }
 
 foreach ($file in $candidateFiles) {
-    if ($file.Path.StartsWith("Diagnostics/") -and -not $runtimeOwnedPathSet.Contains($file.Path)) {
+    if ($file.Path.StartsWith("Private/Diagnostics/") -and
+        -not $runtimeOwnedPathSet.Contains($file.Path)) {
         $ownershipFindings.Add([pscustomobject]@{ File = $file.Path; Kind = "ownership" })
     }
 }
@@ -3465,7 +3808,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $napaSourceItems.Count, $testCoreSourceItems.Count,
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
-Write-Host "Platform: $($candidateFiles.Count) candidate files (Private RHI and Diagnostics platform leaves)"
+Write-Host "Platform: $($candidateFiles.Count) candidate files (Private Core, Graphics and Diagnostics portable leaves)"
 Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
