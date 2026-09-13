@@ -37,32 +37,8 @@
     <Filter Include="Graphics\Asset\Store">
       <UniqueIdentifier>{8D112DE7-7B9A-C494-EDD9-22E26C9C5446}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Graphics\Buffer">
-      <UniqueIdentifier>{410A6D68-F3E0-CD91-88A2-F847D21EE116}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Pipeline">
-      <UniqueIdentifier>{9B9C8ACD-D635-9D2B-6B51-DA8C000568C1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\PostProcess">
-      <UniqueIdentifier>{726DB216-E4A1-19EC-E3D5-6492C163B305}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Profiling">
-      <UniqueIdentifier>{288C41C5-9882-523A-B49C-A5CFDA567792}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RenderGraph">
-      <UniqueIdentifier>{351BD6BB-404C-DF42-19A9-0BCB26988A29}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Graphics\RenderPass">
       <UniqueIdentifier>{BD2D436E-D8AB-4BCD-62B3-533B7D8A29CC}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\RenderPipeline">
-      <UniqueIdentifier>{A0255F77-7017-BC4D-4456-F6FBC21D0274}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Resource">
-      <UniqueIdentifier>{195EF9FA-C795-0182-A83B-11264EFF87CC}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Graphics\Utility">
-      <UniqueIdentifier>{018A9B5F-6D18-3CE9-09D3-F9E8EA2DD24B}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private">
       <UniqueIdentifier>{4BD2FD6A-CDC4-61FF-1400-C63EE4D2327E}</UniqueIdentifier>
@@ -111,6 +87,9 @@
     </Filter>
     <Filter Include="Private\Graphics\PostProcess">
       <UniqueIdentifier>{28AC8BB7-A089-20BA-62CC-16E74084D632}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Private\Graphics\Profiling">
+      <UniqueIdentifier>{F65E84A6-FDB9-7973-4F8E-670934D0C117}</UniqueIdentifier>
     </Filter>
     <Filter Include="Private\Graphics\RenderGraph">
       <UniqueIdentifier>{1F02624B-E1F5-9E78-83DC-401B4551FF0A}</UniqueIdentifier>
@@ -333,24 +312,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetValidation.cpp">
       <Filter>Graphics\Asset</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGCompiler.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGExecutor.cpp">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassBloom.cpp">
       <Filter>Graphics\RenderPass</Filter>
     </ClCompile>
@@ -413,21 +374,6 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\RenderPassTemporalAA.cpp">
       <Filter>Graphics\RenderPass</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.cpp">
-      <Filter>Graphics\RenderPipeline</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
-      <Filter>Graphics\RenderPipeline</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.cpp">
-      <Filter>Graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.cpp">
-      <Filter>Graphics\Resource</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.cpp">
-      <Filter>Graphics\Utility</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.cpp">
       <Filter>Private\Core\Allocator</Filter>
@@ -609,6 +555,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\IBLBakeScheduler.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\DepthCoverage.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -622,6 +574,9 @@
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalFrameTransaction.cpp">
@@ -645,7 +600,16 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGArenaAllocator.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBlackboard.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGCompiler.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
@@ -655,6 +619,12 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp">
+      <Filter>Private\Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.cpp">
+      <Filter>Private\Graphics\RenderPipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp">
       <Filter>Private\Graphics\RenderPipeline</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBRFactory.cpp">
@@ -668,6 +638,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\PersistentTexturePool.cpp">
+      <Filter>Private\Graphics\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.cpp">
       <Filter>Private\Graphics\Resource</Filter>
@@ -927,6 +903,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\TransferManager.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\CubemapUtils.cpp">
+      <Filter>Private\Graphics\Utility</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Private\Graphics\Utility</Filter>
     </ClCompile>
@@ -1022,51 +1001,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Asset\TextureAssetSystem.h">
       <Filter>Graphics\Asset</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Buffer\PersistentStructuredBufferTable.h">
-      <Filter>Graphics\Buffer</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\IBLBakeScheduler.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\MaterialGpuEncoder.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalAACapability.h">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Pipeline\TemporalMotion.h">
-      <Filter>Graphics\Pipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessColor.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessGraphResources.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessOutput.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\PostProcess\PostProcessResolution.h">
-      <Filter>Graphics\PostProcess</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Profiling\GpuProfiler.h">
-      <Filter>Graphics\Profiling</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGBarrierPlanner.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGCompiler.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGExecutionPlan.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderGraph\RGExecutor.h">
-      <Filter>Graphics\RenderGraph</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\ForwardPBRShaderSet.h">
       <Filter>Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1153,24 +1087,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPass\TemporalGeometryGraphResources.h">
       <Filter>Graphics\RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderPipeline\PostProcessPipeline.h">
-      <Filter>Graphics\RenderPipeline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderSceneBuilder.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\RenderWorldExtractor.h">
-      <Filter>Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Resource\PersistentTexturePool.h">
-      <Filter>Graphics\Resource</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\CubemapUtils.h">
-      <Filter>Graphics\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Graphics\Utility\TextureUtils.h">
-      <Filter>Graphics\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h">
       <Filter>Private\Core\Allocator</Filter>
@@ -1265,17 +1181,50 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h">
+      <Filter>Private\Graphics\Buffer</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h">
       <Filter>Private\Graphics\DebugDraw</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\EnvironmentLightingSystem.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\IBLBakeScheduler.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalAACapability.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryManager.h">
       <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalMotion.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessColor.h">
+      <Filter>Private\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessGraphResources.h">
+      <Filter>Private\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessOutput.h">
+      <Filter>Private\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessResolution.h">
+      <Filter>Private\Graphics\PostProcess</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Profiling\GpuProfiler.h">
+      <Filter>Private\Graphics\Profiling</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h">
       <Filter>Private\Graphics</Filter>
@@ -1286,11 +1235,35 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameGpuResources.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.h">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGCompiler.h">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutionPlan.h">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.h">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.h">
+      <Filter>Private\Graphics\RenderPipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBR.h">
       <Filter>Private\Graphics\RenderPipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\PersistentTexturePool.h">
+      <Filter>Private\Graphics\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.h">
       <Filter>Private\Graphics\Resource</Filter>
@@ -1541,7 +1514,13 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Shader\Shader.h">
       <Filter>Private\Graphics\Shader</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\CubemapUtils.h">
+      <Filter>Private\Graphics\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.h">
+      <Filter>Private\Graphics\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\TextureUtils.h">
       <Filter>Private\Graphics\Utility</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Core\Hash\KeyHash.h">
