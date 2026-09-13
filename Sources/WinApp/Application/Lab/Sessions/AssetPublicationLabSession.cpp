@@ -220,6 +220,7 @@ namespace gglab
 		AssetStreamingIdentity m_Identity{};
 		std::filesystem::path m_ModelPath;
 		AssetOwnershipStatistics m_BaselineOwnership{};
+		std::vector<AssetInterestActivity> m_PreScenarioInterests;
 		uint64_t m_StartEnqueued = 0;
 		uint64_t m_StartProcessed = 0;
 		uint64_t m_StartContinue = 0;
@@ -553,6 +554,7 @@ namespace gglab
 		m_State->m_Scenario = scenario;
 		m_State->m_ModelPath = ScenarioModelPath(scenario);
 		m_State->m_BaselineOwnership = m_Services.m_AssetManager->GetOwnershipStatistics();
+		m_State->m_PreScenarioInterests = m_State->m_BaselineOwnership.m_ActiveInterests;
 		const AssetUploadStatistics before = scheduler->GetStatistics();
 		const auto& publicationBefore = before.m_ResourcePublicationQueue;
 		m_State->m_StartEnqueued = publicationBefore.m_EnqueuedCount;
@@ -677,8 +679,41 @@ namespace gglab
 				require(publication.m_CancelledCount == m_State->m_StartCancelled + 1,
 					"The injected cancellation did not terminate the publication as Cancelled.");
 			}
-			require(ownership.m_LeaseCount == m_State->m_BaselineOwnership.m_LeaseCount + 1,
-				"Temporary dependency leases leaked after rollback.");
+			const uint32_t currentModelStableId = m_State->m_Request.m_ModelId.Value();
+			const auto preLeaseCount = [this](const AssetInterestActivity& interest) noexcept
+				{
+					const auto pre = std::ranges::find_if(m_State->m_PreScenarioInterests,
+						[&interest](const AssetInterestActivity& candidate) noexcept
+						{
+							return candidate.m_Kind == interest.m_Kind &&
+								candidate.m_StableId == interest.m_StableId;
+						});
+					return pre != m_State->m_PreScenarioInterests.end() ? pre->m_LeaseCount : 0u;
+				};
+			uint32_t leakedLeaseCount = 0;
+			bool modelLeaseObserved = false;
+			for (const AssetInterestActivity& interest : ownership.m_ActiveInterests)
+			{
+				const uint32_t pre = preLeaseCount(interest);
+				if (interest.m_LeaseCount <= pre)
+				{
+					continue;
+				}
+				const uint32_t added = interest.m_LeaseCount - pre;
+				if (!modelLeaseObserved && interest.m_Kind == AssetKind::Model &&
+					interest.m_StableId == currentModelStableId && added == 1)
+				{
+					modelLeaseObserved = true;
+					continue;
+				}
+				leakedLeaseCount += added;
+			}
+			require(modelLeaseObserved,
+				"The scenario did not retain the owner-scope model lease.");
+			require(leakedLeaseCount == 0,
+				std::format(
+					"Temporary dependency leases leaked after rollback ({} lease(s) beyond the pre-scenario interests).",
+					leakedLeaseCount));
 		}
 
 		m_State->m_Passed = m_State->m_Errors.empty();
