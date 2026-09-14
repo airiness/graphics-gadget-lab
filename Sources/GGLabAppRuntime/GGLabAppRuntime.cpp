@@ -95,7 +95,7 @@ namespace gglab
 		{
 			return;
 		}
-
+		
 		m_WindowWidth = width;
 		m_WindowHeight = height;
 		if (m_LifecycleState == AppRuntimeLifecycleState::Suspended)
