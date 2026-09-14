@@ -1,18 +1,24 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "ApplicationCameraInput.h"
+#include "Application/Content/DesktopApplicationContent.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Time.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
 namespace gglab
 {
-	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo) noexcept :
+	DemoPlayground::DemoPlayground(const DemoCreateInfo& createInfo,
+		PlaygroundContent content) noexcept :
 		m_Services(createInfo.m_Services),
+		m_Content(content),
 		m_AssetOwnerScope(createInfo.m_Services.m_AssetManager->CreateOwnerScope())
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoPlayground requires valid create info.");
@@ -26,6 +32,19 @@ namespace gglab
 		camCreateInfo.m_Near = 0.1f;
 		camCreateInfo.m_Far = 1000.0f;
 		camCreateInfo.m_Fov = 60.0f;
+		if (m_Content == PlaygroundContent::Island)
+		{
+			// Blender (X, Y, Z) maps to runtime (X, Z, Y); preserve authored meters.
+			camCreateInfo.m_Position = Vector3(17.0f, 16.0f, -23.0f);
+			camCreateInfo.m_Forward = Vector3(0.0f, 0.8f, 0.0f) - camCreateInfo.m_Position;
+			camCreateInfo.m_Forward.Normalize();
+			camCreateInfo.m_Far = 100.0f;
+			camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
+			camCreateInfo.m_ExposureCompensationEV = 0.0f;
+			m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
+			m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
+			m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
+		}
 		m_Camera = std::make_unique<Camera>(camCreateInfo);
 
 		// CameraController
@@ -41,24 +60,39 @@ namespace gglab
 		m_RenderPipeline = CreateRenderPipelineForwardPBR();
 	}
 
+	std::string_view DemoPlayground::GetName() const noexcept
+	{
+		return m_Content == PlaygroundContent::Island ?
+			DesktopIslandDemoId : DesktopPlaygroundDemoId;
+	}
+
 	void DemoPlayground::BeginPrepare() noexcept
 	{
 		m_AssetOwnerScope.Reset();
 		m_World.GetRegistry().clear();
-		m_PendingModels = {
-			{
-				.m_Path = "Assets/Models/Sponza/Sponza.gltf",
-				.m_Position = Vector3::Zero,
-				.m_Rotation = Vector3::Zero,
-				.m_Scale = Vector3::One,
-			},
-			{
-				.m_Path = "Assets/Models/FlightHelmet/FlightHelmet.gltf",
-				.m_Position = Vector3::Zero,
-				.m_Rotation = Vector3::Zero,
-				.m_Scale = Vector3::One,
-			},
-		};
+		if (m_Content == PlaygroundContent::Island)
+		{
+			m_PendingModels = {
+				{ .m_Path = "Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf" },
+			};
+		}
+		else
+		{
+			m_PendingModels = {
+				{
+					.m_Path = "Assets/Models/Sponza/Sponza.gltf",
+					.m_Position = Vector3::Zero,
+					.m_Rotation = Vector3::Zero,
+					.m_Scale = Vector3::One,
+				},
+				{
+					.m_Path = "Assets/Models/FlightHelmet/FlightHelmet.gltf",
+					.m_Position = Vector3::Zero,
+					.m_Rotation = Vector3::Zero,
+					.m_Scale = Vector3::One,
+				},
+			};
+		}
 
 		auto* assetManager = m_Services.m_AssetManager;
 		GGLAB_ASSERT_NOT_NULL(assetManager);
@@ -147,6 +181,19 @@ namespace gglab
 
 	void DemoPlayground::OnEnter() noexcept
 	{
+		if (m_Content == PlaygroundContent::Island)
+		{
+			auto* environmentView = m_Services.m_EnvironmentLighting;
+			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+			GGLAB_ASSERT_NOT_NULL(environmentView);
+			GGLAB_ASSERT_NOT_NULL(environmentControl);
+			const auto previous = environmentView->GetEnvironmentLightingSettings();
+			m_PreviousEnvironmentIntensity = previous.m_Intensity;
+			m_PreviousSkyboxEnabled = previous.m_EnableSkybox;
+			m_HasEnvironmentOverride = true;
+			environmentControl->SetIntensity(0.0f);
+			environmentControl->SetSkyboxEnabled(false);
+		}
 	}
 
 	void DemoPlayground::OnResize(uint32_t width, uint32_t height) noexcept
@@ -156,6 +203,14 @@ namespace gglab
 
 	void DemoPlayground::OnExit() noexcept
 	{
+		if (m_HasEnvironmentOverride)
+		{
+			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+			GGLAB_ASSERT_NOT_NULL(environmentControl);
+			environmentControl->SetIntensity(m_PreviousEnvironmentIntensity);
+			environmentControl->SetSkyboxEnabled(m_PreviousSkyboxEnabled);
+			m_HasEnvironmentOverride = false;
+		}
 		m_AssetOwnerScope.Reset();
 	}
 
@@ -198,6 +253,10 @@ namespace gglab
 
 			components::TransformComponent transComp{};
 			Vector3 direction = Vector3(-0.406f, -0.906f, -0.123f);
+			if (m_Content == PlaygroundContent::Island)
+			{
+				direction = Vector3(-0.6f, -1.6f, 0.4f);
+			}
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);

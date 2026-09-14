@@ -14,6 +14,7 @@ namespace gglab
 	{
 		Start,
 		Playground,
+		Island,
 		LabHost,
 	};
 
