@@ -42,6 +42,9 @@ namespace gglab
 		case ApplicationStartupDemo::LabHost:
 			config.m_StartupDemoId = DesktopLabHostDemoId;
 			break;
+		case ApplicationStartupDemo::Island:
+			config.m_StartupDemoId = DesktopIslandDemoId;
+			break;
 		case ApplicationStartupDemo::Start:
 		default:
 			config.m_StartupDemoId = DesktopStartDemoId;

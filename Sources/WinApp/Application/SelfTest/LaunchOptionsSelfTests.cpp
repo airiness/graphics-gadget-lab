@@ -12,6 +12,23 @@ namespace gglab
 {
 	namespace
 	{
+		void RunIslandCliContractTests(SelfTestContext& context) noexcept
+		{
+			for (const std::string_view alias : { "island", "Demo.Playground.Island" })
+			{
+				const std::vector<std::string_view> args = { "--demo", alias, "--absolute-mouse" };
+				const auto result = ParseApplicationLaunchOptions(args);
+				context.Check(result.IsValid() &&
+					result.m_Options.m_StartupDemo == ApplicationStartupDemo::Island &&
+					result.m_Options.m_StartWithAbsoluteMouse,
+					"Island alias selects the content preset with absolute mouse input");
+			}
+			const std::vector<std::string_view> conflict = {
+				"--demo", "island", "--lab", "gglab.lab.culling" };
+			context.Check(!ParseApplicationLaunchOptions(conflict).IsValid(),
+				"Island content cannot be silently replaced by a Lab selection");
+		}
+
 		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
@@ -151,6 +168,7 @@ namespace gglab
 	void RunLaunchOptionsSelfTests(SelfTestContext& context) noexcept
 	{
 		RunVulkanCliContractTests(context);
+		RunIslandCliContractTests(context);
 		RunShaderPreviewSessionCliContractTests(context);
 	}
 }

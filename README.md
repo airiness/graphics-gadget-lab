@@ -52,6 +52,16 @@ interact with the developer UI.
 
 ## RHI backend selection
 
+The Blender island import fixture reuses `DemoPlayground` with a fixed camera
+and lighting preset:
+
+    GraphicsGadgetLab.exe --demo island --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --demo island --rhi vulkan --absolute-mouse
+
+`--demo playground` keeps the Sponza/FlightHelmet preset. See the
+[island asset and validation notes](Assets/Models/GGLabIslandPrototype/README.md)
+for export instructions, baseline settings, and verification evidence.
+
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12
     GraphicsGadgetLab.exe --list-adapters

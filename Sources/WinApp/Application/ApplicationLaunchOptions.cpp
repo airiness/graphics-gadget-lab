@@ -22,6 +22,11 @@ namespace gglab
 			{
 				return ApplicationStartupDemo::Playground;
 			}
+			if (utils::EqualsAsciiIgnoreCase(value, "island") ||
+				utils::EqualsAsciiIgnoreCase(value, "demo.playground.island"))
+			{
+				return ApplicationStartupDemo::Island;
+			}
 			if (utils::EqualsAsciiIgnoreCase(value, "lab") ||
 				utils::EqualsAsciiIgnoreCase(value, "labhost") ||
 				utils::EqualsAsciiIgnoreCase(value, "demo.labhost"))
@@ -132,7 +137,7 @@ namespace gglab
 				if (!demo)
 				{
 					result.m_Error =
-						std::format("Unknown demo '{}'. Expected 'start', 'playground', or 'lab'.",
+						std::format("Unknown demo '{}'. Expected 'start', 'playground', 'island', or 'lab'.",
 							arguments[index]);
 					return result;
 				}
@@ -263,7 +268,7 @@ namespace gglab
 		return "Usage: GraphicsGadgetLab.exe [options]\n"
 			"\n"
 			"Options:\n"
-			"  --demo <start|playground|lab>   Select the startup demo.\n"
+			"  --demo <start|playground|island|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
 			"  --shader-preview-session <id>   Attach Shader Graph Preview to one 128-bit\n"
 			"                                  lowercase hexadecimal session ID. Requires\n"

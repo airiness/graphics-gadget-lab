@@ -41,6 +41,14 @@ namespace gglab
 			defaultContentConfig.m_StartupLabId == "gglab.lab.culling",
 			"Windows host policy supplies explicit stable default Demo and Lab identities");
 
+		ApplicationLaunchOptions islandOptions{};
+		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
+		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(
+			islandOptions, { 1920, 1080 }, true);
+		context.Check(islandConfig.IsValid() &&
+			islandConfig.m_StartupDemoId == "Demo.Playground.Island",
+			"Island launch policy selects its stable Playground content identity");
+
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);
