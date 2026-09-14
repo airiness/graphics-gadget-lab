@@ -1,9 +1,10 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
+#include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
-#include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
+#include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -23,8 +24,8 @@ namespace gglab
 	{
 		void CheckIslandContent(SelfTestContext& context) noexcept
 		{
-			const auto path = win32::GetExecutableDirectory() /
-				"Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf";
+			const auto path = ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf");
 			const auto imported = ModelImporter::Import(path, {});
 			context.Check(imported.Succeeded(),
 				std::format("Island glTF and external buffer import: {}", imported.m_Error));

@@ -93,14 +93,6 @@ int main(int argc, char* argv[])
 			gglab::ApplicationPathCompositionSelfTestSelection ||
 			*launchResult.m_Options.m_SelfTestSelection ==
 				gglab::ApplicationArtifactPackageClosureSelfTestSelection);
-	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
-	{
-		return gglab::RunApplicationSelfTests(*launchResult.m_Options.m_SelfTestSelection)
-			? EXIT_SUCCESS
-			: EXIT_FAILURE;
-	}
-
-	HINSTANCE hInstance = GetModuleHandle(nullptr);
 	const gglab::RuntimePaths runtimePaths =
 		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory(),
 			launchResult.m_Options.m_StateRoot);
@@ -109,6 +101,15 @@ int main(int argc, char* argv[])
 		std::fputs("Error: Runtime inputs and explicit writable state must be absolute and disjoint.\n", stderr);
 		return EXIT_FAILURE;
 	}
+	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
+	{
+		return gglab::RunApplicationSelfTests(
+			*launchResult.m_Options.m_SelfTestSelection, runtimePaths)
+			? EXIT_SUCCESS
+			: EXIT_FAILURE;
+	}
+
+	HINSTANCE hInstance = GetModuleHandle(nullptr);
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	const std::optional<gglab::RHIBackendType> packagedBackend =
 		ReadPackagedBackend(runtimePaths.m_RuntimeRoot);
