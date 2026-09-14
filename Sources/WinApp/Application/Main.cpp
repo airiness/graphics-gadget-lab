@@ -93,16 +93,17 @@ int main(int argc, char* argv[])
 			gglab::ApplicationPathCompositionSelfTestSelection ||
 			*launchResult.m_Options.m_SelfTestSelection ==
 				gglab::ApplicationArtifactPackageClosureSelfTestSelection);
+	const gglab::RuntimePaths runtimePaths =
+		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
 	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
 	{
-		return gglab::RunApplicationSelfTests(*launchResult.m_Options.m_SelfTestSelection)
+		return gglab::RunApplicationSelfTests(
+			*launchResult.m_Options.m_SelfTestSelection, runtimePaths)
 			? EXIT_SUCCESS
 			: EXIT_FAILURE;
 	}
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
-	const gglab::RuntimePaths runtimePaths =
-		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	const std::optional<gglab::RHIBackendType> packagedBackend =
 		ReadPackagedBackend(runtimePaths.m_RuntimeRoot);
