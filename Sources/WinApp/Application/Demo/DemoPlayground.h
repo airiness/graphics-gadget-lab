@@ -21,6 +21,7 @@ namespace gglab
 	{
 		Sponza,
 		Island,
+		CoastalAtrium,
 	};
 
 	class DemoPlayground : public DemoBase

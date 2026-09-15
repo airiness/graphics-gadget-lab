@@ -62,6 +62,15 @@ and lighting preset:
 [island asset and validation notes](Assets/Models/GGLabIslandPrototype/README.md)
 for export instructions, baseline settings, and verification evidence.
 
+The coastal atrium greybox adds the architectural shadow study scene:
+
+    GraphicsGadgetLab.exe --demo atrium --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --demo atrium --rhi vulkan --absolute-mouse
+
+It shares the Playground implementation and starts at the courtyard reference
+camera. See the [atrium asset notes](Assets/Models/GGLabCoastalAtrium/README.md)
+for source provenance, dimensions, camera settings and import coverage.
+
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12
     GraphicsGadgetLab.exe --list-adapters

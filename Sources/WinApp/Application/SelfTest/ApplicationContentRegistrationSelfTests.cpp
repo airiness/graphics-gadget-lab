@@ -9,11 +9,13 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <initializer_list>
+#include <limits>
 #include <numbers>
 #include <string_view>
 #include <vector>
@@ -22,6 +24,102 @@ namespace gglab
 {
 	namespace
 	{
+		void CheckCoastalAtriumContent(SelfTestContext& context) noexcept
+		{
+			const auto path = ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf");
+			const auto imported = ModelImporter::Import(path, {});
+			context.Check(imported.Succeeded(),
+				std::format("Coastal atrium glTF and external buffer import: {}", imported.m_Error));
+			if (!imported.Succeeded())
+			{
+				return;
+			}
+			const auto& model = imported.m_Model;
+			context.Check(model.m_TextureSources.empty() &&
+				std::ranges::all_of(model.m_Materials, [](const ImportedMaterial& material) noexcept
+					{
+						return material.m_Properties.m_AlphaMode == AlphaMode::Opaque &&
+							material.m_Properties.m_MetallicFactor == 0.0f;
+					}), "Atrium greybox uses opaque untextured dielectric materials");
+
+			// Probe imported world triangles, independent of Assimp mesh merging or names.
+			std::vector<std::array<Vector3, 3>> triangles;
+			bool bounded = true;
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				const auto& mesh = model.m_Meshes[instance.m_MeshIndex];
+				for (size_t index = 0; index + 2 < mesh.m_Indices.size(); index += 3)
+				{
+					std::array<Vector3, 3> triangle;
+					for (size_t corner = 0; corner < 3; ++corner)
+					{
+						auto& point = triangle[corner];
+						point = math::TransformPoint(mesh.m_Vertices[mesh.m_Indices[index + corner]].m_Position,
+							instance.m_LocalTransform);
+						bounded &= std::abs(point.m_X) <= 36.001f &&
+							point.m_Y >= -0.801f && point.m_Y <= 6.951f &&
+							point.m_Z >= -37.001f && point.m_Z <= 27.001f;
+					}
+					triangles.push_back(triangle);
+				}
+			}
+			context.Check(bounded && triangles.size() == 1046,
+				std::format("Atrium keeps a bounded 72 by 64 meter footprint and 1046 triangles (actual: {})",
+					triangles.size()));
+			const auto nearestHit = [&](const Vector3& origin, const Vector3& direction) noexcept
+				{
+					float nearest = std::numeric_limits<float>::infinity();
+					for (const auto& triangle : triangles)
+					{
+						const Vector3 edge1 = triangle[1] - triangle[0];
+						const Vector3 edge2 = triangle[2] - triangle[0];
+						const Vector3 p = direction.Cross(edge2);
+						const float determinant = edge1.Dot(p);
+						if (std::abs(determinant) < 0.000001f)
+						{
+							continue;
+						}
+						const Vector3 offset = origin - triangle[0];
+						const float u = offset.Dot(p) / determinant;
+						const Vector3 q = offset.Cross(edge1);
+						const float v = direction.Dot(q) / determinant;
+						const float distance = edge2.Dot(q) / determinant;
+						if (u >= -0.00001f && v >= -0.00001f && u + v <= 1.00001f && distance > 0.0001f)
+						{
+							nearest = std::min(nearest, distance);
+						}
+					}
+					return nearest;
+				};
+			const auto isWithinTolerance = [](float actual, float expected) noexcept
+				{ return std::abs(actual - expected) < 0.001f; };
+			context.Check(isWithinTolerance(nearestHit({ 0.0f, 4.0f, 0.0f }, -Vector3::UnitY), 1.6f) &&
+				isWithinTolerance(nearestHit({ 0.0f, 4.0f, -12.0f }, -Vector3::UnitY), 3.1f) &&
+				isWithinTolerance(nearestHit({ 30.0f, 4.0f, 0.0f }, -Vector3::UnitY), 4.05f),
+				"Courtyard, coastal platform and ocean preserve authored elevations in Y-up meters");
+			bool stairsValid = true;
+			for (int step = 0; step < 10; ++step)
+			{
+				stairsValid &= isWithinTolerance(nearestHit({ 1.2f, 4.0f, -10.5f + (step + 0.5f) * 0.35f },
+					-Vector3::UnitY), 4.0f - (0.9f + (step + 1) * 0.15f));
+			}
+			context.Check(stairsValid, "Ten stair treads connect the two levels with 0.15 meter risers");
+			context.Check(nearestHit({ -10.0f, 4.0f, -3.0f }, Vector3::UnitX) > 2.0f &&
+				nearestHit({ -10.0f, 4.0f, 2.0f }, Vector3::UnitX) > 2.0f,
+				"Door and window openings remain unobstructed after import");
+			context.Check(isWithinTolerance(nearestHit({ -10.0f, 4.0f, 0.0f }, Vector3::UnitX), 0.85f) &&
+				isWithinTolerance(nearestHit({ -8.0f, 4.0f, 0.0f }, -Vector3::UnitX), 0.6f) &&
+				isWithinTolerance(nearestHit({ -10.0f, 3.0f, 2.0f }, Vector3::UnitX), 0.85f) &&
+				isWithinTolerance(nearestHit({ -10.0f, 6.0f, 2.0f }, Vector3::UnitX), 0.85f) &&
+				isWithinTolerance(nearestHit({ -11.0f, 4.0f, 0.0f }, Vector3::UnitY), 2.6f) &&
+				isWithinTolerance(nearestHit({ -11.0f, 4.0f, 0.0f }, -Vector3::UnitX), 1.9f),
+				"Corridor preserves wall thickness, sill, lintel, roof and exterior enclosure");
+			context.Check(isWithinTolerance(nearestHit({ 6.7f, 8.0f, -4.675f }, -Vector3::UnitY), 1.72f) &&
+				isWithinTolerance(nearestHit({ 6.7f, 8.0f, -4.4f }, -Vector3::UnitY), 5.6f),
+				"Pergola retains solid thin slats and open gaps for shadow inspection");
+		}
+
 		void CheckIslandContent(SelfTestContext& context) noexcept
 		{
 			const auto path = ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
@@ -177,19 +275,22 @@ namespace gglab
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
-		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
+		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 5 &&
 			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }) &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.shader_graph_preview"); }),
-			"Windows desktop composition includes four Demo entries and eighteen Labs");
+			"Windows desktop composition includes five Demo entries and eighteen Labs");
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Demos, [](const ApplicationDemoRegistration& demo) noexcept
 				{ return demo.m_Id == DesktopPlaygroundDemoId; }),
 			"Island is selectable alongside the original Playground content");
+		context.Check(ResolveApplicationContentSelection(
+			desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
+			"Coastal atrium is selectable alongside the import prototype");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
 			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
@@ -215,5 +316,6 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.shader_graph_preview", 35,
 			"Shader Graph Preview selection contributes both pinned Pixel Program demands");
 		CheckIslandContent(context);
+		CheckCoastalAtriumContent(context);
 	}
 }
