@@ -30,6 +30,8 @@ namespace gglab
 {
 	namespace
 	{
+		std::filesystem::path g_ApplicationSelfTestAssetRoot;
+
 		constexpr std::array RegisteredSuites{
 			SelfTestSuiteDesc{
 				.m_Id = "app-content-registration",
@@ -131,8 +133,15 @@ namespace gglab
 			FindSuite(selection) != nullptr;
 	}
 
-	bool RunApplicationSelfTests(std::string_view selection) noexcept
+	const std::filesystem::path& GetApplicationSelfTestAssetRoot() noexcept
 	{
+		return g_ApplicationSelfTestAssetRoot;
+	}
+
+	bool RunApplicationSelfTests(
+		std::string_view selection, const RuntimePaths& runtimePaths) noexcept
+	{
+		g_ApplicationSelfTestAssetRoot = runtimePaths.m_AssetRoot;
 		const bool runAll = selection == AllApplicationSelfTestsSelection;
 		const SelfTestSuiteDesc* suite = runAll ? nullptr : FindSuite(selection);
 		if (!runAll && !suite)

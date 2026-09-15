@@ -12,6 +12,34 @@ namespace gglab
 {
 	namespace
 	{
+		void RunPlaygroundContentCliContractTests(SelfTestContext& context) noexcept
+		{
+			struct ContentAlias
+			{
+				std::string_view m_Alias;
+				ApplicationStartupDemo m_Demo;
+			};
+			const ContentAlias aliases[] = {
+				{ "island", ApplicationStartupDemo::Island },
+				{ "Demo.Playground.Island", ApplicationStartupDemo::Island },
+				{ "atrium", ApplicationStartupDemo::CoastalAtrium },
+				{ "Demo.Playground.CoastalAtrium", ApplicationStartupDemo::CoastalAtrium },
+			};
+			for (const auto& alias : aliases)
+			{
+				const std::vector<std::string_view> args = { "--demo", alias.m_Alias, "--absolute-mouse" };
+				const auto result = ParseApplicationLaunchOptions(args);
+				context.Check(result.IsValid() &&
+					result.m_Options.m_StartupDemo == alias.m_Demo &&
+					result.m_Options.m_StartWithAbsoluteMouse,
+					"Playground alias selects its content preset with absolute mouse input");
+				const std::vector<std::string_view> conflict = {
+					"--demo", alias.m_Alias, "--lab", "gglab.lab.culling" };
+				context.Check(!ParseApplicationLaunchOptions(conflict).IsValid(),
+					"Playground content cannot be silently replaced by a Lab selection");
+			}
+		}
+
 		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
@@ -151,6 +179,7 @@ namespace gglab
 	void RunLaunchOptionsSelfTests(SelfTestContext& context) noexcept
 	{
 		RunVulkanCliContractTests(context);
+		RunPlaygroundContentCliContractTests(context);
 		RunShaderPreviewSessionCliContractTests(context);
 	}
 }

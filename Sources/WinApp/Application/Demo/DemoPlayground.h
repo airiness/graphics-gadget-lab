@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <vector>
 
@@ -16,13 +17,21 @@ namespace gglab
 	class CameraController;
 	class RenderPipelineBase;
 
+	enum class PlaygroundContent : uint8_t
+	{
+		Sponza,
+		Island,
+		CoastalAtrium,
+	};
+
 	class DemoPlayground : public DemoBase
 	{
 	public:
-		explicit DemoPlayground(const DemoCreateInfo& createInfo) noexcept;
+		explicit DemoPlayground(const DemoCreateInfo& createInfo,
+			PlaygroundContent content = PlaygroundContent::Sponza) noexcept;
 		~DemoPlayground() override = default;
 
-		std::string_view GetName() const noexcept override { return "Demo.Playground"; }
+		std::string_view GetName() const noexcept override;
 		void BeginPrepare() noexcept override;
 		void TickPrepare() noexcept override;
 		LoadingProgress GetPreparationProgress() const noexcept override
@@ -65,6 +74,10 @@ namespace gglab
 
 	private:
 		DemoServices m_Services{};
+		PlaygroundContent m_Content = PlaygroundContent::Sponza;
+		float m_PreviousEnvironmentIntensity = 1.0f;
+		bool m_PreviousSkyboxEnabled = true;
+		bool m_HasEnvironmentOverride = false;
 		AssetOwnerScope m_AssetOwnerScope;
 		World m_World;
 		std::unique_ptr<Camera> m_Camera;
