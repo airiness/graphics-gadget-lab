@@ -110,6 +110,7 @@ These are visual smoke references rather than pixel-comparison golden images.
 Adapter/driver details and runtime validation logs are not included. The dark
 metallic block is consistent with the disabled environment lighting described above.
 
-Recorded validation covers the Debug headless checks and static display shown
-above. It does not cover whole-entity movement, edited-export reload, GPU validation
-output, or Release builds.
+Whole-entity movement passed manual verification. No suspicious logs were reported
+on either backend; raw GPU validation logs are not archived here. Edited-export
+reload in GGLab was deferred when starting the coastal atrium greybox. Release
+builds are outside this recorded validation.

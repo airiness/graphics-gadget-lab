@@ -32,7 +32,7 @@ namespace gglab
 		camCreateInfo.m_Near = 0.1f;
 		camCreateInfo.m_Far = 1000.0f;
 		camCreateInfo.m_Fov = 60.0f;
-		if (m_Content == PlaygroundContent::Island)
+		if (m_Content != PlaygroundContent::Sponza)
 		{
 			// Blender (X, Y, Z) maps to runtime (X, Z, Y); preserve authored meters.
 			camCreateInfo.m_Position = Vector3(17.0f, 16.0f, -23.0f);
@@ -40,6 +40,15 @@ namespace gglab
 			camCreateInfo.m_Forward.Normalize();
 			camCreateInfo.m_Far = 100.0f;
 			camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
+			if (m_Content == PlaygroundContent::CoastalAtrium)
+			{
+				// CAM_Courtyard: 30 mm lens, 36 mm horizontal sensor, authored at 16:9.
+				camCreateInfo.m_Position = Vector3(23.0f, 19.0f, -28.0f);
+				camCreateInfo.m_Forward = Vector3(-1.0f, 1.8f, -2.0f) - camCreateInfo.m_Position;
+				camCreateInfo.m_Forward.Normalize();
+				camCreateInfo.m_Far = 150.0f;
+				camCreateInfo.m_Fov = math::ToDegrees(0.650991711f);
+			}
 			camCreateInfo.m_ExposureCompensationEV = 0.0f;
 			m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
 			m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -62,6 +71,10 @@ namespace gglab
 
 	std::string_view DemoPlayground::GetName() const noexcept
 	{
+		if (m_Content == PlaygroundContent::CoastalAtrium)
+		{
+			return DesktopCoastalAtriumDemoId;
+		}
 		return m_Content == PlaygroundContent::Island ?
 			DesktopIslandDemoId : DesktopPlaygroundDemoId;
 	}
@@ -70,7 +83,13 @@ namespace gglab
 	{
 		m_AssetOwnerScope.Reset();
 		m_World.GetRegistry().clear();
-		if (m_Content == PlaygroundContent::Island)
+		if (m_Content == PlaygroundContent::CoastalAtrium)
+		{
+			m_PendingModels = {
+				{ .m_Path = "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf" },
+			};
+		}
+		else if (m_Content == PlaygroundContent::Island)
 		{
 			m_PendingModels = {
 				{ .m_Path = "Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf" },
@@ -181,7 +200,7 @@ namespace gglab
 
 	void DemoPlayground::OnEnter() noexcept
 	{
-		if (m_Content == PlaygroundContent::Island)
+		if (m_Content != PlaygroundContent::Sponza)
 		{
 			auto* environmentView = m_Services.m_EnvironmentLighting;
 			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
@@ -256,6 +275,10 @@ namespace gglab
 			if (m_Content == PlaygroundContent::Island)
 			{
 				direction = Vector3(-0.6f, -1.6f, 0.4f);
+			}
+			else if (m_Content == PlaygroundContent::CoastalAtrium)
+			{
+				direction = Vector3(-1.0f, -0.85f, 0.35f);
 			}
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);

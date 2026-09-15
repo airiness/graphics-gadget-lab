@@ -49,6 +49,14 @@ namespace gglab
 			islandConfig.m_StartupDemoId == "Demo.Playground.Island",
 			"Island launch policy selects its stable Playground content identity");
 
+		ApplicationLaunchOptions atriumOptions{};
+		atriumOptions.m_StartupDemo = ApplicationStartupDemo::CoastalAtrium;
+		const AppRuntimeConfig atriumConfig = TranslateApplicationLaunchOptions(
+			atriumOptions, { 1920, 1080 }, true);
+		context.Check(atriumConfig.IsValid() &&
+			atriumConfig.m_StartupDemoId == "Demo.Playground.CoastalAtrium",
+			"Coastal atrium launch policy selects its stable Playground content identity");
+
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);

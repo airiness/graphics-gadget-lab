@@ -15,6 +15,7 @@ namespace gglab
 		Start,
 		Playground,
 		Island,
+		CoastalAtrium,
 		LabHost,
 	};
 

@@ -50,6 +50,12 @@ namespace gglab
 			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::Island);
 		}
 
+		std::unique_ptr<DemoBase> CreateCoastalAtriumDemo(const DemoCreateInfo& createInfo,
+			const LabId&, std::span<const LabRegistration>) noexcept
+		{
+			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::CoastalAtrium);
+		}
+
 		std::unique_ptr<DemoBase> CreateLabHostDemo(const DemoCreateInfo& createInfo,
 			const LabId& startupLab,
 			std::span<const LabRegistration> labRegistrations) noexcept
@@ -79,6 +85,10 @@ namespace gglab
 			{
 				.m_Id = std::string(DesktopIslandDemoId),
 				.m_Factory = &CreateIslandDemo,
+			},
+			{
+				.m_Id = std::string(DesktopCoastalAtriumDemoId),
+				.m_Factory = &CreateCoastalAtriumDemo,
 			},
 			{
 				.m_Id = std::string(DesktopLabHostDemoId),
