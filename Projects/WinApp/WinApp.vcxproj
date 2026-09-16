@@ -346,6 +346,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalAtriumReferenceViews.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />

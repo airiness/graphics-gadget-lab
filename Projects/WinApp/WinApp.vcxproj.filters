@@ -464,6 +464,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Content\DesktopApplicationContent.h">
       <Filter>Application\Content</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalAtriumReferenceViews.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabHost.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>

@@ -59,14 +59,86 @@ one runtime unit, with Blender `(X, Y, Z)` mapped to runtime `(X, Z, Y)`.
 | Exposure / tone mapping | 0 EV / ACES fitted |
 | TAA / GTAO / bloom | Disabled / disabled / disabled |
 
-The source includes `CAM_Courtyard`, `CAM_ShadowStairs` and
-`CAM_InteriorExterior`. The default runtime view reproduces the courtyard camera;
-the other two are provisional Blender composition references, not runtime camera
-switches. glTF cameras and Sun remain reference data, and camera/light import is
-not claimed. The Blender World and AgX previews are not runtime baselines. Interior
-darkness with environment lighting disabled is expected at this stage.
+The default runtime view reproduces `CAM_Courtyard`. All three source cameras
+have explicit runtime profiles described below. glTF cameras and Sun remain
+reference data; the Demo configures its camera and light separately. The Blender
+World and AgX previews are not runtime baselines. Interior darkness with
+environment lighting disabled is expected at this stage.
+
+## Reference camera profiles
+
+In `Scene > Camera`, selecting a `Reference View` immediately restores it onto
+Main Camera. `Restore Reference View` repeats that operation after navigation or
+camera edits. Restoration selects Main for input and display, applies position,
+orientation, vertical FOV, clip planes and 0 EV, clears movement velocity, and
+requests a temporal reset through the existing camera-cut contract. It does not
+create additional render views. Current viewport dimensions and aspect remain
+in effect; the panel reports a mismatch with the intended 16:9 composition.
+
+Profile 1 is provisional greybox composition, not Rendering Baseline 1. Runtime
+definitions live in
+[`CoastalAtriumReferenceViews.h`](../../../Sources/WinApp/Application/Demo/CoastalAtriumReferenceViews.h).
+The coordinate system is left-handed, Y-up, in meters. Each perspective camera
+uses near/far distances of 0.1/150 m and derives roll-free orientation from its
+position and target. Blender's horizontal sensor/lens values are converted to
+vertical FOV at the reference aspect, independently of window size.
+
+| Camera ID | Runtime position | Look-at target | Observation purpose |
+| --- | --- | --- | --- |
+| `CAM_Courtyard` | `(23, 19, -28)` | `(-1, 1.8, -2)` | Courtyard scale, connected levels and primary lighting; initial hero view |
+| `CAM_ShadowStairs` | `(5.5, 3.4, -14)` | `(0, 2.8, 1)` | Near railings and stair contacts, mid-distance slat shadows and distant columns |
+| `CAM_InteriorExterior` | `(-12, 4, -2.9)` | `(2, 2.5, -5)` | Thick doorway occlusion and the corridor-to-courtyard brightness transition |
+
+The following values were read from the runtime `Camera` after restoration in
+the headless content suite on 2026-09-16, using a 1920 by 1080 viewport (actual
+float aspect `1.77777779`). Together with the positions and clip distances above,
+they record the effective transform and perspective projection, independently of
+the Blender lens labels. They are not measurements from the earlier window PNGs.
+
+| Camera ID | Runtime yaw, radians | Runtime pitch, radians | Vertical FOV, degrees |
+| --- | --- | --- | --- |
+| `CAM_Courtyard` | -0.745419502 | -0.452466518 | 37.2990761 |
+| `CAM_ShadowStairs` | -0.351444811 | -0.037537422 | 39.7607002 |
+| `CAM_InteriorExterior` | 1.71968627 | -0.105563588 | 45.7473259 |
+
+`Copy Camera Record` copies the selected camera's actual runtime position, basis,
+yaw/pitch, projection, vertical FOV, aspect, clip planes and exposure. Its
+"Last restored reference" label records provenance; subsequent edits are included
+in the copied values. A stable camera ID alone does not establish an unchanged
+profile. Composition changes require updating the profile version and recorded
+parameters together.
+
+Camera restoration leaves lighting and render feature edits in effect. The
+startup sunlight, exposure and feature settings in the table above describe the
+intended greybox comparison. Re-entering the Demo restores those startup settings.
+The camera record is not a complete render capture manifest, and temporal reset
+does not promise identical jitter, frame sequence or deterministic replay.
 
 ## Validation record
+
+### Reference camera checks
+
+Completed on 2026-09-16:
+
+| Check | Result |
+| --- | --- |
+| Direct GGLabRuntime and GGLabRuntimeTests Debug x64 builds | Passed |
+| WinApp Debug x64, `GGLAB_USE_PCH=0` and `GGLAB_USE_PCH=1` | Both passed |
+| `diagnostics-contracts` | 81 checks passed |
+| `rendering-contracts` | 307 checks passed |
+| `app-content-registration`, both PCH modes | 32 checks passed in each build |
+| Project boundaries / generated filter metadata | Passed |
+| Source `.blend` and runtime `.gltf` / `.bin` hashes | Unchanged from the greybox delivery |
+
+The camera checks cover invalid profile rejection, copied observations, stale
+camera identities, Main input/display selection, residual velocity removal,
+unchanged viewport aspect, and one temporal-reset request on every restoration.
+Each atrium camera centers its authored target and restores identical view and
+projection matrices after navigation and lens edits. These are CPU contract
+checks; interactive controls, clipboard delivery, GPU output for the new views
+and temporal accumulation after a camera cut are not established by these tests.
+
+### Greybox import checks
 
 Completed on 2026-09-15:
 
@@ -104,6 +176,6 @@ The Demo selection and backend panel labels identify the content and renderer.
 Both original PNG files are preserved at 1922 by 1112, including window chrome
 and DevTools. They are visual smoke references, not pixel-comparison golden images
 or measured client extents. Fine surface patterns visible in both captures have
-not been diagnosed by this static comparison. Runtime checks of the other two
+not been diagnosed by this static comparison. Runtime visual checks of the other two
 candidate views, motion stability, detailed shadow quality, GPU validation logs,
 Release builds and edited-export reload are outside this record.

@@ -1,10 +1,14 @@
 #include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
+#include "Application/Demo/CoastalAtriumReferenceViews.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -24,6 +28,45 @@ namespace gglab
 {
 	namespace
 	{
+		void CheckCoastalAtriumReferenceViews(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
+			CameraController controller(CameraController::CreateInfo{});
+			CameraRig rig;
+			rig.AttachMainCamera(camera, controller);
+			const bool registered = rig.SetReferenceViews(
+				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
+			context.Check(registered, "Three coastal atrium reference cameras register in runtime coordinates");
+			if (!registered) return;
+			for (const auto& reference : CoastalAtriumReferenceViews)
+			{
+				const bool restored = rig.RestoreReferenceView(reference.m_Id);
+				const Vector3 targetInView = math::TransformPoint(reference.m_Target, camera.GetViewMatrix());
+				context.Check(restored && (camera.GetPosition() - reference.m_Position).LengthSquared() == 0.0f &&
+					std::abs(targetInView.m_X) < 0.0001f && std::abs(targetInView.m_Y) < 0.0001f &&
+					targetInView.m_Z > 0.0f && camera.GetFov() == reference.m_VerticalFovDegrees &&
+					camera.GetNear() == 0.1f && camera.GetFar() == 150.0f,
+					std::format("{} looks at its authored target with the intended perspective projection", reference.m_Id));
+				const auto view = camera.GetViewMatrix().ToArray();
+				const auto projection = camera.GetProjMatrix().ToArray();
+				camera.SetYawPitch(0.5f, 0.2f);
+				camera.SetFov(75.0f);
+				camera.SetNearFar(0.5f, 500.0f);
+				camera.SetExposureCompensationEV(2.0f);
+				controller.Update(camera, CameraInput{ .m_Front = true }, 0.1f);
+				const auto serial = camera.GetTemporalResetSerial();
+				const bool restoredAgain = rig.RestoreReferenceView(reference.m_Id);
+				controller.Update(camera, CameraInput{}, 0.1f);
+				camera.Update();
+				context.Check(restoredAgain && camera.GetViewMatrix().ToArray() == view &&
+					camera.GetProjMatrix().ToArray() == projection && camera.GetExposureCompensationEV() == 0.0f &&
+					camera.GetTemporalResetSerial() == serial + 1 && rig.GetLastRestoredReferenceId() == reference.m_Id,
+					std::format("{} restores identical matrices after movement and lens edits; runtime yaw/pitch {:.9g}, {:.9g}; "
+						"vertical FOV {:.9g} deg; aspect {:.9g}", reference.m_Id,
+						camera.GetYaw(), camera.GetPitch(), camera.GetFov(), camera.GetAspect()));
+			}
+		}
+
 		void CheckCoastalAtriumContent(SelfTestContext& context) noexcept
 		{
 			const auto path = ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
@@ -317,5 +360,6 @@ namespace gglab
 			"Shader Graph Preview selection contributes both pinned Pixel Program demands");
 		CheckIslandContent(context);
 		CheckCoastalAtriumContent(context);
+		CheckCoastalAtriumReferenceViews(context);
 	}
 }

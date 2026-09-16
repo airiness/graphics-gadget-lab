@@ -19,6 +19,9 @@ namespace gglab
 	{
 		CameraToolingSnapshot result;
 		result.m_DisplayViewId = m_Rig.GetDisplayViewId();
+		const auto references = m_Rig.GetReferenceViews();
+		result.m_ReferenceViews.assign(references.begin(), references.end());
+		result.m_LastRestoredReferenceId = m_Rig.GetLastRestoredReferenceId();
 		for (size_t index = 0; index < m_Rig.GetCameraCount(); ++index)
 		{
 			const auto* slot = m_Rig.GetCameraSlot(index);
@@ -60,6 +63,12 @@ namespace gglab
 	{
 		const auto* slot = m_Rig.GetCameraSlot(FindIndex(id));
 		return slot && m_Rig.SetDisplayViewId(slot->m_RenderViewId);
+	}
+
+	bool CameraTooling::RestoreReferenceView(uint64_t mainCameraId, std::string_view referenceId) noexcept
+	{
+		const auto* main = m_Rig.GetMainCameraSlot();
+		return main && main->m_Id == mainCameraId && m_Rig.RestoreReferenceView(referenceId);
 	}
 
 	uint64_t CameraTooling::AddDebugCamera() noexcept

@@ -68,8 +68,11 @@ The coastal atrium greybox adds the architectural shadow study scene:
     GraphicsGadgetLab.exe --demo atrium --rhi vulkan --absolute-mouse
 
 It shares the Playground implementation and starts at the courtyard reference
-camera. See the [atrium asset notes](Assets/Models/GGLabCoastalAtrium/README.md)
-for source provenance, dimensions, camera settings and import coverage.
+camera. `Scene > Camera > Reference Views` switches between the courtyard,
+shadow stairs and interior/exterior views; `Restore Reference View` returns to
+the selected pose after navigation. See the
+[atrium asset notes](Assets/Models/GGLabCoastalAtrium/README.md) for source
+provenance, dimensions, camera records and verification coverage.
 
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12

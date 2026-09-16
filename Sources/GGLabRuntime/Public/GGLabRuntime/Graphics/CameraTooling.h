@@ -4,11 +4,13 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/CameraControllerSettings.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -48,6 +50,8 @@ namespace gglab
 	struct CameraToolingSnapshot
 	{
 		std::vector<CameraToolingObservation> m_Cameras;
+		std::vector<CameraReferenceView> m_ReferenceViews;
+		std::string m_LastRestoredReferenceId;
 		uint64_t m_ActiveCameraId = 0;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 
@@ -76,6 +80,7 @@ namespace gglab
 		virtual ~CameraToolingControlBase() = default;
 		virtual bool SetActiveCamera(uint64_t id) noexcept = 0;
 		virtual bool SetDisplayCamera(uint64_t id) noexcept = 0;
+		virtual bool RestoreReferenceView(uint64_t mainCameraId, std::string_view referenceId) noexcept = 0;
 		[[nodiscard]] virtual uint64_t AddDebugCamera() noexcept = 0;
 		virtual bool RemoveCamera(uint64_t id) noexcept = 0;
 		virtual bool SetCamera(uint64_t id, const CameraEditSettings& settings) noexcept = 0;

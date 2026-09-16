@@ -1,4 +1,5 @@
 #include "Application/Demo/DemoPlayground.h"
+#include "Application/Demo/CoastalAtriumReferenceViews.h"
 #include "ApplicationCameraInput.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
@@ -40,15 +41,6 @@ namespace gglab
 			camCreateInfo.m_Forward.Normalize();
 			camCreateInfo.m_Far = 100.0f;
 			camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
-			if (m_Content == PlaygroundContent::CoastalAtrium)
-			{
-				// CAM_Courtyard: 30 mm lens, 36 mm horizontal sensor, authored at 16:9.
-				camCreateInfo.m_Position = Vector3(23.0f, 19.0f, -28.0f);
-				camCreateInfo.m_Forward = Vector3(-1.0f, 1.8f, -2.0f) - camCreateInfo.m_Position;
-				camCreateInfo.m_Forward.Normalize();
-				camCreateInfo.m_Far = 150.0f;
-				camCreateInfo.m_Fov = math::ToDegrees(0.650991711f);
-			}
 			camCreateInfo.m_ExposureCompensationEV = 0.0f;
 			m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
 			m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -64,6 +56,14 @@ namespace gglab
 		camCtrlCreateInfo.m_Params.m_SmoothStepT = 0.5f;
 		m_CameraController = std::make_unique<CameraController>(camCtrlCreateInfo);
 		m_CameraRig.AttachMainCamera(*m_Camera, *m_CameraController);
+		if (m_Content == PlaygroundContent::CoastalAtrium)
+		{
+			const bool registered = m_CameraRig.SetReferenceViews(
+				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
+			GGLAB_ASSERT_MSG(registered, "Coastal atrium reference views must be valid.");
+			const bool restored = m_CameraRig.RestoreReferenceView(CoastalAtriumReferenceViews.front().m_Id);
+			GGLAB_ASSERT_MSG(restored, "Coastal atrium must start at its courtyard reference view.");
+		}
 
 		// RenderPipeline
 		m_RenderPipeline = CreateRenderPipelineForwardPBR();

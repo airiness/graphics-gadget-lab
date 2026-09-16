@@ -33,9 +33,11 @@
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 
 #include <concepts>
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace gglab
 {
@@ -439,6 +441,86 @@ namespace gglab
 			context.Check(movedTooling.SetActiveCamera(otherId) &&
 				movedTooling.GetCameras().m_ActiveCameraId == otherId,
 				"Moving a camera rig preserves the identities of its owned slots");
+		}
+		{
+			CameraRig rig;
+			CameraTooling tooling(rig);
+			CameraReferenceView reference{
+				.m_Id = "reference.test",
+				.m_Name = "Test reference",
+				.m_Position = { 4.0f, 3.0f, -6.0f },
+				.m_Target = { 0.0f, 1.0f, 0.0f },
+				.m_VerticalFovDegrees = 45.0f,
+				.m_FarPlane = 150.0f,
+			};
+			context.Check(!rig.SetReferenceViews({ reference }) &&
+				!tooling.RestoreReferenceView(0, reference.m_Id),
+				"Reference registration and restoration require a bound main camera");
+			Camera camera(Camera::CreateInfo{});
+			CameraController controller(CameraController::CreateInfo{});
+			rig.AttachMainCamera(camera, controller);
+			const auto mainId = rig.GetMainCameraSlot()->m_Id;
+			context.Check(rig.SetReferenceViews({ reference }), "Valid reference poses register on the main rig");
+			const auto retained = tooling.GetCameras();
+			auto invalid = reference;
+			invalid.m_Target = invalid.m_Position;
+			bool rejected = !rig.SetReferenceViews({ invalid });
+			invalid = reference;
+			invalid.m_Position.m_X = std::numeric_limits<float>::quiet_NaN();
+			rejected &= !rig.SetReferenceViews({ invalid });
+			invalid = reference;
+			invalid.m_VerticalFovDegrees = 200.0f;
+			rejected &= !rig.SetReferenceViews({ invalid });
+			invalid = reference;
+			invalid.m_Target = invalid.m_Position + Vector3::UnitY;
+			rejected &= !rig.SetReferenceViews({ invalid });
+			context.Check(rejected && !rig.SetReferenceViews({ reference, reference }) &&
+				rig.GetReferenceViews().size() == 1 && rig.GetReferenceViews().front().m_Id == reference.m_Id,
+				"Invalid or duplicate references reject the whole update without replacing the existing profile");
+			const auto debugId = tooling.AddDebugCamera();
+			tooling.SetActiveCamera(debugId);
+			tooling.SetDisplayCamera(debugId);
+			controller.Update(camera, CameraInput{ .m_Front = true }, 0.1f);
+			camera.SetFov(80.0f);
+			camera.SetNearFar(1.0f, 20.0f);
+			camera.SetExposureCompensationEV(2.0f);
+			const auto serial = camera.GetTemporalResetSerial();
+			context.Check(!tooling.RestoreReferenceView(debugId, reference.m_Id) &&
+				!tooling.RestoreReferenceView(mainId, "unknown") && camera.GetTemporalResetSerial() == serial,
+				"Unknown reference and non-main camera IDs cannot cut or move the camera");
+			const bool restored = tooling.RestoreReferenceView(mainId, reference.m_Id);
+			controller.Update(camera, CameraInput{}, 0.1f);
+			camera.Update();
+			const auto snapshot = tooling.GetCameras();
+			Vector3 expectedForward = reference.m_Target - reference.m_Position;
+			expectedForward.Normalize();
+			context.Check(restored && (camera.GetPosition() - reference.m_Position).LengthSquared() == 0.0f &&
+				(camera.GetForward() - expectedForward).Length() < 0.00001f &&
+				camera.GetFov() == reference.m_VerticalFovDegrees && camera.GetNear() == reference.m_NearPlane &&
+				camera.GetFar() == reference.m_FarPlane && camera.GetExposureCompensationEV() == 0.0f &&
+				camera.GetTemporalResetSerial() == serial + 1 && snapshot.m_ActiveCameraId == mainId &&
+				snapshot.m_DisplayViewId == RenderViewID::Main && snapshot.m_Cameras.size() == 2 &&
+				snapshot.m_LastRestoredReferenceId == reference.m_Id,
+				"Restoration applies pose and projection, stops drift, selects Main and requests one temporal reset");
+			const auto viewMatrix = camera.GetViewMatrix().ToArray();
+			const auto projection = camera.GetProjMatrix().ToArray();
+			context.Check(tooling.RestoreReferenceView(mainId, reference.m_Id) &&
+				camera.GetViewMatrix().ToArray() == viewMatrix && camera.GetProjMatrix().ToArray() == projection &&
+				camera.GetTemporalResetSerial() == serial + 2,
+				"Restoring the same reference reproduces matrices and still requests a camera cut");
+			rig.OnResize(800, 600);
+			context.Check(tooling.RestoreReferenceView(mainId, reference.m_Id) &&
+				std::abs(camera.GetAspect() - 4.0f / 3.0f) < 0.00001f &&
+				camera.GetProjMatrix().ToArray() != projection &&
+				tooling.GetCameras().m_ReferenceViews.front().m_ReferenceAspect == 16.0f / 9.0f,
+				"Reference restoration keeps the actual viewport aspect while retaining the intended composition aspect");
+			rig.AttachMainCamera(camera, controller);
+			const auto rebound = tooling.GetCameras();
+			context.Check(rebound.m_ReferenceViews.empty() && rebound.m_LastRestoredReferenceId.empty() &&
+				rig.SetReferenceViews({ reference }) && !tooling.RestoreReferenceView(mainId, reference.m_Id) &&
+				tooling.RestoreReferenceView(rebound.m_ActiveCameraId, reference.m_Id) &&
+				retained.m_ReferenceViews.size() == 1 && retained.m_LastRestoredReferenceId.empty(),
+				"Rebinding clears reference state and rejects stale commands without invalidating copied observations");
 		}
 		{
 			World world;
