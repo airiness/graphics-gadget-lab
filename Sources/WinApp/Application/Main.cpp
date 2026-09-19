@@ -102,7 +102,13 @@ int main(int argc, char* argv[])
 
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 	const gglab::RuntimePaths runtimePaths =
-		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory());
+		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory(),
+			launchResult.m_Options.m_StateRoot);
+	if (!runtimePaths.IsValid())
+	{
+		std::fputs("Error: Runtime inputs and explicit writable state must be absolute and disjoint.\n", stderr);
+		return EXIT_FAILURE;
+	}
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	const std::optional<gglab::RHIBackendType> packagedBackend =
 		ReadPackagedBackend(runtimePaths.m_RuntimeRoot);

@@ -403,3 +403,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 *.dat
+
+# Local build and verification products (including retired qualification outputs).
+/Build/EnvironmentQualification/
+/Build/Output/

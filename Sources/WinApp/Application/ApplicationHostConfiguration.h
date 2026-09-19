@@ -12,5 +12,6 @@ namespace gglab
 		const ApplicationLaunchOptions& options, AppRuntimeExtent initialExtent,
 		bool requestRuntimeValidation) noexcept;
 	[[nodiscard]] RuntimePaths BuildRuntimePaths(
-		const std::filesystem::path& executableDirectory) noexcept;
+		const std::filesystem::path& executableDirectory,
+		const std::filesystem::path& stateDirectory = {}) noexcept;
 }
