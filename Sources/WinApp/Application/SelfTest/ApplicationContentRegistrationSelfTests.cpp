@@ -2,10 +2,12 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Demo/CoastalAtriumReferenceViews.h"
+#include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
@@ -18,16 +20,161 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <filesystem>
 #include <initializer_list>
 #include <limits>
 #include <numbers>
 #include <string_view>
+#include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 namespace gglab
 {
 	namespace
 	{
+		std::vector<TextureAssetData> CheckImportedTextures(SelfTestContext& context,
+			const ImportedModel& model) noexcept
+		{
+			std::vector<TextureAssetData> textures;
+			for (const auto& source : model.m_TextureSources)
+				textures.push_back(TextureLoader::LoadTextureData(source.m_CanonicalPath, source.m_ImportSettings));
+			for (size_t index = 0; index < textures.size(); ++index)
+			{
+				const auto& source = model.m_TextureSources[index];
+				const auto& texture = textures[index];
+				const bool color = source.m_Semantic == TextureSemantic::BaseColor;
+				context.Check(texture.IsValid() && texture.m_MipLevels > 1 &&
+					texture.m_ColorSpace == (color ? TextureColorSpace::SRGB : TextureColorSpace::Linear) &&
+					texture.m_ViewFormat == (color ? RHIFormat::R8G8B8A8UnormSrgb : RHIFormat::R8G8B8A8Unorm) &&
+					source.m_CanonicalPath.parent_path() == model.m_CanonicalPath.parent_path() / "Textures",
+					std::format("{} resolves beside its glTF and decodes with semantic view format and mipmaps",
+						source.m_CanonicalPath.filename().string()));
+			}
+			return textures;
+		}
+
+		void CheckTextureContractContent(SelfTestContext& context) noexcept
+		{
+			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabTextureContract/GGLabTextureContract.gltf"), {});
+			context.Check(imported.Succeeded(), std::format("Texture contract imports: {}", imported.m_Error));
+			if (!imported.Succeeded()) return;
+			const auto& model = imported.m_Model;
+			const auto textures = CheckImportedTextures(context, model);
+			context.Check(textures.size() == 5, "Texture board resolves all five external diagnostic images");
+			const auto pixel = [&](std::string_view filename, uint32_t x, uint32_t y)
+				{
+					std::array<int, 3> value{ -1, -1, -1 };
+					for (size_t i = 0; i < textures.size(); ++i)
+					{
+						const auto& texture = textures[i];
+						if (model.m_TextureSources[i].m_CanonicalPath.filename().string() != filename ||
+							!texture.IsValid() || texture.m_Subresources.empty()) continue;
+						const auto& subresource = texture.m_Subresources.front();
+						if (x >= subresource.m_Width || y >= subresource.m_Height) continue;
+						const size_t offset = static_cast<size_t>(subresource.m_DataOffset + y * subresource.m_RowPitch + x * 4);
+						if (offset + 3 > texture.m_Pixels.size()) continue;
+						for (size_t channel = 0; channel < 3; ++channel)
+							value[channel] = std::to_integer<int>(texture.m_Pixels[offset + channel]);
+					}
+					return value;
+				};
+			context.Check(pixel("Direction.png", 64, 64) == std::array{ 230, 50, 40 } &&
+				pixel("Direction.png", 224, 64) == std::array{ 45, 200, 65 } &&
+				pixel("Direction.png", 64, 224) == std::array{ 45, 95, 230 } &&
+				pixel("Direction.png", 224, 224) == std::array{ 230, 200, 40 },
+				"Direction texture retains red/green top and blue/yellow bottom without pixel conversion");
+			const auto findMaterial = [&](std::string_view name) -> const ImportedMaterial*
+				{
+					const auto it = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
+					return it == model.m_Materials.end() ? nullptr : &*it;
+				};
+			const auto* grayTexture = findMaterial("PROBE_SRGB_Texture");
+			const auto* grayReference = findMaterial("PROBE_SRGB_Factor");
+			context.Check(grayTexture && grayReference && pixel("SRGB128.png", 0, 0) == std::array{ 128, 128, 128 } &&
+				grayTexture->m_Properties.m_BaseColor[0] == 0.5f &&
+				std::abs(grayReference->m_Properties.m_BaseColor[0] - 0.10793025f) < 0.000001f,
+				"sRGB 128 with linear factor 0.5 preserves the independent 0.10793025 linear reference");
+			bool packedChannels = true;
+			const std::array normalPixels{ std::array{ 204, 128, 230 }, std::array{ 51, 128, 230 },
+				std::array{ 128, 204, 230 }, std::array{ 128, 51, 230 } };
+			for (size_t corner = 0; corner < 4; ++corner)
+			{
+				const uint32_t x = corner % 2 == 0 ? 64 : 192;
+				const uint32_t y = corner < 2 ? 64 : 192;
+				const auto mr = pixel("MetallicRoughness.png", x, y);
+				const auto decoy = pixel("MetallicRoughnessDecoy.png", x, y);
+				const int roughness = corner % 2 == 0 ? 64 : 192;
+				const int metallic = corner < 2 ? 0 : 255;
+				const auto* reference = findMaterial(std::format("PROBE_MR_Factor_{}", corner));
+				packedChannels &= mr[1] == roughness && mr[2] == metallic &&
+					decoy[1] == roughness && decoy[2] == metallic && mr[0] + decoy[0] == 255 &&
+					pixel("NormalDirections.png", x, y) == normalPixels[corner] && reference &&
+					std::abs(reference->m_Properties.m_RoughnessFactor - roughness / 255.0f * 0.5f) < 0.000001f &&
+					std::abs(reference->m_Properties.m_MetallicFactor - metallic / 255.0f * 0.5f) < 0.000001f;
+			}
+			const auto* scaled = findMaterial("PROBE_MR_Scaled");
+			context.Check(packedChannels && scaled && scaled->m_Properties.m_RoughnessFactor == 0.5f &&
+				scaled->m_Properties.m_MetallicFactor == 0.5f,
+				"Linear normal/MR bytes, ignored R contrast and independent multiplied factor references survive import");
+			bool bindingsValid = true;
+			for (const auto& material : model.m_Materials)
+			{
+				bindingsValid &= material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Occlusion)].m_TextureIndex ==
+					ImportedMaterialTextureBinding::InvalidTextureIndex;
+				for (size_t slot = 0; slot < material.m_TextureBindings.size(); ++slot)
+				{
+					const auto& binding = material.m_TextureBindings[slot];
+					if (binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex) continue;
+					bindingsValid &= binding.m_TextureIndex < model.m_TextureSources.size() && binding.m_TexCoordIndex == 0 &&
+						binding.m_SamplerKey.m_AddressU == RHITextureAddressMode::Wrap &&
+						binding.m_SamplerKey.m_AddressV == RHITextureAddressMode::Wrap;
+					if (binding.m_TextureIndex < model.m_TextureSources.size())
+						bindingsValid &= model.m_TextureSources[binding.m_TextureIndex].m_Semantic ==
+							GetMaterialTextureSlotSemantic(static_cast<MaterialTextureSlot>(slot));
+				}
+			}
+			context.Check(bindingsValid, "Diagnostic bindings use UV0/repeat with matching semantics and no implicit occlusion");
+			std::array<size_t, 4> probeVertices{};
+			bool basisAndUVValid = true;
+			std::string basisFailure;
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				const auto& mesh = model.m_Meshes[instance.m_MeshIndex];
+				for (const auto& vertex : mesh.m_Vertices)
+				{
+					const Vector3 p = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
+					if (p.m_X > -0.19f || p.m_Y < 1.39f) continue;
+					const bool right = p.m_X > -2.2f;
+					const bool top = p.m_Y > 3.4f;
+					++probeVertices[(top ? 0 : 2) + (right ? 1 : 0)];
+					const float u = (p.m_X - (right ? -2.0f : -4.2f)) / 1.8f;
+					const float repeat = top && right ? 2.0f : 1.0f;
+					const float expectedU = !top && right ? 1.0f - u : u * repeat;
+					const float expectedV = 1.0f - (p.m_Y - (top ? 3.6f : 1.4f)) / 1.8f * repeat;
+					const Vector3 n = math::TransformDirection(vertex.m_Normal, math::CreateNormalMatrix(instance.m_LocalTransform));
+					const Vector3 t = math::TransformDirection(
+						{ vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z }, instance.m_LocalTransform);
+					const Vector3 b = n.Cross(t) * vertex.m_Tangent.m_W;
+					const bool valid = std::abs(vertex.m_TexCoord0.m_X - expectedU) < 0.0001f &&
+						std::abs(vertex.m_TexCoord0.m_Y - expectedV) < 0.0001f &&
+						(n + Vector3::UnitZ).Length() < 0.0001f &&
+						(t - ((!top && right) ? -Vector3::UnitX : Vector3::UnitX)).Length() < 0.0001f &&
+						(b - Vector3::UnitY).Length() < 0.0001f;
+					if (!valid && basisFailure.empty())
+						basisFailure = std::format("; at ({}, {}): UV ({}, {}) expected ({}, {}), N ({}, {}, {}), "
+							"T ({}, {}, {}), B ({}, {}, {})", p.m_X, p.m_Y,
+							vertex.m_TexCoord0.m_X, vertex.m_TexCoord0.m_Y, expectedU, expectedV,
+							n.m_X, n.m_Y, n.m_Z, t.m_X, t.m_Y, t.m_Z, b.m_X, b.m_Y, b.m_Z);
+					basisAndUVValid &= valid;
+				}
+			}
+			context.Check(basisAndUVValid && std::ranges::all_of(probeVertices, [](size_t count) { return count >= 4; }),
+				"Imported UVs preserve orientation/repeat and mirrored tangents preserve normal-map +Y up" + basisFailure);
+		}
+
 		void CheckCoastalAtriumReferenceViews(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{ .m_Width = 1920, .m_Height = 1080 });
@@ -79,19 +226,47 @@ namespace gglab
 				return;
 			}
 			const auto& model = imported.m_Model;
-			context.Check(model.m_TextureSources.empty() &&
+			context.Check(model.m_TextureSources.size() == 9 &&
 				std::ranges::all_of(model.m_Materials, [](const ImportedMaterial& material) noexcept
 					{
-						return material.m_Properties.m_AlphaMode == AlphaMode::Opaque &&
-							material.m_Properties.m_MetallicFactor == 0.0f;
-					}), "Atrium greybox uses opaque untextured dielectric materials");
+						return material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+					}), "Atrium uses nine original textures with opaque materials");
+			CheckImportedTextures(context, model);
+			for (const auto name : { "MAT_Concrete", "MAT_Paving", "MAT_Structure" })
+			{
+				const auto material = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
+				bool valid = material != model.m_Materials.end();
+				if (valid)
+				{
+					valid = material->m_Properties.m_RoughnessFactor == 1.0f &&
+						material->m_Properties.m_MetallicFactor == (std::string_view(name) == "MAT_Structure" ? 1.0f : 0.0f);
+					for (const auto slot : { MaterialTextureSlot::BaseColor, MaterialTextureSlot::Normal, MaterialTextureSlot::MetallicRoughness })
+					{
+						const auto& binding = material->m_TextureBindings[static_cast<size_t>(slot)];
+						valid &= binding.m_TextureIndex < model.m_TextureSources.size() && binding.m_TexCoordIndex == 0;
+					}
+				}
+				context.Check(valid, std::format("{} imports base color, normal and MR with the intended factors", name));
+			}
 
 			// Probe imported world triangles, independent of Assimp mesh merging or names.
 			std::vector<std::array<Vector3, 3>> triangles;
 			bool bounded = true;
+			bool texturedBasisValid = true;
 			for (const auto& instance : model.m_MeshInstances)
 			{
 				const auto& mesh = model.m_Meshes[instance.m_MeshIndex];
+				const auto& material = model.m_Materials[instance.m_MaterialIndex];
+				if (material.m_Name != "MAT_OceanPlaceholder")
+				{
+					for (const auto& vertex : mesh.m_Vertices)
+					{
+						const Vector3 t(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
+						texturedBasisValid &= std::isfinite(vertex.m_TexCoord0.m_X) && std::isfinite(vertex.m_TexCoord0.m_Y) &&
+							std::abs(t.LengthSquared() - 1.0f) < 0.001f && std::abs(t.Dot(vertex.m_Normal)) < 0.001f &&
+							std::abs(vertex.m_Tangent.m_W) == 1.0f;
+					}
+				}
 				for (size_t index = 0; index + 2 < mesh.m_Indices.size(); index += 3)
 				{
 					std::array<Vector3, 3> triangle;
@@ -110,6 +285,7 @@ namespace gglab
 			context.Check(bounded && triangles.size() == 1046,
 				std::format("Atrium keeps a bounded 72 by 64 meter footprint and 1046 triangles (actual: {})",
 					triangles.size()));
+			context.Check(texturedBasisValid, "Textured atrium preserves finite UVs and an orthonormal tangent basis");
 			const auto nearestHit = [&](const Vector3& origin, const Vector3& direction) noexcept
 				{
 					float nearest = std::numeric_limits<float>::infinity();
@@ -318,13 +494,13 @@ namespace gglab
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
-		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 5 &&
+		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 6 &&
 			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }) &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.shader_graph_preview"); }),
-			"Windows desktop composition includes five Demo entries and eighteen Labs");
+			"Windows desktop composition includes six Demo entries and eighteen Labs");
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded() &&
@@ -334,6 +510,9 @@ namespace gglab
 		context.Check(ResolveApplicationContentSelection(
 			desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
 			"Coastal atrium is selectable alongside the import prototype");
+		context.Check(ResolveApplicationContentSelection(
+			desktop, DesktopTextureContractDemoId, DesktopDefaultLabId).Succeeded(),
+			"Texture contract is selectable through the normal application content path");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
 			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
@@ -359,7 +538,14 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.shader_graph_preview", 35,
 			"Shader Graph Preview selection contributes both pinned Pixel Program demands");
 		CheckIslandContent(context);
-		CheckCoastalAtriumContent(context);
 		CheckCoastalAtriumReferenceViews(context);
+		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.
+		std::thread textureWorker([&]
+			{
+				const auto workerContext = win32::Win32TaskWorkerLifecycle{}.CreateContext(0);
+				CheckCoastalAtriumContent(context);
+				CheckTextureContractContent(context);
+			});
+		textureWorker.join();
 	}
 }

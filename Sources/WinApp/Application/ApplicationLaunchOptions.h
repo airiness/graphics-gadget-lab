@@ -16,6 +16,7 @@ namespace gglab
 		Playground,
 		Island,
 		CoastalAtrium,
+		TextureContract,
 		LabHost,
 	};
 

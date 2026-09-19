@@ -3,6 +3,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
+#include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
@@ -21,6 +22,7 @@
 #include <Windows.h>
 
 #include <atomic>
+#include <array>
 #include <chrono>
 #include <concepts>
 #include <cwctype>
@@ -978,6 +980,65 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
+		void RunGltfTangentImportTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const auto root = std::filesystem::temp_directory_path(errorCode) /
+				std::format("gglab-tangent-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
+			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
+			context.Check(created && !errorCode, "glTF tangent regression creates an isolated fixture directory");
+			if (!created || errorCode) return;
+			for (const bool authored : { false, true })
+			{
+				for (const bool mirrored : { false, true })
+				{
+					const float sign = mirrored ? -1.0f : 1.0f;
+					const float left = mirrored ? 1.0f : 0.0f;
+					const float right = 1.0f - left;
+					const std::array<float, 36> data = {
+						0, 0, 0, 1, 0, 0, 0, 1, 0,
+						0, 0, 1, 0, 0, 1, 0, 0, 1,
+						sign, 0, 0, sign, sign, 0, 0, sign, sign, 0, 0, sign,
+						left, 1, right, 1, left, 0,
+					};
+					{
+						std::ofstream buffer(root / "probe.bin", std::ios::binary);
+						buffer.write(reinterpret_cast<const char*>(data.data()), sizeof(data));
+						std::ofstream gltf(root / "probe.gltf");
+						gltf << R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],
+"nodes":[{"mesh":0}],"buffers":[{"uri":"probe.bin","byteLength":144}],
+"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},
+{"buffer":0,"byteOffset":36,"byteLength":36},{"buffer":0,"byteOffset":72,"byteLength":48},
+{"buffer":0,"byteOffset":120,"byteLength":24}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},
+{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+{"bufferView":2,"componentType":5126,"count":3,"type":"VEC4"},
+{"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":3)"
+							<< (authored ? ",\"TANGENT\":2" : "") << "}}]}]}";
+					}
+					const auto result = ModelImporter::Import(root / "probe.gltf", {});
+					bool valid = result.Succeeded();
+					for (const auto& mesh : result.m_Model.m_Meshes)
+					{
+						for (const auto& vertex : mesh.m_Vertices)
+						{
+							const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
+							const Vector3 bitangent = vertex.m_Normal.Cross(tangent) * vertex.m_Tangent.m_W;
+							valid &= (vertex.m_Normal + Vector3::UnitZ).Length() < 0.0001f &&
+								(tangent - Vector3(sign, 0, 0)).Length() < 0.0001f &&
+								(bitangent - Vector3::UnitY).Length() < 0.0001f;
+						}
+					}
+					context.Check(valid, std::format("glTF {} tangents preserve normal-map +Y up with {} UVs: {}",
+						authored ? "authored" : "generated", mirrored ? "mirrored" : "regular", result.m_Error));
+				}
+			}
+			std::filesystem::remove(root / "probe.gltf", errorCode);
+			std::filesystem::remove(root / "probe.bin", errorCode);
+			std::filesystem::remove(root, errorCode);
+		}
+
 		void RunModelImportArtifactTests(SelfTestContext& context) noexcept
 		{
 			{
@@ -1495,6 +1556,7 @@ namespace gglab
 		RunLocalDerivedDataStoreTests(context);
 		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
+		RunGltfTangentImportTests(context);
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
 		RunIBLCacheControlTests(context);

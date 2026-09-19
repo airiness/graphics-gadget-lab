@@ -62,7 +62,8 @@ and lighting preset:
 [island asset and validation notes](Assets/Models/GGLabIslandPrototype/README.md)
 for export instructions, baseline settings, and verification evidence.
 
-The coastal atrium greybox adds the architectural shadow study scene:
+The coastal atrium adds the architectural shadow study scene with basic concrete,
+stone and metal materials:
 
     GraphicsGadgetLab.exe --demo atrium --rhi dx12 --absolute-mouse
     GraphicsGadgetLab.exe --demo atrium --rhi vulkan --absolute-mouse
@@ -73,6 +74,15 @@ shadow stairs and interior/exterior views; `Restore Reference View` returns to
 the selected pose after navigation. See the
 [atrium asset notes](Assets/Models/GGLabCoastalAtrium/README.md) for source
 provenance, dimensions, camera records and verification coverage.
+
+The texture contract board isolates UVs, color space, tangent normals and packed
+metallic/roughness inputs through the same Playground material path:
+
+    GraphicsGadgetLab.exe --demo texture-contract --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --demo texture-contract --rhi vulkan --absolute-mouse
+
+See the [texture contract notes](Assets/Models/GGLabTextureContract/README.md)
+for the board layout, numeric references and CPU/GPU verification scope.
 
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12

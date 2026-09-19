@@ -1,22 +1,24 @@
 # GGLab Coastal Atrium
 
-Original project greybox for the coastal courtyard, colonnade, stairs, corridor
-and platform. The 86 authored meshes export as 1046 triangles and five opaque
-untextured dielectric materials. Load the `.gltf` with its adjacent `.bin`.
+Original project coastal courtyard, colonnade, stairs, corridor and platform.
+The 86 authored meshes retain 1046 triangles and five opaque materials. Basic
+concrete, stone and metal surfaces use nine original procedural PNGs. Load the
+`.gltf` with its adjacent `.bin` and `Textures/` directory.
 
 ## Source
 
 - Repository: `GraphicsGadgetLabContent`.
 - Saved source: `Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend`.
 - Generator: `Scripts/create_coastal_atrium.py`.
+- Material authoring: `Scripts/apply_coastal_atrium_materials.py`.
 - Exporter: `Scripts/export_gltf.py`, Blender 5.1.1 / glTF I/O 5.1.19.
-- Source SHA-256: `34962d6fb0ed91c51c9e5d3632516aaa1ef93e46e8988f625fe414da8b0c9521`.
-- glTF SHA-256: `54ad1232f56a512ff18c619d799a24dd16fb10c3652c550fa70f20ad3feb5e07`.
-- Buffer SHA-256: `35fa68839620ab3ef412d0a61fed3a7ff790f55d1a6e21e11ab198ca704c79e9`.
+- Source SHA-256: `b9db2295a3e0376265f60d031ab83851ccdf539afcb8396d122996f93439c677`.
+- glTF SHA-256: `9653f683b198613b8795fcb28cb1fac2e1b5b3f5761bd3ccb3a60e1c6417624b`.
+- Buffer SHA-256: `b31b36f65c0eb2aaca8ca280aa50ebe2446138bcf0ef4c957c4e4bcffbe52e7e`.
 
 The source was exported from the Content working tree; hashes identify the
-delivery without requiring an unpublished commit. No third-party assets or
-textures are used. The original island import fixture remains separate.
+delivery without requiring an unpublished commit. No third-party assets are
+used. The original island import fixture remains separate.
 
 From the code repository root:
 
@@ -30,6 +32,26 @@ From the code repository root:
 Export reads the saved `.blend` without replacing it. Runtime content is loaded
 when entering the Demo; automatic file watching is not provided. The Blender
 exporter reports 240 unfreed blocks (0.109253 MB) at shutdown with exit code 0.
+
+## Basic materials
+
+| Material | Surfaces | Textures | Metallic / roughness |
+| --- | --- | --- | --- |
+| `MAT_Concrete` | Walls, columns and roofs | 512 square concrete set | 0 / approximately 0.76-0.88 |
+| `MAT_Paving` | Courtyard, stairs and platform | 512 square stone set | 0 / approximately 0.63-0.88 |
+| `MAT_Structure` | Pergola and railings | 256 square brushed metal set | 1 / approximately 0.31-0.41 |
+| `MAT_CoastalRock` | Terrain shelves | Concrete set with darker linear tint | 0 / concrete roughness |
+| `MAT_OceanPlaceholder` | Bounded sea plane | Untextured | 0 / 0.15 |
+
+Each set contains sRGB base color, linear +Y tangent normal and linear packed
+metallic/roughness (G roughness, B metallic). All normal scales are 1; no separate
+occlusion texture is bound. UV0 uses face projection at 2 meters per repeat;
+paving has staggered 0.5 meter tiles. Textures supply detail without adding
+geometry. Source PNGs and exported PNGs are byte-identical. N-gons are triangulated
+only in the transient export scene so Blender can emit complete tangent data.
+
+The [texture contract board](../GGLabTextureContract/README.md) supplies independent
+channel/factor and normal-direction comparisons for this authoring path.
 
 ## Runtime preset
 
@@ -116,6 +138,29 @@ does not promise identical jitter, frame sequence or deterministic replay.
 
 ## Validation record
 
+### Basic material checks
+
+On 2026-09-17, the real-asset CPU suite passed 58 checks, including all nine
+atrium textures, semantic decoding/mipmaps and the separate diagnostic board.
+Geometry probes still establish the 1046 triangles, elevations, ten stair treads,
+wall thickness, openings and pergola gaps. Camera profiles and startup lighting
+remain unchanged. Three updated Blender previews were rendered and inspected;
+they do not establish GGLab GPU correctness for the new materials.
+
+WinApp Debug builds passed with and without PCH. The `asset-data`,
+`app-launch-options` and `app-host-configuration` suites passed 90, 30 and 12
+checks respectively; project boundaries and generated filters passed. Final
+saved-source checks on 2026-09-18 confirmed nine packed images, unchanged
+geometry/camera/light records and a repeat export with identical glTF/buffer
+bytes. The exporter preserved the saved source SHA-256.
+
+The earlier wave pattern was isolated by disabling shadows, disabling 3x3 PCF,
+and temporarily setting receiver depth bias to 0.0001. The observed reduction
+identifies shadow self-occlusion under the current PCF/bias settings, independent
+of these new textures. Shadow sampling and bias defaults are deliberately
+unchanged in this material delivery. DX12/Vulkan material display and GPU logs
+are still awaiting runtime visual verification; Rendering Baseline 1 is not frozen.
+
 ### Reference camera checks
 
 Completed on 2026-09-16:
@@ -175,7 +220,7 @@ The Demo selection and backend panel labels identify the content and renderer.
 
 Both original PNG files are preserved at 1922 by 1112, including window chrome
 and DevTools. They are visual smoke references, not pixel-comparison golden images
-or measured client extents. Fine surface patterns visible in both captures have
-not been diagnosed by this static comparison. Runtime visual checks of the other two
+or measured client extents. The later shadow isolation experiments are recorded
+above. Runtime visual checks of the other two
 candidate views, motion stability, detailed shadow quality, GPU validation logs,
 Release builds and edited-export reload are outside this record.

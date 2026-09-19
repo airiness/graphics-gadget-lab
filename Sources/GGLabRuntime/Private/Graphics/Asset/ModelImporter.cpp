@@ -245,10 +245,30 @@ namespace gglab
 			aiProcess_SortByPType | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph;
 		progress.Report(
 			0.08f, "Parsing model with Assimp", canonicalPath.filename().generic_string());
-		const aiScene* scene = importer.ReadFile(canonicalPath.string(), importFlags);
+		const aiScene* scene = importer.ReadFile(canonicalPath.string(), 0);
 		if (!scene)
 		{
 			result.m_Error = std::format("Assimp failed to load model '{}': {}",
+				canonicalPath.string(), importer.GetErrorString());
+			return result;
+		}
+		// Assimp's MakeLeftHanded pass reflects authored bitangents and also negates
+		// them. glTF normal maps require only the spatial reflection: preserve their
+		// +Y-up tangent basis by cancelling that extra negation before processing.
+		// Do this before CalcTangentSpace so generated tangents remain untouched.
+		for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)
+		{
+			aiMesh* mesh = scene->mMeshes[meshIndex];
+			if (!mesh->HasTangentsAndBitangents()) continue;
+			for (uint32_t vertexIndex = 0; vertexIndex < mesh->mNumVertices; ++vertexIndex)
+			{
+				mesh->mBitangents[vertexIndex] *= -1.0f;
+			}
+		}
+		scene = importer.ApplyPostProcessing(importFlags);
+		if (!scene)
+		{
+			result.m_Error = std::format("Assimp failed to process model '{}': {}",
 				canonicalPath.string(), importer.GetErrorString());
 			return result;
 		}

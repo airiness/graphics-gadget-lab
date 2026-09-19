@@ -49,6 +49,9 @@ namespace gglab
 		case ApplicationStartupDemo::CoastalAtrium:
 			config.m_StartupDemoId = DesktopCoastalAtriumDemoId;
 			break;
+		case ApplicationStartupDemo::TextureContract:
+			config.m_StartupDemoId = DesktopTextureContractDemoId;
+			break;
 		case ApplicationStartupDemo::Start:
 		default:
 			config.m_StartupDemoId = DesktopStartDemoId;

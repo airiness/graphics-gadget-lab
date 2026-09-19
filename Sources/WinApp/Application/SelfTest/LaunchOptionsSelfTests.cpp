@@ -24,6 +24,8 @@ namespace gglab
 				{ "Demo.Playground.Island", ApplicationStartupDemo::Island },
 				{ "atrium", ApplicationStartupDemo::CoastalAtrium },
 				{ "Demo.Playground.CoastalAtrium", ApplicationStartupDemo::CoastalAtrium },
+				{ "texture-contract", ApplicationStartupDemo::TextureContract },
+				{ "Demo.Playground.TextureContract", ApplicationStartupDemo::TextureContract },
 			};
 			for (const auto& alias : aliases)
 			{
