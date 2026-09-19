@@ -237,6 +237,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Main.cpp">
       <Filter>Application</Filter>
     </ClCompile>
@@ -549,6 +552,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h">

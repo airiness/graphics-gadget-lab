@@ -45,6 +45,17 @@ Vulkan SDK.
     GraphicsGadgetLab.exe --rhi dx12 --lab gglab.lab.mini_pbr_grid --absolute-mouse
     GraphicsGadgetLab.exe --rhi vulkan --lab gglab.lab.mini_pbr_grid --absolute-mouse
 
+The Texture Contract Lab isolates UVs, color space, tangent normals and packed
+metallic/roughness inputs through the production asset and Forward PBR path:
+
+    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi vulkan --absolute-mouse
+
+It is also available as `Texture Contract` in `Lab Control > Active Lab` while
+`Demo.LabHost` is active. See the
+[texture contract notes](Assets/Models/GGLabTextureContract/README.md) for the
+board layout, numeric references and CPU/GPU verification scope.
+
 Run with `--help` to see the available startup options.
 
 The application starts in FPS mouse mode. Press `T` to release the cursor and
@@ -74,15 +85,6 @@ shadow stairs and interior/exterior views; `Restore Reference View` returns to
 the selected pose after navigation. See the
 [atrium asset notes](Assets/Models/GGLabCoastalAtrium/README.md) for source
 provenance, dimensions, camera records and verification coverage.
-
-The texture contract board isolates UVs, color space, tangent normals and packed
-metallic/roughness inputs through the same Playground material path:
-
-    GraphicsGadgetLab.exe --demo texture-contract --rhi dx12 --absolute-mouse
-    GraphicsGadgetLab.exe --demo texture-contract --rhi vulkan --absolute-mouse
-
-See the [texture contract notes](Assets/Models/GGLabTextureContract/README.md)
-for the board layout, numeric references and CPU/GPU verification scope.
 
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12

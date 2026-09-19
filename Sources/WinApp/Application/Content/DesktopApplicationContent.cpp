@@ -20,6 +20,7 @@
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
+#include "Application/Lab/Sessions/TextureContractLabSession.h"
 #include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "Lab/LabRuntime.h"
@@ -54,12 +55,6 @@ namespace gglab
 			const LabId&, std::span<const LabRegistration>) noexcept
 		{
 			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::CoastalAtrium);
-		}
-
-		std::unique_ptr<DemoBase> CreateTextureContractDemo(const DemoCreateInfo& createInfo,
-			const LabId&, std::span<const LabRegistration>) noexcept
-		{
-			return std::make_unique<DemoPlayground>(createInfo, PlaygroundContent::TextureContract);
 		}
 
 		std::unique_ptr<DemoBase> CreateLabHostDemo(const DemoCreateInfo& createInfo,
@@ -97,10 +92,6 @@ namespace gglab
 				.m_Factory = &CreateCoastalAtriumDemo,
 			},
 			{
-				.m_Id = std::string(DesktopTextureContractDemoId),
-				.m_Factory = &CreateTextureContractDemo,
-			},
-			{
 				.m_Id = std::string(DesktopLabHostDemoId),
 				.m_Factory = &CreateLabHostDemo,
 				.m_ProvidesLabRuntime = true,
@@ -109,6 +100,7 @@ namespace gglab
 		registration.m_Labs = {
 			{ CullingLabSession::GetDescriptor(), &CullingLabSession::Create },
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
+			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },
 			{ PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create },
 			{ RenderGraphComputeLabSession::GetDescriptor(),
 				&RenderGraphComputeLabSession::Create,

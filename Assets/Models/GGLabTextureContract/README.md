@@ -1,6 +1,6 @@
 # GGLab Texture Contract
 
-Original diagnostic content for the rendering playground's material input checks.
+Original diagnostic content for the Texture Contract Lab's material input checks.
 The board has 18 meshes, 36 triangles, 15 exported materials and five PNG images.
 Keep the `.gltf`, adjacent `.bin` and `Textures/` together.
 
@@ -19,19 +19,23 @@ Exported with Blender 5.1.1 / glTF I/O 5.1.19.
 | `.bin` | `8936806ef89ac8d2c0d3e7e2c90f89b2598e89029d29b3151779a37e84f1f809` |
 
 ```powershell
-./Build/Output/x64/Debug/GraphicsGadgetLab.exe --demo texture-contract --rhi dx12 --absolute-mouse
-./Build/Output/x64/Debug/GraphicsGadgetLab.exe --demo texture-contract --rhi vulkan --absolute-mouse
+./Build/Output/x64/Debug/GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi dx12 --absolute-mouse
+./Build/Output/x64/Debug/GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi vulkan --absolute-mouse
 ./Build/Output/x64/Debug/GraphicsGadgetLab.exe --self-test app-content-registration
 ```
 
-`Demo.Playground.TextureContract` uses the normal Playground asset preparation,
-material upload and Forward PBR path. Its camera is `(0, 2.3, -12.5)`, looking at
+`gglab.lab.texture_contract` is a scene Lab in the `Materials` category, selected
+as `Texture Contract` in `Lab Control > Active Lab` under `Demo.LabHost`.
+It uses asynchronous asset preparation, material upload and the production
+Forward PBR path. LabRuntime queues switches and retains retired session assets
+until GPU work completes. Its camera is `(0, 2.3, -12.5)`, looking at
 `(0, 2.3, 0)`, with vertical FOV 0.6509917105 radians, near/far 0.1/50 m and
 reference aspect 16:9. `Scene > Camera > Reference Views` restores this view.
 The white directional light has intensity 3 and normalized ray direction
 `(-0.45, -0.65, 1)`. Shadows, environment lighting, skybox, TAA, GTAO and bloom are
-disabled for this diagnostic preset; exposure is 0 EV. Atrium shadow settings are
-independent and unchanged.
+disabled for this diagnostic preset; exposure is 0 EV. The environment override
+starts only when the prepared session becomes active and restores the previous
+intensity and skybox state on exit.
 
 ## Board layout
 

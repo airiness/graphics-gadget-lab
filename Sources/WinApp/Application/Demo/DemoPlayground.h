@@ -22,7 +22,6 @@ namespace gglab
 		Sponza,
 		Island,
 		CoastalAtrium,
-		TextureContract,
 	};
 
 	class DemoPlayground : public DemoBase

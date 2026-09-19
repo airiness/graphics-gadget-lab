@@ -494,13 +494,13 @@ namespace gglab
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
-		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 6 &&
-			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
+		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 5 &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }) &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.shader_graph_preview"); }),
-			"Windows desktop composition includes six Demo entries and eighteen Labs");
+			"Windows desktop composition includes five Demo entries and nineteen Labs");
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded() &&
@@ -511,8 +511,11 @@ namespace gglab
 			desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
 			"Coastal atrium is selectable alongside the import prototype");
 		context.Check(ResolveApplicationContentSelection(
-			desktop, DesktopTextureContractDemoId, DesktopDefaultLabId).Succeeded(),
-			"Texture contract is selectable through the normal application content path");
+			desktop, DesktopLabHostDemoId, "gglab.lab.texture_contract").Succeeded(),
+			"Texture contract is selectable through LabHost");
+		context.Check(!ResolveApplicationContentSelection(
+			desktop, "Demo.Playground.TextureContract", DesktopDefaultLabId).Succeeded(),
+			"Texture contract is not registered as a standalone Demo");
 		const auto rendererDemands = shader_programs::GetRendererInitialShaderProgramDemand();
 		context.Check(std::ranges::find(
 			rendererDemands, shader_programs::TemporalAAReprojectionCompute) != rendererDemands.end(),
@@ -537,6 +540,8 @@ namespace gglab
 			"Napa voxel selection contributes two stable shader demands");
 		checkSelectedDemand("gglab.lab.shader_graph_preview", 35,
 			"Shader Graph Preview selection contributes both pinned Pixel Program demands");
+		checkSelectedDemand("gglab.lab.texture_contract", 33,
+			"Texture contract uses the production renderer's shader demands");
 		CheckIslandContent(context);
 		CheckCoastalAtriumReferenceViews(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.

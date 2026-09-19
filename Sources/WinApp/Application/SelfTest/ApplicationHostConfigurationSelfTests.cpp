@@ -58,12 +58,14 @@ namespace gglab
 			"Coastal atrium launch policy selects its stable Playground content identity");
 
 		ApplicationLaunchOptions textureOptions{};
-		textureOptions.m_StartupDemo = ApplicationStartupDemo::TextureContract;
+		textureOptions.m_StartupDemo = ApplicationStartupDemo::LabHost;
+		textureOptions.m_StartupLabId = "gglab.lab.texture_contract";
 		const AppRuntimeConfig textureConfig = TranslateApplicationLaunchOptions(
 			textureOptions, { 1920, 1080 }, true);
 		context.Check(textureConfig.IsValid() &&
-			textureConfig.m_StartupDemoId == "Demo.Playground.TextureContract",
-			"Texture contract launch policy selects its stable Playground content identity");
+			textureConfig.m_StartupDemoId == "Demo.LabHost" &&
+			textureConfig.m_StartupLabId == "gglab.lab.texture_contract",
+			"Texture contract launch policy preserves its stable Lab identity");
 
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";

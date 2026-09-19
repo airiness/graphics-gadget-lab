@@ -8,7 +8,6 @@
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
-#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
@@ -65,21 +64,6 @@ namespace gglab
 			const bool restored = m_CameraRig.RestoreReferenceView(CoastalAtriumReferenceViews.front().m_Id);
 			GGLAB_ASSERT_MSG(restored, "Coastal atrium must start at its courtyard reference view.");
 		}
-		else if (m_Content == PlaygroundContent::TextureContract)
-		{
-			const bool registered = m_CameraRig.SetReferenceViews({ CameraReferenceView{
-				.m_Id = "CAM_TextureContract",
-				.m_Name = "Texture Contract",
-				.m_Purpose = "Top: UV and sRGB. Middle: tangent normals. Bottom: metallic/roughness.",
-				.m_Position = { 0.0f, 2.3f, -12.5f },
-				.m_Target = { 0.0f, 2.3f, 0.0f },
-				.m_VerticalFovDegrees = math::ToDegrees(0.6509917105f),
-				.m_FarPlane = 50.0f,
-			} });
-			GGLAB_ASSERT_MSG(registered, "Texture contract reference view must be valid.");
-			const bool restored = m_CameraRig.RestoreReferenceView("CAM_TextureContract");
-			GGLAB_ASSERT_MSG(restored, "Texture contract must start at its reference view.");
-		}
 
 		// RenderPipeline
 		m_RenderPipeline = CreateRenderPipelineForwardPBR();
@@ -87,10 +71,6 @@ namespace gglab
 
 	std::string_view DemoPlayground::GetName() const noexcept
 	{
-		if (m_Content == PlaygroundContent::TextureContract)
-		{
-			return DesktopTextureContractDemoId;
-		}
 		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
 			return DesktopCoastalAtriumDemoId;
@@ -103,13 +83,7 @@ namespace gglab
 	{
 		m_AssetOwnerScope.Reset();
 		m_World.GetRegistry().clear();
-		if (m_Content == PlaygroundContent::TextureContract)
-		{
-			m_PendingModels = {
-				{ .m_Path = "Assets/Models/GGLabTextureContract/GGLabTextureContract.gltf" },
-			};
-		}
-		else if (m_Content == PlaygroundContent::CoastalAtrium)
+		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
 			m_PendingModels = {
 				{ .m_Path = "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf" },
@@ -306,10 +280,6 @@ namespace gglab
 			{
 				direction = Vector3(-1.0f, -0.85f, 0.35f);
 			}
-			else if (m_Content == PlaygroundContent::TextureContract)
-			{
-				direction = Vector3(-0.45f, -0.65f, 1.0f);
-			}
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);
@@ -319,11 +289,7 @@ namespace gglab
 			lightComp.m_Color = Color::White;
 			lightComp.m_Type = LightType::Directional;
 			lightComp.m_Range = 1000.0f;
-			// The texture board isolates material inputs from shadow filtering artifacts.
-			if (m_Content != PlaygroundContent::TextureContract)
-			{
-				lightComp.m_DirectionalShadowSettings.emplace();
-			}
+			lightComp.m_DirectionalShadowSettings.emplace();
 			registry.emplace<components::LightComponent>(mainLightEntity, lightComp);
 		}
 	}
