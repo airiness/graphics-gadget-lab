@@ -80,9 +80,7 @@ namespace gglab
 					}
 					return true;
 				};
-			const auto immutableRoot = std::filesystem::exists(
-				runtimeRoot.parent_path() / "environment.json") ? runtimeRoot.parent_path() : runtimeRoot;
-			if (isWithin(stateRoot, immutableRoot) || isWithin(immutableRoot, stateRoot))
+			if (isWithin(stateRoot, runtimeRoot) || isWithin(runtimeRoot, stateRoot))
 			{
 				return {};
 			}

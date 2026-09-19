@@ -404,6 +404,6 @@ FodyWeavers.xsd
 *.sln.iml
 *.dat
 
-# Environment publication and native qualification products.
+# Local build and verification products (including retired qualification outputs).
 /Build/EnvironmentQualification/
 /Build/Output/
