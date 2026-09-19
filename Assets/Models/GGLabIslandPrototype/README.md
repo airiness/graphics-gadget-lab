@@ -8,9 +8,11 @@ external `.bin` buffer. Load the `.gltf`, keeping both files together.
 
 ## Source and export
 
-- Content revision: `cad63a6` (`Init commit`).
+- Content revision: `cad63a6`.
 - Source: `Scenes/GGLabIslandPrototype/GGLabIslandPrototype.blend`.
 - Source SHA-256: `8f5bd0b5c411d04b058247092823716cafc5e0f849bc5b558297f8d9853ae019`.
+- glTF SHA-256: `b971bb89c2fc23f11156ff4ac67e97688e1c50df19b7cf7864d5c40f6e4c3c59`.
+- Buffer SHA-256: `88bd7f695c7d78fab7972a9e1e02efbe0356efbcdb05ee5bf36697951a12db0e`.
 - Exporter: `Scripts/export_gltf.py`, Blender 5.1.1, glTF I/O 5.1.19.
 - These are original project primitives, with no third-party model or texture inputs.
 
@@ -25,10 +27,9 @@ and Blender installation if needed:
 
 The exporter reads the saved `.blend`; it does not regenerate or overwrite it.
 Restart the island Demo after re-exporting. This workflow does not provide live
-file watching. The exporter currently reports 240 unfreed blocks (0.109253 MB)
-on process shutdown, after a successful export and exit code 0.
+file watching.
 
-## Runtime baseline
+## Runtime preset
 
 ```powershell
 ./Build/Output/x64/Debug/GraphicsGadgetLab.exe --demo island --rhi dx12 --absolute-mouse --no-devtools
@@ -72,45 +73,15 @@ rotated parent/child and nonuniform scale), 106 triangles, transformed normals
 against triangle planes, absence of texture sources, and linear RGBA/M/R factors.
 Assimp currently merges the seven source meshes into four instances; preserving
 source mesh names/counts is not part of the import contract. Expected geometry and
-materials are tied to this fixture baseline.
+materials are defined by this fixture.
 
-## Validation record
-
-Automated checks completed on 2026-09-14, based on code revision `41aae58a` plus
-this working-tree change:
-
-| Check | Result |
-| --- | --- |
-| WinApp Debug x64 build, `GGLAB_USE_PCH=0` | Passed |
-| `app-content-registration` | 16 checks passed, including actual glTF import |
-| `app-host-configuration` | 10 checks passed |
-| `app-launch-options` | 21 checks passed |
-| `app-lifecycle` | 11 checks passed |
-| External buffer closure | Byte length and all buffer-view ranges passed |
-| Source preservation | Source hash unchanged; Content working tree clean |
-
-Export SHA-256 values:
-
-- `.gltf`: `b971bb89c2fc23f11156ff4ac67e97688e1c50df19b7cf7864d5c40f6e4c3c59`.
-- `.bin`: `88bd7f695c7d78fab7972a9e1e02efbe0356efbcdb05ee5bf36697951a12db0e`.
-
-The reference screenshots show consistent geometry placement, colors, and shadow
-positions on Vulkan and DirectX 12, with no obvious missing model parts or
-axis/scale errors in the captured view. Their visible backend panel labels identify
-the respective renderer. Basic static display passed on both backends.
+## Screenshots
 
 | Backend | Reference capture |
 | --- | --- |
 | Vulkan | [Window capture](../../Media/GGLabIslandPrototype/island-vulkan-baseline.png) |
 | DirectX 12 | [Window capture](../../Media/GGLabIslandPrototype/island-dx12-baseline.png) |
 
-Both original PNG files are preserved without modification at `1922 x 1112`,
-including window chrome and DevTools; this is not the measured client extent.
-These are visual smoke references rather than pixel-comparison golden images.
-Adapter/driver details and runtime validation logs are not included. The dark
-metallic block is consistent with the disabled environment lighting described above.
-
-Whole-entity movement passed manual verification. No suspicious logs were reported
-on either backend; raw GPU validation logs are not archived here. Edited-export
-reload in GGLab was deferred when starting the coastal atrium greybox. Release
-builds are outside this recorded validation.
+The PNGs are 1922 by 1112, including window chrome and DevTools. They show the
+runtime preset on each backend and are visual references, not pixel-comparison
+golden images.

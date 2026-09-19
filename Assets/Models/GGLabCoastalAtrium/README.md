@@ -1,9 +1,9 @@
 # GGLab Coastal Atrium
 
 Original project coastal courtyard, colonnade, stairs, corridor and platform.
-The 86 authored meshes retain 1046 triangles and five opaque materials. Basic
-concrete, stone and metal surfaces use nine original procedural PNGs. Load the
-`.gltf` with its adjacent `.bin` and `Textures/` directory.
+The asset contains 86 authored meshes, 1046 triangles and five opaque materials.
+Basic concrete, stone and metal surfaces use nine original procedural PNGs.
+Load the `.gltf` with its adjacent `.bin` and `Textures/` directory.
 
 ## Source
 
@@ -16,9 +16,7 @@ concrete, stone and metal surfaces use nine original procedural PNGs. Load the
 - glTF SHA-256: `9653f683b198613b8795fcb28cb1fac2e1b5b3f5761bd3ccb3a60e1c6417624b`.
 - Buffer SHA-256: `b31b36f65c0eb2aaca8ca280aa50ebe2446138bcf0ef4c957c4e4bcffbe52e7e`.
 
-The source was exported from the Content working tree; hashes identify the
-delivery without requiring an unpublished commit. No third-party assets are
-used. The original island import fixture remains separate.
+No third-party assets are used. The island import fixture is a separate asset.
 
 From the code repository root:
 
@@ -30,8 +28,7 @@ From the code repository root:
 ```
 
 Export reads the saved `.blend` without replacing it. Runtime content is loaded
-when entering the Demo; automatic file watching is not provided. The Blender
-exporter reports 240 unfreed blocks (0.109253 MB) at shutdown with exit code 0.
+when entering the Demo; automatic file watching is not provided.
 
 ## Basic materials
 
@@ -47,8 +44,8 @@ Each set contains sRGB base color, linear +Y tangent normal and linear packed
 metallic/roughness (G roughness, B metallic). All normal scales are 1; no separate
 occlusion texture is bound. UV0 uses face projection at 2 meters per repeat;
 paving has staggered 0.5 meter tiles. Textures supply detail without adding
-geometry. Source PNGs and exported PNGs are byte-identical. N-gons are triangulated
-only in the transient export scene so Blender can emit complete tangent data.
+geometry. N-gons are triangulated only in the transient export scene so Blender
+can emit complete tangent data.
 
 The [texture contract board](../GGLabTextureContract/README.md) supplies independent
 channel/factor and normal-direction comparisons for this authoring path.
@@ -85,7 +82,7 @@ The default runtime view reproduces `CAM_Courtyard`. All three source cameras
 have explicit runtime profiles described below. glTF cameras and Sun remain
 reference data; the Demo configures its camera and light separately. The Blender
 World and AgX previews are not runtime baselines. Interior darkness with
-environment lighting disabled is expected at this stage.
+environment lighting disabled is expected.
 
 ## Reference camera profiles
 
@@ -97,8 +94,7 @@ requests a temporal reset through the existing camera-cut contract. It does not
 create additional render views. Current viewport dimensions and aspect remain
 in effect; the panel reports a mismatch with the intended 16:9 composition.
 
-Profile 1 is provisional greybox composition, not Rendering Baseline 1. Runtime
-definitions live in
+The reference views use profile version 1. Runtime definitions live in
 [`CoastalAtriumReferenceViews.h`](../../../Sources/WinApp/Application/Demo/CoastalAtriumReferenceViews.h).
 The coordinate system is left-handed, Y-up, in meters. Each perspective camera
 uses near/far distances of 0.1/150 m and derives roll-free orientation from its
@@ -111,11 +107,7 @@ vertical FOV at the reference aspect, independently of window size.
 | `CAM_ShadowStairs` | `(5.5, 3.4, -14)` | `(0, 2.8, 1)` | Near railings and stair contacts, mid-distance slat shadows and distant columns |
 | `CAM_InteriorExterior` | `(-12, 4, -2.9)` | `(2, 2.5, -5)` | Thick doorway occlusion and the corridor-to-courtyard brightness transition |
 
-The following values were read from the runtime `Camera` after restoration in
-the headless content suite on 2026-09-16, using a 1920 by 1080 viewport (actual
-float aspect `1.77777779`). Together with the positions and clip distances above,
-they record the effective transform and perspective projection, independently of
-the Blender lens labels. They are not measurements from the earlier window PNGs.
+The runtime camera angles and vertical field of view for each profile are:
 
 | Camera ID | Runtime yaw, radians | Runtime pitch, radians | Vertical FOV, degrees |
 | --- | --- | --- | --- |
@@ -125,102 +117,39 @@ the Blender lens labels. They are not measurements from the earlier window PNGs.
 
 `Copy Camera Record` copies the selected camera's actual runtime position, basis,
 yaw/pitch, projection, vertical FOV, aspect, clip planes and exposure. Its
-"Last restored reference" label records provenance; subsequent edits are included
-in the copied values. A stable camera ID alone does not establish an unchanged
-profile. Composition changes require updating the profile version and recorded
-parameters together.
+"Last restored reference" label identifies the source profile; subsequent edits
+are included in the copied values. Composition changes require updating the
+profile version and parameters together.
 
 Camera restoration leaves lighting and render feature edits in effect. The
 startup sunlight, exposure and feature settings in the table above describe the
-intended greybox comparison. Re-entering the Demo restores those startup settings.
+runtime preset. Re-entering the Demo restores those startup settings.
 The camera record is not a complete render capture manifest, and temporal reset
 does not promise identical jitter, frame sequence or deterministic replay.
 
-## Validation record
+## Known limitations
 
-### Basic material checks
+Current directional shadows can show wave patterns from PCF self-shadowing.
+Environment lighting is disabled in this preset, so interior surfaces and metal
+away from direct highlights can appear dark.
 
-On 2026-09-17, the real-asset CPU suite passed 58 checks, including all nine
-atrium textures, semantic decoding/mipmaps and the separate diagnostic board.
-Geometry probes still establish the 1046 triangles, elevations, ten stair treads,
-wall thickness, openings and pergola gaps. Camera profiles and startup lighting
-remain unchanged. Three updated Blender previews were rendered and inspected;
-they do not establish GGLab GPU correctness for the new materials.
+## Screenshots
 
-WinApp Debug builds passed with and without PCH. The `asset-data`,
-`app-launch-options` and `app-host-configuration` suites passed 90, 30 and 12
-checks respectively; project boundaries and generated filters passed. Final
-saved-source checks on 2026-09-18 confirmed nine packed images, unchanged
-geometry/camera/light records and a repeat export with identical glTF/buffer
-bytes. The exporter preserved the saved source SHA-256.
+### Basic materials
 
-The earlier wave pattern was isolated by disabling shadows, disabling 3x3 PCF,
-and temporarily setting receiver depth bias to 0.0001. The observed reduction
-identifies shadow self-occlusion under the current PCF/bias settings, independent
-of these new textures. Shadow sampling and bias defaults are deliberately
-unchanged in this material delivery. DX12/Vulkan material display and GPU logs
-are still awaiting runtime visual verification; Rendering Baseline 1 is not frozen.
+| Reference view | DirectX 12 | Vulkan |
+| --- | --- | --- |
+| Courtyard | [Material overview](../../Media/GGLabCoastalAtrium/atrium-dx12-materials-courtyard.png) | [Material overview](../../Media/GGLabCoastalAtrium/atrium-vulkan-materials-courtyard.png) |
+| Shadow Stairs | [Paving, railings and slat shadows](../../Media/GGLabCoastalAtrium/atrium-dx12-materials-shadow-stairs.png) | [Paving, railings and slat shadows](../../Media/GGLabCoastalAtrium/atrium-vulkan-materials-shadow-stairs.png) |
+| Interior / Exterior | [Corridor and courtyard transition](../../Media/GGLabCoastalAtrium/atrium-dx12-materials-interior-exterior.png) | [Corridor and courtyard transition](../../Media/GGLabCoastalAtrium/atrium-vulkan-materials-interior-exterior.png) |
 
-### Reference camera checks
-
-Completed on 2026-09-16:
-
-| Check | Result |
-| --- | --- |
-| Direct GGLabRuntime and GGLabRuntimeTests Debug x64 builds | Passed |
-| WinApp Debug x64, `GGLAB_USE_PCH=0` and `GGLAB_USE_PCH=1` | Both passed |
-| `diagnostics-contracts` | 81 checks passed |
-| `rendering-contracts` | 307 checks passed |
-| `app-content-registration`, both PCH modes | 32 checks passed in each build |
-| Project boundaries / generated filter metadata | Passed |
-| Source `.blend` and runtime `.gltf` / `.bin` hashes | Unchanged from the greybox delivery |
-
-The camera checks cover invalid profile rejection, copied observations, stale
-camera identities, Main input/display selection, residual velocity removal,
-unchanged viewport aspect, and one temporal-reset request on every restoration.
-Each atrium camera centers its authored target and restores identical view and
-projection matrices after navigation and lens edits. These are CPU contract
-checks; interactive controls, clipboard delivery, GPU output for the new views
-and temporal accumulation after a camera cut are not established by these tests.
-
-### Greybox import checks
-
-Completed on 2026-09-15:
-
-| Check | Result |
-| --- | --- |
-| WinApp Debug x64, `GGLAB_USE_PCH=0` | Passed |
-| WinApp Debug x64, `GGLAB_USE_PCH=1` | Passed after renaming the comparison helper to avoid the Windows `near` macro |
-| Project boundaries / filter metadata | Passed / unchanged |
-| `app-content-registration` | 25 checks passed, including both real assets |
-| `app-launch-options` / `app-host-configuration` | 26 / 11 checks passed |
-| `app-lifecycle` | 11 checks passed |
-| Headless executable launched from unrelated working directory | Passed |
-| Saved Blender solids / export buffer and accessor ranges | Passed |
-| Export source preservation | Saved `.blend` SHA-256 unchanged |
-| Three Blender authoring previews | Rendered and inspected |
-
-The import probes operate on transformed triangles rather than source mesh names:
-they check the bounded footprint, floor heights, stair treads, empty openings,
-solid wall faces on both sides, sill/lintel/roof enclosure, and thin pergola slats
-separated by open gaps. These automated checks verify geometry and CPU import;
-the static display references below provide separate visual evidence.
-
-### Courtyard overview references
-
-Static courtyard overview checks passed on Vulkan and DirectX 12 on 2026-09-16.
-The captures show consistent model placement, door/window openings, stairs,
-railings and major shadow positions, without obvious missing parts or axis errors.
-The Demo selection and backend panel labels identify the content and renderer.
+### Greybox
 
 | Backend | Reference capture |
 | --- | --- |
 | Vulkan | [Courtyard overview](../../Media/GGLabCoastalAtrium/atrium-vulkan-overview.png) |
 | DirectX 12 | [Courtyard overview](../../Media/GGLabCoastalAtrium/atrium-dx12-overview.png) |
 
-Both original PNG files are preserved at 1922 by 1112, including window chrome
-and DevTools. They are visual smoke references, not pixel-comparison golden images
-or measured client extents. The later shadow isolation experiments are recorded
-above. Runtime visual checks of the other two
-candidate views, motion stability, detailed shadow quality, GPU validation logs,
-Release builds and edited-export reload are outside this record.
+The PNGs are 1922 by 1112, including window chrome and DevTools. They show the
+scene on each backend and are visual references, not pixel-comparison golden
+images.

@@ -68,20 +68,15 @@ These follow the [glTF material conventions](https://registry.khronos.org/glTF/s
 Images are 256 square except the constant 8 square gray patch. Runtime mipmaps
 and repeat samplers use the existing asset pipeline.
 
-## Verification
+## Screenshots
 
-The 2026-09-17 CPU checks cover actual PNG decoding, semantic view formats and
-mipmaps, adjacent relative paths, known pixel bytes, factors, UV0 orientation,
-2 by 2 repetition, mirrored tangents and the absence of implicit occlusion.
-All exported accessor/index ranges and tangent bases passed structural checks;
-exported PNGs are byte-identical to the source images.
+| Backend | Reference capture |
+| --- | --- |
+| DirectX 12 | [Texture Contract board](../../Media/GGLabTextureContract/texture-contract-dx12.png) |
+| Vulkan | [Texture Contract board](../../Media/GGLabTextureContract/texture-contract-vulkan.png) |
 
-These probes exposed and now guard against an Assimp conversion issue: authored
-glTF bitangents received an extra sign flip in the left-handed conversion.
-`ModelImporter` compensates before post-processing, while generated tangents
-remain unchanged. The `asset-data` suite covers regular and mirrored UVs for
-both authored and generated tangents.
-
-Blender's authoring preview was inspected separately. CPU import checks do not
-establish GPU sampling, material upload or presentation correctness. DX12/Vulkan
-visual acceptance for this board and the textured atrium is not recorded yet.
+The PNGs are 1922 by 1112, including backend labels and Lab Control. They show
+the board's UV, sRGB, normal and metallic/roughness comparisons and are visual
+references, not pixel-comparison golden images. See the
+[atrium screenshots](../GGLabCoastalAtrium/README.md#screenshots) for the scene
+using the same material conventions.
