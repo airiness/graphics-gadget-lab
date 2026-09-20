@@ -86,6 +86,9 @@ the selected pose after navigation. See the
 [atrium asset reference](Assets/Models/GGLabCoastalAtrium/README.md) for source
 provenance, dimensions, camera profiles and screenshots.
 
+[Rendering Baseline 1](Assets/Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
+records reproducible inputs and captures for static rendering comparisons.
+
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12
     GraphicsGadgetLab.exe --list-adapters

@@ -135,6 +135,10 @@ away from direct highlights can appear dark.
 
 ## Screenshots
 
+[Rendering Baseline 1](../../Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
+provides frozen asset and renderer references, capture settings, three paired
+DX12/Vulkan views, and GPU timing observations.
+
 ### Basic materials
 
 | Reference view | DirectX 12 | Vulkan |
