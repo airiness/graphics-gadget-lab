@@ -407,3 +407,4 @@ FodyWeavers.xsd
 # Local build and verification products (including retired qualification outputs).
 /Build/EnvironmentQualification/
 /Build/Output/
+/Build/Verification/

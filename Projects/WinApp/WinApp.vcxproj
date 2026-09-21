@@ -247,6 +247,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Input\InputBase.cpp" />
@@ -346,6 +347,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Demo\CoastalAtriumReferenceViews.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
@@ -371,6 +373,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.h" />

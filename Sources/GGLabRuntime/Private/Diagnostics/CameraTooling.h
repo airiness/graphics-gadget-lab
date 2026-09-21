@@ -14,6 +14,7 @@ namespace gglab
 		[[nodiscard]] CameraToolingSnapshot GetCameras() const override;
 		bool SetActiveCamera(uint64_t id) noexcept override;
 		bool SetDisplayCamera(uint64_t id) noexcept override;
+		bool RestoreReferenceView(uint64_t mainCameraId, std::string_view referenceId) noexcept override;
 		[[nodiscard]] uint64_t AddDebugCamera() noexcept override;
 		bool RemoveCamera(uint64_t id) noexcept override;
 		bool SetCamera(uint64_t id, const CameraEditSettings& settings) noexcept override;

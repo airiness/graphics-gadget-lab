@@ -3,13 +3,16 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRenderViewQueryBase.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -56,6 +59,18 @@ namespace gglab
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 		void SubmitDebugDraw(DebugDrawContext& debugDraw) const noexcept;
 
+		// Bound to the attached main camera; attaching another camera clears its references.
+		bool SetReferenceViews(std::vector<CameraReferenceView> views) noexcept;
+		[[nodiscard]] std::span<const CameraReferenceView> GetReferenceViews() const noexcept
+		{
+			return m_ReferenceViews;
+		}
+		[[nodiscard]] std::string_view GetLastRestoredReferenceId() const noexcept
+		{
+			return m_LastRestoredReferenceId;
+		}
+		bool RestoreReferenceView(std::string_view id) noexcept;
+
 		[[nodiscard]] size_t GetCameraCount() const noexcept { return m_Cameras.size(); }
 		[[nodiscard]] size_t GetActiveCameraIndex() const noexcept { return m_ActiveCameraIndex; }
 		void SetActiveCameraIndex(size_t index) noexcept;
@@ -94,6 +109,8 @@ namespace gglab
 		[[nodiscard]] RenderViewID AcquireDebugRenderViewId() const noexcept;
 
 		std::vector<CameraSlot> m_Cameras;
+		std::vector<CameraReferenceView> m_ReferenceViews;
+		std::string m_LastRestoredReferenceId;
 		size_t m_ActiveCameraIndex = 0;
 		uint32_t m_NextDebugCameraIndex = 1;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;

@@ -1,0 +1,586 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.coastal-atrium.rendering-baseline.1",
+  "captureDate": "2026-09-20",
+  "timeZone": "Asia/Tokyo",
+  "purpose": "Static rendering comparison with frozen content and camera inputs",
+  "content": {
+    "runtimeRepository": "https://github.com/airiness/graphics-gadget-lab.git",
+    "runtimeCommit": "a9a4cb4aab5c17fec563b86f4d0ee224cf79d56e",
+    "authoringRepository": "https://github.com/airiness/graphics-gadget-lab-content.git",
+    "authoringCommit": "0fde6e137eb1505715fe41492b70e27d11a4360d",
+    "runtimeFiles": [
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.bin",
+        "sha256": "b31b36f65c0eb2aaca8ca280aa50ebe2446138bcf0ef4c957c4e4bcffbe52e7e"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf",
+        "sha256": "9653f683b198613b8795fcb28cb1fac2e1b5b3f5761bd3ccb3a60e1c6417624b"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Concrete_BaseColor.png",
+        "sha256": "e818a7ae00626effb5fcc87b52b9e9671cfb60555d5ea6630a2d6ae79e65410d"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Concrete_MetallicRoughness.png",
+        "sha256": "4c86c67ae2978d6d92b7b2c5e95f4ac8ba8d70fa9131dd1e8bf1a4095493a2e9"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Concrete_Normal.png",
+        "sha256": "3cfc07edbd853b63a489d4badb4852891447779c51012bede6362c2db83dcb89"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Metal_BaseColor.png",
+        "sha256": "d8a5bf06a09c0056ec7e9eac0adf71e513d5658b00627acf2902634e87faf73a"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Metal_MetallicRoughness.png",
+        "sha256": "931c557ce52a15ee6c0f581fe4aee34bff96e3dcc00b6254af6d1f42e337962a"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Metal_Normal.png",
+        "sha256": "d1e7cc1c0be239458ab8bcda525c08b05da90cd4ff0d540ad5a89b925b24811d"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Stone_BaseColor.png",
+        "sha256": "430e72861fc0aac6d2f28da426c505fce244cc4e629c0e71ab5c858d51acd86b"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Stone_MetallicRoughness.png",
+        "sha256": "5d8f81d00944a33837b4e88e312ba9bbf18b7e679fbea6c8b0707acb06530c72"
+      },
+      {
+        "path": "Assets/Models/GGLabCoastalAtrium/Textures/Stone_Normal.png",
+        "sha256": "b1d701b9a1c5482e887ac25f6a9d7969ee10ca8a8ff036b2bc7442665e909bac"
+      },
+      {
+        "path": "Assets/Textures/Skybox/golden_gate_hills_2k.hdr",
+        "sha256": "dfe7389710b1d911c213068d4358a142902307ed7d498185b447d92565fc308f"
+      }
+    ],
+    "authoringFiles": [
+      {
+        "path": "Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend",
+        "sha256": "b9db2295a3e0376265f60d031ab83851ccdf539afcb8396d122996f93439c677"
+      },
+      {
+        "path": "Scripts/create_coastal_atrium.py",
+        "sha256": "462d0b8db32f44e91dbf67895df6477bfae9f387760504fd8bc49a8a1d038649"
+      },
+      {
+        "path": "Scripts/apply_coastal_atrium_materials.py",
+        "sha256": "a389988a88353eb0d28df8d46c5beb01208d002916f052cb0a6becf8644cf628"
+      },
+      {
+        "path": "Scripts/material_authoring.py",
+        "sha256": "793e4a6b2b5d61fbbf195fa69eec030755d27fb1b1fe9735703bab9b997e225c"
+      },
+      {
+        "path": "Scripts/export_gltf.py",
+        "sha256": "f3801568f6e89f4b771c938210ce1de269dcbb736347c781960268b251878f2b"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_BaseColor.png",
+        "sha256": "e818a7ae00626effb5fcc87b52b9e9671cfb60555d5ea6630a2d6ae79e65410d"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_MetallicRoughness.png",
+        "sha256": "4c86c67ae2978d6d92b7b2c5e95f4ac8ba8d70fa9131dd1e8bf1a4095493a2e9"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_Normal.png",
+        "sha256": "3cfc07edbd853b63a489d4badb4852891447779c51012bede6362c2db83dcb89"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_BaseColor.png",
+        "sha256": "d8a5bf06a09c0056ec7e9eac0adf71e513d5658b00627acf2902634e87faf73a"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_MetallicRoughness.png",
+        "sha256": "931c557ce52a15ee6c0f581fe4aee34bff96e3dcc00b6254af6d1f42e337962a"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_Normal.png",
+        "sha256": "d1e7cc1c0be239458ab8bcda525c08b05da90cd4ff0d540ad5a89b925b24811d"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_BaseColor.png",
+        "sha256": "430e72861fc0aac6d2f28da426c505fce244cc4e629c0e71ab5c858d51acd86b"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_MetallicRoughness.png",
+        "sha256": "5d8f81d00944a33837b4e88e312ba9bbf18b7e679fbea6c8b0707acb06530c72"
+      },
+      {
+        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_Normal.png",
+        "sha256": "b1d701b9a1c5482e887ac25f6a9d7969ee10ca8a8ff036b2bc7442665e909bac"
+      }
+    ],
+    "environmentContribution": "Disabled: intensity 0, skybox disabled",
+    "exporter": {
+      "blender": "5.1.1",
+      "gltfIo": "5.1.19",
+      "format": "GLTF_SEPARATE",
+      "yUp": true,
+      "uv": true,
+      "normals": true,
+      "tangents": true,
+      "materials": "EXPORT",
+      "cameras": true,
+      "punctualLights": true,
+      "applyModifiers": false,
+      "flattenHierarchy": false,
+      "animations": false,
+      "extras": false,
+      "selectionOnly": false,
+      "triangulation": "N-gons in export memory only; saved source unchanged"
+    }
+  },
+  "renderer": {
+    "gitCommit": "a9a4cb4aab5c17fec563b86f4d0ee224cf79d56e",
+    "shaderSourceTree": "51e0be693dd13de836bdf8dc3b6ef4478155ff7c",
+    "dirtyRenderingInputs": false,
+    "configuration": "Debug",
+    "platform": "x64",
+    "toolset": "v143",
+    "msvc": "14.44.35207",
+    "vulkanSdk": "1.3.296.0",
+    "dxc": "1.9.0.5402 (0d3ee6b55-dirty)",
+    "binaries": [
+      {
+        "path": "GraphicsGadgetLab.exe",
+        "sha256": "00cccb80c5b516294d89418c3d575532f310c0e3d20b8297120854c32b01b844"
+      },
+      {
+        "path": "gglab-shaderc.exe",
+        "sha256": "88d313451c2302d0d79d0b5911929dfabe752938b19af425b395f9dd9bc354f4"
+      },
+      {
+        "path": "dxcompiler.dll",
+        "sha256": "9a5100511e127c6a2fc78edf984f95074a76d35b90c90c4d342430a5ae160e9b"
+      },
+      {
+        "path": "dxil.dll",
+        "sha256": "feb57253eff0a622561e29b44cedbe86b89fc9a5bc8dc00fa2f98fafd712c2d8"
+      }
+    ],
+    "shaderRegistries": [
+      {
+        "rhi": "dx12",
+        "registryId": "a3c00f9b0322829381acbdcb915ead5d52669bc5b651001ab896354fbd4140f6",
+        "files": [
+          {
+            "path": "active/gglab-dx12/program-registry.ggsh.active",
+            "sha256": "bfc5155786673eeec5399bbb2cc240d569ebe0bc46a772118139c17643e82fbb"
+          },
+          {
+            "path": "program-registry/a3/a3c00f9b0322829381acbdcb915ead5d52669bc5b651001ab896354fbd4140f6.ggsh.registry",
+            "sha256": "6f030ab0017af2957f1c2b57202312fdcddfdb928fca9cd11030c6ba0f106ef1"
+          }
+        ]
+      },
+      {
+        "rhi": "vulkan",
+        "registryId": "41724f7690ae28c960d6c88da7b4f686c4b4eb842327572273386fd969cb65de",
+        "files": [
+          {
+            "path": "active/gglab-vulkan13/program-registry.ggsh.active",
+            "sha256": "f941de5f8fb8d25ab5b24242c6a9196b58da0d668eca1aa675a4c48af0e36bd0"
+          },
+          {
+            "path": "program-registry/41/41724f7690ae28c960d6c88da7b4f686c4b4eb842327572273386fd969cb65de.ggsh.registry",
+            "sha256": "403bfdcdb3e852e6fa3a330ec3a8f955b0c6b1b6e81457965f1552ec45bf8a0e"
+          }
+        ]
+      }
+    ]
+  },
+  "captureProfile": {
+    "version": 1,
+    "demo": "Demo.Playground.CoastalAtrium",
+    "outputResolution": [
+      1920,
+      1080
+    ],
+    "internalResolution": [
+      1920,
+      1080
+    ],
+    "aspect": [
+      16,
+      9
+    ],
+    "imageExtent": [
+      1922,
+      1112
+    ],
+    "method": "Windows.Graphics.Capture window PNG, original bytes",
+    "stage": "Presented SDR window after final-color tone mapping and DevTools composition",
+    "encoding": "Final-color shader applies ACES fitted then linear-to-sRGB; desktop capture is not a calibrated GPU readback",
+    "overlays": "Window chrome and menu bar retained; panels closed for scene captures; cursor/highlight may be present",
+    "projection": "Perspective",
+    "coordinates": "Left-handed Y-up, meters",
+    "modelTransform": "Identity",
+    "near": 0.1,
+    "far": 150.0,
+    "exposureEV": 0.0,
+    "toneMapping": "AcesFitted",
+    "pipeline": "ForwardPBR",
+    "forwardLighting": "ForwardPlus",
+    "hdrDiffValidation": false,
+    "taa": false,
+    "gtao": false,
+    "bloom": false,
+    "sunRayDirectionUnnormalized": [
+      -1.0,
+      -0.85,
+      0.35
+    ],
+    "sunColorLinear": [
+      1,
+      1,
+      1
+    ],
+    "sunIntensity": 3.0,
+    "environmentIntensity": 0.0,
+    "skybox": false,
+    "shadows": {
+      "enabled": true,
+      "pcf": "3x3",
+      "mapSize": 2048,
+      "maxDistance": 30.0,
+      "casterExtrusion": 300.0,
+      "orthoPadding": 1.0,
+      "depthPadding": 200.0,
+      "receiverDepthBias": 0.0,
+      "rasterizerDepthBias": 360,
+      "slopeScaledDepthBias": 0.6
+    }
+  },
+  "cameras": [
+    {
+      "id": "CAM_Courtyard",
+      "profileVersion": 1,
+      "position": [
+        23.0,
+        19.0,
+        -28.0
+      ],
+      "target": [
+        -1.0,
+        1.8,
+        -2.0
+      ],
+      "verticalFovRadians": 0.6509917105
+    },
+    {
+      "id": "CAM_ShadowStairs",
+      "profileVersion": 1,
+      "position": [
+        5.5,
+        3.4,
+        -14.0
+      ],
+      "target": [
+        0.0,
+        2.8,
+        1.0
+      ],
+      "verticalFovRadians": 0.6939552104
+    },
+    {
+      "id": "CAM_InteriorExterior",
+      "profileVersion": 1,
+      "position": [
+        -12.0,
+        4.0,
+        -2.9
+      ],
+      "target": [
+        2.0,
+        2.5,
+        -5.0
+      ],
+      "verticalFovRadians": 0.7984415392
+    }
+  ],
+  "state": {
+    "scene": "Static; no animated objects or water simulation",
+    "timeStep": "Real time; no fixed-step playback",
+    "readiness": "Demo activated after model/texture GPU readiness; startup IBL/DDC publication completed before capture",
+    "reset": "Reference-view restoration requests the existing camera-cut temporal reset",
+    "jitter": "Not applicable: TAA disabled",
+    "temporalWarmupFrames": null,
+    "warmup": "Wall-clock settling after activation and camera restoration; exact successful submission count not recorded",
+    "deterministicReplay": false
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "driver": "610.88",
+    "windowsDriver": "32.0.16.1088",
+    "vendorId": "0x10DE",
+    "deviceId": "0x2C02",
+    "dx12FeatureLevel": "12_2",
+    "vulkanAdapterApi": "1.4.341",
+    "vulkanApplicationBaseline": "1.3",
+    "vsync": false,
+    "dx12Buffers": 2,
+    "vulkanImages": 3,
+    "vulkanPresentMode": "Mailbox",
+    "swapchainFormat": "R8G8B8A8Unorm",
+    "frameSlots": 2,
+    "validationRequested": true,
+    "gpuProfiling": true,
+    "os": "Microsoft Windows 11 Pro for Workstations, 10.0.26200 (build 26200)"
+  },
+  "captures": [
+    {
+      "path": "dx12-backend.png",
+      "sha256": "9b99dccfb86a0f621029eebd3af68d76a3546a163fe6e0c4048f3f8fde22f615",
+      "savedAtUtc": "2026-09-19T15:27:24.2179740Z",
+      "rhi": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "backend-evidence",
+      "session": "dx12-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "dx12-courtyard.png",
+      "sha256": "147b11ef0568166e3960bc3dff0097812e50a97e9f26102fbac2ab50956f7f25",
+      "savedAtUtc": "2026-09-19T15:27:36.8042866Z",
+      "rhi": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "dx12-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "dx12-interior-exterior.png",
+      "sha256": "ffc3251282ced4b4b69499e8a311f294e58fa9064d8487f49ce8661e4b2b033b",
+      "savedAtUtc": "2026-09-19T15:30:14.3896744Z",
+      "rhi": "dx12",
+      "cameraId": "CAM_InteriorExterior",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "dx12-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "dx12-interior-timing.png",
+      "sha256": "4e3620ef56e2c367fd99bd7d8c09eff50352329b34eb7eaa9693ff96b43f763c",
+      "savedAtUtc": "2026-09-19T15:30:35.3687709Z",
+      "rhi": "dx12",
+      "cameraId": "CAM_InteriorExterior",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "timing-evidence",
+      "session": "dx12-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "dx12-shadow-stairs.png",
+      "sha256": "f8375f1b717143f5d8430c2659077a1d6832c03446712ee736a9261cd35dcfe7",
+      "savedAtUtc": "2026-09-19T15:28:49.1606902Z",
+      "rhi": "dx12",
+      "cameraId": "CAM_ShadowStairs",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "dx12-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-backend.png",
+      "sha256": "d32465ee941299fdc99938c6ca1275e631a88b7ea124b38274b96fd92f1c60f4",
+      "savedAtUtc": "2026-09-19T15:31:57.6292779Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "backend-evidence",
+      "session": "vulkan-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-courtyard-repeat.png",
+      "sha256": "547a2fc428ca10418d644f1c4280e44a680696a13a6c885769192babf2be822a",
+      "savedAtUtc": "2026-09-20T03:46:13.0173508Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "repeatability",
+      "session": "vulkan-repeat",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-courtyard.png",
+      "sha256": "71b39c5080e37b7126b4bfd204f5c113a0438a437e267e96ebaecffd5aa1fe7b",
+      "savedAtUtc": "2026-09-19T15:32:15.0380249Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "vulkan-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-interior-exterior-repeat.png",
+      "sha256": "46590a0db6ada4284f0f18278f47c6fed86837a9a47c0d2461b2c4c42cf31c10",
+      "savedAtUtc": "2026-09-20T03:47:12.8423050Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "repeatability",
+      "session": "vulkan-repeat",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-interior-exterior.png",
+      "sha256": "f248bc9b3e905398b245f0596f5ea32fbf04c0b586d186e1e1f2212fd7794765",
+      "savedAtUtc": "2026-09-19T15:39:25.7295199Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "vulkan-initial",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-interior-timing.png",
+      "sha256": "5c800cb1ea8952852da720de37fb49a72da56955c5addfa0809fcc07b4622443",
+      "savedAtUtc": "2026-09-20T03:47:38.8245526Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "timing-evidence",
+      "session": "vulkan-repeat",
+      "gpuFrameIndex": null
+    },
+    {
+      "path": "vulkan-shadow-stairs.png",
+      "sha256": "7e5cd91db02d8ec7ddf7158da0fe290eb022707ca28b83a6b1f364264a117c0d",
+      "savedAtUtc": "2026-09-19T15:35:05.3838963Z",
+      "rhi": "vulkan",
+      "cameraId": "CAM_ShadowStairs",
+      "cameraProfileVersion": 1,
+      "captureProfileVersion": 1,
+      "role": "reference",
+      "session": "vulkan-initial",
+      "gpuFrameIndex": null
+    }
+  ],
+  "timingSamples": [
+    {
+      "rhi": "dx12",
+      "cameraId": "CAM_InteriorExterior",
+      "evidence": "dx12-interior-timing.png",
+      "sampleCount": 1,
+      "method": "Paused latest-completed GPU timestamp snapshot, rounded UI values",
+      "gpuFrameMilliseconds": 2.62,
+      "displayedCpuFrame": 34800,
+      "displayedCpuFrameMilliseconds": 6.51,
+      "gpuFrameIndex": null,
+      "samplingInterval": null,
+      "variance": null,
+      "passesMilliseconds": {
+        "Shadow.Directional": 0.036,
+        "Geometry.DepthPrepass": 0.037,
+        "Lighting.ForwardPlus.Cull": 0.064,
+        "Geometry.ForwardOpaque": 2.394,
+        "PostProcess.FinalColor": 0.026,
+        "UI.DevelopGui": 0.023,
+        "Debug.ShadowMapPreview": 0.013
+      }
+    },
+    {
+      "rhi": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "evidence": "vulkan-interior-timing.png",
+      "sampleCount": 1,
+      "method": "Paused latest-completed GPU timestamp snapshot, rounded UI values",
+      "gpuFrameMilliseconds": 0.18,
+      "displayedCpuFrame": 27782,
+      "displayedCpuFrameMilliseconds": 4.0,
+      "gpuFrameIndex": null,
+      "samplingInterval": null,
+      "variance": null,
+      "passesMilliseconds": {
+        "Shadow.Directional": 0.01,
+        "Geometry.DepthPrepass": 0.01,
+        "Lighting.ForwardPlus.Cull": 0.044,
+        "Geometry.ForwardOpaque": 0.079,
+        "PostProcess.FinalColor": 0.013,
+        "UI.DevelopGui": 0.009,
+        "Debug.ShadowMapPreview": 0.009
+      }
+    }
+  ],
+  "limitations": [
+    "PCF self-shadowing waves are intentionally retained.",
+    "Environment is disabled; dark interiors and metals are expected.",
+    "Static frames do not validate temporal stability or camera-path determinism.",
+    "Debug GPU samples with validation and UI are observations, not a release performance benchmark.",
+    "Earlier material screenshots outside this directory lack this capture record and are supplementary references only.",
+    "Repeat captures have small RGB differences; these PNGs are not bit-exact regression goldens."
+  ],
+  "repeatability": {
+    "method": "Restart with a new state root; default Courtyard then restore Interior / Exterior; compare RGB bytes in unchanged original PNGs",
+    "channelRange": [
+      0,
+      255
+    ],
+    "regionPurpose": "Exclude window chrome, menu and cursor highlight in the upper strip; retain the central and lower scene",
+    "exactMatchRequired": false,
+    "comparisons": [
+      {
+        "camera": "courtyard",
+        "first": "vulkan-courtyard.png",
+        "repeat": "vulkan-courtyard-repeat.png",
+        "region": {
+          "y": 180,
+          "width": 1920,
+          "x": 1,
+          "height": 920
+        },
+        "comparedPixels": 1766400,
+        "changedPixels": 11836.0,
+        "meanAbsoluteChannelDifference": 0.015096240942028985,
+        "maxChannelDifference": 32.0
+      },
+      {
+        "camera": "interior-exterior",
+        "first": "vulkan-interior-exterior.png",
+        "repeat": "vulkan-interior-exterior-repeat.png",
+        "region": {
+          "y": 180,
+          "width": 1920,
+          "x": 1,
+          "height": 920
+        },
+        "comparedPixels": 1766400,
+        "changedPixels": 11106.0,
+        "meanAbsoluteChannelDifference": 0.008777740036231885,
+        "maxChannelDifference": 28.0
+      }
+    ]
+  },
+  "verification": {
+    "dx12": "Three reference views presented; backend healthy, resource-operation failure counters zero in saved panel",
+    "vulkan": "Three reference views presented; validation messenger enabled, errors 0, warnings 0 in saved panel",
+    "logs": "No error or critical entries in the recorded capture-session stdout/stderr logs; graceful resource teardown observed",
+    "knownWarning": "Vulkan startup TextureLoader clamps 16 channels of golden_gate_hills_2k.hdr from max 97536 to 65000 for FP16; environment intensity is zero and skybox disabled",
+    "qualification": "No standalone hardware qualification run",
+    "temporal": "No continuous camera path or temporal stability claim"
+  }
+}

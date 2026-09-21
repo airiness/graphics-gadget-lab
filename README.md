@@ -1,6 +1,6 @@
 # Graphics Gadget Lab
 
-Graphics Gadget Lab (gglab) is a personal graphics research playground built
+Graphics Gadget Lab (gglab) is a graphics research playground built
 with C++, Direct3D 12, and Vulkan 1.3.
 
 It is used to experiment with rendering techniques, GPU resource management,
@@ -45,12 +45,49 @@ Vulkan SDK.
     GraphicsGadgetLab.exe --rhi dx12 --lab gglab.lab.mini_pbr_grid --absolute-mouse
     GraphicsGadgetLab.exe --rhi vulkan --lab gglab.lab.mini_pbr_grid --absolute-mouse
 
+The Texture Contract Lab isolates UVs, color space, tangent normals and packed
+metallic/roughness inputs through the production asset and Forward PBR path:
+
+    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi vulkan --absolute-mouse
+
+It is also available as `Texture Contract` in `Lab Control > Active Lab` while
+`Demo.LabHost` is active. See the
+[texture contract reference](Assets/Models/GGLabTextureContract/README.md) for the
+board layout, numeric references and screenshots.
+
 Run with `--help` to see the available startup options.
 
 The application starts in FPS mouse mode. Press `T` to release the cursor and
 interact with the developer UI.
 
 ## RHI backend selection
+
+The Blender island import fixture reuses `DemoPlayground` with a fixed camera
+and lighting preset:
+
+    GraphicsGadgetLab.exe --demo island --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --demo island --rhi vulkan --absolute-mouse
+
+`--demo playground` keeps the Sponza/FlightHelmet preset. See the
+[island asset reference](Assets/Models/GGLabIslandPrototype/README.md)
+for export instructions, runtime settings and screenshots.
+
+The coastal atrium adds the architectural shadow study scene with basic concrete,
+stone and metal materials:
+
+    GraphicsGadgetLab.exe --demo atrium --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --demo atrium --rhi vulkan --absolute-mouse
+
+It shares the Playground implementation and starts at the courtyard reference
+camera. `Scene > Camera > Reference Views` switches between the courtyard,
+shadow stairs and interior/exterior views; `Restore Reference View` returns to
+the selected pose after navigation. See the
+[atrium asset reference](Assets/Models/GGLabCoastalAtrium/README.md) for source
+provenance, dimensions, camera profiles and screenshots.
+
+[Rendering Baseline 1](Assets/Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
+records reproducible inputs and captures for static rendering comparisons.
 
     GraphicsGadgetLab.exe --rhi vulkan
     GraphicsGadgetLab.exe --rhi dx12
@@ -69,8 +106,7 @@ Hardware qualification is a separate privileged executable:
 
 `GGLabVulkanQualification` owns the authoring-time shader compiler and DXC
 dependencies required by the qualification probe. The normal `WinApp` target
-does not link the Shader Toolchain or DXC and no longer accepts the former
-`--vulkan-qualification` option.
+does not link the Shader Toolchain or DXC.
 
 Vulkan uses the normal Application, Renderer, RenderGraph, and backend-neutral
 RHI path. Production coverage includes graphics and direct-compute command
@@ -84,8 +120,7 @@ The Vulkan diagnostics panel reports adapter/profile identity, validation
 counts, descriptor publication and retained backing state, VMA heap budgets,
 resource retirement, pipeline/layout counts, frame-slot versus swapchain-image
 indices, timeline progress, and the first fatal/device-lost operation. Native
-Vulkan pipeline-cache persistence is deliberately deferred; pipeline objects
-are cached only for the current process.
+Vulkan pipeline objects are cached only for the current process.
 
 CI installs the pinned SDK and runtime, then builds Debug, Release, and Debug
 without PCH. Each leg runs the Application, Foundation, Runtime, rendering,
@@ -111,8 +146,3 @@ First-party headless self-tests run as one executable per domain:
 Use `--suite <id>` to select one suite in the domain test executables. CI runs
 all eight executables on the applicable build legs; actual hardware qualification remains
 a manual gate on supported Windows adapters.
-
-## Status
-
-gglab is an evolving personal research project. Its architecture and
-experiments may change as new graphics ideas are explored.

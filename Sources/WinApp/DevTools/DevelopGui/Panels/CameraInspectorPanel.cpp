@@ -5,9 +5,11 @@
 #include "GGLabRuntime/Graphics/CameraTooling.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <string>
 
 #include <imgui.h>
@@ -26,6 +28,8 @@ namespace gglab
 			bool m_ShowMatrices = false;
 			uint64_t m_SelectedCameraId = 0;
 			uint64_t m_LastCameraId = 0;
+			uint64_t m_ReferenceMainId = 0;
+			std::string m_SelectedReferenceId;
 
 			// cached edit values
 			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
@@ -74,6 +78,88 @@ namespace gglab
 				const auto updated = view.GetCameras();
 				if (const auto* camera = updated.FindCamera(id)) PullFromCamera(state, *camera);
 			}
+		}
+
+		static void DrawReferenceViews(CameraPanelState& state, const CameraToolingSnapshot& snapshot,
+			CameraToolingControlBase* control) noexcept
+		{
+			if (snapshot.m_ReferenceViews.empty()) return;
+			const auto main = std::ranges::find(snapshot.m_Cameras, RenderViewID::Main,
+				&CameraToolingObservation::m_RenderViewId);
+			if (main == snapshot.m_Cameras.end()) return;
+			if (state.m_ReferenceMainId != main->m_Id)
+			{
+				state.m_ReferenceMainId = main->m_Id;
+				state.m_SelectedReferenceId = snapshot.m_LastRestoredReferenceId;
+			}
+			auto selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
+				&CameraReferenceView::m_Id);
+			if (selected == snapshot.m_ReferenceViews.end())
+			{
+				selected = snapshot.m_ReferenceViews.begin();
+				state.m_SelectedReferenceId = selected->m_Id;
+			}
+			const auto restore = [&](const CameraReferenceView& reference) noexcept
+				{
+					if (control && control->RestoreReferenceView(main->m_Id, reference.m_Id))
+					{
+						state.m_SelectedReferenceId = reference.m_Id;
+						state.m_SelectedCameraId = main->m_Id;
+						state.m_Initialized = false;
+					}
+				};
+			ImGui::SeparatorText("Reference Views");
+			ImGui::BeginDisabled(!control);
+			if (ImGui::BeginCombo("Reference View", selected->m_Name.c_str()))
+			{
+				for (const auto& reference : snapshot.m_ReferenceViews)
+				{
+					const bool current = reference.m_Id == state.m_SelectedReferenceId;
+					if (ImGui::Selectable(reference.m_Name.c_str(), current)) restore(reference);
+					if (current) ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
+				&CameraReferenceView::m_Id);
+			if (ImGui::Button("Restore Reference View")) restore(*selected);
+			ImGui::EndDisabled();
+			ImGui::TextWrapped("%s", selected->m_Purpose.c_str());
+			ImGui::TextDisabled("%s / profile %u", selected->m_Id.c_str(), selected->m_ProfileVersion);
+			if (std::abs(main->m_Aspect - selected->m_ReferenceAspect) > 0.001f)
+			{
+				ImGui::TextWrapped("Composition aspect: %.4f; current viewport: %.4f.",
+					selected->m_ReferenceAspect, main->m_Aspect);
+			}
+			ImGui::Spacing();
+		}
+
+		static std::string FormatCameraRecord(const CameraToolingObservation& camera,
+			const CameraToolingSnapshot& snapshot)
+		{
+			const auto vectorText = [](const Vector3& value)
+				{ return std::format("({:.9g}, {:.9g}, {:.9g})", value.m_X, value.m_Y, value.m_Z); };
+			const auto& settings = camera.m_Settings;
+			std::string record = std::format(
+				"Camera: {}\nCoordinates: left-handed, Y-up; runtime units\n"
+				"Position: {}\nForward: {}\nUp: {}\nYaw/pitch (radians): {:.9g}, {:.9g}\n"
+				"Projection: perspective\nVertical FOV (degrees): {:.9g}\n"
+				"Aspect: {:.9g}\nNear/far: {:.9g}, {:.9g}\nExposure compensation (EV): {:.9g}\n",
+				camera.m_Name, vectorText(settings.m_Position), vectorText(camera.m_Forward),
+				vectorText(camera.m_Up), settings.m_Yaw, settings.m_Pitch, settings.m_Fov,
+				camera.m_Aspect, settings.m_Near, settings.m_Far, settings.m_ExposureCompensationEV);
+			if (camera.m_RenderViewId == RenderViewID::Main && !snapshot.m_LastRestoredReferenceId.empty())
+			{
+				const auto reference = std::ranges::find(snapshot.m_ReferenceViews, snapshot.m_LastRestoredReferenceId,
+					&CameraReferenceView::m_Id);
+				if (reference != snapshot.m_ReferenceViews.end())
+				{
+					record += std::format("Last restored reference: {} / profile {}\n"
+						"Values above describe the current camera, including subsequent edits.\n",
+						reference->m_Id, reference->m_ProfileVersion);
+				}
+			}
+			return record;
 		}
 
 		static void DrawCameraControls(CameraPanelState& state, const CameraToolingSnapshot& snapshot,
@@ -145,6 +231,8 @@ namespace gglab
 		const auto& view = *context.m_Cameras;
 		auto* control = context.m_CameraControl;
 		auto snapshot = view.GetCameras();
+		DrawReferenceViews(state, snapshot, control);
+		snapshot = view.GetCameras();
 		if (!snapshot.FindCamera(state.m_SelectedCameraId))
 			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
 		DrawCameraControls(state, snapshot, control);
@@ -315,6 +403,11 @@ namespace gglab
 
 		// Read only infos
 		ImGui::SeparatorText("Runtime Info");
+		if (ImGui::Button("Copy Camera Record"))
+		{
+			const auto record = FormatCameraRecord(camera, refreshed);
+			ImGui::SetClipboardText(record.c_str());
+		}
 		ImGui::Text("Aspect: %.4f", camera.m_Aspect);
 
 		if (state.m_ShowBasis)

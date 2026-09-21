@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <format>
 #include <memory>
 #include <utility>
@@ -25,6 +26,8 @@ namespace gglab
 
 	void CameraRig::AttachMainCamera(Camera& camera, CameraController& controller) noexcept
 	{
+		m_ReferenceViews.clear();
+		m_LastRestoredReferenceId.clear();
 		CameraSlot mainSlot{};
 		mainSlot.m_Id = s_NextCameraId.fetch_add(1, std::memory_order_relaxed);
 		mainSlot.m_Name = "Main Camera";
@@ -50,6 +53,60 @@ namespace gglab
 		{
 			m_DisplayViewId = RenderViewID::Main;
 		}
+	}
+
+	bool CameraRig::SetReferenceViews(std::vector<CameraReferenceView> views) noexcept
+	{
+		if (!GetMainCameraSlot()) return false;
+		for (size_t index = 0; index < views.size(); ++index)
+		{
+			const auto& view = views[index];
+			Vector3 forward;
+			if (view.m_Id.empty() || view.m_Name.empty() || view.m_ProfileVersion == 0 ||
+				!math::IsFinite(view.m_Position) || !math::IsFinite(view.m_Target) ||
+				!math::TryNormalize(view.m_Target - view.m_Position, forward) ||
+				std::abs(forward.m_Y) > std::sin(math::ToRadians(85.0f)) ||
+				!math::IsFinite(view.m_VerticalFovDegrees) ||
+				Camera::ClampFov(view.m_VerticalFovDegrees) != view.m_VerticalFovDegrees ||
+				!math::IsFinite(view.m_NearPlane) || !math::IsFinite(view.m_FarPlane) ||
+				Camera::ClampNear(view.m_NearPlane) != view.m_NearPlane ||
+				Camera::ClampFar(view.m_NearPlane, view.m_FarPlane) != view.m_FarPlane ||
+				!math::IsFinite(view.m_ExposureCompensationEV) ||
+				Camera::ClampExposureCompensationEV(view.m_ExposureCompensationEV) != view.m_ExposureCompensationEV ||
+				!math::IsFinite(view.m_ReferenceAspect) || view.m_ReferenceAspect <= 0.0f)
+			{
+				return false;
+			}
+			for (size_t previous = 0; previous < index; ++previous)
+			{
+				if (views[previous].m_Id == view.m_Id) return false;
+			}
+		}
+		m_ReferenceViews = std::move(views);
+		m_LastRestoredReferenceId.clear();
+		return true;
+	}
+
+	bool CameraRig::RestoreReferenceView(std::string_view id) noexcept
+	{
+		const auto view = std::ranges::find(m_ReferenceViews, id, &CameraReferenceView::m_Id);
+		auto* main = GetMainCameraSlot();
+		if (view == m_ReferenceViews.end() || !main || !main->m_Camera || !main->m_Controller)
+		{
+			return false;
+		}
+		auto& camera = *main->m_Camera;
+		// LookAt marks an explicit camera cut, including restoration of the same view.
+		camera.LookAt(view->m_Position, view->m_Target);
+		camera.SetFov(view->m_VerticalFovDegrees);
+		camera.SetNearFar(view->m_NearPlane, view->m_FarPlane);
+		camera.SetExposureCompensationEV(view->m_ExposureCompensationEV);
+		camera.Update();
+		main->m_Controller->ResetVelocity();
+		m_ActiveCameraIndex = 0;
+		m_DisplayViewId = RenderViewID::Main;
+		m_LastRestoredReferenceId = view->m_Id;
+		return true;
 	}
 
 	void CameraRig::OnResize(uint32_t width, uint32_t height) noexcept

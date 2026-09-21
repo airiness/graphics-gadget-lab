@@ -41,6 +41,32 @@ namespace gglab
 			defaultContentConfig.m_StartupLabId == "gglab.lab.culling",
 			"Windows host policy supplies explicit stable default Demo and Lab identities");
 
+		ApplicationLaunchOptions islandOptions{};
+		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
+		const AppRuntimeConfig islandConfig = TranslateApplicationLaunchOptions(
+			islandOptions, { 1920, 1080 }, true);
+		context.Check(islandConfig.IsValid() &&
+			islandConfig.m_StartupDemoId == "Demo.Playground.Island",
+			"Island launch policy selects its stable Playground content identity");
+
+		ApplicationLaunchOptions atriumOptions{};
+		atriumOptions.m_StartupDemo = ApplicationStartupDemo::CoastalAtrium;
+		const AppRuntimeConfig atriumConfig = TranslateApplicationLaunchOptions(
+			atriumOptions, { 1920, 1080 }, true);
+		context.Check(atriumConfig.IsValid() &&
+			atriumConfig.m_StartupDemoId == "Demo.Playground.CoastalAtrium",
+			"Coastal atrium launch policy selects its stable Playground content identity");
+
+		ApplicationLaunchOptions textureOptions{};
+		textureOptions.m_StartupDemo = ApplicationStartupDemo::LabHost;
+		textureOptions.m_StartupLabId = "gglab.lab.texture_contract";
+		const AppRuntimeConfig textureConfig = TranslateApplicationLaunchOptions(
+			textureOptions, { 1920, 1080 }, true);
+		context.Check(textureConfig.IsValid() &&
+			textureConfig.m_StartupDemoId == "Demo.LabHost" &&
+			textureConfig.m_StartupLabId == "gglab.lab.texture_contract",
+			"Texture contract launch policy preserves its stable Lab identity");
+
 		const std::filesystem::path executableDirectory =
 			std::filesystem::temp_directory_path() / "gglab-host-configuration-self-test";
 		const std::filesystem::path runtimeRoot = utils::Canonical(executableDirectory);
