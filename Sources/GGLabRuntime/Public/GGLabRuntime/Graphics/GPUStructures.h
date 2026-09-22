@@ -73,8 +73,14 @@ namespace gglab
 		uint32_t CascadeCount = 0;
 		uint32_t MainViewIndex = 0;
 		float NearDepth = 0.0f;
+		std::array<float, 4> ReceiverDepthBias{};
+		std::array<float, 4> ReceiverSlopeDepthBias{};
+		std::array<float, 4> ReceiverMaxSlope{};
 	};
-	static_assert(sizeof(DirectionalShadowGPU) == 32);
+	static_assert(sizeof(DirectionalShadowGPU) == 80);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverDepthBias) == 32);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) == 48);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverMaxSlope) == 64);
 	static_assert(offsetof(DirectionalShadowGPU, ViewBaseIndex) == 16);
 	static_assert(offsetof(DirectionalShadowGPU, NearDepth) == 28);
 	static_assert(std::is_trivially_copyable_v<DirectionalShadowGPU>);

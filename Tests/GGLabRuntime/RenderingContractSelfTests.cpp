@@ -2254,6 +2254,126 @@ namespace gglab
 				"One-texel maps retain a finite unsnapped fit and zero light direction uses its fallback");
 		}
 
+		void RunDirectionalShadowBiasTests(SelfTestContext& context) noexcept
+		{
+			Camera camera({ .m_Position = Vector3(5.5f, 3.4f, -14.0f),
+				.m_Near = 0.1f, .m_Far = 150.0f, .m_Fov = 50.0f, .m_Width = 1920, .m_Height = 1080 });
+			const ResolvedViewRenderSettings viewSettings{};
+			const ResolvedTemporalFramePlan plan{};
+			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({ .m_Camera = camera,
+				.m_RenderSettings = viewSettings, .m_TemporalFramePlan = plan, .m_Width = 1920, .m_Height = 1080 });
+			const Vector3 lightDirection = Vector3(-1.0f, -0.85f, 0.35f).Normalized();
+			DirectionalShadowSettings settings{};
+			settings.m_MaxShadowDistance = 80.0f;
+			auto baseline = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			bool worldProjectionMatches = true;
+			for (const auto& cascade : baseline.m_Cascades)
+			{
+				const auto& bias = cascade.m_Bias;
+				const Vector3 receiver = mainView.m_CameraPosition + Vector3(0.0f, 0.0f, cascade.m_SplitFar);
+				const Vector4 receiverClip = math::Transform(Vector4(receiver, 1.0f), cascade.m_View.m_UnjitteredViewProj);
+				for (float slope : { 0.0f, 1.0f, bias.m_ReceiverMaxSlope })
+				{
+					const float offsetWorld = bias.m_ReceiverConstantWorld + bias.m_ReceiverSlopeWorld * slope;
+					const Vector4 offsetClip = math::Transform(Vector4(receiver - lightDirection * offsetWorld, 1.0f),
+						cascade.m_View.m_UnjitteredViewProj);
+					const float depthDelta = bias.m_ReceiverDepthBias + bias.m_ReceiverSlopeDepthBias * slope;
+					worldProjectionMatches &= depthDelta > 0.0f &&
+						std::abs(receiverClip.m_Z - offsetClip.m_Z - depthDelta) < 0.000001f;
+				}
+				worldProjectionMatches &= bias.m_Mode == DirectionalShadowBiasMode::CascadeScaled &&
+					bias.m_RasterizerDepthBias == 0 && bias.m_RasterizerSlopeScaledDepthBias == 0.0f;
+			}
+			context.Check(worldProjectionMatches,
+				"Cascade receiver bias equals a world-space offset toward the light under standard Z without stacked raster bias");
+			context.Check(baseline.m_Cascades.back().m_Bias.m_ReceiverConstantWorld >
+				baseline.m_Cascades.front().m_Bias.m_ReceiverConstantWorld,
+				"Far cascades resolve larger world offsets from their larger texel footprints");
+
+			settings.m_DepthPadding += 100.0f;
+			settings.m_CasterExtrusionDistance += 100.0f;
+			const auto expandedDepth = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			bool depthInvariant = true;
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				const auto& before = baseline.m_Cascades[index].m_Bias;
+				const auto& after = expandedDepth.m_Cascades[index].m_Bias;
+				depthInvariant &= before.m_ReceiverConstantWorld == after.m_ReceiverConstantWorld &&
+					before.m_ReceiverSlopeWorld == after.m_ReceiverSlopeWorld &&
+					after.m_ReceiverDepthBias < before.m_ReceiverDepthBias &&
+					after.m_ReceiverSlopeDepthBias < before.m_ReceiverSlopeDepthBias &&
+					std::abs(after.m_ReceiverDepthBias * after.m_DepthSpan - before.m_ReceiverConstantWorld) < 0.000001f;
+			}
+			context.Check(depthInvariant,
+				"Larger caster extrusion and depth padding preserve world bias while reducing its normalized depth delta");
+
+			settings.m_ShadowMapSize = 1024;
+			settings.m_FitMode = DirectionalShadowFitMode::Tight;
+			const auto lowResolution = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			settings.m_ShadowMapSize = 2048;
+			const auto highResolution = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			bool resolutionScales = true;
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				const auto& low = lowResolution.m_Cascades[index];
+				const auto& high = highResolution.m_Cascades[index];
+				resolutionScales &= low.m_Bias.m_ReceiverDepthBias == high.m_Bias.m_ReceiverDepthBias * 2.0f &&
+					low.m_Bias.m_ReceiverSlopeWorld == high.m_Bias.m_ReceiverSlopeWorld * 2.0f &&
+					low.m_Bias.m_WorldUnitsPerTexel == std::max(low.m_Projection.m_WorldUnitsPerTexel.m_X,
+						low.m_Projection.m_WorldUnitsPerTexel.m_Y);
+			}
+			context.Check(resolutionScales,
+				"Doubling resolution halves resolved bias and tight fits use the larger axis footprint");
+
+			baseline.m_ViewBaseOffset = 7;
+			const auto gpu = BuildDirectionalShadowGPU(baseline);
+			bool uploadMatches = gpu.CascadeCount == MaxDirectionalShadowCascades;
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				const auto& bias = baseline.m_Cascades[index].m_Bias;
+				uploadMatches &= gpu.ReceiverDepthBias[index] == bias.m_ReceiverDepthBias &&
+					gpu.ReceiverSlopeDepthBias[index] == bias.m_ReceiverSlopeDepthBias &&
+					gpu.ReceiverMaxSlope[index] == bias.m_ReceiverMaxSlope;
+			}
+			context.Check(uploadMatches, "Every uploaded cascade receives its own resolved constant, slope and clamp");
+
+			settings.m_BiasMode = DirectionalShadowBiasMode::LegacyRaw;
+			settings.m_ReceiverDepthBias = 0.00037f;
+			settings.m_RasterizerDepthBias = -120;
+			settings.m_RasterizerSlopeScaledDepthBias = 0.73f;
+			auto legacy = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			legacy.m_ViewBaseOffset = 7;
+			const auto legacyGpu = BuildDirectionalShadowGPU(legacy);
+			bool legacyExact = true;
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				const auto& bias = legacy.m_Cascades[index].m_Bias;
+				legacyExact &= legacyGpu.ReceiverDepthBias[index] == settings.m_ReceiverDepthBias &&
+					legacyGpu.ReceiverSlopeDepthBias[index] == 0.0f && legacyGpu.ReceiverMaxSlope[index] == 0.0f &&
+					bias.m_RasterizerDepthBias == -120 && bias.m_RasterizerSlopeScaledDepthBias == 0.73f &&
+					legacy.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray() ==
+						highResolution.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray();
+			}
+			context.Check(legacyExact, "Legacy Raw preserves all original bias values and switching policy does not change projections");
+			legacy.m_Cascades.resize(1);
+			const auto singleGpu = BuildDirectionalShadowGPU(legacy);
+			context.Check(singleGpu.CascadeCount == 1 && singleGpu.ReceiverDepthBias[0] == settings.m_ReceiverDepthBias &&
+				singleGpu.ReceiverDepthBias[1] == 0.0f && singleGpu.ReceiverSlopeDepthBias[2] == 0.0f &&
+				singleGpu.ReceiverMaxSlope[3] == 0.0f,
+				"Reducing the cascade count leaves unused bias slots zero rather than stale");
+			settings.m_BiasMode = DirectionalShadowBiasMode::CascadeScaled;
+			settings.m_ReceiverBiasTexels = -1.0f;
+			settings.m_ReceiverSlopeBiasTexels = -1.0f;
+			settings.m_ReceiverMaxSlope = 100.0f;
+			const auto bounded = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			context.Check(bounded.m_Cascades[0].m_Bias.m_ReceiverDepthBias == 0.0f &&
+				bounded.m_Cascades[0].m_Bias.m_ReceiverSlopeDepthBias == 0.0f &&
+				bounded.m_Cascades[0].m_Bias.m_ReceiverMaxSlope == 16.0f &&
+				bounded.m_Cascades[0].m_Bias.m_RasterizerDepthBias == 0 &&
+				bounded.m_Cascades[0].m_Bias.m_RasterizerSlopeScaledDepthBias == 0.0f,
+				"Scaled policy bounds grazing slope, rejects negative offsets and ignores retained legacy raster values");
+		}
+
 		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept
 		{
 			const RHITextureDesc depthDesc{
@@ -6846,6 +6966,7 @@ namespace gglab
 		RunDirectionalShadowCascadeFrameTests(context);
 		RunDirectionalShadowSplitTests(context);
 		RunDirectionalShadowStabilityTests(context);
+		RunDirectionalShadowBiasTests(context);
 		RunDirectionalShadowGraphTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);

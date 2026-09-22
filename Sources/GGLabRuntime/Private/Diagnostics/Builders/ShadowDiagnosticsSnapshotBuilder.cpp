@@ -56,6 +56,7 @@ namespace gglab
 					.m_SplitNear = cascade.m_SplitNear,
 					.m_SplitFar = cascade.m_SplitFar,
 					.m_Projection = cascade.m_Projection,
+					.m_Bias = cascade.m_Bias,
 				});
 			}
 		}

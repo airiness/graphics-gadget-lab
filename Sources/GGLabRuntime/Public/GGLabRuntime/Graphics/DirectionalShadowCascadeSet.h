@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
 #include <limits>
@@ -18,6 +19,7 @@ namespace gglab
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
 		DirectionalShadowProjectionInfo m_Projection{};
+		DirectionalShadowResolvedBias m_Bias{};
 	};
 
 	// Frame-owned values. Cascade identity is its position in this set, not a

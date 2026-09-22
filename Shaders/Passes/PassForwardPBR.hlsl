@@ -18,7 +18,7 @@ struct ForwardPBRPassParameters
 	uint ShadowMapSamplerIndex;
 	uint ShadowMapSize;
 	uint ShadowFlags;
-	float ShadowReceiverDepthBias;
+	float ShadowBiasPadding;
 	uint ShadowPadding;
 	uint ForwardPlusTileCountX;
 	uint ForwardPlusTileCountY;
@@ -191,9 +191,9 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		   g_Scene.IBLResource.EnvironmentIntensity;
 }
 
-float SampleDirectionalShadow(float3 positionWS, float NoL)
+float SampleDirectionalShadow(float3 positionWS, float receiverNoL)
 {
-	if (!IsShadowEnabled() || NoL <= 0.0)
+	if (!IsShadowEnabled())
 	{
 		return 1.0;
 	}
@@ -216,8 +216,9 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerComparisonState shadowSampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 
-	const float compareDepth =
-		saturate(shadowProjection.ReceiverDepth - g_Pass.ShadowReceiverDepthBias);
+	const float receiverBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
+	// Shadow maps use standard Z; subtracting receiver depth moves the comparison toward the light.
+	const float compareDepth = saturate(shadowProjection.ReceiverDepth - receiverBias);
 
 	if (!IsShadowPCFEnabled())
 	{
@@ -281,7 +282,7 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 	return attenuation > 0.0;
 }
 
-float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, float3 V, float NoV,
+float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, float3 shadowNormalWS, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	const LightData light = g_Lights[lightIndex];
@@ -311,21 +312,21 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, float3 
 	float shadowVisibility = 1.0;
 	if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
 	{
-		shadowVisibility = SampleDirectionalShadow(positionWS, NoL);
+		shadowVisibility = SampleDirectionalShadow(positionWS, dot(shadowNormalWS, L));
 	}
 
 	return (diffuse + specular) * light.Color.rgb * light.Intensity * NoL * attenuation *
 		shadowVisibility;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, float3 V, float NoV,
+float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, float3 shadowNormalWS, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowNormalWS, V, NoV, F0,
 			physicalRoughness, baseColor, metallic);
 	}
 	return lighting;
@@ -338,7 +339,7 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
-float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N,
+float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, float3 shadowNormalWS,
 	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	float3 lighting = 0.0.xxx;
@@ -350,7 +351,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		if (lightIndex >= g_Scene.LightBaseIndex &&
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
-			lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowNormalWS, V, NoV, F0,
 				physicalRoughness, baseColor, metallic);
 		}
 	}
@@ -372,7 +373,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		{
 			continue;
 		}
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowNormalWS, V, NoV, F0,
 			physicalRoughness, baseColor, metallic);
 	}
 	return lighting;
@@ -447,15 +448,15 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		IN.PositionWS, N, normalWS, V, NoV, F0, a, baseColor, metallic);
 #else
 	const float3 directLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, normalWS, V, NoV, F0, a, baseColor, metallic);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	const float3 legacyDirectLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, normalWS, V, NoV, F0, a, baseColor, metallic);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)

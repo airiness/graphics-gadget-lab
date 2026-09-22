@@ -46,7 +46,7 @@ namespace gglab
 			uint32_t m_ShadowMapSamplerIndex = 0;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowFlags = 0;
-			float m_ShadowReceiverDepthBias = 0.0f;
+			float m_ShadowBiasPadding = 0.0f;
 			uint32_t m_ShadowPadding = 0;
 			uint32_t m_ForwardPlusTileCountX = 0;
 			uint32_t m_ForwardPlusTileCountY = 0;
@@ -90,7 +90,6 @@ namespace gglab
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
-			float m_ShadowReceiverDepthBias = 0.0f;
 			bool m_GTAOEnabled = false;
 			bool m_GTAOContributionOutputEnabled = false;
 		};
@@ -324,7 +323,6 @@ namespace gglab
 				data.m_ShadowFlags =
 					((shadowSettings.m_Enable && primaryShadowCascade) ? 1u : 0u) |
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
-				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
 			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
@@ -504,7 +502,6 @@ namespace gglab
 					.m_ShadowMapSamplerIndex = data.m_ShadowSamplerIndex,
 					.m_ShadowMapSize = data.m_ShadowMapSize,
 					.m_ShadowFlags = data.m_ShadowFlags,
-					.m_ShadowReceiverDepthBias = data.m_ShadowReceiverDepthBias,
 					.m_ForwardPlusTileCountX = data.m_ForwardPlusTileGrid.m_TileCountX,
 					.m_ForwardPlusTileCountY = data.m_ForwardPlusTileGrid.m_TileCountY,
 					.m_ForwardPlusGlobalLightCount = data.m_LightingVariant ==

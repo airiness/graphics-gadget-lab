@@ -5,6 +5,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
@@ -34,6 +35,7 @@ namespace gglab
 			RGTextureViewId m_Dsv{};
 			const RenderQueue* m_RenderQueue = nullptr;
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
+			DirectionalShadowResolvedBias m_Bias{};
 		};
 
 	}
@@ -88,6 +90,7 @@ namespace gglab
 					data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
 					if (cascade)
 					{
+						data.m_Bias = cascade->m_Bias;
 						data.m_RenderQueue = std::addressof(cascade->m_RenderQueue);
 						data.m_RasterDomain =
 							std::addressof(cascade->m_RenderQueue.m_CoverageRasterDomain);
@@ -152,7 +155,7 @@ namespace gglab
 					}
 					graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
 						renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-						contextPtr->GetDirectionalShadowSettings()));
+						data.m_Bias));
 
 					GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 					GGLAB_ASSERT_MSG(
@@ -189,7 +192,7 @@ namespace gglab
 					graphicsContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-					DrawRenderQueue(graphicsContext, *contextPtr, services, renderQueue);
+					DrawRenderQueue(graphicsContext, services, renderQueue, data.m_Bias);
 				});
 		}
 	}
@@ -232,8 +235,8 @@ namespace gglab
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context, const RenderServices& services,
-		const RenderQueue& renderQueue) noexcept
+		const RenderServices& services, const RenderQueue& renderQueue,
+		const DirectionalShadowResolvedBias& bias) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		if (renderQueue.m_DrawItems.empty())
@@ -242,15 +245,15 @@ namespace gglab
 		}
 
 		const auto ranges = renderQueue.m_BucketDrawRanges;
-		DrawRange(graphicsContext, context, services, renderQueue,
+		DrawRange(graphicsContext, services, renderQueue, bias,
 			ranges[utils::ToIndex(RenderBucket::Opaque)]);
-		DrawRange(graphicsContext, context, services, renderQueue,
+		DrawRange(graphicsContext, services, renderQueue, bias,
 			ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRange(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context, const RenderServices& services,
-		const RenderQueue& renderQueue, const DrawItemsRange& range) noexcept
+		const RenderServices& services, const RenderQueue& renderQueue,
+		const DirectionalShadowResolvedBias& bias, const DrawItemsRange& range) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -273,7 +276,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				const auto pipeline = GetOrCreatePSOForVariant(
-					services, drawItem.m_VariantBits, context.GetDirectionalShadowSettings());
+					services, drawItem.m_VariantBits, bias);
 				graphicsContext->SetPipeline(pipeline);
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -302,7 +305,7 @@ namespace gglab
 
 	RHIPipelineHandle RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
 		const RenderServices& services, uint64_t variantBits,
-		const DirectionalShadowSettings& shadowSettings) noexcept
+		const DirectionalShadowResolvedBias& bias) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = services.m_PipelineResolver;
@@ -316,8 +319,8 @@ namespace gglab
 			recipe.m_PSId = m_AlphaTestPixelShader;
 		}
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
-		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
-		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
+		recipe.m_DepthBias = bias.m_RasterizerDepthBias;
+		recipe.m_SlopeScaledDepthBias = bias.m_RasterizerSlopeScaledDepthBias;
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];

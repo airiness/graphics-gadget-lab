@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
 #include <vector>
@@ -28,6 +29,7 @@ namespace gglab
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
 		DirectionalShadowProjectionInfo m_Projection{};
+		DirectionalShadowResolvedBias m_Bias{};
 	};
 
 	struct ShadowDiagnosticsSnapshot

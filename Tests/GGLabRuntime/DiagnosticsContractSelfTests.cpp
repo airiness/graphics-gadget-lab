@@ -818,6 +818,18 @@ namespace gglab
 			.m_CenterLS = Vector2(10.0f, -3.0f),
 			.m_TexelSnappingApplied = true,
 		};
+		cascades.m_Cascades[1].m_Bias = {
+			.m_Mode = DirectionalShadowBiasMode::CascadeScaled,
+			.m_WorldUnitsPerTexel = 0.025f,
+			.m_DepthSpan = 500.0f,
+			.m_ReceiverConstantWorld = 0.0125f,
+			.m_ReceiverSlopeWorld = 0.0375f,
+			.m_ReceiverDepthBias = 0.000025f,
+			.m_ReceiverSlopeDepthBias = 0.000075f,
+			.m_ReceiverMaxSlope = 4.0f,
+			.m_RasterizerDepthBias = 0,
+			.m_RasterizerSlopeScaledDepthBias = 0.0f,
+		};
 		auto& queue = cascades.m_Cascades[1].m_RenderQueue;
 		queue.m_Statistics.m_CulledInstanceCount = 9;
 		queue.m_Statistics.m_DrawItemCount = 12;
@@ -845,6 +857,14 @@ namespace gglab
 			projection.m_UnsnappedCenterLS.m_X == 10.01f && projection.m_CenterLS.m_Y == -3.0f &&
 			projection.m_TexelSnappingApplied,
 			"Shadow stability diagnostics retain projection, texel scale and snapped centers after frame destruction");
+		const auto& bias = shadowSnapshot.m_Cascades[1].m_Bias;
+		context.Check(bias.m_Mode == DirectionalShadowBiasMode::CascadeScaled &&
+			bias.m_WorldUnitsPerTexel == 0.025f && bias.m_DepthSpan == 500.0f &&
+			bias.m_ReceiverConstantWorld == 0.0125f && bias.m_ReceiverSlopeWorld == 0.0375f &&
+			bias.m_ReceiverDepthBias == 0.000025f && bias.m_ReceiverSlopeDepthBias == 0.000075f &&
+			bias.m_ReceiverMaxSlope == 4.0f && bias.m_RasterizerDepthBias == 0 &&
+			bias.m_RasterizerSlopeScaledDepthBias == 0.0f,
+			"Shadow diagnostics retain the frame-resolved bias policy and units after frame destruction");
 		context.Check(BuildShadowDiagnosticsSnapshot(shadowGraph).m_Cascades.empty() &&
 			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades).m_Cascades.empty(),
 			"Missing and empty cascade sets publish no stale cascade diagnostics");

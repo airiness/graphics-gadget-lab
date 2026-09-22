@@ -5,6 +5,40 @@
 
 namespace gglab
 {
+	namespace
+	{
+		DirectionalShadowResolvedBias ResolveDirectionalShadowBias(
+			const DirectionalShadowViewBuildResult& shadowView,
+			const DirectionalShadowSettings& settings) noexcept
+		{
+			DirectionalShadowResolvedBias result{};
+			result.m_Mode = settings.m_BiasMode;
+			const auto& texelSize = shadowView.m_Projection.m_WorldUnitsPerTexel;
+			result.m_WorldUnitsPerTexel = std::max(texelSize.m_X, texelSize.m_Y);
+			result.m_DepthSpan = std::max(shadowView.m_View.m_Far - shadowView.m_View.m_Near, 0.001f);
+			if (settings.m_BiasMode == DirectionalShadowBiasMode::LegacyRaw)
+			{
+				result.m_ReceiverDepthBias = settings.m_ReceiverDepthBias;
+				result.m_ReceiverConstantWorld = result.m_ReceiverDepthBias * result.m_DepthSpan;
+				result.m_RasterizerDepthBias = settings.m_RasterizerDepthBias;
+				result.m_RasterizerSlopeScaledDepthBias = settings.m_RasterizerSlopeScaledDepthBias;
+				return result;
+			}
+
+			result.m_ReceiverConstantWorld = std::max(settings.m_ReceiverBiasTexels, 0.0f) *
+				result.m_WorldUnitsPerTexel;
+			result.m_ReceiverSlopeWorld = std::max(settings.m_ReceiverSlopeBiasTexels, 0.0f) *
+				result.m_WorldUnitsPerTexel;
+			result.m_ReceiverDepthBias = result.m_ReceiverConstantWorld / result.m_DepthSpan;
+			result.m_ReceiverSlopeDepthBias = result.m_ReceiverSlopeWorld / result.m_DepthSpan;
+			result.m_ReceiverMaxSlope = std::clamp(settings.m_ReceiverMaxSlope, 0.0f, 16.0f);
+			// Apply the portable policy entirely in receiver depth. D32 raster constant bias
+			// has backend/format semantics, so do not convert meters into its raw integer.
+			// Zero raster terms also avoid stacking two policies or varying PSOs with the camera.
+			return result;
+		}
+	}
+
 	DirectionalShadowCascadeSet BuildDirectionalShadowCascades(const RenderView& mainView,
 		const Vector3& lightDirection, const DirectionalShadowSettings& settings) noexcept
 	{
@@ -42,6 +76,7 @@ namespace gglab
 				.m_SplitNear = splitNear,
 				.m_SplitFar = splitFar,
 				.m_Projection = shadowView.m_Projection,
+				.m_Bias = ResolveDirectionalShadowBias(shadowView, settings),
 			});
 			splitNear = splitFar;
 		}
@@ -64,7 +99,11 @@ namespace gglab
 		result.NearDepth = cascades.m_Cascades.front().m_SplitNear;
 		for (uint32_t index = 0; index < result.CascadeCount; ++index)
 		{
-			result.SplitFar[index] = cascades.m_Cascades[index].m_SplitFar;
+			const auto& cascade = cascades.m_Cascades[index];
+			result.SplitFar[index] = cascade.m_SplitFar;
+			result.ReceiverDepthBias[index] = cascade.m_Bias.m_ReceiverDepthBias;
+			result.ReceiverSlopeDepthBias[index] = cascade.m_Bias.m_ReceiverSlopeDepthBias;
+			result.ReceiverMaxSlope[index] = cascade.m_Bias.m_ReceiverMaxSlope;
 		}
 		return result;
 	}

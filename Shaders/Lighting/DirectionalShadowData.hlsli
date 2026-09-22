@@ -8,7 +8,21 @@ struct DirectionalShadowData
 	uint CascadeCount;
 	uint MainViewIndex;
 	float NearDepth;
+	float4 ReceiverDepthBias;
+	float4 ReceiverSlopeDepthBias;
+	float4 ReceiverMaxSlope;
 };
+
+float EvaluateDirectionalShadowReceiverBias(uint cascadeIndex, float receiverNoL,
+	DirectionalShadowData shadow)
+{
+	// Use the unperturbed receiver normal: normal maps do not change shadow-map geometry.
+	// The bounded tangent avoids an unbounded offset at grazing incidence.
+	const float cosine = saturate(abs(receiverNoL));
+	const float slope = min(sqrt(saturate(1.0 - cosine * cosine)) / max(cosine, 0.001),
+		shadow.ReceiverMaxSlope[cascadeIndex]);
+	return shadow.ReceiverDepthBias[cascadeIndex] + shadow.ReceiverSlopeDepthBias[cascadeIndex] * slope;
+}
 
 uint SelectDirectionalShadowCascade(float mainViewZ, DirectionalShadowData shadow)
 {
