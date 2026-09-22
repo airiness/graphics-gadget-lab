@@ -267,6 +267,15 @@ namespace gglab
 				changed = true;
 			}
 			changed |= ImGui::SliderFloat("Split Lambda", &settings.m_SplitLambda, 0.0f, 1.0f, "%.2f");
+			int fitMode = static_cast<int>(settings.m_FitMode);
+			if (ImGui::Combo("Projection Fit", &fitMode, "Tight fit\0Stable sphere\0"))
+			{
+				settings.m_FitMode = static_cast<DirectionalShadowFitMode>(fitMode);
+				changed = true;
+			}
+			ImGui::BeginDisabled(settings.m_FitMode != DirectionalShadowFitMode::StableSphere);
+			changed |= ImGui::Checkbox("Texel Snapping", &settings.m_EnableTexelSnapping);
+			ImGui::EndDisabled();
 			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
 			if (ImGui::DragInt("Shadow Map Size", &shadowMapSize, 16.0f, 256, 8192))
 			{

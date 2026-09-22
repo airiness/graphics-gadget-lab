@@ -14,6 +14,12 @@ namespace gglab
 	inline constexpr int32_t DefaultDirectionalShadowRasterizerDepthBias = 360;
 	inline constexpr float DefaultDirectionalShadowRasterizerSlopeScaledDepthBias = 0.6f;
 
+	enum class DirectionalShadowFitMode : uint8_t
+	{
+		Tight,
+		StableSphere,
+	};
+
 	struct DirectionalShadowSettings
 	{
 		bool m_Enable = true;
@@ -22,6 +28,8 @@ namespace gglab
 		uint32_t m_ShadowMapSize = DefaultDirectionalShadowMapSize;
 		uint32_t m_CascadeCount = MaxDirectionalShadowCascades;
 		float m_SplitLambda = 0.65f;
+		DirectionalShadowFitMode m_FitMode = DirectionalShadowFitMode::StableSphere;
+		bool m_EnableTexelSnapping = true;
 
 		float m_MaxShadowDistance = DefaultDirectionalShadowMaxDistance;
 		float m_CasterExtrusionDistance = DefaultDirectionalShadowCasterExtrusionDistance;

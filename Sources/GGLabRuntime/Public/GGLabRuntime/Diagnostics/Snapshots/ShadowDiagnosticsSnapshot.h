@@ -27,6 +27,7 @@ namespace gglab
 		uint32_t m_ShadowDrawCount = 0;
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
+		DirectionalShadowProjectionInfo m_Projection{};
 	};
 
 	struct ShadowDiagnosticsSnapshot

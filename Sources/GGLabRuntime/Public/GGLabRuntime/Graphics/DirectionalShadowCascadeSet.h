@@ -17,6 +17,7 @@ namespace gglab
 		// Positive main-camera view-space depths, independent of the light view depth range.
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
+		DirectionalShadowProjectionInfo m_Projection{};
 	};
 
 	// Frame-owned values. Cascade identity is its position in this set, not a

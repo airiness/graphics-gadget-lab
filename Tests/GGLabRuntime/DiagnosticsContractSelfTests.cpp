@@ -809,6 +809,15 @@ namespace gglab
 		cascades.m_Cascades[1].m_View.m_Width = 1024;
 		cascades.m_Cascades[1].m_SplitNear = 5.0f;
 		cascades.m_Cascades[1].m_SplitFar = 30.0f;
+		cascades.m_Cascades[1].m_Projection = {
+			.m_FitMode = DirectionalShadowFitMode::StableSphere,
+			.m_SphereRadius = 12.0f,
+			.m_Extent = Vector2(26.0f),
+			.m_WorldUnitsPerTexel = Vector2(26.0f / 1024.0f),
+			.m_UnsnappedCenterLS = Vector2(10.01f, -3.02f),
+			.m_CenterLS = Vector2(10.0f, -3.0f),
+			.m_TexelSnappingApplied = true,
+		};
 		auto& queue = cascades.m_Cascades[1].m_RenderQueue;
 		queue.m_Statistics.m_CulledInstanceCount = 9;
 		queue.m_Statistics.m_DrawItemCount = 12;
@@ -829,6 +838,13 @@ namespace gglab
 			shadowSnapshot.m_Cascades[1].m_SplitNear == 5.0f &&
 			shadowSnapshot.m_Cascades[1].m_SplitFar == 30.0f,
 			"Cascade diagnostics retain independent values after frame destruction and exclude transparent draws");
+		const auto& projection = shadowSnapshot.m_Cascades[1].m_Projection;
+		context.Check(projection.m_FitMode == DirectionalShadowFitMode::StableSphere &&
+			projection.m_SphereRadius == 12.0f && projection.m_Extent.m_X == 26.0f &&
+			projection.m_WorldUnitsPerTexel.m_Y == 26.0f / 1024.0f &&
+			projection.m_UnsnappedCenterLS.m_X == 10.01f && projection.m_CenterLS.m_Y == -3.0f &&
+			projection.m_TexelSnappingApplied,
+			"Shadow stability diagnostics retain projection, texel scale and snapped centers after frame destruction");
 		context.Check(BuildShadowDiagnosticsSnapshot(shadowGraph).m_Cascades.empty() &&
 			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades).m_Cascades.empty(),
 			"Missing and empty cascade sets publish no stale cascade diagnostics");

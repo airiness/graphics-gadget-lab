@@ -1917,6 +1917,7 @@ namespace gglab
 			frame.m_RenderViews[utils::ToIndex(RenderViewID::DebugCamera2)].m_Width = 640;
 			const RenderView legacyShadow = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
 				.m_MainView = mainView,
+				.m_FitMode = DirectionalShadowFitMode::Tight,
 			});
 			auto& cascades = frame.m_DirectionalShadowCascades;
 			cascades.m_Cascades.push_back({ .m_View = legacyShadow });
@@ -2092,15 +2093,165 @@ namespace gglab
 			}
 			shadowSettings.m_CascadeCount = 1;
 			shadowSettings.m_MaxShadowDistance = 150.0f;
+			shadowSettings.m_FitMode = DirectionalShadowFitMode::Tight;
 			const auto single = BuildDirectionalShadowCascades(mainView, -Vector3::UnitY, shadowSettings);
 			const auto reference = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
 				.m_MainView = mainView, .m_MaxShadowDistance = 150.0f,
+				.m_FitMode = DirectionalShadowFitMode::Tight,
 			});
 			context.Check(single.m_Cascades.size() == 1 && single.m_Cascades[0].m_SplitFar == 100.0f &&
 				single.m_Cascades[0].m_View.m_UnjitteredViewProj.ToArray() == reference.m_UnjitteredViewProj.ToArray(),
 				"Single-cascade mode preserves the legacy fit and clamps shadow distance to camera far");
 			context.Check(BuildDirectionalShadowGPU({}).CascadeCount == 0,
 				"Missing shadow views cannot enable a GPU cascade lookup");
+		}
+
+		void RunDirectionalShadowStabilityTests(SelfTestContext& context) noexcept
+		{
+			const auto makeView = [](float yaw, float pitch) noexcept
+			{
+				Camera camera({ .m_Position = Vector3(5.5f, 3.4f, -14.0f),
+					.m_Near = 0.1f, .m_Far = 150.0f, .m_Fov = 50.0f, .m_Width = 1920, .m_Height = 1080 });
+				camera.SetYawPitch(yaw, pitch);
+				camera.Update();
+				const ResolvedViewRenderSettings settings{};
+				const ResolvedTemporalFramePlan plan{};
+				return RenderViewBuilder{}.Build<RenderViewID::Main>({ .m_Camera = camera,
+					.m_RenderSettings = settings, .m_TemporalFramePlan = plan, .m_Width = 1920, .m_Height = 1080 });
+			};
+			const auto translateView = [](RenderView view, const Vector3& offset) noexcept
+			{
+				view.m_CameraPosition += offset;
+				view.m_InvView.Translation(view.m_CameraPosition);
+				view.m_View = math::Inverse(view.m_InvView);
+				view.m_UnjitteredViewProj = view.m_View * view.m_UnjitteredProj;
+				view.m_InvUnjitteredViewProj = math::Inverse(view.m_UnjitteredViewProj);
+				view.m_RasterViewProj = view.m_View * view.m_RasterProj;
+				view.m_InvRasterViewProj = math::Inverse(view.m_RasterViewProj);
+				return view;
+			};
+			const auto fixedPointTexels = [](const RenderView& view) noexcept
+			{
+				const Vector4 clip = math::Transform(Vector4(1.0f, 0.5f, 2.0f, 1.0f), view.m_UnjitteredViewProj);
+				return Vector2(clip.m_X, clip.m_Y) * (0.5f * static_cast<float>(view.m_Width) / clip.m_W);
+			};
+			const RenderView mainView = makeView(0.3f, -0.1f);
+			const Vector3 lightDirection = Vector3(-1.0f, -0.85f, 0.35f).Normalized();
+			const Matrix lightToWorld = math::Transpose(math::CreateLookAtLH(Vector3::Zero, lightDirection, Vector3::UnitY));
+			const Vector3 lightRight = math::TransformDirection(Vector3::UnitX, lightToWorld);
+			const Vector3 lightUp = math::TransformDirection(Vector3::UnitY, lightToWorld);
+			DirectionalShadowSettings settings{};
+			settings.m_OrthoPadding = 0.0f;
+			const auto baseline = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			bool stableRotation = true;
+			for (float yaw : { -1.1f, 0.0f, 1.3f })
+			{
+				for (float pitch : { -0.4f, 0.0f, 0.5f })
+				{
+					const auto rotated = BuildDirectionalShadowCascades(makeView(yaw, pitch), lightDirection, settings);
+					for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+					{
+						const auto& first = baseline.m_Cascades[index];
+						const auto& second = rotated.m_Cascades[index];
+						const Vector2 delta = fixedPointTexels(second.m_View) - fixedPointTexels(first.m_View);
+						stableRotation &= first.m_Projection.m_SphereRadius == second.m_Projection.m_SphereRadius &&
+							first.m_Projection.m_Extent.m_X == second.m_Projection.m_Extent.m_X &&
+							first.m_Projection.m_Extent.m_Y == second.m_Projection.m_Extent.m_Y &&
+							std::abs(delta.m_X - std::round(delta.m_X)) < 0.003f &&
+							std::abs(delta.m_Y - std::round(delta.m_Y)) < 0.003f;
+					}
+				}
+			}
+			context.Check(stableRotation,
+				"Camera rotation preserves each sphere footprint and moves fixed world points by integral shadow texels");
+
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				const auto& projection = baseline.m_Cascades[index].m_Projection;
+				const Vector2 centerOffset = projection.m_CenterLS - projection.m_UnsnappedCenterLS;
+				const RenderView centeredView = translateView(mainView,
+					lightRight * centerOffset.m_X + lightUp * centerOffset.m_Y);
+				const auto centered = BuildDirectionalShadowCascades(centeredView, lightDirection, settings).m_Cascades[index];
+				const float texelSize = centered.m_Projection.m_WorldUnitsPerTexel.m_X;
+				const auto moved = BuildDirectionalShadowCascades(translateView(centeredView,
+					(lightRight + lightUp) * (0.2f * texelSize)), lightDirection, settings).m_Cascades[index];
+				const Vector2 smallDelta = fixedPointTexels(moved.m_View) - fixedPointTexels(centered.m_View);
+				const auto stepped = BuildDirectionalShadowCascades(translateView(centeredView,
+					(lightRight - lightUp) * (1.2f * texelSize)), lightDirection, settings).m_Cascades[index];
+				const Vector2 stepDelta = fixedPointTexels(stepped.m_View) - fixedPointTexels(centered.m_View);
+				context.Check(smallDelta.Length() < 0.003f &&
+					std::abs(stepDelta.m_X + 1.0f) < 0.003f && std::abs(stepDelta.m_Y - 1.0f) < 0.003f,
+					"Sub-texel XY translation holds the shadow grid and crossing its boundary advances exactly one texel");
+				const auto depthMoved = BuildDirectionalShadowCascades(translateView(centeredView,
+					lightDirection * (0.23f * texelSize)), lightDirection, settings).m_Cascades[index];
+				context.Check((fixedPointTexels(depthMoved.m_View) - fixedPointTexels(centered.m_View)).Length() < 0.003f &&
+					std::abs(depthMoved.m_View.m_View.m_43 - centered.m_View.m_View.m_43 + 0.23f * texelSize) < 0.0002f,
+					"Light-space Z remains continuously fitted while the XY grid stays fixed");
+			}
+
+			bool containsCasters = true;
+			for (uint32_t resolution : { 2u, 1024u, 2048u })
+			{
+				settings.m_ShadowMapSize = resolution;
+				for (const Vector3 direction : { lightDirection, -Vector3::UnitY })
+				{
+					for (float yaw : { -0.7f, 0.6f })
+					{
+						const RenderView receiver = makeView(yaw, 0.4f);
+						const auto cascades = BuildDirectionalShadowCascades(receiver, direction, settings);
+						for (const auto& cascade : cascades.m_Cascades)
+						{
+							for (float depth : { cascade.m_SplitNear, cascade.m_SplitFar })
+							{
+								const float halfHeight = std::tan(receiver.m_FovRadians * 0.5f) * depth;
+								for (float x : { -1.0f, 1.0f })
+								{
+									for (float y : { -1.0f, 1.0f })
+									{
+										const Vector3 corner = math::TransformPoint(Vector3(x * halfHeight * receiver.m_Aspect,
+											y * halfHeight, depth), receiver.m_InvView);
+										for (float extrusion : { 0.0f, settings.m_CasterExtrusionDistance })
+										{
+											const Vector4 clip = math::Transform(Vector4(corner - direction * extrusion, 1.0f),
+												cascade.m_View.m_UnjitteredViewProj);
+											containsCasters &= std::abs(clip.m_X) <= clip.m_W + 0.0001f &&
+												std::abs(clip.m_Y) <= clip.m_W + 0.0001f &&
+												clip.m_Z >= -0.0001f && clip.m_Z <= clip.m_W + 0.0001f;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			context.Check(containsCasters,
+				"Snapped spheres with zero ortho padding cover every receiver and extruded caster corner, including vertical light and low resolution");
+			settings.m_ShadowMapSize = DefaultDirectionalShadowMapSize;
+			RenderView jittered = mainView;
+			jittered.m_JitterPixels = Vector2(0.25f, -0.3f);
+			jittered.m_RasterProj.m_31 += 0.01f;
+			jittered.m_RasterProj.m_32 -= 0.02f;
+			const auto jitteredCascades = BuildDirectionalShadowCascades(jittered, lightDirection, settings);
+			bool ignoresJitter = true;
+			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
+			{
+				ignoresJitter &= jitteredCascades.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray() ==
+					baseline.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray();
+			}
+			context.Check(ignoresJitter, "Temporal raster jitter cannot alter a cascade projection");
+			settings.m_EnableTexelSnapping = false;
+			const auto unsnapped = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			context.Check(!unsnapped.m_Cascades[0].m_Projection.m_TexelSnappingApplied &&
+				unsnapped.m_Cascades[0].m_Projection.m_Extent.m_X == baseline.m_Cascades[0].m_Projection.m_Extent.m_X,
+				"Snapping A/B preserves the stable footprint");
+			settings.m_EnableTexelSnapping = true;
+			settings.m_ShadowMapSize = 1;
+			const auto oneTexel = BuildDirectionalShadowCascades(mainView, Vector3::Zero, settings);
+			context.Check(oneTexel.m_Cascades[0].m_View.m_IsValid &&
+				!oneTexel.m_Cascades[0].m_Projection.m_TexelSnappingApplied &&
+				std::isfinite(oneTexel.m_Cascades[0].m_Projection.m_Extent.m_X),
+				"One-texel maps retain a finite unsnapped fit and zero light direction uses its fallback");
 		}
 
 		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept
@@ -6694,6 +6845,7 @@ namespace gglab
 		RunScreenSpaceAndDepthContractTests(context);
 		RunDirectionalShadowCascadeFrameTests(context);
 		RunDirectionalShadowSplitTests(context);
+		RunDirectionalShadowStabilityTests(context);
 		RunDirectionalShadowGraphTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);

@@ -26,18 +26,22 @@ namespace gglab
 			RenderView receiverView = mainView;
 			receiverView.m_Near = splitNear;
 			receiverView.m_Far = splitFar;
+			const auto shadowView = BuildDirectionalShadowView({
+				.m_MainView = receiverView,
+				.m_LightDirection = lightDirection,
+				.m_ShadowMapSize = std::max(settings.m_ShadowMapSize, 1u),
+				.m_MaxShadowDistance = farDepth,
+				.m_CasterExtrusionDistance = settings.m_CasterExtrusionDistance,
+				.m_OrthoPadding = settings.m_OrthoPadding,
+				.m_DepthPadding = settings.m_DepthPadding,
+				.m_FitMode = settings.m_FitMode,
+				.m_EnableTexelSnapping = settings.m_EnableTexelSnapping,
+			});
 			result.m_Cascades.push_back({
-				.m_View = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
-					.m_MainView = receiverView,
-					.m_LightDirection = lightDirection,
-					.m_ShadowMapSize = std::max(settings.m_ShadowMapSize, 1u),
-					.m_MaxShadowDistance = farDepth,
-					.m_CasterExtrusionDistance = settings.m_CasterExtrusionDistance,
-					.m_OrthoPadding = settings.m_OrthoPadding,
-					.m_DepthPadding = settings.m_DepthPadding,
-				}),
+				.m_View = shadowView.m_View,
 				.m_SplitNear = splitNear,
 				.m_SplitFar = splitFar,
+				.m_Projection = shadowView.m_Projection,
 			});
 			splitNear = splitFar;
 		}

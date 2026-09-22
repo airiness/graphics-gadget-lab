@@ -55,6 +55,7 @@ namespace gglab
 						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count,
 					.m_SplitNear = cascade.m_SplitNear,
 					.m_SplitFar = cascade.m_SplitFar,
+					.m_Projection = cascade.m_Projection,
 				});
 			}
 		}

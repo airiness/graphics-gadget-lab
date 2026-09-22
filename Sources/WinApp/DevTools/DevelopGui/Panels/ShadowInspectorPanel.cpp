@@ -88,7 +88,16 @@ namespace gglab
 				changed = true;
 			}
 			changed |= ImGui::SliderFloat("Split Lambda", &settings.m_SplitLambda, 0.0f, 1.0f, "%.2f");
-			ImGui::TextUnformatted("Tight fit | Main-camera splits | Legacy bias | No cascade blending");
+			int fitMode = static_cast<int>(settings.m_FitMode);
+			if (ImGui::Combo("Projection Fit", &fitMode, "Tight fit\0Stable sphere\0"))
+			{
+				settings.m_FitMode = static_cast<DirectionalShadowFitMode>(fitMode);
+				changed = true;
+			}
+			ImGui::BeginDisabled(settings.m_FitMode != DirectionalShadowFitMode::StableSphere);
+			changed |= ImGui::Checkbox("Texel Snapping", &settings.m_EnableTexelSnapping);
+			ImGui::EndDisabled();
+			ImGui::TextUnformatted("Main-camera splits | Legacy bias | No cascade blending");
 
 			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
 			if (ImGui::SliderInt("Shadow Map Size", &shadowMapSize, 256, 8192))
@@ -203,6 +212,26 @@ namespace gglab
 			ImGui::Text("Main-camera split: %.3f - %.3f m", cascade.m_SplitNear, cascade.m_SplitFar);
 			const RenderView* shadowView = &cascade.m_View;
 			ImGui::Text("GPU view offset: %u", cascade.m_ViewIndex);
+			const auto& projection = cascade.m_Projection;
+			ImGui::Text("Fit: %s | Snapping: %s",
+				projection.m_FitMode == DirectionalShadowFitMode::StableSphere ? "Stable sphere" : "Tight",
+				projection.m_TexelSnappingApplied ? "On" : "Off");
+			if (projection.m_FitMode == DirectionalShadowFitMode::StableSphere)
+			{
+				ImGui::Text("Sphere radius: %.4f m", projection.m_SphereRadius);
+			}
+			ImGui::Text("Extent XY: %.4f / %.4f m", projection.m_Extent.m_X, projection.m_Extent.m_Y);
+			ImGui::Text("World units / texel: %.6f / %.6f", projection.m_WorldUnitsPerTexel.m_X,
+				projection.m_WorldUnitsPerTexel.m_Y);
+			ImGui::Text("Unsnapped center LS: %.5f / %.5f", projection.m_UnsnappedCenterLS.m_X,
+				projection.m_UnsnappedCenterLS.m_Y);
+			ImGui::Text("Resolved center LS: %.5f / %.5f", projection.m_CenterLS.m_X, projection.m_CenterLS.m_Y);
+			if (projection.m_WorldUnitsPerTexel.m_X > 0.0f && projection.m_WorldUnitsPerTexel.m_Y > 0.0f)
+			{
+				ImGui::Text("Snap offset (texels): %.3f / %.3f",
+					(projection.m_CenterLS.m_X - projection.m_UnsnappedCenterLS.m_X) / projection.m_WorldUnitsPerTexel.m_X,
+					(projection.m_CenterLS.m_Y - projection.m_UnsnappedCenterLS.m_Y) / projection.m_WorldUnitsPerTexel.m_Y);
+			}
 			ImGui::Text("Shadow draws: %u | Culled instances: %u", cascade.m_ShadowDrawCount,
 				cascade.m_QueueStatistics.m_CulledInstanceCount);
 			ImGui::Text("Queue items: %u | Visible / total instances: %u / %u",
