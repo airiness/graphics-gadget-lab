@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace gglab
 {
@@ -44,6 +46,7 @@ namespace gglab
 			EnvironmentLightingSystem& m_EnvironmentLightingSystem;
 
 			std::span<RenderView> m_RenderViews;
+			DirectionalShadowCascadeSet& m_DirectionalShadowCascades;
 
 			DynamicConstantBufferAllocator& m_SceneCB;
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
@@ -68,5 +71,8 @@ namespace gglab
 
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
+
+		[[nodiscard]] static std::vector<ViewGPU> BuildViewData(
+			std::span<const RenderView> cameraViews, DirectionalShadowCascadeSet& cascades) noexcept;
 	};
 }

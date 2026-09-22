@@ -327,7 +327,8 @@ namespace gglab
 		result.m_TemporalFramePlan = built.m_TemporalFramePlan;
 		result.m_TemporalFrameTransaction = built.m_TemporalFrameTransaction;
 		result.m_RenderScene = std::move(built.m_RenderScene);
-		result.m_RenderQueues = built.m_RenderQueues;
+		result.m_RenderQueues = std::move(built.m_RenderQueues);
+		result.m_DirectionalShadowCascades = std::move(built.m_DirectionalShadowCascades);
 		result.m_DebugDrawFrame = built.m_DebugDrawFrame;
 		result.m_DebugDrawCullContext = built.m_DebugDrawCullContext;
 		result.m_RenderSceneStatus = built.m_RenderSceneStatus;

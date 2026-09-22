@@ -15,6 +15,7 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
@@ -801,8 +802,32 @@ namespace gglab
 				resources.m_ShadowMapSize = 2048;
 				resources.m_ShadowMapPreviewSize = 512;
 			});
+		DirectionalShadowCascadeSet cascades{};
+		cascades.m_ViewBaseOffset = 7;
+		cascades.m_Cascades.resize(2);
+		cascades.m_Cascades[0].m_View.m_Width = 2048;
+		cascades.m_Cascades[1].m_View.m_Width = 1024;
+		auto& queue = cascades.m_Cascades[1].m_RenderQueue;
+		queue.m_Statistics.m_CulledInstanceCount = 9;
+		queue.m_Statistics.m_DrawItemCount = 12;
+		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Opaque)].m_Count = 5;
+		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count = 3;
+		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Transparent)].m_Count = 4;
 		const ShadowDiagnosticsSnapshot shadowSnapshot =
-			BuildShadowDiagnosticsSnapshot(shadowGraph);
+			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades);
+		cascades = {};
+		context.Check(shadowSnapshot.m_Cascades.size() == 2 &&
+			shadowSnapshot.m_Cascades[0].m_ViewIndex == 7 &&
+			shadowSnapshot.m_Cascades[1].m_ViewIndex == 8 &&
+			shadowSnapshot.m_Cascades[0].m_View.m_Width == 2048 &&
+			shadowSnapshot.m_Cascades[1].m_View.m_Width == 1024 &&
+			shadowSnapshot.m_Cascades[1].m_QueueStatistics.m_CulledInstanceCount == 9 &&
+			shadowSnapshot.m_Cascades[1].m_QueueStatistics.m_DrawItemCount == 12 &&
+			shadowSnapshot.m_Cascades[1].m_ShadowDrawCount == 8,
+			"Cascade diagnostics retain independent values after frame destruction and exclude transparent draws");
+		context.Check(BuildShadowDiagnosticsSnapshot(shadowGraph).m_Cascades.empty() &&
+			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades).m_Cascades.empty(),
+			"Missing and empty cascade sets publish no stale cascade diagnostics");
 		context.Check(shadowSnapshot.m_Available &&
 				shadowSnapshot.m_DirectionalShadowMap.m_Available &&
 				shadowSnapshot.m_DirectionalShadowMap.m_Extent.m_Width == 2048 &&

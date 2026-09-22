@@ -32,7 +32,8 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context, const RenderServices& services) noexcept;
+			const RenderFrameContext& context, const RenderServices& services,
+			const RenderQueue& renderQueue) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services,

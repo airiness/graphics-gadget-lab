@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 
 namespace gglab
@@ -26,9 +27,34 @@ namespace gglab
 	}
 
 	ShadowDiagnosticsSnapshot BuildShadowDiagnosticsSnapshot(
-		const RenderGraph& renderGraph) noexcept
+		const RenderGraph& renderGraph, const DirectionalShadowCascadeSet* cascades) noexcept
 	{
 		ShadowDiagnosticsSnapshot snapshot{};
+		if (cascades)
+		{
+			snapshot.m_Cascades.reserve(cascades->m_Cascades.size());
+			for (uint32_t index = 0; index < cascades->m_Cascades.size(); ++index)
+			{
+				const auto& cascade = cascades->m_Cascades[index];
+				const auto& queue = cascade.m_RenderQueue;
+				const RenderQueueStatistics& statistics = queue.m_Statistics;
+				snapshot.m_Cascades.push_back({
+					.m_View = cascade.m_View,
+					.m_QueueStatistics = {
+						.m_TotalInstanceCount = statistics.m_TotalInstanceCount,
+						.m_VisibleInstanceCount = statistics.m_VisibleInstanceCount,
+						.m_CulledInstanceCount = statistics.m_CulledInstanceCount,
+						.m_InvalidInstanceCount = statistics.m_InvalidInstanceCount,
+						.m_UnboundedInstanceCount = statistics.m_UnboundedInstanceCount,
+						.m_DrawItemCount = statistics.m_DrawItemCount,
+					},
+					.m_ViewIndex = cascades->GetViewIndex(index),
+					.m_ShadowDrawCount =
+						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Opaque)].m_Count +
+						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count,
+				});
+			}
+		}
 		const auto* resources =
 			renderGraph.GetBlackboard().TryGet<RGShadowResources>(ShadowResourcesName);
 		if (!resources)

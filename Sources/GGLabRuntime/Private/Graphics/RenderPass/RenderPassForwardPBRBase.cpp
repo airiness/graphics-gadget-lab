@@ -89,6 +89,7 @@ namespace gglab
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
+			uint32_t m_ShadowViewIndex = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
 			bool m_GTAOEnabled = false;
 			bool m_GTAOContributionOutputEnabled = false;
@@ -300,8 +301,18 @@ namespace gglab
 					SamplerPreset::ShadowCmpLinearClamp);
 
 				const auto& shadowSettings = contextPtr->GetDirectionalShadowSettings();
+				const DirectionalShadowCascadeSet& shadowCascades =
+					contextPtr->GetDirectionalShadowCascades();
+				const DirectionalShadowCascade* primaryShadowCascade =
+					shadowCascades.TryGetCascade(0);
+				GGLAB_ASSERT_MSG(primaryShadowCascade != nullptr,
+					"Forward PBR shadow sampling requires an uploaded cascade view.");
+				// Without a cascade view no shader-side shadow lookup may be enabled.
+				data.m_ShadowViewIndex =
+					primaryShadowCascade ? shadowCascades.GetViewIndex(0) : 0u;
 				data.m_ShadowFlags =
-					(shadowSettings.m_Enable ? 1u : 0u) | (shadowSettings.m_EnablePCF ? 2u : 0u);
+					((shadowSettings.m_Enable && primaryShadowCascade) ? 1u : 0u) |
+					(shadowSettings.m_EnablePCF ? 2u : 0u);
 				data.m_ShadowReceiverDepthBias = shadowSettings.m_ReceiverDepthBias;
 			},
 			[this, contextPtr, services, displayViewId](
@@ -478,8 +489,7 @@ namespace gglab
 					.m_ShadowMapSize = data.m_ShadowMapSize,
 					.m_ShadowFlags = data.m_ShadowFlags,
 					.m_ShadowReceiverDepthBias = data.m_ShadowReceiverDepthBias,
-					.m_ShadowViewIndex =
-						static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
+					.m_ShadowViewIndex = data.m_ShadowViewIndex,
 					.m_ForwardPlusTileCountX = data.m_ForwardPlusTileGrid.m_TileCountX,
 					.m_ForwardPlusTileCountY = data.m_ForwardPlusTileGrid.m_TileCountY,
 					.m_ForwardPlusGlobalLightCount = data.m_LightingVariant ==

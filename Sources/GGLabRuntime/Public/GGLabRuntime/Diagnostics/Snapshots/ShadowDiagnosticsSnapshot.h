@@ -1,9 +1,12 @@
 #pragma once
 
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
+#include "GGLabRuntime/Graphics/RenderView.h"
 
 #include <cstdint>
+#include <vector>
 
 namespace gglab
 {
@@ -14,8 +17,18 @@ namespace gglab
 		bool m_Available = false;
 	};
 
+	struct DirectionalShadowCascadeSnapshot
+	{
+		RenderView m_View{};
+		RenderQueueStatisticsSnapshot m_QueueStatistics{};
+		uint32_t m_ViewIndex = 0;
+		// Only opaque and alpha-test buckets are submitted to the shadow pass.
+		uint32_t m_ShadowDrawCount = 0;
+	};
+
 	struct ShadowDiagnosticsSnapshot
 	{
+		std::vector<DirectionalShadowCascadeSnapshot> m_Cascades;
 		ShadowTextureDiagnostics m_DirectionalShadowMap{};
 		ShadowTextureDiagnostics m_DirectionalShadowMapPreviewSource{};
 		uint32_t m_ShadowMapSize = 0;

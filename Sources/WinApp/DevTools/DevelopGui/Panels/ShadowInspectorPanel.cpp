@@ -7,7 +7,6 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
-#include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
@@ -24,6 +23,7 @@ namespace gglab
 	{
 		struct ShadowInspectorPanelState
 		{
+			int m_SelectedCascade = 0;
 			float m_PreviewSize = 384.0f;
 			bool m_FlipPreviewY = false;
 			bool m_ShowMatrices = false;
@@ -155,15 +155,32 @@ namespace gglab
 		{
 			ImGui::SeparatorText("Shadow Camera / Frustum");
 
-			const auto* views = context.m_Diagnostics
-				? context.m_Diagnostics->GetSnapshot<RenderViewSnapshot>() : nullptr;
-			const RenderView* shadowView = views ? views->FindView(RenderViewID::DirectionalShadow) : nullptr;
-			if (!shadowView)
+			const auto* snapshot = context.m_Diagnostics
+				? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() : nullptr;
+			if (!snapshot || snapshot->m_Cascades.empty())
 			{
 				ImGui::TextColored(devtools::style::ErrorTextColor,
 					"Directional shadow render view is not available.");
 				return;
 			}
+
+			const int cascadeCount = static_cast<int>(snapshot->m_Cascades.size());
+			state.m_SelectedCascade = std::clamp(state.m_SelectedCascade, 0, cascadeCount - 1);
+			ImGui::Text("Cascade count: %d", cascadeCount);
+			if (cascadeCount > 1)
+			{
+				ImGui::SliderInt("Cascade", &state.m_SelectedCascade, 0, cascadeCount - 1);
+			}
+			const auto& cascade = snapshot->m_Cascades[state.m_SelectedCascade];
+			const RenderView* shadowView = &cascade.m_View;
+			ImGui::Text("GPU view offset: %u", cascade.m_ViewIndex);
+			ImGui::Text("Shadow draws: %u | Culled instances: %u", cascade.m_ShadowDrawCount,
+				cascade.m_QueueStatistics.m_CulledInstanceCount);
+			ImGui::Text("Queue items: %u | Visible / total instances: %u / %u",
+				cascade.m_QueueStatistics.m_DrawItemCount,
+				cascade.m_QueueStatistics.m_VisibleInstanceCount,
+				cascade.m_QueueStatistics.m_TotalInstanceCount);
+			ImGui::TextUnformatted("Caster culling: disabled (conservative submission)");
 
 			ImGui::Text("Position: %.3f, %.3f, %.3f", shadowView->m_CameraPosition.m_X,
 				shadowView->m_CameraPosition.m_Y, shadowView->m_CameraPosition.m_Z);

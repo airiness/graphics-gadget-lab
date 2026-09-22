@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -30,6 +31,7 @@ namespace gglab
 		{
 			RGTextureId m_ShadowMap{};
 			RGTextureViewId m_Dsv{};
+			const RenderQueue* m_RenderQueue = nullptr;
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		};
 
@@ -40,25 +42,42 @@ namespace gglab
 	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
-
+		const DirectionalShadowCascadeSet& cascades = context.GetDirectionalShadowCascades();
+		GGLAB_ASSERT_MSG(cascades.m_Cascades.size() == 1,
+			"The single-map shadow pass requires exactly one cascade.");
+		const DirectionalShadowCascade* primaryCascade = cascades.TryGetCascade(0);
+		if (!primaryCascade)
+		{
+			GGLAB_LOG_GRAPHICS_ERROR(
+				"The single-map shadow pass found no primary cascade and submits no casters.");
+		}
+		const uint32_t primaryViewIndex = primaryCascade ? cascades.GetViewIndex(0) : 0u;
 
 		EnsureInitialized(services);
 
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[contextPtr](RenderGraph::RGBuilder& builder, PassData& data)
+			[contextPtr, primaryCascade, primaryViewIndex](
+				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				auto& shadowRes =
 					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
 				builder.WriteInPlace(
 					shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilWrite);
 				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
-				const auto& renderQueue =
-					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
-				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
-				if (!renderQueue.m_DrawItems.empty())
+				if (primaryCascade)
+				{
+					data.m_RenderQueue = std::addressof(primaryCascade->m_RenderQueue);
+					data.m_RasterDomain =
+						std::addressof(primaryCascade->m_RenderQueue.m_CoverageRasterDomain);
+				}
+				if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
 				{
 					const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
+					GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == primaryViewIndex &&
+						data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
+							contextPtr->m_RenderScene.m_ViewBaseIndex + primaryViewIndex,
+						"Shadow coverage and shader binding must address the same uploaded cascade view.");
 					GGLAB_ASSERT_MSG(
 						data.m_RasterDomain->IsValid() &&
 						IsDepthCoverageTargetExtentCompatible(*data.m_RasterDomain, shadowDesc),
@@ -70,7 +89,8 @@ namespace gglab
 				data.m_Dsv =
 					builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
 			},
-			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
+			[this, contextPtr, services, primaryViewIndex](
+				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
 				GGLAB_ASSERT_NOT_NULL(graphicsContext);
@@ -84,12 +104,12 @@ namespace gglab
 				});
 				graphicsContext->ClearDepthAttachment(1.0f);
 
-				const auto& renderQueue =
-					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
-				if (renderQueue.m_DrawItems.empty())
+				// A frame without a primary cascade keeps this cleared write and submits nothing.
+				if (!data.m_RenderQueue || data.m_RenderQueue->m_DrawItems.empty())
 				{
 					return;
 				}
+				const RenderQueue& renderQueue = *data.m_RenderQueue;
 				const auto& ranges = renderQueue.m_BucketDrawRanges;
 				const DrawItemsRange* firstDrawRange = nullptr;
 				for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
@@ -145,13 +165,12 @@ namespace gglab
 					viewSB->GetBufferHandle());
 
 				const DirectionalShadowPassParameters passParameters{
-					.ViewIndex =
-						static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
+					.ViewIndex = primaryViewIndex,
 				};
 				graphicsContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-				DrawRenderQueue(graphicsContext, *contextPtr, services);
+				DrawRenderQueue(graphicsContext, *contextPtr, services, renderQueue);
 			});
 	}
 
@@ -193,10 +212,10 @@ namespace gglab
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context, const RenderServices& services) noexcept
+		const RenderFrameContext& context, const RenderServices& services,
+		const RenderQueue& renderQueue) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
-		const auto& renderQueue = context.GetRenderQueue(RenderViewID::DirectionalShadow);
 		if (renderQueue.m_DrawItems.empty())
 		{
 			return;

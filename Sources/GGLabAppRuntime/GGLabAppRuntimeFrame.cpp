@@ -264,6 +264,7 @@ namespace gglab
 				.m_RenderGraph = &renderGraph,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
+				.m_DirectionalShadowCascades = &frame.m_DirectionalShadowCascades,
 				.m_MainRenderView =
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,

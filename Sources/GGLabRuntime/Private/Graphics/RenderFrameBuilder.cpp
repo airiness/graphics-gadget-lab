@@ -129,6 +129,7 @@ namespace gglab
 			.m_DisplayViewId = m_DisplayViewId,
 			.m_RenderScene = m_RenderScene,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
+			.m_DirectionalShadowCascades = &m_DirectionalShadowCascades,
 			.m_DebugDrawFrame = m_DebugDrawFrame,
 			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
@@ -199,8 +200,9 @@ namespace gglab
 			.m_DepthPadding = shadowSettings.m_DepthPadding,
 			.m_Name = StringID("DirectionalShadowView"),
 		};
-		result.m_RenderViews[utils::ToIndex(RenderViewID::DirectionalShadow)] =
-			m_ViewBuilder.Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo);
+		result.m_DirectionalShadowCascades.m_Cascades.push_back({
+			.m_View = m_ViewBuilder.Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo),
+		});
 
 		result.m_DisplayViewId = info.m_DisplayViewId;
 		GGLAB_ASSERT_MSG(IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId),
@@ -234,6 +236,7 @@ namespace gglab
 			.m_RenderResourceRegistry = *info.m_Renderer.GetRenderResourceRegistry(),
 			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystemService(),
 			.m_RenderViews = std::span<RenderView>(result.m_RenderViews),
+			.m_DirectionalShadowCascades = result.m_DirectionalShadowCascades,
 			.m_SceneCB = *info.m_Renderer.GetSceneConstantBuffer(),
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *info.m_Renderer.GetMaterialStructuredBuffer(),
@@ -265,30 +268,20 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(materialBuffer);
 		GGLAB_ASSERT_NOT_NULL(viewBuffer);
 
-		for (const RenderView& renderView : result.m_RenderViews)
+		const auto buildQueue = [&](const RenderView& renderView, RenderQueue& renderQueue,
+			uint32_t viewBindingId, const FrustumList& queueCullFrustums)
 		{
 			if (!renderView.m_IsValid)
 			{
-				continue;
+				return;
 			}
-
-			auto& renderQueue = result.m_RenderQueues[utils::ToIndex(renderView.m_ViewId)];
 			renderQueue.m_ViewId = renderView.m_ViewId;
 
 			if (result.m_RenderSceneStatus != RenderSceneBuildStatus::Ready)
 			{
-				continue;
+				return;
 			}
 
-			const FrustumList queueCullFrustums =
-				renderView.m_ViewId == RenderViewID::DirectionalShadow
-				? FrustumList{}
-				: BuildVisibilityFrustums(result.m_RenderViews, renderView.m_ViewId,
-					GetVisibilityModeForView(info.m_CameraRig, renderView.m_ViewId),
-					mainFrustum, hasMainFrustum);
-
-			const uint32_t viewBindingId =
-				static_cast<uint32_t>(utils::ToIndex(renderView.m_ViewId));
 			const DepthCoverageBufferSource viewSource{
 				.m_Buffer = viewBuffer->GetBufferHandle(),
 				.m_ElementIndex = result.m_RenderScene.m_ViewBaseIndex + viewBindingId,
@@ -331,6 +324,27 @@ namespace gglab
 				.m_MaterialBaseIndex = result.m_RenderScene.m_MaterialBaseIndex,
 			};
 			renderQueue = m_QueueBuilder.Build(queueBuildInfo);
+		};
+
+		for (const RenderView& renderView : result.m_RenderViews)
+		{
+			if (!renderView.m_IsValid)
+			{
+				continue;
+			}
+			const auto viewIndex = static_cast<uint32_t>(utils::ToIndex(renderView.m_ViewId));
+			const FrustumList frustums = BuildVisibilityFrustums(result.m_RenderViews,
+				renderView.m_ViewId, GetVisibilityModeForView(info.m_CameraRig, renderView.m_ViewId),
+				mainFrustum, hasMainFrustum);
+			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex, frustums);
+		}
+
+		auto& cascades = result.m_DirectionalShadowCascades;
+		for (uint32_t index = 0; index < cascades.m_Cascades.size(); ++index)
+		{
+			auto& cascade = cascades.m_Cascades[index];
+			// Preserve conservative all-caster submission until shadow caster culling is introduced.
+			buildQueue(cascade.m_View, cascade.m_RenderQueue, cascades.GetViewIndex(index), {});
 		}
 
 		return result;

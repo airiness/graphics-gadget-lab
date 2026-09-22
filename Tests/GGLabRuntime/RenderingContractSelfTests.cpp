@@ -37,6 +37,8 @@
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameGpuResources.h"
+#include "Graphics/RenderSceneBuilder.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -72,6 +74,7 @@
 #include <numbers>
 #include <ranges>
 #include <type_traits>
+#include <utility>
 
 namespace gglab
 {
@@ -1889,6 +1892,85 @@ namespace gglab
 				"Main view records and projects with its Reversed-Z contract");
 			context.Check(shadowView.m_DepthConvention == DepthConvention::Standard,
 				"Directional shadow view records its Standard-Z contract");
+		}
+
+		void RunDirectionalShadowCascadeFrameTests(SelfTestContext& context) noexcept
+		{
+			RenderFrameBuildResult frame{};
+			frame.m_RenderViews.resize(utils::ToIndex(RenderViewID::Count));
+			Camera camera(Camera::CreateInfo{});
+			const ResolvedViewRenderSettings settings{};
+			const ResolvedTemporalFramePlan plan{};
+			const RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({
+				.m_Camera = camera,
+				.m_RenderSettings = settings,
+				.m_TemporalFramePlan = plan,
+				.m_Width = 1280,
+				.m_Height = 720,
+			});
+			frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)] = mainView;
+			frame.m_RenderViews[utils::ToIndex(RenderViewID::DebugCamera2)] = mainView;
+			frame.m_RenderViews[utils::ToIndex(RenderViewID::DebugCamera2)].m_Width = 640;
+			const RenderView legacyShadow = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
+				.m_MainView = mainView,
+			});
+			auto& cascades = frame.m_DirectionalShadowCascades;
+			cascades.m_Cascades.push_back({ .m_View = legacyShadow });
+			const auto singleViewData = RenderSceneBuilder::BuildViewData(frame.m_RenderViews, cascades);
+			const auto& shadowGpu = singleViewData[cascades.GetViewIndex(0)];
+			context.Check(cascades.GetViewIndex(0) == frame.m_RenderViews.size() &&
+				cascades.GetViewIndex(0) != utils::ToIndex(RenderViewID::DirectionalShadow) &&
+				shadowGpu.ViewMat.ToArray() == legacyShadow.m_View.ToArray() &&
+				shadowGpu.ProjMat.ToArray() == legacyShadow.m_RasterProj.ToArray() &&
+				shadowGpu.Width == legacyShadow.m_Width &&
+				shadowGpu.DepthConvention == static_cast<uint32_t>(DepthConvention::Standard),
+				"Single-cascade upload preserves the legacy shadow projection at a non-enum offset");
+
+			for (uint32_t index = 1; index < 4; ++index)
+			{
+				RenderView receiver = mainView;
+				receiver.m_CameraPosition.m_X = static_cast<float>(index) * 10.0f;
+				cascades.m_Cascades.push_back({
+					.m_View = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
+						.m_MainView = receiver,
+					}),
+				});
+			}
+			const auto multipleViewData = RenderSceneBuilder::BuildViewData(frame.m_RenderViews, cascades);
+			bool contiguousViews = multipleViewData.size() == frame.m_RenderViews.size() + 4;
+			bool distinctCascades = true;
+			for (uint32_t index = 0; index < 4; ++index)
+			{
+				const auto& uploadedView = multipleViewData[cascades.GetViewIndex(index)];
+				contiguousViews &= cascades.GetViewIndex(index) == frame.m_RenderViews.size() + index &&
+					uploadedView.ViewMat.ToArray() ==
+						cascades.m_Cascades[index].m_View.m_View.ToArray();
+				for (uint32_t other = index + 1; other < 4; ++other)
+				{
+					distinctCascades &= uploadedView.ViewMat.ToArray() !=
+						cascades.m_Cascades[other].m_View.m_View.ToArray();
+				}
+			}
+			context.Check(contiguousViews && distinctCascades &&
+				multipleViewData[utils::ToIndex(RenderViewID::Main)].Width == 1280 &&
+				multipleViewData[utils::ToIndex(RenderViewID::DebugCamera2)].Width == 640,
+				"Multiple shadow views flatten contiguously without overwriting camera slots or aliasing cascades");
+
+			cascades.m_Cascades[2].m_RenderQueue.m_DrawItems.resize(3);
+			RenderFrameBuildResult moved = std::move(frame);
+			frame = {};
+			const auto movedContext = moved.MakeRenderFrameContext();
+			context.Check(&movedContext.GetDirectionalShadowCascades() == &moved.m_DirectionalShadowCascades &&
+				movedContext.GetDirectionalShadowCascades().GetViewIndex(3) == multipleViewData.size() - 1 &&
+				movedContext.GetDirectionalShadowCascades().m_Cascades[2].m_RenderQueue.m_DrawItems.size() == 3 &&
+				movedContext.GetDirectionalShadowCascades().m_Cascades[0].m_RenderQueue.m_DrawItems.empty(),
+				"Frame moves retain independent cascade queues and bind contexts to the new owner");
+
+			DirectionalShadowCascadeSet empty{};
+			const auto cameraOnly = RenderSceneBuilder::BuildViewData(moved.m_RenderViews, empty);
+			const auto noViews = RenderSceneBuilder::BuildViewData({}, empty);
+			context.Check(cameraOnly.size() == moved.m_RenderViews.size() && noViews.empty(),
+				"Empty cascade sets do not invent an uploaded shadow view");
 		}
 
 		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept
@@ -6480,6 +6562,7 @@ namespace gglab
 		RunRHIFrameAndGraphicsScopeContractTests(context);
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
+		RunDirectionalShadowCascadeFrameTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);

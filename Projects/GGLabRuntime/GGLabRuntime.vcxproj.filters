@@ -1763,6 +1763,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DirectionalShadowCascadeSet.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentAssetController.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>

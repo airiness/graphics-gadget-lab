@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
@@ -110,6 +111,7 @@ namespace gglab
 		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderScene m_RenderScene{};
 		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
+		DirectionalShadowCascadeSet m_DirectionalShadowCascades{};
 		DebugDrawFrameView m_DebugDrawFrame{};
 		DebugDrawCullContext m_DebugDrawCullContext{};
 		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
@@ -132,6 +134,7 @@ namespace gglab
 				.m_DisplayViewId = m_DisplayViewId,
 				.m_RenderScene = m_RenderScene,
 				.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
+				.m_DirectionalShadowCascades = &m_DirectionalShadowCascades,
 				.m_DebugDrawFrame = m_DebugDrawFrame,
 				.m_DirectionalShadowSettings = m_DirectionalShadowSettings,
 				.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
