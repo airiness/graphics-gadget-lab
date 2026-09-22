@@ -36,13 +36,13 @@ ShadowProjection ProjectToShadowMap(float3 positionWS, uint shadowViewIndex)
 }
 
 float SampleShadowHard(
-	Texture2D<float> shadowMap, SamplerComparisonState shadowSampler, float2 uv, float compareDepth)
+	Texture2DArray<float> shadowMap, SamplerComparisonState shadowSampler, float2 uv, uint layer, float compareDepth)
 {
-	return shadowMap.SampleCmpLevelZero(shadowSampler, uv, compareDepth);
+	return shadowMap.SampleCmpLevelZero(shadowSampler, float3(uv, layer), compareDepth);
 }
 
-float SampleShadowPCF3x3(Texture2D<float> shadowMap, SamplerComparisonState shadowSampler,
-	float2 uv, float compareDepth, float2 texelSize)
+float SampleShadowPCF3x3(Texture2DArray<float> shadowMap, SamplerComparisonState shadowSampler,
+	float2 uv, uint layer, float compareDepth, float2 texelSize)
 {
 	float visibility = 0.0;
 
@@ -53,7 +53,7 @@ float SampleShadowPCF3x3(Texture2D<float> shadowMap, SamplerComparisonState shad
 		for (int x = -1; x <= 1; ++x)
 		{
 			const float2 offset = float2((float) x, (float) y) * texelSize;
-			visibility += SampleShadowHard(shadowMap, shadowSampler, uv + offset, compareDepth);
+			visibility += SampleShadowHard(shadowMap, shadowSampler, uv + offset, layer, compareDepth);
 		}
 	}
 

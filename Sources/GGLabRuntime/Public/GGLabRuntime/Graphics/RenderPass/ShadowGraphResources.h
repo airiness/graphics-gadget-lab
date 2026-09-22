@@ -8,6 +8,7 @@ namespace gglab
 	{
 		RGTextureId m_DirectionalShadowMap{};
 		RGTextureId m_DirectionalShadowMapPreview{};
+		uint32_t m_CascadeCount = 1;
 		uint32_t m_ShadowMapSize = DefaultDirectionalShadowMapSize;
 		uint32_t m_ShadowMapPreviewSize = DefaultDirectionalShadowMapPreviewSize;
 	};

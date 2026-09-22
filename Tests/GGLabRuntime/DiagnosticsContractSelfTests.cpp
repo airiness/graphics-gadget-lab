@@ -807,6 +807,8 @@ namespace gglab
 		cascades.m_Cascades.resize(2);
 		cascades.m_Cascades[0].m_View.m_Width = 2048;
 		cascades.m_Cascades[1].m_View.m_Width = 1024;
+		cascades.m_Cascades[1].m_SplitNear = 5.0f;
+		cascades.m_Cascades[1].m_SplitFar = 30.0f;
 		auto& queue = cascades.m_Cascades[1].m_RenderQueue;
 		queue.m_Statistics.m_CulledInstanceCount = 9;
 		queue.m_Statistics.m_DrawItemCount = 12;
@@ -823,7 +825,9 @@ namespace gglab
 			shadowSnapshot.m_Cascades[1].m_View.m_Width == 1024 &&
 			shadowSnapshot.m_Cascades[1].m_QueueStatistics.m_CulledInstanceCount == 9 &&
 			shadowSnapshot.m_Cascades[1].m_QueueStatistics.m_DrawItemCount == 12 &&
-			shadowSnapshot.m_Cascades[1].m_ShadowDrawCount == 8,
+			shadowSnapshot.m_Cascades[1].m_ShadowDrawCount == 8 &&
+			shadowSnapshot.m_Cascades[1].m_SplitNear == 5.0f &&
+			shadowSnapshot.m_Cascades[1].m_SplitFar == 30.0f,
 			"Cascade diagnostics retain independent values after frame destruction and exclude transparent draws");
 		context.Check(BuildShadowDiagnosticsSnapshot(shadowGraph).m_Cascades.empty() &&
 			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades).m_Cascades.empty(),

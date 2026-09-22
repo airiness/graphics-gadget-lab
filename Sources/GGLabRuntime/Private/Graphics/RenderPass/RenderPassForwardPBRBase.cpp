@@ -34,7 +34,8 @@ namespace gglab
 	{
 		enum class ForwardPBRRootParameter : uint32_t
 		{
-			TileHeaders = static_cast<uint32_t>(CommonRSRootParamIndex::Count),
+			ShadowConstants = static_cast<uint32_t>(CommonRSRootParamIndex::Count),
+			TileHeaders,
 			TileIndices,
 		};
 
@@ -46,7 +47,7 @@ namespace gglab
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowFlags = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
-			uint32_t m_ShadowViewIndex = 0;
+			uint32_t m_ShadowPadding = 0;
 			uint32_t m_ForwardPlusTileCountX = 0;
 			uint32_t m_ForwardPlusTileCountY = 0;
 			uint32_t m_ForwardPlusGlobalLightCount = 0;
@@ -89,7 +90,6 @@ namespace gglab
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
-			uint32_t m_ShadowViewIndex = 0;
 			float m_ShadowReceiverDepthBias = 0.0f;
 			bool m_GTAOEnabled = false;
 			bool m_GTAOContributionOutputEnabled = false;
@@ -112,12 +112,24 @@ namespace gglab
 		}
 
 		RHIBindingLayoutDesc BuildForwardPBRBindingLayout(
-			const RenderServices& services) noexcept
+			const RenderServices& services, bool forwardPlus) noexcept
 		{
 			RHIBindingLayoutDesc desc = services.m_BindingLayout->GetCommonBindingLayoutDesc();
-			desc.m_DebugName = "ForwardPBR.ForwardPlusBindingLayout";
-			AppendForwardPBRBindingSlot(desc, 5, "ForwardPlusTileHeaders");
-			AppendForwardPBRBindingSlot(desc, 6, "ForwardPlusTileIndices");
+			desc.m_DebugName = forwardPlus ? "ForwardPBR.ForwardPlusBindingLayout" : "ForwardPBR.BindingLayout";
+			GGLAB_ASSERT(desc.m_SlotCount < desc.MaxSlots);
+			desc.m_Slots[desc.m_SlotCount++] = {
+				.m_Type = RHIBindingType::ConstantBuffer,
+				.m_Visibility = RHIShaderStage::Pixel,
+				.m_Binding = 3,
+				.m_Space = 0,
+				.m_Count = 1,
+				.m_DebugName = "DirectionalShadowCB",
+			};
+			if (forwardPlus)
+			{
+				AppendForwardPBRBindingSlot(desc, 5, "ForwardPlusTileHeaders");
+				AppendForwardPBRBindingSlot(desc, 6, "ForwardPlusTileIndices");
+			}
 			return desc;
 		}
 	}
@@ -244,7 +256,8 @@ namespace gglab
 				}
 
 				const auto shadowSrvDesc =
-					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+					MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, 0, 0,
+						shadowRes.m_CascadeCount, RHITextureAspect::Depth);
 				data.m_ShadowSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					data.m_ShadowMap, shadowSrvDesc);
 
@@ -308,8 +321,6 @@ namespace gglab
 				GGLAB_ASSERT_MSG(primaryShadowCascade != nullptr,
 					"Forward PBR shadow sampling requires an uploaded cascade view.");
 				// Without a cascade view no shader-side shadow lookup may be enabled.
-				data.m_ShadowViewIndex =
-					primaryShadowCascade ? shadowCascades.GetViewIndex(0) : 0u;
 				data.m_ShadowFlags =
 					((shadowSettings.m_Enable && primaryShadowCascade) ? 1u : 0u) |
 					(shadowSettings.m_EnablePCF ? 2u : 0u);
@@ -444,6 +455,11 @@ namespace gglab
 					sceneBuffer->GetBufferHandle(),
 					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
+				graphicsContext->SetConstantBuffer(
+					static_cast<uint32_t>(ForwardPBRRootParameter::ShadowConstants),
+					sceneBuffer->GetBufferHandle(),
+					contextPtr->m_RenderScene.m_ShadowConstantBufferOffset);
+
 				// Set object structured buffer
 				const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
 				graphicsContext->SetReadOnlyBuffer(
@@ -489,7 +505,6 @@ namespace gglab
 					.m_ShadowMapSize = data.m_ShadowMapSize,
 					.m_ShadowFlags = data.m_ShadowFlags,
 					.m_ShadowReceiverDepthBias = data.m_ShadowReceiverDepthBias,
-					.m_ShadowViewIndex = data.m_ShadowViewIndex,
 					.m_ForwardPlusTileCountX = data.m_ForwardPlusTileGrid.m_TileCountX,
 					.m_ForwardPlusTileCountY = data.m_ForwardPlusTileGrid.m_TileCountY,
 					.m_ForwardPlusGlobalLightCount = data.m_LightingVariant ==
@@ -528,7 +543,9 @@ namespace gglab
 			// Pipeline recipe
 			auto& legacyKey =
 				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::Legacy)][0];
-			legacyKey.m_BindingLayout = services.m_BindingLayout->GetCommonBindingLayout();
+			legacyKey.m_BindingLayout = services.m_Presentation->GetRHIContext()->GetPipelineSystem().CreateBindingLayout(
+				BuildForwardPBRBindingLayout(services, false));
+			GGLAB_ASSERT(legacyKey.m_BindingLayout.IsValid());
 			legacyKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
 			legacyKey.m_VSId = shaderSet.m_CoverageVertexShader;
 			legacyKey.m_PSId = shaderSet.m_LegacyShadingPixelShader;
@@ -550,7 +567,7 @@ namespace gglab
 				GGLAB_ASSERT_NOT_NULL(rhiContext);
 				const RHIBindingLayoutHandle forwardPlusBindingLayout =
 					rhiContext->GetPipelineSystem().CreateBindingLayout(
-						BuildForwardPBRBindingLayout(services));
+						BuildForwardPBRBindingLayout(services, true));
 				GGLAB_ASSERT_MSG(forwardPlusBindingLayout.IsValid(),
 					"Forward+ opaque shading requires its pass-specific binding layout.");
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 
@@ -13,6 +14,9 @@ namespace gglab
 	{
 		RenderView m_View{};
 		RenderQueue m_RenderQueue{};
+		// Positive main-camera view-space depths, independent of the light view depth range.
+		float m_SplitNear = 0.0f;
+		float m_SplitFar = 0.0f;
 	};
 
 	// Frame-owned values. Cascade identity is its position in this set, not a
@@ -46,4 +50,10 @@ namespace gglab
 			return m_ViewBaseOffset + cascadeIndex;
 		}
 	};
+	[[nodiscard]] DirectionalShadowCascadeSet BuildDirectionalShadowCascades(
+		const RenderView& mainView, const Vector3& lightDirection,
+		const DirectionalShadowSettings& settings) noexcept;
+
+	[[nodiscard]] DirectionalShadowGPU BuildDirectionalShadowGPU(
+		const DirectionalShadowCascadeSet& cascades) noexcept;
 }

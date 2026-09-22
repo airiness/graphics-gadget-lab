@@ -2418,6 +2418,39 @@ namespace gglab
 			desc.m_Defines.clear();
 			const ShaderCompileResult legacyForwardPixelArtifact =
 				compiler.Compile(desc);
+			auto shadowDesc = desc;
+			shadowDesc.m_Target = {};
+			shadowDesc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const ShaderCompileResult shadowForwardDxil = compiler.Compile(shadowDesc);
+			std::string shadowDisassembly;
+			const bool shadowDxilReflected = shadowForwardDxil.IsSuccess() &&
+				DisassembleDxil(shadowForwardDxil.m_Artifact.m_Binary, shadowDisassembly);
+			context.Check(shadowDxilReflected &&
+				FindDxilMemberOffset(shadowDisassembly, "SplitFar") == offsetof(DirectionalShadowGPU, SplitFar) &&
+				FindDxilMemberOffset(shadowDisassembly, "ViewBaseIndex") == offsetof(DirectionalShadowGPU, ViewBaseIndex) &&
+				FindDxilMemberOffset(shadowDisassembly, "CascadeCount") == offsetof(DirectionalShadowGPU, CascadeCount) &&
+				FindDxilMemberOffset(shadowDisassembly, "MainViewIndex") == offsetof(DirectionalShadowGPU, MainViewIndex) &&
+				FindDxilMemberOffset(shadowDisassembly, "NearDepth") == offsetof(DirectionalShadowGPU, NearDepth),
+				"DXIL cascaded shadow metadata matches every CPU member offset");
+			SpirVDecorationReflection shadowReflection;
+			const bool shadowSpirVReflected = legacyForwardPixelArtifact.IsSuccess() &&
+				ReadSpirVDecorations(legacyForwardPixelArtifact.m_Artifact.m_Binary, shadowReflection);
+			const auto* shadowLayout = shadowSpirVReflected
+				? shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") : nullptr;
+			context.Check(shadowLayout && shadowLayout->m_Size == sizeof(DirectionalShadowGPU) &&
+				shadowLayout->m_Members.size() == 5 &&
+				shadowLayout->m_Members[0].m_Offset == offsetof(DirectionalShadowGPU, SplitFar) &&
+				shadowLayout->m_Members[1].m_Offset == offsetof(DirectionalShadowGPU, ViewBaseIndex) &&
+				shadowLayout->m_Members[2].m_Offset == offsetof(DirectionalShadowGPU, CascadeCount) &&
+				shadowLayout->m_Members[3].m_Offset == offsetof(DirectionalShadowGPU, MainViewIndex) &&
+				shadowLayout->m_Members[4].m_Offset == offsetof(DirectionalShadowGPU, NearDepth),
+				"SPIR-V cascaded shadow metadata matches the CPU layout and 32-byte size");
+			shadowDesc.m_SourcePath = L"Passes/PassShadowMapPreview.hlsl";
+			const ShaderCompileResult shadowPreviewDxil = compiler.Compile(shadowDesc);
+			shadowDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult shadowPreviewSpirV = compiler.Compile(shadowDesc);
+			context.Check(shadowPreviewDxil.IsSuccess() && shadowPreviewSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile the selected-layer shadow array preview");
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",

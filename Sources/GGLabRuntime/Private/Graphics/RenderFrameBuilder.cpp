@@ -190,19 +190,9 @@ namespace gglab
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
-		const RenderViewBuildInfo<RenderViewID::DirectionalShadow> shadowViewBuildInfo{
-			.m_MainView = result.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
-			.m_LightDirection = result.m_WorldData.m_MainDirectionalLight.m_Direction,
-			.m_ShadowMapSize = shadowSettings.m_ShadowMapSize,
-			.m_MaxShadowDistance = shadowSettings.m_MaxShadowDistance,
-			.m_CasterExtrusionDistance = shadowSettings.m_CasterExtrusionDistance,
-			.m_OrthoPadding = shadowSettings.m_OrthoPadding,
-			.m_DepthPadding = shadowSettings.m_DepthPadding,
-			.m_Name = StringID("DirectionalShadowView"),
-		};
-		result.m_DirectionalShadowCascades.m_Cascades.push_back({
-			.m_View = m_ViewBuilder.Build<RenderViewID::DirectionalShadow>(shadowViewBuildInfo),
-		});
+		result.m_DirectionalShadowCascades = BuildDirectionalShadowCascades(
+			result.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
+			result.m_WorldData.m_MainDirectionalLight.m_Direction, shadowSettings);
 
 		result.m_DisplayViewId = info.m_DisplayViewId;
 		GGLAB_ASSERT_MSG(IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId),

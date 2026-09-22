@@ -300,7 +300,10 @@ namespace gglab
 					builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
 				shadowRes.m_ShadowMapSize = std::max(shadowSettings.m_ShadowMapSize, 1u);
 
+				shadowRes.m_CascadeCount = std::max(1u, static_cast<uint32_t>(
+					context.GetDirectionalShadowCascades().m_Cascades.size()));
 				RHITextureDesc shadowMapDesc{};
+				shadowMapDesc.m_ArraySize = static_cast<uint16_t>(shadowRes.m_CascadeCount);
 				shadowMapDesc.m_Extent = { shadowRes.m_ShadowMapSize, shadowRes.m_ShadowMapSize, 1u };
 				shadowMapDesc.m_Format = RHIFormat::R32Typeless;
 				shadowRes.m_DirectionalShadowMap =

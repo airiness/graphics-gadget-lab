@@ -260,6 +260,13 @@ namespace gglab
 			ImGui::SameLine();
 			changed |= ImGui::Checkbox("PCF", &settings.m_EnablePCF);
 
+			int cascadeCount = static_cast<int>(settings.m_CascadeCount);
+			if (ImGui::SliderInt("Cascades", &cascadeCount, 1, MaxDirectionalShadowCascades))
+			{
+				settings.m_CascadeCount = static_cast<uint32_t>(cascadeCount);
+				changed = true;
+			}
+			changed |= ImGui::SliderFloat("Split Lambda", &settings.m_SplitLambda, 0.0f, 1.0f, "%.2f");
 			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
 			if (ImGui::DragInt("Shadow Map Size", &shadowMapSize, 16.0f, 256, 8192))
 			{

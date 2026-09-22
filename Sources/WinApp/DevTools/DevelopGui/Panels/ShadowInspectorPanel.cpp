@@ -67,6 +67,29 @@ namespace gglab
 			ImGui::SameLine();
 			changed |= ImGui::Checkbox("3x3 PCF", &settings.m_EnablePCF);
 
+			if (ImGui::Button("Single 2048"))
+			{
+				settings.m_CascadeCount = 1;
+				settings.m_ShadowMapSize = 2048;
+				changed = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("CSM 4 x 1024"))
+			{
+				settings.m_CascadeCount = 4;
+				settings.m_ShadowMapSize = 1024;
+				changed = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("CSM 4 x 2048"))
+			{
+				settings.m_CascadeCount = 4;
+				settings.m_ShadowMapSize = 2048;
+				changed = true;
+			}
+			changed |= ImGui::SliderFloat("Split Lambda", &settings.m_SplitLambda, 0.0f, 1.0f, "%.2f");
+			ImGui::TextUnformatted("Tight fit | Main-camera splits | Legacy bias | No cascade blending");
+
 			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
 			if (ImGui::SliderInt("Shadow Map Size", &shadowMapSize, 256, 8192))
 			{
@@ -171,7 +194,13 @@ namespace gglab
 			{
 				ImGui::SliderInt("Cascade", &state.m_SelectedCascade, 0, cascadeCount - 1);
 			}
+			if (context.m_ShadowVisualizationSettings)
+			{
+				context.m_ShadowVisualizationSettings->m_PreviewCascade =
+					static_cast<uint32_t>(state.m_SelectedCascade);
+			}
 			const auto& cascade = snapshot->m_Cascades[state.m_SelectedCascade];
+			ImGui::Text("Main-camera split: %.3f - %.3f m", cascade.m_SplitNear, cascade.m_SplitFar);
 			const RenderView* shadowView = &cascade.m_View;
 			ImGui::Text("GPU view offset: %u", cascade.m_ViewIndex);
 			ImGui::Text("Shadow draws: %u | Culled instances: %u", cascade.m_ShadowDrawCount,
@@ -219,7 +248,8 @@ namespace gglab
 			}
 
 			ImGui::TextUnformatted("ShadowMap is a transient RenderGraph texture.");
-			ImGui::Text("RG Size: %u", snapshot->m_ShadowMapSize);
+			ImGui::Text("RG Size: %u | Array layers: %u", snapshot->m_ShadowMapSize,
+				snapshot->m_DirectionalShadowMap.m_ArraySize);
 			ImGui::Text("Texture Size: %llu x %u",
 				static_cast<unsigned long long>(
 					snapshot->m_DirectionalShadowMap.m_Extent.m_Width),

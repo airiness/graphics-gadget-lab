@@ -10,7 +10,8 @@ struct ShadowMapPreviewPassParameters
 	float PreviewMinDepth;
 	float PreviewMaxDepth;
 	uint PreviewInvert;
-	uint3 Padding;
+	uint CascadeIndex;
+	uint2 Padding;
 };
 
 ConstantBuffer<ShadowMapPreviewPassParameters> g_Pass : register(b2);
@@ -27,9 +28,9 @@ FullscreenTriangleVSOutput VSMain(uint vertexId : SV_VertexID)
 
 float SampleShadowMapDepth(float2 uv)
 {
-	Texture2D<float> shadowMap = GetTexture2DFloat(g_Pass.ShadowMapTextureIndex);
+	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerState shadowSampler = GetSamplerState(g_Pass.ShadowMapSamplerIndex);
-	return shadowMap.SampleLevel(shadowSampler, uv, 0.0);
+	return shadowMap.SampleLevel(shadowSampler, float3(uv, g_Pass.CascadeIndex), 0.0);
 }
 
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target

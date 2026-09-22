@@ -8,6 +8,7 @@
 #include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
+#include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/BRDF.hlsli>
 
 struct ForwardPBRPassParameters
@@ -18,7 +19,7 @@ struct ForwardPBRPassParameters
 	uint ShadowMapSize;
 	uint ShadowFlags;
 	float ShadowReceiverDepthBias;
-	uint ShadowViewIndex;
+	uint ShadowPadding;
 	uint ForwardPlusTileCountX;
 	uint ForwardPlusTileCountY;
 	uint ForwardPlusGlobalLightCount;
@@ -29,6 +30,7 @@ struct ForwardPBRPassParameters
 };
 
 ConstantBuffer<ForwardPBRPassParameters> g_Pass : register(b2);
+ConstantBuffer<DirectionalShadowData> g_Shadow : register(b3);
 
 #if defined(GGLAB_FORWARD_PLUS)
 StructuredBuffer<uint2> g_ForwardPlusTileHeaders : register(t5);
@@ -196,14 +198,22 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 		return 1.0;
 	}
 
+	// Selection always uses the unjittered main camera, including debug-camera shading.
+	const float mainViewZ = TransformPositionVS(float4(positionWS, 1.0),
+		LoadViewData(g_Shadow.MainViewIndex)).z;
+	const uint cascadeIndex = SelectDirectionalShadowCascade(mainViewZ, g_Shadow);
+	if (cascadeIndex >= g_Shadow.CascadeCount)
+	{
+		return 1.0;
+	}
 	const ShadowProjection shadowProjection =
-		ProjectToShadowMap(positionWS, g_Pass.ShadowViewIndex);
+		ProjectToShadowMap(positionWS, g_Shadow.ViewBaseIndex + cascadeIndex);
 	if (!shadowProjection.IsValid)
 	{
 		return 1.0;
 	}
 
-	Texture2D<float> shadowMap = GetTexture2DFloat(g_Pass.ShadowMapTextureIndex);
+	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerComparisonState shadowSampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 
 	const float compareDepth =
@@ -211,13 +221,13 @@ float SampleDirectionalShadow(float3 positionWS, float NoL)
 
 	if (!IsShadowPCFEnabled())
 	{
-		return SampleShadowHard(shadowMap, shadowSampler, shadowProjection.UV, compareDepth);
+		return SampleShadowHard(shadowMap, shadowSampler, shadowProjection.UV, cascadeIndex, compareDepth);
 	}
 
 	const float shadowMapSize = max((float) g_Pass.ShadowMapSize, 1.0);
 	const float2 shadowTexelSize = 1.0.xx / shadowMapSize;
 	return SampleShadowPCF3x3(
-		shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
+		shadowMap, shadowSampler, shadowProjection.UV, cascadeIndex, compareDepth, shadowTexelSize);
 }
 
 bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out float attenuation)

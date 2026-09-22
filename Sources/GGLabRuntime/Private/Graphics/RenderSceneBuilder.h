@@ -29,8 +29,12 @@ namespace gglab
 	{
 		DynamicStructuredBufferAllocator<ViewGPU>::Allocation m_Views{};
 		DynamicBufferAllocation m_SceneConstants{};
+		DynamicBufferAllocation m_ShadowConstants{};
 
-		bool IsEmpty() const noexcept { return !m_Views.IsValid() && !m_SceneConstants.IsValid(); }
+		bool IsEmpty() const noexcept
+		{
+			return !m_Views.IsValid() && !m_SceneConstants.IsValid() && !m_ShadowConstants.IsValid();
+		}
 	};
 
 	class RenderSceneBuilder

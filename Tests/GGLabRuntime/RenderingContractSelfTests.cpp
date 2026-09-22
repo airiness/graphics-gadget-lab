@@ -42,6 +42,8 @@
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
+#include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
@@ -1503,6 +1505,7 @@ namespace gglab
 			RenderSceneGpuAllocations lateValidationAllocations{};
 			lateValidationAllocations.m_SceneConstants.m_OffsetInBytes = 64;
 			lateValidationAllocations.m_SceneConstants.m_SizeInBytes = 128;
+			lateValidationAllocations.m_ShadowConstants.m_SizeInBytes = sizeof(DirectionalShadowGPU);
 			const RHIFencePoint lateValidationFence{ RHIFenceHandle{ 9, 1 }, 23 };
 			RenderFrameGpuResources frameGpuResources{};
 			frameGpuResources.AdoptFrom(lateValidationAllocations, lateValidationFence);
@@ -1512,7 +1515,8 @@ namespace gglab
 			context.Check(lateValidationAllocations.IsEmpty() &&
 				frameGpuResources.m_UploadFencePoint == lateValidationFence &&
 				frameGpuResources.m_SceneGpuAllocations.m_SceneConstants.IsValid() &&
-				adoptedSceneConstantOffset == 64,
+				adoptedSceneConstantOffset == 64 &&
+				frameGpuResources.m_SceneGpuAllocations.m_ShadowConstants.IsValid(),
 				"Frame GPU resources transfer before late validation and remain owned on early return");
 
 			const auto& bgraUnorm = GetRHIFormatInfo(RHIFormat::B8G8R8A8Unorm);
@@ -1971,6 +1975,132 @@ namespace gglab
 			const auto noViews = RenderSceneBuilder::BuildViewData({}, empty);
 			context.Check(cameraOnly.size() == moved.m_RenderViews.size() && noViews.empty(),
 				"Empty cascade sets do not invent an uploaded shadow view");
+		}
+
+		void RunDirectionalShadowGraphTests(SelfTestContext& context) noexcept
+		{
+			class ShadowShaderAccess final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID::Invalid(); }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 0; }
+			} shaders;
+			class ShadowBindingAccess final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return {}; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+			} bindings;
+			const RenderServices services{ .m_ShaderPrograms = &shaders, .m_BindingLayout = &bindings };
+			for (uint32_t count : { 1u, 4u })
+			{
+				RenderFrameBuildResult frame{};
+				frame.m_DirectionalShadowCascades.m_Cascades.resize(count);
+				frame.m_DirectionalShadowCascades.m_ViewBaseOffset = 7;
+				const auto frameContext = frame.MakeRenderFrameContext();
+				RenderGraph graph({
+					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+				struct GraphPassData {};
+				graph.AddPass<GraphPassData>("ShadowTest.Setup",
+					[count](RenderGraph::RGBuilder& builder, GraphPassData&)
+					{
+						auto& resources = builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
+						resources.m_CascadeCount = count;
+						resources.m_DirectionalShadowMap = builder.CreateTexture("ShadowTest.Array", {
+							.m_Format = RHIFormat::R32Typeless,
+							.m_Extent = { 1024, 1024, 1 },
+							.m_ArraySize = static_cast<uint16_t>(count),
+						});
+					});
+				RenderPassDirectionalShadowMap shadowPass;
+				shadowPass.AddPass(graph, frameContext, services);
+				graph.AddPass<GraphPassData>("ShadowTest.Sample",
+					[](RenderGraph::RGBuilder& builder, GraphPassData&)
+					{
+						builder.Read(builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName).m_DirectionalShadowMap,
+							RGTextureAccess::Sample);
+						builder.SideEffect();
+					});
+				const bool compiled = graph.Compile();
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				bool allWritersLive = compiled && snapshot.m_Passes.size() == count + 2;
+				for (uint32_t index = 1; allWritersLive && index <= count; ++index)
+				{
+					allWritersLive &= !snapshot.m_Passes[index].m_Culled &&
+						snapshot.m_Passes[index].m_ExecutionOrder < snapshot.m_Passes[index + 1].m_ExecutionOrder;
+				}
+				context.Check(allWritersLive,
+					"Actual cascade passes define every sampled array layer and preserve all preceding writers");
+			}
+		}
+
+		void RunDirectionalShadowSplitTests(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{});
+			const ResolvedViewRenderSettings settings{};
+			const ResolvedTemporalFramePlan plan{};
+			RenderView mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({
+				.m_Camera = camera, .m_RenderSettings = settings, .m_TemporalFramePlan = plan,
+				.m_Width = 1280, .m_Height = 720,
+			});
+			mainView.m_Near = 1.0f;
+			mainView.m_Far = 100.0f;
+			DirectionalShadowSettings shadowSettings{};
+			shadowSettings.m_MaxShadowDistance = 81.0f;
+			for (float lambda : { 0.0f, 0.65f, 1.0f })
+			{
+				shadowSettings.m_SplitLambda = lambda;
+				auto cascades = BuildDirectionalShadowCascades(mainView, -Vector3::UnitY, shadowSettings);
+				bool valid = cascades.m_Cascades.size() == 4;
+				for (uint32_t index = 0; index < 4; ++index)
+				{
+					const auto& cascade = cascades.m_Cascades[index];
+					const float uniformSplit = 1.0f + 20.0f * static_cast<float>(index + 1);
+					const float logarithmicSplit = std::pow(3.0f, static_cast<float>(index + 1));
+					valid &= NearlyEqual(cascade.m_SplitFar,
+						uniformSplit * (1.0f - lambda) + logarithmicSplit * lambda) &&
+						cascade.m_SplitFar > cascade.m_SplitNear &&
+						cascade.m_SplitNear == (index ? cascades.m_Cascades[index - 1].m_SplitFar : 1.0f);
+					// Every receiver corner must remain inside its independently fitted light volume.
+					for (float depth : { cascade.m_SplitNear, cascade.m_SplitFar })
+					{
+						const float halfHeight = std::tan(mainView.m_FovRadians * 0.5f) * depth;
+						for (float x : { -1.0f, 1.0f })
+						{
+							for (float y : { -1.0f, 1.0f })
+							{
+								const Vector3 world = math::TransformPoint(
+									Vector3(x * halfHeight * mainView.m_Aspect, y * halfHeight, depth), mainView.m_InvView);
+								const Vector4 clip = math::Transform(Vector4(world, 1.0f), cascade.m_View.m_UnjitteredViewProj);
+								valid &= std::abs(clip.m_X) <= clip.m_W + 0.001f &&
+									std::abs(clip.m_Y) <= clip.m_W + 0.001f &&
+									clip.m_Z >= -0.001f && clip.m_Z <= clip.m_W + 0.001f;
+							}
+						}
+					}
+				}
+				context.Check(valid, "Practical splits cover contiguous main-view depths and fit all receiver corners");
+				cascades.m_ViewBaseOffset = 7;
+				const auto gpu = BuildDirectionalShadowGPU(cascades);
+				context.Check(gpu.CascadeCount == 4 && gpu.ViewBaseIndex == 7 &&
+					gpu.MainViewIndex == static_cast<uint32_t>(RenderViewID::Main) &&
+					gpu.NearDepth == 1.0f && gpu.SplitFar[3] == 81.0f,
+					"Shadow metadata uses the uploaded cascade range and positive main-camera depths");
+			}
+			shadowSettings.m_CascadeCount = 1;
+			shadowSettings.m_MaxShadowDistance = 150.0f;
+			const auto single = BuildDirectionalShadowCascades(mainView, -Vector3::UnitY, shadowSettings);
+			const auto reference = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
+				.m_MainView = mainView, .m_MaxShadowDistance = 150.0f,
+			});
+			context.Check(single.m_Cascades.size() == 1 && single.m_Cascades[0].m_SplitFar == 100.0f &&
+				single.m_Cascades[0].m_View.m_UnjitteredViewProj.ToArray() == reference.m_UnjitteredViewProj.ToArray(),
+				"Single-cascade mode preserves the legacy fit and clamps shadow distance to camera far");
+			context.Check(BuildDirectionalShadowGPU({}).CascadeCount == 0,
+				"Missing shadow views cannot enable a GPU cascade lookup");
 		}
 
 		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept
@@ -6563,6 +6693,8 @@ namespace gglab
 		RunDX12GraphicsContractLoweringTests(context);
 		RunScreenSpaceAndDepthContractTests(context);
 		RunDirectionalShadowCascadeFrameTests(context);
+		RunDirectionalShadowSplitTests(context);
+		RunDirectionalShadowGraphTests(context);
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);

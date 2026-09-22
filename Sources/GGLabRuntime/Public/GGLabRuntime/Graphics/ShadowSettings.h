@@ -3,6 +3,7 @@
 
 namespace gglab
 {
+	inline constexpr uint32_t MaxDirectionalShadowCascades = 4;
 	inline constexpr uint32_t DefaultDirectionalShadowMapSize = 2048;
 	inline constexpr uint32_t DefaultDirectionalShadowMapPreviewSize = 512;
 	inline constexpr float DefaultDirectionalShadowMaxDistance = 30.0f;
@@ -19,6 +20,8 @@ namespace gglab
 		bool m_EnablePCF = true;
 
 		uint32_t m_ShadowMapSize = DefaultDirectionalShadowMapSize;
+		uint32_t m_CascadeCount = MaxDirectionalShadowCascades;
+		float m_SplitLambda = 0.65f;
 
 		float m_MaxShadowDistance = DefaultDirectionalShadowMaxDistance;
 		float m_CasterExtrusionDistance = DefaultDirectionalShadowCasterExtrusionDistance;
@@ -33,6 +36,7 @@ namespace gglab
 
 	struct ShadowVisualizationSettings
 	{
+		uint32_t m_PreviewCascade = 0;
 		float m_PreviewMinDepth = 0.0f;
 		float m_PreviewMaxDepth = 1.0f;
 		bool m_PreviewInvert = false;

@@ -26,7 +26,8 @@ namespace gglab
 			float PreviewMinDepth = 0.0f;
 			float PreviewMaxDepth = 1.0f;
 			uint32_t PreviewInvert = 0;
-			uint32_t Padding[3]{};
+			uint32_t CascadeIndex = 0;
+			uint32_t Padding[2]{};
 		};
 		static_assert(IsPassRootConstantStruct<ShadowMapPreviewPassParameters>);
 		static_assert(sizeof(ShadowMapPreviewPassParameters) == 32);
@@ -44,6 +45,7 @@ namespace gglab
 			float m_MinDepth = 0.0f;
 			float m_MaxDepth = 1.0f;
 			uint32_t m_Invert = 0;
+			uint32_t m_CascadeIndex = 0;
 		};
 	}
 
@@ -70,7 +72,8 @@ namespace gglab
 				data.m_ShadowMapPreview = shadowRes.m_DirectionalShadowMapPreview;
 
 				const auto shadowMapSrvDesc =
-					MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+					MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, 0, 0,
+						shadowRes.m_CascadeCount, RHITextureAspect::Depth);
 				data.m_ShadowMapSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
 					data.m_ShadowMap, shadowMapSrvDesc);
 				data.m_PreviewRtv =
@@ -86,6 +89,7 @@ namespace gglab
 				data.m_MinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
 				data.m_MaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
 				data.m_Invert = settings.m_PreviewInvert ? 1u : 0u;
+				data.m_CascadeIndex = std::min(settings.m_PreviewCascade, shadowRes.m_CascadeCount - 1);
 			},
 			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -122,6 +126,7 @@ namespace gglab
 					.PreviewMinDepth = data.m_MinDepth,
 					.PreviewMaxDepth = data.m_MaxDepth,
 					.PreviewInvert = data.m_Invert,
+					.CascadeIndex = data.m_CascadeIndex,
 				};
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);

@@ -21,6 +21,7 @@ namespace gglab
 			const RHITextureDesc& desc = renderGraph.GetTextureDesc(texture);
 			diagnostics.m_Extent = desc.m_Extent;
 			diagnostics.m_Format = desc.m_Format;
+			diagnostics.m_ArraySize = desc.m_ArraySize;
 			diagnostics.m_Available = true;
 			return diagnostics;
 		}
@@ -52,6 +53,8 @@ namespace gglab
 					.m_ShadowDrawCount =
 						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Opaque)].m_Count +
 						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count,
+					.m_SplitNear = cascade.m_SplitNear,
+					.m_SplitFar = cascade.m_SplitFar,
 				});
 			}
 		}

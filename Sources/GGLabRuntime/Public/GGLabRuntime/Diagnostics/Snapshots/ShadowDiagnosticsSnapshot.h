@@ -14,6 +14,7 @@ namespace gglab
 	{
 		RHIExtent3D m_Extent{};
 		RHIFormat m_Format = RHIFormat::Unknown;
+		uint32_t m_ArraySize = 0;
 		bool m_Available = false;
 	};
 
@@ -24,6 +25,8 @@ namespace gglab
 		uint32_t m_ViewIndex = 0;
 		// Only opaque and alpha-test buckets are submitted to the shadow pass.
 		uint32_t m_ShadowDrawCount = 0;
+		float m_SplitNear = 0.0f;
+		float m_SplitFar = 0.0f;
 	};
 
 	struct ShadowDiagnosticsSnapshot

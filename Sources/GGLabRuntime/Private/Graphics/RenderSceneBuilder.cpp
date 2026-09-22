@@ -489,6 +489,19 @@ namespace gglab
 				result.m_GpuAllocations.m_SceneConstants.m_OffsetInBytes;
 		}
 
+		result.m_GpuAllocations.m_ShadowConstants = info.m_SceneCB.Upload(
+			BuildDirectionalShadowGPU(info.m_DirectionalShadowCascades));
+		if (!result.m_GpuAllocations.m_ShadowConstants.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Shadow constant allocation failed.");
+			result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
+		}
+		else
+		{
+			result.m_RenderScene.m_ShadowConstantBufferOffset =
+				result.m_GpuAllocations.m_ShadowConstants.m_OffsetInBytes;
+		}
+
 		return result;
 	}
 }

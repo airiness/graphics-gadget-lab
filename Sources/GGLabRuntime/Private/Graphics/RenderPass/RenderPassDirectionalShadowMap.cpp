@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <span>
@@ -43,135 +44,154 @@ namespace gglab
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
 		const DirectionalShadowCascadeSet& cascades = context.GetDirectionalShadowCascades();
-		GGLAB_ASSERT_MSG(cascades.m_Cascades.size() == 1,
-			"The single-map shadow pass requires exactly one cascade.");
-		const DirectionalShadowCascade* primaryCascade = cascades.TryGetCascade(0);
-		if (!primaryCascade)
+		GGLAB_ASSERT_MSG(!cascades.m_Cascades.empty() &&
+			cascades.m_Cascades.size() <= MaxDirectionalShadowCascades,
+			"Directional shadow rendering requires between one and four cascades.");
+		if (cascades.m_Cascades.empty())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(
-				"The single-map shadow pass found no primary cascade and submits no casters.");
+				"Directional shadow rendering found no cascade; only the fallback layer is cleared.");
 		}
-		const uint32_t primaryViewIndex = primaryCascade ? cascades.GetViewIndex(0) : 0u;
-
 		EnsureInitialized(services);
+		static constexpr const char* passNames[] = {
+			"Shadow.Directional.Cascade0", "Shadow.Directional.Cascade1",
+			"Shadow.Directional.Cascade2", "Shadow.Directional.Cascade3",
+		};
+		// Keep a cleared fallback layer when no cascade is available.
+		const uint32_t layerCount = std::max(1u, static_cast<uint32_t>(cascades.m_Cascades.size()));
+		for (uint32_t cascadeIndex = 0; cascadeIndex < layerCount; ++cascadeIndex)
+		{
+			const DirectionalShadowCascade* cascade = cascades.TryGetCascade(cascadeIndex);
+			const uint32_t viewIndex = cascade ? cascades.GetViewIndex(cascadeIndex) : 0u;
 
-		rg.AddPass<PassData>(
-			GetRenderGraphPassName(),
-			[contextPtr, primaryCascade, primaryViewIndex](
-				RenderGraph::RGBuilder& builder, PassData& data)
-			{
-				auto& shadowRes =
-					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-				builder.WriteInPlace(
-					shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilWrite);
-				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
-				if (primaryCascade)
+			rg.AddPass<PassData>(
+				passNames[cascadeIndex],
+				[contextPtr, cascade, viewIndex, cascadeIndex](
+					RenderGraph::RGBuilder& builder, PassData& data)
 				{
-					data.m_RenderQueue = std::addressof(primaryCascade->m_RenderQueue);
-					data.m_RasterDomain =
-						std::addressof(primaryCascade->m_RenderQueue.m_CoverageRasterDomain);
-				}
-				if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
-				{
-					const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
-					GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == primaryViewIndex &&
-						data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
-							contextPtr->m_RenderScene.m_ViewBaseIndex + primaryViewIndex,
-						"Shadow coverage and shader binding must address the same uploaded cascade view.");
-					GGLAB_ASSERT_MSG(
-						data.m_RasterDomain->IsValid() &&
-						IsDepthCoverageTargetExtentCompatible(*data.m_RasterDomain, shadowDesc),
-						"Shadow-map extent must match its coverage raster domain.");
-				}
-
-				const auto dsvDesc =
-					MakeRHITexture2DViewDesc(RHIFormat::D32Float, 0, 1, RHITextureAspect::Depth);
-				data.m_Dsv =
-					builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
-			},
-			[this, contextPtr, services, primaryViewIndex](
-				RGExecuteContext& executeContext, PassData& data)
-			{
-				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
-				GGLAB_ASSERT_NOT_NULL(graphicsContext);
-				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-
-				graphicsContext->BeginRendering({
-					.m_DepthAttachment = RHIRenderingAttachment{
-						.m_View = dsv,
-						.m_LoadOp = RHIContentLoadOp::DontCare,
-					},
-				});
-				graphicsContext->ClearDepthAttachment(1.0f);
-
-				// A frame without a primary cascade keeps this cleared write and submits nothing.
-				if (!data.m_RenderQueue || data.m_RenderQueue->m_DrawItems.empty())
-				{
-					return;
-				}
-				const RenderQueue& renderQueue = *data.m_RenderQueue;
-				const auto& ranges = renderQueue.m_BucketDrawRanges;
-				const DrawItemsRange* firstDrawRange = nullptr;
-				for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
-				{
-					const auto& range = ranges[utils::ToIndex(bucket)];
-					if (range.m_Count > 0)
+					auto& shadowRes =
+						builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+					if (cascadeIndex > 0)
 					{
-						firstDrawRange = std::addressof(range);
-						break;
+						// Preserve the defined layers through the resource-version chain. Reading
+						// the whole array here would include layers that have not been cleared yet.
+						builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilRead,
+							RHISubresourceRange{ .m_MipCount = 1, .m_ArraySliceCount = cascadeIndex });
 					}
-				}
-				if (!firstDrawRange)
+					const auto dsvDesc = MakeRHITexture2DArrayViewDesc(
+						RHIFormat::D32Float, 0, cascadeIndex, 1, RHITextureAspect::Depth);
+					// R32 has one plane. Leave the dependency aspect mask open until
+					// Compile infers depth usage for the typeless resource; the DSV is explicitly Depth.
+					builder.WriteInPlace(shadowRes.m_DirectionalShadowMap,
+						RGTextureAccess::DepthStencilWrite, RHISubresourceRange{
+							.m_MipCount = 1, .m_BaseArraySlice = cascadeIndex, .m_ArraySliceCount = 1 });
+					data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
+					if (cascade)
+					{
+						data.m_RenderQueue = std::addressof(cascade->m_RenderQueue);
+						data.m_RasterDomain =
+							std::addressof(cascade->m_RenderQueue.m_CoverageRasterDomain);
+					}
+					if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
+					{
+						const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
+						GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == viewIndex &&
+							data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
+								contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+							"Shadow coverage and shader binding must address the same uploaded cascade view.");
+						GGLAB_ASSERT_MSG(
+							data.m_RasterDomain->IsValid() &&
+							IsDepthCoverageTargetExtentCompatible(*data.m_RasterDomain, shadowDesc),
+							"Shadow-map extent must match its coverage raster domain.");
+					}
+
+					data.m_Dsv =
+						builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
+				},
+				[this, contextPtr, services, viewIndex](
+					RGExecuteContext& executeContext, PassData& data)
 				{
-					return;
-				}
-				GGLAB_ASSERT_MSG(firstDrawRange->m_Start < renderQueue.m_DrawItems.size(),
-					"Directional shadow first draw must be inside its RenderQueue.");
-				if (firstDrawRange->m_Start >= renderQueue.m_DrawItems.size())
-				{
-					return;
-				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
-					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-					contextPtr->GetDirectionalShadowSettings()));
+					auto* graphicsContext = executeContext.GetGraphicsCommandContext();
+					GGLAB_ASSERT_NOT_NULL(graphicsContext);
+					const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
-				GGLAB_ASSERT_MSG(
-					data.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain),
-					"Shadow rendering must consume the RenderQueue raster domain directly.");
-				graphicsContext->SetViewport(data.m_RasterDomain->m_Viewport);
-				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
-				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+					graphicsContext->BeginRendering({
+						.m_DepthAttachment = RHIRenderingAttachment{
+							.m_View = dsv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						},
+					});
+					graphicsContext->ClearDepthAttachment(1.0f);
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-				graphicsContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+					// A frame without a cascade keeps this cleared write and submits nothing.
+					if (!data.m_RenderQueue || data.m_RenderQueue->m_DrawItems.empty())
+					{
+						return;
+					}
+					const RenderQueue& renderQueue = *data.m_RenderQueue;
+					const auto& ranges = renderQueue.m_BucketDrawRanges;
+					const DrawItemsRange* firstDrawRange = nullptr;
+					for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
+					{
+						const auto& range = ranges[utils::ToIndex(bucket)];
+						if (range.m_Count > 0)
+						{
+							firstDrawRange = std::addressof(range);
+							break;
+						}
+					}
+					if (!firstDrawRange)
+					{
+						return;
+					}
+					GGLAB_ASSERT_MSG(firstDrawRange->m_Start < renderQueue.m_DrawItems.size(),
+						"Directional shadow first draw must be inside its RenderQueue.");
+					if (firstDrawRange->m_Start >= renderQueue.m_DrawItems.size())
+					{
+						return;
+					}
+					graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
+						renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
+						contextPtr->GetDirectionalShadowSettings()));
 
-				const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
+					GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
+					GGLAB_ASSERT_MSG(
+						data.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain),
+						"Shadow rendering must consume the RenderQueue raster domain directly.");
+					graphicsContext->SetViewport(data.m_RasterDomain->m_Viewport);
+					graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
+					graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
+					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
+					graphicsContext->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+						sceneBuffer->GetBufferHandle(),
+						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBufferHandle());
+					const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
+						objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				const DirectionalShadowPassParameters passParameters{
-					.ViewIndex = primaryViewIndex,
-				};
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
+						materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				DrawRenderQueue(graphicsContext, *contextPtr, services, renderQueue);
-			});
+					const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+						viewSB->GetBufferHandle());
+
+					const DirectionalShadowPassParameters passParameters{
+						.ViewIndex = viewIndex,
+					};
+					graphicsContext->SetPushConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+
+					DrawRenderQueue(graphicsContext, *contextPtr, services, renderQueue);
+				});
+		}
 	}
 
 	void RenderPassDirectionalShadowMap::EnsureInitialized(const RenderServices& services) noexcept

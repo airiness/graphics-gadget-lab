@@ -65,6 +65,20 @@ namespace gglab
 	};
 	static_assert(sizeof(SceneGPU) == 96);
 
+	// Matches DirectionalShadowData in Lighting/DirectionalShadowData.hlsli (b3).
+	struct alignas(16) DirectionalShadowGPU
+	{
+		std::array<float, 4> SplitFar{};
+		uint32_t ViewBaseIndex = 0;
+		uint32_t CascadeCount = 0;
+		uint32_t MainViewIndex = 0;
+		float NearDepth = 0.0f;
+	};
+	static_assert(sizeof(DirectionalShadowGPU) == 32);
+	static_assert(offsetof(DirectionalShadowGPU, ViewBaseIndex) == 16);
+	static_assert(offsetof(DirectionalShadowGPU, NearDepth) == 28);
+	static_assert(std::is_trivially_copyable_v<DirectionalShadowGPU>);
+
 	struct ObjectGPU
 	{
 		Matrix ModelMat;
