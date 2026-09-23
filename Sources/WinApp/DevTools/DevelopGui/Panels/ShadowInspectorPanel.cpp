@@ -143,21 +143,9 @@ namespace gglab
 			return changed;
 		}
 
-		static void DrawVisualizationSettings(ShadowVisualizationSettings& settings) noexcept
+		static void DrawShadowOverlays(ShadowVisualizationSettings& settings) noexcept
 		{
-			ImGui::SeparatorText("Preview");
-			ImGui::Checkbox("2x2 Cascade Overview", &settings.m_PreviewAllCascades);
-			ImGui::DragFloat(
-				"Preview Min Depth", &settings.m_PreviewMinDepth, 0.001f, 0.0f, 1.0f, "%.4f");
-			ImGui::DragFloat(
-				"Preview Max Depth", &settings.m_PreviewMaxDepth, 0.001f, 0.0f, 1.0f, "%.4f");
-			settings.m_PreviewMinDepth = std::clamp(settings.m_PreviewMinDepth, 0.0f, 1.0f);
-			settings.m_PreviewMaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
-			if (settings.m_PreviewMaxDepth <= settings.m_PreviewMinDepth)
-			{
-				settings.m_PreviewMaxDepth = std::min(settings.m_PreviewMinDepth + 0.001f, 1.0f);
-			}
-			ImGui::Checkbox("Invert Preview", &settings.m_PreviewInvert);
+			ImGui::SeparatorText("Scene Overlays");
 			ImGui::Checkbox("Cascade Overlay", &settings.m_ShowCascadeOverlay);
 			ImGui::SameLine();
 			ImGui::Checkbox("Transition Overlay", &settings.m_ShowTransitionOverlay);
@@ -462,10 +450,32 @@ namespace gglab
 			}
 		}
 
-		static void DrawShadowMapResource(
+		static void DrawShadowPreview(
 			DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
 		{
-			ImGui::SeparatorText("ShadowMap Resource");
+			ImGui::SeparatorText("Shadow Map Preview");
+			if (auto* settings = context.m_ShadowVisualizationSettings)
+			{
+				ImGui::Checkbox("2x2 Cascade Overview", &settings->m_PreviewAllCascades);
+				ImGui::DragFloat("Preview Min Depth", &settings->m_PreviewMinDepth,
+					0.001f, 0.0f, 1.0f, "%.4f");
+				ImGui::DragFloat("Preview Max Depth", &settings->m_PreviewMaxDepth,
+					0.001f, 0.0f, 1.0f, "%.4f");
+				settings->m_PreviewMinDepth = std::clamp(settings->m_PreviewMinDepth, 0.0f, 1.0f);
+				settings->m_PreviewMaxDepth = std::clamp(settings->m_PreviewMaxDepth, 0.0f, 1.0f);
+				if (settings->m_PreviewMaxDepth <= settings->m_PreviewMinDepth)
+				{
+					settings->m_PreviewMaxDepth = std::min(settings->m_PreviewMinDepth + 0.001f, 1.0f);
+				}
+				ImGui::Checkbox("Invert Preview", &settings->m_PreviewInvert);
+			}
+			else
+			{
+				ImGui::TextColored(devtools::style::ErrorTextColor,
+					"Shadow visualization settings are not available.");
+			}
+			ImGui::SliderFloat("Preview Size", &state.m_PreviewSize, 128.0f, 768.0f, "%.0f");
+			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 			if (context.m_ShadowPreviewControl)
 			{
 				context.m_ShadowPreviewControl->RequestShadowPreview();
@@ -544,10 +554,6 @@ namespace gglab
 				return;
 			}
 
-			ImGui::SeparatorText("Preview");
-			ImGui::SliderFloat("Preview Size", &state.m_PreviewSize, 128.0f, 768.0f, "%.0f");
-			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
-
 			const float previewSize = std::clamp(state.m_PreviewSize, 16.0f, 2048.0f);
 			if (overview)
 			{
@@ -600,16 +606,11 @@ namespace gglab
 		DrawShadowCapability(context);
 		if (context.m_ShadowVisualizationSettings)
 		{
-			DrawVisualizationSettings(*context.m_ShadowVisualizationSettings);
-		}
-		else
-		{
-			ImGui::TextColored(devtools::style::ErrorTextColor,
-				"Shadow visualization settings are not available.");
+			DrawShadowOverlays(*context.m_ShadowVisualizationSettings);
 		}
 		DrawLightControl(context);
 		DrawTemporalDiagnostics(context, state);
 		DrawShadowCamera(context, state);
-		DrawShadowMapResource(context, state);
+		DrawShadowPreview(context, state);
 	}
 }
