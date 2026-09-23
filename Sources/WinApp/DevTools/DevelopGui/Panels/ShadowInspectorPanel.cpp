@@ -146,6 +146,7 @@ namespace gglab
 		static void DrawVisualizationSettings(ShadowVisualizationSettings& settings) noexcept
 		{
 			ImGui::SeparatorText("Preview");
+			ImGui::Checkbox("2x2 Cascade Overview", &settings.m_PreviewAllCascades);
 			ImGui::DragFloat(
 				"Preview Min Depth", &settings.m_PreviewMinDepth, 0.001f, 0.0f, 1.0f, "%.4f");
 			ImGui::DragFloat(
@@ -523,8 +524,14 @@ namespace gglab
 				devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
 					preview.m_SrvDescriptor);
 
+			const uint32_t cascadeCount = static_cast<uint32_t>(
+				std::min(snapshot->m_Cascades.size(),
+					static_cast<size_t>(snapshot->m_DirectionalShadowMap.m_ArraySize)));
+			const bool overview = context.m_ShadowVisualizationSettings &&
+				context.m_ShadowVisualizationSettings->m_PreviewAllCascades && cascadeCount > 1;
 			ImGui::Text("Preview RG Size: %u", snapshot->m_ShadowMapPreviewSize);
-			ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
+			ImGui::Text("Preview layout: %s", overview ? "2x2 cascade overview" : "selected layer");
+			if (!overview) ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
 			ImGui::Text("Preview Texture Size: %u x %u", preview.m_Width, preview.m_Height);
 			ImGui::Text(
 				"Preview Format: %s", GetRHIFormatInfo(preview.m_Format).m_Name);
@@ -542,9 +549,44 @@ namespace gglab
 			ImGui::Checkbox("Flip Preview Y", &state.m_FlipPreviewY);
 
 			const float previewSize = std::clamp(state.m_PreviewSize, 16.0f, 2048.0f);
-			const ImVec2 uv0 = state.m_FlipPreviewY ? ImVec2(0.0f, 1.0f) : ImVec2(0.0f, 0.0f);
-			const ImVec2 uv1 = state.m_FlipPreviewY ? ImVec2(1.0f, 0.0f) : ImVec2(1.0f, 1.0f);
-			ImGui::Image(previewTextureId, ImVec2(previewSize, previewSize), uv0, uv1);
+			if (overview)
+			{
+				ImGui::TextDisabled("Shared display range; grayscale is per-cascade clip depth, not world distance.");
+				ImGui::TextDisabled("Click a tile for full-size detail.");
+				if (ImGui::BeginTable("CascadePreviewTiles", 2, ImGuiTableFlags_SizingFixedFit))
+				{
+					const float tileSize = previewSize * 0.5f;
+					for (uint32_t index = 0; index < cascadeCount; ++index)
+					{
+						ImGui::TableNextColumn();
+						ImGui::PushID(static_cast<int>(index));
+						const auto& cascade = snapshot->m_Cascades[index];
+						ImGui::Text("Cascade %u | split %.2f-%.2f m", index,
+							cascade.m_SplitNear, cascade.m_SplitFar);
+						ImGui::Text("Texel: %.5f / %.5f m", cascade.m_Projection.m_WorldUnitsPerTexel.m_X,
+							cascade.m_Projection.m_WorldUnitsPerTexel.m_Y);
+						const float u = static_cast<float>(index % 2) * 0.5f;
+						const float v = static_cast<float>(index / 2) * 0.5f;
+						const ImVec2 uv0(u, state.m_FlipPreviewY ? v + 0.5f : v);
+						const ImVec2 uv1(u + 0.5f, state.m_FlipPreviewY ? v : v + 0.5f);
+						if (ImGui::ImageButton("##CascadePreview", previewTextureId,
+							ImVec2(tileSize, tileSize), uv0, uv1))
+						{
+							state.m_SelectedCascade = static_cast<int>(index);
+							context.m_ShadowVisualizationSettings->m_PreviewCascade = index;
+							context.m_ShadowVisualizationSettings->m_PreviewAllCascades = false;
+						}
+						ImGui::PopID();
+					}
+					ImGui::EndTable();
+				}
+			}
+			else
+			{
+				const ImVec2 uv0 = state.m_FlipPreviewY ? ImVec2(0.0f, 1.0f) : ImVec2(0.0f, 0.0f);
+				const ImVec2 uv1 = state.m_FlipPreviewY ? ImVec2(1.0f, 0.0f) : ImVec2(1.0f, 1.0f);
+				ImGui::Image(previewTextureId, ImVec2(previewSize, previewSize), uv0, uv1);
+			}
 		}
 	}
 

@@ -2471,7 +2471,24 @@ namespace gglab
 			shadowDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
 			const ShaderCompileResult shadowPreviewSpirV = compiler.Compile(shadowDesc);
 			context.Check(shadowPreviewDxil.IsSuccess() && shadowPreviewSpirV.IsSuccess(),
-				"DXIL and SPIR-V compile the selected-layer shadow array preview");
+				"DXIL and SPIR-V compile selected-layer and 2x2 cascade shadow array previews");
+			std::string shadowPreviewDisassembly;
+			const bool previewDxilReflected = shadowPreviewDxil.IsSuccess() &&
+				DisassembleDxil(shadowPreviewDxil.m_Artifact.m_Binary, shadowPreviewDisassembly);
+			context.Check(previewDxilReflected &&
+				FindDxilMemberOffset(shadowPreviewDisassembly, "PreviewAllCascades") == 24u &&
+				FindDxilMemberOffset(shadowPreviewDisassembly, "PreviewCascadeCount") == 28u,
+				"DXIL preview layout flags match the 32-byte CPU root constants");
+			SpirVDecorationReflection previewReflection;
+			const bool previewSpirVReflected = shadowPreviewSpirV.IsSuccess() &&
+				ReadSpirVDecorations(shadowPreviewSpirV.m_Artifact.m_Binary, previewReflection);
+			const auto* previewLayout = previewSpirVReflected
+				? previewReflection.FindStructLayout("type.ConstantBuffer.ShadowMapPreviewPassParameters") : nullptr;
+			context.Check(previewLayout && previewLayout->m_Size == 32u &&
+				previewLayout->m_Members.size() == 8u &&
+				previewLayout->m_Members[6].m_Offset == 24u &&
+				previewLayout->m_Members[7].m_Offset == 28u,
+				"SPIR-V preview layout flags match the 32-byte CPU root constants");
 			desc.m_Defines = {
 				{
 					.m_Name = L"GGLAB_GTAO_CONTRIBUTION_OUTPUT",

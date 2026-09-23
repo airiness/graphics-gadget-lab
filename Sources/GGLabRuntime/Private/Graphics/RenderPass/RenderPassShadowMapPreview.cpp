@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 
@@ -27,10 +28,13 @@ namespace gglab
 			float PreviewMaxDepth = 1.0f;
 			uint32_t PreviewInvert = 0;
 			uint32_t CascadeIndex = 0;
-			uint32_t Padding[2]{};
+			uint32_t PreviewAllCascades = 0;
+			uint32_t PreviewCascadeCount = 0;
 		};
 		static_assert(IsPassRootConstantStruct<ShadowMapPreviewPassParameters>);
 		static_assert(sizeof(ShadowMapPreviewPassParameters) == 32);
+		static_assert(offsetof(ShadowMapPreviewPassParameters, PreviewAllCascades) == 24);
+		static_assert(offsetof(ShadowMapPreviewPassParameters, PreviewCascadeCount) == 28);
 
 		struct PassData
 		{
@@ -46,6 +50,8 @@ namespace gglab
 			float m_MaxDepth = 1.0f;
 			uint32_t m_Invert = 0;
 			uint32_t m_CascadeIndex = 0;
+			uint32_t m_PreviewAllCascades = 0;
+			uint32_t m_CascadeCount = 0;
 		};
 	}
 
@@ -64,6 +70,8 @@ namespace gglab
 			{
 				auto& shadowRes =
 					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+				GGLAB_ASSERT(shadowRes.m_CascadeCount > 0 &&
+					shadowRes.m_CascadeCount <= MaxDirectionalShadowCascades);
 
 				data.m_ShadowMap =
 					builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
@@ -90,6 +98,8 @@ namespace gglab
 				data.m_MaxDepth = std::clamp(settings.m_PreviewMaxDepth, 0.0f, 1.0f);
 				data.m_Invert = settings.m_PreviewInvert ? 1u : 0u;
 				data.m_CascadeIndex = std::min(settings.m_PreviewCascade, shadowRes.m_CascadeCount - 1);
+				data.m_PreviewAllCascades = settings.m_PreviewAllCascades && shadowRes.m_CascadeCount > 1 ? 1u : 0u;
+				data.m_CascadeCount = shadowRes.m_CascadeCount;
 			},
 			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
 			{
@@ -127,6 +137,8 @@ namespace gglab
 					.PreviewMaxDepth = data.m_MaxDepth,
 					.PreviewInvert = data.m_Invert,
 					.CascadeIndex = data.m_CascadeIndex,
+					.PreviewAllCascades = data.m_PreviewAllCascades,
+					.PreviewCascadeCount = data.m_CascadeCount,
 				};
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);

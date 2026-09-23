@@ -56,6 +56,7 @@ namespace gglab
 	struct ShadowVisualizationSettings
 	{
 		uint32_t m_PreviewCascade = 0;
+		bool m_PreviewAllCascades = false;
 		float m_PreviewMinDepth = 0.0f;
 		float m_PreviewMaxDepth = 1.0f;
 		bool m_PreviewInvert = false;
