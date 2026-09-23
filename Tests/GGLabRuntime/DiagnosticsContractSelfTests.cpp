@@ -922,9 +922,42 @@ namespace gglab
 		const bool duplicateRejected = !temporal.Record(temporalFrame, 7, "CAM_ShadowStairs");
 		context.Check(firstRecorded && nextRecorded && duplicateRejected &&
 			temporal.GetSamples().size() == 2 &&
+			!temporal.GetSamples().front().m_HasComparison &&
+			temporal.GetSamples().back().m_HasComparison &&
 			temporal.GetSamples().back().m_ProjectionDeltaTexels[0].m_X == 2.0f &&
-			temporal.GetSamples().back().m_ProjectionDeltaTexels[0].m_Y == -1.0f,
+			temporal.GetSamples().back().m_ProjectionDeltaTexels[0].m_Y == -1.0f &&
+			temporal.GetSamples().back().m_GridErrorTexels[0].m_X == 0.0f &&
+			temporal.GetSamples().back().m_GridErrorTexels[0].m_Y == 0.0f,
 			"Adjacent shadow frame plans report projection center motion in texels once per frame");
+
+		ShadowTemporalDiagnostics scaleHistory;
+		auto scaleFrame = temporalFrame;
+		scaleFrame.m_FrameSerial = 100;
+		scaleFrame.m_Cascades[0].m_Projection.m_CenterLS = Vector2(0.0625f, 0.1875f);
+		const bool scaleBaselineRecorded = scaleHistory.Record(scaleFrame, 7, "CAM_ShadowStairs");
+		const auto baseline = scaleBaselineRecorded
+			? scaleHistory.GetSamples().front() : ShadowTemporalSample{};
+		++scaleFrame.m_FrameSerial;
+		scaleFrame.m_Cascades[0].m_Projection.m_WorldUnitsPerTexel = Vector2(0.5f, 0.125f);
+		scaleFrame.m_Cascades[0].m_Projection.m_CenterLS = Vector2(0.5625f, -0.3125f);
+		const bool scaleChangedRecorded = scaleHistory.Record(scaleFrame, 7, "CAM_ShadowStairs");
+		const auto scaleChanged = scaleChangedRecorded
+			? scaleHistory.GetSamples().back() : ShadowTemporalSample{};
+		context.Check(scaleBaselineRecorded && scaleChangedRecorded &&
+			scaleHistory.GetResetCount() == 0 && scaleHistory.GetSamples().size() == 2 &&
+			!baseline.m_HasComparison && baseline.m_TexelScaleDelta[0].m_X == 0.0f &&
+			baseline.m_GridErrorTexels[0].m_X == 0.25f &&
+			baseline.m_GridErrorTexels[0].m_Y == -0.25f &&
+			scaleChanged.m_HasComparison &&
+			scaleChanged.m_WorldUnitsPerTexel[0].m_X == 0.5f &&
+			scaleChanged.m_WorldUnitsPerTexel[0].m_Y == 0.125f &&
+			scaleChanged.m_TexelScaleDelta[0].m_X == 0.25f &&
+			scaleChanged.m_TexelScaleDelta[0].m_Y == -0.125f &&
+			scaleChanged.m_ProjectionDeltaTexels[0].m_X == 1.0f &&
+			scaleChanged.m_ProjectionDeltaTexels[0].m_Y == -4.0f &&
+			scaleChanged.m_GridErrorTexels[0].m_X == 0.125f &&
+			scaleChanged.m_GridErrorTexels[0].m_Y == 0.5f,
+			"Texel scale changes remain comparable while scale deltas and signed grid error are recorded");
 
 		const auto resetsOn = [&](ShadowDiagnosticsSnapshot changed, uint64_t cameraId,
 			std::string_view referenceId) noexcept
@@ -936,6 +969,7 @@ namespace gglab
 			changed.m_FrameSerial = 2;
 			const bool recorded = history.Record(changed, cameraId, referenceId);
 			return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
+				!history.GetSamples().front().m_HasComparison &&
 				history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
 		};
 		auto changed = temporalFrame;
@@ -952,6 +986,7 @@ namespace gglab
 		const bool splitReset = resetsOn(changed, 7, "CAM_ShadowStairs");
 		changed = temporalFrame;
 		changed.m_Settings.m_ShadowMapSize /= 2;
+		changed.m_Cascades[0].m_Projection.m_WorldUnitsPerTexel = Vector2(0.5f);
 		const bool resolutionReset = resetsOn(changed, 7, "CAM_ShadowStairs");
 		changed = temporalFrame;
 		changed.m_MainView.m_TemporalSessionIdentity++;

@@ -14,8 +14,15 @@ namespace gglab
 	struct ShadowTemporalSample
 	{
 		uint64_t m_FrameSerial = 0;
+		// Center translation uses the current frame's texel scale.
 		std::array<Vector2, MaxDirectionalShadowCascades> m_ProjectionDeltaTexels{};
+		std::array<Vector2, MaxDirectionalShadowCascades> m_WorldUnitsPerTexel{};
+		// Current minus previous scale, in world units per texel.
+		std::array<Vector2, MaxDirectionalShadowCascades> m_TexelScaleDelta{};
+		// Signed residual of the resolved center from the nearest integer texel grid.
+		std::array<Vector2, MaxDirectionalShadowCascades> m_GridErrorTexels{};
 		uint32_t m_CascadeCount = 0;
+		bool m_HasComparison = false;
 	};
 
 	// Owns a bounded, CPU-only history. A sample compares only adjacent completed

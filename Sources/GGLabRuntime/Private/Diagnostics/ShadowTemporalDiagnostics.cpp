@@ -33,10 +33,18 @@ namespace gglab
 				std::abs(a.m_Z - b.m_Z) <= 1.0e-6f;
 		}
 
-		bool SameTexelScale(float a, float b) noexcept
+		bool ValidTexelScale(float value) noexcept
 		{
-			return a > 0.0f && b > 0.0f &&
-				std::abs(a - b) <= std::max(a, b) * 1.0e-5f;
+			return std::isfinite(value) && value > 0.0f;
+		}
+
+		float FractionalGridError(float center, float worldUnitsPerTexel) noexcept
+		{
+			if (!std::isfinite(center) || !ValidTexelScale(worldUnitsPerTexel)) return 0.0f;
+			const double gridCoordinate = static_cast<double>(center) /
+				static_cast<double>(worldUnitsPerTexel);
+			if (!std::isfinite(gridCoordinate)) return 0.0f;
+			return static_cast<float>(gridCoordinate - std::round(gridCoordinate));
 		}
 	}
 
@@ -74,11 +82,7 @@ namespace gglab
 			const auto& a = current.m_Cascades[index];
 			const auto& b = m_Previous.m_Cascades[index];
 			if (a.m_SplitNear != b.m_SplitNear || a.m_SplitFar != b.m_SplitFar ||
-				a.m_BlendStart != b.m_BlendStart ||
-				!SameTexelScale(a.m_Projection.m_WorldUnitsPerTexel.m_X,
-					b.m_Projection.m_WorldUnitsPerTexel.m_X) ||
-				!SameTexelScale(a.m_Projection.m_WorldUnitsPerTexel.m_Y,
-					b.m_Projection.m_WorldUnitsPerTexel.m_Y))
+				a.m_BlendStart != b.m_BlendStart)
 			{
 				return false;
 			}
@@ -112,19 +116,33 @@ namespace gglab
 		ShadowTemporalSample sample{};
 		sample.m_FrameSerial = snapshot.m_FrameSerial;
 		sample.m_CascadeCount = static_cast<uint32_t>(snapshot.m_Cascades.size());
-		if (comparable)
+		sample.m_HasComparison = comparable;
+		for (size_t index = 0; index < snapshot.m_Cascades.size(); ++index)
 		{
-			for (size_t index = 0; index < snapshot.m_Cascades.size(); ++index)
+			const auto& current = snapshot.m_Cascades[index].m_Projection;
+			const auto& scale = current.m_WorldUnitsPerTexel;
+			if (ValidTexelScale(scale.m_X) && ValidTexelScale(scale.m_Y))
 			{
-				const auto& previous = m_Previous.m_Cascades[index].m_Projection;
-				const auto& current = snapshot.m_Cascades[index].m_Projection;
-				if (current.m_WorldUnitsPerTexel.m_X > 0.0f &&
-					current.m_WorldUnitsPerTexel.m_Y > 0.0f)
+				sample.m_WorldUnitsPerTexel[index] = scale;
+				sample.m_GridErrorTexels[index] = {
+					FractionalGridError(current.m_CenterLS.m_X, scale.m_X),
+					FractionalGridError(current.m_CenterLS.m_Y, scale.m_Y),
+				};
+				if (comparable)
 				{
+					const auto& previous = m_Previous.m_Cascades[index].m_Projection;
 					sample.m_ProjectionDeltaTexels[index] = {
 						(current.m_CenterLS.m_X - previous.m_CenterLS.m_X) / current.m_WorldUnitsPerTexel.m_X,
 						(current.m_CenterLS.m_Y - previous.m_CenterLS.m_Y) / current.m_WorldUnitsPerTexel.m_Y,
 					};
+					if (ValidTexelScale(previous.m_WorldUnitsPerTexel.m_X) &&
+						ValidTexelScale(previous.m_WorldUnitsPerTexel.m_Y))
+					{
+						sample.m_TexelScaleDelta[index] = {
+							scale.m_X - previous.m_WorldUnitsPerTexel.m_X,
+							scale.m_Y - previous.m_WorldUnitsPerTexel.m_Y,
+						};
+					}
 				}
 			}
 		}

@@ -397,21 +397,56 @@ namespace gglab
 				for (uint32_t index = 0; index < latest.m_CascadeCount; ++index)
 				{
 					const auto& delta = latest.m_ProjectionDeltaTexels[index];
-					ImGui::Text("Cascade %u projection delta: %+7.3f / %+7.3f texels",
-						index, delta.m_X, delta.m_Y);
+					const auto& scale = latest.m_WorldUnitsPerTexel[index];
+					const auto& scaleDelta = latest.m_TexelScaleDelta[index];
+					const auto& gridError = latest.m_GridErrorTexels[index];
+					ImGui::Text("Cascade %u texel scale: %.7f / %.7f m/texel",
+						index, scale.m_X, scale.m_Y);
+					if (latest.m_HasComparison)
+					{
+						const float previousX = scale.m_X - scaleDelta.m_X;
+						const float previousY = scale.m_Y - scaleDelta.m_Y;
+						const float percentX = previousX > 0.0f ? 100.0f * scaleDelta.m_X / previousX : 0.0f;
+						const float percentY = previousY > 0.0f ? 100.0f * scaleDelta.m_Y / previousY : 0.0f;
+						ImGui::Text("  Center delta: %+7.3f / %+7.3f current texels", delta.m_X, delta.m_Y);
+						ImGui::Text("  Scale change: %+.7f / %+.7f m/texel (%+.3f%% / %+.3f%%)",
+							scaleDelta.m_X, scaleDelta.m_Y, percentX, percentY);
+					}
+					else ImGui::TextDisabled("  Baseline frame: no adjacent-frame delta");
+					ImGui::Text("  Fractional grid error: %+7.3f / %+7.3f texels",
+						gridError.m_X, gridError.m_Y);
 				}
+				ImGui::TextDisabled("Resolved center versus nearest integer texel; zero is grid aligned.");
 				const uint32_t selected = std::min(static_cast<uint32_t>(state.m_SelectedCascade),
 					latest.m_CascadeCount - 1);
 				std::array<float, ShadowTemporalDiagnostics::MaxSamples> magnitudes{};
+				std::array<float, ShadowTemporalDiagnostics::MaxSamples> scaleChanges{};
+				std::array<float, ShadowTemporalDiagnostics::MaxSamples> gridErrors{};
 				float maxMagnitude = 1.0f;
+				float maxScaleChange = 0.01f;
 				for (size_t index = 0; index < samples.size(); ++index)
 				{
-					const auto& delta = samples[index].m_ProjectionDeltaTexels[selected];
+					const auto& recorded = samples[index];
+					const auto& delta = recorded.m_ProjectionDeltaTexels[selected];
 					magnitudes[index] = std::sqrt(delta.m_X * delta.m_X + delta.m_Y * delta.m_Y);
 					maxMagnitude = std::max(maxMagnitude, magnitudes[index]);
+					const auto& scale = recorded.m_WorldUnitsPerTexel[selected];
+					const auto& scaleDelta = recorded.m_TexelScaleDelta[selected];
+					const float previousX = scale.m_X - scaleDelta.m_X;
+					const float previousY = scale.m_Y - scaleDelta.m_Y;
+					const float percentX = previousX > 0.0f ? 100.0f * scaleDelta.m_X / previousX : 0.0f;
+					const float percentY = previousY > 0.0f ? 100.0f * scaleDelta.m_Y / previousY : 0.0f;
+					scaleChanges[index] = std::sqrt(percentX * percentX + percentY * percentY);
+					maxScaleChange = std::max(maxScaleChange, scaleChanges[index]);
+					const auto& grid = recorded.m_GridErrorTexels[selected];
+					gridErrors[index] = std::sqrt(grid.m_X * grid.m_X + grid.m_Y * grid.m_Y);
 				}
 				ImGui::PlotLines("Selected cascade |delta| (texels)", magnitudes.data(),
 					static_cast<int>(samples.size()), 0, nullptr, 0.0f, maxMagnitude, ImVec2(0.0f, 70.0f));
+				ImGui::PlotLines("Selected cascade |scale change| (%)", scaleChanges.data(),
+					static_cast<int>(samples.size()), 0, nullptr, 0.0f, maxScaleChange, ImVec2(0.0f, 55.0f));
+				ImGui::PlotLines("Selected cascade |grid error| (texels)", gridErrors.data(),
+					static_cast<int>(samples.size()), 0, nullptr, 0.0f, 0.75f, ImVec2(0.0f, 55.0f));
 			}
 
 			const auto* profiling = context.m_GpuProfiling;
