@@ -76,32 +76,61 @@ namespace gglab
 		static bool DrawDirectionalShadowSettings(DirectionalShadowSettings& settings) noexcept
 		{
 			bool changed = false;
-			ImGui::SeparatorText("General");
-			changed |= ImGui::Checkbox("Enable", &settings.m_Enable);
-			ImGui::SameLine();
-			changed |= ImGui::Checkbox("3x3 PCF", &settings.m_EnablePCF);
+			changed |= ImGui::Checkbox("Enable Shadow Shading", &settings.m_Enable);
 
-			if (ImGui::Button("1 Cascade / 2048"))
+			ImGui::SeparatorText("Cascades");
+			struct CascadePreset
 			{
-				settings.m_CascadeCount = 1;
-				settings.m_ShadowMapSize = 2048;
+				const char* m_Label;
+				uint32_t m_Count;
+				uint32_t m_MapSize;
+			};
+			static constexpr std::array presets = {
+				CascadePreset{ "1 Cascade / 2048", 1, 2048 },
+				CascadePreset{ "4 Cascades / 1024", 4, 1024 },
+				CascadePreset{ "4 Cascades / 2048", 4, 2048 },
+			};
+			const auto currentPreset = std::find_if(presets.begin(), presets.end(),
+				[&](const CascadePreset& preset)
+				{
+					return settings.m_CascadeCount == preset.m_Count &&
+						settings.m_ShadowMapSize == preset.m_MapSize;
+				});
+			if (ImGui::BeginCombo("Cascade Preset",
+				currentPreset != presets.end() ? currentPreset->m_Label : "Custom"))
+			{
+				for (const auto& preset : presets)
+				{
+					if (ImGui::Selectable(preset.m_Label,
+						currentPreset != presets.end() && &*currentPreset == &preset))
+					{
+						if (settings.m_CascadeCount != preset.m_Count || settings.m_ShadowMapSize != preset.m_MapSize)
+						{
+							settings.m_CascadeCount = preset.m_Count;
+							settings.m_ShadowMapSize = preset.m_MapSize;
+							changed = true;
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			int cascadeCount = static_cast<int>(settings.m_CascadeCount);
+			if (ImGui::SliderInt("Cascade Count", &cascadeCount, 1, MaxDirectionalShadowCascades))
+			{
+				settings.m_CascadeCount = static_cast<uint32_t>(cascadeCount);
 				changed = true;
 			}
-			ImGui::SameLine();
-			if (ImGui::Button("4 Cascades / 1024"))
+			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
+			if (ImGui::SliderInt("Shadow Map Size", &shadowMapSize, 256, 8192))
 			{
-				settings.m_CascadeCount = 4;
-				settings.m_ShadowMapSize = 1024;
-				changed = true;
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("4 Cascades / 2048"))
-			{
-				settings.m_CascadeCount = 4;
-				settings.m_ShadowMapSize = 2048;
+				settings.m_ShadowMapSize = static_cast<uint32_t>(shadowMapSize);
 				changed = true;
 			}
 			changed |= ImGui::SliderFloat("Split Lambda", &settings.m_SplitLambda, 0.0f, 1.0f, "%.2f");
+			changed |= ImGui::SliderFloat("Cascade Blend Fraction", &settings.m_CascadeBlendFraction, 0.0f, 0.5f, "%.2f");
+			changed |= ImGui::SliderFloat("Distance Fade Fraction", &settings.m_DistanceFadeFraction, 0.0f, 0.5f, "%.2f");
+
+			ImGui::SeparatorText("Projection");
 			int fitMode = static_cast<int>(settings.m_FitMode);
 			if (ImGui::Combo("Projection Fit", &fitMode, "Tight fit\0Stable sphere\0"))
 			{
@@ -111,16 +140,6 @@ namespace gglab
 			ImGui::BeginDisabled(settings.m_FitMode != DirectionalShadowFitMode::StableSphere);
 			changed |= ImGui::Checkbox("Texel Snapping", &settings.m_EnableTexelSnapping);
 			ImGui::EndDisabled();
-			ImGui::TextUnformatted("Main-camera splits | Overlapping cascade transitions");
-
-			int shadowMapSize = static_cast<int>(settings.m_ShadowMapSize);
-			if (ImGui::SliderInt("Shadow Map Size", &shadowMapSize, 256, 8192))
-			{
-				changed = true;
-				settings.m_ShadowMapSize = static_cast<uint32_t>(std::max(shadowMapSize, 1));
-			}
-
-			ImGui::SeparatorText("Projection");
 			changed |= ImGui::DragFloat(
 				"Max Shadow Distance", &settings.m_MaxShadowDistance, 1.0f, 1.0f, 10000.0f, "%.1f");
 			changed |= ImGui::DragFloat("Caster Extrusion Distance", &settings.m_CasterExtrusionDistance, 1.0f,
@@ -130,9 +149,8 @@ namespace gglab
 			changed |= ImGui::DragFloat(
 				"Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
 
-			ImGui::SeparatorText("Bias / Filtering");
-			changed |= ImGui::SliderFloat("Cascade Blend Fraction", &settings.m_CascadeBlendFraction, 0.0f, 0.5f, "%.2f");
-			changed |= ImGui::SliderFloat("Distance Fade Fraction", &settings.m_DistanceFadeFraction, 0.0f, 0.5f, "%.2f");
+			ImGui::SeparatorText("Sampling / Bias");
+			changed |= ImGui::Checkbox("3x3 PCF", &settings.m_EnablePCF);
 			changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
 				0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 			changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
@@ -154,7 +172,7 @@ namespace gglab
 
 		static void DrawShadowCapability(DevelopGuiContext& context) noexcept
 		{
-			ImGui::SeparatorText("Shadow");
+			ImGui::SeparatorText("Directional Shadow");
 			auto light = context.m_DirectionalLight ? context.m_DirectionalLight->GetLight() : std::nullopt;
 			if (!light)
 			{
@@ -195,7 +213,7 @@ namespace gglab
 		static void DrawShadowCamera(
 			DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
 		{
-			ImGui::SeparatorText("Shadow Camera / Frustum");
+			ImGui::SeparatorText("Cascade Diagnostics");
 
 			const auto* snapshot = context.m_Diagnostics
 				? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() : nullptr;
@@ -211,7 +229,7 @@ namespace gglab
 			ImGui::Text("Cascade count: %d", cascadeCount);
 			if (cascadeCount > 1)
 			{
-				ImGui::SliderInt("Cascade / Preview Layer", &state.m_SelectedCascade, 0, cascadeCount - 1);
+				ImGui::SliderInt("Inspected Cascade / Preview Layer", &state.m_SelectedCascade, 0, cascadeCount - 1);
 			}
 			if (context.m_ShadowVisualizationSettings)
 			{
@@ -497,18 +515,6 @@ namespace gglab
 				return;
 			}
 
-			ImGui::TextUnformatted("ShadowMap is a transient RenderGraph texture.");
-			ImGui::Text("RG Size: %u | Array layers: %u", snapshot->m_ShadowMapSize,
-				snapshot->m_DirectionalShadowMap.m_ArraySize);
-			ImGui::Text("Texture Size: %llu x %u",
-				static_cast<unsigned long long>(
-					snapshot->m_DirectionalShadowMap.m_Extent.m_Width),
-				snapshot->m_DirectionalShadowMap.m_Extent.m_Height);
-			ImGui::Text("Format: %s",
-				GetRHIFormatInfo(snapshot->m_DirectionalShadowMap.m_Format).m_Name);
-			ImGui::Text(
-				"Preview SRV Format: %s", GetRHIFormatInfo(RHIFormat::R32Float).m_Name);
-
 			if (!snapshot->m_DirectionalShadowMapPreviewSource.m_Available)
 			{
 				ImGui::TextColored(devtools::style::ErrorTextColor,
@@ -539,19 +545,31 @@ namespace gglab
 					static_cast<size_t>(snapshot->m_DirectionalShadowMap.m_ArraySize)));
 			const bool overview = context.m_ShadowVisualizationSettings &&
 				context.m_ShadowVisualizationSettings->m_PreviewAllCascades && cascadeCount > 1;
-			ImGui::Text("Preview RG Size: %u", snapshot->m_ShadowMapPreviewSize);
 			ImGui::Text("Preview layout: %s", overview ? "2x2 cascade overview" : "selected layer");
 			if (!overview) ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
-			ImGui::Text("Preview Texture Size: %u x %u", preview.m_Width, preview.m_Height);
-			ImGui::Text(
-				"Preview Format: %s", GetRHIFormatInfo(preview.m_Format).m_Name);
-			ImGui::Text("Preview Shader Visible SRV Index: %u", preview.m_SrvDescriptor.m_Index);
 
 			if (!previewTextureId)
 			{
 				ImGui::TextColored(devtools::style::ErrorTextColor,
 					"ShadowMap preview SRV GPU handle is invalid.");
 				return;
+			}
+			if (ImGui::TreeNode("Resource Details"))
+			{
+				ImGui::TextUnformatted("ShadowMap is a transient RenderGraph texture.");
+				ImGui::Text("RG Size: %u | Array layers: %u", snapshot->m_ShadowMapSize,
+					snapshot->m_DirectionalShadowMap.m_ArraySize);
+				ImGui::Text("Texture Size: %llu x %u",
+					static_cast<unsigned long long>(snapshot->m_DirectionalShadowMap.m_Extent.m_Width),
+					snapshot->m_DirectionalShadowMap.m_Extent.m_Height);
+				ImGui::Text("Format: %s",
+					GetRHIFormatInfo(snapshot->m_DirectionalShadowMap.m_Format).m_Name);
+				ImGui::Text("Preview RG Size: %u", snapshot->m_ShadowMapPreviewSize);
+				ImGui::Text("Preview Texture Size: %u x %u", preview.m_Width, preview.m_Height);
+				ImGui::Text("Preview Format: %s", GetRHIFormatInfo(preview.m_Format).m_Name);
+				ImGui::Text("Preview SRV Format: %s", GetRHIFormatInfo(RHIFormat::R32Float).m_Name);
+				ImGui::Text("Preview Shader Visible SRV Index: %u", preview.m_SrvDescriptor.m_Index);
+				ImGui::TreePop();
 			}
 
 			const float previewSize = std::clamp(state.m_PreviewSize, 16.0f, 2048.0f);
@@ -603,14 +621,14 @@ namespace gglab
 		ImGui::TextUnformatted("Shadow Inspector");
 		ImGui::Separator();
 
+		DrawLightControl(context);
 		DrawShadowCapability(context);
+		DrawShadowCamera(context, state);
+		DrawTemporalDiagnostics(context, state);
 		if (context.m_ShadowVisualizationSettings)
 		{
 			DrawShadowOverlays(*context.m_ShadowVisualizationSettings);
 		}
-		DrawLightControl(context);
-		DrawTemporalDiagnostics(context, state);
-		DrawShadowCamera(context, state);
 		DrawShadowPreview(context, state);
 	}
 }

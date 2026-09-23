@@ -6,7 +6,7 @@ namespace gglab
 	inline constexpr uint32_t MaxDirectionalShadowCascades = 4;
 	inline constexpr uint32_t DefaultDirectionalShadowMapSize = 2048;
 	inline constexpr uint32_t DefaultDirectionalShadowMapPreviewSize = 512;
-	inline constexpr float DefaultDirectionalShadowMaxDistance = 30.0f;
+	inline constexpr float DefaultDirectionalShadowMaxDistance = 80.0f;
 	inline constexpr float DefaultDirectionalShadowCasterExtrusionDistance = 300.0f;
 	inline constexpr float DefaultDirectionalShadowOrthoPadding = 1.0f;
 	inline constexpr float DefaultDirectionalShadowDepthPadding = 200.0f;

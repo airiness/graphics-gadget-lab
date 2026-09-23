@@ -2060,6 +2060,10 @@ namespace gglab
 			mainView.m_Near = 1.0f;
 			mainView.m_Far = 100.0f;
 			DirectionalShadowSettings shadowSettings{};
+			const auto defaultCascades = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, shadowSettings);
+			context.Check(defaultCascades.m_Cascades.size() == MaxDirectionalShadowCascades &&
+				defaultCascades.m_Cascades.back().m_SplitFar == 80.0f,
+				"Default directional shadows cover 80 meters when the camera far plane permits it");
 			shadowSettings.m_MaxShadowDistance = 81.0f;
 			for (float lambda : { 0.0f, 0.65f, 1.0f })
 			{
