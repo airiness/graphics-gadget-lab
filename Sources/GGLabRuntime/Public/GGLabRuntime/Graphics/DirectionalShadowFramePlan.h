@@ -33,6 +33,7 @@ namespace gglab
 
 		// Resolved once before queues and uploads; all consumers use this frame snapshot.
 		DirectionalShadowSettings m_Settings = DisabledDirectionalShadowSettings();
+		Vector3 m_LightDirection = Vector3::Zero;
 		bool m_ShadingEnabled = false;
 		bool m_PreviewRequested = false;
 		float m_DistanceFadeStart = 0.0f;

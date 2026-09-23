@@ -45,6 +45,7 @@ namespace gglab
 		DirectionalShadowFramePlan result{};
 		auto& settings = result.m_Settings;
 		settings = authoredSettings;
+		result.m_LightDirection = lightDirection;
 		settings.m_ShadowMapSize = std::max(settings.m_ShadowMapSize, 1u);
 		settings.m_CascadeCount = std::clamp(settings.m_CascadeCount, 1u, MaxDirectionalShadowCascades);
 		settings.m_SplitLambda = std::clamp(settings.m_SplitLambda, 0.0f, 1.0f);

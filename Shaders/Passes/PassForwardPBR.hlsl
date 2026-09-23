@@ -243,6 +243,43 @@ float SampleDirectionalShadow(float3 positionWS, ShadowReceiverPlane receiver, f
 	return lerp(visibility, 1.0, fade * fade * (3.0 - 2.0 * fade));
 }
 
+float3 ApplyShadowDiagnosticsOverlay(float3 color, float3 positionWS)
+{
+	if (!IsShadowEnabled() || (g_Pass.ShadowFlags & 12u) == 0u)
+	{
+		return color;
+	}
+	const float depth = TransformPositionVS(float4(positionWS, 1.0),
+		LoadViewData(g_Shadow.MainViewIndex)).z;
+	const uint cascade = SelectDirectionalShadowCascade(depth, g_Shadow);
+	if (cascade >= g_Shadow.CascadeCount)
+	{
+		return color;
+	}
+	const float3 cascadeColors[4] = {
+		float3(0.15, 0.65, 1.0), float3(0.35, 1.0, 0.25),
+		float3(1.0, 0.45, 0.15), float3(0.8, 0.3, 1.0)
+	};
+	if ((g_Pass.ShadowFlags & 4u) != 0u)
+	{
+		color = lerp(color, cascadeColors[min(cascade, 3u)], 0.3);
+	}
+	if ((g_Pass.ShadowFlags & 8u) != 0u)
+	{
+		const float transitionStart = g_Shadow.BlendStart[cascade];
+		if (cascade + 1u < g_Shadow.CascadeCount && depth >= transitionStart &&
+			depth <= g_Shadow.SplitFar[cascade])
+		{
+			color = lerp(color, float3(1.0, 0.9, 0.1), 0.55);
+		}
+		if (g_Shadow.DistanceFadeInvRange > 0.0 && depth >= g_Shadow.DistanceFadeStart)
+		{
+			color = lerp(color, float3(1.0, 0.35, 0.65), 0.45);
+		}
+	}
+	return color;
+}
+
 bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out float attenuation)
 {
 	static const uint LightTypeDirectional = 0u;
@@ -504,12 +541,14 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
 	outputLighting += diffuseIBL + specularIBL;
-	const float4 outputColor = float4(SanitizeHDRColor(outputLighting), alpha);
+	const float4 outputColor = float4(SanitizeHDRColor(
+		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS)), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
 	legacyOutputLighting += diffuseIBL + specularIBL;
-	const float4 legacyColor = float4(SanitizeHDRColor(legacyOutputLighting), alpha);
+	const float4 legacyColor = float4(SanitizeHDRColor(
+		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS)), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
 		float4(SanitizeHDRColor(gtaoContribution), 1.0));
 #else

@@ -319,7 +319,9 @@ namespace gglab
 
 				const auto& shadowPlan = contextPtr->GetDirectionalShadowFramePlan();
 				data.m_ShadowFlags = (shadowPlan.m_ShadingEnabled ? 1u : 0u) |
-					(shadowPlan.m_Settings.m_EnablePCF ? 2u : 0u);
+					(shadowPlan.m_Settings.m_EnablePCF ? 2u : 0u) |
+					(contextPtr->GetShadowVisualizationSettings().m_ShowCascadeOverlay ? 4u : 0u) |
+					(contextPtr->GetShadowVisualizationSettings().m_ShowTransitionOverlay ? 8u : 0u);
 			},
 			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)

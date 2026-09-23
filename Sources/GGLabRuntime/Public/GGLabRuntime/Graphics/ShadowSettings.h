@@ -79,6 +79,8 @@ namespace gglab
 		float m_PreviewMinDepth = 0.0f;
 		float m_PreviewMaxDepth = 1.0f;
 		bool m_PreviewInvert = false;
+		bool m_ShowCascadeOverlay = false;
+		bool m_ShowTransitionOverlay = false;
 	};
 
 	inline const DirectionalShadowSettings& DisabledDirectionalShadowSettings() noexcept

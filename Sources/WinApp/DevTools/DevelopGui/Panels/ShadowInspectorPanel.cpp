@@ -6,14 +6,21 @@
 #include "DevTools/DevelopGui/DevelopGuiStyle.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Graphics/CameraTooling.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
+#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 #include <imgui.h>
 
@@ -27,6 +34,13 @@ namespace gglab
 			float m_PreviewSize = 384.0f;
 			bool m_FlipPreviewY = false;
 			bool m_ShowMatrices = false;
+			ShadowTemporalDiagnostics m_Temporal;
+			CameraEditSettings m_ReplayBase{};
+			Vector3 m_ReplayRight = Vector3::UnitX;
+			Vector3 m_ReplayForward = Vector3::Forward;
+			uint64_t m_ReplayCameraId = 0;
+			uint32_t m_ReplayStep = 0;
+			bool m_ReplayActive = false;
 		};
 
 		static void DrawLightControl(DevelopGuiContext& context) noexcept
@@ -162,6 +176,10 @@ namespace gglab
 				settings.m_PreviewMaxDepth = std::min(settings.m_PreviewMinDepth + 0.001f, 1.0f);
 			}
 			ImGui::Checkbox("Invert Preview", &settings.m_PreviewInvert);
+			ImGui::Checkbox("Cascade Overlay", &settings.m_ShowCascadeOverlay);
+			ImGui::SameLine();
+			ImGui::Checkbox("Transition Overlay", &settings.m_ShowTransitionOverlay);
+			ImGui::TextDisabled("Blue / green / orange / purple: cascades; yellow: blend; pink: distance fade.");
 		}
 
 		static void DrawShadowCapability(DevelopGuiContext& context) noexcept
@@ -223,7 +241,7 @@ namespace gglab
 			ImGui::Text("Cascade count: %d", cascadeCount);
 			if (cascadeCount > 1)
 			{
-				ImGui::SliderInt("Cascade", &state.m_SelectedCascade, 0, cascadeCount - 1);
+				ImGui::SliderInt("Cascade / Preview Layer", &state.m_SelectedCascade, 0, cascadeCount - 1);
 			}
 			if (context.m_ShadowVisualizationSettings)
 			{
@@ -232,6 +250,7 @@ namespace gglab
 			}
 			const auto& cascade = snapshot->m_Cascades[state.m_SelectedCascade];
 			ImGui::Text("Main-camera split: %.3f - %.3f m", cascade.m_SplitNear, cascade.m_SplitFar);
+			ImGui::Text("Transition begins: %.3f m", cascade.m_BlendStart);
 			const RenderView* shadowView = &cascade.m_View;
 			ImGui::Text("GPU view offset: %u", cascade.m_ViewIndex);
 			const auto& projection = cascade.m_Projection;
@@ -288,6 +307,145 @@ namespace gglab
 				devtools::DrawMatrix4x4Tree("UnjitteredProjection", shadowView->m_UnjitteredProj);
 				devtools::DrawMatrix4x4Tree(
 					"UnjitteredViewProjection", shadowView->m_UnjitteredViewProj);
+			}
+		}
+
+		static void DrawTemporalDiagnostics(
+			DevelopGuiContext& context, ShadowInspectorPanelState& state) noexcept
+		{
+			ImGui::SeparatorText("Temporal Diagnostics / CAM_ShadowStairs");
+			const auto* shadow = context.m_Diagnostics
+				? context.m_Diagnostics->GetSnapshot<ShadowDiagnosticsSnapshot>() : nullptr;
+			const CameraToolingSnapshot cameras = context.m_Cameras
+				? context.m_Cameras->GetCameras() : CameraToolingSnapshot{};
+			const CameraToolingObservation* mainCamera = nullptr;
+			for (const auto& camera : cameras.m_Cameras)
+			{
+				if (camera.m_RenderViewId == RenderViewID::Main) mainCamera = &camera;
+			}
+			const CameraReferenceView* stairs = nullptr;
+			for (const auto& reference : cameras.m_ReferenceViews)
+			{
+				if (reference.m_Id == "CAM_ShadowStairs") stairs = &reference;
+			}
+			if (shadow && mainCamera)
+			{
+				(void) state.m_Temporal.Record(*shadow, mainCamera->m_Id,
+					cameras.m_LastRestoredReferenceId);
+			}
+			else
+			{
+				state.m_Temporal.Reset();
+				state.m_ReplayActive = false;
+			}
+
+			bool replayStarted = false;
+			ImGui::BeginDisabled(!stairs || !mainCamera || !context.m_CameraControl);
+			if (ImGui::Button("Replay stairs path") && stairs && mainCamera && context.m_CameraControl &&
+				context.m_CameraControl->RestoreReferenceView(mainCamera->m_Id, stairs->m_Id))
+			{
+				const CameraToolingSnapshot restored = context.m_Cameras->GetCameras();
+				const auto* camera = restored.FindCamera(mainCamera->m_Id);
+				if (camera)
+				{
+					state.m_ReplayBase = camera->m_Settings;
+					state.m_ReplayForward = (stairs->m_Target - stairs->m_Position).Normalized();
+					state.m_ReplayRight = Vector3::UnitY.Cross(state.m_ReplayForward).Normalized();
+					state.m_ReplayCameraId = camera->m_Id;
+					state.m_ReplayStep = 0;
+					state.m_ReplayActive = true;
+					replayStarted = true;
+					state.m_Temporal.Reset();
+					if (context.m_GpuProfilingControl) context.m_GpuProfilingControl->RequestEnabled(true);
+				}
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("Stop replay")) state.m_ReplayActive = false;
+			ImGui::SameLine();
+			if (ImGui::Button("Clear comparison")) state.m_Temporal.Reset();
+			ImGui::TextDisabled("121 fixed camera samples; replay starts from the authored reference pose.");
+			if (state.m_ReplayActive)
+			{
+				if (!mainCamera || mainCamera->m_Id != state.m_ReplayCameraId ||
+					(!replayStarted && cameras.m_LastRestoredReferenceId != "CAM_ShadowStairs") ||
+					!context.m_CameraControl)
+				{
+					state.m_ReplayActive = false;
+				}
+				else
+				{
+					constexpr uint32_t ReplayLastStep = 120;
+					const float phase = static_cast<float>(state.m_ReplayStep) /
+						static_cast<float>(ReplayLastStep) * 6.28318530718f;
+					CameraEditSettings sample = state.m_ReplayBase;
+					sample.m_Position += state.m_ReplayRight * (0.8f * std::sin(phase)) +
+						state.m_ReplayForward * (0.35f * (1.0f - std::cos(phase)));
+					state.m_ReplayActive = context.m_CameraControl->SetCamera(mainCamera->m_Id, sample);
+					(void) context.m_CameraControl->ResetVelocity(mainCamera->m_Id);
+					if (state.m_ReplayStep++ == ReplayLastStep) state.m_ReplayActive = false;
+				}
+			}
+			ImGui::Text("Replay sample: %u / 120", std::min(state.m_ReplayStep, 120u));
+
+			const auto& samples = state.m_Temporal.GetSamples();
+			ImGui::Text("Comparison frames: %u | automatic resets: %u",
+				static_cast<uint32_t>(samples.size()), state.m_Temporal.GetResetCount());
+			if (!samples.empty() && shadow && !shadow->m_Cascades.empty())
+			{
+				const auto& latest = samples.back();
+				for (uint32_t index = 0; index < latest.m_CascadeCount; ++index)
+				{
+					const auto& delta = latest.m_ProjectionDeltaTexels[index];
+					ImGui::Text("Cascade %u projection delta: %+7.3f / %+7.3f texels",
+						index, delta.m_X, delta.m_Y);
+				}
+				const uint32_t selected = std::min(static_cast<uint32_t>(state.m_SelectedCascade),
+					latest.m_CascadeCount - 1);
+				std::array<float, ShadowTemporalDiagnostics::MaxSamples> magnitudes{};
+				float maxMagnitude = 1.0f;
+				for (size_t index = 0; index < samples.size(); ++index)
+				{
+					const auto& delta = samples[index].m_ProjectionDeltaTexels[selected];
+					magnitudes[index] = std::sqrt(delta.m_X * delta.m_X + delta.m_Y * delta.m_Y);
+					maxMagnitude = std::max(maxMagnitude, magnitudes[index]);
+				}
+				ImGui::PlotLines("Selected cascade |delta| (texels)", magnitudes.data(),
+					static_cast<int>(samples.size()), 0, nullptr, 0.0f, maxMagnitude, ImVec2(0.0f, 70.0f));
+			}
+
+			const auto* profiling = context.m_GpuProfiling;
+			bool profilingEnabled = profiling && profiling->IsEnabled();
+			ImGui::BeginDisabled(!context.m_GpuProfilingControl);
+			if (ImGui::Checkbox("GPU profiling", &profilingEnabled) && context.m_GpuProfilingControl)
+			{
+				context.m_GpuProfilingControl->RequestEnabled(profilingEnabled);
+			}
+			ImGui::EndDisabled();
+			if (profilingEnabled && profiling)
+			{
+				const auto frame = profiling->GetLatestFrame();
+				if (frame.IsValid())
+				{
+					static constexpr std::array<std::string_view, MaxDirectionalShadowCascades> names = {
+						"Shadow.Directional.Cascade0", "Shadow.Directional.Cascade1",
+						"Shadow.Directional.Cascade2", "Shadow.Directional.Cascade3",
+					};
+					ImGui::Text("Last completed GPU frame: %llu",
+						static_cast<unsigned long long>(frame.m_FrameIndex));
+					for (uint32_t index = 0; shadow && index < shadow->m_Cascades.size() && index < names.size(); ++index)
+					{
+						const auto sample = std::find_if(frame.m_Samples.begin(), frame.m_Samples.end(),
+							[&](const auto& value) { return value.m_Name == names[index]; });
+						if (sample != frame.m_Samples.end())
+						{
+							ImGui::Text("Cascade %u GPU: %.3f ms (%u calls)",
+								index, sample->m_Milliseconds, sample->m_CallCount);
+						}
+						else ImGui::TextDisabled("Cascade %u GPU: waiting for timestamps", index);
+					}
+				}
+				else ImGui::TextDisabled("Waiting for completed GPU timestamps...");
 			}
 		}
 
@@ -354,6 +512,7 @@ namespace gglab
 					preview.m_SrvDescriptor);
 
 			ImGui::Text("Preview RG Size: %u", snapshot->m_ShadowMapPreviewSize);
+			ImGui::Text("Selected layer: %d", state.m_SelectedCascade);
 			ImGui::Text("Preview Texture Size: %u x %u", preview.m_Width, preview.m_Height);
 			ImGui::Text(
 				"Preview Format: %s", GetRHIFormatInfo(preview.m_Format).m_Name);
@@ -395,6 +554,7 @@ namespace gglab
 				"Shadow visualization settings are not available.");
 		}
 		DrawLightControl(context);
+		DrawTemporalDiagnostics(context, state);
 		DrawShadowCamera(context, state);
 		DrawShadowMapResource(context, state);
 	}

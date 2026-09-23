@@ -28,11 +28,17 @@ namespace gglab
 	}
 
 	ShadowDiagnosticsSnapshot BuildShadowDiagnosticsSnapshot(
-		const RenderGraph& renderGraph, const DirectionalShadowFramePlan* cascades) noexcept
+		const RenderGraph& renderGraph, const DirectionalShadowFramePlan* cascades,
+		const RenderView* mainView, uint64_t frameSerial) noexcept
 	{
 		ShadowDiagnosticsSnapshot snapshot{};
+		snapshot.m_FrameSerial = frameSerial;
+		if (mainView) snapshot.m_MainView = *mainView;
 		if (cascades)
 		{
+			snapshot.m_Settings = cascades->m_Settings;
+			snapshot.m_LightDirection = cascades->m_LightDirection;
+			snapshot.m_DistanceFadeStart = cascades->m_DistanceFadeStart;
 			snapshot.m_Cascades.reserve(cascades->m_Cascades.size());
 			for (uint32_t index = 0; index < cascades->m_Cascades.size(); ++index)
 			{
@@ -55,6 +61,7 @@ namespace gglab
 						queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count,
 					.m_SplitNear = cascade.m_SplitNear,
 					.m_SplitFar = cascade.m_SplitFar,
+					.m_BlendStart = cascade.m_BlendStart,
 					.m_Projection = cascade.m_Projection,
 					.m_Bias = cascade.m_Bias,
 				});

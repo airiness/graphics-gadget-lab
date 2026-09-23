@@ -36,6 +36,7 @@ namespace gglab
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
 		const DirectionalShadowFramePlan* m_DirectionalShadowFramePlan = nullptr;
+		uint64_t m_FrameSerial = 0;
 		RenderView* m_MainRenderView = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;

@@ -28,6 +28,7 @@ namespace gglab
 		uint32_t m_ShadowDrawCount = 0;
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
+		float m_BlendStart = 0.0f;
 		DirectionalShadowProjectionInfo m_Projection{};
 		DirectionalShadowResolvedBias m_Bias{};
 	};
@@ -35,6 +36,11 @@ namespace gglab
 	struct ShadowDiagnosticsSnapshot
 	{
 		std::vector<DirectionalShadowCascadeSnapshot> m_Cascades;
+		RenderView m_MainView{};
+		DirectionalShadowSettings m_Settings = DisabledDirectionalShadowSettings();
+		Vector3 m_LightDirection = Vector3::Zero;
+		uint64_t m_FrameSerial = 0;
+		float m_DistanceFadeStart = 0.0f;
 		ShadowTextureDiagnostics m_DirectionalShadowMap{};
 		ShadowTextureDiagnostics m_DirectionalShadowMapPreviewSource{};
 		uint32_t m_ShadowMapSize = 0;

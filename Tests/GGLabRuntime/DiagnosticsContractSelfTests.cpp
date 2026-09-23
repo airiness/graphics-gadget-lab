@@ -19,6 +19,7 @@
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Core/World.h"
@@ -803,12 +804,16 @@ namespace gglab
 				resources.m_ShadowMapPreviewSize = 512;
 			});
 		DirectionalShadowFramePlan cascades{};
+		cascades.m_Settings.m_CascadeBlendFraction = 0.2f;
+		cascades.m_LightDirection = { 0.1f, -1.0f, 0.2f };
+		cascades.m_DistanceFadeStart = 26.0f;
 		cascades.m_ViewBaseOffset = 7;
 		cascades.m_Cascades.resize(2);
 		cascades.m_Cascades[0].m_View.m_Width = 2048;
 		cascades.m_Cascades[1].m_View.m_Width = 1024;
 		cascades.m_Cascades[1].m_SplitNear = 5.0f;
 		cascades.m_Cascades[1].m_SplitFar = 30.0f;
+		cascades.m_Cascades[1].m_BlendStart = 27.0f;
 		cascades.m_Cascades[1].m_Projection = {
 			.m_FitMode = DirectionalShadowFitMode::StableSphere,
 			.m_SphereRadius = 12.0f,
@@ -836,8 +841,12 @@ namespace gglab
 		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Opaque)].m_Count = 5;
 		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::AlphaTest)].m_Count = 3;
 		queue.m_BucketDrawRanges[utils::ToIndex(RenderBucket::Transparent)].m_Count = 4;
+		RenderView mainView{};
+		mainView.m_IsValid = true;
+		mainView.m_Aspect = 16.0f / 9.0f;
+		mainView.m_TemporalSessionIdentity = 42;
 		const ShadowDiagnosticsSnapshot shadowSnapshot =
-			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades);
+			BuildShadowDiagnosticsSnapshot(shadowGraph, &cascades, &mainView, 77);
 		cascades = {};
 		context.Check(shadowSnapshot.m_Cascades.size() == 2 &&
 			shadowSnapshot.m_Cascades[0].m_ViewIndex == 7 &&
@@ -848,7 +857,14 @@ namespace gglab
 			shadowSnapshot.m_Cascades[1].m_QueueStatistics.m_DrawItemCount == 12 &&
 			shadowSnapshot.m_Cascades[1].m_ShadowDrawCount == 8 &&
 			shadowSnapshot.m_Cascades[1].m_SplitNear == 5.0f &&
-			shadowSnapshot.m_Cascades[1].m_SplitFar == 30.0f,
+			shadowSnapshot.m_Cascades[1].m_SplitFar == 30.0f &&
+			shadowSnapshot.m_Cascades[1].m_BlendStart == 27.0f &&
+			shadowSnapshot.m_MainView.m_IsValid &&
+			shadowSnapshot.m_MainView.m_TemporalSessionIdentity == 42 &&
+			shadowSnapshot.m_FrameSerial == 77 &&
+			shadowSnapshot.m_LightDirection.m_Y == -1.0f &&
+			shadowSnapshot.m_DistanceFadeStart == 26.0f &&
+			shadowSnapshot.m_Settings.m_CascadeBlendFraction == 0.2f,
 			"Cascade diagnostics retain independent values after frame destruction and exclude transparent draws");
 		const auto& projection = shadowSnapshot.m_Cascades[1].m_Projection;
 		context.Check(projection.m_FitMode == DirectionalShadowFitMode::StableSphere &&
@@ -879,5 +895,77 @@ namespace gglab
 				shadowSnapshot.m_ShadowMapSize == 2048 &&
 				shadowSnapshot.m_ShadowMapPreviewSize == 512,
 			"Shadow diagnostics copies RenderGraph resource state into an immutable snapshot");
+
+		ShadowDiagnosticsSnapshot temporalFrame{};
+		temporalFrame.m_FrameSerial = 1;
+		temporalFrame.m_MainView.m_IsValid = true;
+		temporalFrame.m_MainView.m_FovRadians = 0.69f;
+		temporalFrame.m_MainView.m_Aspect = 16.0f / 9.0f;
+		temporalFrame.m_MainView.m_Near = 0.1f;
+		temporalFrame.m_MainView.m_Far = 150.0f;
+		temporalFrame.m_MainView.m_TemporalSessionIdentity = 42;
+		temporalFrame.m_Settings = DirectionalShadowSettings{};
+		temporalFrame.m_LightDirection = { 0.1f, -1.0f, 0.2f };
+		temporalFrame.m_Cascades.resize(2);
+		for (auto& cascade : temporalFrame.m_Cascades)
+		{
+			cascade.m_SplitNear = 0.1f;
+			cascade.m_SplitFar = 10.0f;
+			cascade.m_BlendStart = 9.0f;
+			cascade.m_Projection.m_WorldUnitsPerTexel = Vector2(0.25f);
+		}
+		ShadowTemporalDiagnostics temporal;
+		const bool firstRecorded = temporal.Record(temporalFrame, 7, "CAM_ShadowStairs");
+		++temporalFrame.m_FrameSerial;
+		temporalFrame.m_Cascades[0].m_Projection.m_CenterLS = Vector2(0.5f, -0.25f);
+		const bool nextRecorded = temporal.Record(temporalFrame, 7, "CAM_ShadowStairs");
+		const bool duplicateRejected = !temporal.Record(temporalFrame, 7, "CAM_ShadowStairs");
+		context.Check(firstRecorded && nextRecorded && duplicateRejected &&
+			temporal.GetSamples().size() == 2 &&
+			temporal.GetSamples().back().m_ProjectionDeltaTexels[0].m_X == 2.0f &&
+			temporal.GetSamples().back().m_ProjectionDeltaTexels[0].m_Y == -1.0f,
+			"Adjacent shadow frame plans report projection center motion in texels once per frame");
+
+		const auto resetsOn = [&](ShadowDiagnosticsSnapshot changed, uint64_t cameraId,
+			std::string_view referenceId) noexcept
+		{
+			ShadowTemporalDiagnostics history;
+			auto first = temporalFrame;
+			first.m_FrameSerial = 1;
+			(void) history.Record(first, 7, "CAM_ShadowStairs");
+			changed.m_FrameSerial = 2;
+			const bool recorded = history.Record(changed, cameraId, referenceId);
+			return recorded && history.GetResetCount() == 1 && history.GetSamples().size() == 1 &&
+				history.GetSamples().front().m_ProjectionDeltaTexels[0].m_X == 0.0f;
+		};
+		auto changed = temporalFrame;
+		changed.m_LightDirection = { 0.2f, -1.0f, 0.2f };
+		const bool lightReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_MainView.m_FovRadians += 0.1f;
+		const bool fovReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_MainView.m_Aspect += 0.1f;
+		const bool aspectReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_Settings.m_SplitLambda += 0.1f;
+		const bool splitReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_Settings.m_ShadowMapSize /= 2;
+		const bool resolutionReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_MainView.m_TemporalSessionIdentity++;
+		const bool sessionReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_MainView.m_TemporalResetIdentity++;
+		const bool cutReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		changed = temporalFrame;
+		changed.m_MainView.m_Width++;
+		const bool viewportReset = resetsOn(changed, 7, "CAM_ShadowStairs");
+		const bool cameraReset = resetsOn(temporalFrame, 8, "CAM_ShadowStairs");
+		const bool referenceReset = resetsOn(temporalFrame, 7, "CAM_Courtyard");
+		context.Check(lightReset && fovReset && aspectReset && splitReset &&
+			resolutionReset && sessionReset && cutReset && viewportReset && cameraReset && referenceReset,
+			"Shadow temporal comparison resets across light, lens, split, resolution and camera-session changes");
 	}
 }
