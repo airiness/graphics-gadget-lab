@@ -10,9 +10,6 @@ namespace gglab
 	inline constexpr float DefaultDirectionalShadowCasterExtrusionDistance = 300.0f;
 	inline constexpr float DefaultDirectionalShadowOrthoPadding = 1.0f;
 	inline constexpr float DefaultDirectionalShadowDepthPadding = 200.0f;
-	inline constexpr float DefaultDirectionalShadowReceiverDepthBias = 0.0f;
-	inline constexpr int32_t DefaultDirectionalShadowRasterizerDepthBias = 360;
-	inline constexpr float DefaultDirectionalShadowRasterizerSlopeScaledDepthBias = 0.6f;
 
 	enum class DirectionalShadowFitMode : uint8_t
 	{
@@ -20,16 +17,8 @@ namespace gglab
 		StableSphere,
 	};
 
-	// Raw raster bias retains backend/format units; scaled bias is resolved in receiver depth.
-	enum class DirectionalShadowBiasMode : uint8_t
-	{
-		LegacyRaw,
-		CascadeScaled,
-	};
-
 	struct DirectionalShadowResolvedBias
 	{
-		DirectionalShadowBiasMode m_Mode = DirectionalShadowBiasMode::LegacyRaw;
 		float m_WorldUnitsPerTexel = 0.0f;
 		float m_DepthSpan = 0.0f;
 		float m_ReceiverConstantWorld = 0.0f;
@@ -37,8 +26,6 @@ namespace gglab
 		float m_ReceiverDepthBias = 0.0f;
 		float m_ReceiverSlopeDepthBias = 0.0f;
 		float m_ReceiverMaxSlope = 0.0f;
-		int32_t m_RasterizerDepthBias = 0;
-		float m_RasterizerSlopeScaledDepthBias = 0.0f;
 	};
 
 	struct DirectionalShadowSettings
@@ -59,18 +46,11 @@ namespace gglab
 		float m_OrthoPadding = DefaultDirectionalShadowOrthoPadding;
 		float m_DepthPadding = DefaultDirectionalShadowDepthPadding;
 
-		DirectionalShadowBiasMode m_BiasMode = DirectionalShadowBiasMode::CascadeScaled;
 		// Receiver offset in shadow texels along light-space Z, before depth normalization.
 		float m_ReceiverBiasTexels = 0.5f;
 		// Optional residual slope bias; receiver-plane/filter correction is automatic.
 		float m_ReceiverSlopeBiasTexels = 0.0f;
 		float m_ReceiverMaxSlope = 4.0f;
-
-		// Legacy Raw controls are preserved when switching policies for A/B comparisons.
-		float m_ReceiverDepthBias = DefaultDirectionalShadowReceiverDepthBias;
-		int32_t m_RasterizerDepthBias = DefaultDirectionalShadowRasterizerDepthBias;
-		float m_RasterizerSlopeScaledDepthBias =
-			DefaultDirectionalShadowRasterizerSlopeScaledDepthBias;
 	};
 
 	struct ShadowVisualizationSettings

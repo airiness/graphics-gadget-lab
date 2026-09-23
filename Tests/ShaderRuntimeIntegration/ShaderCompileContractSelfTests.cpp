@@ -2442,7 +2442,6 @@ namespace gglab
 				FindDxilMemberOffset(shadowDisassembly, "ReceiverSlopeDepthBias") == offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) &&
 				FindDxilMemberOffset(shadowDisassembly, "ReceiverMaxSlope") == offsetof(DirectionalShadowGPU, ReceiverMaxSlope) &&
 				FindDxilMemberOffset(shadowDisassembly, "BlendStart") == offsetof(DirectionalShadowGPU, BlendStart) &&
-				FindDxilMemberOffset(shadowDisassembly, "ReceiverPlaneCorrection") == offsetof(DirectionalShadowGPU, ReceiverPlaneCorrection) &&
 				FindDxilMemberOffset(shadowDisassembly, "DistanceFadeStart") == offsetof(DirectionalShadowGPU, DistanceFadeStart) &&
 				FindDxilMemberOffset(shadowDisassembly, "DistanceFadeInvRange") == offsetof(DirectionalShadowGPU, DistanceFadeInvRange) &&
 				FindDxilMemberOffset(shadowDisassembly, "ShadowMetadataPadding") == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
@@ -2453,7 +2452,7 @@ namespace gglab
 			const auto* shadowLayout = shadowSpirVReflected
 				? shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") : nullptr;
 			context.Check(shadowLayout && shadowLayout->m_Size == sizeof(DirectionalShadowGPU) &&
-				shadowLayout->m_Members.size() == 13 &&
+				shadowLayout->m_Members.size() == 12 &&
 				shadowLayout->m_Members[0].m_Offset == offsetof(DirectionalShadowGPU, SplitFar) &&
 				shadowLayout->m_Members[1].m_Offset == offsetof(DirectionalShadowGPU, ViewBaseIndex) &&
 				shadowLayout->m_Members[2].m_Offset == offsetof(DirectionalShadowGPU, CascadeCount) &&
@@ -2463,10 +2462,9 @@ namespace gglab
 				shadowLayout->m_Members[6].m_Offset == offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) &&
 				shadowLayout->m_Members[7].m_Offset == offsetof(DirectionalShadowGPU, ReceiverMaxSlope) &&
 				shadowLayout->m_Members[8].m_Offset == offsetof(DirectionalShadowGPU, BlendStart) &&
-				shadowLayout->m_Members[9].m_Offset == offsetof(DirectionalShadowGPU, ReceiverPlaneCorrection) &&
-				shadowLayout->m_Members[10].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeStart) &&
-				shadowLayout->m_Members[11].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeInvRange) &&
-				shadowLayout->m_Members[12].m_Offset == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
+				shadowLayout->m_Members[9].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeStart) &&
+				shadowLayout->m_Members[10].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeInvRange) &&
+				shadowLayout->m_Members[11].m_Offset == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
 				"SPIR-V cascaded shadow metadata and bias match the CPU layout and 112-byte size");
 			shadowDesc.m_SourcePath = L"Passes/PassShadowMapPreview.hlsl";
 			const ShaderCompileResult shadowPreviewDxil = compiler.Compile(shadowDesc);

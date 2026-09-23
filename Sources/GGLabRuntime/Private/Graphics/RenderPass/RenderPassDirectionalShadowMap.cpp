@@ -35,7 +35,6 @@ namespace gglab
 			RGTextureViewId m_Dsv{};
 			const RenderQueue* m_RenderQueue = nullptr;
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
-			DirectionalShadowResolvedBias m_Bias{};
 		};
 
 	}
@@ -79,7 +78,6 @@ namespace gglab
 					data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
 					if (cascade)
 					{
-						data.m_Bias = cascade->m_Bias;
 						data.m_RenderQueue = std::addressof(cascade->m_RenderQueue);
 						data.m_RasterDomain =
 							std::addressof(cascade->m_RenderQueue.m_CoverageRasterDomain);
@@ -143,8 +141,7 @@ namespace gglab
 						return;
 					}
 					graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
-						renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-						data.m_Bias));
+						renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
 
 					GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 					GGLAB_ASSERT_MSG(
@@ -181,7 +178,7 @@ namespace gglab
 					graphicsContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
-					DrawRenderQueue(graphicsContext, services, renderQueue, data.m_Bias);
+					DrawRenderQueue(graphicsContext, services, renderQueue);
 				});
 		}
 	}
@@ -216,6 +213,8 @@ namespace gglab
 			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 
 			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseRecipe.m_DepthBias = 0;
+			m_BaseRecipe.m_SlopeScaledDepthBias = 0.0f;
 			m_BaseRecipe.m_BlendPreset = BlendPreset::ColorWriteDisable;
 			m_BaseRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 
@@ -224,8 +223,7 @@ namespace gglab
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-		const RenderServices& services, const RenderQueue& renderQueue,
-		const DirectionalShadowResolvedBias& bias) noexcept
+		const RenderServices& services, const RenderQueue& renderQueue) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		if (renderQueue.m_DrawItems.empty())
@@ -234,15 +232,15 @@ namespace gglab
 		}
 
 		const auto ranges = renderQueue.m_BucketDrawRanges;
-		DrawRange(graphicsContext, services, renderQueue, bias,
+		DrawRange(graphicsContext, services, renderQueue,
 			ranges[utils::ToIndex(RenderBucket::Opaque)]);
-		DrawRange(graphicsContext, services, renderQueue, bias,
+		DrawRange(graphicsContext, services, renderQueue,
 			ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services, const RenderQueue& renderQueue,
-		const DirectionalShadowResolvedBias& bias, const DrawItemsRange& range) noexcept
+		const DrawItemsRange& range) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -265,7 +263,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				const auto pipeline = GetOrCreatePSOForVariant(
-					services, drawItem.m_VariantBits, bias);
+					services, drawItem.m_VariantBits);
 				graphicsContext->SetPipeline(pipeline);
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -293,8 +291,7 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
-		const RenderServices& services, uint64_t variantBits,
-		const DirectionalShadowResolvedBias& bias) noexcept
+		const RenderServices& services, uint64_t variantBits) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = services.m_PipelineResolver;
@@ -308,8 +305,6 @@ namespace gglab
 			recipe.m_PSId = m_AlphaTestPixelShader;
 		}
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
-		recipe.m_DepthBias = bias.m_RasterizerDepthBias;
-		recipe.m_SlopeScaledDepthBias = bias.m_RasterizerSlopeScaledDepthBias;
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];

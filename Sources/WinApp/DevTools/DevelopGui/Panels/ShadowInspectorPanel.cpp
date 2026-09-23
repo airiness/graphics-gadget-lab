@@ -81,21 +81,21 @@ namespace gglab
 			ImGui::SameLine();
 			changed |= ImGui::Checkbox("3x3 PCF", &settings.m_EnablePCF);
 
-			if (ImGui::Button("Single 2048"))
+			if (ImGui::Button("1 Cascade / 2048"))
 			{
 				settings.m_CascadeCount = 1;
 				settings.m_ShadowMapSize = 2048;
 				changed = true;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("CSM 4 x 1024"))
+			if (ImGui::Button("4 Cascades / 1024"))
 			{
 				settings.m_CascadeCount = 4;
 				settings.m_ShadowMapSize = 1024;
 				changed = true;
 			}
 			ImGui::SameLine();
-			if (ImGui::Button("CSM 4 x 2048"))
+			if (ImGui::Button("4 Cascades / 2048"))
 			{
 				settings.m_CascadeCount = 4;
 				settings.m_ShadowMapSize = 2048;
@@ -133,32 +133,13 @@ namespace gglab
 			ImGui::SeparatorText("Bias / Filtering");
 			changed |= ImGui::SliderFloat("Cascade Blend Fraction", &settings.m_CascadeBlendFraction, 0.0f, 0.5f, "%.2f");
 			changed |= ImGui::SliderFloat("Distance Fade Fraction", &settings.m_DistanceFadeFraction, 0.0f, 0.5f, "%.2f");
-			int biasMode = static_cast<int>(settings.m_BiasMode);
-			if (ImGui::Combo("Bias Mode", &biasMode, "Legacy Raw\0Cascade Scaled\0"))
-			{
-				settings.m_BiasMode = static_cast<DirectionalShadowBiasMode>(biasMode);
-				changed = true;
-			}
-			if (settings.m_BiasMode == DirectionalShadowBiasMode::CascadeScaled)
-			{
-				changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
-					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
-					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				changed |= ImGui::DragFloat("Max Receiver Slope", &settings.m_ReceiverMaxSlope,
-					0.1f, 0.0f, 16.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				ImGui::TextUnformatted("Automatic receiver-plane and bilinear footprint correction");
-				ImGui::TextUnformatted("Raw raster bias: 0 | Raster slope bias: 0");
-			}
-			else
-			{
-				changed |= ImGui::DragFloat(
-					"Receiver Depth Bias", &settings.m_ReceiverDepthBias, 0.0001f, 0.0f, 0.1f, "%.5f");
-				changed |= ImGui::DragInt(
-					"Rasterizer Depth Bias (raw)", &settings.m_RasterizerDepthBias, 1.0f, -100000, 100000);
-				changed |= ImGui::DragFloat("Slope Scaled Depth Bias", &settings.m_RasterizerSlopeScaledDepthBias,
-					0.01f, -100.0f, 100.0f, "%.3f");
-			}
+			changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
+				0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
+				0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			changed |= ImGui::DragFloat("Max Receiver Slope", &settings.m_ReceiverMaxSlope,
+				0.1f, 0.0f, 16.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			ImGui::TextUnformatted("Automatic receiver-plane and bilinear footprint correction");
 			return changed;
 		}
 
@@ -275,8 +256,6 @@ namespace gglab
 			}
 			const auto& bias = cascade.m_Bias;
 			ImGui::SeparatorText("Resolved Bias");
-			ImGui::Text("Policy: %s", bias.m_Mode == DirectionalShadowBiasMode::CascadeScaled
-				? "Cascade Scaled" : "Legacy Raw");
 			ImGui::Text("Texel footprint: %.6f m | Depth span: %.3f m",
 				bias.m_WorldUnitsPerTexel, bias.m_DepthSpan);
 			ImGui::Text("Receiver constant: %.6f m / %.8f depth",
@@ -285,8 +264,6 @@ namespace gglab
 				bias.m_ReceiverSlopeWorld, bias.m_ReceiverSlopeDepthBias);
 			ImGui::Text("Max slope: %.2f | Max depth delta: %.8f", bias.m_ReceiverMaxSlope,
 				bias.m_ReceiverDepthBias + bias.m_ReceiverSlopeDepthBias * bias.m_ReceiverMaxSlope);
-			ImGui::Text("Raster: DepthBias %d (raw) | SlopeScaledBias %.3f",
-				bias.m_RasterizerDepthBias, bias.m_RasterizerSlopeScaledDepthBias);
 			ImGui::Text("Shadow draws: %u | Culled instances: %u", cascade.m_ShadowDrawCount,
 				cascade.m_QueueStatistics.m_CulledInstanceCount);
 			ImGui::Text("Queue items: %u | Visible / total instances: %u / %u",

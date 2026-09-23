@@ -292,32 +292,13 @@ namespace gglab
 				"Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
 			changed |= ImGui::SliderFloat("Cascade Blend Fraction", &settings.m_CascadeBlendFraction, 0.0f, 0.5f, "%.2f");
 			changed |= ImGui::SliderFloat("Distance Fade Fraction", &settings.m_DistanceFadeFraction, 0.0f, 0.5f, "%.2f");
-			int biasMode = static_cast<int>(settings.m_BiasMode);
-			if (ImGui::Combo("Bias Mode", &biasMode, "Legacy Raw\0Cascade Scaled\0"))
-			{
-				settings.m_BiasMode = static_cast<DirectionalShadowBiasMode>(biasMode);
-				changed = true;
-			}
-			if (settings.m_BiasMode == DirectionalShadowBiasMode::CascadeScaled)
-			{
-				changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
-					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
-					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				changed |= ImGui::DragFloat("Max Receiver Slope", &settings.m_ReceiverMaxSlope,
-					0.1f, 0.0f, 16.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				ImGui::TextUnformatted("Automatic receiver-plane and bilinear footprint correction");
-				ImGui::TextUnformatted("Raw raster bias: 0 | Raster slope bias: 0");
-			}
-			else
-			{
-				changed |= ImGui::DragFloat(
-					"Receiver Depth Bias", &settings.m_ReceiverDepthBias, 0.0001f, 0.0f, 0.1f, "%.5f");
-				changed |= ImGui::DragInt(
-					"Rasterizer Depth Bias (raw)", &settings.m_RasterizerDepthBias, 1.0f, -100000, 100000);
-				changed |= ImGui::DragFloat("Slope Scaled Depth Bias", &settings.m_RasterizerSlopeScaledDepthBias,
-					0.01f, -100.0f, 100.0f, "%.3f");
-			}
+			changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
+				0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
+				0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			changed |= ImGui::DragFloat("Max Receiver Slope", &settings.m_ReceiverMaxSlope,
+				0.1f, 0.0f, 16.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+			ImGui::TextUnformatted("Automatic receiver-plane and bilinear footprint correction");
 			ImGui::PopID();
 			return changed;
 		}

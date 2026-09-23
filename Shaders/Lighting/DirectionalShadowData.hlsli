@@ -12,10 +12,9 @@ struct DirectionalShadowData
 	float4 ReceiverSlopeDepthBias;
 	float4 ReceiverMaxSlope;
 	float4 BlendStart;
-	uint ReceiverPlaneCorrection;
 	float DistanceFadeStart;
 	float DistanceFadeInvRange;
-	float ShadowMetadataPadding;
+	float2 ShadowMetadataPadding;
 };
 
 float EvaluateDirectionalShadowReceiverBias(uint cascadeIndex, float receiverNoL,

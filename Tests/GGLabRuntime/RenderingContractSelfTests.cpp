@@ -2399,11 +2399,9 @@ namespace gglab
 					worldProjectionMatches &= depthDelta > 0.0f &&
 						std::abs(receiverClip.m_Z - offsetClip.m_Z - depthDelta) < 0.000001f;
 				}
-				worldProjectionMatches &= bias.m_Mode == DirectionalShadowBiasMode::CascadeScaled &&
-					bias.m_RasterizerDepthBias == 0 && bias.m_RasterizerSlopeScaledDepthBias == 0.0f;
 			}
 			context.Check(worldProjectionMatches,
-				"Cascade receiver bias equals a world-space offset toward the light under standard Z without stacked raster bias");
+				"Cascade receiver bias equals a world-space offset toward the light under standard Z");
 			context.Check(baseline.m_Cascades.back().m_Bias.m_ReceiverConstantWorld >
 				baseline.m_Cascades.front().m_Bias.m_ReceiverConstantWorld,
 				"Far cascades resolve larger world offsets from their larger texel footprints");
@@ -2455,41 +2453,24 @@ namespace gglab
 			}
 			context.Check(uploadMatches, "Every uploaded cascade receives its own resolved constant, slope and clamp");
 
-			settings.m_BiasMode = DirectionalShadowBiasMode::LegacyRaw;
-			settings.m_ReceiverDepthBias = 0.00037f;
-			settings.m_RasterizerDepthBias = -120;
-			settings.m_RasterizerSlopeScaledDepthBias = 0.73f;
-			auto legacy = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
-			legacy.m_ViewBaseOffset = 7;
-			const auto legacyGpu = BuildDirectionalShadowGPU(legacy, legacy.m_ViewBaseOffset);
-			bool legacyExact = true;
-			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
-			{
-				const auto& bias = legacy.m_Cascades[index].m_Bias;
-				legacyExact &= legacyGpu.ReceiverDepthBias[index] == settings.m_ReceiverDepthBias &&
-					legacyGpu.ReceiverSlopeDepthBias[index] == 0.0f && legacyGpu.ReceiverMaxSlope[index] == 0.0f &&
-					bias.m_RasterizerDepthBias == -120 && bias.m_RasterizerSlopeScaledDepthBias == 0.73f &&
-					legacy.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray() ==
-						highResolution.m_Cascades[index].m_View.m_UnjitteredViewProj.ToArray();
-			}
-			context.Check(legacyExact, "Legacy Raw preserves all original bias values and switching policy does not change projections");
-			legacy.m_Cascades.resize(1);
-			const auto singleGpu = BuildDirectionalShadowGPU(legacy, legacy.m_ViewBaseOffset);
-			context.Check(singleGpu.CascadeCount == 1 && singleGpu.ReceiverDepthBias[0] == settings.m_ReceiverDepthBias &&
+			settings.m_CascadeCount = 1;
+			auto single = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
+			single.m_ViewBaseOffset = 7;
+			const auto singleGpu = BuildDirectionalShadowGPU(single, single.m_ViewBaseOffset);
+			context.Check(singleGpu.CascadeCount == 1 &&
+				singleGpu.ReceiverDepthBias[0] == single.m_Cascades[0].m_Bias.m_ReceiverDepthBias &&
 				singleGpu.ReceiverDepthBias[1] == 0.0f && singleGpu.ReceiverSlopeDepthBias[2] == 0.0f &&
 				singleGpu.ReceiverMaxSlope[3] == 0.0f,
-				"Reducing the cascade count leaves unused bias slots zero rather than stale");
-			settings.m_BiasMode = DirectionalShadowBiasMode::CascadeScaled;
+				"Single-cascade receiver bias uploads only its active slot and leaves unused slots zero");
+			settings.m_CascadeCount = MaxDirectionalShadowCascades;
 			settings.m_ReceiverBiasTexels = -1.0f;
 			settings.m_ReceiverSlopeBiasTexels = -1.0f;
 			settings.m_ReceiverMaxSlope = 100.0f;
 			const auto bounded = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			context.Check(bounded.m_Cascades[0].m_Bias.m_ReceiverDepthBias == 0.0f &&
 				bounded.m_Cascades[0].m_Bias.m_ReceiverSlopeDepthBias == 0.0f &&
-				bounded.m_Cascades[0].m_Bias.m_ReceiverMaxSlope == 16.0f &&
-				bounded.m_Cascades[0].m_Bias.m_RasterizerDepthBias == 0 &&
-				bounded.m_Cascades[0].m_Bias.m_RasterizerSlopeScaledDepthBias == 0.0f,
-				"Scaled policy bounds grazing slope, rejects negative offsets and ignores retained legacy raster values");
+				bounded.m_Cascades[0].m_Bias.m_ReceiverMaxSlope == 16.0f,
+				"Receiver bias bounds grazing slope and rejects negative authored offsets");
 		}
 
 		void RunSampleableDepthFormatTests(SelfTestContext& context) noexcept

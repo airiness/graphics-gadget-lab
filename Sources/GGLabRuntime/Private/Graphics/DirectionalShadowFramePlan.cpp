@@ -12,19 +12,9 @@ namespace gglab
 			const DirectionalShadowSettings& settings) noexcept
 		{
 			DirectionalShadowResolvedBias result{};
-			result.m_Mode = settings.m_BiasMode;
 			const auto& texelSize = shadowView.m_Projection.m_WorldUnitsPerTexel;
 			result.m_WorldUnitsPerTexel = std::max(texelSize.m_X, texelSize.m_Y);
 			result.m_DepthSpan = std::max(shadowView.m_View.m_Far - shadowView.m_View.m_Near, 0.001f);
-			if (settings.m_BiasMode == DirectionalShadowBiasMode::LegacyRaw)
-			{
-				result.m_ReceiverDepthBias = settings.m_ReceiverDepthBias;
-				result.m_ReceiverConstantWorld = result.m_ReceiverDepthBias * result.m_DepthSpan;
-				result.m_RasterizerDepthBias = settings.m_RasterizerDepthBias;
-				result.m_RasterizerSlopeScaledDepthBias = settings.m_RasterizerSlopeScaledDepthBias;
-				return result;
-			}
-
 			result.m_ReceiverConstantWorld = std::max(settings.m_ReceiverBiasTexels, 0.0f) *
 				result.m_WorldUnitsPerTexel;
 			result.m_ReceiverSlopeWorld = std::max(settings.m_ReceiverSlopeBiasTexels, 0.0f) *
@@ -32,9 +22,8 @@ namespace gglab
 			result.m_ReceiverDepthBias = result.m_ReceiverConstantWorld / result.m_DepthSpan;
 			result.m_ReceiverSlopeDepthBias = result.m_ReceiverSlopeWorld / result.m_DepthSpan;
 			result.m_ReceiverMaxSlope = std::clamp(settings.m_ReceiverMaxSlope, 0.0f, 16.0f);
-			// Apply the portable policy entirely in receiver depth. D32 raster constant bias
-			// has backend/format semantics, so do not convert meters into its raw integer.
-			// Zero raster terms also avoid stacking two policies or varying PSOs with the camera.
+			// Receiver depth bias follows each cascade's footprint without coupling
+			// the shadow-map producer to backend-specific raster bias units.
 			return result;
 		}
 	}
@@ -115,7 +104,6 @@ namespace gglab
 		result.CascadeCount = std::min(
 			static_cast<uint32_t>(cascades.m_Cascades.size()), MaxDirectionalShadowCascades);
 		result.ViewBaseIndex = viewBaseOffset;
-		result.ReceiverPlaneCorrection = cascades.m_Settings.m_BiasMode == DirectionalShadowBiasMode::CascadeScaled ? 1u : 0u;
 		result.DistanceFadeStart = cascades.m_DistanceFadeStart;
 		result.DistanceFadeInvRange = cascades.m_DistanceFadeInvRange;
 		result.MainViewIndex = static_cast<uint32_t>(RenderViewID::Main);

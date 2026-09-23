@@ -203,8 +203,7 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
 	SamplerComparisonState sampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 	const float2 texelSize = 1.0.xx / max((float) g_Pass.ShadowMapSize, 1.0);
-	const float2 gradient = g_Shadow.ReceiverPlaneCorrection != 0u
-		? ComputeShadowReceiverDepthGradient(receiver, viewIndex) : 0.0.xx;
+	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
 	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
 	// Each hardware comparison blends four texels. Account for its one-texel support,
 	// while PCF tap offsets below follow the actual receiver plane instead of adding bias.
