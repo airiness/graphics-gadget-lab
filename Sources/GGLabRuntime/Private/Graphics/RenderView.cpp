@@ -160,8 +160,8 @@ namespace gglab
 		// from eye and eye + direction introduces camera-position-dependent rotation error.
 		const Matrix lightRotation = math::CreateLookAtLH(Vector3::Zero, lightDir, lightUp);
 		const Vector3 lightEyeForBounds = stable ? Vector3::Zero : frustumCenter - lightDir;
-		const Matrix lightViewForBounds = stable ? lightRotation
-			: math::CreateLookAtLH(lightEyeForBounds, frustumCenter, lightUp);
+		Matrix lightViewForBounds = lightRotation;
+		lightViewForBounds.Translation(-math::TransformPoint(lightEyeForBounds, lightRotation));
 
 		Vector3 minLS(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
 			std::numeric_limits<float>::max());
@@ -183,6 +183,8 @@ namespace gglab
 			includeLightSpacePoint(corner - lightDir * casterExtrusionDistance);
 		}
 
+		const float filterSupport = std::clamp(info.m_FilterSupportTexels, 0.0f,
+			std::max(0.0f, (static_cast<float>(resolution) - 2.0f) * 0.5f));
 		const float orthoPadding = std::max(info.m_OrthoPadding, 0.0f);
 		minLS.m_X -= orthoPadding;
 		minLS.m_Y -= orthoPadding;
@@ -210,9 +212,10 @@ namespace gglab
 			float halfExtent = std::max(projection.m_SphereRadius + orthoPadding, 0.001f);
 			if (resolution > 1)
 			{
-				// Reserve half a final texel on each edge: H >= radius + padding + H / N.
+				// Reserve filter support plus half a final texel for snapping at each edge.
 				// Keep this guard with snapping off as well, so A/B does not change the footprint.
-				halfExtent *= static_cast<float>(resolution) / static_cast<float>(resolution - 1);
+				halfExtent *= static_cast<float>(resolution) /
+					(static_cast<float>(resolution - 1) - 2.0f * filterSupport);
 			}
 			projection.m_Extent = Vector2(2.0f * halfExtent);
 			projection.m_WorldUnitsPerTexel = projection.m_Extent / static_cast<float>(resolution);
@@ -238,8 +241,19 @@ namespace gglab
 		}
 		else
 		{
-			// Retain the previous tight fit for comparisons, including its conservative Z range.
-			lightView = math::CreateLookAtLH(lightEye, lightEye + lightDir, lightUp);
+			// Expand around the fitted center so the filter never samples outside the receiver coverage.
+			const float guardScale = static_cast<float>(resolution) /
+				(static_cast<float>(resolution) - 2.0f * filterSupport);
+			const Vector2 guard((maxLS.m_X - minLS.m_X) * (guardScale - 1.0f) * 0.5f,
+				(maxLS.m_Y - minLS.m_Y) * (guardScale - 1.0f) * 0.5f);
+			minLS.m_X -= guard.m_X;
+			minLS.m_Y -= guard.m_Y;
+			maxLS.m_X += guard.m_X;
+			maxLS.m_Y += guard.m_Y;
+			// Reuse the fitted orientation: reconstructing eye + direction after the
+			// large Z shift can rotate a tight fit enough to consume its filter guard.
+			lightView = lightRotation;
+			lightView.Translation(-math::TransformPoint(lightEye, lightRotation));
 			projection.m_Extent = Vector2(maxLS.m_X - minLS.m_X, maxLS.m_Y - minLS.m_Y);
 			projection.m_WorldUnitsPerTexel = projection.m_Extent / static_cast<float>(resolution);
 			const Vector3 centerLS = math::TransformPoint(lightEye, lightRotation);

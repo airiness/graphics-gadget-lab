@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
@@ -50,7 +50,7 @@ namespace gglab
 			EnvironmentLightingSystem& m_EnvironmentLightingSystem;
 
 			std::span<RenderView> m_RenderViews;
-			DirectionalShadowCascadeSet& m_DirectionalShadowCascades;
+			const DirectionalShadowFramePlan& m_DirectionalShadowFramePlan;
 
 			DynamicConstantBufferAllocator& m_SceneCB;
 			PersistentStructuredBuffer<ObjectGPU>& m_ObjectsSB;
@@ -65,8 +65,15 @@ namespace gglab
 			uint32_t m_FrameSlotIndex = 0;
 		};
 
+		struct ViewUploadData
+		{
+			std::vector<ViewGPU> m_Views;
+			uint32_t m_ShadowViewBaseOffset = DirectionalShadowFramePlan::UnassignedViewBaseOffset;
+		};
+
 		struct BuildResult
 		{
+			uint32_t m_ShadowViewBaseOffset = DirectionalShadowFramePlan::UnassignedViewBaseOffset;
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_GpuAllocations{};
 			RHIFencePoint m_UploadFencePoint{};
@@ -76,7 +83,7 @@ namespace gglab
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
 
-		[[nodiscard]] static std::vector<ViewGPU> BuildViewData(
-			std::span<const RenderView> cameraViews, DirectionalShadowCascadeSet& cascades) noexcept;
+		[[nodiscard]] static ViewUploadData BuildViewData(
+			std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept;
 	};
 }

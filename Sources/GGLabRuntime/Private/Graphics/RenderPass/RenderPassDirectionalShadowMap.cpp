@@ -45,22 +45,18 @@ namespace gglab
 	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
-		const DirectionalShadowCascadeSet& cascades = context.GetDirectionalShadowCascades();
-		GGLAB_ASSERT_MSG(!cascades.m_Cascades.empty() &&
-			cascades.m_Cascades.size() <= MaxDirectionalShadowCascades,
-			"Directional shadow rendering requires between one and four cascades.");
+		const DirectionalShadowFramePlan& cascades = context.GetDirectionalShadowFramePlan();
+		GGLAB_ASSERT(cascades.m_Cascades.size() <= MaxDirectionalShadowCascades);
 		if (cascades.m_Cascades.empty())
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Directional shadow rendering found no cascade; only the fallback layer is cleared.");
+			return;
 		}
 		EnsureInitialized(services);
 		static constexpr const char* passNames[] = {
 			"Shadow.Directional.Cascade0", "Shadow.Directional.Cascade1",
 			"Shadow.Directional.Cascade2", "Shadow.Directional.Cascade3",
 		};
-		// Keep a cleared fallback layer when no cascade is available.
-		const uint32_t layerCount = std::max(1u, static_cast<uint32_t>(cascades.m_Cascades.size()));
+		const uint32_t layerCount = static_cast<uint32_t>(cascades.m_Cascades.size());
 		for (uint32_t cascadeIndex = 0; cascadeIndex < layerCount; ++cascadeIndex)
 		{
 			const DirectionalShadowCascade* cascade = cascades.TryGetCascade(cascadeIndex);
@@ -73,13 +69,6 @@ namespace gglab
 				{
 					auto& shadowRes =
 						builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-					if (cascadeIndex > 0)
-					{
-						// Preserve the defined layers through the resource-version chain. Reading
-						// the whole array here would include layers that have not been cleared yet.
-						builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilRead,
-							RHISubresourceRange{ .m_MipCount = 1, .m_ArraySliceCount = cascadeIndex });
-					}
 					const auto dsvDesc = MakeRHITexture2DArrayViewDesc(
 						RHIFormat::D32Float, 0, cascadeIndex, 1, RHITextureAspect::Depth);
 					// R32 has one plane. Leave the dependency aspect mask open until

@@ -30,4 +30,11 @@ namespace gglab
 		[[nodiscard]] virtual ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
 			const noexcept = 0;
 	};
+	class ShadowPreviewControlBase
+	{
+	public:
+		virtual ~ShadowPreviewControlBase() = default;
+		// Coalesced render-thread request, consumed by the next frame plan.
+		virtual void RequestShadowPreview() noexcept = 0;
+	};
 }

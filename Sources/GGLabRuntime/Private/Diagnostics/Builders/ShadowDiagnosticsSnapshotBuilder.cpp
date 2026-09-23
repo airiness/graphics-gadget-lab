@@ -2,7 +2,7 @@
 
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 
 namespace gglab
@@ -28,7 +28,7 @@ namespace gglab
 	}
 
 	ShadowDiagnosticsSnapshot BuildShadowDiagnosticsSnapshot(
-		const RenderGraph& renderGraph, const DirectionalShadowCascadeSet* cascades) noexcept
+		const RenderGraph& renderGraph, const DirectionalShadowFramePlan* cascades) noexcept
 	{
 		ShadowDiagnosticsSnapshot snapshot{};
 		if (cascades)

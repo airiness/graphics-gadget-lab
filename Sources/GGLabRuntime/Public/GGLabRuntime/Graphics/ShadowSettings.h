@@ -49,6 +49,8 @@ namespace gglab
 		uint32_t m_ShadowMapSize = DefaultDirectionalShadowMapSize;
 		uint32_t m_CascadeCount = MaxDirectionalShadowCascades;
 		float m_SplitLambda = 0.65f;
+		float m_CascadeBlendFraction = 0.1f;
+		float m_DistanceFadeFraction = 0.1f;
 		DirectionalShadowFitMode m_FitMode = DirectionalShadowFitMode::StableSphere;
 		bool m_EnableTexelSnapping = true;
 
@@ -60,7 +62,8 @@ namespace gglab
 		DirectionalShadowBiasMode m_BiasMode = DirectionalShadowBiasMode::CascadeScaled;
 		// Receiver offset in shadow texels along light-space Z, before depth normalization.
 		float m_ReceiverBiasTexels = 0.5f;
-		float m_ReceiverSlopeBiasTexels = 1.5f;
+		// Optional residual slope bias; receiver-plane/filter correction is automatic.
+		float m_ReceiverSlopeBiasTexels = 0.0f;
 		float m_ReceiverMaxSlope = 4.0f;
 
 		// Legacy Raw controls are preserved when switching policies for A/B comparisons.

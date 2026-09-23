@@ -264,7 +264,7 @@ namespace gglab
 				.m_RenderGraph = &renderGraph,
 				.m_RenderViews = std::span<RenderView>(frame.m_RenderViews),
 				.m_RenderQueues = std::span<const RenderQueue>(frame.m_RenderQueues),
-				.m_DirectionalShadowCascades = &frame.m_DirectionalShadowCascades,
+				.m_DirectionalShadowFramePlan = &frame.m_DirectionalShadowFramePlan,
 				.m_MainRenderView =
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
@@ -308,6 +308,7 @@ namespace gglab
 				.m_PostProcessPreview = m_RenderHost->GetPostProcessPreviewView(),
 				.m_PostProcessPreviewControl = m_RenderHost->GetPostProcessPreviewControl(),
 				.m_ShadowPreview = m_RenderHost->GetShadowPreviewView(),
+				.m_ShadowPreviewControl = m_RenderHost->GetShadowPreviewControl(),
 				.m_DebugDrawChannels = m_DebugDrawService->GetChannelView(),
 				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,

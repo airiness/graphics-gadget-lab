@@ -328,7 +328,7 @@ namespace gglab
 		result.m_TemporalFrameTransaction = built.m_TemporalFrameTransaction;
 		result.m_RenderScene = std::move(built.m_RenderScene);
 		result.m_RenderQueues = std::move(built.m_RenderQueues);
-		result.m_DirectionalShadowCascades = std::move(built.m_DirectionalShadowCascades);
+		result.m_DirectionalShadowFramePlan = std::move(built.m_DirectionalShadowFramePlan);
 		result.m_DebugDrawFrame = built.m_DebugDrawFrame;
 		result.m_DebugDrawCullContext = built.m_DebugDrawCullContext;
 		result.m_RenderSceneStatus = built.m_RenderSceneStatus;
@@ -827,6 +827,11 @@ namespace gglab
 	}
 
 	ShadowPreviewViewBase* Renderer::GetShadowPreviewView() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	ShadowPreviewControlBase* Renderer::GetShadowPreviewControl() const noexcept
 	{
 		return m_RenderResRegistry.get();
 	}

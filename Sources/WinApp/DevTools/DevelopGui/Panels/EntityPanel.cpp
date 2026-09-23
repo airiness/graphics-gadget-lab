@@ -290,6 +290,8 @@ namespace gglab
 				"Ortho Padding", &settings.m_OrthoPadding, 0.1f, 0.0f, 1000.0f, "%.2f");
 			changed |= ImGui::DragFloat(
 				"Depth Padding", &settings.m_DepthPadding, 0.5f, 0.0f, 10000.0f, "%.1f");
+			changed |= ImGui::SliderFloat("Cascade Blend Fraction", &settings.m_CascadeBlendFraction, 0.0f, 0.5f, "%.2f");
+			changed |= ImGui::SliderFloat("Distance Fade Fraction", &settings.m_DistanceFadeFraction, 0.0f, 0.5f, "%.2f");
 			int biasMode = static_cast<int>(settings.m_BiasMode);
 			if (ImGui::Combo("Bias Mode", &biasMode, "Legacy Raw\0Cascade Scaled\0"))
 			{
@@ -300,11 +302,11 @@ namespace gglab
 			{
 				changed |= ImGui::DragFloat("Receiver Bias (texels)", &settings.m_ReceiverBiasTexels,
 					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				changed |= ImGui::DragFloat("Receiver Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
+				changed |= ImGui::DragFloat("Residual Slope Bias (texels)", &settings.m_ReceiverSlopeBiasTexels,
 					0.05f, 0.0f, 8.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 				changed |= ImGui::DragFloat("Max Receiver Slope", &settings.m_ReceiverMaxSlope,
 					0.1f, 0.0f, 16.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-				ImGui::TextUnformatted("Receiver offset = texel size * (bias + slope bias * bounded tan)");
+				ImGui::TextUnformatted("Automatic receiver-plane and bilinear footprint correction");
 				ImGui::TextUnformatted("Raw raster bias: 0 | Raster slope bias: 0");
 			}
 			else

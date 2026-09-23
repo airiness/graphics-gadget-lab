@@ -35,6 +35,7 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -52,6 +53,12 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+namespace shader_shadow_math
+{
+	using std::abs;
+#include "../../Shaders/Lighting/ShadowReceiverPlaneMath.hlsli"
+}
 
 namespace gglab
 {
@@ -2433,7 +2440,12 @@ namespace gglab
 				FindDxilMemberOffset(shadowDisassembly, "NearDepth") == offsetof(DirectionalShadowGPU, NearDepth) &&
 				FindDxilMemberOffset(shadowDisassembly, "ReceiverDepthBias") == offsetof(DirectionalShadowGPU, ReceiverDepthBias) &&
 				FindDxilMemberOffset(shadowDisassembly, "ReceiverSlopeDepthBias") == offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) &&
-				FindDxilMemberOffset(shadowDisassembly, "ReceiverMaxSlope") == offsetof(DirectionalShadowGPU, ReceiverMaxSlope),
+				FindDxilMemberOffset(shadowDisassembly, "ReceiverMaxSlope") == offsetof(DirectionalShadowGPU, ReceiverMaxSlope) &&
+				FindDxilMemberOffset(shadowDisassembly, "BlendStart") == offsetof(DirectionalShadowGPU, BlendStart) &&
+				FindDxilMemberOffset(shadowDisassembly, "ReceiverPlaneCorrection") == offsetof(DirectionalShadowGPU, ReceiverPlaneCorrection) &&
+				FindDxilMemberOffset(shadowDisassembly, "DistanceFadeStart") == offsetof(DirectionalShadowGPU, DistanceFadeStart) &&
+				FindDxilMemberOffset(shadowDisassembly, "DistanceFadeInvRange") == offsetof(DirectionalShadowGPU, DistanceFadeInvRange) &&
+				FindDxilMemberOffset(shadowDisassembly, "ShadowMetadataPadding") == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
 				"DXIL cascaded shadow metadata matches every CPU member offset");
 			SpirVDecorationReflection shadowReflection;
 			const bool shadowSpirVReflected = legacyForwardPixelArtifact.IsSuccess() &&
@@ -2441,7 +2453,7 @@ namespace gglab
 			const auto* shadowLayout = shadowSpirVReflected
 				? shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") : nullptr;
 			context.Check(shadowLayout && shadowLayout->m_Size == sizeof(DirectionalShadowGPU) &&
-				shadowLayout->m_Members.size() == 8 &&
+				shadowLayout->m_Members.size() == 13 &&
 				shadowLayout->m_Members[0].m_Offset == offsetof(DirectionalShadowGPU, SplitFar) &&
 				shadowLayout->m_Members[1].m_Offset == offsetof(DirectionalShadowGPU, ViewBaseIndex) &&
 				shadowLayout->m_Members[2].m_Offset == offsetof(DirectionalShadowGPU, CascadeCount) &&
@@ -2449,8 +2461,13 @@ namespace gglab
 				shadowLayout->m_Members[4].m_Offset == offsetof(DirectionalShadowGPU, NearDepth) &&
 				shadowLayout->m_Members[5].m_Offset == offsetof(DirectionalShadowGPU, ReceiverDepthBias) &&
 				shadowLayout->m_Members[6].m_Offset == offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) &&
-				shadowLayout->m_Members[7].m_Offset == offsetof(DirectionalShadowGPU, ReceiverMaxSlope),
-				"SPIR-V cascaded shadow metadata and bias match the CPU layout and 80-byte size");
+				shadowLayout->m_Members[7].m_Offset == offsetof(DirectionalShadowGPU, ReceiverMaxSlope) &&
+				shadowLayout->m_Members[8].m_Offset == offsetof(DirectionalShadowGPU, BlendStart) &&
+				shadowLayout->m_Members[9].m_Offset == offsetof(DirectionalShadowGPU, ReceiverPlaneCorrection) &&
+				shadowLayout->m_Members[10].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeStart) &&
+				shadowLayout->m_Members[11].m_Offset == offsetof(DirectionalShadowGPU, DistanceFadeInvRange) &&
+				shadowLayout->m_Members[12].m_Offset == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
+				"SPIR-V cascaded shadow metadata and bias match the CPU layout and 112-byte size");
 			shadowDesc.m_SourcePath = L"Passes/PassShadowMapPreview.hlsl";
 			const ShaderCompileResult shadowPreviewDxil = compiler.Compile(shadowDesc);
 			shadowDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
@@ -2763,8 +2780,56 @@ namespace gglab
 
 	}
 
+	void RunShadowReceiverPlaneSamplingTests(SelfTestContext& context) noexcept
+	{
+		bool planesLit = true;
+		bool occludersRetained = true;
+		// Rasterized sample depths come from an independent analytic plane. Sweep
+		// both gradient signs, diagonal slopes, filter modes and subtexel phases.
+		for (const float slope : { 0.0f, 0.5f, 2.0f, 8.0f })
+		{
+			for (const float angle : { 0.0f, 0.78539816f, 2.4f, 4.0f })
+			{
+				const float gx = slope * std::cos(angle) * 0.001f;
+				const float gy = slope * std::sin(angle) * 0.001f;
+				for (const float px : { 0.0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.99f })
+				{
+					for (const float py : { 0.0f, 0.1f, 0.25f, 0.5f, 0.75f, 0.99f })
+					{
+						for (const int radius : { 0, 1 })
+						{
+							const float centerDepth = 0.5f + gx * px + gy * py;
+							const float base = centerDepth - 0.0005f -
+								shader_shadow_math::ShadowBilinearReceiverBias(gx, gy, 1.0f, 1.0f);
+							for (int y = -radius; y <= radius; ++y)
+							{
+								for (int x = -radius; x <= radius; ++x)
+								{
+									const float compare = shader_shadow_math::OffsetShadowReceiverDepth(base, gx, gy,
+										static_cast<float>(x), static_cast<float>(y));
+									for (int iy = 0; iy <= 1; ++iy)
+									{
+										for (int ix = 0; ix <= 1; ++ix)
+										{
+											const float stored = 0.5f + gx * static_cast<float>(x + ix) + gy * static_cast<float>(y + iy);
+											planesLit &= compare <= stored;
+											occludersRetained &= compare > stored - 0.1f;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		context.Check(planesLit, "Production receiver-plane equations keep unoccluded slopes fully lit across PCF/bilinear footprints and subtexel phases");
+		context.Check(occludersRetained, "Receiver-plane correction preserves a separated foreground occluder across the same sampling cases");
+	}
+
 	void RunShaderCompileContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunShadowReceiverPlaneSamplingTests(context);
 		RunShaderCompileContractTests(context);
 		RunShaderBindingABITests(context);
 		RunCoordinatePolicyTests(context);

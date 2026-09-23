@@ -112,6 +112,7 @@ namespace gglab
 				guiContext.m_PostProcessPreview = context.m_PostProcessPreview;
 				guiContext.m_PostProcessPreviewControl = context.m_PostProcessPreviewControl;
 				guiContext.m_ShadowPreview = context.m_ShadowPreview;
+				guiContext.m_ShadowPreviewControl = context.m_ShadowPreviewControl;
 				guiContext.m_DebugDrawChannels = context.m_DebugDrawChannels;
 				guiContext.m_DebugDrawChannelControl = context.m_DebugDrawChannelControl;
 				guiContext.m_DebugDrawFrame =

@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Resource/RenderResourceRegistry.h"
 
 #include <array>
 #include <optional>
@@ -129,7 +130,7 @@ namespace gglab
 			.m_DisplayViewId = m_DisplayViewId,
 			.m_RenderScene = m_RenderScene,
 			.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
-			.m_DirectionalShadowCascades = &m_DirectionalShadowCascades,
+			.m_DirectionalShadowFramePlan = &m_DirectionalShadowFramePlan,
 			.m_DebugDrawFrame = m_DebugDrawFrame,
 			.m_DirectionalShadowSettings = m_WorldData.GetMainDirectionalShadowSettings(),
 			.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
@@ -190,9 +191,10 @@ namespace gglab
 		}
 
 		const auto& shadowSettings = result.m_WorldData.GetMainDirectionalShadowSettings();
-		result.m_DirectionalShadowCascades = BuildDirectionalShadowCascades(
+		result.m_DirectionalShadowFramePlan = BuildDirectionalShadowFramePlan(
 			result.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
-			result.m_WorldData.m_MainDirectionalLight.m_Direction, shadowSettings);
+			result.m_WorldData.m_MainDirectionalLight.m_Direction, shadowSettings,
+			info.m_Renderer.GetRenderResourceRegistry()->ConsumeShadowPreviewRequest());
 
 		result.m_DisplayViewId = info.m_DisplayViewId;
 		GGLAB_ASSERT_MSG(IsValidBuiltView(result.m_RenderViews, result.m_DisplayViewId),
@@ -226,7 +228,7 @@ namespace gglab
 			.m_RenderResourceRegistry = *info.m_Renderer.GetRenderResourceRegistry(),
 			.m_EnvironmentLightingSystem = *info.m_Renderer.GetEnvironmentLightingSystemService(),
 			.m_RenderViews = std::span<RenderView>(result.m_RenderViews),
-			.m_DirectionalShadowCascades = result.m_DirectionalShadowCascades,
+			.m_DirectionalShadowFramePlan = result.m_DirectionalShadowFramePlan,
 			.m_SceneCB = *info.m_Renderer.GetSceneConstantBuffer(),
 			.m_ObjectsSB = *info.m_Renderer.GetObjectStructuredBuffer(),
 			.m_MaterialsSB = *info.m_Renderer.GetMaterialStructuredBuffer(),
@@ -245,6 +247,7 @@ namespace gglab
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderSceneBuilder");
 			sceneBuildResult = m_SceneBuilder.Build(sceneBuildInfo);
+			result.m_DirectionalShadowFramePlan.m_ViewBaseOffset = sceneBuildResult.m_ShadowViewBaseOffset;
 		}
 		result.m_RenderScene = std::move(sceneBuildResult.m_RenderScene);
 		result.m_SceneGpuAllocations = sceneBuildResult.m_GpuAllocations;
@@ -329,7 +332,7 @@ namespace gglab
 			buildQueue(renderView, result.m_RenderQueues[viewIndex], viewIndex, frustums);
 		}
 
-		auto& cascades = result.m_DirectionalShadowCascades;
+		auto& cascades = result.m_DirectionalShadowFramePlan;
 		for (uint32_t index = 0; index < cascades.m_Cascades.size(); ++index)
 		{
 			auto& cascade = cascades.m_Cascades[index];

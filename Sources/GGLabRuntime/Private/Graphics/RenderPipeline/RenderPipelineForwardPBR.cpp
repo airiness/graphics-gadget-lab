@@ -295,13 +295,17 @@ namespace gglab
 		rg.AddPass<ShadowSetupPassData>("ShadowMap.Setup",
 			[services, &context](RenderGraph::RGBuilder& builder, ShadowSetupPassData&)
 			{
-				const auto& shadowSettings = context.GetDirectionalShadowSettings();
+				const auto& shadowPlan = context.GetDirectionalShadowFramePlan();
+				const auto& shadowSettings = shadowPlan.m_Settings;
 				auto& shadowRes =
 					builder.GetBlackboard().GetOrCreate<RGShadowResources>(ShadowResourcesName);
-				shadowRes.m_ShadowMapSize = std::max(shadowSettings.m_ShadowMapSize, 1u);
+				if (shadowPlan.m_Cascades.empty())
+				{
+					return;
+				}
+				shadowRes.m_ShadowMapSize = shadowSettings.m_ShadowMapSize;
 
-				shadowRes.m_CascadeCount = std::max(1u, static_cast<uint32_t>(
-					context.GetDirectionalShadowCascades().m_Cascades.size()));
+				shadowRes.m_CascadeCount = static_cast<uint32_t>(shadowPlan.m_Cascades.size());
 				RHITextureDesc shadowMapDesc{};
 				shadowMapDesc.m_ArraySize = static_cast<uint16_t>(shadowRes.m_CascadeCount);
 				shadowMapDesc.m_Extent = { shadowRes.m_ShadowMapSize, shadowRes.m_ShadowMapSize, 1u };
@@ -309,6 +313,10 @@ namespace gglab
 				shadowRes.m_DirectionalShadowMap =
 					builder.CreateTexture("Shadow.DirectionalShadowMap", shadowMapDesc);
 
+				if (!shadowPlan.m_PreviewRequested)
+				{
+					return;
+				}
 				shadowRes.m_ShadowMapPreviewSize = DefaultDirectionalShadowMapPreviewSize;
 				auto* renderResourceRegistry = services.m_Resources;
 				GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
@@ -368,7 +376,10 @@ namespace gglab
 		m_DirectionalShadowMapPass.AddPass(rg, context, services);
 
 		// ShadowMap Preview
-		m_ShadowMapPreviewPass.AddPass(rg, context, services);
+		if (context.GetDirectionalShadowFramePlan().m_PreviewRequested)
+		{
+			m_ShadowMapPreviewPass.AddPass(rg, context, services);
+		}
 
 		// Clear HDR color before background and scene geometry.
 		m_ClearViewTargetsPass.AddPass(rg, context, services);
@@ -448,7 +459,10 @@ namespace gglab
 
 		// Return the persistent shadow preview to Common after DevelopGui and other
 		// overlay consumers have declared their reads for this frame.
-		m_ShadowMapPreviewPass.AddFinishPass(rg);
+		if (context.GetDirectionalShadowFramePlan().m_PreviewRequested)
+		{
+			m_ShadowMapPreviewPass.AddFinishPass(rg);
+		}
 
 		// Return persistent IBL resources to Common only after every consumer and
 		// preview pass has declared its final access for this frame.

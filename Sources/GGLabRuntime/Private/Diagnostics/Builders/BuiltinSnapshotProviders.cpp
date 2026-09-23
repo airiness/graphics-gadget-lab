@@ -178,7 +178,7 @@ namespace gglab
 				auto& snapshot = store.GetOrCreate<ShadowDiagnosticsSnapshot>();
 				snapshot = context.m_RenderGraph
 					? BuildShadowDiagnosticsSnapshot(*context.m_RenderGraph,
-						context.m_DirectionalShadowCascades)
+						context.m_DirectionalShadowFramePlan)
 					: ShadowDiagnosticsSnapshot{};
 			}
 		};

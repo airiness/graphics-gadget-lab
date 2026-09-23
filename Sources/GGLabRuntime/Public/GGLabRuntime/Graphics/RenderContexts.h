@@ -1,5 +1,5 @@
 #pragma once
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
@@ -31,7 +31,7 @@ namespace gglab
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
-		const DirectionalShadowCascadeSet* m_DirectionalShadowCascades = nullptr;
+		const DirectionalShadowFramePlan* m_DirectionalShadowFramePlan = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 
 		DirectionalShadowSettings m_DirectionalShadowSettings = DisabledDirectionalShadowSettings();
@@ -57,10 +57,10 @@ namespace gglab
 			return m_RenderQueues[index];
 		}
 
-		const DirectionalShadowCascadeSet& GetDirectionalShadowCascades() const noexcept
+		const DirectionalShadowFramePlan& GetDirectionalShadowFramePlan() const noexcept
 		{
-			GGLAB_ASSERT_NOT_NULL(m_DirectionalShadowCascades);
-			return *m_DirectionalShadowCascades;
+			GGLAB_ASSERT_NOT_NULL(m_DirectionalShadowFramePlan);
+			return *m_DirectionalShadowFramePlan;
 		}
 
 		RenderViewID GetDisplayViewId() const noexcept { return m_DisplayViewId; }

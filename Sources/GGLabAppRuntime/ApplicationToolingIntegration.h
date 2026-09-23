@@ -26,6 +26,7 @@ namespace gglab
 	class PostProcessPreviewViewBase;
 	class RenderPipelineOverlayExtensionBase;
 	class ShadowPreviewViewBase;
+	class ShadowPreviewControlBase;
 	class WorldToolingViewBase;
 	class WorldToolingControlBase;
 	class DirectionalLightViewBase;
@@ -71,6 +72,7 @@ namespace gglab
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
+		ShadowPreviewControlBase* m_ShadowPreviewControl = nullptr;
 		const DebugDrawChannelViewBase* m_DebugDrawChannels = nullptr;
 		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;

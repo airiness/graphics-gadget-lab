@@ -114,6 +114,7 @@ namespace gglab
 		float m_CasterExtrusionDistance = DefaultDirectionalShadowCasterExtrusionDistance;
 		float m_OrthoPadding = DefaultDirectionalShadowOrthoPadding;
 		float m_DepthPadding = DefaultDirectionalShadowDepthPadding;
+		float m_FilterSupportTexels = 0.0f;
 		DirectionalShadowFitMode m_FitMode = DirectionalShadowFitMode::StableSphere;
 		bool m_EnableTexelSnapping = true;
 		StringID m_Name = StringID("DirectionalShadowView");

@@ -38,7 +38,7 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
@@ -753,6 +753,12 @@ namespace gglab
 				.m_SamplerRegistry = &samplers,
 				});
 			const ShadowPreviewViewBase& view = registry;
+			ShadowPreviewControlBase& control = registry;
+			context.Check(!registry.ConsumeShadowPreviewRequest(), "Shadow previews start without rendering demand");
+			control.RequestShadowPreview();
+			control.RequestShadowPreview();
+			context.Check(registry.ConsumeShadowPreviewRequest() && !registry.ConsumeShadowPreviewRequest() &&
+				device.m_CreateTextureCount == 0, "Shadow preview requests coalesce without allocating resources");
 			const auto empty = view.GetShadowPreviewDiagnostics();
 			context.Check(!empty.m_Allocated && !empty.m_SrvDescriptor.IsValid() &&
 				empty.m_Width == 0 && empty.m_Height == 0 &&
@@ -1919,10 +1925,12 @@ namespace gglab
 				.m_MainView = mainView,
 				.m_FitMode = DirectionalShadowFitMode::Tight,
 			});
-			auto& cascades = frame.m_DirectionalShadowCascades;
+			auto& cascades = frame.m_DirectionalShadowFramePlan;
 			cascades.m_Cascades.push_back({ .m_View = legacyShadow });
 			const auto singleViewData = RenderSceneBuilder::BuildViewData(frame.m_RenderViews, cascades);
-			const auto& shadowGpu = singleViewData[cascades.GetViewIndex(0)];
+			context.Check(!cascades.HasViewRange(), "View flattening returns bindings without mutating the frame plan");
+			cascades.m_ViewBaseOffset = singleViewData.m_ShadowViewBaseOffset;
+			const auto& shadowGpu = singleViewData.m_Views[cascades.GetViewIndex(0)];
 			context.Check(cascades.GetViewIndex(0) == frame.m_RenderViews.size() &&
 				cascades.GetViewIndex(0) != utils::ToIndex(RenderViewID::DirectionalShadow) &&
 				shadowGpu.ViewMat.ToArray() == legacyShadow.m_View.ToArray() &&
@@ -1942,11 +1950,11 @@ namespace gglab
 				});
 			}
 			const auto multipleViewData = RenderSceneBuilder::BuildViewData(frame.m_RenderViews, cascades);
-			bool contiguousViews = multipleViewData.size() == frame.m_RenderViews.size() + 4;
+			bool contiguousViews = multipleViewData.m_Views.size() == frame.m_RenderViews.size() + 4;
 			bool distinctCascades = true;
 			for (uint32_t index = 0; index < 4; ++index)
 			{
-				const auto& uploadedView = multipleViewData[cascades.GetViewIndex(index)];
+				const auto& uploadedView = multipleViewData.m_Views[cascades.GetViewIndex(index)];
 				contiguousViews &= cascades.GetViewIndex(index) == frame.m_RenderViews.size() + index &&
 					uploadedView.ViewMat.ToArray() ==
 						cascades.m_Cascades[index].m_View.m_View.ToArray();
@@ -1957,24 +1965,24 @@ namespace gglab
 				}
 			}
 			context.Check(contiguousViews && distinctCascades &&
-				multipleViewData[utils::ToIndex(RenderViewID::Main)].Width == 1280 &&
-				multipleViewData[utils::ToIndex(RenderViewID::DebugCamera2)].Width == 640,
+				multipleViewData.m_Views[utils::ToIndex(RenderViewID::Main)].Width == 1280 &&
+				multipleViewData.m_Views[utils::ToIndex(RenderViewID::DebugCamera2)].Width == 640,
 				"Multiple shadow views flatten contiguously without overwriting camera slots or aliasing cascades");
 
 			cascades.m_Cascades[2].m_RenderQueue.m_DrawItems.resize(3);
 			RenderFrameBuildResult moved = std::move(frame);
 			frame = {};
 			const auto movedContext = moved.MakeRenderFrameContext();
-			context.Check(&movedContext.GetDirectionalShadowCascades() == &moved.m_DirectionalShadowCascades &&
-				movedContext.GetDirectionalShadowCascades().GetViewIndex(3) == multipleViewData.size() - 1 &&
-				movedContext.GetDirectionalShadowCascades().m_Cascades[2].m_RenderQueue.m_DrawItems.size() == 3 &&
-				movedContext.GetDirectionalShadowCascades().m_Cascades[0].m_RenderQueue.m_DrawItems.empty(),
+			context.Check(&movedContext.GetDirectionalShadowFramePlan() == &moved.m_DirectionalShadowFramePlan &&
+				movedContext.GetDirectionalShadowFramePlan().GetViewIndex(3) == multipleViewData.m_Views.size() - 1 &&
+				movedContext.GetDirectionalShadowFramePlan().m_Cascades[2].m_RenderQueue.m_DrawItems.size() == 3 &&
+				movedContext.GetDirectionalShadowFramePlan().m_Cascades[0].m_RenderQueue.m_DrawItems.empty(),
 				"Frame moves retain independent cascade queues and bind contexts to the new owner");
 
-			DirectionalShadowCascadeSet empty{};
+			DirectionalShadowFramePlan empty{};
 			const auto cameraOnly = RenderSceneBuilder::BuildViewData(moved.m_RenderViews, empty);
 			const auto noViews = RenderSceneBuilder::BuildViewData({}, empty);
-			context.Check(cameraOnly.size() == moved.m_RenderViews.size() && noViews.empty(),
+			context.Check(cameraOnly.m_Views.size() == moved.m_RenderViews.size() && noViews.m_Views.empty(),
 				"Empty cascade sets do not invent an uploaded shadow view");
 		}
 
@@ -1996,8 +2004,8 @@ namespace gglab
 			for (uint32_t count : { 1u, 4u })
 			{
 				RenderFrameBuildResult frame{};
-				frame.m_DirectionalShadowCascades.m_Cascades.resize(count);
-				frame.m_DirectionalShadowCascades.m_ViewBaseOffset = 7;
+				frame.m_DirectionalShadowFramePlan.m_Cascades.resize(count);
+				frame.m_DirectionalShadowFramePlan.m_ViewBaseOffset = 7;
 				const auto frameContext = frame.MakeRenderFrameContext();
 				RenderGraph graph({
 					.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
@@ -2031,10 +2039,12 @@ namespace gglab
 				for (uint32_t index = 1; allWritersLive && index <= count; ++index)
 				{
 					allWritersLive &= !snapshot.m_Passes[index].m_Culled &&
-						snapshot.m_Passes[index].m_ExecutionOrder < snapshot.m_Passes[index + 1].m_ExecutionOrder;
+						snapshot.m_Passes[index].m_ExecutionOrder < snapshot.m_Passes.back().m_ExecutionOrder &&
+						snapshot.m_Passes[index].m_Accesses.size() == 1 &&
+						snapshot.m_Passes[index].m_Accesses[0].m_DependencyAccess == RGDependencyAccess::Write;
 				}
 				context.Check(allWritersLive,
-					"Actual cascade passes define every sampled array layer and preserve all preceding writers");
+					"Actual cascade passes retain every sampled layer without synthetic GPU reads");
 			}
 		}
 
@@ -2054,7 +2064,7 @@ namespace gglab
 			for (float lambda : { 0.0f, 0.65f, 1.0f })
 			{
 				shadowSettings.m_SplitLambda = lambda;
-				auto cascades = BuildDirectionalShadowCascades(mainView, -Vector3::UnitY, shadowSettings);
+				auto cascades = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, shadowSettings);
 				bool valid = cascades.m_Cascades.size() == 4;
 				for (uint32_t index = 0; index < 4; ++index)
 				{
@@ -2085,7 +2095,7 @@ namespace gglab
 				}
 				context.Check(valid, "Practical splits cover contiguous main-view depths and fit all receiver corners");
 				cascades.m_ViewBaseOffset = 7;
-				const auto gpu = BuildDirectionalShadowGPU(cascades);
+				const auto gpu = BuildDirectionalShadowGPU(cascades, cascades.m_ViewBaseOffset);
 				context.Check(gpu.CascadeCount == 4 && gpu.ViewBaseIndex == 7 &&
 					gpu.MainViewIndex == static_cast<uint32_t>(RenderViewID::Main) &&
 					gpu.NearDepth == 1.0f && gpu.SplitFar[3] == 81.0f,
@@ -2094,16 +2104,123 @@ namespace gglab
 			shadowSettings.m_CascadeCount = 1;
 			shadowSettings.m_MaxShadowDistance = 150.0f;
 			shadowSettings.m_FitMode = DirectionalShadowFitMode::Tight;
-			const auto single = BuildDirectionalShadowCascades(mainView, -Vector3::UnitY, shadowSettings);
+			const auto single = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, shadowSettings);
 			const auto reference = RenderViewBuilder{}.Build<RenderViewID::DirectionalShadow>({
 				.m_MainView = mainView, .m_MaxShadowDistance = 150.0f,
+				.m_FilterSupportTexels = 2.0f,
 				.m_FitMode = DirectionalShadowFitMode::Tight,
 			});
 			context.Check(single.m_Cascades.size() == 1 && single.m_Cascades[0].m_SplitFar == 100.0f &&
 				single.m_Cascades[0].m_View.m_UnjitteredViewProj.ToArray() == reference.m_UnjitteredViewProj.ToArray(),
-				"Single-cascade mode preserves the legacy fit and clamps shadow distance to camera far");
-			context.Check(BuildDirectionalShadowGPU({}).CascadeCount == 0,
+				"Single-cascade mode uses the filter guard and clamps shadow distance to camera far");
+			context.Check(BuildDirectionalShadowGPU({}, DirectionalShadowFramePlan::UnassignedViewBaseOffset).CascadeCount == 0,
 				"Missing shadow views cannot enable a GPU cascade lookup");
+		}
+
+		void RunDirectionalShadowPlanningTests(SelfTestContext& context) noexcept
+		{
+			Camera camera({ .m_Near = 0.1f, .m_Far = 100.0f, .m_Fov = 60.0f, .m_Width = 1280, .m_Height = 720 });
+			const ResolvedViewRenderSettings viewSettings{};
+			const ResolvedTemporalFramePlan temporal{};
+			const auto mainView = RenderViewBuilder{}.Build<RenderViewID::Main>({
+				.m_Camera = camera, .m_RenderSettings = viewSettings, .m_TemporalFramePlan = temporal,
+				.m_Width = 1280, .m_Height = 720 });
+			DirectionalShadowSettings settings{};
+			settings.m_Enable = false;
+			const auto disabled = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, settings);
+			const auto upload = RenderSceneBuilder::BuildViewData({}, disabled);
+			RenderGraph emptyGraph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+			RenderFrameBuildResult frame{};
+			frame.m_DirectionalShadowFramePlan = disabled;
+			RenderPassDirectionalShadowMap shadowPass;
+			shadowPass.AddPass(emptyGraph, frame.MakeRenderFrameContext(), {});
+			RGSnapshot emptySnapshot;
+			const bool emptyCompiled = emptyGraph.Compile();
+			BuildRenderGraphSnapshot(emptyGraph, emptySnapshot);
+			context.Check(!disabled.m_ShadingEnabled && disabled.m_Cascades.empty() && upload.m_Views.empty() &&
+				BuildDirectionalShadowGPU(disabled, upload.m_ShadowViewBaseOffset).CascadeCount == 0 &&
+				emptyCompiled && emptySnapshot.m_Passes.empty() && emptySnapshot.m_Resources.empty(),
+				"Disabled shadows without preview demand build no views, queues, GPU cascades or shadow passes");
+			const auto preview = BuildDirectionalShadowFramePlan(mainView, -Vector3::UnitY, settings, true);
+			context.Check(!preview.m_ShadingEnabled && preview.m_PreviewRequested && preview.m_Cascades.size() == 4,
+				"Explicit preview demand builds cascades without enabling shadowed lighting");
+			settings.m_Enable = true;
+			settings.m_OrthoPadding = 0.0f;
+			settings.m_ShadowMapSize = 256;
+			for (const auto fit : { DirectionalShadowFitMode::Tight, DirectionalShadowFitMode::StableSphere })
+			{
+				settings.m_FitMode = fit;
+				const auto plan = BuildDirectionalShadowFramePlan(mainView, Vector3(-1.0f, -0.7f, 0.2f), settings);
+				bool covered = true;
+				for (uint32_t index = 0; index < plan.m_Cascades.size(); ++index)
+				{
+					const auto& cascade = plan.m_Cascades[index];
+					const float receiverNear = index == 0 ? cascade.m_SplitNear : plan.m_Cascades[index - 1].m_BlendStart;
+					for (const float depth : { receiverNear, cascade.m_SplitFar })
+					{
+						const float halfHeight = std::tan(mainView.m_FovRadians * 0.5f) * depth;
+						for (float x : { -1.0f, 1.0f })
+						{
+							for (float y : { -1.0f, 1.0f })
+							{
+								const Vector3 world = math::TransformPoint(Vector3(x * halfHeight * mainView.m_Aspect,
+									y * halfHeight, depth), mainView.m_InvView);
+								const Vector4 clip = math::Transform(Vector4(world, 1.0f), cascade.m_View.m_UnjitteredViewProj);
+								const float limit = 1.0f - 4.0f / static_cast<float>(settings.m_ShadowMapSize);
+								covered &= std::abs(clip.m_X) <= limit + 0.0001f &&
+									std::abs(clip.m_Y) <= limit + 0.0001f;
+							}
+						}
+					}
+				}
+				const auto gpu = BuildDirectionalShadowGPU(plan, 7);
+				const float farDepth = plan.m_Cascades.back().m_SplitFar;
+				context.Check(covered && gpu.BlendStart[0] < gpu.SplitFar[0] &&
+					gpu.DistanceFadeStart < farDepth && NearlyEqual((farDepth - gpu.DistanceFadeStart) * gpu.DistanceFadeInvRange, 1.0f),
+					"Cascade overlap includes receiver corners plus the full PCF guard, and the far boundary fades to fully lit");
+			}
+		}
+
+		void RunPartialTextureProducerTests(SelfTestContext& context) noexcept
+		{
+			// Both array layers and mip levels must inherit only their own live producer.
+			for (const bool useMips : { false, true })
+			{
+				for (const bool sampleWhole : { false, true })
+				{
+					RenderGraph graph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+						.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+					RGTextureId texture{};
+					struct Data {};
+					const RHISubresourceRange first{ .m_MipCount = 1, .m_ArraySliceCount = 1 };
+					const RHISubresourceRange second{ .m_BaseMip = useMips ? 1u : 0u, .m_MipCount = 1,
+						.m_BaseArraySlice = useMips ? 0u : 1u, .m_ArraySliceCount = 1 };
+					graph.AddPass<Data>("Initialize", [&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							texture = builder.CreateTexture("PartialTexture", { .m_Format = RHIFormat::R32Float,
+								.m_Extent = { 16, 16, 1 }, .m_ArraySize = static_cast<uint16_t>(useMips ? 1 : 2),
+								.m_MipLevels = static_cast<uint16_t>(useMips ? 2 : 1) });
+							builder.WriteInPlace(texture, RGTextureAccess::RenderTarget);
+						});
+					graph.AddPass<Data>("OverwrittenFirst", [&](RenderGraph::RGBuilder& builder, Data&)
+						{ builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first); });
+					graph.AddPass<Data>("FinalFirst", [&](RenderGraph::RGBuilder& builder, Data&)
+						{ builder.WriteInPlace(texture, RGTextureAccess::RenderTarget, first); });
+					graph.AddPass<Data>("Sample", [&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							builder.Read(texture, RGTextureAccess::Sample, sampleWhole ? RHISubresourceRange{} : second);
+							builder.SideEffect();
+						});
+					const bool compiled = graph.Compile();
+					RGSnapshot snapshot;
+					BuildRenderGraphSnapshot(graph, snapshot);
+					context.Check(compiled && !snapshot.m_Passes[0].m_Culled && snapshot.m_Passes[1].m_Culled &&
+						snapshot.m_Passes[2].m_Culled == !sampleWhole && snapshot.m_Resources[0].m_LastUserPassIndex == 3 &&
+						snapshot.m_Passes[3].m_DestroyResources.size() == 1,
+						"Partial texture reads retain inherited producers, cull overwritten/unused writes, and release after the final consumer");
+				}
+			}
 		}
 
 		void RunDirectionalShadowStabilityTests(SelfTestContext& context) noexcept
@@ -2142,13 +2259,13 @@ namespace gglab
 			const Vector3 lightUp = math::TransformDirection(Vector3::UnitY, lightToWorld);
 			DirectionalShadowSettings settings{};
 			settings.m_OrthoPadding = 0.0f;
-			const auto baseline = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto baseline = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			bool stableRotation = true;
 			for (float yaw : { -1.1f, 0.0f, 1.3f })
 			{
 				for (float pitch : { -0.4f, 0.0f, 0.5f })
 				{
-					const auto rotated = BuildDirectionalShadowCascades(makeView(yaw, pitch), lightDirection, settings);
+					const auto rotated = BuildDirectionalShadowFramePlan(makeView(yaw, pitch), lightDirection, settings);
 					for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 					{
 						const auto& first = baseline.m_Cascades[index];
@@ -2171,18 +2288,18 @@ namespace gglab
 				const Vector2 centerOffset = projection.m_CenterLS - projection.m_UnsnappedCenterLS;
 				const RenderView centeredView = translateView(mainView,
 					lightRight * centerOffset.m_X + lightUp * centerOffset.m_Y);
-				const auto centered = BuildDirectionalShadowCascades(centeredView, lightDirection, settings).m_Cascades[index];
+				const auto centered = BuildDirectionalShadowFramePlan(centeredView, lightDirection, settings).m_Cascades[index];
 				const float texelSize = centered.m_Projection.m_WorldUnitsPerTexel.m_X;
-				const auto moved = BuildDirectionalShadowCascades(translateView(centeredView,
+				const auto moved = BuildDirectionalShadowFramePlan(translateView(centeredView,
 					(lightRight + lightUp) * (0.2f * texelSize)), lightDirection, settings).m_Cascades[index];
 				const Vector2 smallDelta = fixedPointTexels(moved.m_View) - fixedPointTexels(centered.m_View);
-				const auto stepped = BuildDirectionalShadowCascades(translateView(centeredView,
+				const auto stepped = BuildDirectionalShadowFramePlan(translateView(centeredView,
 					(lightRight - lightUp) * (1.2f * texelSize)), lightDirection, settings).m_Cascades[index];
 				const Vector2 stepDelta = fixedPointTexels(stepped.m_View) - fixedPointTexels(centered.m_View);
 				context.Check(smallDelta.Length() < 0.003f &&
 					std::abs(stepDelta.m_X + 1.0f) < 0.003f && std::abs(stepDelta.m_Y - 1.0f) < 0.003f,
 					"Sub-texel XY translation holds the shadow grid and crossing its boundary advances exactly one texel");
-				const auto depthMoved = BuildDirectionalShadowCascades(translateView(centeredView,
+				const auto depthMoved = BuildDirectionalShadowFramePlan(translateView(centeredView,
 					lightDirection * (0.23f * texelSize)), lightDirection, settings).m_Cascades[index];
 				context.Check((fixedPointTexels(depthMoved.m_View) - fixedPointTexels(centered.m_View)).Length() < 0.003f &&
 					std::abs(depthMoved.m_View.m_View.m_43 - centered.m_View.m_View.m_43 + 0.23f * texelSize) < 0.0002f,
@@ -2198,7 +2315,7 @@ namespace gglab
 					for (float yaw : { -0.7f, 0.6f })
 					{
 						const RenderView receiver = makeView(yaw, 0.4f);
-						const auto cascades = BuildDirectionalShadowCascades(receiver, direction, settings);
+						const auto cascades = BuildDirectionalShadowFramePlan(receiver, direction, settings);
 						for (const auto& cascade : cascades.m_Cascades)
 						{
 							for (float depth : { cascade.m_SplitNear, cascade.m_SplitFar })
@@ -2232,7 +2349,7 @@ namespace gglab
 			jittered.m_JitterPixels = Vector2(0.25f, -0.3f);
 			jittered.m_RasterProj.m_31 += 0.01f;
 			jittered.m_RasterProj.m_32 -= 0.02f;
-			const auto jitteredCascades = BuildDirectionalShadowCascades(jittered, lightDirection, settings);
+			const auto jitteredCascades = BuildDirectionalShadowFramePlan(jittered, lightDirection, settings);
 			bool ignoresJitter = true;
 			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 			{
@@ -2241,13 +2358,13 @@ namespace gglab
 			}
 			context.Check(ignoresJitter, "Temporal raster jitter cannot alter a cascade projection");
 			settings.m_EnableTexelSnapping = false;
-			const auto unsnapped = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto unsnapped = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			context.Check(!unsnapped.m_Cascades[0].m_Projection.m_TexelSnappingApplied &&
 				unsnapped.m_Cascades[0].m_Projection.m_Extent.m_X == baseline.m_Cascades[0].m_Projection.m_Extent.m_X,
 				"Snapping A/B preserves the stable footprint");
 			settings.m_EnableTexelSnapping = true;
 			settings.m_ShadowMapSize = 1;
-			const auto oneTexel = BuildDirectionalShadowCascades(mainView, Vector3::Zero, settings);
+			const auto oneTexel = BuildDirectionalShadowFramePlan(mainView, Vector3::Zero, settings);
 			context.Check(oneTexel.m_Cascades[0].m_View.m_IsValid &&
 				!oneTexel.m_Cascades[0].m_Projection.m_TexelSnappingApplied &&
 				std::isfinite(oneTexel.m_Cascades[0].m_Projection.m_Extent.m_X),
@@ -2264,8 +2381,9 @@ namespace gglab
 				.m_RenderSettings = viewSettings, .m_TemporalFramePlan = plan, .m_Width = 1920, .m_Height = 1080 });
 			const Vector3 lightDirection = Vector3(-1.0f, -0.85f, 0.35f).Normalized();
 			DirectionalShadowSettings settings{};
+			settings.m_ReceiverSlopeBiasTexels = 1.5f;
 			settings.m_MaxShadowDistance = 80.0f;
-			auto baseline = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			auto baseline = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			bool worldProjectionMatches = true;
 			for (const auto& cascade : baseline.m_Cascades)
 			{
@@ -2292,7 +2410,7 @@ namespace gglab
 
 			settings.m_DepthPadding += 100.0f;
 			settings.m_CasterExtrusionDistance += 100.0f;
-			const auto expandedDepth = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto expandedDepth = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			bool depthInvariant = true;
 			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 			{
@@ -2309,24 +2427,24 @@ namespace gglab
 
 			settings.m_ShadowMapSize = 1024;
 			settings.m_FitMode = DirectionalShadowFitMode::Tight;
-			const auto lowResolution = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto lowResolution = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			settings.m_ShadowMapSize = 2048;
-			const auto highResolution = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto highResolution = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			bool resolutionScales = true;
 			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 			{
 				const auto& low = lowResolution.m_Cascades[index];
 				const auto& high = highResolution.m_Cascades[index];
-				resolutionScales &= low.m_Bias.m_ReceiverDepthBias == high.m_Bias.m_ReceiverDepthBias * 2.0f &&
-					low.m_Bias.m_ReceiverSlopeWorld == high.m_Bias.m_ReceiverSlopeWorld * 2.0f &&
+				resolutionScales &= std::abs(low.m_Bias.m_ReceiverDepthBias / high.m_Bias.m_ReceiverDepthBias - 2.0f) < 0.01f &&
+					std::abs(low.m_Bias.m_ReceiverSlopeWorld / high.m_Bias.m_ReceiverSlopeWorld - 2.0f) < 0.01f &&
 					low.m_Bias.m_WorldUnitsPerTexel == std::max(low.m_Projection.m_WorldUnitsPerTexel.m_X,
 						low.m_Projection.m_WorldUnitsPerTexel.m_Y);
 			}
 			context.Check(resolutionScales,
-				"Doubling resolution halves resolved bias and tight fits use the larger axis footprint");
+				"Doubling resolution approximately halves residual bias including the filter guard, using the larger axis footprint");
 
 			baseline.m_ViewBaseOffset = 7;
-			const auto gpu = BuildDirectionalShadowGPU(baseline);
+			const auto gpu = BuildDirectionalShadowGPU(baseline, baseline.m_ViewBaseOffset);
 			bool uploadMatches = gpu.CascadeCount == MaxDirectionalShadowCascades;
 			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 			{
@@ -2341,9 +2459,9 @@ namespace gglab
 			settings.m_ReceiverDepthBias = 0.00037f;
 			settings.m_RasterizerDepthBias = -120;
 			settings.m_RasterizerSlopeScaledDepthBias = 0.73f;
-			auto legacy = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			auto legacy = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			legacy.m_ViewBaseOffset = 7;
-			const auto legacyGpu = BuildDirectionalShadowGPU(legacy);
+			const auto legacyGpu = BuildDirectionalShadowGPU(legacy, legacy.m_ViewBaseOffset);
 			bool legacyExact = true;
 			for (uint32_t index = 0; index < MaxDirectionalShadowCascades; ++index)
 			{
@@ -2356,7 +2474,7 @@ namespace gglab
 			}
 			context.Check(legacyExact, "Legacy Raw preserves all original bias values and switching policy does not change projections");
 			legacy.m_Cascades.resize(1);
-			const auto singleGpu = BuildDirectionalShadowGPU(legacy);
+			const auto singleGpu = BuildDirectionalShadowGPU(legacy, legacy.m_ViewBaseOffset);
 			context.Check(singleGpu.CascadeCount == 1 && singleGpu.ReceiverDepthBias[0] == settings.m_ReceiverDepthBias &&
 				singleGpu.ReceiverDepthBias[1] == 0.0f && singleGpu.ReceiverSlopeDepthBias[2] == 0.0f &&
 				singleGpu.ReceiverMaxSlope[3] == 0.0f,
@@ -2365,7 +2483,7 @@ namespace gglab
 			settings.m_ReceiverBiasTexels = -1.0f;
 			settings.m_ReceiverSlopeBiasTexels = -1.0f;
 			settings.m_ReceiverMaxSlope = 100.0f;
-			const auto bounded = BuildDirectionalShadowCascades(mainView, lightDirection, settings);
+			const auto bounded = BuildDirectionalShadowFramePlan(mainView, lightDirection, settings);
 			context.Check(bounded.m_Cascades[0].m_Bias.m_ReceiverDepthBias == 0.0f &&
 				bounded.m_Cascades[0].m_Bias.m_ReceiverSlopeDepthBias == 0.0f &&
 				bounded.m_Cascades[0].m_Bias.m_ReceiverMaxSlope == 16.0f &&
@@ -6965,6 +7083,8 @@ namespace gglab
 		RunScreenSpaceAndDepthContractTests(context);
 		RunDirectionalShadowCascadeFrameTests(context);
 		RunDirectionalShadowSplitTests(context);
+		RunDirectionalShadowPlanningTests(context);
+		RunPartialTextureProducerTests(context);
 		RunDirectionalShadowStabilityTests(context);
 		RunDirectionalShadowBiasTests(context);
 		RunDirectionalShadowGraphTests(context);

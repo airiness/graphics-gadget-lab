@@ -1,4 +1,4 @@
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,10 +39,23 @@ namespace gglab
 		}
 	}
 
-	DirectionalShadowCascadeSet BuildDirectionalShadowCascades(const RenderView& mainView,
-		const Vector3& lightDirection, const DirectionalShadowSettings& settings) noexcept
+	DirectionalShadowFramePlan BuildDirectionalShadowFramePlan(const RenderView& mainView,
+		const Vector3& lightDirection, const DirectionalShadowSettings& authoredSettings, bool previewRequested) noexcept
 	{
-		DirectionalShadowCascadeSet result{};
+		DirectionalShadowFramePlan result{};
+		auto& settings = result.m_Settings;
+		settings = authoredSettings;
+		settings.m_ShadowMapSize = std::max(settings.m_ShadowMapSize, 1u);
+		settings.m_CascadeCount = std::clamp(settings.m_CascadeCount, 1u, MaxDirectionalShadowCascades);
+		settings.m_SplitLambda = std::clamp(settings.m_SplitLambda, 0.0f, 1.0f);
+		settings.m_CascadeBlendFraction = std::clamp(settings.m_CascadeBlendFraction, 0.0f, 0.5f);
+		settings.m_DistanceFadeFraction = std::clamp(settings.m_DistanceFadeFraction, 0.0f, 0.5f);
+		result.m_ShadingEnabled = settings.m_Enable;
+		result.m_PreviewRequested = previewRequested;
+		if (!settings.m_Enable && !previewRequested)
+		{
+			return result;
+		}
 		const uint32_t count = std::clamp(settings.m_CascadeCount, 1u, MaxDirectionalShadowCascades);
 		const float nearDepth = std::max(mainView.m_Near, 0.001f);
 		const float farDepth = std::max(nearDepth + 0.001f,
@@ -58,7 +71,7 @@ namespace gglab
 			const float splitFar = index + 1 == count ? farDepth
 				: uniformSplit + lambda * (logarithmicSplit - uniformSplit);
 			RenderView receiverView = mainView;
-			receiverView.m_Near = splitNear;
+			receiverView.m_Near = index == 0 ? splitNear : result.m_Cascades.back().m_BlendStart;
 			receiverView.m_Far = splitFar;
 			const auto shadowView = BuildDirectionalShadowView({
 				.m_MainView = receiverView,
@@ -68,6 +81,7 @@ namespace gglab
 				.m_CasterExtrusionDistance = settings.m_CasterExtrusionDistance,
 				.m_OrthoPadding = settings.m_OrthoPadding,
 				.m_DepthPadding = settings.m_DepthPadding,
+				.m_FilterSupportTexels = settings.m_EnablePCF ? 2.0f : 1.0f,
 				.m_FitMode = settings.m_FitMode,
 				.m_EnableTexelSnapping = settings.m_EnableTexelSnapping,
 			});
@@ -75,32 +89,41 @@ namespace gglab
 				.m_View = shadowView.m_View,
 				.m_SplitNear = splitNear,
 				.m_SplitFar = splitFar,
+				.m_BlendStart = splitFar - (splitFar - splitNear) * settings.m_CascadeBlendFraction,
 				.m_Projection = shadowView.m_Projection,
 				.m_Bias = ResolveDirectionalShadowBias(shadowView, settings),
 			});
 			splitNear = splitFar;
 		}
+		const auto& last = result.m_Cascades.back();
+		const float fadeWidth = (last.m_SplitFar - last.m_SplitNear) * settings.m_DistanceFadeFraction;
+		result.m_DistanceFadeStart = last.m_SplitFar - fadeWidth;
+		result.m_DistanceFadeInvRange = fadeWidth > 0.0f ? 1.0f / fadeWidth : 0.0f;
 		return result;
 	}
 
 	DirectionalShadowGPU BuildDirectionalShadowGPU(
-		const DirectionalShadowCascadeSet& cascades) noexcept
+		const DirectionalShadowFramePlan& cascades, uint32_t viewBaseOffset) noexcept
 	{
 		DirectionalShadowGPU result{};
-		if (cascades.m_Cascades.empty() || !cascades.HasViewRange())
+		if (cascades.m_Cascades.empty() || viewBaseOffset == DirectionalShadowFramePlan::UnassignedViewBaseOffset)
 		{
 			return result;
 		}
 		GGLAB_ASSERT(cascades.m_Cascades.size() <= MaxDirectionalShadowCascades);
 		result.CascadeCount = std::min(
 			static_cast<uint32_t>(cascades.m_Cascades.size()), MaxDirectionalShadowCascades);
-		result.ViewBaseIndex = cascades.GetViewIndex(0);
+		result.ViewBaseIndex = viewBaseOffset;
+		result.ReceiverPlaneCorrection = cascades.m_Settings.m_BiasMode == DirectionalShadowBiasMode::CascadeScaled ? 1u : 0u;
+		result.DistanceFadeStart = cascades.m_DistanceFadeStart;
+		result.DistanceFadeInvRange = cascades.m_DistanceFadeInvRange;
 		result.MainViewIndex = static_cast<uint32_t>(RenderViewID::Main);
 		result.NearDepth = cascades.m_Cascades.front().m_SplitNear;
 		for (uint32_t index = 0; index < result.CascadeCount; ++index)
 		{
 			const auto& cascade = cascades.m_Cascades[index];
 			result.SplitFar[index] = cascade.m_SplitFar;
+			result.BlendStart[index] = cascade.m_BlendStart;
 			result.ReceiverDepthBias[index] = cascade.m_Bias.m_ReceiverDepthBias;
 			result.ReceiverSlopeDepthBias[index] = cascade.m_Bias.m_ReceiverSlopeDepthBias;
 			result.ReceiverMaxSlope[index] = cascade.m_Bias.m_ReceiverMaxSlope;

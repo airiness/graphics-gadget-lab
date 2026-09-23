@@ -182,8 +182,10 @@ namespace gglab
 				data.m_PrefilteredSpecularCubemap =
 					builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
-				data.m_ShadowMap =
-					builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
+				if (contextPtr->GetDirectionalShadowFramePlan().m_ShadingEnabled)
+				{
+					data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
+				}
 				const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
 				if (!transparent && gtao && gtao->IsComplete())
 				{
@@ -254,11 +256,14 @@ namespace gglab
 							data.m_LegacyReferenceColor);
 				}
 
-				const auto shadowSrvDesc =
-					MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, 0, 0,
-						shadowRes.m_CascadeCount, RHITextureAspect::Depth);
-				data.m_ShadowSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
-					data.m_ShadowMap, shadowSrvDesc);
+				if (data.m_ShadowMap.IsValid())
+				{
+					const auto shadowSrvDesc =
+						MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, 0, 0,
+							shadowRes.m_CascadeCount, RHITextureAspect::Depth);
+					data.m_ShadowSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_ShadowMap, shadowSrvDesc);
+				}
 
 				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
 				data.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
@@ -312,17 +317,9 @@ namespace gglab
 				data.m_ShadowSamplerIndex = services.m_Samplers->GetSamplerIndex(
 					SamplerPreset::ShadowCmpLinearClamp);
 
-				const auto& shadowSettings = contextPtr->GetDirectionalShadowSettings();
-				const DirectionalShadowCascadeSet& shadowCascades =
-					contextPtr->GetDirectionalShadowCascades();
-				const DirectionalShadowCascade* primaryShadowCascade =
-					shadowCascades.TryGetCascade(0);
-				GGLAB_ASSERT_MSG(primaryShadowCascade != nullptr,
-					"Forward PBR shadow sampling requires an uploaded cascade view.");
-				// Without a cascade view no shader-side shadow lookup may be enabled.
-				data.m_ShadowFlags =
-					((shadowSettings.m_Enable && primaryShadowCascade) ? 1u : 0u) |
-					(shadowSettings.m_EnablePCF ? 2u : 0u);
+				const auto& shadowPlan = contextPtr->GetDirectionalShadowFramePlan();
+				data.m_ShadowFlags = (shadowPlan.m_ShadingEnabled ? 1u : 0u) |
+					(shadowPlan.m_Settings.m_EnablePCF ? 2u : 0u);
 			},
 			[this, contextPtr, services, displayViewId](
 				RGExecuteContext& executeContext, PassData& data)
@@ -375,9 +372,10 @@ namespace gglab
 					graphicsContext->ClearDepthAttachment(data.m_ClearDepthValue);
 				}
 
-				const auto shadowSrv = executeContext.GetViewDescriptor(data.m_ShadowSrv);
-				GGLAB_ASSERT_MSG(shadowSrv.IsValid(),
-					"ForwardPBR shadow map SRV must expose a descriptor heap index.");
+				const auto shadowSrv = data.m_ShadowSrv.IsValid()
+					? executeContext.GetViewDescriptor(data.m_ShadowSrv) : RHIDescriptorHandle{};
+				GGLAB_ASSERT_MSG((data.m_ShadowFlags & 1u) == 0 || shadowSrv.IsValid(),
+					"Enabled shadow sampling requires a valid shadow descriptor.");
 
 				uint32_t gtaoTextureIndex = 0;
 				if (data.m_GTAOEnabled)
@@ -498,7 +496,7 @@ namespace gglab
 
 				const ForwardPBRPassParameters passParameters{
 					.m_ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
-					.m_ShadowMapTextureIndex = shadowSrv.m_Index,
+					.m_ShadowMapTextureIndex = shadowSrv.IsValid() ? shadowSrv.m_Index : 0u,
 					.m_ShadowMapSamplerIndex = data.m_ShadowSamplerIndex,
 					.m_ShadowMapSize = data.m_ShadowMapSize,
 					.m_ShadowFlags = data.m_ShadowFlags,

@@ -44,10 +44,11 @@ namespace gglab
 		};
 	}
 
-	std::vector<ViewGPU> RenderSceneBuilder::BuildViewData(
-		std::span<const RenderView> cameraViews, DirectionalShadowCascadeSet& cascades) noexcept
+	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
+		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept
 	{
-		std::vector<ViewGPU> viewData;
+		ViewUploadData result{};
+		auto& viewData = result.m_Views;
 		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size());
 		const auto appendView = [&viewData](const RenderView& renderView)
 		{
@@ -79,12 +80,13 @@ namespace gglab
 		{
 			appendView(view);
 		}
-		cascades.m_ViewBaseOffset = static_cast<uint32_t>(viewData.size());
+		result.m_ShadowViewBaseOffset = cascades.m_Cascades.empty()
+			? DirectionalShadowFramePlan::UnassignedViewBaseOffset : static_cast<uint32_t>(viewData.size());
 		for (const DirectionalShadowCascade& cascade : cascades.m_Cascades)
 		{
 			appendView(cascade.m_View);
 		}
-		return viewData;
+		return result;
 	}
 
 	RenderSceneBuilder::BuildResult RenderSceneBuilder::Build(const BuildInfo& info) noexcept
@@ -112,8 +114,9 @@ namespace gglab
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
 
-		const std::vector<ViewGPU> viewData =
-			BuildViewData(info.m_RenderViews, info.m_DirectionalShadowCascades);
+		const auto viewUpload = BuildViewData(info.m_RenderViews, info.m_DirectionalShadowFramePlan);
+		const auto& viewData = viewUpload.m_Views;
+		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
 
 		std::unordered_map<RenderMaterialKey, MaterialUploadRecord> materialRecords;
 
@@ -490,7 +493,7 @@ namespace gglab
 		}
 
 		result.m_GpuAllocations.m_ShadowConstants = info.m_SceneCB.Upload(
-			BuildDirectionalShadowGPU(info.m_DirectionalShadowCascades));
+			BuildDirectionalShadowGPU(info.m_DirectionalShadowFramePlan, viewUpload.m_ShadowViewBaseOffset));
 		if (!result.m_GpuAllocations.m_ShadowConstants.IsValid())
 		{
 			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Shadow constant allocation failed.");

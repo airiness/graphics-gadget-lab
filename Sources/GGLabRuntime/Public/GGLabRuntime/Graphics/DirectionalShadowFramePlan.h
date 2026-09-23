@@ -18,18 +18,25 @@ namespace gglab
 		// Positive main-camera view-space depths, independent of the light view depth range.
 		float m_SplitNear = 0.0f;
 		float m_SplitFar = 0.0f;
+		float m_BlendStart = 0.0f;
 		DirectionalShadowProjectionInfo m_Projection{};
 		DirectionalShadowResolvedBias m_Bias{};
 	};
 
 	// Frame-owned values. Cascade identity is its position in this set, not a
 	// RenderViewID slot. No pointers into the containing frame survive a move.
-	struct DirectionalShadowCascadeSet
+	struct DirectionalShadowFramePlan
 	{
 		// Assigned when flattening ViewGPU data; no cascade view index is valid until then.
 		static constexpr uint32_t UnassignedViewBaseOffset =
 			std::numeric_limits<uint32_t>::max();
 
+		// Resolved once before queues and uploads; all consumers use this frame snapshot.
+		DirectionalShadowSettings m_Settings = DisabledDirectionalShadowSettings();
+		bool m_ShadingEnabled = false;
+		bool m_PreviewRequested = false;
+		float m_DistanceFadeStart = 0.0f;
+		float m_DistanceFadeInvRange = 0.0f;
 		std::vector<DirectionalShadowCascade> m_Cascades;
 		// Relative to SceneCB.ViewBaseIndex, assigned when flattening ViewGPU data.
 		uint32_t m_ViewBaseOffset = UnassignedViewBaseOffset;
@@ -53,10 +60,10 @@ namespace gglab
 			return m_ViewBaseOffset + cascadeIndex;
 		}
 	};
-	[[nodiscard]] DirectionalShadowCascadeSet BuildDirectionalShadowCascades(
+	[[nodiscard]] DirectionalShadowFramePlan BuildDirectionalShadowFramePlan(
 		const RenderView& mainView, const Vector3& lightDirection,
-		const DirectionalShadowSettings& settings) noexcept;
+		const DirectionalShadowSettings& settings, bool previewRequested = false) noexcept;
 
 	[[nodiscard]] DirectionalShadowGPU BuildDirectionalShadowGPU(
-		const DirectionalShadowCascadeSet& cascades) noexcept;
+		const DirectionalShadowFramePlan& cascades, uint32_t viewBaseOffset) noexcept;
 }

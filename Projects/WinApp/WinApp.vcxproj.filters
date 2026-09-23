@@ -963,6 +963,9 @@
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>

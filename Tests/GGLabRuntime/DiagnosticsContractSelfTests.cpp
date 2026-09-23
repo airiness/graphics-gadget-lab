@@ -15,7 +15,7 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
-#include "GGLabRuntime/Graphics/DirectionalShadowCascadeSet.h"
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
@@ -802,7 +802,7 @@ namespace gglab
 				resources.m_ShadowMapSize = 2048;
 				resources.m_ShadowMapPreviewSize = 512;
 			});
-		DirectionalShadowCascadeSet cascades{};
+		DirectionalShadowFramePlan cascades{};
 		cascades.m_ViewBaseOffset = 7;
 		cascades.m_Cascades.resize(2);
 		cascades.m_Cascades[0].m_View.m_Width = 2048;

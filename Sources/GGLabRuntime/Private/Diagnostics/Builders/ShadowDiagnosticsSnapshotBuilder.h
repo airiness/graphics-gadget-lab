@@ -3,9 +3,9 @@
 namespace gglab
 {
 	class RenderGraph;
-	struct DirectionalShadowCascadeSet;
+	struct DirectionalShadowFramePlan;
 	struct ShadowDiagnosticsSnapshot;
 
 	[[nodiscard]] ShadowDiagnosticsSnapshot BuildShadowDiagnosticsSnapshot(
-		const RenderGraph& renderGraph, const DirectionalShadowCascadeSet* cascades = nullptr) noexcept;
+		const RenderGraph& renderGraph, const DirectionalShadowFramePlan* cascades = nullptr) noexcept;
 }
