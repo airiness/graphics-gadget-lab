@@ -2,7 +2,6 @@
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/String/StringUtils.h"
-#include "ShaderArtifactRuntime/ShaderPreviewPublication.h"
 
 #include <format>
 
@@ -180,24 +179,6 @@ namespace gglab
 				result.m_Options.m_StartupLabId = std::string(arguments[index]);
 				continue;
 			}
-			if (argument == "--shader-preview-session")
-			{
-				if (result.m_Options.m_ShaderPreviewSessionId)
-				{
-					result.m_Error =
-						"Option '--shader-preview-session' may only be specified once.";
-					return result;
-				}
-				if (++index >= arguments.size() ||
-					!IsValidShaderPreviewSessionId(arguments[index]))
-				{
-					result.m_Error =
-						"Option '--shader-preview-session' requires exactly 32 lowercase hexadecimal characters.";
-					return result;
-				}
-				result.m_Options.m_ShaderPreviewSessionId = std::string(arguments[index]);
-				continue;
-			}
 			if (argument == "--self-test")
 			{
 				if (result.m_Options.m_SelfTestSelection)
@@ -233,24 +214,8 @@ namespace gglab
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		}
-		if (result.m_Options.m_ShaderPreviewSessionId &&
-			(!result.m_Options.m_StartupLabId ||
-				*result.m_Options.m_StartupLabId != DesktopShaderGraphPreviewLabId))
-		{
-			result.m_Error =
-				"Option '--shader-preview-session' requires '--lab gglab.lab.shader_graph_preview'.";
-			return result;
-		}
-		if (result.m_Options.m_ShaderPreviewSessionId &&
-			result.m_Options.m_ListAdapters)
-		{
-			result.m_Error =
-				"Option '--shader-preview-session' cannot be combined with '--list-adapters'.";
-			return result;
-		}
 		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
-				result.m_Options.m_ShaderPreviewSessionId ||
 				result.m_Options.m_StartWithAbsoluteMouse ||
 				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
@@ -290,9 +255,6 @@ namespace gglab
 			"Options:\n"
 			"  --demo <start|playground|island|atrium|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
-			"  --shader-preview-session <id>   Attach Shader Graph Preview to one 128-bit\n"
-			"                                  lowercase hexadecimal session ID. Requires\n"
-			"                                  --lab gglab.lab.shader_graph_preview.\n"
 			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
 			"  --state-root <absolute-path>    Store artifacts, caches and settings outside deployed inputs.\n"
 			"  --no-devtools                   Disable optional desktop development tooling.\n"

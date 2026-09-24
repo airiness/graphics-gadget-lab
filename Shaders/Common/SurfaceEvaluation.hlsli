@@ -1,21 +1,7 @@
 #pragma once
 #include <Common/MaterialUtils.hlsli>
 
-// gglab.surface profile shape (surface integration probe).
-//
-// The surface seam answers "what is the material surface" for the existing
-// Forward PBR lighting path: it consumes the runtime-driven MaterialData
-// (scalar/vector factors plus texture+sampler bindings) and resolves the
-// surface quantities the lighting consumes.
-//
-// Intentionally not owned here (kept in the Forward PBR pass or BRDF):
-// normal-map perturbation, BRDF clamps/filters, Forward+ lighting, IBL,
-// shadow, GTAO, and post-process behavior.
-//
-// Sampling: reuses the existing texture+sampler binding representation
-// (TextureIndex + SamplerIndex) as-is. The probe exercises the texture
-// fixtures; sampler authoring policy stays deferred to that representation.
-
+// Resolves runtime material factors and texture bindings for Forward PBR.
 struct SurfaceData
 {
 	float3 BaseColor;

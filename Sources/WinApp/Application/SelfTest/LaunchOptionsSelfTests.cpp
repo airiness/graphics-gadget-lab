@@ -148,60 +148,6 @@ namespace gglab
 			}
 		}
 
-		void RunShaderPreviewSessionCliContractTests(SelfTestContext& context) noexcept
-		{
-			const auto parse = [](std::initializer_list<std::string_view> arguments)
-				{
-					const std::vector<std::string_view> args(arguments);
-					return ParseApplicationLaunchOptions(args);
-				};
-			constexpr std::string_view SessionId = "0123456789abcdef0123456789abcdef";
-
-			{
-				const auto result = parse({ "--lab", "gglab.lab.shader_graph_preview",
-					"--shader-preview-session", SessionId });
-				context.Check(result.IsValid() &&
-					result.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
-					result.m_Options.m_ShaderPreviewSessionId == SessionId,
-					"Shader Preview session attachment requires the stable Preview Lab ID");
-			}
-			{
-				const auto result = parse({ "--shader-preview-session", SessionId });
-				context.Check(!result.IsValid() && result.m_Error.find("--lab") != std::string::npos,
-					"Shader Preview session attachment cannot silently select a Lab");
-			}
-			{
-				const auto result = parse({ "--lab", "gglab.lab.culling",
-					"--shader-preview-session", SessionId });
-				context.Check(!result.IsValid(),
-					"Shader Preview session attachment rejects every non-Preview Lab");
-			}
-			{
-				const auto result = parse({ "--lab", "gglab.lab.shader_graph_preview",
-					"--shader-preview-session", "0123456789ABCDEF0123456789ABCDEF" });
-				context.Check(!result.IsValid(),
-					"Shader Preview session IDs reject uppercase hexadecimal characters");
-			}
-			{
-				const auto result = parse({ "--lab", "gglab.lab.shader_graph_preview",
-					"--shader-preview-session", "0123456789abcdef" });
-				context.Check(!result.IsValid(),
-					"Shader Preview session IDs reject the wrong length before path construction");
-			}
-			{
-				const auto result = parse({ "--lab", "gglab.lab.shader_graph_preview",
-					"--shader-preview-session", SessionId,
-					"--shader-preview-session", SessionId });
-				context.Check(!result.IsValid(),
-					"Shader Preview session attachment rejects duplicate session options");
-			}
-			{
-				const auto result = parse({ "--lab", "gglab.lab.shader_graph_preview",
-					"--shader-preview-session", SessionId, "--list-adapters" });
-				context.Check(!result.IsValid(),
-					"Shader Preview session attachment cannot be discarded by an adapter-list exit mode");
-			}
-		}
 	}
 
 	void RunLaunchOptionsSelfTests(SelfTestContext& context) noexcept
@@ -209,6 +155,12 @@ namespace gglab
 		RunVulkanCliContractTests(context);
 		RunPlaygroundContentCliContractTests(context);
 		RunTextureContractLabCliTests(context);
-		RunShaderPreviewSessionCliContractTests(context);
+		const std::vector<std::string_view> retiredPreviewOption{
+			"--shader-preview-session", "0123456789abcdef0123456789abcdef" };
+		const ApplicationLaunchParseResult retiredPreviewResult =
+			ParseApplicationLaunchOptions(retiredPreviewOption);
+		context.Check(!retiredPreviewResult.IsValid() &&
+			retiredPreviewResult.m_Error.find("Unknown option") != std::string::npos,
+			"Archived shader editor session option is rejected");
 	}
 }

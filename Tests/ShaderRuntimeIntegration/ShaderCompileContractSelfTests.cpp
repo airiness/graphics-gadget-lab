@@ -23,13 +23,11 @@
 #include "Targets/ShaderTargetWireNames.h"
 #include "Targets/Vulkan13ShaderTarget.h"
 #include "Wire/ShaderWireNames.h"
-#include "ShaderArtifactRuntime/ShaderGraphPreviewProgram.h"
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <dxcapi.h>
 #include <windows.h>
 
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -234,198 +232,6 @@ namespace gglab
 			auto recordPath = binaryPath;
 			recordPath += L".json";
 			return recordPath;
-		}
-
-		struct GeneratedSurfaceCompileCase final
-		{
-			const wchar_t* m_ArtifactPath = nullptr;
-			const wchar_t* m_ProvenancePath = nullptr;
-			const wchar_t* m_HarnessPath = nullptr;
-			std::uint64_t m_ProfileVersion = 0;
-			const char* m_PinCheckName = nullptr;
-			const char* m_DxilCheckName = nullptr;
-			const char* m_SpirVCheckName = nullptr;
-		};
-
-		[[nodiscard]] bool IsLowercaseHex(std::string_view value, std::size_t length) noexcept
-		{
-			return value.size() == length && std::ranges::all_of(value,
-				[](char character) noexcept
-				{
-					return (character >= '0' && character <= '9') ||
-						(character >= 'a' && character <= 'f');
-				});
-		}
-
-		[[nodiscard]] std::optional<std::vector<std::byte>> ReadExactFileBytes(
-			const std::filesystem::path& path) noexcept
-		{
-			std::ifstream input(path, std::ios::binary | std::ios::ate);
-			if (!input)
-			{
-				return std::nullopt;
-			}
-
-			const std::streampos end = input.tellg();
-			if (end < 0 || static_cast<std::uintmax_t>(end) >
-				std::numeric_limits<std::size_t>::max())
-			{
-				return std::nullopt;
-			}
-
-			std::vector<std::byte> bytes(static_cast<std::size_t>(end));
-			input.seekg(0, std::ios::beg);
-			if (!bytes.empty())
-			{
-				input.read(reinterpret_cast<char*>(bytes.data()),
-					static_cast<std::streamsize>(bytes.size()));
-			}
-			if (!input)
-			{
-				return std::nullopt;
-			}
-			return bytes;
-		}
-
-		[[nodiscard]] std::optional<nlohmann::json> ReadJsonObject(
-			const std::filesystem::path& path) noexcept
-		{
-			std::ifstream input(path, std::ios::binary);
-			if (!input)
-			{
-				return std::nullopt;
-			}
-
-			try
-			{
-				const nlohmann::json document =
-					nlohmann::json::parse(input, nullptr, /*allow_exceptions=*/false);
-				if (document.is_discarded() || !document.is_object())
-				{
-					return std::nullopt;
-				}
-				return document;
-			}
-			catch (...)
-			{
-				return std::nullopt;
-			}
-		}
-
-		[[nodiscard]] bool ReadUnsignedJsonValue(
-			const nlohmann::json& value, std::uint64_t& out) noexcept
-		{
-			if (value.is_number_unsigned())
-			{
-				out = value.get<std::uint64_t>();
-				return true;
-			}
-			if (!value.is_number_integer())
-			{
-				return false;
-			}
-
-			const std::int64_t signedValue = value.get<std::int64_t>();
-			if (signedValue < 0)
-			{
-				return false;
-			}
-			out = static_cast<std::uint64_t>(signedValue);
-			return true;
-		}
-
-		[[nodiscard]] bool ValidateGeneratedSurfaceFixturePin(
-			const std::filesystem::path& shaderSourceRoot,
-			const GeneratedSurfaceCompileCase& compileCase) noexcept
-		{
-			const std::optional<nlohmann::json> document =
-				ReadJsonObject(shaderSourceRoot / compileCase.m_ProvenancePath);
-			constexpr std::array<std::string_view, 7> ExpectedFields{
-				"schemaVersion",
-				"profileId",
-				"profileVersion",
-				"editorCommit",
-				"fixturePath",
-				"generatedSourceIdentity",
-				"byteCount",
-			};
-			if (!document.has_value() || document->size() != ExpectedFields.size() ||
-				!std::ranges::all_of(ExpectedFields,
-					[&document](std::string_view field)
-					{
-						return document->contains(std::string(field));
-					}))
-			{
-				return false;
-			}
-
-			std::uint64_t schemaVersion = 0;
-			std::uint64_t profileVersion = 0;
-			std::uint64_t byteCount = 0;
-			if (!ReadUnsignedJsonValue(document->at("schemaVersion"), schemaVersion) ||
-				schemaVersion != 1 ||
-				!ReadUnsignedJsonValue(document->at("profileVersion"), profileVersion) ||
-				profileVersion != compileCase.m_ProfileVersion ||
-				!ReadUnsignedJsonValue(document->at("byteCount"), byteCount) ||
-				byteCount > std::numeric_limits<std::size_t>::max())
-			{
-				return false;
-			}
-
-			const auto& profileId = document->at("profileId");
-			const auto& editorCommit = document->at("editorCommit");
-			const auto& fixturePath = document->at("fixturePath");
-			const auto& generatedSourceIdentity = document->at("generatedSourceIdentity");
-			if (!profileId.is_string() ||
-				profileId.get_ref<const std::string&>() != "gglab.surface" ||
-				!editorCommit.is_string() ||
-				!IsLowercaseHex(editorCommit.get_ref<const std::string&>(), 40) ||
-				!fixturePath.is_string() || fixturePath.get_ref<const std::string&>().empty() ||
-				!generatedSourceIdentity.is_string() ||
-				!IsLowercaseHex(generatedSourceIdentity.get_ref<const std::string&>(), 64))
-			{
-				return false;
-			}
-
-			const std::optional<std::vector<std::byte>> artifactBytes =
-				ReadExactFileBytes(shaderSourceRoot / compileCase.m_ArtifactPath);
-			if (!artifactBytes.has_value() || artifactBytes->size() != byteCount)
-			{
-				return false;
-			}
-
-			return Sha256DigestToHex(ComputeSha256(std::span(*artifactBytes))) ==
-				generatedSourceIdentity.get_ref<const std::string&>();
-		}
-
-		void RunGeneratedSurfaceContractCompileCase(SelfTestContext& context,
-			ShaderCompiler& compiler, const std::filesystem::path& shaderSourceRoot,
-			ShaderDesc& desc, const GeneratedSurfaceCompileCase& compileCase) noexcept
-		{
-			const bool pinValid =
-				ValidateGeneratedSurfaceFixturePin(shaderSourceRoot, compileCase);
-			context.Check(pinValid, compileCase.m_PinCheckName);
-			if (!pinValid)
-			{
-				return;
-			}
-
-			desc.m_SourcePath = compileCase.m_HarnessPath;
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			desc.m_Target = {};
-			const ShaderCompileResult dxilArtifact = compiler.Compile(desc);
-			context.Check(dxilArtifact.IsSuccess() &&
-				dxilArtifact.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil,
-				compileCase.m_DxilCheckName);
-
-			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-			const ShaderCompileResult spirVArtifact = compiler.Compile(desc);
-			desc.m_Target = {};
-			context.Check(spirVArtifact.IsSuccess() &&
-				spirVArtifact.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV,
-				compileCase.m_SpirVCheckName);
 		}
 
 		constexpr std::wstring_view VulkanSdkValidationBaseline = L"1.3.296.0";
@@ -2279,13 +2085,41 @@ namespace gglab
 				? std::string_view(viewLayoutDisassembly).substr(
 					dxilViewDataOffset, dxilViewDataLineEnd - dxilViewDataOffset)
 				: std::string_view{};
-			for (const GPUAbiMember& member : ViewGPUAbiMembers)
+			struct GPUAbiMember final
+			{
+				std::string_view m_Name;
+				size_t m_Offset = 0;
+			};
+			const std::array viewGPUAbiMembers{
+				GPUAbiMember{ "ViewMat", offsetof(ViewGPU, ViewMat) },
+				GPUAbiMember{ "ProjMat", offsetof(ViewGPU, ProjMat) },
+				GPUAbiMember{ "InvViewMat", offsetof(ViewGPU, InvViewMat) },
+				GPUAbiMember{ "InvProjMat", offsetof(ViewGPU, InvProjMat) },
+				GPUAbiMember{ "PreviousViewMat", offsetof(ViewGPU, PreviousViewMat) },
+				GPUAbiMember{ "PreviousRasterViewProj", offsetof(ViewGPU, PreviousRasterViewProj) },
+				GPUAbiMember{ "CameraPos", offsetof(ViewGPU, CameraPos) },
+				GPUAbiMember{ "PreviousDepthReconstructionParams",
+					offsetof(ViewGPU, PreviousDepthReconstructionParams) },
+				GPUAbiMember{ "Near", offsetof(ViewGPU, Near) },
+				GPUAbiMember{ "Far", offsetof(ViewGPU, Far) },
+				GPUAbiMember{ "FovRadians", offsetof(ViewGPU, FovRadians) },
+				GPUAbiMember{ "Aspect", offsetof(ViewGPU, Aspect) },
+				GPUAbiMember{ "CurrentJitterUV", offsetof(ViewGPU, CurrentJitterUV) },
+				GPUAbiMember{ "PreviousJitterUV", offsetof(ViewGPU, PreviousJitterUV) },
+				GPUAbiMember{ "ExposureMultiplier", offsetof(ViewGPU, ExposureMultiplier) },
+				GPUAbiMember{ "Width", offsetof(ViewGPU, Width) },
+				GPUAbiMember{ "Height", offsetof(ViewGPU, Height) },
+				GPUAbiMember{ "DepthConvention", offsetof(ViewGPU, DepthConvention) },
+				GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
+				GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
+			};
+			for (const GPUAbiMember& member : viewGPUAbiMembers)
 			{
 				dxilLayoutMatches = dxilLayoutMatches &&
 					FindDxilMemberOffset(dxilViewDataLayout, member.m_Name) == member.m_Offset;
 			}
 			dxilLayoutMatches = dxilLayoutMatches && !dxilViewDataLayout.empty() &&
-				ParseUnsignedAfter(dxilViewDataLayout, "Size:") == ViewGPUAbiStride;
+				ParseUnsignedAfter(dxilViewDataLayout, "Size:") == sizeof(ViewGPU);
 			context.Check(dxilLayoutMatches,
 				"DXIL ViewData member offsets and structured-buffer stride match ViewGPU exactly");
 
@@ -2300,15 +2134,15 @@ namespace gglab
 				? viewLayoutReflection.FindStructLayout("ViewData")
 				: nullptr;
 			bool spirVLayoutMatches = spirVViewData &&
-				spirVViewData->m_Members.size() == ViewGPUAbiMembers.size() &&
-				spirVViewData->m_ArrayStride == ViewGPUAbiStride;
+				spirVViewData->m_Members.size() == viewGPUAbiMembers.size() &&
+				spirVViewData->m_ArrayStride == sizeof(ViewGPU);
 			if (spirVLayoutMatches)
 			{
-				for (size_t index = 0; index < ViewGPUAbiMembers.size(); ++index)
+				for (size_t index = 0; index < viewGPUAbiMembers.size(); ++index)
 				{
 					spirVLayoutMatches =
-						spirVViewData->m_Members[index].m_Name == ViewGPUAbiMembers[index].m_Name &&
-						spirVViewData->m_Members[index].m_Offset == ViewGPUAbiMembers[index].m_Offset;
+						spirVViewData->m_Members[index].m_Name == viewGPUAbiMembers[index].m_Name &&
+						spirVViewData->m_Members[index].m_Offset == viewGPUAbiMembers[index].m_Offset;
 					if (!spirVLayoutMatches)
 					{
 						break;
@@ -2341,14 +2175,22 @@ namespace gglab
 				? std::string_view(objectLayoutDisassembly).substr(
 					dxilObjectDataOffset, dxilObjectDataLineEnd - dxilObjectDataOffset)
 				: std::string_view{};
-			for (const GPUAbiMember& member : ObjectGPUAbiMembers)
+			const std::array objectGPUAbiMembers{
+				GPUAbiMember{ "ModelMat", offsetof(ObjectGPU, ModelMat) },
+				GPUAbiMember{ "PreviousModelMat", offsetof(ObjectGPU, PreviousModelMat) },
+				GPUAbiMember{ "NormalMat", offsetof(ObjectGPU, NormalMat) },
+				GPUAbiMember{ "MaterialIndex", offsetof(ObjectGPU, MaterialIndex) },
+				GPUAbiMember{ "ViewIndex", offsetof(ObjectGPU, ViewIndex) },
+				GPUAbiMember{ "Padding", offsetof(ObjectGPU, Padding) },
+			};
+			for (const GPUAbiMember& member : objectGPUAbiMembers)
 			{
 				dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
 					FindDxilMemberOffset(dxilObjectDataLayout, member.m_Name) == member.m_Offset;
 			}
 			dxilObjectLayoutMatches = dxilObjectLayoutMatches &&
 				!dxilObjectDataLayout.empty() &&
-				ParseUnsignedAfter(dxilObjectDataLayout, "Size:") == ObjectGPUAbiStride;
+				ParseUnsignedAfter(dxilObjectDataLayout, "Size:") == sizeof(ObjectGPU);
 			context.Check(dxilObjectLayoutMatches,
 				"DXIL ObjectData member offsets and structured-buffer stride match ObjectGPU exactly");
 
@@ -2364,17 +2206,17 @@ namespace gglab
 				? objectLayoutReflection.FindStructLayout("ObjectData")
 				: nullptr;
 			bool spirVObjectLayoutMatches = spirVObjectData &&
-				spirVObjectData->m_Members.size() == ObjectGPUAbiMembers.size() &&
-				spirVObjectData->m_ArrayStride == ObjectGPUAbiStride;
+				spirVObjectData->m_Members.size() == objectGPUAbiMembers.size() &&
+				spirVObjectData->m_ArrayStride == sizeof(ObjectGPU);
 			if (spirVObjectLayoutMatches)
 			{
-				for (size_t index = 0; index < ObjectGPUAbiMembers.size(); ++index)
+				for (size_t index = 0; index < objectGPUAbiMembers.size(); ++index)
 				{
 					spirVObjectLayoutMatches =
 						spirVObjectData->m_Members[index].m_Name ==
-							ObjectGPUAbiMembers[index].m_Name &&
+							objectGPUAbiMembers[index].m_Name &&
 						spirVObjectData->m_Members[index].m_Offset ==
-							ObjectGPUAbiMembers[index].m_Offset;
+							objectGPUAbiMembers[index].m_Offset;
 					if (!spirVObjectLayoutMatches)
 					{
 						break;
@@ -2551,139 +2393,8 @@ namespace gglab
 			const ShaderCompileResult surfaceContractArtifact =
 				compiler.Compile(desc);
 			context.Check(surfaceContractArtifact.IsSuccess(),
-				"Production DXC compiles the gglab.surface surface evaluation "
-				"seam contract (profile shape and the runtime MaterialData input)");
-
-			desc.m_SourcePath = L"Tests/SurfaceTextureContractCompile.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			desc.m_Target = {};
-			const ShaderCompileResult surfaceTextureContractArtifact =
-				compiler.Compile(desc);
-			context.Check(surfaceTextureContractArtifact.IsSuccess() &&
-				surfaceTextureContractArtifact.m_Artifact.GetBinaryFormat() ==
-					ShaderBinaryFormat::Dxil,
-				"Production DXC compiles the gglab.surface texture signature "
-				"contract for the DX12 target (generated texture parameter form, "
-				"bindless sample expression, and the profile output shape) to DXIL");
-
-			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-			const ShaderCompileResult surfaceTextureContractSpirVArtifact =
-				compiler.Compile(desc);
-			desc.m_Target = {};
-			context.Check(surfaceTextureContractSpirVArtifact.IsSuccess() &&
-				surfaceTextureContractSpirVArtifact.m_Artifact.GetBinaryFormat() ==
-					ShaderBinaryFormat::SpirV,
-				"Production DXC compiles the gglab.surface texture signature "
-				"contract for the Vulkan 1.3 target through the toolchain "
-				"bindless-heap binding arguments to SPIR-V");
-
-			const GeneratedSurfaceCompileCase generatedSurfaceV1Case{
-				.m_ArtifactPath = L"Tests/Generated/SurfaceGeneratedV1.hlsli",
-				.m_ProvenancePath = L"Tests/Generated/SurfaceGeneratedV1.provenance.json",
-				.m_HarnessPath = L"Tests/SurfaceGeneratedV1ContractCompile.hlsl",
-				.m_ProfileVersion = 1,
-				.m_PinCheckName = "Generated gglab.surface profileVersion 1 fixture matches its sole provenance pin authority",
-				.m_DxilCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 1 function to DXIL",
-				.m_SpirVCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 1 function to SPIR-V",
-			};
-			RunGeneratedSurfaceContractCompileCase(
-				context, compiler, shaderSourceRoot, desc, generatedSurfaceV1Case);
-
-			const GeneratedSurfaceCompileCase generatedSurfaceV2Case{
-				.m_ArtifactPath = L"Tests/Generated/SurfaceGeneratedV2.hlsli",
-				.m_ProvenancePath = L"Tests/Generated/SurfaceGeneratedV2.provenance.json",
-				.m_HarnessPath = L"Tests/SurfaceGeneratedV2ContractCompile.hlsl",
-				.m_ProfileVersion = 2,
-				.m_PinCheckName = "Generated gglab.surface profileVersion 2 fixture matches its sole provenance pin authority",
-				.m_DxilCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 2 function to DXIL",
-				.m_SpirVCheckName = "Production DXC compiles the pinned generated gglab.surface profileVersion 2 function to SPIR-V",
-			};
-			RunGeneratedSurfaceContractCompileCase(
-				context, compiler, shaderSourceRoot, desc, generatedSurfaceV2Case);
-
-			desc.m_SourcePath =
-				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV1.hlsl";
-			desc.m_Stage = ShaderStage::Pixel;
-			desc.m_Entry = L"PSMain";
-			desc.m_Defines.clear();
-			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
-			desc.m_Target.m_Flags =
-				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
-			const ShaderCompileResult previewV1Dxil = compiler.Compile(desc);
-			desc.m_SourcePath =
-				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl";
-			const ShaderCompileResult previewV2Dxil = compiler.Compile(desc);
-			desc.m_SourcePath =
-				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV1.hlsl";
-			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-			desc.m_Target.m_Flags =
-				ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
-			const ShaderCompileResult previewV1SpirV = compiler.Compile(desc);
-			desc.m_SourcePath =
-				L"Programs/ShaderGraphPreview/ShaderGraphPreviewSurfaceV2.hlsl";
-			const ShaderCompileResult previewV2SpirV = compiler.Compile(desc);
-			desc.m_Target = {};
-			context.Check(previewV1Dxil.IsSuccess() && previewV2Dxil.IsSuccess() &&
-				previewV1SpirV.IsSuccess() && previewV2SpirV.IsSuccess() &&
-				previewV1Dxil.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
-				previewV2Dxil.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::Dxil &&
-				previewV1SpirV.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV &&
-				previewV2SpirV.m_Artifact.GetBinaryFormat() == ShaderBinaryFormat::SpirV,
-				"Production DXC compiles both pinned Shader Graph Preview adapters "
-				"through DX12 and Vulkan target policy");
-
-			std::string previewDxilDisassembly;
-			bool previewDxilLayoutMatches = previewV2Dxil.IsSuccess() &&
-				DisassembleDxil(previewV2Dxil.m_Artifact.m_Binary, previewDxilDisassembly);
-			const size_t previewDxilTypeNameOffset = previewDxilDisassembly.find(
-				"struct struct.ShaderGraphPreviewPassParameters");
-			previewDxilLayoutMatches =
-				previewDxilLayoutMatches && previewDxilTypeNameOffset != std::string::npos;
-			for (const ShaderGraphPreviewPassAbiMember& member :
-				ShaderGraphPreviewPassAbiMembers)
-			{
-				previewDxilLayoutMatches = previewDxilLayoutMatches &&
-					FindDxilMemberOffset(previewDxilDisassembly, member.m_Name) == member.m_Offset;
-			}
-			previewDxilLayoutMatches = previewDxilLayoutMatches &&
-				ParseUnsignedAfter(previewDxilDisassembly, "Size:", previewDxilTypeNameOffset) ==
-					sizeof(ShaderGraphPreviewPassParameters);
-			context.Check(previewDxilLayoutMatches,
-				"DXIL reflection matches every ShaderGraphPreviewPassParameters member "
-				"offset and its 48-byte size");
-
-			SpirVDecorationReflection previewSpirVReflection;
-			const bool reflectedPreviewSpirV = previewV2SpirV.IsSuccess() &&
-				ReadSpirVDecorations(
-					previewV2SpirV.m_Artifact.m_Binary, previewSpirVReflection);
-			const SpirVStructLayoutReflection* previewSpirVLayout = reflectedPreviewSpirV
-				? previewSpirVReflection.FindStructLayout(
-					"type.ConstantBuffer.ShaderGraphPreviewPassParameters")
-				: nullptr;
-			bool previewSpirVLayoutMatches = previewSpirVLayout &&
-				previewSpirVLayout->m_Members.size() ==
-					ShaderGraphPreviewPassAbiMembers.size() &&
-				previewSpirVLayout->m_Size == sizeof(ShaderGraphPreviewPassParameters);
-			if (previewSpirVLayoutMatches)
-			{
-				for (size_t index = 0; index < ShaderGraphPreviewPassAbiMembers.size(); ++index)
-				{
-					previewSpirVLayoutMatches =
-						previewSpirVLayout->m_Members[index].m_Name ==
-							ShaderGraphPreviewPassAbiMembers[index].m_Name &&
-						previewSpirVLayout->m_Members[index].m_Offset ==
-							ShaderGraphPreviewPassAbiMembers[index].m_Offset;
-					if (!previewSpirVLayoutMatches)
-					{
-						break;
-					}
-				}
-			}
-			context.Check(previewSpirVLayoutMatches,
-				"SPIR-V reflection matches every ShaderGraphPreviewPassParameters member "
-				"offset and its 48-byte size");
+				"Production DXC compiles the Forward PBR surface evaluation "
+				"contract with runtime MaterialData input");
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
