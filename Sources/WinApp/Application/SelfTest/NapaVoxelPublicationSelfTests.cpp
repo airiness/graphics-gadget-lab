@@ -99,6 +99,10 @@ namespace gglab
 			{
 				return nullptr;
 			}
+			[[nodiscard]] ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override
 			{
 				return nullptr;

@@ -429,8 +429,10 @@
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
+    <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />

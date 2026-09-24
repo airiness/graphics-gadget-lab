@@ -44,6 +44,7 @@ namespace gglab
 	class PostProcessPreviewViewBase;
 	class RenderFrameBuilder;
 	class ShadowPreviewViewBase;
+	class ShadowPreviewControlBase;
 	class TemporalHistoryManager;
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
@@ -159,6 +160,7 @@ namespace gglab
 		[[nodiscard]] PostProcessPreviewControlBase* GetPostProcessPreviewControl()
 			const noexcept override;
 		[[nodiscard]] ShadowPreviewViewBase* GetShadowPreviewView() const noexcept override;
+		[[nodiscard]] ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept override;
 		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override;
 		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept override;
 		// Composition-time asset lease wiring for the IBL bake scheduler. The

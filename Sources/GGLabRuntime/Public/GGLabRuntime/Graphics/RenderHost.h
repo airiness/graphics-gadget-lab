@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
@@ -110,6 +111,7 @@ namespace gglab
 		TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 		RenderScene m_RenderScene{};
 		std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
+		DirectionalShadowFramePlan m_DirectionalShadowFramePlan{};
 		DebugDrawFrameView m_DebugDrawFrame{};
 		DebugDrawCullContext m_DebugDrawCullContext{};
 		RenderSceneBuildStatus m_RenderSceneStatus = RenderSceneBuildStatus::GpuUploadFailed;
@@ -132,6 +134,7 @@ namespace gglab
 				.m_DisplayViewId = m_DisplayViewId,
 				.m_RenderScene = m_RenderScene,
 				.m_RenderQueues = std::span<const RenderQueue>(m_RenderQueues),
+				.m_DirectionalShadowFramePlan = &m_DirectionalShadowFramePlan,
 				.m_DebugDrawFrame = m_DebugDrawFrame,
 				.m_DirectionalShadowSettings = m_DirectionalShadowSettings,
 				.m_ShadowVisualizationSettings = m_ShadowVisualizationSettings,
@@ -209,6 +212,7 @@ namespace gglab
 		[[nodiscard]] virtual PostProcessPreviewControlBase* GetPostProcessPreviewControl()
 			const noexcept = 0;
 		[[nodiscard]] virtual ShadowPreviewViewBase* GetShadowPreviewView() const noexcept = 0;
+		[[nodiscard]] virtual ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept = 0;
 		[[nodiscard]] virtual GpuProfilingViewBase* GetGpuProfilingView() const noexcept = 0;
 		[[nodiscard]] virtual GpuProfilingControlBase* GetGpuProfilingControl() const noexcept = 0;
 

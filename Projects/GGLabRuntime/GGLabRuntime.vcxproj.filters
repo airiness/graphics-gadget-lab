@@ -321,6 +321,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\RuntimeToolingAdapters.cpp">
       <Filter>Private\Diagnostics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\ShadowTemporalDiagnostics.cpp">
+      <Filter>Private\Diagnostics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.cpp">
       <Filter>Private\Diagnostics</Filter>
     </ClCompile>
@@ -467,6 +470,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp">
       <Filter>Private\Graphics\DebugDraw</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DirectionalShadowFramePlan.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\EnvironmentAssetController.cpp">
       <Filter>Private\Graphics</Filter>
@@ -1562,6 +1568,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\RuntimeToolingAdapters.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\ShadowTemporalDiagnostics.h">
+      <Filter>Public\GGLabRuntime\Diagnostics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\SnapshotCommon.h">
       <Filter>Public\GGLabRuntime\Diagnostics</Filter>
     </ClInclude>
@@ -1762,6 +1771,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDrawService.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DirectionalShadowFramePlan.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\EnvironmentAssetController.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>

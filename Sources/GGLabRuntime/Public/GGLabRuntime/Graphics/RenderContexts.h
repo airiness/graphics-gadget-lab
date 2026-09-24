@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
@@ -30,6 +31,7 @@ namespace gglab
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
 		const RenderScene& m_RenderScene;
 		std::span<const RenderQueue> m_RenderQueues;
+		const DirectionalShadowFramePlan* m_DirectionalShadowFramePlan = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};
 
 		DirectionalShadowSettings m_DirectionalShadowSettings = DisabledDirectionalShadowSettings();
@@ -48,9 +50,17 @@ namespace gglab
 
 		const RenderQueue& GetRenderQueue(RenderViewID viewId) const noexcept
 		{
+			GGLAB_ASSERT_MSG(viewId != RenderViewID::DirectionalShadow,
+				"Directional shadow queues belong to the cascade set.");
 			const auto index = utils::ToIndex(viewId);
 			GGLAB_ASSERT(index < m_RenderQueues.size());
 			return m_RenderQueues[index];
+		}
+
+		const DirectionalShadowFramePlan& GetDirectionalShadowFramePlan() const noexcept
+		{
+			GGLAB_ASSERT_NOT_NULL(m_DirectionalShadowFramePlan);
+			return *m_DirectionalShadowFramePlan;
 		}
 
 		RenderViewID GetDisplayViewId() const noexcept { return m_DisplayViewId; }

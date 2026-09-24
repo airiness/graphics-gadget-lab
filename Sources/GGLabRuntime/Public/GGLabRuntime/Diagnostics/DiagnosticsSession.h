@@ -17,6 +17,7 @@ namespace gglab
 	class RenderGraph;
 	class TaskSystem;
 	class World;
+	struct DirectionalShadowFramePlan;
 	struct ResolvedTemporalFramePlan;
 	struct ViewRenderProfile;
 
@@ -34,6 +35,8 @@ namespace gglab
 		RenderGraph* m_RenderGraph = nullptr;
 		std::span<RenderView> m_RenderViews;
 		std::span<const RenderQueue> m_RenderQueues;
+		const DirectionalShadowFramePlan* m_DirectionalShadowFramePlan = nullptr;
+		uint64_t m_FrameSerial = 0;
 		RenderView* m_MainRenderView = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;

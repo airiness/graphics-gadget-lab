@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
@@ -49,6 +50,7 @@ namespace gglab
 			RenderScene m_RenderScene{};
 			RenderSceneGpuAllocations m_SceneGpuAllocations{};
 			std::array<RenderQueue, utils::ToIndex(RenderViewID::Count)> m_RenderQueues{};
+			DirectionalShadowFramePlan m_DirectionalShadowFramePlan{};
 			DebugDrawFrameView m_DebugDrawFrame{};
 			DebugDrawCullContext m_DebugDrawCullContext{};
 			RHIFencePoint m_UploadFencePoint{};

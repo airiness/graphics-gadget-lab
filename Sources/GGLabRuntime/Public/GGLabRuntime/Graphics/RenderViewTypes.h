@@ -7,7 +7,7 @@ namespace gglab
 	enum class RenderViewID : uint32_t
 	{
 		Main,
-		DirectionalShadow,
+		DirectionalShadow, // Shadow view kind; not a camera queue or GPU view index.
 		DebugCamera0,
 		DebugCamera1,
 		DebugCamera2,

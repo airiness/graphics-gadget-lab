@@ -27,6 +27,7 @@ namespace gglab
 	class PostProcessPreviewControlBase;
 	class PostProcessPreviewViewBase;
 	class ShadowPreviewViewBase;
+	class ShadowPreviewControlBase;
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
@@ -63,6 +64,7 @@ namespace gglab
 		const PostProcessPreviewViewBase* m_PostProcessPreview = nullptr;
 		PostProcessPreviewControlBase* m_PostProcessPreviewControl = nullptr;
 		const ShadowPreviewViewBase* m_ShadowPreview = nullptr;
+		ShadowPreviewControlBase* m_ShadowPreviewControl = nullptr;
 		const DebugDrawChannelViewBase* m_DebugDrawChannels = nullptr;
 		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		DebugDrawFrameView m_DebugDrawFrame{};

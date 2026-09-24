@@ -44,6 +44,51 @@ namespace gglab
 		};
 	}
 
+	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
+		std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept
+	{
+		ViewUploadData result{};
+		auto& viewData = result.m_Views;
+		viewData.reserve(cameraViews.size() + cascades.m_Cascades.size());
+		const auto appendView = [&viewData](const RenderView& renderView)
+		{
+			ViewGPU viewGpu{};
+			viewGpu.ViewMat = renderView.m_View;
+			viewGpu.ProjMat = renderView.m_RasterProj;
+			viewGpu.InvViewMat = renderView.m_InvView;
+			viewGpu.InvProjMat = renderView.m_InvRasterProj;
+			viewGpu.PreviousViewMat = renderView.m_PreviousView;
+			viewGpu.PreviousRasterViewProj = renderView.m_PreviousRasterViewProj;
+			viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
+			viewGpu.PreviousDepthReconstructionParams =
+				renderView.m_PreviousDepthReconstructionParams;
+			viewGpu.Near = renderView.m_Near;
+			viewGpu.Far = renderView.m_Far;
+			viewGpu.FovRadians = renderView.m_FovRadians;
+			viewGpu.Aspect = renderView.m_Aspect;
+			viewGpu.CurrentJitterUV = renderView.m_JitterUV;
+			viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
+			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
+			viewGpu.Width = renderView.m_Width;
+			viewGpu.Height = renderView.m_Height;
+			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
+			viewGpu.PreviousDepthConvention =
+				static_cast<uint32_t>(renderView.m_PreviousDepthConvention);
+			viewData.push_back(viewGpu);
+		};
+		for (const RenderView& view : cameraViews)
+		{
+			appendView(view);
+		}
+		result.m_ShadowViewBaseOffset = cascades.m_Cascades.empty()
+			? DirectionalShadowFramePlan::UnassignedViewBaseOffset : static_cast<uint32_t>(viewData.size());
+		for (const DirectionalShadowCascade& cascade : cascades.m_Cascades)
+		{
+			appendView(cascade.m_View);
+		}
+		return result;
+	}
+
 	RenderSceneBuilder::BuildResult RenderSceneBuilder::Build(const BuildInfo& info) noexcept
 	{
 		BuildResult result{};
@@ -51,8 +96,6 @@ namespace gglab
 		auto& registry = info.m_World.GetRegistry();
 		auto& transferManager = info.m_TransferManager;
 		auto& assetManager = info.m_AssetManager;
-
-		const auto& renderViews = info.m_RenderViews;
 
 		// Reclaim staging uploads. GPU-local structured-buffer allocations are
 		// reclaimed by Renderer from the graphics fence timeline.
@@ -71,8 +114,9 @@ namespace gglab
 		info.m_MaterialTable.BeginUpdate();
 		info.m_LightTable.BeginUpdate();
 
-		std::vector<ViewGPU> viewData;
-		viewData.reserve(renderViews.size());
+		const auto viewUpload = BuildViewData(info.m_RenderViews, info.m_DirectionalShadowFramePlan);
+		const auto& viewData = viewUpload.m_Views;
+		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
 
 		std::unordered_map<RenderMaterialKey, MaterialUploadRecord> materialRecords;
 
@@ -307,34 +351,6 @@ namespace gglab
 		info.m_MaterialTable.EndUpdate();
 		info.m_LightTable.EndUpdate();
 
-		// View data
-		for (const RenderView& renderView : renderViews)
-		{
-			ViewGPU viewGpu{};
-			viewGpu.ViewMat = renderView.m_View;
-			viewGpu.ProjMat = renderView.m_RasterProj;
-			viewGpu.InvViewMat = renderView.m_InvView;
-			viewGpu.InvProjMat = renderView.m_InvRasterProj;
-			viewGpu.PreviousViewMat = renderView.m_PreviousView;
-			viewGpu.PreviousRasterViewProj = renderView.m_PreviousRasterViewProj;
-			viewGpu.CameraPos = math::ToVector4(renderView.m_CameraPosition, 1.0f);
-			viewGpu.PreviousDepthReconstructionParams =
-				renderView.m_PreviousDepthReconstructionParams;
-			viewGpu.Near = renderView.m_Near;
-			viewGpu.Far = renderView.m_Far;
-			viewGpu.FovRadians = renderView.m_FovRadians;
-			viewGpu.Aspect = renderView.m_Aspect;
-			viewGpu.CurrentJitterUV = renderView.m_JitterUV;
-			viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
-			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
-			viewGpu.Width = renderView.m_Width;
-			viewGpu.Height = renderView.m_Height;
-			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
-			viewGpu.PreviousDepthConvention =
-				static_cast<uint32_t>(renderView.m_PreviousDepthConvention);
-			viewData.push_back(viewGpu);
-		}
-
 		// Update View Structured Buffer
 		RHIFencePoint uploadFencePoint{};
 		DynamicStructuredBufferAllocator<ViewGPU>::Allocation viewsBufferResult{};
@@ -474,6 +490,19 @@ namespace gglab
 		{
 			result.m_RenderScene.m_SceneConstantBufferOffset =
 				result.m_GpuAllocations.m_SceneConstants.m_OffsetInBytes;
+		}
+
+		result.m_GpuAllocations.m_ShadowConstants = info.m_SceneCB.Upload(
+			BuildDirectionalShadowGPU(info.m_DirectionalShadowFramePlan, viewUpload.m_ShadowViewBaseOffset));
+		if (!result.m_GpuAllocations.m_ShadowConstants.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("RenderSceneBuilder: Shadow constant allocation failed.");
+			result.m_Status = RenderSceneBuildStatus::GpuUploadFailed;
+		}
+		else
+		{
+			result.m_RenderScene.m_ShadowConstantBufferOffset =
+				result.m_GpuAllocations.m_ShadowConstants.m_OffsetInBytes;
 		}
 
 		return result;

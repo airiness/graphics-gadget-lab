@@ -82,6 +82,17 @@ namespace gglab
 	RenderView RenderViewBuildTraits<RenderViewID::DirectionalShadow>::Build(
 		const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept
 	{
+		return BuildDirectionalShadowView(info).m_View;
+	}
+
+	DirectionalShadowViewBuildResult BuildDirectionalShadowView(
+		const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept
+	{
+		DirectionalShadowViewBuildResult result{};
+		auto& projection = result.m_Projection;
+		projection.m_FitMode = info.m_FitMode;
+		const bool stable = info.m_FitMode == DirectionalShadowFitMode::StableSphere;
+		const uint32_t resolution = std::max(info.m_ShadowMapSize, 1u);
 		Vector3 lightDir = info.m_LightDirection;
 		if (lightDir.LengthSquared() <= 1.0e-8f)
 		{
@@ -145,9 +156,12 @@ namespace gglab
 			lightUp = Vector3::UnitZ;
 		}
 
-		const Vector3 lightEyeForBounds = frustumCenter - lightDir;
-		const Matrix lightViewForBounds =
-			math::CreateLookAtLH(lightEyeForBounds, frustumCenter, lightUp);
+		// Build the stable light orientation at the world origin. Reconstructing it
+		// from eye and eye + direction introduces camera-position-dependent rotation error.
+		const Matrix lightRotation = math::CreateLookAtLH(Vector3::Zero, lightDir, lightUp);
+		const Vector3 lightEyeForBounds = stable ? Vector3::Zero : frustumCenter - lightDir;
+		Matrix lightViewForBounds = lightRotation;
+		lightViewForBounds.Translation(-math::TransformPoint(lightEyeForBounds, lightRotation));
 
 		Vector3 minLS(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
 			std::numeric_limits<float>::max());
@@ -169,6 +183,8 @@ namespace gglab
 			includeLightSpacePoint(corner - lightDir * casterExtrusionDistance);
 		}
 
+		const float filterSupport = std::clamp(info.m_FilterSupportTexels, 0.0f,
+			std::max(0.0f, (static_cast<float>(resolution) - 2.0f) * 0.5f));
 		const float orthoPadding = std::max(info.m_OrthoPadding, 0.0f);
 		minLS.m_X -= orthoPadding;
 		minLS.m_Y -= orthoPadding;
@@ -184,15 +200,74 @@ namespace gglab
 		// In the LH light view, points in front of the light have increasing z.
 		// Place the eye before the minimum required near plane while preserving the fitted depth range.
 		const float lightEyeOffset = minLS.m_Z - ShadowNear;
-		const Vector3 lightEye = lightEyeForBounds + lightDir * lightEyeOffset;
-		const Vector3 lightTarget = lightEye + lightDir;
+		Vector3 lightEye = lightEyeForBounds + lightDir * lightEyeOffset;
+		Matrix lightView{};
+		if (stable)
+		{
+			// The midpoint sphere encloses both frustum planes. Its radius uses only
+			// projection parameters, so translation, rotation and TAA jitter cannot resize XY.
+			const float halfDepth = (farZ - nearZ) * 0.5f;
+			projection.m_SphereRadius = std::sqrt(halfDepth * halfDepth +
+				farHalfWidth * farHalfWidth + farHalfHeight * farHalfHeight);
+			float halfExtent = std::max(projection.m_SphereRadius + orthoPadding, 0.001f);
+			if (resolution > 1)
+			{
+				// Reserve filter support plus half a final texel for snapping at each edge.
+				// Keep this guard with snapping off as well, so A/B does not change the footprint.
+				halfExtent *= static_cast<float>(resolution) /
+					(static_cast<float>(resolution - 1) - 2.0f * filterSupport);
+			}
+			projection.m_Extent = Vector2(2.0f * halfExtent);
+			projection.m_WorldUnitsPerTexel = projection.m_Extent / static_cast<float>(resolution);
+			const Vector3 sphereCenter = info.m_MainView.m_CameraPosition +
+				cameraForward * ((nearZ + farZ) * 0.5f);
+			const Vector3 centerLS = math::TransformPoint(sphereCenter, lightRotation);
+			projection.m_UnsnappedCenterLS = Vector2(centerLS.m_X, centerLS.m_Y);
+			projection.m_CenterLS = projection.m_UnsnappedCenterLS;
+			// A one-texel map has no finite guard for half-texel snapping; keep its valid unsnapped fit.
+			projection.m_TexelSnappingApplied = info.m_EnableTexelSnapping && resolution > 1;
+			if (projection.m_TexelSnappingApplied)
+			{
+				const float texelSize = projection.m_WorldUnitsPerTexel.m_X;
+				projection.m_CenterLS.m_X = std::round(centerLS.m_X / texelSize) * texelSize;
+				projection.m_CenterLS.m_Y = std::round(centerLS.m_Y / texelSize) * texelSize;
+			}
+			const Vector3 eyeLS(projection.m_CenterLS.m_X, projection.m_CenterLS.m_Y, lightEyeOffset);
+			lightEye = math::TransformPoint(eyeLS, math::Transpose(lightRotation));
+			lightView = lightRotation;
+			lightView.Translation(-eyeLS);
+			minLS.m_X = minLS.m_Y = -halfExtent;
+			maxLS.m_X = maxLS.m_Y = halfExtent;
+		}
+		else
+		{
+			// Expand around the fitted center so the filter never samples outside the receiver coverage.
+			const float guardScale = static_cast<float>(resolution) /
+				(static_cast<float>(resolution) - 2.0f * filterSupport);
+			const Vector2 guard((maxLS.m_X - minLS.m_X) * (guardScale - 1.0f) * 0.5f,
+				(maxLS.m_Y - minLS.m_Y) * (guardScale - 1.0f) * 0.5f);
+			minLS.m_X -= guard.m_X;
+			minLS.m_Y -= guard.m_Y;
+			maxLS.m_X += guard.m_X;
+			maxLS.m_Y += guard.m_Y;
+			// Reuse the fitted orientation: reconstructing eye + direction after the
+			// large Z shift can rotate a tight fit enough to consume its filter guard.
+			lightView = lightRotation;
+			lightView.Translation(-math::TransformPoint(lightEye, lightRotation));
+			projection.m_Extent = Vector2(maxLS.m_X - minLS.m_X, maxLS.m_Y - minLS.m_Y);
+			projection.m_WorldUnitsPerTexel = projection.m_Extent / static_cast<float>(resolution);
+			const Vector3 centerLS = math::TransformPoint(lightEye, lightRotation);
+			projection.m_UnsnappedCenterLS = Vector2(centerLS.m_X + (minLS.m_X + maxLS.m_X) * 0.5f,
+				centerLS.m_Y + (minLS.m_Y + maxLS.m_Y) * 0.5f);
+			projection.m_CenterLS = projection.m_UnsnappedCenterLS;
+		}
 
-		RenderView view{};
+		RenderView& view = result.m_View;
 		view.m_Name = info.m_Name;
 		view.m_ViewId = RenderViewID::DirectionalShadow;
 		view.m_IsValid = true;
 		view.m_DepthConvention = DepthConvention::Standard;
-		view.m_View = math::CreateLookAtLH(lightEye, lightTarget, lightUp);
+		view.m_View = lightView;
 		view.m_InvView = math::Inverse(view.m_View);
 		view.m_UnjitteredProj = math::CreateOrthographicOffCenterLH(
 			minLS.m_X, maxLS.m_X, minLS.m_Y, maxLS.m_Y, ShadowNear, shadowFar);
@@ -216,9 +291,9 @@ namespace gglab
 		view.m_Aspect = 1.0f;
 		view.m_ExposureCompensationEV = 0.0f;
 		view.m_ExposureMultiplier = 1.0f;
-		view.m_Width = info.m_ShadowMapSize;
-		view.m_Height = info.m_ShadowMapSize;
+		view.m_Width = resolution;
+		view.m_Height = resolution;
 
-		return view;
+		return result;
 	}
 }

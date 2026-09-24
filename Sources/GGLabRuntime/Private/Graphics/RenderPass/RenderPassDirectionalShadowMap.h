@@ -6,7 +6,6 @@
 namespace gglab
 {
 	class RHIGraphicsCommandContext;
-	struct DirectionalShadowSettings;
 
 	class RenderPassDirectionalShadowMap final : public RenderPassBase
 	{
@@ -32,14 +31,13 @@ namespace gglab
 		void EnsureInitialized(const RenderServices& services) noexcept;
 
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context, const RenderServices& services) noexcept;
+			const RenderServices& services, const RenderQueue& renderQueue) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext,
-			const RenderFrameContext& context, const RenderServices& services,
-			const RenderQueue& renderQueue, const DrawItemsRange& range) noexcept;
+			const RenderServices& services, const RenderQueue& renderQueue,
+			const DrawItemsRange& range) noexcept;
 
-		RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services, uint64_t variantBits,
-			const DirectionalShadowSettings& shadowSettings) noexcept;
+		RHIPipelineHandle GetOrCreatePSOForVariant(const RenderServices& services, uint64_t variantBits) noexcept;
 
 		RasterizerPreset GetRasterizerPresetFromVariantBits(uint64_t variantBits) const noexcept;
 

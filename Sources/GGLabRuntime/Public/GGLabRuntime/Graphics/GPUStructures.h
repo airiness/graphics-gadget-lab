@@ -65,6 +65,34 @@ namespace gglab
 	};
 	static_assert(sizeof(SceneGPU) == 96);
 
+	// Matches DirectionalShadowData in Lighting/DirectionalShadowData.hlsli (b3).
+	struct alignas(16) DirectionalShadowGPU
+	{
+		std::array<float, 4> SplitFar{};
+		uint32_t ViewBaseIndex = 0;
+		uint32_t CascadeCount = 0;
+		uint32_t MainViewIndex = 0;
+		float NearDepth = 0.0f;
+		std::array<float, 4> ReceiverDepthBias{};
+		std::array<float, 4> ReceiverSlopeDepthBias{};
+		std::array<float, 4> ReceiverMaxSlope{};
+		std::array<float, 4> BlendStart{};
+		float DistanceFadeStart = 0.0f;
+		float DistanceFadeInvRange = 0.0f;
+		std::array<float, 2> ShadowMetadataPadding{};
+	};
+	static_assert(sizeof(DirectionalShadowGPU) == 112);
+	static_assert(offsetof(DirectionalShadowGPU, BlendStart) == 80);
+	static_assert(offsetof(DirectionalShadowGPU, DistanceFadeStart) == 96);
+	static_assert(offsetof(DirectionalShadowGPU, DistanceFadeInvRange) == 100);
+	static_assert(offsetof(DirectionalShadowGPU, ShadowMetadataPadding) == 104);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverDepthBias) == 32);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverSlopeDepthBias) == 48);
+	static_assert(offsetof(DirectionalShadowGPU, ReceiverMaxSlope) == 64);
+	static_assert(offsetof(DirectionalShadowGPU, ViewBaseIndex) == 16);
+	static_assert(offsetof(DirectionalShadowGPU, NearDepth) == 28);
+	static_assert(std::is_trivially_copyable_v<DirectionalShadowGPU>);
+
 	struct ObjectGPU
 	{
 		Matrix ModelMat;

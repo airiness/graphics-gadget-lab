@@ -8,6 +8,7 @@
 #include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
+#include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/BRDF.hlsli>
 
 struct ForwardPBRPassParameters
@@ -17,8 +18,8 @@ struct ForwardPBRPassParameters
 	uint ShadowMapSamplerIndex;
 	uint ShadowMapSize;
 	uint ShadowFlags;
-	float ShadowReceiverDepthBias;
-	uint ShadowViewIndex;
+	float ShadowBiasPadding;
+	uint ShadowPadding;
 	uint ForwardPlusTileCountX;
 	uint ForwardPlusTileCountY;
 	uint ForwardPlusGlobalLightCount;
@@ -29,6 +30,7 @@ struct ForwardPBRPassParameters
 };
 
 ConstantBuffer<ForwardPBRPassParameters> g_Pass : register(b2);
+ConstantBuffer<DirectionalShadowData> g_Shadow : register(b3);
 
 #if defined(GGLAB_FORWARD_PLUS)
 StructuredBuffer<uint2> g_ForwardPlusTileHeaders : register(t5);
@@ -189,35 +191,92 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		   g_Scene.IBLResource.EnvironmentIntensity;
 }
 
-float SampleDirectionalShadow(float3 positionWS, float NoL)
+float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
+	float receiverNoL, uint cascadeIndex)
 {
-	if (!IsShadowEnabled() || NoL <= 0.0)
+	const uint viewIndex = g_Shadow.ViewBaseIndex + cascadeIndex;
+	const ShadowProjection projection = ProjectToShadowMap(positionWS, viewIndex);
+	if (!projection.IsValid)
 	{
 		return 1.0;
 	}
-
-	const ShadowProjection shadowProjection =
-		ProjectToShadowMap(positionWS, g_Pass.ShadowViewIndex);
-	if (!shadowProjection.IsValid)
-	{
-		return 1.0;
-	}
-
-	Texture2D<float> shadowMap = GetTexture2DFloat(g_Pass.ShadowMapTextureIndex);
-	SamplerComparisonState shadowSampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
-
-	const float compareDepth =
-		saturate(shadowProjection.ReceiverDepth - g_Pass.ShadowReceiverDepthBias);
-
+	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
+	SamplerComparisonState sampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
+	const float2 texelSize = 1.0.xx / max((float) g_Pass.ShadowMapSize, 1.0);
+	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
+	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
+	// Each hardware comparison blends four texels. Account for its one-texel support,
+	// while PCF tap offsets below follow the actual receiver plane instead of adding bias.
+	const float bilinearBias = ShadowBilinearReceiverBias(gradient.x, gradient.y, texelSize.x, texelSize.y);
+	const float compareDepth = projection.ReceiverDepth - residualBias - bilinearBias;
 	if (!IsShadowPCFEnabled())
 	{
-		return SampleShadowHard(shadowMap, shadowSampler, shadowProjection.UV, compareDepth);
+		return SampleShadowHard(shadowMap, sampler, projection.UV, cascadeIndex, saturate(compareDepth));
 	}
+	return SampleShadowPCF3x3(shadowMap, sampler, projection.UV, cascadeIndex,
+		compareDepth, texelSize, gradient);
+}
 
-	const float shadowMapSize = max((float) g_Pass.ShadowMapSize, 1.0);
-	const float2 shadowTexelSize = 1.0.xx / shadowMapSize;
-	return SampleShadowPCF3x3(
-		shadowMap, shadowSampler, shadowProjection.UV, compareDepth, shadowTexelSize);
+float SampleDirectionalShadow(float3 positionWS, ShadowReceiverPlane receiver, float receiverNoL)
+{
+	if (!IsShadowEnabled())
+	{
+		return 1.0;
+	}
+	const float mainViewZ = TransformPositionVS(float4(positionWS, 1.0),
+		LoadViewData(g_Shadow.MainViewIndex)).z;
+	const uint cascadeIndex = SelectDirectionalShadowCascade(mainViewZ, g_Shadow);
+	if (cascadeIndex >= g_Shadow.CascadeCount)
+	{
+		return 1.0;
+	}
+	float visibility = SampleDirectionalShadowCascade(positionWS, receiver, receiverNoL, cascadeIndex);
+	const float blendStart = g_Shadow.BlendStart[cascadeIndex];
+	const float blendWidth = g_Shadow.SplitFar[cascadeIndex] - blendStart;
+	if (cascadeIndex + 1u < g_Shadow.CascadeCount && blendWidth > 0.0 && mainViewZ > blendStart)
+	{
+		const float next = SampleDirectionalShadowCascade(positionWS, receiver, receiverNoL, cascadeIndex + 1u);
+		visibility = lerp(visibility, next, smoothstep(blendStart, g_Shadow.SplitFar[cascadeIndex], mainViewZ));
+	}
+	const float fade = saturate((mainViewZ - g_Shadow.DistanceFadeStart) * g_Shadow.DistanceFadeInvRange);
+	return lerp(visibility, 1.0, fade * fade * (3.0 - 2.0 * fade));
+}
+
+float3 ApplyShadowDiagnosticsOverlay(float3 color, float3 positionWS)
+{
+	if (!IsShadowEnabled() || (g_Pass.ShadowFlags & 12u) == 0u)
+	{
+		return color;
+	}
+	const float depth = TransformPositionVS(float4(positionWS, 1.0),
+		LoadViewData(g_Shadow.MainViewIndex)).z;
+	const uint cascade = SelectDirectionalShadowCascade(depth, g_Shadow);
+	if (cascade >= g_Shadow.CascadeCount)
+	{
+		return color;
+	}
+	const float3 cascadeColors[4] = {
+		float3(0.15, 0.65, 1.0), float3(0.35, 1.0, 0.25),
+		float3(1.0, 0.45, 0.15), float3(0.8, 0.3, 1.0)
+	};
+	if ((g_Pass.ShadowFlags & 4u) != 0u)
+	{
+		color = lerp(color, cascadeColors[min(cascade, 3u)], 0.3);
+	}
+	if ((g_Pass.ShadowFlags & 8u) != 0u)
+	{
+		const float transitionStart = g_Shadow.BlendStart[cascade];
+		if (cascade + 1u < g_Shadow.CascadeCount && depth >= transitionStart &&
+			depth <= g_Shadow.SplitFar[cascade])
+		{
+			color = lerp(color, float3(1.0, 0.9, 0.1), 0.55);
+		}
+		if (g_Shadow.DistanceFadeInvRange > 0.0 && depth >= g_Shadow.DistanceFadeStart)
+		{
+			color = lerp(color, float3(1.0, 0.35, 0.65), 0.45);
+		}
+	}
+	return color;
 }
 
 bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out float attenuation)
@@ -271,7 +330,7 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 	return attenuation > 0.0;
 }
 
-float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, float3 V, float NoV,
+float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	const LightData light = g_Lights[lightIndex];
@@ -301,21 +360,21 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, float3 
 	float shadowVisibility = 1.0;
 	if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
 	{
-		shadowVisibility = SampleDirectionalShadow(positionWS, NoL);
+		shadowVisibility = SampleDirectionalShadow(positionWS, shadowReceiver, dot(shadowReceiver.NormalWS, L));
 	}
 
 	return (diffuse + specular) * light.Color.rgb * light.Intensity * NoL * attenuation *
 		shadowVisibility;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, float3 V, float NoV,
+float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
 			physicalRoughness, baseColor, metallic);
 	}
 	return lighting;
@@ -328,7 +387,7 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
-float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N,
+float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
 	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor, float metallic)
 {
 	float3 lighting = 0.0.xxx;
@@ -340,7 +399,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		if (lightIndex >= g_Scene.LightBaseIndex &&
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
-			lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
 				physicalRoughness, baseColor, metallic);
 		}
 	}
@@ -362,7 +421,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		{
 			continue;
 		}
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, V, NoV, F0,
+		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
 			physicalRoughness, baseColor, metallic);
 	}
 	return lighting;
@@ -375,6 +434,7 @@ ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_I
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
 #endif
 {
+	const ShadowReceiverPlane shadowReceiver = BuildShadowReceiverPlane(IN.PositionWS);
 	MaterialData matData = g_Materials[IN.MaterialIndex];
 
 	// Get view data
@@ -437,15 +497,15 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
 #else
 	const float3 directLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	const float3 legacyDirectLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
@@ -480,12 +540,14 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
 	outputLighting += diffuseIBL + specularIBL;
-	const float4 outputColor = float4(SanitizeHDRColor(outputLighting), alpha);
+	const float4 outputColor = float4(SanitizeHDRColor(
+		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS)), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
 	legacyOutputLighting += diffuseIBL + specularIBL;
-	const float4 legacyColor = float4(SanitizeHDRColor(legacyOutputLighting), alpha);
+	const float4 legacyColor = float4(SanitizeHDRColor(
+		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS)), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
 		float4(SanitizeHDRColor(gtaoContribution), 1.0));
 #else

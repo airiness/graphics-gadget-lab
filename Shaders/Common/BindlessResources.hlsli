@@ -10,6 +10,11 @@ Texture2D<float> GetTexture2DFloat(uint srvIndex)
 	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
 }
 
+Texture2DArray<float> GetTexture2DArrayFloat(uint srvIndex)
+{
+	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];
+}
+
 Texture2D<float2> GetTexture2DFloat2(uint srvIndex)
 {
 	return ResourceDescriptorHeap[NonUniformResourceIndex(srvIndex)];

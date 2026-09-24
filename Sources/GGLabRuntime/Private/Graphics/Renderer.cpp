@@ -327,7 +327,8 @@ namespace gglab
 		result.m_TemporalFramePlan = built.m_TemporalFramePlan;
 		result.m_TemporalFrameTransaction = built.m_TemporalFrameTransaction;
 		result.m_RenderScene = std::move(built.m_RenderScene);
-		result.m_RenderQueues = built.m_RenderQueues;
+		result.m_RenderQueues = std::move(built.m_RenderQueues);
+		result.m_DirectionalShadowFramePlan = std::move(built.m_DirectionalShadowFramePlan);
 		result.m_DebugDrawFrame = built.m_DebugDrawFrame;
 		result.m_DebugDrawCullContext = built.m_DebugDrawCullContext;
 		result.m_RenderSceneStatus = built.m_RenderSceneStatus;
@@ -620,6 +621,10 @@ namespace gglab
 		{
 			m_SceneCB->Retire(&allocations->m_SceneConstants, fencePoint);
 		}
+		if (allocations->m_ShadowConstants.IsValid())
+		{
+			m_SceneCB->Retire(&allocations->m_ShadowConstants, fencePoint);
+		}
 		*allocations = {};
 	}
 
@@ -731,8 +736,13 @@ namespace gglab
 		{
 			DynamicConstantBufferAllocator::CreateInfo createInfo{};
 			createInfo.m_Device = GetDevice();
-			createInfo.m_CapacityInBytes = static_cast<uint32_t>(sizeof(SceneGPU)) *
-				m_RHIContext->GetFrameSlotCount() * 4;
+			const uint32_t alignment = GetDevice()->GetBufferViewAlignment(RHIBufferViewType::ConstantBuffer);
+			const uint32_t sceneSize = (static_cast<uint32_t>(sizeof(SceneGPU)) + alignment - 1) /
+				alignment * alignment;
+			const uint32_t shadowSize = (static_cast<uint32_t>(sizeof(DirectionalShadowGPU)) + alignment - 1) /
+				alignment * alignment;
+			createInfo.m_CapacityInBytes = (sceneSize + shadowSize) *
+				m_RHIContext->GetFrameSlotCount() * 2;
 			createInfo.m_DebugName = "Renderer.DynamicConstants";
 			m_SceneCB = std::make_unique<DynamicConstantBufferAllocator>(createInfo);
 		}
@@ -817,6 +827,11 @@ namespace gglab
 	}
 
 	ShadowPreviewViewBase* Renderer::GetShadowPreviewView() const noexcept
+	{
+		return m_RenderResRegistry.get();
+	}
+
+	ShadowPreviewControlBase* Renderer::GetShadowPreviewControl() const noexcept
 	{
 		return m_RenderResRegistry.get();
 	}

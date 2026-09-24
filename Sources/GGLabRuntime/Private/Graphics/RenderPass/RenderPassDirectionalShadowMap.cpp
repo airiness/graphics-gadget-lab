@@ -3,13 +3,16 @@
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/ShadowSettings.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <span>
@@ -30,6 +33,7 @@ namespace gglab
 		{
 			RGTextureId m_ShadowMap{};
 			RGTextureViewId m_Dsv{};
+			const RenderQueue* m_RenderQueue = nullptr;
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		};
 
@@ -40,119 +44,143 @@ namespace gglab
 	{
 		auto* contextPtr = &context;
 		GGLAB_ASSERT_NOT_NULL(contextPtr);
-
-
+		const DirectionalShadowFramePlan& cascades = context.GetDirectionalShadowFramePlan();
+		GGLAB_ASSERT(cascades.m_Cascades.size() <= MaxDirectionalShadowCascades);
+		if (cascades.m_Cascades.empty())
+		{
+			return;
+		}
 		EnsureInitialized(services);
+		static constexpr const char* passNames[] = {
+			"Shadow.Directional.Cascade0", "Shadow.Directional.Cascade1",
+			"Shadow.Directional.Cascade2", "Shadow.Directional.Cascade3",
+		};
+		const uint32_t layerCount = static_cast<uint32_t>(cascades.m_Cascades.size());
+		for (uint32_t cascadeIndex = 0; cascadeIndex < layerCount; ++cascadeIndex)
+		{
+			const DirectionalShadowCascade* cascade = cascades.TryGetCascade(cascadeIndex);
+			const uint32_t viewIndex = cascade ? cascades.GetViewIndex(cascadeIndex) : 0u;
 
-		rg.AddPass<PassData>(
-			GetRenderGraphPassName(),
-			[contextPtr](RenderGraph::RGBuilder& builder, PassData& data)
-			{
-				auto& shadowRes =
-					builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
-				builder.WriteInPlace(
-					shadowRes.m_DirectionalShadowMap, RGTextureAccess::DepthStencilWrite);
-				data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
-				const auto& renderQueue =
-					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
-				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
-				if (!renderQueue.m_DrawItems.empty())
+			rg.AddPass<PassData>(
+				passNames[cascadeIndex],
+				[contextPtr, cascade, viewIndex, cascadeIndex](
+					RenderGraph::RGBuilder& builder, PassData& data)
 				{
-					const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
-					GGLAB_ASSERT_MSG(
-						data.m_RasterDomain->IsValid() &&
-						IsDepthCoverageTargetExtentCompatible(*data.m_RasterDomain, shadowDesc),
-						"Shadow-map extent must match its coverage raster domain.");
-				}
-
-				const auto dsvDesc =
-					MakeRHITexture2DViewDesc(RHIFormat::D32Float, 0, 1, RHITextureAspect::Depth);
-				data.m_Dsv =
-					builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
-			},
-			[this, contextPtr, services](RGExecuteContext& executeContext, PassData& data)
-			{
-				auto* graphicsContext = executeContext.GetGraphicsCommandContext();
-				GGLAB_ASSERT_NOT_NULL(graphicsContext);
-				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-
-				graphicsContext->BeginRendering({
-					.m_DepthAttachment = RHIRenderingAttachment{
-						.m_View = dsv,
-						.m_LoadOp = RHIContentLoadOp::DontCare,
-					},
-				});
-				graphicsContext->ClearDepthAttachment(1.0f);
-
-				const auto& renderQueue =
-					contextPtr->GetRenderQueue(RenderViewID::DirectionalShadow);
-				if (renderQueue.m_DrawItems.empty())
-				{
-					return;
-				}
-				const auto& ranges = renderQueue.m_BucketDrawRanges;
-				const DrawItemsRange* firstDrawRange = nullptr;
-				for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
-				{
-					const auto& range = ranges[utils::ToIndex(bucket)];
-					if (range.m_Count > 0)
+					auto& shadowRes =
+						builder.GetBlackboard().Get<RGShadowResources>(ShadowResourcesName);
+					const auto dsvDesc = MakeRHITexture2DArrayViewDesc(
+						RHIFormat::D32Float, 0, cascadeIndex, 1, RHITextureAspect::Depth);
+					// R32 has one plane. Leave the dependency aspect mask open until
+					// Compile infers depth usage for the typeless resource; the DSV is explicitly Depth.
+					builder.WriteInPlace(shadowRes.m_DirectionalShadowMap,
+						RGTextureAccess::DepthStencilWrite, RHISubresourceRange{
+							.m_MipCount = 1, .m_BaseArraySlice = cascadeIndex, .m_ArraySliceCount = 1 });
+					data.m_ShadowMap = shadowRes.m_DirectionalShadowMap;
+					if (cascade)
 					{
-						firstDrawRange = std::addressof(range);
-						break;
+						data.m_RenderQueue = std::addressof(cascade->m_RenderQueue);
+						data.m_RasterDomain =
+							std::addressof(cascade->m_RenderQueue.m_CoverageRasterDomain);
 					}
-				}
-				if (!firstDrawRange)
+					if (data.m_RenderQueue && !data.m_RenderQueue->m_DrawItems.empty())
+					{
+						const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
+						GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == viewIndex &&
+							data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
+								contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+							"Shadow coverage and shader binding must address the same uploaded cascade view.");
+						GGLAB_ASSERT_MSG(
+							data.m_RasterDomain->IsValid() &&
+							IsDepthCoverageTargetExtentCompatible(*data.m_RasterDomain, shadowDesc),
+							"Shadow-map extent must match its coverage raster domain.");
+					}
+
+					data.m_Dsv =
+						builder.CreateView<RHITextureViewType::DepthStencil>(data.m_ShadowMap, dsvDesc);
+				},
+				[this, contextPtr, services, viewIndex](
+					RGExecuteContext& executeContext, PassData& data)
 				{
-					return;
-				}
-				GGLAB_ASSERT_MSG(firstDrawRange->m_Start < renderQueue.m_DrawItems.size(),
-					"Directional shadow first draw must be inside its RenderQueue.");
-				if (firstDrawRange->m_Start >= renderQueue.m_DrawItems.size())
-				{
-					return;
-				}
-				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
-					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-					contextPtr->GetDirectionalShadowSettings()));
+					auto* graphicsContext = executeContext.GetGraphicsCommandContext();
+					GGLAB_ASSERT_NOT_NULL(graphicsContext);
+					const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
-				GGLAB_ASSERT_MSG(
-					data.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain),
-					"Shadow rendering must consume the RenderQueue raster domain directly.");
-				graphicsContext->SetViewport(data.m_RasterDomain->m_Viewport);
-				graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
-				graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+					graphicsContext->BeginRendering({
+						.m_DepthAttachment = RHIRenderingAttachment{
+							.m_View = dsv,
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						},
+					});
+					graphicsContext->ClearDepthAttachment(1.0f);
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-				graphicsContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+					// A frame without a cascade keeps this cleared write and submits nothing.
+					if (!data.m_RenderQueue || data.m_RenderQueue->m_DrawItems.empty())
+					{
+						return;
+					}
+					const RenderQueue& renderQueue = *data.m_RenderQueue;
+					const auto& ranges = renderQueue.m_BucketDrawRanges;
+					const DrawItemsRange* firstDrawRange = nullptr;
+					for (const RenderBucket bucket : {RenderBucket::Opaque, RenderBucket::AlphaTest})
+					{
+						const auto& range = ranges[utils::ToIndex(bucket)];
+						if (range.m_Count > 0)
+						{
+							firstDrawRange = std::addressof(range);
+							break;
+						}
+					}
+					if (!firstDrawRange)
+					{
+						return;
+					}
+					GGLAB_ASSERT_MSG(firstDrawRange->m_Start < renderQueue.m_DrawItems.size(),
+						"Directional shadow first draw must be inside its RenderQueue.");
+					if (firstDrawRange->m_Start >= renderQueue.m_DrawItems.size())
+					{
+						return;
+					}
+					graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
+						renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits));
 
-				const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
-					objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
+					GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
+					GGLAB_ASSERT_MSG(
+						data.m_RasterDomain == std::addressof(renderQueue.m_CoverageRasterDomain),
+						"Shadow rendering must consume the RenderQueue raster domain directly.");
+					graphicsContext->SetViewport(data.m_RasterDomain->m_Viewport);
+					graphicsContext->SetScissorRect(data.m_RasterDomain->m_Scissor);
+					graphicsContext->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
-				const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
-					materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
+					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
+					graphicsContext->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+						sceneBuffer->GetBufferHandle(),
+						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
 
-				const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
-				graphicsContext->SetReadOnlyBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
-					viewSB->GetBufferHandle());
+					const auto& objectSB = services.m_FrameBuffers->GetObjectStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::ObjectSB),
+						objectSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				const DirectionalShadowPassParameters passParameters{
-					.ViewIndex =
-						static_cast<uint32_t>(utils::ToIndex(RenderViewID::DirectionalShadow)),
-				};
-				graphicsContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+					const auto& materialSB = services.m_FrameBuffers->GetMaterialStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
+						materialSB->GetBufferHandle(contextPtr->m_FrameSlotIndex));
 
-				DrawRenderQueue(graphicsContext, *contextPtr, services);
-			});
+					const auto& viewSB = services.m_FrameBuffers->GetViewStructuredBuffer();
+					graphicsContext->SetReadOnlyBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
+						viewSB->GetBufferHandle());
+
+					const DirectionalShadowPassParameters passParameters{
+						.ViewIndex = viewIndex,
+					};
+					graphicsContext->SetPushConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+
+					DrawRenderQueue(graphicsContext, services, renderQueue);
+				});
+		}
 	}
 
 	void RenderPassDirectionalShadowMap::EnsureInitialized(const RenderServices& services) noexcept
@@ -185,6 +213,8 @@ namespace gglab
 			m_BaseRecipe.m_Formats.m_SampleQuality = 0;
 
 			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
+			m_BaseRecipe.m_DepthBias = 0;
+			m_BaseRecipe.m_SlopeScaledDepthBias = 0.0f;
 			m_BaseRecipe.m_BlendPreset = BlendPreset::ColorWriteDisable;
 			m_BaseRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 
@@ -193,25 +223,24 @@ namespace gglab
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context, const RenderServices& services) noexcept
+		const RenderServices& services, const RenderQueue& renderQueue) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
-		const auto& renderQueue = context.GetRenderQueue(RenderViewID::DirectionalShadow);
 		if (renderQueue.m_DrawItems.empty())
 		{
 			return;
 		}
 
 		const auto ranges = renderQueue.m_BucketDrawRanges;
-		DrawRange(graphicsContext, context, services, renderQueue,
+		DrawRange(graphicsContext, services, renderQueue,
 			ranges[utils::ToIndex(RenderBucket::Opaque)]);
-		DrawRange(graphicsContext, context, services, renderQueue,
+		DrawRange(graphicsContext, services, renderQueue,
 			ranges[utils::ToIndex(RenderBucket::AlphaTest)]);
 	}
 
 	void RenderPassDirectionalShadowMap::DrawRange(RHIGraphicsCommandContext* graphicsContext,
-		const RenderFrameContext& context, const RenderServices& services,
-		const RenderQueue& renderQueue, const DrawItemsRange& range) noexcept
+		const RenderServices& services, const RenderQueue& renderQueue,
+		const DrawItemsRange& range) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -234,7 +263,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				const auto pipeline = GetOrCreatePSOForVariant(
-					services, drawItem.m_VariantBits, context.GetDirectionalShadowSettings());
+					services, drawItem.m_VariantBits);
 				graphicsContext->SetPipeline(pipeline);
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -262,8 +291,7 @@ namespace gglab
 	}
 
 	RHIPipelineHandle RenderPassDirectionalShadowMap::GetOrCreatePSOForVariant(
-		const RenderServices& services, uint64_t variantBits,
-		const DirectionalShadowSettings& shadowSettings) noexcept
+		const RenderServices& services, uint64_t variantBits) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = services.m_PipelineResolver;
@@ -277,8 +305,6 @@ namespace gglab
 			recipe.m_PSId = m_AlphaTestPixelShader;
 		}
 		recipe.m_RasterizerPreset = GetRasterizerPresetFromVariantBits(variantBits);
-		recipe.m_DepthBias = shadowSettings.m_RasterizerDepthBias;
-		recipe.m_SlopeScaledDepthBias = shadowSettings.m_RasterizerSlopeScaledDepthBias;
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
 		auto& slot = m_PipelineSlots[slotIndex];

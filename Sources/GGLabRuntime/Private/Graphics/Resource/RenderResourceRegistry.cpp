@@ -796,6 +796,7 @@ namespace gglab
 
 	void RenderResourceRegistry::ReleaseAll(const RHIFencePoint& fencePoint) noexcept
 	{
+		m_ShadowPreviewRequested = false;
 		for (size_t index = 0; index < m_TextureEntries.size(); ++index)
 		{
 			auto& entry = m_TextureEntries[index];

@@ -33,10 +33,6 @@ namespace gglab
 			{
 				return "Main";
 			}
-			if (viewId == RenderViewID::DirectionalShadow)
-			{
-				return "Shadow";
-			}
 			if (IsDebugCameraRenderViewID(viewId))
 			{
 				return "Debug Camera";
@@ -44,20 +40,11 @@ namespace gglab
 			return "Unknown";
 		}
 
-		const char* ProjectionLabel(RenderViewID viewId) noexcept
-		{
-			return viewId == RenderViewID::DirectionalShadow ? "Orthographic" : "Perspective";
-		}
-
 		std::string CullingSourceLabel(const DevelopGuiContext& context, RenderViewID viewId)
 		{
 			if (viewId == RenderViewID::Main)
 			{
 				return devtools::EnumText(RenderViewVisibilityMode::Self);
-			}
-			if (viewId == RenderViewID::DirectionalShadow)
-			{
-				return "Shadow Queue";
 			}
 			if (!context.m_CameraRenderViewQuery)
 			{
@@ -190,6 +177,7 @@ namespace gglab
 			std::span<const RenderQueueEntrySnapshot> queues, std::span<const RenderView> views) noexcept
 		{
 			ImGui::SeparatorText("RenderView Overview");
+			ImGui::TextDisabled("Directional shadow cascades are shown in Shadow Inspector.");
 			if (views.empty())
 			{
 				ImGui::TextDisabled("No RenderViews are available.");
@@ -233,6 +221,10 @@ namespace gglab
 
 			for (const RenderView& view : views)
 			{
+				if (view.m_ViewId == RenderViewID::DirectionalShadow)
+				{
+					continue;
+				}
 				const auto* queue = FindRenderQueue(queues, view.m_ViewId);
 				const RenderQueueStatisticsSnapshot stats =
 					queue ? queue->m_Statistics : RenderQueueStatisticsSnapshot{};
@@ -258,20 +250,13 @@ namespace gglab
 				ImGui::TableSetColumnIndex(5);
 				ImGui::Text("%u x %u", view.m_Width, view.m_Height);
 				ImGui::TableSetColumnIndex(6);
-				ImGui::TextUnformatted(ProjectionLabel(view.m_ViewId));
+				ImGui::TextUnformatted("Perspective");
 				ImGui::TableSetColumnIndex(7);
 				ImGui::Text("%.4f", view.m_Near);
 				ImGui::TableSetColumnIndex(8);
 				ImGui::Text("%.2f", view.m_Far);
 				ImGui::TableSetColumnIndex(9);
-				if (view.m_ViewId == RenderViewID::DirectionalShadow)
-				{
-					ImGui::TextUnformatted("N/A");
-				}
-				else
-				{
-					ImGui::Text("%.2f", math::ToDegrees(view.m_FovRadians));
-				}
+				ImGui::Text("%.2f", math::ToDegrees(view.m_FovRadians));
 				ImGui::TableSetColumnIndex(10);
 				ImGui::Text("%.4f", view.m_Aspect);
 				ImGui::TableSetColumnIndex(11);
@@ -393,15 +378,12 @@ namespace gglab
 			ImGui::Text(
 				"Display: %s", view->m_ViewId == ResolveDisplayViewId(context) ? "Yes" : "No");
 			ImGui::Text("Kind: %s", RenderViewKindLabel(view->m_ViewId));
-			ImGui::Text("Projection: %s", ProjectionLabel(view->m_ViewId));
+			ImGui::TextUnformatted("Projection: Perspective");
 			ImGui::Text("Culling: %s", cullingText.c_str());
 			ImGui::Text(
 				"Size: %u x %u, Aspect: %.4f", view->m_Width, view->m_Height, view->m_Aspect);
 			ImGui::Text("Near/Far: %.4f / %.2f", view->m_Near, view->m_Far);
-			if (view->m_ViewId != RenderViewID::DirectionalShadow)
-			{
-				ImGui::Text("FOV: %.2f deg", math::ToDegrees(view->m_FovRadians));
-			}
+			ImGui::Text("FOV: %.2f deg", math::ToDegrees(view->m_FovRadians));
 			ImGui::Text("Exposure Compensation: %+.2f EV", view->m_ExposureCompensationEV);
 			ImGui::Text("Exposure Multiplier: %.4fx", view->m_ExposureMultiplier);
 			devtools::DrawVector3Text("Camera Position", view->m_CameraPosition);

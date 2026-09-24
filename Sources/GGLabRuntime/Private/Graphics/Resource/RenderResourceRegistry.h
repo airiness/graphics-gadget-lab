@@ -24,7 +24,7 @@ namespace gglab
 	* Management runtime generated GPU Textures
 	*/
 	class RenderResourceRegistry : public PostProcessPreviewViewBase,
-		public PostProcessPreviewControlBase, public ShadowPreviewViewBase,
+		public PostProcessPreviewControlBase, public ShadowPreviewViewBase, public ShadowPreviewControlBase,
 		public IBLPreviewViewBase, public IBLPreviewControlBase,
 		public RenderResourceRegistryAccess
 	{
@@ -94,6 +94,13 @@ namespace gglab
 			return m_HasInitializedActiveIBL;
 		}
 		void MarkActiveIBLInitialized() noexcept { m_HasInitializedActiveIBL = true; }
+		void RequestShadowPreview() noexcept override { m_ShadowPreviewRequested = true; }
+		[[nodiscard]] bool ConsumeShadowPreviewRequest() noexcept
+		{
+			const bool requested = m_ShadowPreviewRequested;
+			m_ShadowPreviewRequested = false;
+			return requested;
+		}
 		void EnsureShadowPreviewResources(
 			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
@@ -237,5 +244,7 @@ namespace gglab
 			bool m_HasPublished = false;
 		};
 		PostProcessPreviewState m_PostProcessPreviewState{};
+		bool m_ShadowPreviewRequested = false;
+
 	};
 }

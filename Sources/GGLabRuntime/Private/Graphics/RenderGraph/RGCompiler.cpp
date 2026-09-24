@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "Graphics/RenderGraph/RGBarrierPlanner.h"
+#include "Graphics/RHI/RHISubresourceUtils.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -215,11 +216,122 @@ namespace gglab
 				m_Plan->m_Passes[to.Value()].m_Dependencies.push_back(from);
 			};
 
+		// Track the producer of each texture subresource through resource versions.
+		// A partial write replaces only its declared range; inherited contents do not
+		// imply a GPU read in that pass and must not introduce a read barrier.
+		std::vector<RHITextureDesc> textureDescs(m_Plan->m_Resources.size());
+		for (const auto& resource : m_Plan->m_Resources)
+		{
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				textureDescs[resource.m_Declaration.Value()] =
+					static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource)->m_Desc;
+			}
+		}
+		for (const auto& pass : m_Plan->m_Passes)
+		{
+			for (const auto& access : pass.m_Accesses)
+			{
+				if (access.m_ResourceType == RGResourceType::RGTexture)
+				{
+					textureDescs[access.m_Resource.Value()].m_Usage |=
+						ToRHIUsage(static_cast<RGTextureAccess>(access.m_AccessValue));
+				}
+			}
+		}
+		std::vector<std::vector<RGPassNodeIndex>> textureProducers(m_Graph.m_ResourceNodes.size());
+		for (uint32_t index = 0; index < m_Graph.m_ResourceNodes.size(); ++index)
+		{
+			const auto& node = m_Graph.m_ResourceNodes[index];
+			if (node.m_VirtualResource->m_ResourceType != RGResourceType::RGTexture)
+			{
+				continue;
+			}
+			const auto& desc = textureDescs[m_ResourceIndices.at(node.m_VirtualResource).Value()];
+			auto& producers = textureProducers[index];
+			producers = node.m_Previous.IsValid() ? textureProducers[node.m_Previous.Value()]
+				: std::vector<RGPassNodeIndex>(GetRHITextureSubresourceCount(desc), InvalidRGPassNodeIndex);
+			if (!node.m_Writer.IsValid())
+			{
+				continue;
+			}
+			for (const auto& access : m_Graph.m_PassNodes[node.m_Writer.Value()].m_Accesses)
+			{
+				const bool writesNode = access.m_DependencyAccess == RGDependencyAccess::Write
+					? access.m_ResourceNodeIndex == RGResourceNodeIndex{ index }
+					: access.m_DependencyAccess == RGDependencyAccess::ReadWrite &&
+						access.m_ResourceNodeIndex == node.m_Previous;
+				if (!writesNode)
+				{
+					continue;
+				}
+				ForEachRHITextureSubresource(desc, NormalizeTextureSubresourceRange(desc, access.m_Subresources),
+					[&](uint32_t mip, uint32_t slice, RHITextureAspect aspect)
+					{
+						producers[GetRHITextureSubresourceIndex(desc, mip, slice, aspect)] = node.m_Writer;
+					});
+			}
+		}
+		for (const auto& pass : m_Plan->m_Passes)
+		{
+			for (const auto& access : pass.m_Accesses)
+			{
+				if (access.m_ResourceType != RGResourceType::RGTexture)
+				{
+					continue;
+				}
+				const auto& desc = textureDescs[access.m_Resource.Value()];
+				const auto range = NormalizeTextureSubresourceRange(desc, access.m_Subresources);
+				if (access.m_DependencyAccess != RGDependencyAccess::Write)
+				{
+					ForEachRHITextureSubresource(desc, range,
+						[&](uint32_t mip, uint32_t slice, RHITextureAspect aspect)
+						{
+							const auto producer = textureProducers[access.m_ResourceNodeIndex.Value()]
+								[GetRHITextureSubresourceIndex(desc, mip, slice, aspect)];
+							addEdge(producer, pass.m_Declaration, access.m_ResourceNodeIndex,
+								RGDependencyReason::WriterToReader);
+						});
+				}
+				if (access.m_DependencyAccess == RGDependencyAccess::Read)
+				{
+					continue;
+				}
+				// Keep overlapping WAR/WAW hazards even when an intervening version is culled.
+				// These edges order independently live passes; they do not retain overwritten data.
+				for (uint32_t prior = 0; prior < pass.m_Declaration.Value(); ++prior)
+				{
+					for (const auto& earlier : m_Plan->m_Passes[prior].m_Accesses)
+					{
+						if (earlier.m_Resource != access.m_Resource)
+						{
+							continue;
+						}
+						const auto previous = NormalizeTextureSubresourceRange(desc, earlier.m_Subresources);
+						if ((range.m_Aspects & previous.m_Aspects) != RHITextureAspect::None &&
+							range.m_BaseMip < previous.m_BaseMip + previous.m_MipCount &&
+							previous.m_BaseMip < range.m_BaseMip + range.m_MipCount &&
+							range.m_BaseArraySlice < previous.m_BaseArraySlice + previous.m_ArraySliceCount &&
+							previous.m_BaseArraySlice < range.m_BaseArraySlice + range.m_ArraySliceCount)
+						{
+							addEdge(RGPassNodeIndex{ prior }, pass.m_Declaration, earlier.m_ResourceNodeIndex,
+								earlier.m_DependencyAccess == RGDependencyAccess::Read
+								? RGDependencyReason::PreviousReaderToWriter : RGDependencyReason::PreviousWriterToWriter);
+						}
+					}
+				}
+			}
+		}
+
 		for (uint32_t resourceNodeIndex = 0; resourceNodeIndex < m_Graph.m_ResourceNodes.size();
 			++resourceNodeIndex)
 		{
 			const auto& resourceNode = m_Graph.m_ResourceNodes[resourceNodeIndex];
 			const RGResourceNodeIndex stableResourceNodeIndex{ resourceNodeIndex };
+			if (resourceNode.m_VirtualResource->m_ResourceType == RGResourceType::RGTexture)
+			{
+				continue;
+			}
 			for (const auto readerPassIndex : resourceNode.m_Readers)
 			{
 				addEdge(resourceNode.m_Writer, readerPassIndex, stableResourceNodeIndex,
@@ -258,8 +370,33 @@ namespace gglab
 
 			const auto& resourceNode =
 				m_Graph.m_ResourceNodes[resource.m_ExportResourceNode.Value()];
-			addEdge(resourceNode.m_Writer, resource.m_ExportPass, resource.m_ExportResourceNode,
-				RGDependencyReason::ExportWriterToExport);
+			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			{
+				const auto& desc = textureDescs[resource.m_Declaration.Value()];
+				ForEachRHITextureSubresource(desc, NormalizeTextureSubresourceRange(desc, resource.m_FinalSubresources),
+					[&](uint32_t mip, uint32_t slice, RHITextureAspect aspect)
+					{
+						addEdge(textureProducers[resource.m_ExportResourceNode.Value()]
+							[GetRHITextureSubresourceIndex(desc, mip, slice, aspect)],
+							resource.m_ExportPass, resource.m_ExportResourceNode, RGDependencyReason::ExportWriterToExport);
+					});
+				for (const auto& pass : m_Plan->m_Passes)
+				{
+					for (const auto& access : pass.m_Accesses)
+					{
+						if (access.m_Resource == resource.m_Declaration)
+						{
+							addEdge(pass.m_Declaration, resource.m_ExportPass, access.m_ResourceNodeIndex,
+								RGDependencyReason::ExportReaderToExport);
+						}
+					}
+				}
+			}
+			else
+			{
+				addEdge(resourceNode.m_Writer, resource.m_ExportPass, resource.m_ExportResourceNode,
+					RGDependencyReason::ExportWriterToExport);
+			}
 			for (const auto readerPassIndex : resourceNode.m_Readers)
 			{
 				addEdge(readerPassIndex, resource.m_ExportPass, resource.m_ExportResourceNode,

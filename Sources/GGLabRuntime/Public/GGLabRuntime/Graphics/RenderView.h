@@ -62,6 +62,24 @@ namespace gglab
 		bool m_IsValid = false;
 	};
 
+	struct DirectionalShadowProjectionInfo
+	{
+		DirectionalShadowFitMode m_FitMode = DirectionalShadowFitMode::Tight;
+		float m_SphereRadius = 0.0f;
+		Vector2 m_Extent = Vector2::Zero;
+		Vector2 m_WorldUnitsPerTexel = Vector2::Zero;
+		// XY in a light basis anchored at the world origin, before and after snapping.
+		Vector2 m_UnsnappedCenterLS = Vector2::Zero;
+		Vector2 m_CenterLS = Vector2::Zero;
+		bool m_TexelSnappingApplied = false;
+	};
+
+	struct DirectionalShadowViewBuildResult
+	{
+		RenderView m_View{};
+		DirectionalShadowProjectionInfo m_Projection{};
+	};
+
 	class RenderViewBuilder
 	{
 	public:
@@ -96,6 +114,9 @@ namespace gglab
 		float m_CasterExtrusionDistance = DefaultDirectionalShadowCasterExtrusionDistance;
 		float m_OrthoPadding = DefaultDirectionalShadowOrthoPadding;
 		float m_DepthPadding = DefaultDirectionalShadowDepthPadding;
+		float m_FilterSupportTexels = 0.0f;
+		DirectionalShadowFitMode m_FitMode = DirectionalShadowFitMode::StableSphere;
+		bool m_EnableTexelSnapping = true;
 		StringID m_Name = StringID("DirectionalShadowView");
 	};
 
@@ -109,4 +130,6 @@ namespace gglab
 		static RenderView Build(
 			const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
 	};
+	[[nodiscard]] DirectionalShadowViewBuildResult BuildDirectionalShadowView(
+		const RenderViewBuildInfo<RenderViewID::DirectionalShadow>& info) noexcept;
 }
