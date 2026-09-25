@@ -52,8 +52,10 @@ namespace gglab
 		}
 		EnsureInitialized(services);
 		static constexpr const char* passNames[] = {
-			"Shadow.Directional.Cascade0", "Shadow.Directional.Cascade1",
-			"Shadow.Directional.Cascade2", "Shadow.Directional.Cascade3",
+			"Shadow.Directional.Cascade0",
+			"Shadow.Directional.Cascade1",
+			"Shadow.Directional.Cascade2",
+			"Shadow.Directional.Cascade3",
 		};
 		const uint32_t layerCount = static_cast<uint32_t>(cascades.m_Cascades.size());
 		for (uint32_t cascadeIndex = 0; cascadeIndex < layerCount; ++cascadeIndex)
@@ -87,7 +89,7 @@ namespace gglab
 						const auto& shadowDesc = builder.GetTextureDesc(data.m_ShadowMap);
 						GGLAB_ASSERT_MSG(data.m_RasterDomain->m_ViewBindingId == viewIndex &&
 							data.m_RasterDomain->m_CurrentViewSource.m_ElementIndex ==
-								contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
+							contextPtr->m_RenderScene.m_ViewBaseIndex + viewIndex,
 							"Shadow coverage and shader binding must address the same uploaded cascade view.");
 						GGLAB_ASSERT_MSG(
 							data.m_RasterDomain->IsValid() &&
@@ -110,7 +112,7 @@ namespace gglab
 							.m_View = dsv,
 							.m_LoadOp = RHIContentLoadOp::DontCare,
 						},
-					});
+						});
 					graphicsContext->ClearDepthAttachment(1.0f);
 
 					// A frame without a cascade keeps this cleared write and submits nothing.

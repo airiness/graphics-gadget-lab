@@ -49,9 +49,12 @@ namespace gglab
 	struct RenderFrameGpuResources;
 	struct RenderSceneGpuAllocations;
 
-	class Renderer : public RenderHost, public RenderFrameBufferAccess,
-		public RenderEnvironmentAccess, public RenderPresentationAccess,
-		public RenderBindingLayoutAccess, public RenderTemporalAccess,
+	class Renderer : public RenderHost,
+		public RenderFrameBufferAccess,
+		public RenderEnvironmentAccess,
+		public RenderPresentationAccess,
+		public RenderBindingLayoutAccess,
+		public RenderTemporalAccess,
 		public RenderCompositionAccess
 	{
 	public:
@@ -92,8 +95,7 @@ namespace gglab
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept override;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
-		void Render(
-			Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
+		void Render(Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
 		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept override;
 
 		RHIContext* GetRHIContext() const noexcept override { return m_RHIContext.get(); }

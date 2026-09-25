@@ -1,11 +1,8 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
-#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 
-#include <algorithm>
-#include <array>
 #include <cstdint>
 
 namespace gglab
@@ -26,26 +23,6 @@ namespace gglab
 		bool operator==(const GTAOExtent&) const noexcept = default;
 	};
 
-	struct GTAOSurfaceCandidate
-	{
-		float m_RawDepth = 0.0f;
-		float m_ViewZ = 0.0f;
-	};
-
-	struct GTAOSurfaceSelection
-	{
-		uint32_t m_SelectedIndex = 0;
-		float m_RawDepth = 0.0f;
-		float m_ViewZ = 0.0f;
-		bool m_IsValid = false;
-	};
-
-	struct GTAONormalAxisNeighborAvailability
-	{
-		bool m_HasNegativeNeighbor = false;
-		bool m_HasPositiveNeighbor = false;
-	};
-
 	[[nodiscard]] constexpr GTAOExtent MakeGTAOHalfResolutionExtent(
 		uint32_t fullWidth, uint32_t fullHeight) noexcept
 	{
@@ -53,24 +30,6 @@ namespace gglab
 			.m_Width = (fullWidth + GTAOResolutionDivisor - 1) / GTAOResolutionDivisor,
 			.m_Height = (fullHeight + GTAOResolutionDivisor - 1) / GTAOResolutionDivisor,
 		};
-	}
-
-	// Candidates are ordered top-left, top-right, bottom-left, bottom-right.
-	// A strict nearer comparison intentionally preserves the first candidate on equal depth.
-	[[nodiscard]] GTAOSurfaceSelection SelectGTAOHalfResolutionSurface(
-		const std::array<GTAOSurfaceCandidate, 4>& candidates,
-		DepthConvention convention) noexcept;
-
-	[[nodiscard]] float GTAOInterleavedGradientNoise(uint32_t pixelX, uint32_t pixelY) noexcept;
-	[[nodiscard]] constexpr float ResolveGTAODiffuseIBLVisibility(
-		float materialAO, float gtao) noexcept
-	{
-		return std::clamp(materialAO * gtao, 0.0f, 1.0f);
-	}
-
-	[[nodiscard]] constexpr float ResolveGTAOSpecularIBLVisibility(float materialAO) noexcept
-	{
-		return std::clamp(materialAO, 0.0f, 1.0f);
 	}
 
 	[[nodiscard]] constexpr GTAOFinalAOFormatResolution ResolveGTAOFinalAOFormat(
@@ -82,15 +41,6 @@ namespace gglab
 			.m_FallbackR16Float = fallbackR16Float,
 			.m_Format = preferredR8Unorm.IsSupported() ? RHIFormat::R8Unorm
 				: fallbackR16Float.IsSupported() ? RHIFormat::R16Float : RHIFormat::Unknown,
-		};
-	}
-
-	[[nodiscard]] constexpr GTAONormalAxisNeighborAvailability
-		GetGTAONormalAxisNeighborAvailability(uint32_t centerCoordinate, uint32_t extent) noexcept
-	{
-		return {
-			.m_HasNegativeNeighbor = centerCoordinate > 0 && centerCoordinate < extent,
-			.m_HasPositiveNeighbor = centerCoordinate < extent && centerCoordinate + 1 < extent,
 		};
 	}
 }

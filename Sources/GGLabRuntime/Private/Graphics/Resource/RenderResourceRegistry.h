@@ -24,8 +24,11 @@ namespace gglab
 	* Management runtime generated GPU Textures
 	*/
 	class RenderResourceRegistry : public PostProcessPreviewViewBase,
-		public PostProcessPreviewControlBase, public ShadowPreviewViewBase, public ShadowPreviewControlBase,
-		public IBLPreviewViewBase, public IBLPreviewControlBase,
+		public PostProcessPreviewControlBase,
+		public ShadowPreviewViewBase,
+		public ShadowPreviewControlBase,
+		public IBLPreviewViewBase,
+		public IBLPreviewControlBase,
 		public RenderResourceRegistryAccess
 	{
 	public:

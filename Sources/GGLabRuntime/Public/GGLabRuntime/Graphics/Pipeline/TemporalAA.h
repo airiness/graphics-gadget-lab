@@ -2,7 +2,6 @@
 
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
-#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 #include <algorithm>
 #include <array>
@@ -33,58 +32,6 @@ namespace gglab
 	static_assert(TemporalAAMaxHistoryFeedbackCeiling < 1.0f);
 	static_assert(TemporalAAMaxHistoryFeedbackCeiling <=
 		TemporalHistoryMaxAge / (TemporalHistoryMaxAge + 1.0f));
-
-	[[nodiscard]] inline bool IsTemporalHistoryAgeValid(float historyAge) noexcept
-	{
-		return std::isfinite(historyAge) && historyAge >= TemporalHistoryInitialAge &&
-			historyAge <= TemporalHistoryMaxAge;
-	}
-
-	[[nodiscard]] inline float ResolveTemporalHistoryNextAge(
-		bool historyAccepted, float previousHistoryAge) noexcept
-	{
-		return historyAccepted && IsTemporalHistoryAgeValid(previousHistoryAge)
-			? std::min(previousHistoryAge + 1.0f, TemporalHistoryMaxAge)
-			: TemporalHistoryInitialAge;
-	}
-
-	struct TemporalAAOutputAlphaContract final
-	{
-		float m_ResolvedAlpha = 1.0f;
-		float m_HistoryAlpha = TemporalHistoryInitialAge;
-	};
-
-	[[nodiscard]] inline TemporalAAOutputAlphaContract ResolveTemporalAAOutputAlphas(
-		float nextHistoryAge) noexcept
-	{
-		return {
-			.m_ResolvedAlpha = 1.0f,
-			.m_HistoryAlpha = IsTemporalHistoryAgeValid(nextHistoryAge)
-				? nextHistoryAge
-				: TemporalHistoryInitialAge,
-		};
-	}
-
-	[[nodiscard]] inline Vector2 ResolveTemporalHistoryMotionUV(
-		const Vector2& rasterMotionUV, const Vector2& currentJitterUV,
-		const Vector2& previousJitterUV) noexcept
-	{
-		return rasterMotionUV - (currentJitterUV - previousJitterUV);
-	}
-
-	[[nodiscard]] inline bool IsTemporalAAUVInBounds(const Vector2& uv) noexcept
-	{
-		return std::isfinite(uv.m_X) && std::isfinite(uv.m_Y) &&
-			uv.m_X >= 0.0f && uv.m_X <= 1.0f &&
-			uv.m_Y >= 0.0f && uv.m_Y <= 1.0f;
-	}
-
-	[[nodiscard]] inline bool AreTemporalAAReprojectionUVsValid(
-		const Vector2& previousHistoryUV, const Vector2& previousRasterUV) noexcept
-	{
-		return IsTemporalAAUVInBounds(previousHistoryUV) &&
-			IsTemporalAAUVInBounds(previousRasterUV);
-	}
 
 	[[nodiscard]] constexpr uint32_t QuantizeTemporalAAUnitRange(float value) noexcept
 	{
@@ -150,22 +97,6 @@ namespace gglab
 		return saturationAge;
 	}
 
-	[[nodiscard]] inline float ResolveTemporalAAHistoryAgePreview(
-		float nextHistoryAge, float maxHistoryFeedback) noexcept
-	{
-		if (!IsTemporalHistoryAgeValid(nextHistoryAge))
-		{
-			return 0.0f;
-		}
-
-		const float feedbackSaturationAge =
-			ResolveTemporalAAFeedbackSaturationAge(maxHistoryFeedback);
-		// Feedback uses PreviousAge while this preview displays stored NextAge.
-		// Keep the saturation-age denominator intact; there is intentionally no -1.
-		return std::clamp((nextHistoryAge - TemporalHistoryInitialAge) /
-			std::max(feedbackSaturationAge, TemporalHistoryInitialAge), 0.0f, 1.0f);
-	}
-
 	struct TemporalAASettings
 	{
 		bool m_Enabled = false;
@@ -209,82 +140,6 @@ namespace gglab
 				TemporalAAMaxNeighborhoodClampExpansion)
 			: defaults.m_NeighborhoodClampExpansion;
 		return settings;
-	}
-
-	[[nodiscard]] inline float ResolveTemporalAAHistoryWeight(float previousHistoryAge,
-		float motionMagnitudePixels, float currentLuminance, float historyLuminance,
-		const TemporalAASettings& settings) noexcept
-	{
-		if (!IsTemporalHistoryAgeValid(previousHistoryAge) ||
-			!std::isfinite(motionMagnitudePixels) || motionMagnitudePixels < 0.0f ||
-			!std::isfinite(currentLuminance) || !std::isfinite(historyLuminance))
-		{
-			return 0.0f;
-		}
-
-		const TemporalAASettings resolved = ResolveTemporalAASettings(settings);
-		const float ageWeight = previousHistoryAge / (previousHistoryAge + 1.0f);
-		const float baseHistoryWeight =
-			std::min(ageWeight, resolved.m_MaxHistoryFeedback);
-		const float velocityConfidence = 1.0f - std::clamp(
-			motionMagnitudePixels * resolved.m_VelocityWeightScale, 0.0f, 1.0f);
-		const float luminanceDenominator =
-			std::max({ std::abs(currentLuminance), std::abs(historyLuminance), 1.0e-4f });
-		const float relativeLuminanceDifference =
-			std::abs(currentLuminance - historyLuminance) / luminanceDenominator;
-		const float luminanceConfidence = 1.0f - std::clamp(
-			relativeLuminanceDifference * resolved.m_LuminanceWeightScale, 0.0f, 1.0f);
-		return baseHistoryWeight * velocityConfidence * luminanceConfidence;
-	}
-
-	[[nodiscard]] inline bool IsTemporalSkyHistoryCompatible(
-		float previousRawDepth, DepthConvention previousDepthConvention) noexcept
-	{
-		return std::isfinite(previousRawDepth) &&
-			screen_space::IsDepthBackground(previousRawDepth, previousDepthConvention);
-	}
-
-	[[nodiscard]] inline bool IsTemporalHistoryDepthCompatible(float expectedPreviousViewZ,
-		float storedPreviousViewZ,
-		float absoluteThreshold = TemporalAADepthAbsoluteThreshold,
-		float relativeThreshold = TemporalAADepthRelativeThreshold) noexcept
-	{
-		if (!std::isfinite(expectedPreviousViewZ) || !std::isfinite(storedPreviousViewZ) ||
-			expectedPreviousViewZ <= 0.0f || storedPreviousViewZ <= 0.0f ||
-			!std::isfinite(absoluteThreshold) || !std::isfinite(relativeThreshold) ||
-			absoluteThreshold < 0.0f || relativeThreshold < 0.0f)
-		{
-			return false;
-		}
-
-		const float tolerance =
-			std::max(absoluteThreshold, relativeThreshold * expectedPreviousViewZ);
-		return std::abs(expectedPreviousViewZ - storedPreviousViewZ) <= tolerance;
-	}
-
-	struct TemporalAAGeometryDepthSample
-	{
-		float m_StoredPreviousViewZ = 0.0f;
-		bool m_IsGeometry = false;
-	};
-
-	[[nodiscard]] inline bool HasCompatibleTemporalGeometryDepthSample(
-		float expectedPreviousViewZ,
-		const std::array<TemporalAAGeometryDepthSample, 9>& previousDepthNeighborhood,
-		float absoluteThreshold = TemporalAADepthAbsoluteThreshold,
-		float relativeThreshold = TemporalAADepthRelativeThreshold) noexcept
-	{
-		for (const TemporalAAGeometryDepthSample& sample : previousDepthNeighborhood)
-		{
-			if (sample.m_IsGeometry && IsTemporalHistoryDepthCompatible(
-				expectedPreviousViewZ, sample.m_StoredPreviousViewZ,
-				absoluteThreshold, relativeThreshold))
-			{
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	enum class SceneExtensionTemporalParticipation : uint8_t
@@ -350,7 +205,6 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		bool m_DisplayViewEligible = false;
 		bool m_DepthVelocityPathAvailable = false;
-		bool m_InternalContractMode = false;
 	};
 
 	struct ResolvedTemporalFramePlan
@@ -366,7 +220,6 @@ namespace gglab
 		bool m_Requested = false;
 		bool m_CoreAvailable = false;
 		bool m_Active = false;
-		bool m_InternalContractMode = false;
 		bool m_DisplayViewEligible = false;
 		bool m_DepthVelocityPathAvailable = false;
 
@@ -391,7 +244,6 @@ namespace gglab
 			.m_SessionIdentity = info.m_SessionIdentity,
 			.m_Requested = info.m_Settings.m_Enabled,
 			.m_CoreAvailable = info.m_Capabilities.IsCoreAvailable(),
-			.m_InternalContractMode = info.m_InternalContractMode,
 			.m_DisplayViewEligible = info.m_DisplayViewEligible,
 			.m_DepthVelocityPathAvailable = info.m_DepthVelocityPathAvailable,
 		};
@@ -402,7 +254,7 @@ namespace gglab
 		}
 
 		plan.m_Status = TemporalAAFrameStatus::Unavailable;
-		if (!plan.m_CoreAvailable && !plan.m_InternalContractMode)
+		if (!plan.m_CoreAvailable)
 		{
 			plan.m_DisableReason = TemporalAADisableReason::CoreCapabilityUnavailable;
 			return plan;

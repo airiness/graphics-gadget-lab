@@ -55,11 +55,6 @@ namespace gglab
 		TextureCubeArray,
 	};
 
-	[[nodiscard]] constexpr inline RHITextureAspect GetRHIFormatAspects(RHIFormat format) noexcept
-	{
-		return GetRHIFormatInfo(format).m_Aspects;
-	}
-
 	struct RHITextureDesc
 	{
 		RHITextureDimension m_Dimension = RHITextureDimension::Texture2D;

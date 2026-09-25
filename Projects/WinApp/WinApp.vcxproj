@@ -326,7 +326,6 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiStyle.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />

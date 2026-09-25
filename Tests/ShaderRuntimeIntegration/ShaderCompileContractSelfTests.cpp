@@ -16,6 +16,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
+#include "Graphics/RHI/Vulkan/VulkanGlobalDescriptorLayout.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "DevelopmentShaderPaths.h"
@@ -458,21 +459,20 @@ namespace gglab
 				VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace,
 				"Fixed bindings reject unsupported HLSL register spaces explicitly");
 
-			const auto sampledTexture =
-				EvaluateVulkanBindlessShaderBinding(VulkanBindlessResourceClass::SampledTexture);
-			const auto storageTexture =
-				EvaluateVulkanBindlessShaderBinding(VulkanBindlessResourceClass::StorageTexture);
-			const auto sampler =
-				EvaluateVulkanBindlessShaderBinding(VulkanBindlessResourceClass::Sampler);
-			context.Check(sampledTexture.IsSupported() && storageTexture.IsSupported() &&
-				sampledTexture.m_Location.m_DescriptorSet == 1 &&
-				sampledTexture.m_Location.m_Binding == 0 &&
-				storageTexture.m_Location.m_DescriptorSet == 1 &&
-				storageTexture.m_Location.m_Binding == 0,
-				"Sampled and storage textures share Vulkan set 1 binding 0");
-			context.Check(sampler.IsSupported() && sampler.m_Location.m_DescriptorSet == 1 &&
-				sampler.m_Location.m_Binding == 1,
-				"Bindless samplers use Vulkan set 1 binding 1");
+			const VulkanGlobalDescriptorLayoutPlan globalLayoutPlan;
+			const VkDescriptorSetLayoutCreateInfo& globalLayoutInfo =
+				globalLayoutPlan.GetLayoutInfo();
+			const bool hasGlobalBindings = globalLayoutInfo.bindingCount == 2 &&
+				globalLayoutInfo.pBindings != nullptr;
+			context.Check(hasGlobalBindings &&
+				GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet == 1 &&
+				globalLayoutInfo.pBindings[0].binding ==
+					GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding &&
+				globalLayoutInfo.pBindings[0].descriptorType == VK_DESCRIPTOR_TYPE_MUTABLE_EXT &&
+				globalLayoutInfo.pBindings[1].binding ==
+					GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding &&
+				globalLayoutInfo.pBindings[1].descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER,
+				"Vulkan global layout publishes the actual resource and sampler heap bindings");
 
 			const auto& mutableTypes =
 				GGLabVulkanShaderBindingABI.m_ResourceHeapMutableAllowedTypes;
@@ -485,34 +485,29 @@ namespace gglab
 				GGLabVulkanShaderBindingABI.m_SamplerHeapDescriptorType ==
 				VulkanDescriptorType::Sampler,
 				"Vulkan global heap descriptor types match binding ABI revision 1");
-			context.Check(VulkanDescriptorTypeName(mutableTypes[0]) ==
-				"VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE" &&
-				VulkanDescriptorTypeName(mutableTypes[1]) ==
-				"VK_DESCRIPTOR_TYPE_STORAGE_IMAGE",
-				"Vulkan mutable resource binding locks the exact native descriptor types");
+			context.Check(ToVkDescriptorType(mutableTypes[0]) ==
+				VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
+				ToVkDescriptorType(mutableTypes[1]) == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+				"Vulkan mutable resource binding converts to the exact native descriptor types");
 			context.Check(GGLabVulkanShaderBindingABI.m_PartiallyBound &&
 				GGLabVulkanShaderBindingABI.m_UpdateAfterBind &&
 				GGLabVulkanShaderBindingABI.m_UpdateUnusedWhilePending,
 				"Vulkan global heaps lock the descriptor publication binding flags");
 
-			constexpr std::array UnsupportedResourceClasses{
-				VulkanBindlessResourceClass::ConstantBuffer,
-				VulkanBindlessResourceClass::ReadOnlyStorageBuffer,
-				VulkanBindlessResourceClass::ReadWriteStorageBuffer,
-				VulkanBindlessResourceClass::UniformTexelBuffer,
-				VulkanBindlessResourceClass::StorageTexelBuffer,
-				VulkanBindlessResourceClass::CombinedImageSampler,
-				VulkanBindlessResourceClass::AccelerationStructure,
-			};
-			bool unsupportedClassesRejected = true;
-			for (VulkanBindlessResourceClass resourceClass : UnsupportedResourceClasses)
-			{
-				const auto result = EvaluateVulkanBindlessShaderBinding(resourceClass);
-				unsupportedClassesRejected &= !result.IsSupported() && result.m_RejectionReason ==
-					VulkanShaderBindingRejectionReason::UnsupportedBindlessResourceClass;
-			}
-			context.Check(unsupportedClassesRejected,
-				"Vulkan binding ABI revision 1 explicitly rejects non-image bindless resources");
+			const VkMutableDescriptorTypeCreateInfoEXT& mutableInfo =
+				globalLayoutPlan.GetMutableInfo();
+			const bool hasMutableLists = mutableInfo.mutableDescriptorTypeListCount == 2 &&
+				mutableInfo.pMutableDescriptorTypeLists != nullptr;
+			const bool resourceListContainsOnlyImages = hasMutableLists &&
+				mutableInfo.pMutableDescriptorTypeLists[0].descriptorTypeCount == 2 &&
+				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes != nullptr &&
+				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[0] ==
+					VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
+				mutableInfo.pMutableDescriptorTypeLists[0].pDescriptorTypes[1] ==
+					VK_DESCRIPTOR_TYPE_STORAGE_IMAGE &&
+				mutableInfo.pMutableDescriptorTypeLists[1].descriptorTypeCount == 0;
+			context.Check(resourceListContainsOnlyImages,
+				"Vulkan global layout allows only sampled and storage images in the resource heap");
 		}
 
 		void RunCoordinatePolicyTests(SelfTestContext& context) noexcept

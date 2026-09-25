@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdint>
-#include <string_view>
 
 namespace gglab
 {
@@ -16,27 +15,12 @@ namespace gglab
 		Sampler,
 	};
 
-	enum class VulkanBindlessResourceClass : uint8_t
-	{
-		SampledTexture,
-		StorageTexture,
-		Sampler,
-		ConstantBuffer,
-		ReadOnlyStorageBuffer,
-		ReadWriteStorageBuffer,
-		UniformTexelBuffer,
-		StorageTexelBuffer,
-		CombinedImageSampler,
-		AccelerationStructure,
-	};
-
 	enum class VulkanShaderBindingRejectionReason : uint8_t
 	{
 		None,
 		ReservedGlobalHeapRegisterSpace,
 		UnsupportedFixedRegisterSpace,
 		FixedRegisterIndexOutOfRange,
-		UnsupportedBindlessResourceClass,
 	};
 
 	struct VulkanShaderBindingLocation
@@ -112,75 +96,5 @@ namespace gglab
 				.m_Binding = range.m_BindingShift + registerIndex,
 			},
 		};
-	}
-
-	[[nodiscard]] constexpr VulkanShaderBindingResult EvaluateVulkanBindlessShaderBinding(
-		VulkanBindlessResourceClass resourceClass) noexcept
-	{
-		switch (resourceClass)
-		{
-		case VulkanBindlessResourceClass::SampledTexture:
-		case VulkanBindlessResourceClass::StorageTexture:
-			return {
-				.m_Location = {
-					.m_DescriptorSet = GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet,
-					.m_Binding = GGLabVulkanShaderRuntimeABI.m_ResourceHeapBinding,
-				},
-			};
-		case VulkanBindlessResourceClass::Sampler:
-			return {
-				.m_Location = {
-					.m_DescriptorSet = GGLabVulkanShaderRuntimeABI.m_GlobalDescriptorSet,
-					.m_Binding = GGLabVulkanShaderRuntimeABI.m_SamplerHeapBinding,
-				},
-			};
-		default:
-			return {
-				.m_RejectionReason =
-					VulkanShaderBindingRejectionReason::UnsupportedBindlessResourceClass,
-			};
-		}
-	}
-
-	[[nodiscard]] constexpr bool IsVulkanBindlessResourceClassSupported(
-		VulkanBindlessResourceClass resourceClass) noexcept
-	{
-		return EvaluateVulkanBindlessShaderBinding(resourceClass).IsSupported();
-	}
-
-	[[nodiscard]] constexpr std::string_view VulkanDescriptorTypeName(
-		VulkanDescriptorType type) noexcept
-	{
-		switch (type)
-		{
-		case VulkanDescriptorType::Mutable:
-			return "VK_DESCRIPTOR_TYPE_MUTABLE_EXT";
-		case VulkanDescriptorType::SampledImage:
-			return "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE";
-		case VulkanDescriptorType::StorageImage:
-			return "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE";
-		case VulkanDescriptorType::Sampler:
-			return "VK_DESCRIPTOR_TYPE_SAMPLER";
-		}
-		return "VK_DESCRIPTOR_TYPE_UNKNOWN";
-	}
-
-	[[nodiscard]] constexpr std::string_view VulkanShaderBindingRejectionReasonText(
-		VulkanShaderBindingRejectionReason reason) noexcept
-	{
-		switch (reason)
-		{
-		case VulkanShaderBindingRejectionReason::None:
-			return "none";
-		case VulkanShaderBindingRejectionReason::ReservedGlobalHeapRegisterSpace:
-			return "HLSL space1 is reserved for the global descriptor heaps";
-		case VulkanShaderBindingRejectionReason::UnsupportedFixedRegisterSpace:
-			return "fixed shader bindings only support HLSL space0";
-		case VulkanShaderBindingRejectionReason::FixedRegisterIndexOutOfRange:
-			return "shader register index exceeds its fixed Vulkan binding range";
-		case VulkanShaderBindingRejectionReason::UnsupportedBindlessResourceClass:
-			return "bindless resource class is not supported by Vulkan binding ABI revision 1";
-		}
-		return "unknown shader binding rejection reason";
 	}
 }

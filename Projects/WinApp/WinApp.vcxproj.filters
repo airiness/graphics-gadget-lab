@@ -55,9 +55,6 @@
     <Filter Include="DevTools\DevelopGui\Backends\Windows">
       <UniqueIdentifier>{4A816AF9-80EC-4329-43D4-43686984F510}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DevTools\DevelopGui\Interop">
-      <UniqueIdentifier>{A5343AB4-CA42-49B8-FBF1-13FDC043BD56}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DevTools\DevelopGui\Panels">
       <UniqueIdentifier>{EF8B60AF-9134-41DA-33AD-FB3F82B0C886}</UniqueIdentifier>
     </Filter>
@@ -655,9 +652,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h">
       <Filter>DevTools\DevelopGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Interop\ImGuiMathInterop.h">
-      <Filter>DevTools\DevelopGui\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h">
       <Filter>DevTools\DevelopGui</Filter>
