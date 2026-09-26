@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
@@ -25,6 +26,7 @@ namespace gglab
 		SessionIdentityChanged,
 		ExtentChanged,
 		FormatChanged,
+		ColorAbiChanged,
 		AllocationFailure,
 		AvailabilityChanged,
 		ResolveProgramChanged,
@@ -42,6 +44,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
+		TemporalColorAbi m_ColorAbi = TemporalColorAbi::LinearRec709SceneReferredV1;
 
 		bool operator==(const TemporalHistoryCompatibilityIdentity&) const noexcept = default;
 	};
@@ -51,6 +54,7 @@ namespace gglab
 		TemporalHistoryCompatibilityIdentity m_Compatibility{};
 		Vector2 m_JitterUV = Vector2::Zero;
 		uint32_t m_JitterIndex = 0;
+		float m_PreExposure = SceneColorStoragePreExposureV1;
 		RHIFencePoint m_GraphicsFence{};
 	};
 

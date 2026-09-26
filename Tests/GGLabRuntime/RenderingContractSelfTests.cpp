@@ -5011,6 +5011,10 @@ namespace gglab
 				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
 				firstCommitted.m_ReadIndex == 1 && firstCommitted.m_ActiveBytes > 0 &&
 				firstCommitted.m_LastCommitted.m_JitterIndex == 0 &&
+				firstCommitted.m_Compatibility.m_ColorAbi ==
+					TemporalColorAbi::LinearRec709SceneReferredV1 &&
+				firstCommitted.m_LastCommitted.m_PreExposure ==
+					SceneColorStoragePreExposureV1 &&
 				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
 				device.m_CreateTextureCount == 4,
 				"Temporal history cold start imports four persistent textures and commits one write pair");
@@ -5043,6 +5047,8 @@ namespace gglab
 				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
 				afterAbort.m_AllocationGeneration == firstGeneration &&
+				afterAbort.m_LastCommitted.m_PreExposure ==
+					firstCommitted.m_LastCommitted.m_PreExposure &&
 				afterAbort.m_LastCommitted.m_GraphicsFence == firstFence &&
 				viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 1,
 				"Vulkan abort fences gate lifetime without advancing logical temporal history");
@@ -6283,6 +6289,70 @@ namespace gglab
 			return false;
 		}
 
+		void RunExposureContractTests(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{});
+			const ResolvedExposureSettings defaultExposure =
+				ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
+			context.Check(NearlyEqual(defaultExposure.m_ExposureScale,
+				1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
+				defaultExposure.m_ManualEV100 == 0.0f &&
+				defaultExposure.m_CompensationEV == 0.0f &&
+				defaultExposure.m_PreExposure == defaultExposure.m_ExposureScale,
+				"Zero manual EV100 uses saturation-normalized default exposure");
+
+			bool compensationResponseMatches = true;
+			for (float compensation : { -10.0f, -2.0f, 0.0f, 2.0f, 10.0f })
+			{
+				camera.SetExposureCompensationEV(compensation);
+				const float exposureScale =
+					ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure.m_ExposureScale;
+				compensationResponseMatches &= NearlyEqual(
+					exposureScale / std::exp2(compensation),
+					defaultExposure.m_ExposureScale, 0.000001f);
+			}
+			context.Check(compensationResponseMatches,
+				"Exposure compensation retains its stop response at zero manual EV100");
+
+			const ResolvedExposureSettings base = ResolveManualExposureSettings(12.0f, 0.0f);
+			const ResolvedExposureSettings plusStop = ResolveManualExposureSettings(13.0f, 0.0f);
+			const ResolvedExposureSettings minusStop = ResolveManualExposureSettings(11.0f, 0.0f);
+			const ResolvedExposureSettings plusCompensation =
+				ResolveManualExposureSettings(12.0f, 1.0f);
+			context.Check(NearlyEqual(plusStop.m_ExposureScale / base.m_ExposureScale, 0.5f) &&
+				NearlyEqual(minusStop.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
+				NearlyEqual(plusCompensation.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
+				base.m_EffectiveEV100 == 12.0f &&
+				plusCompensation.m_EffectiveEV100 == 11.0f,
+				"Manual exposure and compensation move exposed-linear brightness by exact stops");
+
+			const float nan = std::numeric_limits<float>::quiet_NaN();
+			const ResolvedExposureSettings sanitized =
+				ResolveManualExposureSettings(nan, std::numeric_limits<float>::infinity());
+			const ResolvedExposureSettings clamped =
+				ResolveManualExposureSettings(1000.0f, -1000.0f);
+			camera.SetManualEV100(nan);
+			context.Check(sanitized.m_ManualEV100 == 0.0f &&
+				sanitized.m_CompensationEV == 0.0f &&
+				std::isfinite(sanitized.m_ExposureScale) && sanitized.m_ExposureScale > 0.0f &&
+				clamped.m_ManualEV100 == Camera::ClampManualEV100(1000.0f) &&
+				clamped.m_CompensationEV == Camera::ClampExposureCompensationEV(-1000.0f) &&
+				std::isfinite(clamped.m_ExposureScale) && clamped.m_ExposureScale > 0.0f &&
+				camera.GetManualEV100() == 0.0f,
+				"Exposure resolution clamps finite ranges and rejects non-finite camera input");
+
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			TemporalFrameTransaction disabledTransaction;
+			disabledTransaction.Begin(viewHistory, objectHistory, {}, 64, 64, nullptr, 0.5f);
+			const bool retainedDisabledScale =
+				disabledTransaction.GetScenePreExposure() == 0.5f;
+			disabledTransaction.Abort();
+			context.Check(retainedDisabledScale &&
+				disabledTransaction.GetState() == TemporalFrameTransactionState::Aborted,
+				"A TAA-disabled frame can carry a non-unit storage scale without committing history");
+		}
+
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext& context) noexcept
 		{
 			static_assert(sizeof(ViewGPU) == 480);
@@ -6724,6 +6794,8 @@ namespace gglab
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
 					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::SceneLinearRec709, 0.5f) &&
+				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2,
 					PostProcessColorState::SceneLinearRec709, 0.5f),
 				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
 
@@ -7337,6 +7409,7 @@ namespace gglab
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
+		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);

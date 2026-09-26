@@ -1,13 +1,12 @@
 #pragma once
 
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 
 #include <cstdint>
 
 namespace gglab
 {
-	class Camera;
-
 	enum class ToneMappingOperator : uint8_t
 	{
 		AcesFitted,
@@ -81,10 +80,17 @@ namespace gglab
 		PostProcessProfile m_PostProcess{};
 	};
 
+	// Saturation-based normalization for the manual EV100 exposure contract.
+	inline constexpr float ManualExposureSaturationNormalization = 1.2f;
+
 	struct ResolvedExposureSettings
 	{
+		float m_ManualEV100 = 0.0f;
 		float m_CompensationEV = 0.0f;
-		float m_ExposureScale = 1.0f;
+		float m_EffectiveEV100 = 0.0f;
+		float m_ExposureScale = 1.0f / ManualExposureSaturationNormalization;
+		// Desired storage scale; scene color still uses unit scale with the active temporal ABI.
+		float m_PreExposure = 1.0f / ManualExposureSaturationNormalization;
 	};
 
 	struct ResolvedPostProcessSettings
@@ -110,4 +116,6 @@ namespace gglab
 
 	[[nodiscard]] ResolvedViewRenderSettings ResolveViewRenderSettings(
 		const ViewRenderProfile& profile, const Camera& camera) noexcept;
+	[[nodiscard]] ResolvedExposureSettings ResolveManualExposureSettings(
+		float manualEV100, float compensationEV) noexcept;
 }

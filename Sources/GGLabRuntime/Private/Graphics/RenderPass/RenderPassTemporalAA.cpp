@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -111,6 +112,14 @@ namespace gglab
 		auto* transaction = context.m_TemporalFrameTransaction;
 		GGLAB_ASSERT_NOT_NULL(transaction);
 		if (!transaction)
+		{
+			return;
+		}
+		GGLAB_ASSERT_MSG(IsTemporalColorCompatible(transaction->GetColorAbi(),
+			PostProcessColorState::SceneLinearRec709, transaction->GetScenePreExposure()),
+			"Temporal AA cannot read scene color outside its active color ABI.");
+		if (!IsTemporalColorCompatible(transaction->GetColorAbi(),
+			PostProcessColorState::SceneLinearRec709, transaction->GetScenePreExposure()))
 		{
 			return;
 		}

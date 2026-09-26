@@ -32,7 +32,7 @@ namespace gglab
 				return {};
 			}
 			[[nodiscard]] TemporalFrameTransaction& BeginTemporalFrame(RenderFrame&,
-				const ResolvedTemporalFramePlan&, uint32_t, uint32_t) noexcept override
+				const ResolvedTemporalFramePlan&, uint32_t, uint32_t, float) noexcept override
 			{
 				return m_Transaction;
 			}

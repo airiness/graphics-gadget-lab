@@ -161,7 +161,9 @@ namespace gglab
 
 		const Camera& mainCamera = info.m_CameraRig.GetMainCamera();
 		auto& mainViewSettings = result.m_ViewRenderSettings[utils::ToIndex(RenderViewID::Main)];
-		mainViewSettings = ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
+		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main
+			? info.m_DisplayViewSettings
+			: ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
 		const RenderViewBuildInfo<RenderViewID::Main> mainViewBuildInfo{
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
@@ -184,7 +186,9 @@ namespace gglab
 
 			const RenderViewID viewId = slot->m_RenderViewId;
 			auto& viewSettings = result.m_ViewRenderSettings[utils::ToIndex(viewId)];
-			viewSettings = ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
+			viewSettings = viewId == info.m_DisplayViewId
+				? info.m_DisplayViewSettings
+				: ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
 				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan,
 				info.m_WindowWidth, info.m_WindowHeight, StringID(std::string_view(slot->m_Name)));

@@ -42,6 +42,7 @@ namespace gglab
 			renderGraph.GetBlackboard().TryGet<RGPostProcessResources>(PostProcessResourcesName);
 		if (resources)
 		{
+			snapshot.m_Exposure = resources->m_Exposure;
 			snapshot.m_SceneColor =
 				BuildTextureDiagnostics(renderGraph, resources->m_Inputs.m_SceneColor);
 			snapshot.m_BloomPrefilter =

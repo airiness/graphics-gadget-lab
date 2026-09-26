@@ -3,6 +3,8 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "GGLabRuntime/Graphics/CameraTooling.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include <algorithm>
@@ -39,6 +41,7 @@ namespace gglab
 			float m_FovDegree = 60.0f;
 			float m_NearZ = 0.01f;
 			float m_FarZ = 1000.0f;
+			float m_ManualEV100 = 0.0f;
 			float m_ExposureCompensationEV = 0.0f;
 
 			// controller params
@@ -61,6 +64,7 @@ namespace gglab
 			state.m_FovDegree = camera.m_Settings.m_Fov;
 			state.m_NearZ = camera.m_Settings.m_Near;
 			state.m_FarZ = camera.m_Settings.m_Far;
+			state.m_ManualEV100 = camera.m_Settings.m_ManualEV100;
 			state.m_ExposureCompensationEV = camera.m_Settings.m_ExposureCompensationEV;
 		}
 
@@ -71,7 +75,8 @@ namespace gglab
 			const CameraEditSettings settings{
 				Vector3(state.m_Pos[0], state.m_Pos[1], state.m_Pos[2]),
 				math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree),
-				state.m_FovDegree, state.m_NearZ, state.m_FarZ, state.m_ExposureCompensationEV
+				state.m_FovDegree, state.m_NearZ, state.m_FarZ, state.m_ManualEV100,
+				state.m_ExposureCompensationEV
 			};
 			if (control.SetCamera(id, settings))
 			{
@@ -323,6 +328,8 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
 
 		ImGui::SeparatorText("Exposure");
+		camChanged |= ImGui::SliderFloat("Manual EV100", &state.m_ManualEV100,
+			-16.0f, 24.0f, "%.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		camChanged |= ImGui::SliderFloat("Exposure Compensation", &state.m_ExposureCompensationEV,
 			-10.0f, 10.0f, "%+.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -330,9 +337,13 @@ namespace gglab
 			ImGui::SetTooltip("Adjusts image brightness in photographic stops.\n"
 				"+1 EV doubles exposure; -1 EV halves it.");
 		}
-		ImGui::Text("Exposure Multiplier: %.4fx", std::exp2(state.m_ExposureCompensationEV));
+		const ResolvedExposureSettings exposure = ResolveManualExposureSettings(
+			state.m_ManualEV100, state.m_ExposureCompensationEV);
+		ImGui::Text("Effective EV100: %.2f | Exposure Scale: %.4fx",
+			exposure.m_EffectiveEV100, exposure.m_ExposureScale);
 		if (ImGui::Button("Reset Exposure"))
 		{
+			state.m_ManualEV100 = 0.0f;
 			state.m_ExposureCompensationEV = 0.0f;
 			camChanged = true;
 		}

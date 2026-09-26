@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <algorithm>
+#include <cmath>
 #include <string_view>
 #include <utility>
 
@@ -70,7 +71,8 @@ namespace gglab
 	}
 
 	TemporalHistoryFrameState TemporalHistoryManager::BeginFrame(
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
+		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+		TemporalColorAbi colorAbi) noexcept
 	{
 		GGLAB_ASSERT_MSG(!m_Shutdown, "Temporal history cannot begin after shutdown.");
 		if (m_Shutdown)
@@ -92,6 +94,7 @@ namespace gglab
 			.m_SessionIdentity = plan.m_SessionIdentity,
 			.m_Width = width,
 			.m_Height = height,
+			.m_ColorAbi = colorAbi,
 		};
 		if (compatibility.m_DisplayViewId == RenderViewID::Unknown ||
 			compatibility.m_SessionIdentity == 0 || width == 0 || height == 0)
@@ -213,7 +216,10 @@ namespace gglab
 		const RHIFencePoint& submittedFence) noexcept
 	{
 		if (!IsCurrentFrame(frame) || frame.m_Ended || !frame.m_RenderGraphExported ||
-			!submittedFence.IsValid())
+			!submittedFence.IsValid() || !std::isfinite(metadata.m_PreExposure) ||
+			!IsTemporalColorCompatible(metadata.m_Compatibility.m_ColorAbi,
+				PostProcessColorState::SceneLinearRec709, metadata.m_PreExposure) ||
+			metadata.m_Compatibility.m_ColorAbi != m_ActiveHistory->m_Compatibility.m_ColorAbi)
 		{
 			AbortFrame(frame, submittedFence);
 			return false;
@@ -338,6 +344,10 @@ namespace gglab
 		if (current.m_Width != compatibility.m_Width || current.m_Height != compatibility.m_Height)
 		{
 			return TemporalHistoryResetReason::ExtentChanged;
+		}
+		if (current.m_ColorAbi != compatibility.m_ColorAbi)
+		{
+			return TemporalHistoryResetReason::ColorAbiChanged;
 		}
 		return current.m_ColorFormat != compatibility.m_ColorFormat ||
 			current.m_DepthFormat != compatibility.m_DepthFormat

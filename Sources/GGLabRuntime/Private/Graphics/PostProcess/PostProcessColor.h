@@ -6,18 +6,6 @@
 
 namespace gglab
 {
-	enum class TemporalColorAbi : uint8_t
-	{
-		LinearRec709SceneReferredV1,
-	};
-
-	[[nodiscard]] constexpr bool IsTemporalColorCompatible(TemporalColorAbi colorAbi,
-		PostProcessColorState colorState, float preExposure) noexcept
-	{
-		return colorAbi == TemporalColorAbi::LinearRec709SceneReferredV1 &&
-			colorState == PostProcessColorState::SceneLinearRec709 && preExposure == 1.0f;
-	}
-
 	struct RGPostProcessColor
 	{
 		RGTextureId m_Texture{};
@@ -25,7 +13,7 @@ namespace gglab
 
 		// StoredColor = SceneLinearColor * PreExposure. Scene rendering is not
 		// pre-exposed yet, so the current path requires this value to remain 1.
-		float m_PreExposure = 1.0f;
+		float m_PreExposure = SceneColorStoragePreExposureV1;
 	};
 
 	struct RGPostProcessInputs

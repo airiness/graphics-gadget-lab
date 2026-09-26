@@ -14,6 +14,7 @@
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDrawService.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
@@ -201,12 +202,14 @@ namespace gglab
 					effectiveDisplayView.m_ViewId, m_WindowWidth, m_WindowHeight),
 			});
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
-			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight);
+			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
+			SceneColorStoragePreExposureV1);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),
 			.m_ViewRenderProfile = effectiveViewRenderProfile,
 			.m_ShadowVisualizationSettings = shadowVisualizationSettings,
+			.m_DisplayViewSettings = displayViewSettings,
 			.m_TemporalFramePlan = temporalFramePlan,
 			.m_TemporalFrameTransaction = temporalFrameTransaction,
 			.m_DisplayViewId = effectiveDisplayView.m_ViewId,

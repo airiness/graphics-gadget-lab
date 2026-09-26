@@ -281,14 +281,15 @@ namespace gglab
 	}
 
 	TemporalFrameTransaction& Renderer::BeginTemporalFrame(Frame& frame,
-		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept
+		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+		float scenePreExposure) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
 			"Temporal frame planning requires the active begun render host frame.");
 		m_ActiveFrame.m_TemporalTransaction.Begin(
 			m_TemporalViewHistory, m_TemporalObjectHistory, plan, width, height,
-			m_TemporalHistoryManager.get());
+			m_TemporalHistoryManager.get(), scenePreExposure);
 		return m_ActiveFrame.m_TemporalTransaction;
 	}
 
@@ -308,6 +309,7 @@ namespace gglab
 			.m_AssetManager = *m_AttachedAssetManager,
 			.m_ShadowVisualizationSettings = request.m_ShadowVisualizationSettings,
 			.m_ViewRenderProfile = request.m_ViewRenderProfile,
+			.m_DisplayViewSettings = request.m_DisplayViewSettings,
 			.m_TemporalFramePlan = request.m_TemporalFramePlan,
 			.m_TemporalFrameTransaction = &request.m_TemporalFrameTransaction,
 			.m_DisplayViewId = request.m_DisplayViewId,

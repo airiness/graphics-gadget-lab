@@ -3,9 +3,30 @@
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace gglab
 {
+	ResolvedExposureSettings ResolveManualExposureSettings(
+		float manualEV100, float compensationEV) noexcept
+	{
+		const float manual = std::isfinite(manualEV100)
+			? Camera::ClampManualEV100(manualEV100)
+			: 0.0f;
+		const float compensation = std::isfinite(compensationEV)
+			? Camera::ClampExposureCompensationEV(compensationEV) : 0.0f;
+		const float effective = manual - compensation;
+		const float scale = 1.0f /
+			(ManualExposureSaturationNormalization * std::exp2(effective));
+		return {
+			.m_ManualEV100 = manual,
+			.m_CompensationEV = compensation,
+			.m_EffectiveEV100 = effective,
+			.m_ExposureScale = scale,
+			.m_PreExposure = scale,
+		};
+	}
+
 	ResolvedViewRenderSettings ResolveViewRenderSettings(
 		const ViewRenderProfile& profile, const Camera& camera) noexcept
 	{
@@ -31,11 +52,8 @@ namespace gglab
 
 		return {
 			.m_TemporalAA = temporalAA,
-			.m_Exposure =
-				{
-					.m_CompensationEV = camera.GetExposureCompensationEV(),
-					.m_ExposureScale = camera.GetExposureMultiplier(),
-				},
+			.m_Exposure = ResolveManualExposureSettings(
+				camera.GetManualEV100(), camera.GetExposureCompensationEV()),
 			.m_Lighting =
 				{
 					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,

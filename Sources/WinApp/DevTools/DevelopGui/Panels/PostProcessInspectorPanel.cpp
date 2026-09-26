@@ -309,6 +309,17 @@ namespace gglab
 		}
 
 		DrawPreview(context, *snapshot);
+		if (ImGui::CollapsingHeader("Exposure", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			const auto& exposure = snapshot->m_Exposure;
+			ImGui::Text("Manual / Compensation / Effective EV100: %.2f / %+.2f / %.2f",
+				exposure.m_ManualEV100, exposure.m_CompensationEV,
+				exposure.m_EffectiveEV100);
+			ImGui::Text("Exposure scale: %.6g | Planned pre-exposure: %.6g",
+				exposure.m_ExposureScale, exposure.m_PreExposure);
+			ImGui::Text("SceneColor storage pre-exposure: %.6g",
+				snapshot->m_SceneColor.m_PreExposure);
+		}
 
 		if (ImGui::CollapsingHeader("Scene Depth", ImGuiTreeNodeFlags_DefaultOpen))
 		{

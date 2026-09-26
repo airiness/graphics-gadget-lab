@@ -31,7 +31,8 @@ namespace gglab
 			observation.m_Id = slot->m_Id;
 			observation.m_Name = slot->m_Name;
 			observation.m_Settings = { camera.GetPosition(), camera.GetYaw(), camera.GetPitch(),
-				camera.GetFov(), camera.GetNear(), camera.GetFar(), camera.GetExposureCompensationEV() };
+				camera.GetFov(), camera.GetNear(), camera.GetFar(), camera.GetManualEV100(),
+				camera.GetExposureCompensationEV() };
 			if (slot->m_Controller) observation.m_Controller = slot->m_Controller->GetParams();
 			observation.m_FrustumColor = slot->m_FrustumColor;
 			observation.m_RenderViewId = slot->m_RenderViewId;
@@ -94,6 +95,7 @@ namespace gglab
 		camera.SetFov(Camera::ClampFov(settings.m_Fov));
 		const float nearZ = Camera::ClampNear(settings.m_Near);
 		camera.SetNearFar(nearZ, Camera::ClampFar(nearZ, settings.m_Far));
+		camera.SetManualEV100(settings.m_ManualEV100);
 		camera.SetExposureCompensationEV(Camera::ClampExposureCompensationEV(settings.m_ExposureCompensationEV));
 		camera.Update();
 		return true;

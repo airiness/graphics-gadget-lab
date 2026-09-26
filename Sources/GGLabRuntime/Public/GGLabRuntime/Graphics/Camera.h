@@ -17,6 +17,7 @@ namespace gglab
 			float m_Near = 0.01f;
 			float m_Far = 1000.0f;
 			float m_Fov = 60.0f;
+			float m_ManualEV100 = 0.0f;
 			float m_ExposureCompensationEV = 0.0f;
 
 			uint32_t m_Width = 1280;
@@ -41,8 +42,8 @@ namespace gglab
 		float GetFar() const noexcept { return m_Far; }
 		float GetFov() const noexcept { return m_Fov; }
 		float GetAspect() const noexcept { return m_Aspect; }
+		float GetManualEV100() const noexcept { return m_ManualEV100; }
 		float GetExposureCompensationEV() const noexcept { return m_ExposureCompensationEV; }
-		float GetExposureMultiplier() const noexcept;
 
 		float GetYaw() const noexcept { return m_Yaw; }
 		float GetPitch() const noexcept { return m_Pitch; }
@@ -52,6 +53,7 @@ namespace gglab
 		void SetYawPitch(float yawRadians, float pitchRadians) noexcept;
 		void SetNearFar(float nearZ, float farZ) noexcept;
 		void SetFov(float fovDegrees) noexcept;
+		void SetManualEV100(float ev) noexcept;
 		void SetExposureCompensationEV(float ev) noexcept;
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;
@@ -63,6 +65,7 @@ namespace gglab
 		static float ClampNear(float nearZ) noexcept;
 		static float ClampFar(float nearZ, float farZ) noexcept;
 		static float ClampFov(float fov) noexcept;
+		static float ClampManualEV100(float ev) noexcept;
 		static float ClampExposureCompensationEV(float ev) noexcept;
 
 	private:
@@ -90,6 +93,7 @@ namespace gglab
 		float m_Far = 1000.0f;
 		float m_Aspect = 1.0f;
 		float m_Fov = 60.0f; // degrees
+		float m_ManualEV100 = 0.0f;
 		float m_ExposureCompensationEV = 0.0f;
 
 		float m_Pitch = 0.0f; // radians

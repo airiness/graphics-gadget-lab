@@ -71,6 +71,8 @@ namespace gglab
 				!math::IsFinite(view.m_NearPlane) || !math::IsFinite(view.m_FarPlane) ||
 				Camera::ClampNear(view.m_NearPlane) != view.m_NearPlane ||
 				Camera::ClampFar(view.m_NearPlane, view.m_FarPlane) != view.m_FarPlane ||
+				!math::IsFinite(view.m_ManualEV100) ||
+				Camera::ClampManualEV100(view.m_ManualEV100) != view.m_ManualEV100 ||
 				!math::IsFinite(view.m_ExposureCompensationEV) ||
 				Camera::ClampExposureCompensationEV(view.m_ExposureCompensationEV) != view.m_ExposureCompensationEV ||
 				!math::IsFinite(view.m_ReferenceAspect) || view.m_ReferenceAspect <= 0.0f)
@@ -100,6 +102,7 @@ namespace gglab
 		camera.LookAt(view->m_Position, view->m_Target);
 		camera.SetFov(view->m_VerticalFovDegrees);
 		camera.SetNearFar(view->m_NearPlane, view->m_FarPlane);
+		camera.SetManualEV100(view->m_ManualEV100);
 		camera.SetExposureCompensationEV(view->m_ExposureCompensationEV);
 		camera.Update();
 		main->m_Controller->ResetVelocity();

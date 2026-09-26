@@ -1,6 +1,7 @@
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -18,13 +19,14 @@ namespace gglab
 		auto& resources =
 			rg.GetBlackboard().GetOrCreate<RGPostProcessResources>(PostProcessResourcesName);
 		resources = {
+			.m_Exposure = context.GetDisplayViewRenderSettings().m_Exposure,
 			.m_Inputs =
 				{
 					.m_SceneColor =
 						{
 							.m_Texture = targets.m_SceneColor,
 							.m_State = PostProcessColorState::SceneLinearRec709,
-							.m_PreExposure = 1.0f,
+							.m_PreExposure = SceneColorStoragePreExposureV1,
 						},
 				},
 			.m_Output =
@@ -36,6 +38,13 @@ namespace gglab
 						},
 				},
 		};
+		if (context.GetTemporalFramePlan().m_Active)
+		{
+			GGLAB_ASSERT_NOT_NULL(context.m_TemporalFrameTransaction);
+			GGLAB_ASSERT_MSG(context.m_TemporalFrameTransaction->GetScenePreExposure() ==
+				resources.m_Inputs.m_SceneColor.m_PreExposure,
+				"Temporal history and SceneColor must use the same storage scale.");
+		}
 
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);

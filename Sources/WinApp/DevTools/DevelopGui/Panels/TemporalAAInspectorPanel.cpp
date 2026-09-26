@@ -61,6 +61,7 @@ namespace gglab
 			case TemporalHistoryResetReason::SessionIdentityChanged: return "Session changed";
 			case TemporalHistoryResetReason::ExtentChanged: return "Extent changed";
 			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
+			case TemporalHistoryResetReason::ColorAbiChanged: return "Color ABI changed";
 			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
 			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
 			case TemporalHistoryResetReason::ResolveProgramChanged:
@@ -257,6 +258,9 @@ namespace gglab
 				static_cast<double>(history.m_PendingRetirementBytes) / (1024.0 * 1024.0));
 			ImGui::Text("Last committed fence: %llu",
 				static_cast<unsigned long long>(history.m_LastCommitted.m_GraphicsFence.m_Value));
+			ImGui::Text("Color ABI: %u | Committed pre-exposure: %.6g",
+				static_cast<unsigned>(history.m_Compatibility.m_ColorAbi),
+				history.m_LastCommitted.m_PreExposure);
 			if (!history.m_PendingRetirementFences.empty())
 			{
 				ImGui::Text("Latest pending fence: %llu",
