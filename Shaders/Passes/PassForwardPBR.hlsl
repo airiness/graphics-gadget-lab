@@ -37,6 +37,12 @@ StructuredBuffer<uint2> g_ForwardPlusTileHeaders : register(t5);
 StructuredBuffer<uint> g_ForwardPlusTileIndices : register(t6);
 #endif
 
+float4 EncodeForwardSceneColor(float4 color)
+{
+	const float preExposure = LoadViewData(g_Pass.ViewIndex).ScenePreExposure;
+	return float4(EncodeSceneColor(color.rgb, preExposure), color.a);
+}
+
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 struct ForwardPBRPixelOutput
 {
@@ -49,8 +55,8 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
 	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
 {
 	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = forwardPlusColor;
-	output.LegacyColor = legacyColor;
+	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
+	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
 	output.GTAOContribution = gtaoContribution;
 	return output;
 }
@@ -65,8 +71,8 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
 	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
 {
 	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = forwardPlusColor;
-	output.LegacyColor = legacyColor;
+	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
+	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
 	return output;
 }
 #elif defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
@@ -80,7 +86,7 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
 	float4 color, float4 legacyColor, float4 gtaoContribution)
 {
 	ForwardPBRPixelOutput output;
-	output.Color = color;
+	output.Color = EncodeForwardSceneColor(color);
 	output.GTAOContribution = gtaoContribution;
 	return output;
 }
@@ -89,7 +95,7 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
 
 float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution)
 {
-	return color;
+	return EncodeForwardSceneColor(color);
 }
 #endif
 
@@ -540,14 +546,14 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
 	outputLighting += diffuseIBL + specularIBL;
-	const float4 outputColor = float4(SanitizeHDRColor(
-		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS)), alpha);
+	const float4 outputColor = float4(
+		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
 	legacyOutputLighting += diffuseIBL + specularIBL;
-	const float4 legacyColor = float4(SanitizeHDRColor(
-		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS)), alpha);
+	const float4 legacyColor = float4(
+		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
 		float4(SanitizeHDRColor(gtaoContribution), 1.0));
 #else

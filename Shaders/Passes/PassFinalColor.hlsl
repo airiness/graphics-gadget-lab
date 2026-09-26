@@ -38,7 +38,7 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 	}
 
 	const float exposureScaleOverPreExposure =
-		viewData.ExposureMultiplier / max(g_Pass.ScenePreExposure, 1e-6);
+		ExposureScaleOverPreExposure(viewData.ExposureMultiplier, g_Pass.ScenePreExposure);
 	float3 color = ACESFitted(storedColor * exposureScaleOverPreExposure);
 	color = LinearToSRGB(color);
 

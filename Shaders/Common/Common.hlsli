@@ -1,20 +1,16 @@
 #pragma once
 
+#include <Common/HDRColorMath.hlsli>
+
 static const float PI = 3.14159265359f;
 static const float TWO_PI = 6.28318530718f;
 static const float INV_PI = 0.31830988618f;
 static const float HALF_PI = 1.57079632679f;
-static const float MAX_FP16_FINITE = 65504.0f;
 
 float Pow5(float x)
 {
 	float xx = x * x;
 	return xx * xx * x;
-}
-
-float SanitizeHDRChannel(float value)
-{
-	return isfinite(value) ? clamp(value, 0.0, MAX_FP16_FINITE) : 0.0;
 }
 
 float3 SanitizeHDRColor(float3 color)
@@ -23,6 +19,14 @@ float3 SanitizeHDRColor(float3 color)
 		SanitizeHDRChannel(color.r),
 		SanitizeHDRChannel(color.g),
 		SanitizeHDRChannel(color.b));
+}
+
+float3 EncodeSceneColor(float3 sceneLinearColor, float preExposure)
+{
+	return float3(
+		EncodeSceneColorChannel(sceneLinearColor.r, preExposure),
+		EncodeSceneColorChannel(sceneLinearColor.g, preExposure),
+		EncodeSceneColorChannel(sceneLinearColor.b, preExposure));
 }
 
 float3 ACESFitted(float3 x)

@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace gglab
@@ -41,9 +42,12 @@ namespace gglab
 			uint32_t m_DepthConvention = 0;
 			uint32_t m_TileCountX = 0;
 			uint32_t m_TileCount = 0;
+			float m_ScenePreExposure = 1.0f;
+			uint32_t m_Padding[3]{};
 		};
 		static_assert(IsPassRootConstantStruct<HdrDiffParameters>);
-		static_assert(sizeof(HdrDiffParameters) == 32);
+		static_assert(offsetof(HdrDiffParameters, m_ScenePreExposure) == 32);
+		static_assert(sizeof(HdrDiffParameters) == 48);
 
 		struct TilePassData
 		{
@@ -165,6 +169,7 @@ namespace gglab
 		}
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
+		const float scenePreExposure = context.GetDisplayRenderView().m_ScenePreExposure;
 
 		rg.AddPass<TilePassData>(
 			"Lighting.ForwardPlus.HdrDiffTiles", RGPassEncoderType::Compute,
@@ -210,7 +215,7 @@ namespace gglab
 					RHIStage::ComputeShader);
 				data.m_TileMetrics = validation.m_TileMetrics;
 			},
-			[this, services](RGExecuteContext& executeContext, TilePassData& data)
+			[this, services, scenePreExposure](RGExecuteContext& executeContext, TilePassData& data)
 			{
 				auto* commandContext = executeContext.GetDirectComputeCommandContext();
 				GGLAB_ASSERT_NOT_NULL(commandContext);
@@ -238,6 +243,7 @@ namespace gglab
 						.m_DepthConvention = static_cast<uint32_t>(data.m_DepthConvention),
 						.m_TileCountX = data.m_TileGrid.m_TileCountX,
 						.m_TileCount = data.m_TileGrid.m_TileCount,
+						.m_ScenePreExposure = scenePreExposure,
 					});
 				commandContext->Dispatch(
 					data.m_TileGrid.m_TileCountX, data.m_TileGrid.m_TileCountY, 1);

@@ -54,6 +54,7 @@ namespace gglab
 			view.m_Aspect = camera.GetAspect();
 			view.m_ExposureCompensationEV = renderSettings.m_Exposure.m_CompensationEV;
 			view.m_ExposureMultiplier = renderSettings.m_Exposure.m_ExposureScale;
+			view.m_ScenePreExposure = renderSettings.m_Exposure.m_PreExposure;
 
 			view.m_Width = width;
 			view.m_Height = height;

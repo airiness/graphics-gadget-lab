@@ -11,6 +11,8 @@ namespace gglab
 	{
 		const LabParameterId EnableCameraInputId("post_process.camera.enable_input");
 		const LabParameterId ExposureEvId("post_process.exposure.ev");
+		const LabParameterId ManualEV100Id("post_process.exposure.manual_ev100");
+		const LabParameterId PreExposureEnabledId("post_process.exposure.pre_exposure_enabled");
 		const LabParameterId EmissiveIntensityId("post_process.scene.emissive_intensity");
 		const LabParameterId BloomEnabledId("post_process.bloom.enabled");
 		const LabParameterId BloomThresholdId("post_process.bloom.threshold");
@@ -39,6 +41,24 @@ namespace gglab
 			.m_DefaultValue = true,
 			}));
 		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ManualEV100Id,
+			.m_Name = "Manual EV100",
+			.m_Group = "Exposure",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.0f,
+			.m_MinValue = LabValue(-16.0f),
+			.m_MaxValue = LabValue(24.0f),
+			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = PreExposureEnabledId,
+			.m_Name = "Scene Pre-exposure (TAA Off)",
+			.m_Group = "Exposure",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = false,
+			}));
+		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ExposureEvId,
 			.m_Name = "Exposure Compensation EV",
 			.m_Group = "Exposure",
@@ -56,7 +76,7 @@ namespace gglab
 			.m_Impact = LabChangeImpact::Immediate,
 			.m_DefaultValue = 12.0f,
 			.m_MinValue = LabValue(0.0f),
-			.m_MaxValue = LabValue(64.0f),
+			.m_MaxValue = LabValue(1000000.0f),
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = BloomEnabledId,
@@ -171,7 +191,10 @@ namespace gglab
 	{
 		const auto& parameters = GetParameters();
 		m_EnableCameraInput = parameters.Get(EnableCameraInputId, true);
+		GetCamera().SetManualEV100(parameters.Get(ManualEV100Id, 0.0f));
 		GetCamera().SetExposureCompensationEV(parameters.Get(ExposureEvId, 0.0f));
+		GetMutableViewRenderProfile().m_EnableScenePreExposure =
+			parameters.Get(PreExposureEnabledId, false);
 
 		auto& bloom = GetMutableViewRenderProfile().m_PostProcess.m_Bloom;
 		bloom.m_Enabled = parameters.Get(BloomEnabledId, true);

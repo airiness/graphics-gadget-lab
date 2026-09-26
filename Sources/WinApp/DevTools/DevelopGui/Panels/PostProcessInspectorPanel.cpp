@@ -1,4 +1,5 @@
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
+#include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
@@ -12,6 +13,7 @@
 
 #include <algorithm>
 #include <format>
+#include <optional>
 #include <string>
 
 #include <imgui.h>
@@ -242,6 +244,10 @@ namespace gglab
 					GetRHIFormatInfo(snapshot.m_SceneDepth.m_ResourceFormat).m_Name,
 					GetRHIFormatInfo(snapshot.m_SceneDepth.m_SrvFormat).m_Name);
 			}
+			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			{
+				ImGui::TextDisabled("Source: scene-referred linear Rec.709 lighting diagnostic (unit storage scale).");
+			}
 			else if (gtaoSelection)
 			{
 				ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
@@ -262,9 +268,11 @@ namespace gglab
 			}
 			else
 			{
-				ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.3f", selectedTexture->m_Width,
+				ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.6g", selectedTexture->m_Width,
 					selectedTexture->m_Height, GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
 					selectedTexture->m_PreExposure);
+				ImGui::TextDisabled("Scene-linear Rec.709 storage; preview removes storage scale,"
+					" then applies camera exposure, tone mapping and sRGB encoding.");
 			}
 
 			if (preview.m_HasPublished && preview.m_Width && preview.m_Height)
@@ -311,11 +319,26 @@ namespace gglab
 		DrawPreview(context, *snapshot);
 		if (ImGui::CollapsingHeader("Exposure", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			if (auto* overrides = context.m_ViewRenderSettingsOverrides)
+			{
+				bool active = overrides->m_ScenePreExposure.has_value();
+				if (ImGui::Checkbox("Override Scene Pre-exposure", &active))
+				{
+					overrides->m_ScenePreExposure = active
+						? std::optional<bool>(snapshot->m_Exposure.m_PreExposure != 1.0f)
+						: std::nullopt;
+				}
+				if (active)
+				{
+					ImGui::Checkbox("Enable Scene Pre-exposure", &*overrides->m_ScenePreExposure);
+				}
+				ImGui::TextDisabled("Pre-exposure requires Temporal AA to be disabled.");
+			}
 			const auto& exposure = snapshot->m_Exposure;
 			ImGui::Text("Manual / Compensation / Effective EV100: %.2f / %+.2f / %.2f",
 				exposure.m_ManualEV100, exposure.m_CompensationEV,
 				exposure.m_EffectiveEV100);
-			ImGui::Text("Exposure scale: %.6g | Planned pre-exposure: %.6g",
+			ImGui::Text("Exposure scale: %.6g | Frame pre-exposure: %.6g",
 				exposure.m_ExposureScale, exposure.m_PreExposure);
 			ImGui::Text("SceneColor storage pre-exposure: %.6g",
 				snapshot->m_SceneColor.m_PreExposure);

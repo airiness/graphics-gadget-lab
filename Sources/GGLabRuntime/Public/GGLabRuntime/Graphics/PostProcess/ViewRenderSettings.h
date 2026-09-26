@@ -76,6 +76,8 @@ namespace gglab
 	struct ViewRenderProfile
 	{
 		TemporalAASettings m_TemporalAA{};
+		// Requires TAA to be disabled until temporal history supports exposure rescaling.
+		bool m_EnableScenePreExposure = false;
 		LightingProfile m_Lighting{};
 		PostProcessProfile m_PostProcess{};
 	};
@@ -89,8 +91,8 @@ namespace gglab
 		float m_CompensationEV = 0.0f;
 		float m_EffectiveEV100 = 0.0f;
 		float m_ExposureScale = 1.0f / ManualExposureSaturationNormalization;
-		// Desired storage scale; scene color still uses unit scale with the active temporal ABI.
-		float m_PreExposure = 1.0f / ManualExposureSaturationNormalization;
+		// Actual frame/view storage scale applied before writing scene color.
+		float m_PreExposure = 1.0f;
 	};
 
 	struct ResolvedPostProcessSettings
@@ -117,5 +119,5 @@ namespace gglab
 	[[nodiscard]] ResolvedViewRenderSettings ResolveViewRenderSettings(
 		const ViewRenderProfile& profile, const Camera& camera) noexcept;
 	[[nodiscard]] ResolvedExposureSettings ResolveManualExposureSettings(
-		float manualEV100, float compensationEV) noexcept;
+		float manualEV100, float compensationEV, bool enablePreExposure = false) noexcept;
 }

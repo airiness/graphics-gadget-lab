@@ -8,7 +8,7 @@
 namespace gglab
 {
 	ResolvedExposureSettings ResolveManualExposureSettings(
-		float manualEV100, float compensationEV) noexcept
+		float manualEV100, float compensationEV, bool enablePreExposure) noexcept
 	{
 		const float manual = std::isfinite(manualEV100)
 			? Camera::ClampManualEV100(manualEV100)
@@ -23,7 +23,7 @@ namespace gglab
 			.m_CompensationEV = compensation,
 			.m_EffectiveEV100 = effective,
 			.m_ExposureScale = scale,
-			.m_PreExposure = scale,
+			.m_PreExposure = enablePreExposure ? scale : 1.0f,
 		};
 	}
 
@@ -53,7 +53,8 @@ namespace gglab
 		return {
 			.m_TemporalAA = temporalAA,
 			.m_Exposure = ResolveManualExposureSettings(
-				camera.GetManualEV100(), camera.GetExposureCompensationEV()),
+				camera.GetManualEV100(), camera.GetExposureCompensationEV(),
+				profile.m_EnableScenePreExposure && !temporalAA.m_Enabled),
 			.m_Lighting =
 				{
 					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,

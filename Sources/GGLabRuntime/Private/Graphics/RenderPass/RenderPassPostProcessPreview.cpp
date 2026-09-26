@@ -269,7 +269,8 @@ namespace gglab
 			return;
 		}
 		GGLAB_ASSERT_MSG(
-			sourcePreExposure > 0.0f, "Post-process preview requires positive pre-exposure.");
+			std::isfinite(sourcePreExposure) && sourcePreExposure > 0.0f,
+			"Post-process preview requires positive finite pre-exposure.");
 
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();

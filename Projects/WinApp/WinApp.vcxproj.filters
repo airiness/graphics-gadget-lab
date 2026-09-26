@@ -861,6 +861,9 @@
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>

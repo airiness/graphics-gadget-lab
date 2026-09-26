@@ -206,6 +206,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(result.m_DisplayViewId == info.m_TemporalFramePlan.m_DisplayViewId,
 			"Temporal frame plan display view must match the built display view.");
 		GGLAB_ASSERT_NOT_NULL(info.m_TemporalFrameTransaction);
+		GGLAB_ASSERT_MSG(info.m_TemporalFrameTransaction->GetScenePreExposure() ==
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)].m_ScenePreExposure,
+			"Frame planning and scene writes must share one resolved pre-exposure.");
 		info.m_TemporalFrameTransaction->PrepareDisplayView(
 			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
 		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==

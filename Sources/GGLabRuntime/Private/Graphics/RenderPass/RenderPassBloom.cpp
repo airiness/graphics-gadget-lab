@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <span>
@@ -96,8 +97,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			postProcess.m_Inputs.m_SceneColor.m_State == PostProcessColorState::SceneLinearRec709,
 			"Bloom requires scene-linear Rec.709 input.");
-		GGLAB_ASSERT_MSG(postProcess.m_Inputs.m_SceneColor.m_PreExposure > 0.0f,
-			"Bloom requires a positive scene pre-exposure.");
+		GGLAB_ASSERT_MSG(std::isfinite(postProcess.m_Inputs.m_SceneColor.m_PreExposure) &&
+			postProcess.m_Inputs.m_SceneColor.m_PreExposure > 0.0f,
+			"Bloom requires a positive finite scene pre-exposure.");
 		EnsureInitialized(services);
 
 		const uint32_t samplerIndex =

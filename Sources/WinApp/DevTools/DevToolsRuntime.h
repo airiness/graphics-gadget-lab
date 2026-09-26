@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
+#include <optional>
+
 namespace gglab
 {
 	struct DevelopGuiContext;
@@ -29,6 +31,7 @@ namespace gglab
 	{
 		TemporalAASettingsOverride m_TemporalAA{};
 		GTAOSettingsOverride m_GTAO{};
+		std::optional<bool> m_ScenePreExposure;
 	};
 
 	class DevToolsRuntime

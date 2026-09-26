@@ -9,6 +9,7 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 
+#include <cmath>
 #include <cstdint>
 #include <span>
 
@@ -70,8 +71,9 @@ namespace gglab
 				GGLAB_ASSERT_MSG(postProcess.m_Inputs.m_SceneColor.m_State ==
 					PostProcessColorState::SceneLinearRec709,
 					"FinalColor requires scene-linear Rec.709 input.");
-				GGLAB_ASSERT_MSG(postProcess.m_Inputs.m_SceneColor.m_PreExposure > 0.0f,
-					"FinalColor requires a positive scene pre-exposure.");
+				GGLAB_ASSERT_MSG(std::isfinite(postProcess.m_Inputs.m_SceneColor.m_PreExposure) &&
+					postProcess.m_Inputs.m_SceneColor.m_PreExposure > 0.0f,
+					"FinalColor requires a positive finite scene pre-exposure.");
 				GGLAB_ASSERT_MSG(
 					postProcess.m_Output.m_Transform.m_Mode == OutputColorMode::SdrSRGB,
 					"FinalColor currently supports only SDR sRGB output.");

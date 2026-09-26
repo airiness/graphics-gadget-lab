@@ -411,6 +411,7 @@
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
     <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli" />
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
     <None Include="..\..\Shaders\Common\Sampling.hlsli" />

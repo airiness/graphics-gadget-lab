@@ -6298,7 +6298,7 @@ namespace gglab
 				1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
 				defaultExposure.m_ManualEV100 == 0.0f &&
 				defaultExposure.m_CompensationEV == 0.0f &&
-				defaultExposure.m_PreExposure == defaultExposure.m_ExposureScale,
+				defaultExposure.m_PreExposure == 1.0f,
 				"Zero manual EV100 uses saturation-normalized default exposure");
 
 			bool compensationResponseMatches = true;
@@ -6313,6 +6313,36 @@ namespace gglab
 			}
 			context.Check(compensationResponseMatches,
 				"Exposure compensation retains its stop response at zero manual EV100");
+
+			camera.SetManualEV100(16.0f);
+			camera.SetExposureCompensationEV(0.0f);
+			ViewRenderProfile preExposedProfile{};
+			preExposedProfile.m_EnableScenePreExposure = true;
+			const auto preExposedSettings = ResolveViewRenderSettings(preExposedProfile, camera);
+			preExposedProfile.m_TemporalAA.m_Enabled = true;
+			const auto temporalSettings = ResolveViewRenderSettings(preExposedProfile, camera);
+			context.Check(preExposedSettings.m_Exposure.m_PreExposure ==
+				preExposedSettings.m_Exposure.m_ExposureScale &&
+				preExposedSettings.m_Exposure.m_PreExposure < 0.0001f &&
+				temporalSettings.m_Exposure.m_PreExposure == 1.0f &&
+				temporalSettings.m_Exposure.m_ExposureScale ==
+				preExposedSettings.m_Exposure.m_ExposureScale,
+				"Scene pre-exposure is opt-in and a TAA request preserves the unit-scale temporal ABI");
+			const ResolvedTemporalFramePlan noTemporalFrame{};
+			const RenderView preExposedView = RenderViewBuildTraits<RenderViewID::Main>::Build({
+				.m_Camera = camera,
+				.m_RenderSettings = preExposedSettings,
+				.m_TemporalFramePlan = noTemporalFrame,
+				.m_Width = 64,
+				.m_Height = 64,
+			});
+			const auto upload = RenderSceneBuilder::BuildViewData(
+				std::span<const RenderView>(&preExposedView, 1), {});
+			context.Check(upload.m_Views.size() == 1 &&
+				preExposedView.m_ScenePreExposure == preExposedSettings.m_Exposure.m_PreExposure &&
+				upload.m_Views[0].ScenePreExposure == preExposedView.m_ScenePreExposure &&
+				upload.m_Views[0].ExposureMultiplier == preExposedSettings.m_Exposure.m_ExposureScale,
+				"The resolved view uploads one unchanged scene storage scale for every scene writer");
 
 			const ResolvedExposureSettings base = ResolveManualExposureSettings(12.0f, 0.0f);
 			const ResolvedExposureSettings plusStop = ResolveManualExposureSettings(13.0f, 0.0f);
@@ -6338,7 +6368,7 @@ namespace gglab
 				clamped.m_ManualEV100 == Camera::ClampManualEV100(1000.0f) &&
 				clamped.m_CompensationEV == Camera::ClampExposureCompensationEV(-1000.0f) &&
 				std::isfinite(clamped.m_ExposureScale) && clamped.m_ExposureScale > 0.0f &&
-				camera.GetManualEV100() == 0.0f,
+				camera.GetManualEV100() == 16.0f,
 				"Exposure resolution clamps finite ranges and rejects non-finite camera input");
 
 			TemporalViewHistory viewHistory;
@@ -6360,6 +6390,7 @@ namespace gglab
 			static_assert(offsetof(ViewGPU, PreviousDepthReconstructionParams) == 400);
 			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
 			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
+			static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
 
 			const Vector2 staticMotion = ComputeTemporalMotionUV(
 				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));

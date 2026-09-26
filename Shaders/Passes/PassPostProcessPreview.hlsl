@@ -146,7 +146,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	}
 
 	const float exposureScaleOverPreExposure =
-		viewData.ExposureMultiplier / max(g_Pass.SourcePreExposure, 1e-6);
+		ExposureScaleOverPreExposure(viewData.ExposureMultiplier, g_Pass.SourcePreExposure);
 	const float3 storedColor = SanitizeHDRColor(
 		SampleTexture2D(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, input.UV).rgb);
 	float3 color =

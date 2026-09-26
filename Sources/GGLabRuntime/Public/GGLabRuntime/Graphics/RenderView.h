@@ -48,6 +48,7 @@ namespace gglab
 		float m_Aspect = 1.0f;
 		float m_ExposureCompensationEV = 0.0f;
 		float m_ExposureMultiplier = 1.0f;
+		float m_ScenePreExposure = 1.0f;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

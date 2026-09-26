@@ -26,7 +26,7 @@ namespace gglab
 						{
 							.m_Texture = targets.m_SceneColor,
 							.m_State = PostProcessColorState::SceneLinearRec709,
-							.m_PreExposure = SceneColorStoragePreExposureV1,
+							.m_PreExposure = context.GetDisplayRenderView().m_ScenePreExposure,
 						},
 				},
 			.m_Output =

@@ -15,6 +15,8 @@ struct HdrDiffParameters
 	uint DepthConvention;
 	uint TileCountX;
 	uint TileCount;
+	float ScenePreExposure;
+	uint3 Padding;
 };
 
 ConstantBuffer<HdrDiffParameters> g_Pass : register(b0);
@@ -76,8 +78,9 @@ void CSReduceTiles(
 			Texture2D<float4> sceneColor = GetTexture2DFloat4(g_Pass.SceneColorTextureIndex);
 			Texture2D<float4> legacyReference =
 				GetTexture2DFloat4(g_Pass.LegacyReferenceTextureIndex);
-			const float3 forwardPlus = sceneColor.Load(int3(pixel, 0)).rgb;
-			const float3 legacy = legacyReference.Load(int3(pixel, 0)).rgb;
+			// Keep absolute errors and the relative-error floor in scene-referred units.
+			const float3 forwardPlus = sceneColor.Load(int3(pixel, 0)).rgb / g_Pass.ScenePreExposure;
+			const float3 legacy = legacyReference.Load(int3(pixel, 0)).rgb / g_Pass.ScenePreExposure;
 
 			float absoluteError = 3.402823466e+38;
 			float relativeLuminanceError = 3.402823466e+38;

@@ -203,7 +203,7 @@ namespace gglab
 			});
 		TemporalFrameTransaction& temporalFrameTransaction = m_RenderHost->BeginTemporalFrame(
 			rendererFrame, temporalFramePlan, m_WindowWidth, m_WindowHeight,
-			SceneColorStoragePreExposureV1);
+			displayViewSettings.m_Exposure.m_PreExposure);
 		const RenderFrameBuildRequest frameBuildRequest{
 			.m_World = world,
 			.m_CameraRig = demo->GetCameraRig(),

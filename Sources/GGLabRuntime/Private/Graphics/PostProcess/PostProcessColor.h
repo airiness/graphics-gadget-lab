@@ -11,8 +11,7 @@ namespace gglab
 		RGTextureId m_Texture{};
 		PostProcessColorState m_State = PostProcessColorState::SceneLinearRec709;
 
-		// StoredColor = SceneLinearColor * PreExposure. Scene rendering is not
-		// pre-exposed yet, so the current path requires this value to remain 1.
+		// StoredColor = SceneLinearColor * PreExposure, applied before FP16 storage.
 		float m_PreExposure = SceneColorStoragePreExposureV1;
 	};
 

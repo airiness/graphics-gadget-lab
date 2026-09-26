@@ -59,6 +59,13 @@ namespace shader_shadow_math
 #include "../../Shaders/Lighting/ShadowReceiverPlaneMath.hlsli"
 }
 
+namespace shader_hdr_math
+{
+	using std::clamp;
+	using std::isfinite;
+#include "../../Shaders/Common/HDRColorMath.hlsli"
+}
+
 namespace gglab
 {
 	namespace
@@ -2038,6 +2045,34 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
+			const float daylightRadiance = 1000000.0f;
+			const float storageScale = 1.0f / (1.2f * std::exp2(16.0f));
+			const float stored = shader_hdr_math::EncodeSceneColorChannel(daylightRadiance, storageScale);
+			context.Check(stored > 12.0f && stored < 13.0f &&
+				std::abs(stored / storageScale - daylightRadiance) < 1.0f &&
+				shader_hdr_math::SanitizeHDRChannel(daylightRadiance) * storageScale < 1.0f,
+				"Production scene-color math pre-exposes daylight radiance before FP16 saturation");
+			bool exposureInvariant = true;
+			for (const float ev : { -4.0f, 0.0f, 8.0f, 16.0f, 24.0f })
+			{
+				const float exposure = 1.0f / (1.2f * std::exp2(ev));
+				const float source = 0.25f / exposure;
+				const float exposed = shader_hdr_math::EncodeSceneColorChannel(source, exposure) *
+					shader_hdr_math::ExposureScaleOverPreExposure(exposure, exposure);
+				exposureInvariant &= std::abs(exposed - 0.25f) < 0.000001f;
+			}
+			context.Check(exposureInvariant,
+				"Final-color and preview conversion preserve exposure even below a 1e-6 storage scale");
+			const float alpha = 0.35f;
+			const float blended =
+				shader_hdr_math::EncodeSceneColorChannel(150000.0f, storageScale) * alpha +
+				shader_hdr_math::EncodeSceneColorChannel(90000.0f, storageScale) * (1.0f - alpha);
+			const float expected = (150000.0f * alpha + 90000.0f * (1.0f - alpha)) * storageScale;
+			context.Check(std::abs(blended - expected) < 0.000001f &&
+				shader_hdr_math::EncodeSceneColorChannel(-1.0f, storageScale) == 0.0f &&
+				shader_hdr_math::EncodeSceneColorChannel(
+					std::numeric_limits<float>::infinity(), storageScale) == 0.0f,
+				"Pre-exposed RGB preserves alpha blending and rejects invalid HDR channels");
 			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 			ShaderCompiler compiler(shaderSourceRoot, ResolveShaderCacheRoot(runtimeRoot));
@@ -2106,6 +2141,7 @@ namespace gglab
 				GPUAbiMember{ "Height", offsetof(ViewGPU, Height) },
 				GPUAbiMember{ "DepthConvention", offsetof(ViewGPU, DepthConvention) },
 				GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
+				GPUAbiMember{ "ScenePreExposure", offsetof(ViewGPU, ScenePreExposure) },
 				GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
 			};
 			for (const GPUAbiMember& member : viewGPUAbiMembers)
@@ -2497,6 +2533,21 @@ namespace gglab
 			context.Check(napaVoxelVertexArtifact.IsSuccess() &&
 				napaVoxelPixelArtifact.IsSuccess(),
 				"Production DXC compiles the Napa voxel static mesh shader");
+
+			bool exposureShadersCompile = true;
+			for (const wchar_t* source : { L"Passes/PassForwardPBR.hlsl", L"Passes/PassSkybox.hlsl",
+				L"Passes/PassNapaVoxel.hlsl", L"Passes/PassDebugDraw.hlsl",
+				L"Passes/PassFinalColor.hlsl", L"Passes/PassPostProcessPreview.hlsl" })
+			{
+				desc.m_SourcePath = source;
+				desc.m_Defines.clear();
+				desc.m_Target = {};
+				exposureShadersCompile &= compiler.Compile(desc).IsSuccess();
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				exposureShadersCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(exposureShadersCompile,
+				"DXIL and SPIR-V compile every scene-color writer and exposure conversion consumer");
 		}
 
 	}

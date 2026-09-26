@@ -386,6 +386,7 @@ namespace gglab
 			ImGui::Text("FOV: %.2f deg", math::ToDegrees(view->m_FovRadians));
 			ImGui::Text("Exposure Compensation: %+.2f EV", view->m_ExposureCompensationEV);
 			ImGui::Text("Exposure Multiplier: %.4fx", view->m_ExposureMultiplier);
+			ImGui::Text("Scene Pre-exposure: %.6g", view->m_ScenePreExposure);
 			devtools::DrawVector3Text("Camera Position", view->m_CameraPosition);
 
 			ImGui::Checkbox("Show Matrices", &state.m_ShowMatrices);

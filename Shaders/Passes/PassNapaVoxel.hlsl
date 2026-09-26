@@ -56,5 +56,7 @@ float4 PSMain(VSOutput input) : SV_Target
 	const float3 toLight = SafeNormalize(float3(0.35, 0.85, 0.4), float3(0.0, 1.0, 0.0));
 	const float diffuse = saturate(dot(normalWS, toLight));
 	const float lighting = 0.22 + diffuse * 0.78;
-	return float4(ResolveMaterialColor(g_Pass.Material) * lighting, 1.0);
+	const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
+	return float4(EncodeSceneColor(
+		ResolveMaterialColor(g_Pass.Material) * lighting, viewData.ScenePreExposure), 1.0);
 }
