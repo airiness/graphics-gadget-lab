@@ -5,7 +5,7 @@
 
 namespace gglab
 {
-	// Surface integration probe: proves the gglab.surface seam end-to-end on
+	// Surface integration probe: proves the material evaluation path end-to-end on
 	// the real Forward PBR path. Fixture A/B values and textures are driven
 	// through the normal runtime material update path
 	// (MaterialInstanceComponent -> MaterialGPU -> g_Materials ->

@@ -168,7 +168,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp" />
@@ -180,7 +179,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp" />
@@ -241,7 +239,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
@@ -276,7 +273,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.h" />
@@ -287,7 +283,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformWindow.h" />
@@ -331,7 +326,6 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiStyle.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Interop\ImGuiMathInterop.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiRegistry.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
@@ -367,7 +361,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
@@ -435,16 +428,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
-    <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json" />
-    <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json" />
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json" />
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli" />
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewVisualizer.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli" />
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json" />
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.hlsli" />
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.provenance.json" />
   </ItemGroup>
   <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
@@ -470,13 +454,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
-    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV1.hlsl" />
-    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV2.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl" />
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV2ContractCompile.hlsl" />
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl" />
   </ItemGroup>

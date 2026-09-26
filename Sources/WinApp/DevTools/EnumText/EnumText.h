@@ -107,19 +107,6 @@ namespace gglab::devtools
 	}
 
 	template <utils::Enum E>
-	[[nodiscard]] std::string EnumValueText(E value)
-		requires detail::HasEnumTextEntries<E>
-	{
-		const std::string text = EnumText(value);
-		if (std::string_view(text.data(), text.size()) != detail::UnknownText<E>())
-		{
-			return text;
-		}
-
-		return std::format("{}({})", text, static_cast<uint64_t>(utils::ToUnderlying(value)));
-	}
-
-	template <utils::Enum E>
 	[[nodiscard]] std::string EnumValueTextWithBits(E value)
 		requires detail::HasEnumTextEntries<E>
 	{

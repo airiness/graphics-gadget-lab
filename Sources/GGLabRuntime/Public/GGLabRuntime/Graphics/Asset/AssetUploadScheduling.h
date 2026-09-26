@@ -14,23 +14,6 @@ namespace gglab
 	class RHIDevice;
 	class TransferManager;
 
-	[[nodiscard]] constexpr AssetKind ToAssetKind(AssetStreamingWorkKind kind) noexcept
-	{
-		switch (kind)
-		{
-		case AssetStreamingWorkKind::Model:
-			return AssetKind::Model;
-		case AssetStreamingWorkKind::Texture:
-			return AssetKind::Texture;
-		case AssetStreamingWorkKind::Mesh:
-			return AssetKind::Mesh;
-		case AssetStreamingWorkKind::RuntimeMesh:
-		case AssetStreamingWorkKind::Unknown:
-			return AssetKind::Unknown;
-		}
-		return AssetKind::Unknown;
-	}
-
 	[[nodiscard]] constexpr AssetStreamingWorkKind ToAssetStreamingWorkKind(AssetKind kind) noexcept
 	{
 		switch (kind)
@@ -46,13 +29,6 @@ namespace gglab
 			return AssetStreamingWorkKind::Unknown;
 		}
 		return AssetStreamingWorkKind::Unknown;
-	}
-
-	[[nodiscard]] constexpr AssetContentVersion ToAssetContentVersion(
-		const AssetStreamingIdentity& identity) noexcept
-	{
-		return MakeAssetContentVersion(
-			ToAssetKind(identity.m_Kind), identity.m_StableId, identity.m_Generation);
 	}
 
 	[[nodiscard]] constexpr AssetStreamingIdentity ToAssetStreamingIdentity(

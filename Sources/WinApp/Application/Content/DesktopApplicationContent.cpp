@@ -16,12 +16,10 @@
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
-#include "Application/Lab/Sessions/ShaderGraphPreviewLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "Application/Lab/Sessions/TextureContractLabSession.h"
-#include "Application/Shader/ShaderPreviewRuntimeSession.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "Lab/LabRuntime.h"
 
@@ -116,10 +114,6 @@ namespace gglab
 					shader_programs::CoordinateConformancePixel } },
 			{ SampleableDepthLabSession::GetDescriptor(), &SampleableDepthLabSession::Create },
 			{ SurfaceProbeLabSession::GetDescriptor(), &SurfaceProbeLabSession::Create },
-			{ ShaderGraphPreviewLabSession::GetDescriptor(),
-				&ShaderGraphPreviewLabSession::Create,
-				{ shader_programs::ShaderGraphPreviewSurfaceV1Pixel,
-					shader_programs::ShaderGraphPreviewSurfaceV2Pixel } },
 			{ GTAOLabSession::GetDescriptor(), &GTAOLabSession::Create },
 			{ ForwardPlusLabSession::GetDescriptor(), &ForwardPlusLabSession::Create },
 			{ TemporalAALabSession::GetDescriptor(), &TemporalAALabSession::Create },
@@ -135,20 +129,4 @@ namespace gglab
 		return registration;
 	}
 
-	void SynchronizeDesktopShaderPreviewLab(LabRuntime& runtime,
-		const ShaderPreviewPublicationArtifact& publication,
-		const ShaderPreviewRuntimeSessionSnapshot& snapshot) noexcept
-	{
-		auto* previewLab = dynamic_cast<ShaderGraphPreviewLabSession*>(
-			runtime.GetActiveSession());
-		if (!previewLab)
-		{
-			previewLab = dynamic_cast<ShaderGraphPreviewLabSession*>(
-				runtime.GetPendingSession());
-		}
-		if (previewLab)
-		{
-			previewLab->ApplyAttachedRuntimeSession(publication, snapshot);
-		}
-	}
 }

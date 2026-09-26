@@ -8,7 +8,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
 #include <type_traits>
 
 // struct member name without m_ for GPU using
@@ -159,20 +158,6 @@ namespace gglab
 		uint32_t PreviousDepthConvention;
 		uint32_t Padding[3];
 	};
-	struct GPUAbiMember
-	{
-		std::string_view m_Name;
-		size_t m_Offset = 0;
-	};
-	inline constexpr std::array ObjectGPUAbiMembers = {
-		GPUAbiMember{ "ModelMat", offsetof(ObjectGPU, ModelMat) },
-		GPUAbiMember{ "PreviousModelMat", offsetof(ObjectGPU, PreviousModelMat) },
-		GPUAbiMember{ "NormalMat", offsetof(ObjectGPU, NormalMat) },
-		GPUAbiMember{ "MaterialIndex", offsetof(ObjectGPU, MaterialIndex) },
-		GPUAbiMember{ "ViewIndex", offsetof(ObjectGPU, ViewIndex) },
-		GPUAbiMember{ "Padding", offsetof(ObjectGPU, Padding) },
-	};
-	inline constexpr size_t ObjectGPUAbiStride = sizeof(ObjectGPU);
 	static_assert(std::is_standard_layout_v<ObjectGPU>);
 	static_assert(offsetof(ObjectGPU, ModelMat) == 0);
 	static_assert(offsetof(ObjectGPU, PreviousModelMat) == 64);
@@ -181,30 +166,6 @@ namespace gglab
 	static_assert(offsetof(ObjectGPU, ViewIndex) == 196);
 	static_assert(offsetof(ObjectGPU, Padding) == 200);
 	static_assert(sizeof(ObjectGPU) == 208);
-	inline constexpr std::array ViewGPUAbiMembers = {
-		GPUAbiMember{ "ViewMat", offsetof(ViewGPU, ViewMat) },
-		GPUAbiMember{ "ProjMat", offsetof(ViewGPU, ProjMat) },
-		GPUAbiMember{ "InvViewMat", offsetof(ViewGPU, InvViewMat) },
-		GPUAbiMember{ "InvProjMat", offsetof(ViewGPU, InvProjMat) },
-		GPUAbiMember{ "PreviousViewMat", offsetof(ViewGPU, PreviousViewMat) },
-		GPUAbiMember{ "PreviousRasterViewProj", offsetof(ViewGPU, PreviousRasterViewProj) },
-		GPUAbiMember{ "CameraPos", offsetof(ViewGPU, CameraPos) },
-		GPUAbiMember{ "PreviousDepthReconstructionParams",
-			offsetof(ViewGPU, PreviousDepthReconstructionParams) },
-		GPUAbiMember{ "Near", offsetof(ViewGPU, Near) },
-		GPUAbiMember{ "Far", offsetof(ViewGPU, Far) },
-		GPUAbiMember{ "FovRadians", offsetof(ViewGPU, FovRadians) },
-		GPUAbiMember{ "Aspect", offsetof(ViewGPU, Aspect) },
-		GPUAbiMember{ "CurrentJitterUV", offsetof(ViewGPU, CurrentJitterUV) },
-		GPUAbiMember{ "PreviousJitterUV", offsetof(ViewGPU, PreviousJitterUV) },
-		GPUAbiMember{ "ExposureMultiplier", offsetof(ViewGPU, ExposureMultiplier) },
-		GPUAbiMember{ "Width", offsetof(ViewGPU, Width) },
-		GPUAbiMember{ "Height", offsetof(ViewGPU, Height) },
-		GPUAbiMember{ "DepthConvention", offsetof(ViewGPU, DepthConvention) },
-		GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
-		GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
-	};
-	inline constexpr size_t ViewGPUAbiStride = sizeof(ViewGPU);
 	static_assert(std::is_standard_layout_v<ViewGPU>);
 	static_assert(offsetof(ViewGPU, ViewMat) == 0);
 	static_assert(offsetof(ViewGPU, ProjMat) == 64);

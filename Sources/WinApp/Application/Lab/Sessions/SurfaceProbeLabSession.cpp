@@ -314,7 +314,7 @@ namespace gglab
 
 	void SurfaceProbeLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
-		diagnostics.m_Title = "Surface Probe (gglab.surface)";
+		diagnostics.m_Title = "Surface Probe";
 
 		const auto& parameters = GetParameters();
 		const int32_t factorFixture =
@@ -418,7 +418,7 @@ namespace gglab
 			.m_DisplayName = "Surface Probe",
 			.m_Category = "Materials",
 			.m_Description =
-				"Probes the gglab.surface surface evaluation seam with named A/B base color "
+				"Probes surface evaluation with named A/B base color "
 				"factor and base color texture fixtures driven through the normal runtime "
 				"material path on the existing Forward PBR lighting.",
 			.m_Kind = LabKind::Pipeline,

@@ -55,9 +55,6 @@
     <Filter Include="DevTools\DevelopGui\Backends\Windows">
       <UniqueIdentifier>{4A816AF9-80EC-4329-43D4-43686984F510}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DevTools\DevelopGui\Interop">
-      <UniqueIdentifier>{A5343AB4-CA42-49B8-FBF1-13FDC043BD56}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DevTools\DevelopGui\Panels">
       <UniqueIdentifier>{EF8B60AF-9134-41DA-33AD-FB3F82B0C886}</UniqueIdentifier>
     </Filter>
@@ -79,29 +76,8 @@
     <Filter Include="Shaders\PBR">
       <UniqueIdentifier>{1F2F2B7C-826D-A3A3-334B-8866C6719D60}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Profiles">
-      <UniqueIdentifier>{C567613B-5B0D-CCB2-9F51-623009A500E1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Profiles\GGLab.Surface">
-      <UniqueIdentifier>{A694C989-1473-20D2-FCBB-A77870EA80D1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Profiles\GGLab.Surface\1">
-      <UniqueIdentifier>{7C934EDD-EDB1-2F44-2793-37D818D5A666}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Profiles\GGLab.Surface\2">
-      <UniqueIdentifier>{1D37AE8E-AE2B-8900-EE5C-03A94B2887A7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Programs">
-      <UniqueIdentifier>{1A4EF42B-4BCC-F632-7BEC-A3C384F7487D}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Programs\ShaderGraphPreview">
-      <UniqueIdentifier>{B0BE4E04-E2F5-C6ED-3989-B04824DB5961}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{EEA089C0-E071-EA3C-EFDF-59DAECA485F6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Shaders\Tests\Generated">
-      <UniqueIdentifier>{7AE87480-80F0-D053-4394-CE077F3B40E8}</UniqueIdentifier>
     </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{171B5147-9F2B-A638-FB02-84BF202F994B}</UniqueIdentifier>
@@ -225,9 +201,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -312,16 +285,10 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp">
-      <Filter>Application\Shader</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.cpp">
       <Filter>Application\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\AssetSnapshotText.cpp">
@@ -542,9 +509,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SampleableDepthLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ShaderGraphPreviewLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -626,16 +590,10 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ShaderPreviewRuntimeSessionSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h">
-      <Filter>Application\Shader</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Shader\ShaderPreviewRuntimeSession.h">
       <Filter>Application\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Tooling\ApplicationToolingComposition.h">
@@ -694,9 +652,6 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h">
       <Filter>DevTools\DevelopGui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Interop\ImGuiMathInterop.h">
-      <Filter>DevTools\DevelopGui\Interop</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h">
       <Filter>DevTools\DevelopGui</Filter>
@@ -865,25 +820,10 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
-    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV1.hlsl">
-      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewSurfaceV2.hlsl">
-      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
-    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
-      <Filter>Shaders\Tests</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV1ContractCompile.hlsl">
-      <Filter>Shaders\Tests</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceGeneratedV2ContractCompile.hlsl">
-      <Filter>Shaders\Tests</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Shaders\Tests\SurfaceTextureContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl">
@@ -972,35 +912,8 @@
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
-    <None Include="..\..\Shaders\Profiles\GGLab.Surface\1\descriptor.json">
-      <Filter>Shaders\Profiles\GGLab.Surface\1</Filter>
-    </None>
-    <None Include="..\..\Shaders\Profiles\GGLab.Surface\2\descriptor.json">
-      <Filter>Shaders\Profiles\GGLab.Surface\2</Filter>
-    </None>
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\descriptor.json">
-      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
-    </None>
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewProgram.hlsli">
-      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
-    </None>
-    <None Include="..\..\Shaders\Programs\ShaderGraphPreview\ShaderGraphPreviewVisualizer.hlsli">
-      <Filter>Shaders\Programs\ShaderGraphPreview</Filter>
-    </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>
-    </None>
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.hlsli">
-      <Filter>Shaders\Tests\Generated</Filter>
-    </None>
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV1.provenance.json">
-      <Filter>Shaders\Tests\Generated</Filter>
-    </None>
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.hlsli">
-      <Filter>Shaders\Tests\Generated</Filter>
-    </None>
-    <None Include="..\..\Shaders\Tests\Generated\SurfaceGeneratedV2.provenance.json">
-      <Filter>Shaders\Tests\Generated</Filter>
     </None>
     <None Include="packages.config" />
   </ItemGroup>

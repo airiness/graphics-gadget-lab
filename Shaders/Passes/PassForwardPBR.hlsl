@@ -440,7 +440,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// Get view data
 	ViewData viewData = g_Views[GetViewDataIndex(g_Pass.ViewIndex)];
 
-	// Surface evaluation seam (gglab.surface profile): the hand-authored
+	// Surface evaluation: the hand-authored
 	// surface functions resolved from the runtime-driven MaterialData (factors
 	// plus texture+sampler bindings) feed the existing Forward PBR lighting
 	// below.

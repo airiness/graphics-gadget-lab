@@ -9,9 +9,10 @@
           BeforeTargets="PrepareForBuild"
           Condition="'$(OS)'=='Windows_NT' and '$(_IsAppProject)'=='true' and Exists('$(AssetSrcDir)')">
     <MakeDir Directories="$(OutDir)" />
-    <Exec Command="&quot;$(CmdExe)&quot; /D /C if exist &quot;$(AssetOutDir)&quot; rmdir &quot;$(AssetOutDir)&quot;"
+    <Exec Command="&quot;$(CmdExe)&quot; /D /C if not exist &quot;$(AssetOutDir)&quot; mklink /J &quot;$(AssetOutDir)&quot; &quot;$(AssetSrcDir)&quot;"
           IgnoreExitCode="true" />
-    <Exec Command="&quot;$(CmdExe)&quot; /D /C if not exist &quot;$(AssetOutDir)&quot; mklink /J &quot;$(AssetOutDir)&quot; &quot;$(AssetSrcDir)&quot;" />
+    <Error Condition="!Exists('$(AssetOutDir)')"
+           Text="Failed to link asset directory '$(AssetOutDir)' to '$(AssetSrcDir)'." />
   </Target>
 
   <Target Name="UnlinkAssetsFromOutDir"

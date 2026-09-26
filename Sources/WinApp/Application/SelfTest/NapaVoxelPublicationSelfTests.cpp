@@ -937,8 +937,7 @@ namespace gglab
 			std::shared_ptr<NapaVoxelInitialPublicationOwner> publication;
 			const bool built = BuildPublicationOwner(false, 1001, 1, publication);
 			context.Check(built && publication && publication->GetTargetWorldRevision() == 1 &&
-				publication->GetUploadIdentity().m_Kind == AssetStreamingWorkKind::RuntimeMesh &&
-				ToAssetKind(publication->GetUploadIdentity().m_Kind) == AssetKind::Unknown,
+				publication->GetUploadIdentity().m_Kind == AssetStreamingWorkKind::RuntimeMesh,
 				"Initial voxel publications use an isolated runtime-mesh Scheduler identity");
 			if (!built)
 			{
