@@ -72,6 +72,30 @@ Run with `--help` to see the available startup options.
 The application starts in FPS mouse mode. Press `T` to release the cursor and
 interact with the developer UI.
 
+## World Lighting exposure and temporal history
+
+Normal view profiles enable scene pre-exposure, including when TAA is requested.
+Stored HDR RGB is scene-linear RGB multiplied by the resolved frame exposure
+scale. TAA uses `LinearRec709PreExposedV2`: committed history RGB is multiplied by
+`current pre-exposure / history pre-exposure` before rejection, clipping and
+blending. History alpha remains the sample age. Aborted frames do not publish a
+new scale; invalid metadata and V1 history cannot be reused as V2 history.
+
+The Temporal AA inspector reports current, sampled-history and last-committed
+scales, the ABI and reset reason. The Post Process inspector can override scene
+pre-exposure with TAA either on or off. This override changes storage scale, not
+camera exposure. Lighting Contract explicitly retains its validated C0 unit-scale
+baseline; its inspector override can opt into the new path.
+
+For manual DX12/Vulkan validation, run `gglab.lab.temporal_aa` and use the camera's
+Manual EV100/compensation controls while keeping TAA enabled. Check that exposure
+changes do not retain stale brightness, then exercise TAA off/on and scene
+pre-exposure off/on at a fixed exposure. Compare Bloom at the same camera exposure,
+restore views and switch Labs. Record backend, exposure/scales, reset cause and
+validation output. SDR screenshots establish visual behavior; stop arithmetic and
+storage invariance require linear measurements. The code/shader contract tests do
+not establish GPU presentation or temporal visual quality.
+
 ## RHI backend selection
 
 The Blender island import fixture reuses `DemoPlayground` with a fixed camera

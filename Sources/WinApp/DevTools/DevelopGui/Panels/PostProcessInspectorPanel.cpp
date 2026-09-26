@@ -332,7 +332,7 @@ namespace gglab
 				{
 					ImGui::Checkbox("Enable Scene Pre-exposure", &*overrides->m_ScenePreExposure);
 				}
-				ImGui::TextDisabled("Pre-exposure requires Temporal AA to be disabled.");
+				ImGui::TextDisabled("Temporal history V2 rescales RGB when pre-exposure changes.");
 			}
 			const auto& exposure = snapshot->m_Exposure;
 			ImGui::Text("Manual / Compensation / Effective EV100: %.2f / %+.2f / %.2f",

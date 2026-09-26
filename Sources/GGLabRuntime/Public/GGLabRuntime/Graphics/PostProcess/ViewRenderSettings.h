@@ -76,8 +76,8 @@ namespace gglab
 	struct ViewRenderProfile
 	{
 		TemporalAASettings m_TemporalAA{};
-		// Requires TAA to be disabled until temporal history supports exposure rescaling.
-		bool m_EnableScenePreExposure = false;
+		// The V2 temporal ABI rescales committed history into this frame's storage scale.
+		bool m_EnableScenePreExposure = true;
 		LightingProfile m_Lighting{};
 		PostProcessProfile m_PostProcess{};
 	};

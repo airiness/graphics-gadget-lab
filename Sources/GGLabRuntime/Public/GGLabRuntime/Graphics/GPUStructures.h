@@ -157,7 +157,8 @@ namespace gglab
 		uint32_t DepthConvention;
 		uint32_t PreviousDepthConvention;
 		float ScenePreExposure;
-		uint32_t Padding[2];
+		float PreviousScenePreExposure;
+		uint32_t Padding;
 	};
 	static_assert(std::is_standard_layout_v<ObjectGPU>);
 	static_assert(offsetof(ObjectGPU, ModelMat) == 0);
@@ -188,7 +189,8 @@ namespace gglab
 	static_assert(offsetof(ViewGPU, DepthConvention) == 460);
 	static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
 	static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
-	static_assert(offsetof(ViewGPU, Padding) == 472);
+	static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
+	static_assert(offsetof(ViewGPU, Padding) == 476);
 	static_assert(sizeof(ViewGPU) == 480);
 	static constexpr uint32_t MaxViewCapacity =
 		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;

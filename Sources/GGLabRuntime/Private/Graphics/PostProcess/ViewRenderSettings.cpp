@@ -54,7 +54,7 @@ namespace gglab
 			.m_TemporalAA = temporalAA,
 			.m_Exposure = ResolveManualExposureSettings(
 				camera.GetManualEV100(), camera.GetExposureCompensationEV(),
-				profile.m_EnableScenePreExposure && !temporalAA.m_Enabled),
+				profile.m_EnableScenePreExposure),
 			.m_Lighting =
 				{
 					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,

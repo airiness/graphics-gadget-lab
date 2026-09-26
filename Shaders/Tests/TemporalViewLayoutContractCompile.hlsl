@@ -12,6 +12,6 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	g_ContractOutput[0] = view.CameraPos +
 		view.PreviousDepthReconstructionParams +
 		float4(view.CurrentJitterUV, view.PreviousJitterUV) +
-		view.ScenePreExposure +
+		view.ScenePreExposure + view.PreviousScenePreExposure +
 		float4(view.PreviousRasterViewProj[0].xy, ViewDataSize, view.PreviousDepthConvention);
 }

@@ -32,6 +32,8 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		float m_PreExposure = 1.0f;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 	};
 
 	struct TemporalViewHistory
@@ -171,7 +173,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		uint32_t m_JitterIndex = 0;
 		float m_ScenePreExposure = SceneColorStoragePreExposureV1;
-		TemporalColorAbi m_ColorAbi = TemporalColorAbi::LinearRec709SceneReferredV1;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		bool m_HasCompatiblePreviousView = false;
 		bool m_HasPendingView = false;
 		bool m_ParticipatedInResolve = false;

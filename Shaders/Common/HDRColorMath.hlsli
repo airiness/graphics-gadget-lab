@@ -18,3 +18,9 @@ float ExposureScaleOverPreExposure(float exposureScale, float preExposure)
 	// The frame contract guarantees a positive finite scale, including values below 1e-6.
 	return exposureScale / preExposure;
 }
+
+float RescaleHistoryColorChannel(float historyColor, float currentPreExposure, float previousPreExposure)
+{
+	// Rescale RGB before temporal comparison and clipping; history age is not color.
+	return historyColor * (currentPreExposure / previousPreExposure);
+}

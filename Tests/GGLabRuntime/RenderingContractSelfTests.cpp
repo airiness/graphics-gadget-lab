@@ -4898,6 +4898,7 @@ namespace gglab
 				view.m_Width = 64;
 				view.m_Height = 64;
 				view.m_IsValid = true;
+				view.m_ScenePreExposure = transaction.GetScenePreExposure();
 				transaction.PrepareDisplayView(view);
 				return view;
 			};
@@ -4998,7 +4999,7 @@ namespace gglab
 
 			TemporalFrameTransaction firstTransaction;
 			firstTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 0.25f);
 			const RenderView firstView = prepareDisplayView(firstTransaction);
 			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
 			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
@@ -5011,10 +5012,8 @@ namespace gglab
 				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
 				firstCommitted.m_ReadIndex == 1 && firstCommitted.m_ActiveBytes > 0 &&
 				firstCommitted.m_LastCommitted.m_JitterIndex == 0 &&
-				firstCommitted.m_Compatibility.m_ColorAbi ==
-					TemporalColorAbi::LinearRec709SceneReferredV1 &&
-				firstCommitted.m_LastCommitted.m_PreExposure ==
-					SceneColorStoragePreExposureV1 &&
+				firstCommitted.m_Compatibility.m_ColorAbi == ActiveTemporalColorAbi &&
+				firstCommitted.m_LastCommitted.m_PreExposure == 0.25f &&
 				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
 				device.m_CreateTextureCount == 4,
 				"Temporal history cold start imports four persistent textures and commits one write pair");
@@ -5037,13 +5036,14 @@ namespace gglab
 
 			TemporalFrameTransaction abortedTransaction;
 			abortedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 8.0f);
 			const RenderView abortedView = prepareDisplayView(abortedTransaction);
 			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
 			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
 			abortedTransaction.Abort(vulkanAbortFence);
 			const TemporalHistoryManagerDiagnostics afterAbort = historyManager.GetDiagnostics();
 			context.Check(abortGraphValid && abortedView.m_HasPreviousTemporalState &&
+				abortedView.m_PreviousScenePreExposure == 0.25f &&
 				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
 				afterAbort.m_AllocationGeneration == firstGeneration &&
@@ -5183,6 +5183,75 @@ namespace gglab
 				texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
 				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
 				"Temporal history shutdown leaves no active or pending persistent allocation");
+
+			TemporalHistoryManager exposureManager(&texturePool);
+			viewHistory.Invalidate();
+			float previousScale = 1.0f;
+			uint64_t exposureFence = 100;
+			bool sweepValid = true;
+			bool expectPrevious = false;
+			for (const float scale : { 0.5f, 4.0f, 0.00000001f, 1024.0f, 1.0f })
+			{
+				TemporalFrameTransaction transaction;
+				transaction.Begin(viewHistory, objectHistory, activePlan, 64, 64, &exposureManager, scale);
+				const auto view = prepareDisplayView(transaction);
+				sweepValid &= view.m_HasPreviousTemporalState == expectPrevious &&
+					view.m_PreviousScenePreExposure == (expectPrevious ? previousScale : scale) &&
+					buildHistoryGraph(transaction, expectPrevious, false);
+				transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, exposureFence++ });
+				sweepValid &= transaction.GetState() == TemporalFrameTransactionState::Committed &&
+					exposureManager.GetDiagnostics().m_LastCommitted.m_PreExposure == scale;
+				previousScale = scale;
+				expectPrevious = true;
+			}
+			context.Check(sweepValid, "Exposure sweeps sample the prior committed scale and commit only the new submitted scale");
+			exposureManager.Invalidate(TemporalHistoryResetReason::Disabled);
+			auto writeManagerFrame = [&](TemporalHistoryFrameState& frame)
+			{
+				RenderGraph graph({ .m_Device = &device,
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+				bool written = false;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.ExposureMetadata",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						if (!exposureManager.ImportRenderGraphResources(frame, builder, data.m_History)) return;
+						builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						written = exposureManager.ExportRenderGraphResources(frame, builder, data.m_History);
+					});
+				return graph.Compile() && written;
+			};
+			auto legacyFrame = exposureManager.BeginFrame(activePlan, 64, 64,
+				TemporalColorAbi::LinearRec709SceneReferredV1);
+			const bool legacyWritten = writeManagerFrame(legacyFrame);
+			const bool legacyCommitted = exposureManager.CommitFrame(legacyFrame, {
+				.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
+				.m_PreExposure = 1.0f }, { RHIFenceHandle{ 1, 1 }, exposureFence++ });
+			auto migratedFrame = exposureManager.BeginFrame(activePlan, 64, 64);
+			context.Check(legacyWritten && legacyCommitted && !migratedFrame.m_PreviousValid &&
+				exposureManager.GetDiagnostics().m_LastResetReason == TemporalHistoryResetReason::ColorAbiChanged,
+				"V1 history is retired rather than sampled after migration to active V2");
+			exposureManager.AbortFrame(migratedFrame, {});
+			bool invalidScalesRejected = true;
+			for (const float invalidScale : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(),
+				std::numeric_limits<float>::quiet_NaN() })
+			{
+				auto frame = exposureManager.BeginFrame(activePlan, 64, 64);
+				invalidScalesRejected &= writeManagerFrame(frame);
+				invalidScalesRejected &= !exposureManager.CommitFrame(frame, {
+					.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
+					.m_PreExposure = invalidScale }, { RHIFenceHandle{ 1, 1 }, exposureFence++ });
+				const auto diagnostics = exposureManager.GetDiagnostics();
+				invalidScalesRejected &= !diagnostics.m_HistoryValid && !diagnostics.m_HasActiveHistory &&
+					diagnostics.m_LastResetReason == TemporalHistoryResetReason::InvalidExposureMetadata;
+			}
+			context.Check(invalidScalesRejected, "Zero, negative, infinite and NaN scales cannot publish history and retire submitted resources");
+			exposureManager.Shutdown();
+			device.m_CompletedFenceValue = exposureFence;
+			texturePool.Tick();
+			context.Check(texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Exposure migration and invalid-metadata paths retain no allocations after their fences complete");
 		}
 
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
@@ -6298,7 +6367,7 @@ namespace gglab
 				1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
 				defaultExposure.m_ManualEV100 == 0.0f &&
 				defaultExposure.m_CompensationEV == 0.0f &&
-				defaultExposure.m_PreExposure == 1.0f,
+				defaultExposure.m_PreExposure == defaultExposure.m_ExposureScale,
 				"Zero manual EV100 uses saturation-normalized default exposure");
 
 			bool compensationResponseMatches = true;
@@ -6324,10 +6393,10 @@ namespace gglab
 			context.Check(preExposedSettings.m_Exposure.m_PreExposure ==
 				preExposedSettings.m_Exposure.m_ExposureScale &&
 				preExposedSettings.m_Exposure.m_PreExposure < 0.0001f &&
-				temporalSettings.m_Exposure.m_PreExposure == 1.0f &&
+				temporalSettings.m_Exposure.m_PreExposure == temporalSettings.m_Exposure.m_ExposureScale &&
 				temporalSettings.m_Exposure.m_ExposureScale ==
 				preExposedSettings.m_Exposure.m_ExposureScale,
-				"Scene pre-exposure is opt-in and a TAA request preserves the unit-scale temporal ABI");
+				"Scene pre-exposure remains enabled with a TAA request under the V2 ABI");
 			const ResolvedTemporalFramePlan noTemporalFrame{};
 			const RenderView preExposedView = RenderViewBuildTraits<RenderViewID::Main>::Build({
 				.m_Camera = camera,
@@ -6391,6 +6460,7 @@ namespace gglab
 			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
 			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
 			static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
+			static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
 
 			const Vector2 staticMotion = ComputeTemporalMotionUV(
 				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
@@ -6826,9 +6896,9 @@ namespace gglab
 					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
 					PostProcessColorState::SceneLinearRec709, 0.5f) &&
-				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2,
+				IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2,
 					PostProcessColorState::SceneLinearRec709, 0.5f),
-				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
+				"V1 remains unit-only while V2 accepts pre-exposed scene-linear Rec.709");
 
 			Camera rigCamera(Camera::CreateInfo{});
 			CameraController rigController(CameraController::CreateInfo{});

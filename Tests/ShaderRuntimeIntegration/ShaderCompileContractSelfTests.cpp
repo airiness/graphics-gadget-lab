@@ -2045,6 +2045,21 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
+			bool historyRescalingMatches = true;
+			for (const float previous : { 0.00000001f, 0.25f, 1.0f, 1024.0f })
+			{
+				for (const float current : { 0.00000001f, 0.5f, 1.0f, 1024.0f })
+				{
+					const float expected = 2.0f * current;
+					const float actual = shader_hdr_math::RescaleHistoryColorChannel(2.0f * previous, current, previous);
+					historyRescalingMatches &= std::abs(actual - expected) <= expected * 0.00001f;
+					// Bloom thresholds use exposed-linear units regardless of storage scaling.
+					const float exposed = actual * shader_hdr_math::ExposureScaleOverPreExposure(0.125f, current);
+					historyRescalingMatches &= std::abs(exposed - 0.25f) < 0.00001f;
+				}
+			}
+			context.Check(historyRescalingMatches,
+				"Production history rescaling and Bloom exposure normalization preserve radiance across storage scales");
 			const float daylightRadiance = 1000000.0f;
 			const float storageScale = 1.0f / (1.2f * std::exp2(16.0f));
 			const float stored = shader_hdr_math::EncodeSceneColorChannel(daylightRadiance, storageScale);
@@ -2142,6 +2157,7 @@ namespace gglab
 				GPUAbiMember{ "DepthConvention", offsetof(ViewGPU, DepthConvention) },
 				GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
 				GPUAbiMember{ "ScenePreExposure", offsetof(ViewGPU, ScenePreExposure) },
+				GPUAbiMember{ "PreviousScenePreExposure", offsetof(ViewGPU, PreviousScenePreExposure) },
 				GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
 			};
 			for (const GPUAbiMember& member : viewGPUAbiMembers)

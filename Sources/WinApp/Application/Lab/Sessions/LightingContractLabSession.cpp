@@ -21,6 +21,8 @@ namespace gglab
 		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
 		auto& profile = GetMutableViewRenderProfile();
+		// Preserve the validated C0 unit-storage baseline; the inspector can override it.
+		profile.m_EnableScenePreExposure = false;
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;

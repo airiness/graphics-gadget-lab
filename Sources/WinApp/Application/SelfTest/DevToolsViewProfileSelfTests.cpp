@@ -43,12 +43,12 @@ namespace gglab
 			"Temporal AA DevTools override is explicit and does not mutate authoring state");
 		context.Check(TemporalAALabSession::GetDescriptor().m_SchemaVersion == 2,
 			"Temporal AA Lab schema rejects presets that used fixed history-weight semantics");
-		devTools.GetViewRenderSettingsOverrides().m_ScenePreExposure = true;
-		const auto preExposedProfile = devTools.ResolveViewRenderProfile(activeProfile);
+		devTools.GetViewRenderSettingsOverrides().m_ScenePreExposure = false;
+		const auto unitStorageProfile = devTools.ResolveViewRenderProfile(activeProfile);
 		devTools.Reset();
-		context.Check(preExposedProfile.m_EnableScenePreExposure &&
-			!activeProfile.m_EnableScenePreExposure &&
-			!devTools.ResolveViewRenderProfile(activeProfile).m_EnableScenePreExposure,
+		context.Check(!unitStorageProfile.m_EnableScenePreExposure &&
+			activeProfile.m_EnableScenePreExposure &&
+			devTools.ResolveViewRenderProfile(activeProfile).m_EnableScenePreExposure,
 			"Scene pre-exposure override leaves authoring state unchanged and resets with DevTools");
 	}
 }

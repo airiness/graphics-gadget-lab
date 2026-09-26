@@ -1,6 +1,7 @@
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/BindlessResources.hlsli>
 #include <Common/TemporalAA.hlsli>
+#include <Common/Common.hlsli>
 
 struct TemporalAAPassParameters
 {
@@ -108,6 +109,10 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 				GetSamplerState(g_Pass.PointClampSamplerIndex);
 			historyColor = previousColorTexture.SampleLevel(
 				linearClampSampler, previousHistoryUV, 0.0).rgb;
+			historyColor = float3(
+				RescaleHistoryColorChannel(historyColor.r, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
+				RescaleHistoryColorChannel(historyColor.g, viewData.ScenePreExposure, viewData.PreviousScenePreExposure),
+				RescaleHistoryColorChannel(historyColor.b, viewData.ScenePreExposure, viewData.PreviousScenePreExposure));
 			previousHistoryAge = previousColorTexture.SampleLevel(
 				pointClampSampler, previousHistoryUV, 0.0).a;
 			if (!IsTemporalColorFinite(historyColor) ||
@@ -163,7 +168,9 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 		const float motionMagnitudePixels =
 			length(historyMotionUV * float2(width, height));
 		historyWeight = ComputeTemporalHistoryWeight(previousHistoryAge,
-			motionMagnitudePixels, currentYCoCg.x, historyYCoCg.x,
+			motionMagnitudePixels,
+			currentYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
+			historyYCoCg.x * ExposureScaleOverPreExposure(viewData.ExposureMultiplier, viewData.ScenePreExposure),
 			maxHistoryFeedbackAndClampExpansion.x,
 			g_Pass.VelocityWeightScale, g_Pass.LuminanceWeightScale);
 		historyColor = TemporalYCoCgToRGB(
@@ -188,8 +195,8 @@ void CSMain(uint3 dispatchThreadId : SV_DispatchThreadID)
 	const float nextHistoryAge =
 		ResolveTemporalHistoryNextAge(accepted, previousHistoryAge);
 	const float2 outputAlphas = ResolveTemporalAAOutputAlphas(nextHistoryAge);
-	const float4 resolvedOutput = float4(outputColor, outputAlphas.x);
-	const float4 historyOutput = float4(outputColor, outputAlphas.y);
+	const float4 resolvedOutput = float4(SanitizeHDRColor(outputColor), outputAlphas.x);
+	const float4 historyOutput = float4(resolvedOutput.rgb, outputAlphas.y);
 	resolvedColor[pixel] = resolvedOutput;
 	nextHistoryColor[pixel] = historyOutput;
 	nextHistoryDepth[pixel] = currentRawDepth;

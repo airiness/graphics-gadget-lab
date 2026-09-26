@@ -109,5 +109,6 @@ struct ViewData
 	uint DepthConvention;
 	uint PreviousDepthConvention;
 	float ScenePreExposure;
-	uint2 Padding;
+	float PreviousScenePreExposure;
+	uint Padding;
 };

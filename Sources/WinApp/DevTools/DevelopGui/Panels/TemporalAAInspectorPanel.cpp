@@ -62,6 +62,7 @@ namespace gglab
 			case TemporalHistoryResetReason::ExtentChanged: return "Extent changed";
 			case TemporalHistoryResetReason::FormatChanged: return "Format changed";
 			case TemporalHistoryResetReason::ColorAbiChanged: return "Color ABI changed";
+			case TemporalHistoryResetReason::InvalidExposureMetadata: return "Invalid exposure metadata";
 			case TemporalHistoryResetReason::AllocationFailure: return "Allocation failure";
 			case TemporalHistoryResetReason::AvailabilityChanged: return "Availability changed";
 			case TemporalHistoryResetReason::ResolveProgramChanged:
@@ -240,6 +241,8 @@ namespace gglab
 		if (ImGui::CollapsingHeader("Temporal State", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			const auto& history = snapshot->m_History;
+			ImGui::Text("Frame pre-exposure: %.6g | Sampled history scale: %.6g",
+				snapshot->m_CurrentPreExposure, snapshot->m_PreviousPreExposure);
 			ImGui::Text("Jitter pixels: current (%.4f, %.4f)",
 				snapshot->m_CurrentJitterPixels.m_X, snapshot->m_CurrentJitterPixels.m_Y);
 			ImGui::Text("Jitter UV: current (%.7f, %.7f), previous (%.7f, %.7f)",

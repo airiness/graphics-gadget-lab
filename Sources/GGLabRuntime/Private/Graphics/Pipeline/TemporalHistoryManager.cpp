@@ -125,11 +125,18 @@ namespace gglab
 			}
 		}
 
-		const HistorySet& history = *m_ActiveHistory;
+		HistorySet& history = *m_ActiveHistory;
+		if (history.m_Valid && !IsTemporalColorCompatible(history.m_Compatibility.m_ColorAbi,
+			PostProcessColorState::SceneLinearRec709, history.m_LastCommitted.m_PreExposure))
+		{
+			history.m_Valid = false;
+			RecordReset(TemporalHistoryResetReason::InvalidExposureMetadata);
+		}
 		return {
 			.m_AllocationGeneration = history.m_AllocationGeneration,
 			.m_ReadIndex = history.m_ReadIndex,
 			.m_WriteIndex = 1u - history.m_ReadIndex,
+			.m_PreviousPreExposure = history.m_Valid ? history.m_LastCommitted.m_PreExposure : 1.0f,
 			.m_Active = true,
 			.m_PreviousValid = history.m_Valid && history.m_Initialized[history.m_ReadIndex],
 		};
@@ -216,12 +223,18 @@ namespace gglab
 		const RHIFencePoint& submittedFence) noexcept
 	{
 		if (!IsCurrentFrame(frame) || frame.m_Ended || !frame.m_RenderGraphExported ||
-			!submittedFence.IsValid() || !std::isfinite(metadata.m_PreExposure) ||
-			!IsTemporalColorCompatible(metadata.m_Compatibility.m_ColorAbi,
-				PostProcessColorState::SceneLinearRec709, metadata.m_PreExposure) ||
+			!submittedFence.IsValid() ||
 			metadata.m_Compatibility.m_ColorAbi != m_ActiveHistory->m_Compatibility.m_ColorAbi)
 		{
 			AbortFrame(frame, submittedFence);
+			return false;
+		}
+
+		if (!IsTemporalColorCompatible(metadata.m_Compatibility.m_ColorAbi,
+			PostProcessColorState::SceneLinearRec709, metadata.m_PreExposure))
+		{
+			AbortFrame(frame, submittedFence);
+			RetireActiveHistory(TemporalHistoryResetReason::InvalidExposureMetadata, submittedFence);
 			return false;
 		}
 

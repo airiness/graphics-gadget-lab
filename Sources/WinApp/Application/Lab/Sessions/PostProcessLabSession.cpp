@@ -52,11 +52,11 @@ namespace gglab
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = PreExposureEnabledId,
-			.m_Name = "Scene Pre-exposure (TAA Off)",
+			.m_Name = "Scene Pre-exposure",
 			.m_Group = "Exposure",
 			.m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = false,
+			.m_DefaultValue = true,
 			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ExposureEvId,

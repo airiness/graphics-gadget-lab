@@ -33,6 +33,7 @@ namespace gglab
 		FatalSubmission,
 		Resume,
 		Shutdown,
+		InvalidExposureMetadata,
 	};
 
 	struct TemporalHistoryCompatibilityIdentity
@@ -44,7 +45,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
-		TemporalColorAbi m_ColorAbi = TemporalColorAbi::LinearRec709SceneReferredV1;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 
 		bool operator==(const TemporalHistoryCompatibilityIdentity&) const noexcept = default;
 	};
@@ -63,6 +64,8 @@ namespace gglab
 		uint64_t m_AllocationGeneration = 0;
 		uint32_t m_ReadIndex = 0;
 		uint32_t m_WriteIndex = 1;
+		// Latched from the successfully committed read generation, never the pending write.
+		float m_PreviousPreExposure = 1.0f;
 		bool m_Active = false;
 		bool m_PreviousValid = false;
 		bool m_RenderGraphImported = false;

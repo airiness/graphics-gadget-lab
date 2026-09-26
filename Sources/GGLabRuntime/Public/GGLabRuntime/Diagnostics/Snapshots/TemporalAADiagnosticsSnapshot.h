@@ -13,6 +13,8 @@ namespace gglab
 		TemporalHistoryManagerDiagnostics m_History{};
 		TemporalAASettings m_AuthoringSettings{};
 		TemporalAASettings m_RequestedSettings{};
+		float m_CurrentPreExposure = 1.0f;
+		float m_PreviousPreExposure = 1.0f;
 		Vector2 m_CurrentJitterPixels = Vector2::Zero;
 		Vector2 m_CurrentJitterUV = Vector2::Zero;
 		Vector2 m_PreviousJitterUV = Vector2::Zero;
