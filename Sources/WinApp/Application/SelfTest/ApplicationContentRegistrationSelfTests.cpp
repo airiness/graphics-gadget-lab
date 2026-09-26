@@ -2,6 +2,7 @@
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Demo/CoastalAtriumReferenceViews.h"
+#include "Application/Lab/LightingContractReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
@@ -53,6 +54,181 @@ namespace gglab
 						source.m_CanonicalPath.filename().string()));
 			}
 			return textures;
+		}
+
+		void CheckLightingContractContent(SelfTestContext& context) noexcept
+		{
+			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
+				"Models/GGLabLightingContract/GGLabLightingContract.gltf"), {});
+			context.Check(imported.Succeeded(), std::format("Lighting contract imports: {}", imported.m_Error));
+			if (!imported.Succeeded()) return;
+			const auto& model = imported.m_Model;
+			context.Check(model.m_TextureSources.empty(),
+				"Lighting contract imports without texture dependencies");
+			struct MaterialReference
+			{
+				std::string_view m_Name;
+				float m_Base;
+				float m_Metallic;
+				float m_Roughness;
+			};
+			const std::array materials{
+				MaterialReference{ "MAT_Reflectance_02", 0.02f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Reflectance_18", 0.18f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Reflectance_50", 0.50f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Reflectance_90", 0.90f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Sphere_Matte", 0.18f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Sphere_RoughDielectric", 0.18f, 0.0f, 0.5f },
+				MaterialReference{ "MAT_Sphere_SmoothDielectric", 0.18f, 0.0f, 0.05f },
+				MaterialReference{ "MAT_Sphere_Metallic", 0.18f, 1.0f, 0.1f },
+				MaterialReference{ "MAT_Ground", 0.08f, 0.0f, 1.0f },
+			};
+			const auto matchesMaterial = [](const ImportedMaterial& material, const MaterialReference& reference) noexcept
+				{
+					const auto& properties = material.m_Properties;
+					bool valid = std::abs(properties.m_MetallicFactor - reference.m_Metallic) < 0.00001f &&
+						std::abs(properties.m_RoughnessFactor - reference.m_Roughness) < 0.00001f &&
+						properties.m_AlphaMode == AlphaMode::Opaque && properties.m_BaseColor[3] == 1.0f;
+					for (size_t channel = 0; channel < 3; ++channel)
+						valid &= std::abs(properties.m_BaseColor[channel] - reference.m_Base) < 0.00001f &&
+							properties.m_EmissiveColor[channel] == 0.0f;
+					for (const auto& binding : material.m_TextureBindings)
+						valid &= binding.m_TextureIndex == ImportedMaterialTextureBinding::InvalidTextureIndex;
+					return valid;
+				};
+			// Assimp merges equivalent materials and meshes. Numeric inputs and spatial
+			// geometry remain authoritative; authored names/counts need not survive.
+			for (const auto& reference : materials)
+			{
+				context.Check(std::ranges::any_of(model.m_Materials, [&](const auto& material) noexcept
+					{ return matchesMaterial(material, reference); }),
+					std::format("{} retains an equivalent linear, opaque, untextured material", reference.m_Name));
+			}
+
+			struct MeshReference
+			{
+				std::string_view m_Name;
+				Vector3 m_Center;
+				Vector3 m_Size;
+				Vector3 m_Normal;
+				size_t m_MaterialReference;
+				size_t m_TriangleCount;
+			};
+			const float diagonal = std::sqrt(0.5f);
+			const std::array meshes{
+				MeshReference{ "Card_Reflectance_02_Mesh", { -3.3f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 0, 2 },
+				MeshReference{ "Card_Reflectance_18_Mesh", { -1.1f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
+				MeshReference{ "Card_Reflectance_50_Mesh", { 1.1f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 2, 2 },
+				MeshReference{ "Card_Reflectance_90_Mesh", { 3.3f, 2.0f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 3, 2 },
+				MeshReference{ "Sphere_Matte_Mesh", { 12.7f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 4, 3968 },
+				MeshReference{ "Sphere_RoughDielectric_Mesh", { 14.9f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 5, 3968 },
+				MeshReference{ "Sphere_SmoothDielectric_Mesh", { 17.1f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 6, 3968 },
+				MeshReference{ "Sphere_Metallic_Mesh", { 19.3f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 7, 3968 },
+				MeshReference{ "Receiver_Horizontal_Mesh", { 29.4f, 1.4f, 0.0f }, { 1.8f, 0.0f, 1.8f }, Vector3::UnitY, 1, 2 },
+				MeshReference{ "Receiver_Vertical_Mesh", { 32.0f, 1.4f, 0.0f }, { 1.8f, 1.8f, 0.0f }, -Vector3::UnitZ, 1, 2 },
+				MeshReference{ "Receiver_Tilt45_Mesh", { 34.6f, 1.4f, 0.0f }, { 1.8f, 1.8f * diagonal, 1.8f * diagonal }, { 0.0f, diagonal, -diagonal }, 1, 2 },
+				MeshReference{ "Ground_Chart_Mesh", { 0.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Ground_Spheres_Mesh", { 16.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Ground_Angles_Mesh", { 32.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
+				MeshReference{ "Scale_OneMeter_Mesh", { 21.0f, 0.5f, 3.0f }, { 1.0f, 1.0f, 1.0f }, Vector3::Zero, 1, 12 },
+			};
+			std::array<size_t, 15> triangleCounts{};
+			std::array<Vector3, 15> lower;
+			std::array<Vector3, 15> upper;
+			std::array<bool, 15> shapeValid;
+			shapeValid.fill(true);
+			const float infinity = std::numeric_limits<float>::infinity();
+			lower.fill(Vector3(infinity, infinity, infinity));
+			upper.fill(Vector3(-infinity, -infinity, -infinity));
+			bool allTrianglesClassified = true;
+			for (const auto& instance : model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= model.m_Meshes.size() || instance.m_MaterialIndex >= model.m_Materials.size())
+				{
+					allTrianglesClassified = false;
+					continue;
+				}
+				const auto& mesh = model.m_Meshes[instance.m_MeshIndex];
+				const auto& material = model.m_Materials[instance.m_MaterialIndex];
+				const auto normalMatrix = math::CreateNormalMatrix(instance.m_LocalTransform);
+				allTrianglesClassified &= mesh.m_Indices.size() % 3 == 0;
+				for (size_t index = 0; index + 2 < mesh.m_Indices.size(); index += 3)
+				{
+					std::array<Vector3, 3> positions;
+					std::array<Vector3, 3> normals;
+					bool indicesValid = true;
+					for (size_t corner = 0; corner < 3; ++corner)
+					{
+						const auto vertexIndex = mesh.m_Indices[index + corner];
+						if (vertexIndex >= mesh.m_Vertices.size()) { indicesValid = false; break; }
+						const auto& vertex = mesh.m_Vertices[vertexIndex];
+						positions[corner] = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
+						normals[corner] = math::TransformDirection(vertex.m_Normal, normalMatrix);
+					}
+					if (!indicesValid) { allTrianglesClassified = false; continue; }
+					size_t matchedShapes = 0;
+					for (size_t shape = 0; shape < meshes.size(); ++shape)
+					{
+						const auto& reference = meshes[shape];
+						const auto half = reference.m_Size * 0.5f;
+						const bool contains = std::ranges::all_of(positions, [&](const Vector3& position) noexcept
+							{
+								const auto d = position - reference.m_Center;
+								return std::abs(d.m_X) <= half.m_X + 0.0001f &&
+									std::abs(d.m_Y) <= half.m_Y + 0.0001f && std::abs(d.m_Z) <= half.m_Z + 0.0001f;
+							});
+						// The meter cube bottom touches the ground; material identity separates those coplanar faces.
+						if (!contains || !matchesMaterial(material, materials[reference.m_MaterialReference])) continue;
+						++matchedShapes;
+						++triangleCounts[shape];
+						for (size_t corner = 0; corner < 3; ++corner)
+						{
+							const auto& position = positions[corner];
+							lower[shape].m_X = std::min(lower[shape].m_X, position.m_X);
+							lower[shape].m_Y = std::min(lower[shape].m_Y, position.m_Y);
+							lower[shape].m_Z = std::min(lower[shape].m_Z, position.m_Z);
+							upper[shape].m_X = std::max(upper[shape].m_X, position.m_X);
+							upper[shape].m_Y = std::max(upper[shape].m_Y, position.m_Y);
+							upper[shape].m_Z = std::max(upper[shape].m_Z, position.m_Z);
+							if (reference.m_Normal.LengthSquared() > 0.0f)
+								shapeValid[shape] &= (normals[corner] - reference.m_Normal).Length() < 0.0001f;
+							if (reference.m_Name.starts_with("Sphere_"))
+								shapeValid[shape] &= std::abs((position - reference.m_Center).Length() - 0.8f) < 0.0001f;
+						}
+					}
+					allTrianglesClassified &= matchedShapes == 1;
+				}
+			}
+			context.Check(allTrianglesClassified, "Every imported triangle belongs to exactly one authored lighting fixture shape");
+			for (size_t shape = 0; shape < meshes.size(); ++shape)
+			{
+				const auto& reference = meshes[shape];
+				context.Check(shapeValid[shape] && triangleCounts[shape] == reference.m_TriangleCount &&
+					((lower[shape] + upper[shape]) * 0.5f - reference.m_Center).Length() < 0.0001f &&
+					(upper[shape] - lower[shape] - reference.m_Size).Length() < 0.0001f,
+					std::format("{} preserves triangles, material, placement, dimensions and reference normals", reference.m_Name));
+			}
+
+			Camera camera(Camera::CreateInfo{ .m_Width = 1280, .m_Height = 720 });
+			CameraController controller(CameraController::CreateInfo{});
+			CameraRig rig;
+			rig.AttachMainCamera(camera, controller);
+			const bool registered = rig.SetReferenceViews(
+				{ LightingContractReferenceViews.begin(), LightingContractReferenceViews.end() });
+			context.Check(registered, "Lighting contract reference views register");
+			if (!registered) return;
+			for (const auto& reference : LightingContractReferenceViews)
+			{
+				camera.SetManualEV100(4.0f);
+				camera.SetExposureCompensationEV(2.0f);
+				const bool restored = rig.RestoreReferenceView(reference.m_Id);
+				const auto target = math::TransformPoint(reference.m_Target, camera.GetViewMatrix());
+				context.Check(restored && (camera.GetPosition() - reference.m_Position).Length() < 0.0001f &&
+					std::abs(target.m_X) < 0.0001f && std::abs(target.m_Y) < 0.0001f && target.m_Z > 0.0f &&
+					camera.GetFov() == reference.m_VerticalFovDegrees && camera.GetNear() == 0.1f &&
+					camera.GetFar() == 100.0f && camera.GetManualEV100() == 0.0f && camera.GetExposureCompensationEV() == 0.0f,
+					std::format("{} restores its authored pose, projection and zero-EV reference", reference.m_Id));
+			}
 		}
 
 		void CheckTextureContractContent(SelfTestContext& context) noexcept
@@ -495,10 +671,10 @@ namespace gglab
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 5 &&
-			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
-			"Windows desktop composition includes five Demo entries and eighteen Labs");
+			"Windows desktop composition includes five Demo entries and nineteen Labs");
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded() &&
@@ -538,6 +714,9 @@ namespace gglab
 			"Napa voxel selection contributes two stable shader demands");
 		checkSelectedDemand("gglab.lab.texture_contract", 33,
 			"Texture contract uses the production renderer's shader demands");
+		checkSelectedDemand("gglab.lab.lighting_contract", 33,
+			"Lighting contract is selectable through LabHost with production shader demands");
+		CheckLightingContractContent(context);
 		CheckIslandContent(context);
 		CheckCoastalAtriumReferenceViews(context);
 		// Keep one COM apartment alive across WIC decoder use, as runtime asset workers do.

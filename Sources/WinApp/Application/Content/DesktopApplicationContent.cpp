@@ -10,6 +10,7 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "Application/Lab/Sessions/LightingContractLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
@@ -99,6 +100,7 @@ namespace gglab
 			{ CullingLabSession::GetDescriptor(), &CullingLabSession::Create },
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },
+			{ LightingContractLabSession::GetDescriptor(), &LightingContractLabSession::Create },
 			{ PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create },
 			{ RenderGraphComputeLabSession::GetDescriptor(),
 				&RenderGraphComputeLabSession::Create,

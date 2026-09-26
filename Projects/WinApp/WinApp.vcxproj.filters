@@ -183,6 +183,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -449,6 +452,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
       <Filter>Application\Lab\NapaVoxel</Filter>
     </ClInclude>
@@ -489,6 +495,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.h">

@@ -244,6 +244,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.cpp" />
@@ -366,6 +367,8 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h" />

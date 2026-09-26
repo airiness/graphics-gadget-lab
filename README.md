@@ -56,6 +56,17 @@ It is also available as `Texture Contract` in `Lab Control > Active Lab` while
 [texture contract reference](Assets/Models/GGLabTextureContract/README.md) for the
 board layout, numeric references and screenshots.
 
+The [Lighting Contract Lab](Assets/Models/GGLabLightingContract/README.md) provides
+controlled reflectance cards, material spheres and orientation receivers for
+World Lighting development:
+
+    GraphicsGadgetLab.exe --lab gglab.lab.lighting_contract --rhi dx12 --absolute-mouse
+    GraphicsGadgetLab.exe --lab gglab.lab.lighting_contract --rhi vulkan --absolute-mouse
+
+Select its three reference views in `Scene > Camera > Reference Views`. The initial
+preset uses legacy direct-light units with environment lighting, TAA, GTAO and
+Bloom disabled; physical sun/sky validation is separate.
+
 Run with `--help` to see the available startup options.
 
 The application starts in FPS mouse mode. Press `T` to release the cursor and
