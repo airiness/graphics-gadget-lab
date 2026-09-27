@@ -247,6 +247,7 @@ namespace gglab
 			.m_DirectionalShadowLightKey =
 				shadowSettings.m_Enable ? result.m_WorldData.m_MainDirectionalLight.m_EntityKey
 										: std::nullopt,
+			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
 		};

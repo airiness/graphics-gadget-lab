@@ -12,6 +12,7 @@ namespace gglab
 {
 	namespace
 	{
+		const LabParameterId PhysicalSunId("lighting_contract.physical_sun");
 		constexpr const char* LightingContractModelPath =
 			"Assets/Models/GGLabLightingContract/GGLabLightingContract.gltf";
 	}
@@ -20,6 +21,14 @@ namespace gglab
 		const LabSessionCreateInfo& createInfo) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
+		GGLAB_UNUSED(GetMutableParameters().Add({
+			.m_Id = PhysicalSunId,
+			.m_Name = "Physical Sun (120000 lux / EV15 preset)",
+			.m_Group = "Lighting",
+			.m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = false,
+			}));
 		auto& profile = GetMutableViewRenderProfile();
 		// Preserve the validated C0 unit-storage baseline; the inspector can override it.
 		profile.m_EnableScenePreExposure = false;
@@ -33,6 +42,36 @@ namespace gglab
 		GGLAB_ASSERT_MSG(registered, "Lighting contract reference view must be valid.");
 		const bool restored = cameraRig.RestoreReferenceView(LightingContractReferenceViews.front().m_Id);
 		GGLAB_ASSERT_MSG(restored, "Lighting contract must start at its reference view.");
+	}
+
+	void LightingContractLabSession::ApplyImmediateParameters() noexcept
+	{
+		const bool physicalSun = GetParameters().Get(PhysicalSunId, false);
+		if (physicalSun == m_PhysicalSun)
+		{
+			return;
+		}
+		m_PhysicalSun = physicalSun;
+		const auto references = BuildLightingContractReferenceViews(physicalSun);
+		const bool registered = GetCameraRig().SetReferenceViews({ references.begin(), references.end() });
+		GGLAB_ASSERT_MSG(registered, "Lighting contract mode must provide valid reference views.");
+		GetMutableViewRenderProfile().m_EnableScenePreExposure = physicalSun;
+		GetCamera().SetManualEV100(physicalSun ? 15.0f : 0.0f);
+		GetCamera().SetExposureCompensationEV(0.0f);
+		for (auto [entity, light] : m_World.GetRegistry().view<components::LightComponent>().each())
+		{
+			GGLAB_UNUSED(entity);
+			if (light.m_Type == LightType::Directional)
+			{
+				light.m_WorldSun = physicalSun ? std::optional<WorldSunSettings>(WorldSunSettings{}) : std::nullopt;
+			}
+		}
+	}
+
+	void LightingContractLabSession::OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept
+	{
+		GGLAB_UNUSED(impact);
+		ApplyImmediateParameters();
 	}
 
 	void LightingContractLabSession::BeginPrepare() noexcept
@@ -96,6 +135,10 @@ namespace gglab
 		light.m_Type = LightType::Directional;
 		light.m_Range = 1000.0f;
 		// Leave shadows disabled to isolate material inputs from shadow filtering artifacts.
+		if (m_PhysicalSun)
+		{
+			light.m_WorldSun = WorldSunSettings{};
+		}
 		registry.emplace<components::LightComponent>(lightEntity, light);
 	}
 
@@ -150,7 +193,7 @@ namespace gglab
 			.m_Id = GetId(),
 			.m_DisplayName = "Lighting Contract",
 			.m_Category = "Lighting",
-			.m_Description = "Controlled reflectance, orientation and sphere inputs with legacy direct lighting.",
+			.m_Description = "Controlled reflectance, orientation and spheres with legacy or physical directional sun lighting.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

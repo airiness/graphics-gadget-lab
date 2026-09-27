@@ -229,6 +229,17 @@ namespace gglab
 					camera.GetFar() == 100.0f && camera.GetManualEV100() == 0.0f && camera.GetExposureCompensationEV() == 0.0f,
 					std::format("{} restores its authored pose, projection and zero-EV reference", reference.m_Id));
 			}
+			const auto physicalReferences = BuildLightingContractReferenceViews(true);
+			const bool physicalRegistered = rig.SetReferenceViews({ physicalReferences.begin(), physicalReferences.end() });
+			bool physicalRestored = physicalRegistered;
+			for (const auto& reference : physicalReferences)
+			{
+				physicalRestored &= rig.RestoreReferenceView(reference.m_Id) && camera.GetManualEV100() == 15.0f &&
+					reference.m_ProfileVersion == 2;
+			}
+			context.Check(physicalRestored && LightingContractReferenceViews.front().m_ManualEV100 == 0.0f,
+				"Physical sun reference views restore daylight exposure without mutating the C0 baseline");
+
 		}
 
 		void CheckTextureContractContent(SelfTestContext& context) noexcept

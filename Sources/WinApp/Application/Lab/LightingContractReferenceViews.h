@@ -37,4 +37,15 @@ namespace gglab
 			.m_FarPlane = 100.0f,
 		},
 	} };
+	inline auto BuildLightingContractReferenceViews(bool physicalSun)
+	{
+		auto views = LightingContractReferenceViews;
+		for (auto& view : views)
+		{
+			view.m_ManualEV100 = physicalSun ? 15.0f : 0.0f;
+			view.m_ProfileVersion = physicalSun ? 2 : 1;
+		}
+		return views;
+	}
+
 }

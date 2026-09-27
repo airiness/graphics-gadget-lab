@@ -574,6 +574,27 @@ namespace gglab
 				context.Check(!view.GetLight()->m_ShadowSettings &&
 					edited && edited->m_ShadowSettings,
 					"Disabling shadows preserves previously copied settings");
+				control.SetWorldSun(id, WorldSunSettings{});
+				const auto shadowlessSun = RenderWorldExtractor{}.Extract(world).m_MainDirectionalLight;
+				control.SetShadowSettings(id, settings);
+				const auto shadowedSun = RenderWorldExtractor{}.Extract(world).m_MainDirectionalLight;
+				context.Check(shadowlessSun.m_WorldSun && shadowedSun.m_WorldSun &&
+					shadowlessSun.m_EntityKey == shadowedSun.m_EntityKey &&
+					shadowlessSun.m_Direction.m_Y == shadowedSun.m_Direction.m_Y &&
+					shadowlessSun.m_WorldSun->m_PerpendicularIlluminanceLux == shadowedSun.m_WorldSun->m_PerpendicularIlluminanceLux,
+					"World sun identity, direction and lux do not depend on shadow enablement");
+				const auto legacy = registry.create();
+				registry.emplace<components::TransformComponent>(legacy);
+				registry.emplace<components::LightComponent>(legacy);
+				context.Check(view.GetLight()->m_Id == id,
+					"An explicit world sun takes priority over registry traversal order");
+				control.SetWorldSun(entt::to_integral(legacy), WorldSunSettings{});
+				context.Check(view.GetLight()->m_Id == entt::to_integral(legacy) &&
+					!registry.get<components::LightComponent>(entity).m_WorldSun &&
+					registry.get<components::LightComponent>(entity).m_Intensity == 3.0f,
+					"World sun reassignment clears the prior designation and preserves legacy light authoring");
+				registry.destroy(legacy);
+
 				registry.get<components::LightComponent>(entity).m_Type = LightType::Point;
 				control.SetRadiance(id, Color::White, 9.0f);
 				context.Check(!view.GetLight() &&

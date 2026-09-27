@@ -38,6 +38,9 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
+#include "GGLabRuntime/Scene/Components.h"
+#include <numbers>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -6358,6 +6361,70 @@ namespace gglab
 			return false;
 		}
 
+		void RunWorldSunContractTests(SelfTestContext& context) noexcept
+		{
+			const auto luminance = [](const Vector3& rgb)
+			{
+				return 0.2126 * rgb.m_X + 0.7152 * rgb.m_Y + 0.0722 * rgb.m_Z;
+			};
+			WorldSunSettings settings{};
+			settings.m_Chromaticity = Vector3(1.0f, 0.8f, 0.6f);
+			const auto sun = ResolveWorldSun(settings, Vector3(0.0f, -2.0f, 0.0f));
+			context.Check(std::abs(luminance(sun.m_Chromaticity) - 1.0) < 1.0e-6 &&
+				sun.m_Direction.m_Y == -1.0f && sun.m_PerpendicularIlluminanceLux == 120000.0f,
+				"World sun resolves unit direction and luminance-normalized chromaticity independently of exposure");
+			bool integratedLuxMatches = true;
+			for (float radius : { 0.01f, 0.2666f, 1.0f, 5.0f })
+			{
+				settings.m_AngularRadiusDegrees = radius;
+				const auto disk = ResolveWorldSun(settings, -Vector3::UnitY);
+				double projectedIntegral = 0.0;
+				constexpr int samples = 4096;
+				const double step = disk.m_AngularRadiusRadians / static_cast<double>(samples);
+				for (int i = 0; i < samples; ++i)
+				{
+					const double theta = (i + 0.5) * step;
+					projectedIntegral += std::cos(theta) * std::sin(theta) * step * 2.0 * std::numbers::pi;
+				}
+				const double integratedLux = luminance(disk.m_DiskRadiance) * projectedIntegral;
+				integratedLuxMatches &= std::abs(integratedLux / settings.m_PerpendicularIlluminanceLux - 1.0) < 1.0e-5;
+			}
+			context.Check(integratedLuxMatches,
+				"Numerical RGB solar disk integration recovers configured perpendicular lux across angular radii");
+			const auto whiteSun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			components::TransformComponent transform{};
+			components::LightComponent light{};
+			light.m_Color = Color::Red;
+			light.m_Intensity = 3.0f;
+			RenderDirectionalLight selected{};
+			selected.m_EntityKey = 42;
+			selected.m_Direction = sun.m_Direction;
+			selected.m_WorldSun = sun;
+			const auto physicalGpu = RenderSceneBuilder::BuildLightData(42, transform, light, selected);
+			const auto legacyGpu = RenderSceneBuilder::BuildLightData(43, transform, light, selected);
+			light.m_Type = LightType::Point;
+			const auto localGpu = RenderSceneBuilder::BuildLightData(42, transform, light, selected);
+			context.Check(physicalGpu.Intensity == 120000.0f && physicalGpu.Direction.m_Y == -1.0f &&
+				physicalGpu.Color.m_Y == sun.m_Chromaticity.m_Y && legacyGpu.Intensity == 3.0f &&
+				legacyGpu.Color.m_Y == 0.0f && localGpu.Intensity == 3.0f && localGpu.Color.m_Y == 0.0f,
+				"GPU light encoding applies physical units only to the designated directional sun");
+			const float radiance = whiteSun.m_DirectIlluminance.m_X * 0.18f / std::numbers::pi_v<float>;
+			const auto ev15 = ResolveManualExposureSettings(15.0f, 0.0f, true);
+			const auto ev16 = ResolveManualExposureSettings(16.0f, 0.0f, true);
+			context.Check(std::abs(radiance - 6875.4935f) < 0.01f &&
+				std::abs(radiance * ev15.m_ExposureScale - 2.0f * radiance * ev16.m_ExposureScale) < 1.0e-6f,
+				"Neutral 18 percent Lambert reference is rho E over pi and one exposure stop halves exposed radiance");
+			WorldSunSettings invalid{};
+			invalid.m_PerpendicularIlluminanceLux = std::numeric_limits<float>::infinity();
+			invalid.m_Chromaticity = Vector3::Zero;
+			invalid.m_AngularRadiusDegrees = std::numeric_limits<float>::quiet_NaN();
+			const auto sanitized = ResolveWorldSun(invalid, Vector3(std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f));
+			context.Check(sanitized.m_PerpendicularIlluminanceLux == 0.0f &&
+				sanitized.m_Direction.m_Y == -1.0f && sanitized.m_Chromaticity.m_X == 1.0f &&
+				std::isfinite(sanitized.m_DiskRadiance.m_X) && sanitized.m_ProjectedSolidAngle > 0.0f,
+				"Invalid sun input resolves finite darkness, neutral chromaticity and a valid angular radius");
+		}
+
 		void RunExposureContractTests(SelfTestContext& context) noexcept
 		{
 			Camera camera(Camera::CreateInfo{});
@@ -7510,6 +7577,7 @@ namespace gglab
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
+		RunWorldSunContractTests(context);
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);

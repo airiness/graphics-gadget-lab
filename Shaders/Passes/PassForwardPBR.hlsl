@@ -369,6 +369,8 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 		shadowVisibility = SampleDirectionalShadow(positionWS, shadowReceiver, dot(shadowReceiver.NormalWS, L));
 	}
 
+	// The designated world sun supplies Y-normalized RGB and perpendicular lux.
+	// Center-direction BRDF evaluation approximates the finite disk; do not apply another pi factor.
 	return (diffuse + specular) * light.Color.rgb * light.Intensity * NoL * attenuation *
 		shadowVisibility;
 }

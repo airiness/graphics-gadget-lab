@@ -21,6 +21,33 @@
 
 namespace gglab
 {
+	LightGPU RenderSceneBuilder::BuildLightData(uint64_t entityKey,
+		const components::TransformComponent& transform, const components::LightComponent& light,
+		const RenderDirectionalLight& mainLight) noexcept
+	{
+		LightGPU gpu{};
+		gpu.Position = math::ToVector4(transform.m_Position, 1.0f);
+		Vector3 direction = math::TransformDirection(Vector3::Forward, math::CreateFromQuaternion(transform.m_Rotation));
+		direction.Normalize();
+		gpu.Direction = math::ToVector4(direction, 0.0f);
+		gpu.Color = light.m_Color;
+		gpu.Intensity = light.m_Intensity;
+		gpu.Range = light.m_Range;
+		gpu.SpotAngle = light.m_SpotAngle;
+		gpu.LightType = static_cast<uint32_t>(light.m_Type);
+		if (mainLight.m_EntityKey == entityKey && light.m_Type == LightType::Directional)
+		{
+			gpu.Direction = math::ToVector4(mainLight.m_Direction, 0.0f);
+			if (const auto& sun = mainLight.m_WorldSun)
+			{
+				// The BRDF already supplies Lambert's 1/pi and the cosine term.
+				gpu.Color = Color(sun->m_Chromaticity.m_X, sun->m_Chromaticity.m_Y, sun->m_Chromaticity.m_Z, 1.0f);
+				gpu.Intensity = sun->m_PerpendicularIlluminanceLux;
+			}
+		}
+		return gpu;
+	}
+
 	namespace
 	{
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
@@ -286,21 +313,8 @@ namespace gglab
 				registry.view<components::TransformComponent, components::LightComponent>();
 			for (auto&& [entity, transComp, lightComp] : lightView.each())
 			{
-				LightGPU lightGpu{};
-				lightGpu.Position = math::ToVector4(transComp.m_Position, 1.0f);
-
-				const Matrix rotation = math::CreateFromQuaternion(transComp.m_Rotation);
-				Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);
-				forward.Normalize();
-				lightGpu.Direction = math::ToVector4(forward, 0.0f);
-
-				lightGpu.Color = lightComp.m_Color;
-				lightGpu.Intensity = lightComp.m_Intensity;
-				lightGpu.Range = lightComp.m_Range;
-				lightGpu.SpotAngle = lightComp.m_SpotAngle;
-				lightGpu.LightType = static_cast<uint32_t>(lightComp.m_Type);
-
 				const uint64_t lightKey = static_cast<uint64_t>(entt::to_integral(entity));
+				const LightGPU lightGpu = BuildLightData(lightKey, transComp, lightComp, info.m_MainDirectionalLight);
 				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
 				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
 				if (lightSlot != LightTable::InvalidSlot)

@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/ShadowTemporalDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/CameraTooling.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
@@ -60,6 +61,42 @@ namespace gglab
 			{
 				control->SetDirection(light->m_Id, Vector3(direction[0], direction[1], direction[2]));
 			}
+			bool physicalSun = light->m_WorldSun.has_value();
+			if (ImGui::Checkbox("Physical World Sun", &physicalSun) && control)
+			{
+				control->SetWorldSun(light->m_Id, physicalSun
+					? std::optional<WorldSunSettings>(WorldSunSettings{}) : std::nullopt);
+			}
+			if (light->m_WorldSun)
+			{
+				auto settings = *light->m_WorldSun;
+				float chromaticity[3] = { settings.m_Chromaticity.m_X, settings.m_Chromaticity.m_Y, settings.m_Chromaticity.m_Z };
+				bool edited = ImGui::ColorEdit3("Solar Chromaticity (linear)", chromaticity);
+				edited |= ImGui::DragFloat("TOA Illuminance (lux)", &settings.m_PerpendicularIlluminanceLux,
+					100.0f, 0.0f, 1000000.0f, "%.0f");
+				edited |= ImGui::DragFloat("Solar Angular Radius (degrees)", &settings.m_AngularRadiusDegrees,
+					0.001f, 0.01f, 5.0f, "%.4f");
+				if (edited && control)
+				{
+					settings.m_Chromaticity = Vector3(chromaticity[0], chromaticity[1], chromaticity[2]);
+					control->SetWorldSun(light->m_Id, settings);
+				}
+				const auto& sun = *light->m_ResolvedWorldSun;
+				ImGui::Text("World Sun ID: %u | Local illuminance: %.0f lux", light->m_Id, sun.m_PerpendicularIlluminanceLux);
+				ImGui::Text("Disk radiance RGB: %.6g / %.6g / %.6g cd/m2",
+					sun.m_DiskRadiance.m_X, sun.m_DiskRadiance.m_Y, sun.m_DiskRadiance.m_Z);
+				if (const auto* exposure = context.m_Diagnostics
+					? context.m_Diagnostics->GetSnapshot<PostProcessDiagnosticsSnapshot>() : nullptr)
+				{
+					ImGui::Text("Pre-exposed direct scale: %.6g", sun.m_PerpendicularIlluminanceLux * exposure->m_Exposure.m_PreExposure);
+				}
+				ImGui::Text("Shadow shading requested: %s", light->m_ShadowSettings && light->m_ShadowSettings->m_Enable ? "yes" : "no");
+				ImGui::TextDisabled("Atmospheric transmittance: 1; direct BRDF uses the disk center.");
+				ImGui::TextDisabled("Angular radius calibrates the source; finite-disk specular is not evaluated yet.");
+				ImGui::EndDisabled();
+				return;
+			}
+			ImGui::TextDisabled("Legacy artistic light units");
 			float color[3] = { light->m_Color.m_R, light->m_Color.m_G, light->m_Color.m_B };
 			bool changed = ImGui::ColorEdit3("Color", color);
 			changed |= ImGui::DragFloat("Intensity", &light->m_Intensity, 0.01f, 0.0f, 100.0f, "%.3f");

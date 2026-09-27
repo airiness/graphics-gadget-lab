@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Core/Math/Color.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,6 +18,8 @@ namespace gglab
 		Color m_Color = Color::White;
 		float m_Intensity = 1.0f;
 		std::optional<DirectionalShadowSettings> m_ShadowSettings;
+		std::optional<WorldSunSettings> m_WorldSun;
+		std::optional<ResolvedWorldSun> m_ResolvedWorldSun;
 	};
 
 	class DirectionalLightViewBase
@@ -34,6 +37,7 @@ namespace gglab
 		virtual ~DirectionalLightControlBase() = default;
 		virtual void SetDirection(uint32_t id, const Vector3& direction) noexcept = 0;
 		virtual void SetRadiance(uint32_t id, const Color& color, float intensity) noexcept = 0;
+		virtual void SetWorldSun(uint32_t id, const std::optional<WorldSunSettings>& settings) noexcept = 0;
 		virtual void SetShadowSettings(uint32_t id,
 			const std::optional<DirectionalShadowSettings>& settings) noexcept = 0;
 	};

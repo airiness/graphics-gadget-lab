@@ -96,6 +96,50 @@ validation output. SDR screenshots establish visual behavior; stop arithmetic an
 storage invariance require linear measurements. The code/shader contract tests do
 not establish GPU presentation or temporal visual quality.
 
+## Physical directional sun
+
+A directional light with `WorldSunSettings` explicitly designates the world sun.
+Its perpendicular top-of-atmosphere illuminance is in lux; linear Rec.709
+chromaticity is normalized so `Y = dot(RGB, (0.2126, 0.7152, 0.0722)) = 1`.
+The resolved uniform solar disk uses `L = C * E / (pi * sin(alpha)^2)`.
+Numerical disk integration is checked to relative tolerance `1e-5`. No atmosphere
+is active in this slice, so sun-path transmittance is 1 and local illuminance equals
+TOA illuminance. Shadow visibility is an independent multiplier.
+
+Only the selected sun overrides legacy light color/intensity at GPU upload.
+Unmarked directional lights and all point/spot lights retain renderer-relative
+units. Sun selection is independent of shadow enablement. Tooling maintains one
+sun designation; malformed worlds with multiple designated directional lights
+select the lowest entity identity. Without a sun, legacy first-directional-light
+selection is preserved. The same resolved photon-travel direction feeds the
+shadow frame and direct lighting.
+
+The direct BRDF uses the disk center and perpendicular RGB illuminance, including
+its existing cosine and Lambert `1/pi` factors. A pure Lambertian 18% reflector
+under 120000 lux at normal incidence produces about 6875.49 cd/m2 before exposure.
+The production PBR material additionally has Fresnel/specular terms, so its final
+pixel is not a pure Lambert reference. The angular radius calibrates disk radiance;
+it does not broaden direct specular highlights yet. Finite-disk smooth-specular
+quality evaluation belongs to the physical-sky stage. No solar disk is rendered yet.
+
+Inputs are bounded to 0..1000000 lux, 0.01..5 degrees angular radius, and 0..1
+linear chromaticity channels before luminance normalization. Non-finite lux becomes
+zero; an invalid radius uses 0.2666 degrees; degenerate chromaticity uses neutral
+white; invalid directions use downward photon travel. These bounds keep the
+resolved full-float source finite, before scene pre-exposure and FP16 storage.
+
+For validation, open `gglab.lab.lighting_contract`, enable **Physical Sun
+(120000 lux / EV15 preset)** in Lab Control, and compare all three reference views.
+The preset enables pre-exposure and sets EV100 to 15; returning to legacy mode
+restores EV100 0 and unit storage. Camera reference views restore EV100 15 in physical mode and EV100 0 in legacy
+mode. Clear DevTools exposure overrides
+when comparing presets. The Shadow inspector's Light Control exposes the explicit
+sun toggle, lux, chromaticity, angular radius, identity, local illuminance, disk
+radiance and pre-exposed direct scale. Change lux by a factor of two, sweep camera
+EV100 14/15/16, and toggle shadow shading while checking that sun identity and lux
+remain unchanged. Repeat on DX12 and Vulkan; visual and GPU validation remain
+separate from CPU contracts and shader compilation.
+
 ## RHI backend selection
 
 The Blender island import fixture reuses `DemoPlayground` with a fixed camera
