@@ -40,9 +40,14 @@ namespace gglab
 		a.m_Sun = Vector4(sun.m_DirectIlluminance.m_X, sun.m_DirectIlluminance.m_Y,
 			sun.m_DirectIlluminance.m_Z, sun.m_AngularRadiusRadians);
 		const double scale = Bound(s.m_WorldUnitsToMeters, 0.0001f, 10000.0f, 1.0f);
-		const double x = static_cast<double>(camera.m_X) * scale - s.m_PlanetCenterMeters.m_X;
-		const double y = static_cast<double>(camera.m_Y) * scale - s.m_PlanetCenterMeters.m_Y;
-		const double z = static_cast<double>(camera.m_Z) * scale - s.m_PlanetCenterMeters.m_Z;
+		const float centerX = Bound(s.m_PlanetCenterMeters.m_X, -100000000.0f, 100000000.0f, 0.0f);
+		const float centerY = Bound(s.m_PlanetCenterMeters.m_Y, -100000000.0f, 100000000.0f, -6360000.0f);
+		const float centerZ = Bound(s.m_PlanetCenterMeters.m_Z, -100000000.0f, 100000000.0f, 0.0f);
+		a.m_World = Vector4(centerX * 0.001f, centerY * 0.001f, centerZ * 0.001f,
+			static_cast<float>(scale * 0.001));
+		const double x = static_cast<double>(camera.m_X) * scale - centerX;
+		const double y = static_cast<double>(camera.m_Y) * scale - centerY;
+		const double z = static_cast<double>(camera.m_Z) * scale - centerZ;
 		const double radius = std::sqrt(x*x + y*y + z*z);
 		const bool valid = std::isfinite(radius) && radius > 1.0;
 		const float mu = valid ? static_cast<float>(-(x * sun.m_Direction.m_X + y * sun.m_Direction.m_Y +
@@ -57,12 +62,17 @@ namespace gglab
 		auto c = current;
 		p.m_Sun = c.m_Sun = Vector4::Zero;
 		p.m_Observer = c.m_Observer = Vector4::Zero;
+		p.m_World = c.m_World = Vector4::Zero;
 		p.m_Mie.m_W = c.m_Mie.m_W = 0.0f; // isotropic multiple-scattering closure
 		const bool multiple = std::memcmp(&p, &c, sizeof(p)) != 0;
 		p.m_Ground.m_X = p.m_Ground.m_Y = p.m_Ground.m_Z = 0.0f;
 		c.m_Ground.m_X = c.m_Ground.m_Y = c.m_Ground.m_Z = 0.0f;
 		const bool transmittance = std::memcmp(&p, &c, sizeof(p)) != 0;
-		return transmittance ? 7u : multiple ? 6u : std::memcmp(&previous, &current, sizeof(current)) != 0 ? 4u : 0u;
+		auto skyPrevious = previous;
+		auto skyCurrent = current;
+		skyPrevious.m_World = skyCurrent.m_World = Vector4::Zero;
+		return transmittance ? 7u : multiple ? 6u :
+			std::memcmp(&skyPrevious, &skyCurrent, sizeof(current)) != 0 ? 4u : 0u;
 	}
 	Vector3 EvaluateAtmosphereTransmittance(const AtmosphereGPU& a, float altitudeMeters,
 		float mu, float distanceMeters) noexcept

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/IBLBakeConfig.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 
 #include <cstdint>
 
@@ -23,6 +24,7 @@ namespace gglab
 		virtual void SetPrefilteredSpecularSampleCount(uint32_t sampleCount) noexcept = 0;
 		virtual void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept = 0;
 		virtual void SetSkyboxEnabled(bool enabled) noexcept = 0;
+		virtual void SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept = 0;
 		// Each request advances the generation; ignoreCache applies only to that generation.
 		virtual void RequestRebake(bool ignoreCache = false) noexcept = 0;
 	};

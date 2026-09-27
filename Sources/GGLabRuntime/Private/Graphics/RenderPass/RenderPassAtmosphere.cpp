@@ -35,8 +35,12 @@ namespace gglab
 		const auto pipeline = services.m_PipelineResolver->Resolve(m_Slot, m_Recipe, GetInfo());
 		if (!pipeline.IsValid()) { atmosphere->Disable(); return; }
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
+		const bool previewSky = services.m_Environment &&
+			services.m_Environment->GetEnvironmentLightingSettings().m_EnableSkybox &&
+			services.m_Environment->GetEnvironmentLightingSettings().m_BackgroundMode ==
+				EnvironmentBackgroundMode::PhysicalAtmospherePreview;
 		if (!atmosphere->Begin(ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
-			context.GetDisplayRenderView().m_CameraPosition), { generation, generation, generation })) return;
+			context.GetDisplayRenderView().m_CameraPosition), { generation, generation, generation }, previewSky)) return;
 		const auto diagnostics = atmosphere->GetDiagnostics();
 		auto& resources = rg.GetBlackboard().Create<RGAtmosphereResources>(AtmosphereResourcesName);
 		resources.m_Diagnostics = diagnostics;

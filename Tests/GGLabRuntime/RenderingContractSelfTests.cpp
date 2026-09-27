@@ -198,6 +198,7 @@ namespace gglab
 			value.SetPrefilteredSpecularSampleCount(512);
 			value.SetPrefilteredSpecularMaxSampleLuminance(1000.0f);
 			value.SetSkyboxEnabled(true);
+			value.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
 			value.RequestRebake();
 		};
 		template <typename T>
@@ -509,7 +510,8 @@ namespace gglab
 			EnvironmentLightingControlBase& control = environment;
 			const auto initial = view.GetEnvironmentLightingSettings();
 			context.Check(initial.m_Intensity == 1.0f && initial.m_RotationRadians == 0.0f &&
-				initial.m_EnableSkybox && initial.m_QualityPreset == IBLQualityPreset::Medium &&
+				initial.m_EnableSkybox && initial.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment &&
+				initial.m_QualityPreset == IBLQualityPreset::Medium &&
 				initial.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Medium) &&
 				environment.GetBakeRequestGeneration() == 0,
 				"Environment query preserves initial settings without requesting a bake");
@@ -559,12 +561,16 @@ namespace gglab
 			control.SetRotationRadians(std::numeric_limits<float>::quiet_NaN());
 			control.SetRotationRadians(std::numeric_limits<float>::infinity());
 			control.SetSkyboxEnabled(false);
+			control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalAtmospherePreview);
+			control.SetBackgroundMode(static_cast<EnvironmentBackgroundMode>(255));
 			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
 				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
+				view.GetEnvironmentLightingSettings().m_BackgroundMode ==
+					EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
 				environment.GetBakeRequestGeneration() == 0 &&
 				std::ranges::none_of(PreviewTypes,
 					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
-				"Unchanged or non-finite yaw and skybox toggles preserve bake and preview state");
+				"Background preview selection does not alter texture IBL bake or preview state");
 
 			control.SetQualityPreset(IBLQualityPreset::Low);
 			const auto low = view.GetEnvironmentLightingSettings();
@@ -6412,6 +6418,9 @@ namespace gglab
 			const auto scaled = ResolveAtmosphere(settings,sun,Vector3(0.0f,1.0f,0.0f));
 			context.Check(scaled.m_Observer.m_X==a.m_Observer.m_X && AtmosphereDirtyMask(a,scaled)==0,
 				"Equivalent meter and kilometer worlds resolve identical atmosphere transport");
+			context.Check(a.m_World.m_W == 0.001f && scaled.m_World.m_W == 1.0f &&
+				std::abs(a.m_World.m_Y + 6360.0f) < 0.001f,
+				"Physical sky and direct sunlight use the same resolved world-to-atmosphere transform");
 			auto changed=a; changed.m_Sun.m_X*=2.0f;
 			bool invalidation=AtmosphereDirtyMask(a,changed)==4;
 			changed=a; changed.m_Observer.m_X+=1.0f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
@@ -6489,9 +6498,10 @@ namespace gglab
 			context.Check(first && system.GetDiagnostics().m_DirtyMask==7,"Cold atmosphere allocation requires all three LUT producers");
 			if (first) { for (uint32_t i=0;i<3;++i) system.NotifyExecuted(i); }
 			system.EndFrame(true,{RHIFenceHandle{1,1},10});
-			const bool cached=system.Begin(a,{1,1,1});
-			context.Check(cached && system.GetDiagnostics().m_DirtyMask==0 && system.GetDiagnostics().m_Generations[0]==1,
-				"Submitted atmosphere LUTs are reused without exposure-dependent recomputation");
+			const bool cached=system.Begin(a,{1,1,1},true);
+			context.Check(cached && system.GetDiagnostics().m_DirtyMask==0 && system.GetDiagnostics().m_Generations[0]==1 &&
+				system.GetConstants().IsValid(),
+				"Physical sky preview retains frame constants without recomputing cached atmosphere LUTs");
 			system.EndFrame(true,{RHIFenceHandle{1,1},11});
 			changed=a; changed.m_Observer.m_X+=1.0f;
 			const bool updated=system.Begin(changed,{1,1,1});
@@ -6503,14 +6513,14 @@ namespace gglab
 				"Cancelled submitted atmosphere work publishes no generation and retains textures and constants until its fence");
 			device.m_CompletedFenceValue=12;
 			system.Tick(); pool.Tick();
-			context.Check(device.m_AtmosphereDestroyedBufferCount==2 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
+			context.Check(device.m_AtmosphereDestroyedBufferCount==3 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
 				"Atmosphere constants and textures retire after GPU completion");
 			const bool retry=system.Begin(a,{1,1,1});
 			if (retry) system.NotifyExecuted(0);
 			system.EndFrame(false,{});
 			device.m_CompletedFenceValue=12;
 			system.Shutdown(); pool.Tick();
-			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==3,
+			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==4,
 				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
 
 			// Exercise the actual inspector consumer between LUT production and final export.

@@ -43,9 +43,13 @@ struct SceneData
 	uint LightBaseIndex;
 	uint LightCount;
 	uint DirectionalShadowLightIndex;
-	uint3 Padding;
+	uint WorldSunLightIndex;
+	float WorldSunAngularRadius;
+	uint Padding;
 
 	IBLResourceData IBLResource;
+	float4 AtmosphereWorld;
+	float4 AtmosphereRadii;
 };
 
 struct ObjectData

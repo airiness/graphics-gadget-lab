@@ -17,7 +17,8 @@ namespace gglab
 			.m_Extent = { AtmosphereLutWidths[i], AtmosphereLutHeights[i], 1 },
 			.m_DebugName = AtmosphereLutNames[i] };
 	}
-	bool AtmosphereSystem::Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaders) noexcept
+	bool AtmosphereSystem::Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaders,
+		bool previewSky) noexcept
 	{
 		GGLAB_ASSERT(!m_InFrame && !m_Shutdown);
 		m_Diagnostics.m_Available = false;
@@ -40,7 +41,7 @@ namespace gglab
 		m_Diagnostics.m_Parameters = parameters;
 		m_Diagnostics.m_DirtyMask = dirty;
 		m_PendingShaderGenerations = shaders;
-		if (dirty)
+		if (dirty || previewSky)
 		{
 			m_Constants = m_Device->CreateBuffer({ .m_SizeInBytes = 256, .m_Usage = RHIBufferUsage::Constant,
 				.m_MemoryUsage = RHIMemoryUsage::CpuToGpu, .m_DebugName = "Atmosphere.Constants" });

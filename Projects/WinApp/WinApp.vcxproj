@@ -463,6 +463,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />

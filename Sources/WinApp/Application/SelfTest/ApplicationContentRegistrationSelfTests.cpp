@@ -717,15 +717,15 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 37,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 39,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 37,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 39,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 35,
+		checkSelectedDemand("gglab.lab.napa_voxel", 37,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 33,
+		checkSelectedDemand("gglab.lab.texture_contract", 35,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 33,
+		checkSelectedDemand("gglab.lab.lighting_contract", 35,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
 		CheckIslandContent(context);

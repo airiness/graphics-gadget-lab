@@ -39,8 +39,9 @@ namespace gglab
 		Vector4 m_Ground{}; // albedo, absorption half width km
 		Vector4 m_Sun{}; // normalized RGB illuminance, angular radius
 		Vector4 m_Observer{}; // radius km, sun zenith cosine, unused, unused
+		Vector4 m_World{}; // planet center km, km per world unit
 	};
-	static_assert(sizeof(AtmosphereGPU) == 112);
+	static_assert(sizeof(AtmosphereGPU) == 128);
 	static_assert(offsetof(AtmosphereGPU, m_Radii) == 0);
 	static_assert(offsetof(AtmosphereGPU, m_Rayleigh) == 16);
 	static_assert(offsetof(AtmosphereGPU, m_Mie) == 32);
@@ -48,6 +49,7 @@ namespace gglab
 	static_assert(offsetof(AtmosphereGPU, m_Ground) == 64);
 	static_assert(offsetof(AtmosphereGPU, m_Sun) == 80);
 	static_assert(offsetof(AtmosphereGPU, m_Observer) == 96);
+	static_assert(offsetof(AtmosphereGPU, m_World) == 112);
 
 	[[nodiscard]] AtmosphereGPU ResolveAtmosphere(const AtmosphereSettings& settings,
 		const ResolvedWorldSun& sun, const Vector3& cameraWorldPosition) noexcept;
@@ -73,7 +75,8 @@ namespace gglab
 	{
 	public:
 		virtual ~RenderAtmosphereAccess() = default;
-		virtual bool Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaderGenerations) noexcept = 0;
+		virtual bool Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaderGenerations,
+			bool previewSky = false) noexcept = 0;
 		virtual void Disable() noexcept = 0;
 		virtual RHITextureHandle GetTexture(uint32_t index) const noexcept = 0;
 		virtual RHITextureDesc GetTextureDesc(uint32_t index) const noexcept = 0;

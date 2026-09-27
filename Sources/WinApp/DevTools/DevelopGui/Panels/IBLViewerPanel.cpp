@@ -287,6 +287,10 @@ namespace gglab
 				return;
 			}
 			const auto settings = context.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+			if (settings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview)
+			{
+				ImGui::TextDisabled("Background: Physical Sky preview | IBL: HDR texture");
+			}
 
 			auto* control = context.m_EnvironmentLightingControl;
 			ImGui::BeginDisabled(!control);

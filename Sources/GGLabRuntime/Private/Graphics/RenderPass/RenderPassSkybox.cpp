@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
@@ -32,18 +33,35 @@ namespace gglab
 		};
 		static_assert(IsPassRootConstantStruct<SkyboxPassParameters>);
 		static_assert(sizeof(SkyboxPassParameters) == 16);
+		struct PhysicalSkyPassParameters
+		{
+			uint32_t ViewIndex = 0;
+			uint32_t SkyViewIndex = 0;
+			uint32_t TransmittanceIndex = 0;
+			uint32_t SamplerIndex = 0;
+			Vector3 SunDirection = Vector3::UnitY;
+			float Padding = 0.0f;
+		};
+		static_assert(IsPassRootConstantStruct<PhysicalSkyPassParameters>);
+		static_assert(sizeof(PhysicalSkyPassParameters) == 32);
 
 		struct PassData
 		{
 			RGTextureId m_EnvironmentCubemap{};
+			RGTextureId m_Transmittance{};
+			RGTextureId m_SkyView{};
 			RGTextureId m_SceneColor{};
 			RGTextureId m_Depth{};
 			RGTextureViewId m_Rtv{};
 			RGTextureViewId m_Dsv{};
+			RGTextureViewId m_TransmittanceSrv{};
+			RGTextureViewId m_SkyViewSrv{};
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
 			uint32_t m_EnvironmentTextureIndex = 0;
 			uint32_t m_EnvironmentSamplerIndex = 0;
+			Vector3 m_SunDirection = Vector3::UnitY;
+			bool m_PhysicalPreview = false;
 		};
 	}
 
@@ -55,8 +73,6 @@ namespace gglab
 			return;
 		}
 
-		auto* assetManager = services.m_TextureAssets;
-		GGLAB_ASSERT_NOT_NULL(assetManager);
 		GGLAB_ASSERT_NOT_NULL(services.m_Environment);
 		const EnvironmentLightingSettings& environmentSettings =
 			services.m_Environment->GetEnvironmentLightingSettings();
@@ -66,12 +82,20 @@ namespace gglab
 		}
 
 		EnsureInitialized(services);
+		const bool physicalPreview =
+			environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
+			context.m_RenderScene.m_Atmosphere && context.m_RenderScene.m_WorldSun &&
+			services.m_Atmosphere && services.m_Atmosphere->GetConstants().IsValid() &&
+			rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
+		auto* assetManager = services.m_TextureAssets;
+		GGLAB_ASSERT_NOT_NULL(assetManager);
 		auto* bakeScheduler = services.m_Environment;
 		auto* renderResourceRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(bakeScheduler);
 		GGLAB_ASSERT_NOT_NULL(renderResourceRegistry);
 
-		const bool useFallback = bakeScheduler->GetBakingStatus().m_ActiveGeneration == 0;
+		const bool useFallback = !physicalPreview &&
+			bakeScheduler->GetBakingStatus().m_ActiveGeneration == 0;
 		RHITextureHandle fallbackTextureHandle{};
 		RHITextureDesc fallbackTextureDesc{};
 		uint32_t environmentTextureIndex = 0;
@@ -93,7 +117,7 @@ namespace gglab
 			fallbackTextureDesc = fallbackResource->m_Desc;
 			environmentTextureIndex = fallbackResource->m_SrvIndex;
 		}
-		else
+		else if (!physicalPreview)
 		{
 			environmentTextureIndex = renderResourceRegistry->GetShaderVisibleSrvIndex(
 				RenderTextureIndex::IBL_EnvironmentCubemap);
@@ -104,15 +128,30 @@ namespace gglab
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(
-			GetRenderGraphPassName(),
-			[displayViewId, useFallback, fallbackTextureHandle, fallbackTextureDesc,
-			environmentTextureIndex,
-			environmentSamplerIndex](RenderGraph::RGBuilder& builder, PassData& data)
+			physicalPreview ? "Background.PhysicalSkyPreview" : GetRenderGraphPassName(),
+			[displayViewId, physicalPreview, useFallback, fallbackTextureHandle, fallbackTextureDesc,
+				environmentTextureIndex,
+				environmentSamplerIndex,
+				sunDirection = physicalPreview ? -context.m_RenderScene.m_WorldSun->m_Direction : Vector3::UnitY](
+				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
 
 				auto& blackboard = builder.GetBlackboard();
-				if (useFallback)
+				data.m_PhysicalPreview = physicalPreview;
+				data.m_SunDirection = sunDirection;
+				if (physicalPreview)
+				{
+					const auto& atmosphere = blackboard.Get<RGAtmosphereResources>(AtmosphereResourcesName);
+					data.m_Transmittance = builder.Read(atmosphere.m_Luts[0], RGTextureAccess::Sample,
+						RHIStage::PixelShader);
+					data.m_SkyView = builder.Read(atmosphere.m_Luts[2], RGTextureAccess::Sample,
+						RHIStage::PixelShader);
+					data.m_TransmittanceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+						data.m_Transmittance);
+					data.m_SkyViewSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SkyView);
+				}
+				else if (useFallback)
 				{
 					data.m_EnvironmentCubemap =
 						builder.ImportTexture("Skybox.FallbackEnvironmentCubemap",
@@ -159,7 +198,7 @@ namespace gglab
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
 
-				commandContext->SetPipeline(GetOrCreatePSO(services));
+				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_PhysicalPreview));
 				const RHIRenderingAttachment colorAttachment{ .m_View = rtv };
 				commandContext->BeginRendering({
 					.m_ColorAttachments =
@@ -171,24 +210,49 @@ namespace gglab
 				commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(data.m_Width),
 					static_cast<int32_t>(data.m_Height) });
 
-				const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
-				commandContext->SetConstantBuffer(
-					static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
-					sceneBuffer->GetBufferHandle(),
-					contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+				if (data.m_PhysicalPreview)
+				{
+					commandContext->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+						services.m_Atmosphere->GetConstants(), 0);
+				}
+				else
+				{
+					const auto* sceneBuffer = services.m_FrameBuffers->GetSceneConstantBuffer();
+					commandContext->SetConstantBuffer(
+						static_cast<uint32_t>(CommonRSRootParamIndex::SceneCB),
+						sceneBuffer->GetBufferHandle(),
+						contextPtr->m_RenderScene.m_SceneConstantBufferOffset);
+				}
 
 				const auto* viewBuffer = services.m_FrameBuffers->GetViewStructuredBuffer();
 				commandContext->SetReadOnlyBuffer(
 					static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB),
 					viewBuffer->GetBufferHandle());
 
-				const SkyboxPassParameters passParameters{
-					.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
-					.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
-					.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
-				};
-				commandContext->SetPushConstants(
-					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				if (data.m_PhysicalPreview)
+				{
+					const PhysicalSkyPassParameters passParameters{
+						.ViewIndex = contextPtr->m_RenderScene.m_ViewBaseIndex +
+							static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+						.SkyViewIndex = executeContext.GetViewDescriptor(data.m_SkyViewSrv).m_Index,
+						.TransmittanceIndex = executeContext.GetViewDescriptor(data.m_TransmittanceSrv).m_Index,
+						.SamplerIndex = data.m_EnvironmentSamplerIndex,
+						.SunDirection = data.m_SunDirection,
+					};
+					commandContext->SetPushConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				}
+				else
+				{
+					const SkyboxPassParameters passParameters{
+						.ViewIndex = static_cast<uint32_t>(utils::ToIndex(displayViewId)),
+						.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
+						.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
+					};
+					commandContext->SetPushConstants(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
+				}
 				commandContext->DrawFullscreenTriangle();
 			});
 	}
@@ -220,13 +284,19 @@ namespace gglab
 		m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 		m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
 		m_BaseRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
+		m_PhysicalPreviewRecipe = m_BaseRecipe;
+		m_PhysicalPreviewRecipe.m_VSId = shaderManager->LoadProgram(shader_programs::PhysicalSkyPreviewVertex);
+		m_PhysicalPreviewRecipe.m_PSId = shaderManager->LoadProgram(shader_programs::PhysicalSkyPreviewPixel);
 		m_IsInitialized = true;
 	}
 
-	RHIPipelineHandle RenderPassSkybox::GetOrCreatePSO(const RenderServices& services) noexcept
+	RHIPipelineHandle RenderPassSkybox::GetOrCreatePSO(const RenderServices& services,
+		bool physicalPreview) noexcept
 	{
 		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
-		return pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
+		return physicalPreview
+			? pipelineCache->Resolve(m_PhysicalPreviewPipelineSlot, m_PhysicalPreviewRecipe, GetInfo())
+			: pipelineCache->Resolve(m_PipelineSlot, m_BaseRecipe, GetInfo());
 	}
 }

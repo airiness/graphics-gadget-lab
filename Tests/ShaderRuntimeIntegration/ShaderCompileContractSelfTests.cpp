@@ -2523,7 +2523,7 @@ namespace gglab
 			const auto atmosphereDxil = compiler.Compile(desc);
 			std::string atmosphereDisassembly;
 			const bool atmosphereDxilReflected = atmosphereDxil.IsSuccess() && DisassembleDxil(atmosphereDxil.m_Artifact.m_Binary,atmosphereDisassembly);
-			const std::array<const char*,7> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer" };
+			const std::array<const char*,8> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer", "World" };
 			bool atmosphereDxilOffsets = atmosphereDxilReflected;
 			for (size_t i=0;i<atmosphereMembers.size();++i)
 				atmosphereDxilOffsets &= FindDxilMemberOffset(atmosphereDisassembly,atmosphereMembers[i])==i*16;
@@ -2537,12 +2537,29 @@ namespace gglab
 				ReadSpirVDecorations(atmosphereSpirV.m_Artifact.m_Binary,atmosphereReflection);
 			const auto* atmosphereLayout = atmosphereReflected
 				? atmosphereReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters") : nullptr;
-			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size()==7;
+			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size()==8;
 			if (atmosphereOffsets)
 			{
-				for (size_t i=0;i<7;++i) atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset==i*16;
+				for (size_t i=0;i<8;++i) atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset==i*16;
 			}
-			context.Check(atmosphereOffsets,"Atmosphere constant buffer has seven explicitly aligned float4 rows in SPIR-V");
+			context.Check(atmosphereOffsets,"Atmosphere constant buffer has eight explicitly aligned float4 rows in SPIR-V");
+
+			desc.m_SourcePath = L"Passes/PassPhysicalSky.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			desc.m_Target = {};
+			const auto physicalSkyVertexDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex);
+			const auto physicalSkyVertexSpirV = compiler.Compile(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Target = {};
+			const auto physicalSkyPixelDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const auto physicalSkyPixelSpirV = compiler.Compile(desc);
+			context.Check(physicalSkyVertexDxil.IsSuccess() && physicalSkyVertexSpirV.IsSuccess() &&
+				physicalSkyPixelDxil.IsSuccess() && physicalSkyPixelSpirV.IsSuccess(),
+				"Physical sky preview vertex and pixel shaders compile for DX12 and Vulkan");
 
 			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

@@ -74,6 +74,10 @@ namespace gglab::shader_programs
 		"gglab.shader.skybox", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef SkyboxPixel{
 		"gglab.shader.skybox", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef PhysicalSkyPreviewVertex{
+		"gglab.shader.physical-sky-preview", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef PhysicalSkyPreviewPixel{
+		"gglab.shader.physical-sky-preview", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLEnvironmentVertex{
 		"gglab.shader.ibl-environment", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLEnvironmentPixel{

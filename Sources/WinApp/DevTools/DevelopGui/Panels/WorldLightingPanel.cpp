@@ -3,6 +3,8 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AtmosphereDiagnosticsSnapshot.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "GGLabRuntime/Scene/DirectionalLightTooling.h"
@@ -91,7 +93,7 @@ namespace gglab
 				ImGui::TextDisabled("No directional light.");
 				return;
 			}
-			ImGui::Text("Atmosphere: %s | LUT diagnostics only",
+			ImGui::Text("Atmosphere: %s",
 				light->m_Atmosphere ? "Enabled" : "Disabled");
 			auto* control = context.m_DirectionalLightControl;
 			ImGui::BeginDisabled(!control);
@@ -127,6 +129,33 @@ namespace gglab
 				}
 			}
 			ImGui::EndDisabled();
+			if (context.m_EnvironmentLighting)
+			{
+				const auto environment = context.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+				bool previewSky = environment.m_BackgroundMode ==
+					EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+				auto* environmentControl = context.m_EnvironmentLightingControl;
+				ImGui::BeginDisabled(!environmentControl);
+				if (ImGui::Checkbox("Preview Physical Sky in Viewport", &previewSky) && environmentControl)
+				{
+					environmentControl->SetBackgroundMode(previewSky
+						? EnvironmentBackgroundMode::PhysicalAtmospherePreview
+						: EnvironmentBackgroundMode::TextureEnvironment);
+				}
+				ImGui::EndDisabled();
+				if (previewSky && !environment.m_EnableSkybox)
+				{
+					ImGui::TextDisabled("Preview paused: enable Skybox in Environment & IBL.");
+				}
+				else if (previewSky && (!light->m_Atmosphere || !light->m_WorldSun))
+				{
+					ImGui::TextDisabled("Preview paused: enable Atmosphere and Physical Sun.");
+				}
+				else if (previewSky)
+				{
+					ImGui::TextDisabled("Display preview only; IBL still uses the HDR texture.");
+				}
+			}
 
 			const auto* snapshot = context.m_Diagnostics
 				? context.m_Diagnostics->GetSnapshot<AtmosphereDiagnosticsSnapshot>() : nullptr;

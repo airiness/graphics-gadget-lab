@@ -88,6 +88,7 @@ namespace gglab
 			void SetPrefilteredSpecularSampleCount(uint32_t) noexcept override {}
 			void SetPrefilteredSpecularMaxSampleLuminance(float) noexcept override {}
 			void SetSkyboxEnabled(bool) noexcept override {}
+			void SetBackgroundMode(EnvironmentBackgroundMode) noexcept override {}
 			void RequestRebake(bool) noexcept override {}
 		};
 

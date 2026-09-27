@@ -10,6 +10,7 @@ struct AtmosphereParameters
 	float4 Ground;
 	float4 Sun;
 	float4 Observer;
+	float4 World;
 };
 ConstantBuffer<AtmosphereParameters> g_Atmosphere : register(b0);
 static const float AtmospherePi = 3.141592653589793;

@@ -53,6 +53,7 @@ namespace gglab
 		void SetPrefilteredSpecularMaxSampleLuminance(float maxSampleLuminance) noexcept override;
 		void RequestRebake(bool ignoreCache = false) noexcept override;
 		void SetSkyboxEnabled(bool enabled) noexcept override { m_Settings.m_EnableSkybox = enabled; }
+		void SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept override;
 
 	private:
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;

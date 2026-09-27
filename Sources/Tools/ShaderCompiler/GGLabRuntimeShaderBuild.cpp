@@ -108,6 +108,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &DebugDrawPixel, L"Passes/PassDebugDraw.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &SkyboxVertex, L"Passes/PassSkybox.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &SkyboxPixel, L"Passes/PassSkybox.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &PhysicalSkyPreviewVertex, L"Passes/PassPhysicalSky.hlsl", L"VSMain" },
+			ShaderProgramBuildRecord{ &PhysicalSkyPreviewPixel, L"Passes/PassPhysicalSky.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &IBLEnvironmentVertex, L"Passes/PassIBLEnvironment.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &IBLEnvironmentPixel, L"Passes/PassIBLEnvironment.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &IBLEnvironmentMipVertex, L"Passes/PassIBLEnvironmentMip.hlsl", L"VSMain" },

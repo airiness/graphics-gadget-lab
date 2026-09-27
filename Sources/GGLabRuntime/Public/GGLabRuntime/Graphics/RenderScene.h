@@ -44,6 +44,7 @@ namespace gglab
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightCount = 0;
 		uint32_t m_DirectionalShadowLightIndex = std::numeric_limits<uint32_t>::max();
+		uint32_t m_WorldSunLightIndex = std::numeric_limits<uint32_t>::max();
 		uint32_t m_DirectionalLightCount = 0;
 		uint32_t m_LocalLightCount = 0;
 		std::array<uint32_t, MaxLightCapacity> m_LightTypesByIndex{};

@@ -9,7 +9,8 @@ namespace gglab
 	public:
 		AtmosphereSystem(RHIDevice* device, PersistentTexturePool* pool) noexcept : m_Device(device), m_Pool(pool) {}
 		~AtmosphereSystem() override;
-		bool Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaderGenerations) noexcept override;
+		bool Begin(const AtmosphereGPU& parameters, const std::array<uint64_t, 3>& shaderGenerations,
+			bool previewSky = false) noexcept override;
 		void Disable() noexcept override;
 		RHITextureHandle GetTexture(uint32_t i) const noexcept override { return m_Textures[i].GetTexture(); }
 		RHITextureDesc GetTextureDesc(uint32_t i) const noexcept override;

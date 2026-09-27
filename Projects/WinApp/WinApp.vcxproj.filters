@@ -841,6 +841,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

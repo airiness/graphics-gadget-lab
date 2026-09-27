@@ -28,6 +28,8 @@ namespace gglab::shader_programs
 			DebugDrawPixel,
 			SkyboxVertex,
 			SkyboxPixel,
+			PhysicalSkyPreviewVertex,
+			PhysicalSkyPreviewPixel,
 			IBLEnvironmentVertex,
 			IBLEnvironmentPixel,
 			IBLEnvironmentMipVertex,

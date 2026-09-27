@@ -114,4 +114,13 @@ namespace gglab
 			m_IgnoreCacheGeneration = m_BakeRequestGeneration;
 		}
 	}
+
+	void EnvironmentLightingSystem::SetBackgroundMode(EnvironmentBackgroundMode mode) noexcept
+	{
+		if (mode == EnvironmentBackgroundMode::TextureEnvironment ||
+			mode == EnvironmentBackgroundMode::PhysicalAtmospherePreview)
+		{
+			m_Settings.m_BackgroundMode = mode;
+		}
+	}
 }
