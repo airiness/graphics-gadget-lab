@@ -2063,6 +2063,10 @@ namespace gglab
 			const float daylightRadiance = 1000000.0f;
 			const float storageScale = 1.0f / (1.2f * std::exp2(16.0f));
 			const float stored = shader_hdr_math::EncodeSceneColorChannel(daylightRadiance, storageScale);
+			context.Check(shader_hdr_math::SanitizeSceneRadianceChannel(1000000.0f) == 1000000.0f &&
+				shader_hdr_math::SanitizeSceneRadianceChannel(-1.0f) == 0.0f &&
+				shader_hdr_math::SanitizeSceneRadianceChannel(std::numeric_limits<float>::infinity()) == 0.0f,
+				"Persistent physical IBL preserves scene radiance above FP16 without admitting invalid transport");
 			context.Check(stored > 12.0f && stored < 13.0f &&
 				std::abs(stored / storageScale - daylightRadiance) < 1.0f &&
 				shader_hdr_math::SanitizeHDRChannel(daylightRadiance) * storageScale < 1.0f,
@@ -2560,6 +2564,40 @@ namespace gglab
 			context.Check(physicalSkyVertexDxil.IsSuccess() && physicalSkyVertexSpirV.IsSuccess() &&
 				physicalSkyPixelDxil.IsSuccess() && physicalSkyPixelSpirV.IsSuccess(),
 				"Physical sky preview vertex and pixel shaders compile for DX12 and Vulkan");
+
+			struct IBLAbiCase
+			{
+				const wchar_t* m_Path;
+				const char* m_StructName;
+				const char* m_Member;
+				uint32_t m_Offset;
+			};
+			const IBLAbiCase iblCases[] = {
+				{ L"Passes/PassIBLEnvironment.hlsl", "type.ConstantBuffer.IBLEnvironmentPassParameters", "SunDirection", 16 },
+				{ L"Passes/PassIBLEnvironmentMip.hlsl", "type.ConstantBuffer.IBLEnvironmentMipPassParameters", "PhysicalSky", 12 },
+				{ L"Passes/PassIBLIrradiance.hlsl", "type.ConstantBuffer.IBLIrradiancePassParameters", "PhysicalSky", 24 },
+				{ L"Passes/PassIBLPrefilteredSpecular.hlsl", "type.ConstantBuffer.IBLPrefilteredSpecularPassParameters", "PhysicalSky", 36 },
+			};
+			for (const auto& abi : iblCases)
+			{
+				desc.m_SourcePath = abi.m_Path;
+				desc.m_Target = {};
+				desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+				const auto dxil = compiler.Compile(desc);
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				const auto spirV = compiler.Compile(desc);
+				std::string disassembly;
+				SpirVDecorationReflection reflection;
+				const bool reflected = spirV.IsSuccess() && ReadSpirVDecorations(spirV.m_Artifact.m_Binary, reflection);
+				const auto* layout = reflected ? reflection.FindStructLayout(abi.m_StructName) : nullptr;
+				const bool matchingSpirV = layout && std::ranges::any_of(layout->m_Members,
+					[&abi](const auto& member) { return member.m_Name == abi.m_Member && member.m_Offset == abi.m_Offset; });
+				const bool matchingDxil = dxil.IsSuccess() && DisassembleDxil(dxil.m_Artifact.m_Binary, disassembly) &&
+					FindDxilMemberOffset(disassembly, abi.m_Member) == abi.m_Offset;
+				context.Check(dxil.IsSuccess() && spirV.IsSuccess() && matchingSpirV && matchingDxil,
+					std::format("Physical IBL member {} at offset {} (DXIL compile/layout: {}/{}, SPIR-V compile/layout: {}/{})",
+						abi.m_Member, abi.m_Offset, dxil.IsSuccess(), matchingDxil, spirV.IsSuccess(), matchingSpirV));
+			}
 
 			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

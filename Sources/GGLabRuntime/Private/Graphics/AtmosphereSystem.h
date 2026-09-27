@@ -21,6 +21,8 @@ namespace gglab
 		void EndFrame(bool completed, const RHIFencePoint& fence) noexcept;
 		void Tick() noexcept;
 		void Shutdown() noexcept;
+		[[nodiscard]] bool CanPublish() const noexcept;
+		void SwapPublished(AtmosphereSystem& pending) noexcept;
 	private:
 		RHIDevice* m_Device;
 		PersistentTexturePool* m_Pool;

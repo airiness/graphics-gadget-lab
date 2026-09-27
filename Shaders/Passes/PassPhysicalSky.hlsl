@@ -44,15 +44,7 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target0
 	const float3 observer = viewData.CameraPos.xyz * g_Atmosphere.World.w - g_Atmosphere.World.xyz;
 	const float3 up = SafeNormalize(observer, float3(0.0, 1.0, 0.0));
 	const float3 sun = SafeNormalize(g_Pass.SunDirection, float3(0.0, 1.0, 0.0));
-	const float3 sunHorizontal = sun - up * dot(up, sun);
-	const float3 fallbackAxis = abs(up.y) < 0.99 ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-	const float3 xAxis = SafeNormalize(sunHorizontal, normalize(cross(fallbackAxis, up)));
-	const float3 zAxis = cross(xAxis, up);
-	const float zenith = acos(clamp(dot(direction, up), -1.0, 1.0));
-	float azimuth = atan2(dot(direction, zAxis), dot(direction, xAxis));
-	if (azimuth < 0.0) azimuth += 2.0 * AtmospherePi;
-	const float2 unitUV = float2(azimuth / (2.0 * AtmospherePi), zenith / AtmospherePi);
-	const float2 skyUV = (unitUV * float2(191.0, 107.0) + 0.5) / float2(192.0, 108.0);
+	const float2 skyUV = AtmosphereSkyViewUV(direction, up, sun);
 	Texture2D<float4> skyView = GetTexture2DFloat4(g_Pass.SkyViewIndex);
 	Texture2D<float4> transmittance = GetTexture2DFloat4(g_Pass.TransmittanceIndex);
 	SamplerState samplerState = GetSamplerState(g_Pass.SamplerIndex);

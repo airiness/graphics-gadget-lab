@@ -119,6 +119,7 @@ namespace gglab
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
 		m_Atmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
+		m_BakeAtmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_TemporalHistoryManager =
 			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
 
@@ -145,6 +146,8 @@ namespace gglab
 			std::make_unique<EnvironmentLightingSystem>(environmentLightingCreateInfo);
 
 		IBLBakeScheduler::CreateInfo iblBakeSchedulerCreateInfo{};
+		iblBakeSchedulerCreateInfo.m_Atmosphere = m_Atmosphere.get();
+		iblBakeSchedulerCreateInfo.m_BakeAtmosphere = m_BakeAtmosphere.get();
 		iblBakeSchedulerCreateInfo.m_Device = device;
 		iblBakeSchedulerCreateInfo.m_TaskSystem = createInfo.m_TaskSystem;
 		iblBakeSchedulerCreateInfo.m_EnvironmentLightingSystem = m_EnvironmentLightingSystem.get();
@@ -223,6 +226,8 @@ namespace gglab
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
 		m_Atmosphere->Shutdown();
+		m_BakeAtmosphere->Shutdown();
+		m_BakeAtmosphere.reset();
 		m_Atmosphere.reset();
 		m_TemporalHistoryManager->Shutdown();
 		m_TemporalHistoryManager.reset();
@@ -269,8 +274,8 @@ namespace gglab
 		m_TransientResourcePool->Tick();
 		m_PersistentTexturePool->Tick();
 		m_Atmosphere->Tick();
+		m_BakeAtmosphere->Tick();
 		m_AssetUploadScheduler->Tick();
-		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
 		m_HasActiveFrame = true;
 		m_FrameGpuResources = std::make_unique<RenderFrameGpuResources>();
@@ -435,6 +440,7 @@ namespace gglab
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
 		m_Atmosphere->EndFrame(result.IsCompleted(), submittedFence);
+		m_BakeAtmosphere->EndFrame(result.IsCompleted(), submittedFence);
 		if (result.IsCompleted() && submittedFence.IsValid())
 		{
 			m_ActiveFrame.m_TemporalTransaction.CommitCompleted(submittedFence);
@@ -450,7 +456,8 @@ namespace gglab
 		if (submittedFence.IsValid())
 		{
 			m_LastSubmittedFencePoint = submittedFence;
-			m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
+			if (result.IsCompleted()) m_IBLBakeScheduler->OnFrameSubmitted(submittedFence);
+			else m_IBLBakeScheduler->OnFrameAborted(submittedFence);
 		}
 		else
 		{
@@ -482,11 +489,6 @@ namespace gglab
 		{
 			return {};
 		}
-		if (m_IBLBakeScheduler)
-		{
-			m_IBLBakeScheduler->OnFrameAborted();
-		}
-
 		if (m_RHIContext && m_FrameGpuResources &&
 			m_FrameGpuResources->m_UploadFencePoint.IsValid())
 		{
@@ -499,6 +501,8 @@ namespace gglab
 			const RHIFencePoint submittedFence =
 				m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
 			m_Atmosphere->EndFrame(false, submittedFence);
+			m_BakeAtmosphere->EndFrame(false, submittedFence);
+			m_IBLBakeScheduler->OnFrameAborted(submittedFence);
 			if (submittedFence.IsValid())
 			{
 				m_LastSubmittedFencePoint = submittedFence;
@@ -524,6 +528,8 @@ namespace gglab
 		}
 
 		m_Atmosphere->EndFrame(false, {});
+		m_BakeAtmosphere->EndFrame(false, {});
+		m_IBLBakeScheduler->OnFrameAborted();
 		m_ActiveFrame.m_TemporalTransaction.Abort();
 		EndFrameLifetime();
 		return {};
@@ -539,7 +545,7 @@ namespace gglab
 	const EnvironmentLightingSettings& Renderer::GetEnvironmentLightingSettings() const noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem.get());
-		return m_EnvironmentLightingSystem->GetSettings();
+		return m_EnvironmentLightingSystem->GetRenderSettings();
 	}
 
 	bool Renderer::ShouldInitializeBakeResources() const noexcept
@@ -592,6 +598,17 @@ namespace gglab
 	{
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem.get());
 		return m_EnvironmentLightingSystem->GetBakeSource();
+	}
+
+	const AtmosphereGPU* Renderer::GetBakingAtmosphereParameters() const noexcept
+	{
+		const auto* source = m_IBLBakeScheduler->GetBakingPhysicalSky();
+		return source ? &source->m_Parameters : nullptr;
+	}
+	Vector3 Renderer::GetBakingSunDirection() const noexcept
+	{
+		const auto* source = m_IBLBakeScheduler->GetBakingPhysicalSky();
+		return source ? -source->m_Sun.m_Direction : Vector3::UnitY;
 	}
 
 	ArtifactCacheCoreStatistics Renderer::GetArtifactCacheStatistics() const noexcept

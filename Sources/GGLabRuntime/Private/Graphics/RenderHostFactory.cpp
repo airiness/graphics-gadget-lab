@@ -45,6 +45,7 @@ namespace gglab
 		instance.m_Services.m_BindingLayout = renderer.get();
 		instance.m_Services.m_Temporal = renderer.get();
 		instance.m_Services.m_Atmosphere = renderer->GetAtmosphereSystem();
+		instance.m_Services.m_BakeAtmosphere = renderer->GetBakeAtmosphereSystem();
 		instance.m_Services.m_AssetUpload = renderer->GetAssetUploadScheduler();
 		instance.m_Composition = renderer.get();
 		instance.m_Host = std::move(renderer);

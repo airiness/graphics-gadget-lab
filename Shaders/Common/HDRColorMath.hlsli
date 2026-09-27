@@ -2,6 +2,11 @@
 
 static const float MAX_FP16_FINITE = 65504.0f;
 
+float SanitizeSceneRadianceChannel(float value)
+{
+	return isfinite(value) && value > 0.0f ? value : 0.0f;
+}
+
 float SanitizeHDRChannel(float value)
 {
 	return isfinite(value) ? clamp(value, 0.0f, MAX_FP16_FINITE) : 0.0f;

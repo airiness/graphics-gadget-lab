@@ -115,4 +115,21 @@ namespace gglab
 		GGLAB_ASSERT(m_PendingBuffers.empty());
 		m_Shutdown = true;
 	}
+	bool AtmosphereSystem::CanPublish() const noexcept
+	{
+		return !m_InFrame && m_Diagnostics.m_Available &&
+			std::ranges::all_of(m_Initialized, [](bool initialized) { return initialized; }) &&
+			m_LastFence.IsValid() && m_Device->IsFencePointCompleted(m_LastFence);
+	}
+	void AtmosphereSystem::SwapPublished(AtmosphereSystem& pending) noexcept
+	{
+		GGLAB_ASSERT(!m_InFrame && pending.CanPublish() && m_Device == pending.m_Device);
+		std::swap(m_Textures, pending.m_Textures);
+		std::swap(m_Initialized, pending.m_Initialized);
+		std::swap(m_ShaderGenerations, pending.m_ShaderGenerations);
+		std::swap(m_Committed, pending.m_Committed);
+		std::swap(m_Diagnostics, pending.m_Diagnostics);
+		// The old set keeps its last-use fence even when its replacement completed earlier.
+		std::swap(m_LastFence, pending.m_LastFence);
+	}
 }

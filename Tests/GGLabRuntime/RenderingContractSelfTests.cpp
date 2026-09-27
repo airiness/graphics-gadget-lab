@@ -42,6 +42,9 @@
 #include "GGLabRuntime/Graphics/WorldSun.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
@@ -627,6 +630,52 @@ namespace gglab
 				!environment.ShouldIgnoreCache(8) &&
 				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
 				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+
+			control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			const AtmosphereSettings earth{};
+			auto sun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			environment.ResolveWorldLighting(earth, sun, 42);
+			const auto firstPhysical = environment.GetRequestedPhysicalSky();
+			const uint64_t firstGeneration = environment.GetBakeRequestGeneration();
+			context.Check(firstPhysical && !environment.GetActivePhysicalSky() &&
+				std::abs(firstPhysical->m_ReferenceObserverWorld.m_Y - 1.0f) < 0.01f,
+				"Physical sky captures a fixed one-meter observer without fabricating texture provenance");
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(environment.GetBakeRequestGeneration() == firstGeneration,
+				"Unchanged physical parameters do not rebake; camera pose and exposure are absent from the request");
+			context.Check(environment.PublishWorldLighting(firstPhysical, firstGeneration),
+				"A complete current world-lighting snapshot can be published");
+			sun = ResolveWorldSun(WorldSunSettings{ .m_PerpendicularIlluminanceLux = 60000.0f }, Vector3(1.0f, -1.0f, 0.0f));
+			environment.ResolveWorldLighting(earth, sun, 42);
+			const auto pending = environment.GetRequestedPhysicalSky();
+			const auto& active = environment.GetActivePhysicalSky();
+			context.Check(pending && active && pending->m_Sun.m_PerpendicularIlluminanceLux == 60000.0f &&
+				active->m_Sun.m_PerpendicularIlluminanceLux == 120000.0f &&
+				environment.GetRenderSettings().m_Intensity == 1.0f &&
+				environment.GetRenderSettings().m_RotationRadians == 0.0f,
+				"Sun edits remain pending while physical IBL retains the active sun, neutral intensity and world alignment");
+			context.Check(!environment.PublishWorldLighting(firstPhysical, firstGeneration) &&
+				environment.GetActivePhysicalSky()->m_Sun.m_PerpendicularIlluminanceLux == 120000.0f,
+				"Superseded world-lighting publications cannot change the active generation");
+			context.Check(environment.PublishWorldLighting(pending, environment.GetBakeRequestGeneration()),
+				"The replacement snapshot switches after the publication gate");
+			const uint64_t beforeSessionChange = environment.GetBakeRequestGeneration();
+			environment.ResolveWorldLighting(earth, sun, 42, 1);
+			context.Check(environment.GetBakeRequestGeneration() == beforeSessionChange + 1 &&
+				environment.GetRequestedPhysicalSky()->m_SessionIdentity == 1 &&
+				environment.GetActivePhysicalSky()->m_SessionIdentity == 0,
+				"A replacement Lab session cannot reuse the old sun entity identity while its lighting remains pending");
+			control.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(!environment.GetRequestedPhysicalSky() && environment.GetActivePhysicalSky() &&
+				environment.GetRenderSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A source-mode switch retains the complete physical generation while texture IBL is pending");
+			context.Check(environment.PublishWorldLighting(std::nullopt, environment.GetBakeRequestGeneration()),
+				"Texture IBL completion clears the linked physical source");
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(!environment.GetActivePhysicalSky() &&
+				environment.GetRenderSettings().m_Intensity == view.GetEnvironmentLightingSettings().m_Intensity,
+				"Texture mode restores its authored artistic intensity only after publication");
 		}
 
 		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
@@ -6627,7 +6676,84 @@ namespace gglab
 			context.Check(disabledSnapshot.m_Passes.empty() &&
 				!registry.HasPublishedPostProcessPreview(PostProcessPreviewChannel::Atmosphere),
 				"Disabled atmosphere creates no LUT exports and invalidates the unavailable preview");
-			device.m_CompletedFenceValue = fenceValue;
+
+			class BakeEnvironmentAccess final : public RenderEnvironmentAccess
+			{
+			public:
+				AtmosphereGPU m_Parameters{};
+				EnvironmentLightingSettings m_Settings{};
+				IBLBakeStatus m_Status{};
+				EnvironmentTextureSource m_TextureSource{};
+				const EnvironmentLightingSettings& GetEnvironmentLightingSettings() const noexcept override { return m_Settings; }
+				bool ShouldInitializeBakeResources() const noexcept override { return false; }
+				uint64_t GetBakingGeneration() const noexcept override { return 1; }
+				const IBLBakeConfig& GetBakingConfig() const noexcept override { return m_Settings.m_BakeConfig; }
+				const IBLBakeStatus& GetBakingStatus() const noexcept override { return m_Status; }
+				IBLBakeStage GetStageForRecording() const noexcept override { return IBLBakeStage::Environment; }
+				void NotifyStageExecuted(IBLBakeStage, uint64_t) noexcept override {}
+				void NotifyBakeResourcesInitialized(uint64_t) noexcept override {}
+				const EnvironmentTextureSource& GetBakingSource() const noexcept override { return m_TextureSource; }
+				const EnvironmentTextureSource& GetCommittedEnvironmentSource() const noexcept override { return m_TextureSource; }
+				ArtifactCacheCoreStatistics GetArtifactCacheStatistics() const noexcept override { return {}; }
+				LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics() const noexcept override { return {}; }
+				const AtmosphereGPU* GetBakingAtmosphereParameters() const noexcept override { return &m_Parameters; }
+			} bakeEnvironment;
+			bakeEnvironment.m_Parameters = a;
+			registry.EnsureIBLBakeResources(bakeEnvironment.m_Settings.m_BakeConfig);
+			AtmosphereSystem bakeAtmosphere(&device, &pool);
+			auto bakeServices = services;
+			bakeServices.m_Environment = &bakeEnvironment;
+			bakeServices.m_BakeAtmosphere = &bakeAtmosphere;
+			bakeServices.m_Resources = &registry;
+			RenderGraph bakeGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			struct BakeImportData {};
+			bakeGraph.AddPass<BakeImportData>("IBL.Import.Contract", [&registry](RenderGraph::RGBuilder& builder, BakeImportData&)
+				{
+					auto& resources = builder.GetBlackboard().Create<RGIBLResources>(IBLResourcesName);
+					resources.m_BakeEnvironmentCubemap = builder.ImportTexture("IBL.Bake.Environment",
+						registry.GetIBLBakeTextureHandle(RenderTextureIndex::IBL_EnvironmentCubemap),
+						*registry.GetIBLBakeTextureDesc(RenderTextureIndex::IBL_EnvironmentCubemap),
+						UndefinedRHITextureState(), RGContentValidity::Undefined);
+				});
+			pass.AddBakePass(bakeGraph, bakeServices);
+			RenderPassIBLEnvironment environmentPass;
+			environmentPass.AddPass(bakeGraph, disabledContext, bakeServices);
+			pass.AddFinishPass(bakeGraph);
+			const bool bakeCompiled = bakeGraph.Compile();
+			RGSnapshot bakeSnapshot;
+			BuildRenderGraphSnapshot(bakeGraph, bakeSnapshot);
+			context.Check(bakeCompiled && std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+				[](const RGSnapshotDependencyEdge& edge)
+				{
+					return edge.m_FromPassName == BakeAtmosphereLutNames[2] && edge.m_ToPassName == "IBL.Environment";
+				}), "Production procedural IBL depends on the pending sky LUT with no texture asset service");
+			context.Check(std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+				[](const RGSnapshotDependencyEdge& edge)
+				{
+					return edge.m_FromPassName == "IBL.Environment" && edge.m_ToPassName == "IBL.Atmosphere.Export" &&
+						edge.m_Reason == RGDependencyReason::ExportReaderToExport;
+				}), "Pending atmosphere export follows its IBL consumer and restores the persistent state contract");
+			for (uint32_t i = 0; i < 3; ++i) bakeAtmosphere.NotifyExecuted(i);
+			bakeAtmosphere.EndFrame(bakeCompiled, { RHIFenceHandle{ 1, 1 }, 100 });
+			device.m_CompletedFenceValue = 99;
+			context.Check(!bakeAtmosphere.CanPublish(), "A submitted physical sky remains unpublished until its GPU fence completes");
+			device.m_CompletedFenceValue = 100;
+			context.Check(bakeAtmosphere.CanPublish(), "GPU completion unlocks a complete pending atmosphere generation");
+			AtmosphereSystem activeAtmosphere(&device, &pool);
+			const bool activeBegun = activeAtmosphere.Begin(a, { 1,1,1 });
+			if (activeBegun) for (uint32_t i = 0; i < 3; ++i) activeAtmosphere.NotifyExecuted(i);
+			activeAtmosphere.EndFrame(activeBegun, { RHIFenceHandle{ 1, 1 }, 200 });
+			const auto oldTexture = activeAtmosphere.GetTexture(0);
+			const auto newTexture = bakeAtmosphere.GetTexture(0);
+			activeAtmosphere.SwapPublished(bakeAtmosphere);
+			bakeAtmosphere.Disable();
+			pool.Tick();
+			context.Check(activeAtmosphere.GetTexture(0) == newTexture && oldTexture != newTexture &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount == 3,
+				"Atomic LUT replacement retains the old set behind its last-use fence, independent of the bake fence");
+			device.m_CompletedFenceValue = 200;
+			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
+			device.m_CompletedFenceValue = std::max(fenceValue, uint64_t{ 200 });
 			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });
 			previewAtmosphere.Shutdown();
 			previewPool.Tick();

@@ -291,6 +291,8 @@ namespace gglab
 			{
 				ImGui::TextDisabled("Background: Physical Sky preview | IBL: HDR texture");
 			}
+			const bool physicalSky = settings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky;
+			if (physicalSky) ImGui::TextDisabled("Physical Sky: calibrated intensity, world-aligned IBL, FP32 radiance.");
 
 			auto* control = context.m_EnvironmentLightingControl;
 			ImGui::BeginDisabled(!control);
@@ -301,19 +303,21 @@ namespace gglab
 				control->SetSkyboxEnabled(skyboxEnabled);
 			}
 
-			float intensity = settings.m_Intensity;
+			float intensity = physicalSky ? 1.0f : settings.m_Intensity;
+			ImGui::BeginDisabled(physicalSky);
 			if (ImGui::DragFloat(
 				"Environment Intensity", &intensity, 0.01f, 0.0f, 100.0f, "%.3f") && control)
 			{
 				control->SetIntensity(intensity);
 			}
 
-			float rotationDegrees = math::ToDegrees(settings.m_RotationRadians);
+			float rotationDegrees = physicalSky ? 0.0f : math::ToDegrees(settings.m_RotationRadians);
 			if (ImGui::SliderFloat(
 				"Environment Yaw", &rotationDegrees, -180.0f, 180.0f, "%.1f deg") && control)
 			{
 				control->SetRotationRadians(math::ToRadians(rotationDegrees));
 			}
+			ImGui::EndDisabled();
 
 			if (ImGui::TreeNode("Advanced: Bake Quality"))
 			{
@@ -337,11 +341,13 @@ namespace gglab
 
 				float maxSampleLuminance =
 					settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
+				ImGui::BeginDisabled(physicalSky);
 				if (ImGui::DragFloat(
 					"Prefilter Firefly Clamp", &maxSampleLuminance, 10.0f, 1.0f, 65000.0f, "%.0f") && control)
 				{
 					control->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
 				}
+				ImGui::EndDisabled();
 				if (ImGui::IsItemHovered())
 				{
 					ImGui::SetTooltip(

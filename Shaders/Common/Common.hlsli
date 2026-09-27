@@ -29,6 +29,13 @@ float3 EncodeSceneColor(float3 sceneLinearColor, float preExposure)
 		EncodeSceneColorChannel(sceneLinearColor.b, preExposure));
 }
 
+// Persistent FP32 physical lighting has no camera/storage scale or FP16 brightness ceiling.
+float3 SanitizeSceneRadiance(float3 color)
+{
+	return float3(SanitizeSceneRadianceChannel(color.r),
+		SanitizeSceneRadianceChannel(color.g), SanitizeSceneRadianceChannel(color.b));
+}
+
 float3 ACESFitted(float3 x)
 {
 	// Narkowicz 2015

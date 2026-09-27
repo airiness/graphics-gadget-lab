@@ -305,6 +305,15 @@ namespace gglab
 			});
 
 		result.m_RenderScene.m_Atmosphere = info.m_World.m_Atmosphere;
+		if (const auto& active = info.m_EnvironmentLightingSystem.GetActivePhysicalSky())
+		{
+			result.m_RenderScene.m_Atmosphere = active->m_Settings;
+		}
+		else if (info.m_EnvironmentLightingSystem.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky)
+		{
+			// Keep the texture path until the first complete physical generation is available.
+			result.m_RenderScene.m_Atmosphere.reset();
+		}
 		result.m_RenderScene.m_WorldSun = info.m_MainDirectionalLight.m_WorldSun;
 		uint32_t directionalShadowLightSlot = LightTable::InvalidSlot;
 
@@ -511,7 +520,7 @@ namespace gglab
 		}
 
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
-		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetSettings();
+		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetRenderSettings();
 		sceneCB.IBLResource.EnvironmentIntensity = environmentSettings.m_Intensity;
 		sceneCB.IBLResource.EnvironmentRotationRadians = environmentSettings.m_RotationRadians;
 

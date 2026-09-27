@@ -14,6 +14,18 @@ struct AtmosphereParameters
 };
 ConstantBuffer<AtmosphereParameters> g_Atmosphere : register(b0);
 static const float AtmospherePi = 3.141592653589793;
+float2 AtmosphereSkyViewUV(float3 direction, float3 up, float3 sun)
+{
+	float3 horizontal = sun - up * dot(up, sun);
+	float3 fallback = abs(up.y) < 0.99 ? float3(0,1,0) : float3(1,0,0);
+	float3 xAxis = dot(horizontal,horizontal) > 1e-12 ? normalize(horizontal) : normalize(cross(fallback,up));
+	float3 zAxis = cross(xAxis,up);
+	float zenith = acos(clamp(dot(direction,up),-1.0,1.0));
+	float azimuth = atan2(dot(direction,zAxis),dot(direction,xAxis));
+	if (azimuth < 0.0) azimuth += 2.0 * AtmospherePi;
+	float2 unitUV = float2(azimuth / (2.0 * AtmospherePi), zenith / AtmospherePi);
+	return (unitUV * float2(191,107) + 0.5) / float2(192,108);
+}
 float AtmosphereTopDistance(float3 p, float3 d)
 {
 	float b = dot(p, d);

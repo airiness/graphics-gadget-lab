@@ -100,8 +100,9 @@ not establish GPU presentation or temporal visual quality.
 
 An optional world-owned `AtmosphereSettings` generates three persistent RGBA32F
 LUTs on the Direct queue: Transmittance (256 x 64), Multiple Scattering (32 x 32),
-and Sky View (192 x 108). This diagnostic stage does not yet replace the visible
-sky, attenuate the direct sun, or bake atmosphere IBL.
+and Sky View (192 x 108). These support LUT diagnostics, a display preview, and
+the published Physical Sky source. An enabled atmosphere attenuates direct sun;
+opaque aerial perspective is not yet implemented.
 
 Authoring uses meters and inverse meters. The CPU boundary converts lengths to
 kilometers and coefficients to inverse kilometers. Camera coordinates are scaled
@@ -127,8 +128,8 @@ and exposure do not invalidate transport. Shader generation changes invalidate
 the corresponding producers and their consumers. RenderGraph declares all LUT
 reads, writes and exports. Upload buffers and retired textures remain alive until
 the submission fence completes. Cancelled frames invalidate the cache without
-publishing new counters. Counters denote successfully submitted updates, not the
-atomic world-lighting/IBL publication planned for the later Physical Sky stage.
+publishing new counters. LUT counters denote successfully submitted updates;
+the separate world-lighting generation identifies atomically published sun/sky/IBL.
 
 For manual validation on both DX12 and Vulkan:
 
@@ -149,14 +150,68 @@ Headless lifetime, invalidation, graph dependency and DXIL/SPIR-V ABI tests do n
 establish GPU presentation, finite GPU output or visual quality. Retain both-backend
 manual results separately.
 
+## Published Physical Sky lighting
+
+In Scene / World Lighting / Atmosphere, select **Physical Sky** under Sky Source
+after enabling Atmosphere and Physical Sun. **Physical Sky Preview** retains the
+immediate display-only preview with texture IBL. Production Physical Sky captures
+an immutable atmosphere/sun request and builds a separate pending LUT set, a
+disk-free environment cubemap, its mip chain, diffuse irradiance, prefiltered
+specular, and BRDF LUT through the existing IBL scheduler.
+
+Only a complete GPU-finished replacement is published, before scene and shadow
+extraction at a frame boundary. Direct sun, shadow direction, atmosphere LUTs,
+visible sky and diffuse/specular IBL then share that source. Edits and source-mode
+switches retain the previous complete generation; superseded or cancelled work
+cannot publish. Before the first physical publication the texture background/IBL
+path remains active. Old LUTs retire behind their last-use fence; the IBL registry
+retains its previous complete set as staging storage for the next bake.
+
+The reference IBL observer is fixed at one meter above the planet's local +Y
+surface. Its declared v1 validity range is 0..100 m altitude within 1 km horizontally
+of that reference. This is a local sky-light approximation, not a global probe
+system: movement outside that range does not automatically rebake IBL. The visible
+Sky View still follows the display observer. Camera orientation and manual exposure
+never change the procedural IBL request. Transport textures remain scene-referred
+RGBA32F; Physical Sky bypasses the texture-source FP16 sanitization ceiling and
+specular sample-luminance clamp. Its intensity is 1 and yaw is 0. Texture mode
+retains its existing artistic controls and asset-backed cache identities.
+
+Procedural provenance uses runtime source/generation snapshots and shader registry
+compatibility. It does not invent asset fingerprints or persisted cache keys, and
+does not read or write the texture IBL DDC. Sunlight is represented by the analytic
+direct source and calibrated visible disk; the disk is excluded from IBL. Smooth
+materials retain the existing 32-sample finite-disk direct-specular approximation
+below perceptual roughness 0.2. Shadow visibility and sun-path transmittance remain
+evaluated at the center direction, so solar-edge penumbra and grazing/horizon
+accuracy remain quality limitations.
+
+The Atmosphere panel reports active/requested generations, the active sun, last
+publication latency, reference observer range, persistent texture retirement and GPU timings.
+Environment & IBL reports bake progress/cost and texture formats. Validate both
+RHIs with Lighting Contract at EV100 15: inspect smooth/rough spheres, edit sun and
+density settings rapidly, switch source modes, sweep exposure and rotate/move the
+camera. Pending edits must preserve the old complete lighting until publication;
+exposure/rotation must not cause global IBL bakes. Shader compilation and headless
+contracts do not establish presentation, visual quality or measured GPU budgets.
+
+The WL6 smoke run on an RTX 5080 used Debug, Medium IBL quality and EV100 15.
+DX12 and Vulkan both presented the physical sky and smooth/rough sphere response
+without validation errors; switching reference camera poses did not request another
+global bake. First physical publication took 88.0 ms on DX12 and 76.5 ms on Vulkan
+(wall time, including staged scheduling). DX12 also completed a 120000-to-60000 lux
+replacement in 107.9 ms and restored cached texture IBL in 55.5 ms. These samples
+are smoke evidence, not per-pass GPU budgets or a full horizon/altitude/TAA matrix.
+
 ## Physical directional sun
 
 A directional light with `WorldSunSettings` explicitly designates the world sun.
 Its perpendicular top-of-atmosphere illuminance is in lux; linear Rec.709
 chromaticity is normalized so `Y = dot(RGB, (0.2126, 0.7152, 0.0722)) = 1`.
 The resolved uniform solar disk uses `L = C * E / (pi * sin(alpha)^2)`.
-Numerical disk integration is checked to relative tolerance `1e-5`. Atmosphere LUTs currently serve diagnostics only; direct sun-path transmittance
-remains 1 and local illuminance equals TOA illuminance. Shadow visibility is an independent multiplier.
+Numerical disk integration is checked to relative tolerance `1e-5`. Without an
+atmosphere, direct sun-path transmittance is 1; with an atmosphere its LUT attenuates
+local illuminance. Shadow visibility is an independent multiplier.
 
 Only the selected sun overrides legacy light color/intensity at GPU upload.
 Unmarked directional lights and all point/spot lights retain renderer-relative
@@ -170,9 +225,8 @@ The direct BRDF uses the disk center and perpendicular RGB illuminance, includin
 its existing cosine and Lambert `1/pi` factors. A pure Lambertian 18% reflector
 under 120000 lux at normal incidence produces about 6875.49 cd/m2 before exposure.
 The production PBR material additionally has Fresnel/specular terms, so its final
-pixel is not a pure Lambert reference. The angular radius calibrates disk radiance;
-it does not broaden direct specular highlights yet. Finite-disk smooth-specular
-quality evaluation belongs to the physical-sky stage. No solar disk is rendered yet.
+pixel is not a pure Lambert reference. The angular radius also drives the finite-disk
+specular approximation and the visible disk in the physical sky shader.
 
 Inputs are bounded to 0..1000000 lux, 0.01..5 degrees angular radius, and 0..1
 linear chromaticity channels before luminance normalization. Non-finite lux becomes

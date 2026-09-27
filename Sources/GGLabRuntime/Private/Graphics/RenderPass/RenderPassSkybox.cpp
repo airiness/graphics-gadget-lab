@@ -83,7 +83,7 @@ namespace gglab
 
 		EnsureInitialized(services);
 		const bool physicalPreview =
-			environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
+			environmentSettings.m_BackgroundMode != EnvironmentBackgroundMode::TextureEnvironment &&
 			context.m_RenderScene.m_Atmosphere && context.m_RenderScene.m_WorldSun &&
 			services.m_Atmosphere && services.m_Atmosphere->GetConstants().IsValid() &&
 			rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
@@ -128,7 +128,8 @@ namespace gglab
 		const auto* contextPtr = &context;
 
 		rg.AddPass<PassData>(
-			physicalPreview ? "Background.PhysicalSkyPreview" : GetRenderGraphPassName(),
+			physicalPreview ? (environmentSettings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky
+				? "Background.PhysicalSky" : "Background.PhysicalSkyPreview") : GetRenderGraphPassName(),
 			[displayViewId, physicalPreview, useFallback, fallbackTextureHandle, fallbackTextureDesc,
 				environmentTextureIndex,
 				environmentSamplerIndex,

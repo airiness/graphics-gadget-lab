@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstddef>
 #include <span>
 #include <vector>
 
@@ -28,10 +29,12 @@ namespace gglab
 			uint32_t EnvironmentMipLevels = 0;
 			uint32_t SampleCount = 0;
 			float MaxSampleLuminance = 0.0f;
-			uint32_t Padding[3]{};
+			uint32_t PhysicalSky = 0;
+			uint32_t Padding[2]{};
 		};
 		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
 		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 48);
+		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, PhysicalSky) == 36);
 
 		struct PassData
 		{
@@ -160,6 +163,7 @@ namespace gglab
 							.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
 							.SampleCount = data.m_SampleCount,
 							.MaxSampleLuminance = data.m_MaxSampleLuminance,
+							.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
 						};
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

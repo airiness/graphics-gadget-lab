@@ -9,6 +9,7 @@ namespace gglab
 	{
 		TextureEnvironment,
 		PhysicalAtmospherePreview,
+		PhysicalSky,
 	};
 
 	struct EnvironmentLightingSettings

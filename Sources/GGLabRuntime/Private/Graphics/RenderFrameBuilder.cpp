@@ -6,6 +6,10 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 #include <array>
@@ -151,6 +155,37 @@ namespace gglab
 		result.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
+		auto& environment = *info.m_Renderer.GetEnvironmentLightingSystemService();
+		auto& mainLight = result.m_WorldData.m_MainDirectionalLight;
+		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+		// Observe this frame's authored request before completing any older bake.
+		info.m_Renderer.GetIBLBakeScheduler()->Tick(info.m_Renderer.GetLastSubmittedFencePoint());
+		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+		if (const auto& active = environment.GetActivePhysicalSky())
+		{
+			// Keep the published sun bound to its original entity while a new designation bakes.
+			// Deleted entities or retired sessions use the current light without retaining World pointers.
+			auto& registry = info.m_World.GetRegistry();
+			const auto entity = static_cast<entt::entity>(active->m_SunEntityKey);
+			if (active->m_SessionIdentity == info.m_TemporalFramePlan.m_SessionIdentity &&
+				registry.valid(entity) &&
+				registry.all_of<components::TransformComponent, components::LightComponent>(entity))
+			{
+				auto& light = registry.get<components::LightComponent>(entity);
+				if (light.m_Type == LightType::Directional)
+				{
+					mainLight.m_EntityKey = active->m_SunEntityKey;
+					mainLight.m_Transform = &registry.get<components::TransformComponent>(entity);
+					mainLight.m_Light = &light;
+					mainLight.m_ShadowSettings = light.m_DirectionalShadowSettings
+						? &*light.m_DirectionalShadowSettings : nullptr;
+				}
+			}
+			mainLight.m_WorldSun = active->m_Sun;
+			mainLight.m_Direction = active->m_Sun.m_Direction;
+		}
 
 		result.m_RenderViews.resize(utils::ToIndex(RenderViewID::Count));
 		for (size_t index = 0; index < result.m_RenderViews.size(); ++index)

@@ -179,6 +179,7 @@ namespace gglab
 		}
 
 		m_AtmospherePass.AddPass(rg, context, services);
+		m_AtmospherePass.AddBakePass(rg, services);
 
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",

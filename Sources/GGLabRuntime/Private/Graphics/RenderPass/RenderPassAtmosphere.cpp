@@ -27,6 +27,28 @@ namespace gglab
 			atmosphere->Disable();
 			return;
 		}
+		const bool skyConstants = services.m_Environment &&
+			services.m_Environment->GetEnvironmentLightingSettings().m_EnableSkybox &&
+			services.m_Environment->GetEnvironmentLightingSettings().m_BackgroundMode !=
+				EnvironmentBackgroundMode::TextureEnvironment;
+		AddLuts(rg, services, *atmosphere, ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
+			context.GetDisplayRenderView().m_CameraPosition), skyConstants, false);
+	}
+
+	void RenderPassAtmosphere::AddBakePass(RenderGraph& rg, const RenderServices& services) noexcept
+	{
+		if (!services.m_Environment || !services.m_BakeAtmosphere ||
+			services.m_Environment->GetStageForRecording() != IBLBakeStage::Environment) return;
+		if (const auto* parameters = services.m_Environment->GetBakingAtmosphereParameters())
+		{
+			AddLuts(rg, services, *services.m_BakeAtmosphere, *parameters, true, true);
+		}
+	}
+
+	void RenderPassAtmosphere::AddLuts(RenderGraph& rg, const RenderServices& services,
+		RenderAtmosphereAccess& access, const AtmosphereGPU& parameters, bool skyConstants, bool bake) noexcept
+	{
+		auto* atmosphere = &access;
 		if (!m_Recipe.m_CSId.IsValid())
 		{
 			m_Recipe.m_CSId = services.m_ShaderPrograms->LoadProgram(shader_programs::AtmosphereLutCompute);
@@ -35,22 +57,20 @@ namespace gglab
 		const auto pipeline = services.m_PipelineResolver->Resolve(m_Slot, m_Recipe, GetInfo());
 		if (!pipeline.IsValid()) { atmosphere->Disable(); return; }
 		const uint64_t generation = services.m_ShaderPrograms->GetGeneration(m_Recipe.m_CSId);
-		const bool previewSky = services.m_Environment &&
-			services.m_Environment->GetEnvironmentLightingSettings().m_EnableSkybox &&
-			services.m_Environment->GetEnvironmentLightingSettings().m_BackgroundMode ==
-				EnvironmentBackgroundMode::PhysicalAtmospherePreview;
-		if (!atmosphere->Begin(ResolveAtmosphere(*scene.m_Atmosphere, *scene.m_WorldSun,
-			context.GetDisplayRenderView().m_CameraPosition), { generation, generation, generation }, previewSky)) return;
+		if (!atmosphere->Begin(parameters, { generation, generation, generation }, skyConstants)) return;
 		const auto diagnostics = atmosphere->GetDiagnostics();
-		auto& resources = rg.GetBlackboard().Create<RGAtmosphereResources>(AtmosphereResourcesName);
+		const auto* resourceName = bake ? BakeAtmosphereResourcesName : AtmosphereResourcesName;
+		const auto names = bake ? BakeAtmosphereLutNames : AtmosphereLutNames;
+		auto& resources = rg.GetBlackboard().Create<RGAtmosphereResources>(resourceName);
 		resources.m_Diagnostics = diagnostics;
-		rg.AddPass<SetupData>("Atmosphere.Import", [atmosphere](RenderGraph::RGBuilder& builder, SetupData&)
+		rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Import" : "Atmosphere.Import",
+			[atmosphere, resourceName, names](RenderGraph::RGBuilder& builder, SetupData&)
 			{
-				auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(AtmosphereResourcesName);
+				auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(resourceName);
 				for (uint32_t i = 0; i < 3; ++i)
 				{
 					const bool initialized = atmosphere->IsInitialized(i);
-					resources.m_Luts[i] = builder.ImportTexture(AtmosphereLutNames[i], atmosphere->GetTexture(i),
+					resources.m_Luts[i] = builder.ImportTexture(names[i], atmosphere->GetTexture(i),
 						atmosphere->GetTextureDesc(i), initialized ? CommonRHIResourceState() : UndefinedRHITextureState(),
 						initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
 				}
@@ -59,10 +79,10 @@ namespace gglab
 		for (uint32_t stage = 0; stage < 3; ++stage)
 		{
 			if (!(diagnostics.m_DirtyMask & (1u << stage))) continue;
-			rg.AddPass<PassData>(AtmosphereLutNames[stage], RGPassEncoderType::Compute,
-				[stage](RenderGraph::RGBuilder& builder, PassData& data)
+			rg.AddPass<PassData>(names[stage], RGPassEncoderType::Compute,
+				[stage, resourceName](RenderGraph::RGBuilder& builder, PassData& data)
 				{
-					auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(AtmosphereResourcesName);
+					auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(resourceName);
 					builder.WriteInPlace(resources.m_Luts[stage], RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Output = builder.CreateView<RHITextureViewType::UnorderedAccess>(resources.m_Luts[stage]);
 					if (stage > 0)
@@ -99,16 +119,21 @@ namespace gglab
 
 	void RenderPassAtmosphere::AddFinishPass(RenderGraph& rg) noexcept
 	{
-		if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName)) return;
 		// Export closes graph ownership. All scene and diagnostic reads must be declared first.
-		rg.AddPass<SetupData>("Atmosphere.Export", [](RenderGraph::RGBuilder& builder, SetupData&)
-			{
-				builder.SideEffect();
-				const auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(AtmosphereResourcesName);
-				for (const auto texture : resources.m_Luts)
+		for (const bool bake : { false, true })
+		{
+			const auto* resourceName = bake ? BakeAtmosphereResourcesName : AtmosphereResourcesName;
+			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(resourceName)) continue;
+			rg.AddPass<SetupData>(bake ? "IBL.Atmosphere.Export" : "Atmosphere.Export",
+				[resourceName](RenderGraph::RGBuilder& builder, SetupData&)
 				{
-					builder.Export(texture, RGTextureAccess::None);
-				}
-			});
+					builder.SideEffect();
+					const auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(resourceName);
+					for (const auto texture : resources.m_Luts)
+					{
+						builder.Export(texture, RGTextureAccess::None);
+					}
+				});
+		}
 	}
 }

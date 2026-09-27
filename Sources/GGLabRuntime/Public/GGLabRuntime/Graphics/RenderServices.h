@@ -40,6 +40,7 @@ namespace gglab
 	struct ComputePipelineRecipe;
 	struct ComputePipelineSlot;
 	struct EnvironmentTextureSource;
+	struct AtmosphereGPU;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
 
@@ -204,6 +205,8 @@ namespace gglab
 		[[nodiscard]] virtual IBLBakeStage GetStageForRecording() const noexcept = 0;
 		virtual void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept = 0;
 		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;
+		[[nodiscard]] virtual const AtmosphereGPU* GetBakingAtmosphereParameters() const noexcept { return nullptr; }
+		[[nodiscard]] virtual Vector3 GetBakingSunDirection() const noexcept { return Vector3::UnitY; }
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetBakingSource()
 			const noexcept = 0;
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetCommittedEnvironmentSource()
@@ -267,6 +270,7 @@ namespace gglab
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
 		RenderAtmosphereAccess* m_Atmosphere = nullptr;
+		RenderAtmosphereAccess* m_BakeAtmosphere = nullptr;
 		AssetUploadScheduling* m_AssetUpload = nullptr;
 		// Deliberate per-frame application injection; null when no developer
 		// overlay pass participates in the frame.

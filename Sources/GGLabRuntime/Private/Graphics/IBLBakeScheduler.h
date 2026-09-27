@@ -10,6 +10,7 @@
 #include <array>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace gglab
@@ -106,6 +107,7 @@ namespace gglab
 	class TaskSystem;
 	class ShaderManager;
 	class TransferManager;
+	class AtmosphereSystem;
 
 	class IBLBakeScheduler
 	{
@@ -115,6 +117,7 @@ namespace gglab
 			uint64_t m_Attempt = 0;
 			uint64_t m_Generation = 0;
 			EnvironmentTextureSource m_Source{};
+			std::optional<PhysicalSkySource> m_PhysicalSky;
 			IBLBakeConfig m_Config{};
 			ShaderProgramRegistryArtifactRef m_ShaderRegistry{};
 			IBLShaderArtifactIdentities m_ShaderArtifacts{};
@@ -122,7 +125,7 @@ namespace gglab
 
 			[[nodiscard]] bool IsValid() const noexcept
 			{
-				return m_Attempt != 0 && m_Generation != 0 && m_Source.IsValid() &&
+				return m_Attempt != 0 && m_Generation != 0 && (m_Source.IsValid() || m_PhysicalSky) &&
 					m_ShaderRegistry.IsValid() && std::ranges::all_of(m_ShaderArtifacts,
 						[](const IBLStageShaderArtifactIdentity& identity) noexcept
 						{ return identity.IsValid(); });
@@ -139,6 +142,8 @@ namespace gglab
 			TransferManager* m_TransferManager = nullptr;
 			GpuProfiler* m_GpuProfiler = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
+			AtmosphereSystem* m_Atmosphere = nullptr;
+			AtmosphereSystem* m_BakeAtmosphere = nullptr;
 			std::filesystem::path m_DerivedDataCacheDirectory;
 			IBLStageArtifactCacheConfig m_ArtifactCache{};
 		};
@@ -153,7 +158,7 @@ namespace gglab
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept;
 		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept;
 		void OnFrameSubmitted(const RHIFencePoint& fencePoint) noexcept;
-		void OnFrameAborted() noexcept;
+		void OnFrameAborted(const RHIFencePoint& submittedFence = {}) noexcept;
 
 		[[nodiscard]] IBLBakeStage GetStageForRecording() const noexcept;
 		[[nodiscard]] bool ShouldInitializeBakeResources() const noexcept
@@ -173,6 +178,10 @@ namespace gglab
 			return m_BakingRequest.m_Source;
 		}
 		[[nodiscard]] const IBLBakeStatus& GetStatus() const noexcept { return m_Status; }
+		[[nodiscard]] const PhysicalSkySource* GetBakingPhysicalSky() const noexcept
+		{
+			return m_BakingRequest.m_PhysicalSky ? &*m_BakingRequest.m_PhysicalSky : nullptr;
+		}
 		[[nodiscard]] IBLStageArtifactCacheStatistics GetArtifactCacheStatistics() const noexcept
 		{
 			return m_DerivedDataSystem.GetArtifactCacheStatistics();
@@ -221,6 +230,8 @@ namespace gglab
 
 		std::unique_ptr<AssetOwnerScope> m_BakingSourceOwner;
 		BakeRequestSnapshot m_BakingRequest{};
+		AtmosphereSystem* m_Atmosphere = nullptr;
+		AtmosphereSystem* m_BakeAtmosphere = nullptr;
 		uint64_t m_NextBakeAttempt = 1;
 		IBLBakeStatus m_Status{};
 		RHIFencePoint m_InFlightFence{};
@@ -229,6 +240,7 @@ namespace gglab
 		detail::IBLBakeResourceInitializationState m_BakeResourceInitialization;
 		bool m_CacheUploadInFlight = false;
 		bool m_CacheReadbackInFlight = false;
+		bool m_AbortedSubmittedWork = false;
 
 		struct CacheLoadWork
 		{

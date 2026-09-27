@@ -132,15 +132,15 @@ namespace gglab
 			if (context.m_EnvironmentLighting)
 			{
 				const auto environment = context.m_EnvironmentLighting->GetEnvironmentLightingSettings();
-				bool previewSky = environment.m_BackgroundMode ==
-					EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+				const bool previewSky = environment.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+				const bool physicalSky = environment.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky;
 				auto* environmentControl = context.m_EnvironmentLightingControl;
 				ImGui::BeginDisabled(!environmentControl);
-				if (ImGui::Checkbox("Preview Physical Sky in Viewport", &previewSky) && environmentControl)
+				int sourceMode = static_cast<int>(environment.m_BackgroundMode);
+				if (ImGui::Combo("Sky Source", &sourceMode,
+					"HDR Texture\0Physical Sky Preview\0Physical Sky\0") && environmentControl)
 				{
-					environmentControl->SetBackgroundMode(previewSky
-						? EnvironmentBackgroundMode::PhysicalAtmospherePreview
-						: EnvironmentBackgroundMode::TextureEnvironment);
+					environmentControl->SetBackgroundMode(static_cast<EnvironmentBackgroundMode>(sourceMode));
 				}
 				ImGui::EndDisabled();
 				if (previewSky && !environment.m_EnableSkybox)
@@ -155,10 +155,39 @@ namespace gglab
 				{
 					ImGui::TextDisabled("Display preview only; IBL still uses the HDR texture.");
 				}
+				else if (physicalSky)
+				{
+					ImGui::TextDisabled("Sun, sky and IBL switch together when the replacement is ready.");
+					if (!light->m_Atmosphere || !light->m_WorldSun)
+						ImGui::TextDisabled("Physical Sky requires Atmosphere and Physical Sun.");
+				}
 			}
 
 			const auto* snapshot = context.m_Diagnostics
 				? context.m_Diagnostics->GetSnapshot<AtmosphereDiagnosticsSnapshot>() : nullptr;
+			if (snapshot)
+			{
+				ImGui::Text("Active source: %s", snapshot->m_PhysicalSkyActive ? "Physical Sky" : "HDR Texture");
+				ImGui::Text("World lighting: active %llu | requested %llu",
+					static_cast<unsigned long long>(snapshot->m_ActiveWorldLightingGeneration),
+					static_cast<unsigned long long>(snapshot->m_RequestedWorldLightingGeneration));
+				ImGui::Text("Last publication: %.1f ms | retiring persistent textures: %u",
+					snapshot->m_PublicationMilliseconds, snapshot->m_RetiringTextureCount);
+				if (snapshot->m_PhysicalSkyActive)
+				{
+					ImGui::Text("IBL reference altitude: %.0f m | range %.0f-%.0f m",
+						snapshot->m_ReferenceObserverAltitudeMeters, snapshot->m_ObserverMinAltitudeMeters,
+						snapshot->m_ObserverMaxAltitudeMeters);
+					ImGui::TextDisabled("Local +Y region within 1 km; camera motion does not rebake IBL.");
+					if (snapshot->m_ActiveSun)
+					{
+						const auto& sun = *snapshot->m_ActiveSun;
+						ImGui::Text("Active sun: %.0f lux | direction %.3f, %.3f, %.3f",
+							sun.m_PerpendicularIlluminanceLux, sun.m_Direction.m_X,
+							sun.m_Direction.m_Y, sun.m_Direction.m_Z);
+					}
+				}
+			}
 			if (snapshot && light->m_Atmosphere)
 			{
 				constexpr auto Channel = PostProcessPreviewChannel::Atmosphere;
