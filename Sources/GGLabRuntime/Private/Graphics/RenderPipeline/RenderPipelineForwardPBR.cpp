@@ -470,6 +470,9 @@ namespace gglab
 		// preview pass has declared its final access for this frame.
 		m_IBLPass.AddFinishPass(rg);
 
+		// Atmosphere LUT previews must declare their reads before the persistent cache is exported.
+		m_AtmospherePass.AddFinishPass(rg);
+
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",
 			[displayViewId](RenderGraph::RGBuilder& builder, FinishBackBufferPassData&)

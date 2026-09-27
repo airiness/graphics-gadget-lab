@@ -42,6 +42,7 @@
 #include "GGLabRuntime/Graphics/WorldSun.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
@@ -6453,6 +6454,7 @@ namespace gglab
 				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
 			RenderPassAtmosphere pass;
 			pass.AddPass(graph, frame.MakeRenderFrameContext(), services);
+			pass.AddFinishPass(graph);
 			const bool compiled = graph.Compile();
 			RGSnapshot snapshot;
 			BuildRenderGraphSnapshot(graph, snapshot);
@@ -6492,6 +6494,112 @@ namespace gglab
 			system.Shutdown(); pool.Tick();
 			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==3,
 				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
+
+			// Exercise the actual inspector consumer between LUT production and final export.
+			// A producer-only graph cannot detect reads declared after an early Export.
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool previewPool(&device);
+			SamplerRegistry previewSamplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &previewPool, .m_SamplerRegistry = &previewSamplers });
+			class PresentationAccess final : public RenderPresentationAccess
+			{
+			public:
+				RHIContext* GetRHIContext() const noexcept override { return nullptr; }
+				RHIDevice* GetDevice() const noexcept override { return nullptr; }
+				RHISwapChain* GetSwapChain() const noexcept override { return nullptr; }
+				const std::array<float, 4>& GetBackBufferClearColor() const noexcept override { return m_Clear; }
+				RHIFencePoint GetLastSubmittedFencePoint() const noexcept override { return {}; }
+			private:
+				std::array<float, 4> m_Clear{};
+			} presentation;
+			AtmosphereSystem previewAtmosphere(&device, &pool);
+			auto previewServices = services;
+			previewServices.m_Resources = &registry;
+			previewServices.m_Presentation = &presentation;
+			previewServices.m_Atmosphere = &previewAtmosphere;
+			frame.m_RenderViews[0].m_Width = 1024;
+			frame.m_RenderViews[0].m_Height = 512;
+			const std::array previewTaps{ PostProcessDebugTap::AtmosphereTransmittance,
+				PostProcessDebugTap::AtmosphereMultipleScattering, PostProcessDebugTap::AtmosphereSkyView };
+			uint64_t fenceValue = 20;
+			for (size_t tap = 0; tap < previewTaps.size(); ++tap)
+			{
+				frame.m_RenderViews[0].m_CameraPosition = Vector3::Zero;
+				for (uint32_t phase = 0; phase < 3; ++phase)
+				{
+					if (phase == 2) frame.m_RenderViews[0].m_CameraPosition = Vector3(0.0f, 1000.0f, 0.0f);
+					RenderGraph previewGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+					const auto previewContext = frame.MakeRenderFrameContext();
+					pass.AddPass(previewGraph, previewContext, previewServices);
+					const uint32_t expectedMask = phase == 0 ? 7u : phase == 1 ? 0u : 4u;
+					const bool expectedUpdate = previewAtmosphere.GetDiagnostics().m_DirtyMask == expectedMask;
+					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 });
+					registry.RequestPostProcessPreview();
+					RenderPassPostProcessPreview preview;
+					preview.AddPass(previewGraph, previewContext, previewServices);
+					pass.AddFinishPass(previewGraph);
+					const bool previewCompiled = previewGraph.Compile();
+					RGSnapshot previewSnapshot;
+					BuildRenderGraphSnapshot(previewGraph, previewSnapshot);
+					const auto consumer = std::ranges::find(previewSnapshot.m_Passes,
+						"PostProcess.Preview", &RGSnapshotPassInfo::m_Name);
+					const auto finish = std::ranges::find(previewSnapshot.m_Passes,
+						"Atmosphere.Export", &RGSnapshotPassInfo::m_Name);
+					bool valid = previewCompiled && expectedUpdate && consumer != previewSnapshot.m_Passes.end() &&
+						finish != previewSnapshot.m_Passes.end() && !consumer->m_Culled && !finish->m_Culled &&
+						consumer->m_ExecutionOrder < finish->m_ExecutionOrder;
+					valid &= std::ranges::any_of(previewSnapshot.m_DependencyEdges,
+						[tap](const RGSnapshotDependencyEdge& edge)
+						{
+							return edge.m_FromPassName == "PostProcess.Preview" && edge.m_ToPassName == "Atmosphere.Export" &&
+								edge.m_ResourceName == AtmosphereLutNames[tap] && edge.m_Reason == RGDependencyReason::ExportReaderToExport;
+						});
+					for (const auto name : AtmosphereLutNames)
+					{
+						const auto resource = std::ranges::find(previewSnapshot.m_Resources, name, &RGSnapshotResourceInfo::m_Name);
+						valid &= resource != previewSnapshot.m_Resources.end() && resource->m_HasFinalBarrierState &&
+							resource->m_FinalBarrierState == CommonRHIResourceState();
+					}
+					if (valid)
+					{
+						valid &= std::ranges::any_of(finish->m_PostBarriers,
+							[tap](const RGSnapshotBarrierInfo& barrier)
+							{
+								return barrier.m_ResourceName == AtmosphereLutNames[tap] &&
+									barrier.m_After == CommonRHIResourceState();
+							});
+					}
+					context.Check(valid, std::format("Atmosphere preview {} reads before export with dirty mask {} and returns to Common",
+						AtmosphereLutNames[tap], expectedMask));
+					// Simulate a successful submission to exercise cache reuse in the next graph.
+					for (uint32_t i = 0; i < 3; ++i)
+					{
+						if (expectedMask & (1u << i)) previewAtmosphere.NotifyExecuted(i);
+					}
+					previewAtmosphere.EndFrame(previewCompiled, { RHIFenceHandle{ 1, 1 }, ++fenceValue });
+				}
+				previewAtmosphere.Disable();
+			}
+			frame.m_RenderScene.m_Atmosphere.reset();
+			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			const auto disabledContext = frame.MakeRenderFrameContext();
+			pass.AddPass(disabledGraph, disabledContext, previewServices);
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 });
+			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 });
+			registry.RequestPostProcessPreview();
+			RenderPassPostProcessPreview unavailablePreview;
+			unavailablePreview.AddPass(disabledGraph, disabledContext, previewServices);
+			pass.AddFinishPass(disabledGraph);
+			RGSnapshot disabledSnapshot;
+			BuildRenderGraphSnapshot(disabledGraph, disabledSnapshot);
+			context.Check(disabledSnapshot.m_Passes.empty() && !registry.HasPublishedPostProcessPreview(),
+				"Disabled atmosphere creates no LUT exports and invalidates the unavailable preview");
+			device.m_CompletedFenceValue = fenceValue;
+			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });
+			previewAtmosphere.Shutdown();
+			previewPool.Tick();
+			pool.Tick();
 		}
 
 		void RunWorldSunContractTests(SelfTestContext& context) noexcept

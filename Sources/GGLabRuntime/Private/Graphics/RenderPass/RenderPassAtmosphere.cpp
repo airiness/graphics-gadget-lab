@@ -91,13 +91,18 @@ namespace gglab
 					atmosphere->NotifyExecuted(stage);
 				});
 		}
+	}
+
+	void RenderPassAtmosphere::AddFinishPass(RenderGraph& rg) noexcept
+	{
+		if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName)) return;
+		// Export closes graph ownership. All scene and diagnostic reads must be declared first.
 		rg.AddPass<SetupData>("Atmosphere.Export", [](RenderGraph::RGBuilder& builder, SetupData&)
 			{
 				builder.SideEffect();
 				const auto& resources = builder.GetBlackboard().Get<RGAtmosphereResources>(AtmosphereResourcesName);
 				for (const auto texture : resources.m_Luts)
 				{
-					builder.Read(texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 					builder.Export(texture, RGTextureAccess::None);
 				}
 			});
