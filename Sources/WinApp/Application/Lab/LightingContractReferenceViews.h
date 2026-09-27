@@ -8,7 +8,7 @@
 namespace gglab
 {
 	// Content C0: Blender (X, Y, Z) -> runtime (X, Z, Y), meters, 16:9 reference aspect.
-	inline const std::array<CameraReferenceView, 3> LightingContractReferenceViews = { {
+	inline const std::array<CameraReferenceView, 4> LightingContractReferenceViews = { {
 		{
 			.m_Id = "CAM_ExposureChart",
 			.m_Name = "Exposure Chart",
@@ -34,6 +34,15 @@ namespace gglab
 			.m_Position = { 32.0f, 6.0f, -7.0f },
 			.m_Target = { 32.0f, 1.4f, 0.0f },
 			.m_VerticalFovDegrees = math::ToDegrees(0.6128792380f),
+			.m_FarPlane = 100.0f,
+		},
+		{
+			.m_Id = "CAM_RoughnessSweep",
+			.m_Name = "Roughness Sweep",
+			.m_Purpose = "Roughness 0, 0.05, 0.1, 0.25, 0.5, 1; lower row dielectric, upper row metallic.",
+			.m_Position = { 48.0f, 3.5f, -13.0f },
+			.m_Target = { 48.0f, 2.0f, 0.0f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6509917105f),
 			.m_FarPlane = 100.0f,
 		},
 	} };

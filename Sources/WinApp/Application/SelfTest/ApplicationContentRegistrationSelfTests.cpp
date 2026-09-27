@@ -82,6 +82,18 @@ namespace gglab
 				MaterialReference{ "MAT_Sphere_SmoothDielectric", 0.18f, 0.0f, 0.05f },
 				MaterialReference{ "MAT_Sphere_Metallic", 0.18f, 1.0f, 0.1f },
 				MaterialReference{ "MAT_Ground", 0.08f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R000", 0.18f, 0.0f, 0.0f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R005", 0.18f, 0.0f, 0.05f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R010", 0.18f, 0.0f, 0.1f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R025", 0.18f, 0.0f, 0.25f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R050", 0.18f, 0.0f, 0.5f },
+				MaterialReference{ "MAT_Sweep_Dielectric_R100", 0.18f, 0.0f, 1.0f },
+				MaterialReference{ "MAT_Sweep_Metallic_R000", 0.18f, 1.0f, 0.0f },
+				MaterialReference{ "MAT_Sweep_Metallic_R005", 0.18f, 1.0f, 0.05f },
+				MaterialReference{ "MAT_Sweep_Metallic_R010", 0.18f, 1.0f, 0.1f },
+				MaterialReference{ "MAT_Sweep_Metallic_R025", 0.18f, 1.0f, 0.25f },
+				MaterialReference{ "MAT_Sweep_Metallic_R050", 0.18f, 1.0f, 0.5f },
+				MaterialReference{ "MAT_Sweep_Metallic_R100", 0.18f, 1.0f, 1.0f },
 			};
 			const auto matchesMaterial = [](const ImportedMaterial& material, const MaterialReference& reference) noexcept
 				{
@@ -131,11 +143,24 @@ namespace gglab
 				MeshReference{ "Ground_Spheres_Mesh", { 16.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
 				MeshReference{ "Ground_Angles_Mesh", { 32.0f, -0.05f, 1.0f }, { 12.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
 				MeshReference{ "Scale_OneMeter_Mesh", { 21.0f, 0.5f, 3.0f }, { 1.0f, 1.0f, 1.0f }, Vector3::Zero, 1, 12 },
+				MeshReference{ "SweepSphere_Dielectric_R000_Mesh", { 42.5f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 9, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R005_Mesh", { 44.7f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 10, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R010_Mesh", { 46.9f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 11, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R025_Mesh", { 49.1f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 12, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R050_Mesh", { 51.3f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 13, 3968 },
+				MeshReference{ "SweepSphere_Dielectric_R100_Mesh", { 53.5f, 0.8f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 14, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R000_Mesh", { 42.5f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 15, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R005_Mesh", { 44.7f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 16, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R010_Mesh", { 46.9f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 17, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R025_Mesh", { 49.1f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 18, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R050_Mesh", { 51.3f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 19, 3968 },
+				MeshReference{ "SweepSphere_Metallic_R100_Mesh", { 53.5f, 3.2f, 0.0f }, { 1.6f, 1.6f, 1.6f }, Vector3::Zero, 20, 3968 },
+				MeshReference{ "Ground_RoughnessSweep_Mesh", { 48.0f, -0.05f, 1.0f }, { 16.0f, 0.1f, 8.0f }, Vector3::Zero, 8, 12 },
 			};
-			std::array<size_t, 15> triangleCounts{};
-			std::array<Vector3, 15> lower;
-			std::array<Vector3, 15> upper;
-			std::array<bool, 15> shapeValid;
+			std::array<size_t, meshes.size()> triangleCounts{};
+			std::array<Vector3, meshes.size()> lower;
+			std::array<Vector3, meshes.size()> upper;
+			std::array<bool, meshes.size()> shapeValid;
 			shapeValid.fill(true);
 			const float infinity = std::numeric_limits<float>::infinity();
 			lower.fill(Vector3(infinity, infinity, infinity));
@@ -192,8 +217,10 @@ namespace gglab
 							upper[shape].m_Z = std::max(upper[shape].m_Z, position.m_Z);
 							if (reference.m_Normal.LengthSquared() > 0.0f)
 								shapeValid[shape] &= (normals[corner] - reference.m_Normal).Length() < 0.0001f;
-							if (reference.m_Name.starts_with("Sphere_"))
+							if (reference.m_Name.starts_with("Sphere_") || reference.m_Name.starts_with("SweepSphere_"))
 								shapeValid[shape] &= std::abs((position - reference.m_Center).Length() - 0.8f) < 0.0001f;
+							if (reference.m_Name.starts_with("SweepSphere_"))
+								shapeValid[shape] &= normals[corner].Dot((position - reference.m_Center) / 0.8f) > 0.998f;
 						}
 					}
 					allTrianglesClassified &= matchedShapes == 1;

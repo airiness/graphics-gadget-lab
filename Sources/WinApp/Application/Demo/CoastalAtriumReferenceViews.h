@@ -9,7 +9,7 @@ namespace gglab
 {
 	// Blender (X, Y, Z) -> runtime (X, Z, Y), meters. Perspective, vertical FOV.
 	// Profile 1 records the greybox composition; it is not Rendering Baseline 1.
-	inline const std::array<CameraReferenceView, 3> CoastalAtriumReferenceViews = { {
+	inline const std::array<CameraReferenceView, 4> CoastalAtriumReferenceViews = { {
 		{
 			.m_Id = "CAM_Courtyard",
 			.m_Name = "Courtyard",
@@ -34,6 +34,15 @@ namespace gglab
 			.m_Purpose = "Thick doorway occlusion and the transition from corridor to sunlit courtyard.",
 			.m_Position = { -12.0f, 4.0f, -2.9f },
 			.m_Target = { 2.0f, 2.5f, -5.0f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.7984415392f),
+			.m_FarPlane = 150.0f,
+		},
+		{
+			.m_Id = "CAM_SkyHorizon",
+			.m_Name = "Sky / Horizon",
+			.m_Purpose = "Sky and horizon above the coastal platform, with architecture and shoreline in the foreground.",
+			.m_Position = { 20.0f, 5.5f, -26.0f },
+			.m_Target = { 0.0f, 3.0f, 0.0f },
 			.m_VerticalFovDegrees = math::ToDegrees(0.7984415392f),
 			.m_FarPlane = 150.0f,
 		},
