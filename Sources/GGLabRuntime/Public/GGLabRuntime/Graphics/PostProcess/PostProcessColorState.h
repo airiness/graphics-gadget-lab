@@ -11,6 +11,7 @@ namespace gglab
 		SceneLinearRec709,
 		DisplayLinearRec709,
 		DisplayEncodedSRGB,
+		DiagnosticData,
 	};
 
 	enum class TemporalColorAbi : uint8_t

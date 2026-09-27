@@ -87,6 +87,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &ForwardPlusCullDiagnosticsCompute, L"Passes/PassForwardPlusCull.hlsl", L"CSMain", ForwardPlusDiagnosticsDefines },
 			ShaderProgramBuildRecord{ &ForwardPlusValidationTilesCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceTiles", ValidationReduceTilesDefines },
 			ShaderProgramBuildRecord{ &ForwardPlusValidationFrameCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceFrame", ValidationReduceFrameDefines },
+			ShaderProgramBuildRecord{ &AtmosphereLutCompute, L"Passes/PassAtmosphere.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },

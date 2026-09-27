@@ -304,6 +304,8 @@ namespace gglab
 				}
 			});
 
+		result.m_RenderScene.m_Atmosphere = info.m_World.m_Atmosphere;
+		result.m_RenderScene.m_WorldSun = info.m_MainDirectionalLight.m_WorldSun;
 		uint32_t directionalShadowLightSlot = LightTable::InvalidSlot;
 
 		// Light data

@@ -760,6 +760,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -904,6 +907,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">

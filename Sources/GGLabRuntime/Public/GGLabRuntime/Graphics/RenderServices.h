@@ -31,6 +31,7 @@ namespace gglab
 	class AssetUploadScheduling;
 	class RenderPipelineOverlayExtensionBase;
 	class RHIDevice;
+	class RenderAtmosphereAccess;
 	class RHISwapChain;
 	template <typename T>
 	class DynamicStructuredBufferAllocator;
@@ -253,6 +254,7 @@ namespace gglab
 		RenderPresentationAccess* m_Presentation = nullptr;
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
+		RenderAtmosphereAccess* m_Atmosphere = nullptr;
 		AssetUploadScheduling* m_AssetUpload = nullptr;
 		// Deliberate per-frame application injection; null when no developer
 		// overlay pass participates in the frame.

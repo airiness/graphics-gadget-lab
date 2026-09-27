@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/AtmosphereSystem.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
@@ -43,6 +44,7 @@ namespace gglab
 		instance.m_Services.m_Presentation = renderer.get();
 		instance.m_Services.m_BindingLayout = renderer.get();
 		instance.m_Services.m_Temporal = renderer.get();
+		instance.m_Services.m_Atmosphere = renderer->GetAtmosphereSystem();
 		instance.m_Services.m_AssetUpload = renderer->GetAssetUploadScheduler();
 		instance.m_Composition = renderer.get();
 		instance.m_Host = std::move(renderer);

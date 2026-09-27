@@ -47,6 +47,16 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
+	if (g_Pass.SourceMode >= 21 && g_Pass.SourceMode <= 23)
+	{
+		float4 sampleValue = GetTexture2DFloat4(g_Pass.SourceTextureIndex).SampleLevel(pointSampler,input.UV,0);
+		if (sampleValue.a < 0.999 || !all(isfinite(sampleValue))) return float4(1,0,1,1);
+		// Dimensionless transmittance and unit-illuminance scattering do not use camera exposure.
+		float3 color = sampleValue.rgb;
+		if (g_Pass.SourceMode == 21) return float4(saturate(color),1);
+		float exposure = g_Pass.SourceMode == 23 ? viewData.ExposureMultiplier : 1.0;
+		return float4(LinearToSRGB(ACESFitted(color*exposure*g_Pass.PreviewExposureScale)),1);
+	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_DIRECTION ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_MAGNITUDE)
 	{

@@ -178,6 +178,8 @@ namespace gglab
 				depthCoverageFramePlan.m_Diagnostic);
 		}
 
+		m_AtmospherePass.AddPass(rg, context, services);
+
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,

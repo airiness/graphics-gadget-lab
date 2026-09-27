@@ -4,6 +4,7 @@
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 
@@ -38,6 +39,15 @@ namespace gglab
 		const Renderer& renderer, const RenderGraph& renderGraph) noexcept
 	{
 		PostProcessDiagnosticsSnapshot snapshot{};
+		if (const auto* atmosphere = renderGraph.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName))
+		{
+			snapshot.m_Atmosphere = atmosphere->m_Diagnostics;
+			for (uint32_t i=0; i<3; ++i)
+			{
+				snapshot.m_AtmosphereLuts[i] = BuildTextureDiagnostics(renderGraph, {
+					.m_Texture = atmosphere->m_Luts[i], .m_State = i == 2 ? PostProcessColorState::SceneLinearRec709 : PostProcessColorState::DiagnosticData, .m_PreExposure = 1.0f });
+			}
+		}
 		const auto* resources =
 			renderGraph.GetBlackboard().TryGet<RGPostProcessResources>(PostProcessResourcesName);
 		if (resources)
@@ -91,6 +101,10 @@ namespace gglab
 			snapshot.m_GpuFrameIndex = gpuFrame.m_FrameIndex;
 			for (const auto& sample : gpuFrame.m_Samples)
 			{
+				if (sample.m_Name.starts_with("Atmosphere."))
+				{
+					snapshot.m_AtmosphereGpuPasses.push_back({ sample.m_Name, sample.m_Milliseconds, sample.m_CallCount });
+				}
 				if (!sample.m_Name.starts_with("PostProcess."))
 				{
 					continue;

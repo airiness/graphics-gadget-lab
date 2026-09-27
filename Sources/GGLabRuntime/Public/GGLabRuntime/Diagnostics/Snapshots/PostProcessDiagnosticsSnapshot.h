@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
+#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include <array>
 #include <string>
 #include <vector>
@@ -47,6 +48,9 @@ namespace gglab
 
 	struct PostProcessDiagnosticsSnapshot
 	{
+		AtmosphereDiagnostics m_Atmosphere{};
+		std::array<PostProcessTextureDiagnostics, 3> m_AtmosphereLuts{};
+		std::vector<PostProcessGpuPassDiagnostics> m_AtmosphereGpuPasses;
 		ResolvedExposureSettings m_Exposure{};
 		PostProcessTextureDiagnostics m_SceneColor{};
 		SceneDepthDiagnostics m_SceneDepth{};

@@ -6,6 +6,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -149,6 +150,15 @@ namespace gglab
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection();
+		if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
+		{
+			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
+			if (!atmosphere) { registry->InvalidatePostProcessPreview(selection); return; }
+			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
+			if (!registry->ConsumePostProcessPreviewRequest()) return;
+			AddResolvedPass(rg, context, services, atmosphere->m_Luts[index], 1.0f, std::nullopt, selection);
+			return;
+		}
 		if (IsTemporalAAPreview(selection.m_Tap))
 		{
 			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(

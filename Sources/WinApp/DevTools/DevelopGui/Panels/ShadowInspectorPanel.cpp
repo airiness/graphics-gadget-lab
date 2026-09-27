@@ -93,6 +93,25 @@ namespace gglab
 				ImGui::Text("Shadow shading requested: %s", light->m_ShadowSettings && light->m_ShadowSettings->m_Enable ? "yes" : "no");
 				ImGui::TextDisabled("Atmospheric transmittance: 1; direct BRDF uses the disk center.");
 				ImGui::TextDisabled("Angular radius calibrates the source; finite-disk specular is not evaluated yet.");
+				bool atmosphereEnabled = light->m_Atmosphere.has_value();
+				if (ImGui::Checkbox("Atmosphere LUT Diagnostics", &atmosphereEnabled) && control)
+				{
+					control->SetAtmosphere(atmosphereEnabled ? std::optional<AtmosphereSettings>(AtmosphereSettings{}) : std::nullopt);
+				}
+				if (light->m_Atmosphere)
+				{
+					auto atmosphere = *light->m_Atmosphere;
+					bool changed = ImGui::DragFloat("Atmosphere height (m)", &atmosphere.m_HeightMeters, 100.0f, 1000.0f, 1000000.0f);
+					changed |= ImGui::DragFloat("Rayleigh scale height (m)", &atmosphere.m_RayleighScaleHeightMeters, 50.0f, 100.0f, 100000.0f);
+					changed |= ImGui::DragFloat("Mie scale height (m)", &atmosphere.m_MieScaleHeightMeters, 10.0f, 100.0f, 100000.0f);
+					changed |= ImGui::SliderFloat("Mie anisotropy", &atmosphere.m_MieAnisotropy, -0.95f, 0.95f);
+					changed |= ImGui::DragFloat("Absorption center (m)", &atmosphere.m_AbsorptionCenterMeters, 100.0f, 0.0f, atmosphere.m_HeightMeters);
+					changed |= ImGui::DragFloat("Meters per world unit", &atmosphere.m_WorldUnitsToMeters, 0.01f, 0.0001f, 10000.0f);
+					if (changed && control) control->SetAtmosphere(atmosphere);
+					if (ImGui::Button("Reset Earth Atmosphere") && control) control->SetAtmosphere(AtmosphereSettings{});
+					ImGui::TextDisabled("Diagnostic LUTs only: scene sky, direct sun and IBL remain unchanged.");
+					ImGui::TextDisabled("Inspect the three Atmosphere taps in Post Process Inspector.");
+				}
 				ImGui::EndDisabled();
 				return;
 			}

@@ -32,7 +32,12 @@ namespace gglab
 		const auto& light = *selected.m_Light;
 		return DirectionalLightObservation{ static_cast<uint32_t>(*selected.m_EntityKey), selected.m_Direction,
 			light.m_Color, light.m_Intensity, light.m_DirectionalShadowSettings,
-			light.m_WorldSun, selected.m_WorldSun };
+			light.m_WorldSun, selected.m_WorldSun, m_World.m_Atmosphere };
+	}
+
+	void DirectionalLightTooling::SetAtmosphere(const std::optional<AtmosphereSettings>& settings) noexcept
+	{
+		m_World.m_Atmosphere = settings;
 	}
 
 	void DirectionalLightTooling::SetWorldSun(uint32_t id, const std::optional<WorldSunSettings>& settings) noexcept

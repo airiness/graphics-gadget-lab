@@ -1,3 +1,4 @@
+#include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
@@ -39,6 +40,8 @@
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
 #include "GGLabRuntime/Graphics/WorldSun.h"
+#include "Graphics/AtmosphereSystem.h"
+#include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
@@ -340,6 +343,10 @@ namespace gglab
 		class RecordingDevice final : public RHIDevice
 		{
 		public:
+			bool m_AtmosphereBuffersEnabled = false;
+			uint32_t m_AtmosphereBufferCount = 0;
+			uint32_t m_AtmosphereDestroyedBufferCount = 0;
+			std::array<std::byte, 256> m_AtmosphereUpload{};
 			RHIBackendType GetBackendType() const noexcept override { return {}; }
 			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 			{
@@ -376,7 +383,7 @@ namespace gglab
 			RHIBufferHandle CreateBuffer(
 				const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return {};
+				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
 			}
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
@@ -398,7 +405,7 @@ namespace gglab
 			{
 				++m_DestroyTextureCount;
 			}
-			void DestroyBuffer(RHIBufferHandle) noexcept override {}
+			void DestroyBuffer(RHIBufferHandle) noexcept override { ++m_AtmosphereDestroyedBufferCount; }
 			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
 			void DestroySampler(RHISamplerHandle) noexcept override {}
@@ -420,7 +427,7 @@ namespace gglab
 			}
 			void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
 			{
-				return nullptr;
+				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
@@ -6361,6 +6368,132 @@ namespace gglab
 			return false;
 		}
 
+		void RunAtmosphereContractTests(SelfTestContext& context) noexcept
+		{
+			World authoredWorld;
+			authoredWorld.m_Atmosphere = AtmosphereSettings{};
+			authoredWorld.m_Atmosphere->m_MieAnisotropy = 0.6f;
+			World movedWorld(std::move(authoredWorld));
+			context.Check(movedWorld.m_Atmosphere && movedWorld.m_Atmosphere->m_MieAnisotropy == 0.6f &&
+				!authoredWorld.m_Atmosphere, "World movement preserves authored atmosphere and clears the moved-away owner");
+			AtmosphereSettings settings{};
+			const auto sun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			const auto a = ResolveAtmosphere(settings, sun, Vector3(0.0f, 1000.0f, 0.0f));
+			context.Check(std::abs(a.m_Observer.m_X-a.m_Radii.m_X-1.0f)<0.001f &&
+				std::abs(a.m_Rayleigh.m_X-0.005802f)<1e-7f && a.m_Rayleigh.m_W==8.0f,
+				"Atmosphere boundary converts meters and inverse meters to kilometers and resolves radial altitude");
+			const auto shortPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,1000.0f);
+			const auto longPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,50000.0f);
+			context.Check(shortPath.m_X<=1.0f && longPath.m_X>0.0f && longPath.m_X<shortPath.m_X &&
+				longPath.m_Y<shortPath.m_Y && longPath.m_Z<shortPath.m_Z &&
+				EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,0.0f).m_X==1.0f &&
+				EvaluateAtmosphereTransmittance(a,1000.0f,-1.0f,2000.0f).m_X==0.0f,
+				"Earth transmittance is finite, bounded, decreases with path length, and rejects planet-occluded sun paths");
+			settings.m_WorldUnitsToMeters=1000.0f;
+			const auto scaled = ResolveAtmosphere(settings,sun,Vector3(0.0f,1.0f,0.0f));
+			context.Check(scaled.m_Observer.m_X==a.m_Observer.m_X && AtmosphereDirtyMask(a,scaled)==0,
+				"Equivalent meter and kilometer worlds resolve identical atmosphere transport");
+			auto changed=a; changed.m_Sun.m_X*=2.0f;
+			bool invalidation=AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Observer.m_X+=1.0f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Ground.m_X+=0.1f; invalidation &= AtmosphereDirtyMask(a,changed)==6;
+			changed=a; changed.m_Mie.m_W=0.5f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Rayleigh.m_X*=2.0f; invalidation &= AtmosphereDirtyMask(a,changed)==7;
+			context.Check(invalidation,"Atmosphere dirty masks preserve transmittance and unit-sun scattering when only the sun or observer changes");
+			settings.m_MieExtinction=-1.0f;
+			settings.m_MieAnisotropy=std::numeric_limits<float>::quiet_NaN();
+			settings.m_RayleighScaleHeightMeters=0.0f;
+			const auto sanitized=ResolveAtmosphere(settings,sun,Vector3::Zero);
+			context.Check(sanitized.m_Mie.m_Y>=sanitized.m_Mie.m_X && std::isfinite(sanitized.m_Mie.m_W) &&
+				sanitized.m_Rayleigh.m_W>0.0f,"Atmosphere sanitization preserves nonnegative absorption and finite density scales");
+
+			RecordingDevice device;
+			device.m_AtmosphereBuffersEnabled=true;
+			device.m_TextureViewsSupported=true;
+			device.m_UseControlledFenceCompletion=true;
+			PersistentTexturePool pool(&device);
+			AtmosphereSystem system(&device,&pool);
+			class ShaderAccess final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID{ 1 }; }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class BindingAccess final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return {}; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+			} bindings;
+			class PipelineAccess final : public RenderPipelineResolver
+			{
+			public:
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&,
+					const RenderPassInfo&) noexcept override { return {}; }
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
+					const RenderPassInfo&) noexcept override { return RHIPipelineHandle{ 1, 1 }; }
+				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+			} pipelines;
+			class SamplerAccess final : public RenderSamplerAccess
+			{
+			public:
+				SamplerID GetOrCreateSampler(const SamplerKey&) noexcept override { return {}; }
+				SamplerID GetPresetSamplerId(SamplerPreset) const noexcept override { return {}; }
+				uint32_t GetSamplerIndex(SamplerPreset) const noexcept override { return 0; }
+				uint32_t GetSamplerIndex(const SamplerID&) const noexcept override { return 0; }
+				uint32_t ResolveSamplerIndex(SamplerID, SamplerPreset) const noexcept override { return 0; }
+			} samplers;
+			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
+				.m_Samplers = &samplers, .m_BindingLayout = &bindings, .m_Atmosphere = &system };
+			RenderFrameBuildResult frame{};
+			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
+			frame.m_RenderScene.m_WorldSun = sun;
+			frame.m_RenderViews.resize(1);
+			RenderGraph graph({ .m_Device = &device,
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
+			RenderPassAtmosphere pass;
+			pass.AddPass(graph, frame.MakeRenderFrameContext(), services);
+			const bool compiled = graph.Compile();
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			bool dependencies = compiled && snapshot.m_Passes.size() == 5;
+			for (size_t i = 1; dependencies && i < 4; ++i)
+			{
+				dependencies &= !snapshot.m_Passes[i].m_Culled && snapshot.m_Passes[i].m_Accesses.size() == i &&
+					snapshot.m_Passes[i].m_ExecutionOrder < snapshot.m_Passes[i + 1].m_ExecutionOrder;
+			}
+			context.Check(dependencies, "Production atmosphere graph retains ordered transmittance, multiple scattering, sky and export dependencies");
+			system.EndFrame(false, {});
+			device.m_AtmosphereDestroyedBufferCount = 0;
+			const bool first=system.Begin(a,{1,1,1});
+			context.Check(first && system.GetDiagnostics().m_DirtyMask==7,"Cold atmosphere allocation requires all three LUT producers");
+			if (first) { for (uint32_t i=0;i<3;++i) system.NotifyExecuted(i); }
+			system.EndFrame(true,{RHIFenceHandle{1,1},10});
+			const bool cached=system.Begin(a,{1,1,1});
+			context.Check(cached && system.GetDiagnostics().m_DirtyMask==0 && system.GetDiagnostics().m_Generations[0]==1,
+				"Submitted atmosphere LUTs are reused without exposure-dependent recomputation");
+			system.EndFrame(true,{RHIFenceHandle{1,1},11});
+			changed=a; changed.m_Observer.m_X+=1.0f;
+			const bool updated=system.Begin(changed,{1,1,1});
+			context.Check(updated && system.GetDiagnostics().m_DirtyMask==4,"Observer edits schedule only the sky-view producer");
+			if (updated) system.NotifyExecuted(2);
+			system.EndFrame(false,{RHIFenceHandle{1,1},12});
+			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2]==1 &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount==3 && device.m_AtmosphereDestroyedBufferCount==0,
+				"Cancelled submitted atmosphere work publishes no generation and retains textures and constants until its fence");
+			device.m_CompletedFenceValue=12;
+			system.Tick(); pool.Tick();
+			context.Check(device.m_AtmosphereDestroyedBufferCount==2 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
+				"Atmosphere constants and textures retire after GPU completion");
+			const bool retry=system.Begin(a,{1,1,1});
+			if (retry) system.NotifyExecuted(0);
+			system.EndFrame(false,{});
+			device.m_CompletedFenceValue=12;
+			system.Shutdown(); pool.Tick();
+			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==3,
+				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
+		}
+
 		void RunWorldSunContractTests(SelfTestContext& context) noexcept
 		{
 			const auto luminance = [](const Vector3& rgb)
@@ -7577,6 +7710,7 @@ namespace gglab
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
+		RunAtmosphereContractTests(context);
 		RunWorldSunContractTests(context);
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);

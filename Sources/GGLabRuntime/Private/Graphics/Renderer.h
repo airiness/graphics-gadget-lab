@@ -27,6 +27,7 @@ namespace gglab
 	class AssetUploadScheduling;
 	class EnvironmentLightingSystem;
 	class IBLBakeScheduler;
+	class AtmosphereSystem;
 	class RenderResourceRegistry;
 	class SamplerRegistry;
 	class ShaderManager;
@@ -123,6 +124,7 @@ namespace gglab
 		{
 			return m_EnvironmentLightingSystem.get();
 		}
+		AtmosphereSystem* GetAtmosphereSystem() const noexcept { return m_Atmosphere.get(); }
 		IBLBakeScheduler* GetIBLBakeScheduler() const noexcept { return m_IBLBakeScheduler.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept
 		{
@@ -334,6 +336,7 @@ namespace gglab
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
+		std::unique_ptr<AtmosphereSystem> m_Atmosphere;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		RHIBindingLayoutHandle m_CommonBindingLayout{};

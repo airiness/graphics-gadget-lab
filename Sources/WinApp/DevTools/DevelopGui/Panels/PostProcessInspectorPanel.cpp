@@ -26,6 +26,9 @@ namespace gglab
 		{
 			switch (tap)
 			{
+			case PostProcessDebugTap::AtmosphereTransmittance: return "Atmosphere / Transmittance";
+			case PostProcessDebugTap::AtmosphereMultipleScattering: return "Atmosphere / Multiple Scattering";
+			case PostProcessDebugTap::AtmosphereSkyView: return "Atmosphere / Sky View";
 			case PostProcessDebugTap::SceneColor:
 				return "Scene Color";
 			case PostProcessDebugTap::BloomPrefilter:
@@ -100,6 +103,9 @@ namespace gglab
 					PostProcessDebugTap::TemporalRejection,
 					PostProcessDebugTap::TemporalHistoryWeight,
 					PostProcessDebugTap::TemporalHistoryAge,
+					PostProcessDebugTap::AtmosphereTransmittance,
+					PostProcessDebugTap::AtmosphereMultipleScattering,
+					PostProcessDebugTap::AtmosphereSkyView,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -125,6 +131,9 @@ namespace gglab
 		{
 			switch (selection.m_Tap)
 			{
+			case PostProcessDebugTap::AtmosphereTransmittance: return &snapshot.m_AtmosphereLuts[0];
+			case PostProcessDebugTap::AtmosphereMultipleScattering: return &snapshot.m_AtmosphereLuts[1];
+			case PostProcessDebugTap::AtmosphereSkyView: return &snapshot.m_AtmosphereLuts[2];
 			case PostProcessDebugTap::SceneColor:
 				return &snapshot.m_SceneColor;
 			case PostProcessDebugTap::BloomPrefilter:
@@ -248,6 +257,11 @@ namespace gglab
 			{
 				ImGui::TextDisabled("Source: scene-referred linear Rec.709 lighting diagnostic (unit storage scale).");
 			}
+			else if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
+			{
+				ImGui::TextDisabled("Atmosphere: transmittance is dimensionless; multiple scattering is per unit solar illuminance.");
+				ImGui::TextDisabled("Only Sky View uses camera exposure. Magenta indicates an invalid generated value.");
+			}
 			else if (gtaoSelection)
 			{
 				ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
@@ -317,6 +331,20 @@ namespace gglab
 		}
 
 		DrawPreview(context, *snapshot);
+		if (ImGui::CollapsingHeader("Atmosphere LUTs", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::Text("Status: %s | Scheduled update mask: %u", snapshot->m_Atmosphere.m_Available ? "available" : "disabled or unavailable", snapshot->m_Atmosphere.m_DirtyMask);
+			for (uint32_t i=0; i<3; ++i)
+			{
+				ImGui::Text("%s: %u x %u RGBA32F | committed updates: %llu", AtmosphereLutNames[i], AtmosphereLutWidths[i], AtmosphereLutHeights[i],
+					static_cast<unsigned long long>(snapshot->m_Atmosphere.m_Generations[i]));
+			}
+			const auto& a = snapshot->m_Atmosphere.m_Parameters;
+			ImGui::Text("Observer altitude: %.3f km | Sun zenith cosine: %.4f", a.m_Observer.m_X-a.m_Radii.m_X, a.m_Observer.m_Y);
+			ImGui::TextDisabled("Magenta pixels signal non-finite or negative generated transport values.");
+			for (const auto& timing : snapshot->m_AtmosphereGpuPasses)
+				ImGui::Text("%s: %.3f ms", timing.m_Name.c_str(), timing.m_Milliseconds);
+		}
 		if (ImGui::CollapsingHeader("Exposure", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			if (auto* overrides = context.m_ViewRenderSettingsOverrides)

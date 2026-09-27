@@ -31,6 +31,8 @@ namespace gglab::shader_programs
 		"gglab.shader.forward-plus-validation", "compute.tiles", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusValidationFrameCompute{
 		"gglab.shader.forward-plus-validation", "compute.frame", ShaderStage::Compute };
+	inline const ShaderProgramRef AtmosphereLutCompute{
+		"gglab.shader.atmosphere-luts", "compute", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateCompute{
 		"gglab.shader.gtao", "compute.evaluate", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateDiagnosticsCompute{

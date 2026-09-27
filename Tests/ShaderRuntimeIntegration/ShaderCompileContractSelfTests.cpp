@@ -2514,6 +2514,36 @@ namespace gglab
 				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
 				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
 
+			desc.m_SourcePath = L"Passes/PassAtmosphere.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const auto atmosphereDxil = compiler.Compile(desc);
+			std::string atmosphereDisassembly;
+			const bool atmosphereDxilReflected = atmosphereDxil.IsSuccess() && DisassembleDxil(atmosphereDxil.m_Artifact.m_Binary,atmosphereDisassembly);
+			const std::array<const char*,7> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer" };
+			bool atmosphereDxilOffsets = atmosphereDxilReflected;
+			for (size_t i=0;i<atmosphereMembers.size();++i)
+				atmosphereDxilOffsets &= FindDxilMemberOffset(atmosphereDisassembly,atmosphereMembers[i])==i*16;
+			context.Check(atmosphereDxilOffsets,"DXIL atmosphere parameter offsets match the explicit CPU float4 layout");
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto atmosphereSpirV = compiler.Compile(desc);
+			context.Check(atmosphereDxil.IsSuccess() && atmosphereSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile atmosphere transmittance, multiple scattering and sky-view transport");
+			SpirVDecorationReflection atmosphereReflection;
+			const bool atmosphereReflected = atmosphereSpirV.IsSuccess() &&
+				ReadSpirVDecorations(atmosphereSpirV.m_Artifact.m_Binary,atmosphereReflection);
+			const auto* atmosphereLayout = atmosphereReflected
+				? atmosphereReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters") : nullptr;
+			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size()==7;
+			if (atmosphereOffsets)
+			{
+				for (size_t i=0;i<7;++i) atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset==i*16;
+			}
+			context.Check(atmosphereOffsets,"Atmosphere constant buffer has seven explicitly aligned float4 rows in SPIR-V");
+
 			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";

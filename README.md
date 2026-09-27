@@ -96,15 +96,67 @@ validation output. SDR screenshots establish visual behavior; stop arithmetic an
 storage invariance require linear measurements. The code/shader contract tests do
 not establish GPU presentation or temporal visual quality.
 
+## Atmosphere transport diagnostics
+
+An optional world-owned `AtmosphereSettings` generates three persistent RGBA32F
+LUTs on the Direct queue: Transmittance (256 x 64), Multiple Scattering (32 x 32),
+and Sky View (192 x 108). This diagnostic stage does not yet replace the visible
+sky, attenuate the direct sun, or bake atmosphere IBL.
+
+Authoring uses meters and inverse meters. The CPU boundary converts lengths to
+kilometers and coefficients to inverse kilometers. Camera coordinates are scaled
+by `WorldUnitsToMeters` before subtracting `PlanetCenterMeters`. The Earth preset
+places sea level at world Y = 0. The observer is clamped to one meter inside the
+atmosphere boundaries; orbital views are not supported by this initial LUT path.
+Transport uses RGB Rec.709 coefficients, exponential Rayleigh/Mie densities and a
+triangular absorption layer. This is an RGB approximation, not spectral transport.
+
+Transmittance integrates 64 segments. Multiple Scattering uses 64 spherical
+directions with 24 segments and an isotropic geometric-series closure; its
+denominator is bounded at 0.001. Sky View integrates 40 segments with Rayleigh and
+Henyey-Greenstein single scattering. Uniform cosine/altitude lookup coordinates
+and a sun-relative latitude/longitude sky parameterization establish the initial
+contract; horizon resolution and dense/high-albedo accuracy still need visual
+and numerical quality review. The solar disk is not included in this sky LUT.
+The conceptual LUT decomposition follows [Hillaire (2020)](https://sebh.github.io/publications/egsr2020.pdf);
+the shaders are an original implementation.
+
+Medium edits invalidate all three LUTs. Ground albedo invalidates the latter two;
+Mie anisotropy, sun and observer edits invalidate Sky View only. Camera rotation
+and exposure do not invalidate transport. Shader generation changes invalidate
+the corresponding producers and their consumers. RenderGraph declares all LUT
+reads, writes and exports. Upload buffers and retired textures remain alive until
+the submission fence completes. Cancelled frames invalidate the cache without
+publishing new counters. Counters denote successfully submitted updates, not the
+atomic world-lighting/IBL publication planned for the later Physical Sky stage.
+
+For manual validation on both DX12 and Vulkan:
+
+1. Open Lighting Contract and select its physical sun preset (EV100 15).
+2. In the Shadow inspector's physical sun controls, enable `Atmosphere LUT Diagnostics`.
+3. Open the Post Process inspector and select each Atmosphere preview. Its atmosphere
+   section lists LUT dimensions, committed counters, scheduled dirty mask and GPU timings.
+   Enable GPU profiling to collect timings when a LUT update is scheduled.
+4. Change sun direction/intensity and camera altitude: only Sky View should update.
+   Change a density scale height: all three should update. Change camera exposure:
+   counters should stay unchanged, while only the Sky View preview follows camera EV.
+5. Disable/re-enable the atmosphere and switch Labs. Check resource retirement,
+   RenderGraph validation and backend diagnostics. Invalid generated values carry
+   alpha zero and appear magenta in previews; transmittance is displayed directly,
+   while scattering previews are tone mapped with preview exposure.
+
+Headless lifetime, invalidation, graph dependency and DXIL/SPIR-V ABI tests do not
+establish GPU presentation, finite GPU output or visual quality. Retain both-backend
+manual results separately.
+
 ## Physical directional sun
 
 A directional light with `WorldSunSettings` explicitly designates the world sun.
 Its perpendicular top-of-atmosphere illuminance is in lux; linear Rec.709
 chromaticity is normalized so `Y = dot(RGB, (0.2126, 0.7152, 0.0722)) = 1`.
 The resolved uniform solar disk uses `L = C * E / (pi * sin(alpha)^2)`.
-Numerical disk integration is checked to relative tolerance `1e-5`. No atmosphere
-is active in this slice, so sun-path transmittance is 1 and local illuminance equals
-TOA illuminance. Shadow visibility is an independent multiplier.
+Numerical disk integration is checked to relative tolerance `1e-5`. Atmosphere LUTs currently serve diagnostics only; direct sun-path transmittance
+remains 1 and local illuminance equals TOA illuminance. Shadow visibility is an independent multiplier.
 
 Only the selected sun overrides legacy light color/intensity at GPU upload.
 Unmarked directional lights and all point/spot lights retain renderer-relative

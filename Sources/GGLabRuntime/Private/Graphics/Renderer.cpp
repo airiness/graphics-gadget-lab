@@ -1,4 +1,5 @@
 #include "Graphics/Renderer.h"
+#include "Graphics/AtmosphereSystem.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
@@ -117,6 +118,7 @@ namespace gglab
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
+		m_Atmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_TemporalHistoryManager =
 			std::make_unique<TemporalHistoryManager>(m_PersistentTexturePool.get());
 
@@ -220,6 +222,8 @@ namespace gglab
 		m_RenderResRegistry.reset();
 		m_SamplerRegistry.reset();
 		m_PipelineCache.reset();
+		m_Atmosphere->Shutdown();
+		m_Atmosphere.reset();
 		m_TemporalHistoryManager->Shutdown();
 		m_TemporalHistoryManager.reset();
 		m_PersistentTexturePool.reset();
@@ -264,6 +268,7 @@ namespace gglab
 
 		m_TransientResourcePool->Tick();
 		m_PersistentTexturePool->Tick();
+		m_Atmosphere->Tick();
 		m_AssetUploadScheduler->Tick();
 		m_IBLBakeScheduler->Tick(m_LastSubmittedFencePoint);
 
@@ -429,6 +434,7 @@ namespace gglab
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
+		m_Atmosphere->EndFrame(result.IsCompleted(), submittedFence);
 		if (result.IsCompleted() && submittedFence.IsValid())
 		{
 			m_ActiveFrame.m_TemporalTransaction.CommitCompleted(submittedFence);
@@ -492,6 +498,7 @@ namespace gglab
 		{
 			const RHIFencePoint submittedFence =
 				m_RHIContext->AbortFrame(*m_ActiveFrame.m_RHIFrame);
+			m_Atmosphere->EndFrame(false, submittedFence);
 			if (submittedFence.IsValid())
 			{
 				m_LastSubmittedFencePoint = submittedFence;
@@ -516,6 +523,7 @@ namespace gglab
 			return submittedFence;
 		}
 
+		m_Atmosphere->EndFrame(false, {});
 		m_ActiveFrame.m_TemporalTransaction.Abort();
 		EndFrameLifetime();
 		return {};

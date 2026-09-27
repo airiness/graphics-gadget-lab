@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
+#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include <optional>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -28,6 +30,8 @@ namespace gglab
 
 	struct RenderScene
 	{
+		std::optional<AtmosphereSettings> m_Atmosphere;
+		std::optional<ResolvedWorldSun> m_WorldSun;
 		uint32_t m_ObjectBaseIndex = 0;
 		uint32_t m_ObjectCount = 0;
 
