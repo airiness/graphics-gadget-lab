@@ -214,31 +214,34 @@ namespace gglab
 				ImGui::TextWrapped("%s", snapshot.m_LoadingDetail.c_str());
 			}
 		}
-		if (snapshot.m_RetiringSessionCount > 0)
-		{
-			ImGui::TextDisabled(
-				"Retiring sessions: %u (waiting for GPU fences)", snapshot.m_RetiringSessionCount);
-		}
-		ImGui::Text("Session frame: %llu", snapshot.m_FrameInSession);
 		if (snapshot.m_State == LabSnapshotRunState::WarmingUp)
 		{
 			ImGui::Text("Warm-up remaining: %u", snapshot.m_WarmupFramesRemaining);
-		}
-		ImGui::Text("Effective delta: %.6f s", snapshot.m_EffectiveDeltaTime);
-		if (snapshot.m_LastFrame.m_HasFeedback)
-		{
-			ImGui::Text("Last submitted frame: %llu (back buffer %u, fence %llu)",
-				snapshot.m_LastFrame.m_ApplicationFrameIndex,
-				snapshot.m_LastFrame.m_BackBufferIndex, snapshot.m_LastFrame.m_SubmittedFenceValue);
 		}
 		if (!snapshot.m_IsHostActive)
 		{
 			ImGui::TextDisabled(
 				"Demo.LabHost is inactive; commands will apply when it becomes active.");
 		}
-		if (!snapshot.m_Description.empty())
+		if (ImGui::CollapsingHeader("Diagnostics: Session"))
 		{
-			ImGui::TextWrapped("%s", snapshot.m_Description.c_str());
+			ImGui::Text("Session frame: %llu | delta %.6f s",
+				snapshot.m_FrameInSession, snapshot.m_EffectiveDeltaTime);
+			if (snapshot.m_LastFrame.m_HasFeedback)
+			{
+				ImGui::Text("Last submitted: frame %llu | buffer %u | fence %llu",
+					snapshot.m_LastFrame.m_ApplicationFrameIndex,
+					snapshot.m_LastFrame.m_BackBufferIndex,
+					snapshot.m_LastFrame.m_SubmittedFenceValue);
+			}
+			if (snapshot.m_RetiringSessionCount > 0)
+			{
+				ImGui::Text("Retiring sessions: %u", snapshot.m_RetiringSessionCount);
+			}
+			if (!snapshot.m_Description.empty())
+			{
+				ImGui::TextWrapped("%s", snapshot.m_Description.c_str());
+			}
 		}
 
 		if (snapshot.m_ActiveLabId.m_Name == CullingLabId)

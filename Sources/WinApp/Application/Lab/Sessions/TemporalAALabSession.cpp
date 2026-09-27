@@ -161,7 +161,8 @@ namespace gglab
 		}
 		ResetEvidenceCapture();
 		auto* registry = m_Services.m_RenderServices.m_Resources;
-		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
+		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel::TemporalAA);
 		m_IsEntered = true;
 		ApplySelectedPreviewSelection();
 	}
@@ -175,8 +176,9 @@ namespace gglab
 		}
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
-			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
-			registry->RequestPostProcessPreview();
+			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
+				PostProcessPreviewChannel::TemporalAA);
+			registry->RequestPostProcessPreview(PostProcessPreviewChannel::TemporalAA);
 		}
 	}
 
@@ -438,8 +440,9 @@ namespace gglab
 	{
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
-			registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap });
-			registry->RequestPostProcessPreview();
+			registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap },
+				PostProcessPreviewChannel::TemporalAA);
+			registry->RequestPostProcessPreview(PostProcessPreviewChannel::TemporalAA);
 		}
 	}
 
@@ -447,7 +450,7 @@ namespace gglab
 	{
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
-			registry->RequestPostProcessPreview();
+			registry->RequestPostProcessPreview(PostProcessPreviewChannel::TemporalAA);
 		}
 	}
 

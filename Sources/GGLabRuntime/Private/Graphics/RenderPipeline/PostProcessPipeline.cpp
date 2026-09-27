@@ -48,11 +48,15 @@ namespace gglab
 
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
-		const auto previewSelection = registry->GetPostProcessPreviewSelection();
-		const bool wantsIntermediateBloomTap =
-			registry->IsPostProcessPreviewRequested() &&
-			(previewSelection.m_Tap == PostProcessDebugTap::BloomPrefilter ||
-				previewSelection.m_Tap == PostProcessDebugTap::BloomPyramid);
+		bool wantsIntermediateBloomTap = false;
+		for (uint32_t index = 0; index < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++index)
+		{
+			const auto channel = static_cast<PostProcessPreviewChannel>(index);
+			if (!registry->IsPostProcessPreviewRequested(channel)) continue;
+			const auto tap = registry->GetPostProcessPreviewSelection(channel).m_Tap;
+			wantsIntermediateBloomTap |= tap == PostProcessDebugTap::BloomPrefilter ||
+				tap == PostProcessDebugTap::BloomPyramid;
+		}
 		if (wantsIntermediateBloomTap)
 		{
 			m_BloomPass.AddPass(rg, context, services,

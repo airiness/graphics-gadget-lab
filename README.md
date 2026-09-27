@@ -82,7 +82,7 @@ blending. History alpha remains the sample age. Aborted frames do not publish a
 new scale; invalid metadata and V1 history cannot be reused as V2 history.
 
 The Temporal AA inspector reports current, sampled-history and last-committed
-scales, the ABI and reset reason. The Post Process inspector can override scene
+scales, the ABI and reset reason. The Post Processing panel can override scene
 pre-exposure with TAA either on or off. This override changes storage scale, not
 camera exposure. Lighting Contract explicitly retains its validated C0 unit-scale
 baseline; its inspector override can opt into the new path.
@@ -133,10 +133,10 @@ atomic world-lighting/IBL publication planned for the later Physical Sky stage.
 For manual validation on both DX12 and Vulkan:
 
 1. Open Lighting Contract and select its physical sun preset (EV100 15).
-2. In the Shadow inspector's physical sun controls, enable `Atmosphere LUT Diagnostics`.
-3. Open the Post Process inspector and select each Atmosphere preview. Its atmosphere
-   section lists LUT dimensions, committed counters, scheduled dirty mask and GPU timings.
-   Enable GPU profiling to collect timings when a LUT update is scheduled.
+2. Open Scene / World Lighting / Atmosphere and enable the atmosphere.
+3. Select each LUT in the Atmosphere preview. Expand `Diagnostics: LUT Updates` for
+   committed generations, scheduled updates and captured GPU timings. Enable GPU
+   profiling in Diagnostics / Profiling before changing a LUT input to collect timings.
 4. Change sun direction/intensity and camera altitude: only Sky View should update.
    Change a density scale height: all three should update. Change camera exposure:
    counters should stay unchanged, while only the Sky View preview follows camera EV.
@@ -185,9 +185,8 @@ For validation, open `gglab.lab.lighting_contract`, enable **Physical Sun
 The preset enables pre-exposure and sets EV100 to 15; returning to legacy mode
 restores EV100 0 and unit storage. Camera reference views restore EV100 15 in physical mode and EV100 0 in legacy
 mode. Clear DevTools exposure overrides
-when comparing presets. The Shadow inspector's Light Control exposes the explicit
-sun toggle, lux, chromaticity, angular radius, identity, local illuminance, disk
-radiance and pre-exposed direct scale. Change lux by a factor of two, sweep camera
+when comparing presets. Scene / World Lighting / Sun exposes the physical sun
+toggle, lux, chromaticity and angular radius. Change lux by a factor of two, sweep camera
 EV100 14/15/16, and toggle shadow shading while checking that sun identity and lux
 remain unchanged. Repeat on DX12 and Vulkan; visual and GPU validation remain
 separate from CPU contracts and shader compilation.

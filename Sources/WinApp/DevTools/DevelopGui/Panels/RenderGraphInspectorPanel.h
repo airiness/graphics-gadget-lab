@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Frame/Render Graph";
+			return "Diagnostics/Render Graph";
 		}
 		std::string_view GetTitle() const noexcept override { return "RenderGraph Inspector"; }
 		void Draw(DevelopGuiContext& context) noexcept override;

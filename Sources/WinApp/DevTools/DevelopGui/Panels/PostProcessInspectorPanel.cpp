@@ -4,8 +4,6 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
@@ -86,26 +84,6 @@ namespace gglab
 					PostProcessDebugTap::BloomPrefilter,
 					PostProcessDebugTap::BloomPyramid,
 					PostProcessDebugTap::BloomResult,
-					PostProcessDebugTap::SceneDepthRaw,
-					PostProcessDebugTap::SceneDepthLinearViewZ,
-					PostProcessDebugTap::GTAORawAO,
-					PostProcessDebugTap::GTAOHalfDepthViewZ,
-					PostProcessDebugTap::GTAOReconstructedNormal,
-					PostProcessDebugTap::GTAOSelectedSurfaceOffset,
-					PostProcessDebugTap::GTAODenoiseX,
-					PostProcessDebugTap::GTAODenoiseY,
-					PostProcessDebugTap::GTAOFinalAO,
-					PostProcessDebugTap::GTAOAOOnlyLightingContribution,
-					PostProcessDebugTap::TemporalMotionDirection,
-					PostProcessDebugTap::TemporalMotionMagnitude,
-					PostProcessDebugTap::TemporalHistoryColor,
-					PostProcessDebugTap::TemporalReprojectionUV,
-					PostProcessDebugTap::TemporalRejection,
-					PostProcessDebugTap::TemporalHistoryWeight,
-					PostProcessDebugTap::TemporalHistoryAge,
-					PostProcessDebugTap::AtmosphereTransmittance,
-					PostProcessDebugTap::AtmosphereMultipleScattering,
-					PostProcessDebugTap::AtmosphereSkyView,
 				};
 				for (const auto candidate : Taps)
 				{
@@ -131,9 +109,6 @@ namespace gglab
 		{
 			switch (selection.m_Tap)
 			{
-			case PostProcessDebugTap::AtmosphereTransmittance: return &snapshot.m_AtmosphereLuts[0];
-			case PostProcessDebugTap::AtmosphereMultipleScattering: return &snapshot.m_AtmosphereLuts[1];
-			case PostProcessDebugTap::AtmosphereSkyView: return &snapshot.m_AtmosphereLuts[2];
 			case PostProcessDebugTap::SceneColor:
 				return &snapshot.m_SceneColor;
 			case PostProcessDebugTap::BloomPrefilter:
@@ -184,6 +159,13 @@ namespace gglab
 			const auto preview = view->GetPostProcessPreviewDiagnostics();
 			ImGui::BeginDisabled(!control);
 			PostProcessDebugSelection selection = preview.m_Selected;
+			if (selection.m_Tap != PostProcessDebugTap::SceneColor &&
+				selection.m_Tap != PostProcessDebugTap::BloomPrefilter &&
+				selection.m_Tap != PostProcessDebugTap::BloomPyramid &&
+				selection.m_Tap != PostProcessDebugTap::BloomResult)
+			{
+				ImGui::TextDisabled("Lab preview: %s", GetTapName(selection.m_Tap));
+			}
 			bool selectionChanged = DrawTapCombo(selection.m_Tap);
 			if (selection.m_Tap == PostProcessDebugTap::BloomPyramid)
 			{
@@ -227,75 +209,24 @@ namespace gglab
 				control->RequestPostProcessPreview();
 			}
 			const auto* selectedTexture = ResolveSelectedTexture(snapshot, selection);
-			const bool depthSelection = selection.m_Tap == PostProcessDebugTap::SceneDepthRaw ||
-				selection.m_Tap == PostProcessDebugTap::SceneDepthLinearViewZ;
-			const bool gtaoSelection = selection.m_Tap == PostProcessDebugTap::GTAORawAO ||
-				selection.m_Tap == PostProcessDebugTap::GTAOHalfDepthViewZ ||
-				selection.m_Tap == PostProcessDebugTap::GTAOReconstructedNormal ||
-				selection.m_Tap == PostProcessDebugTap::GTAOSelectedSurfaceOffset ||
-				selection.m_Tap == PostProcessDebugTap::GTAODenoiseX ||
-				selection.m_Tap == PostProcessDebugTap::GTAODenoiseY ||
-				selection.m_Tap == PostProcessDebugTap::GTAOFinalAO ||
-				selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution;
-			const bool temporalMotionSelection =
-				selection.m_Tap == PostProcessDebugTap::TemporalMotionDirection ||
-				selection.m_Tap == PostProcessDebugTap::TemporalMotionMagnitude;
-			const bool temporalAASelection =
-				selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor ||
-				selection.m_Tap == PostProcessDebugTap::TemporalReprojectionUV ||
-				selection.m_Tap == PostProcessDebugTap::TemporalRejection ||
-				selection.m_Tap == PostProcessDebugTap::TemporalHistoryWeight ||
-				selection.m_Tap == PostProcessDebugTap::TemporalHistoryAge;
-			if (depthSelection && snapshot.m_SceneDepth.m_Available)
+			if (selectedTexture && !selectedTexture->m_Available)
 			{
-				ImGui::TextDisabled("Source: %u x %u, %s resource, %s SRV",
-					snapshot.m_SceneDepth.m_Width, snapshot.m_SceneDepth.m_Height,
-					GetRHIFormatInfo(snapshot.m_SceneDepth.m_ResourceFormat).m_Name,
-					GetRHIFormatInfo(snapshot.m_SceneDepth.m_SrvFormat).m_Name);
+				ImGui::TextDisabled("Source unavailable.");
 			}
-			else if (selection.m_Tap == PostProcessDebugTap::GTAOAOOnlyLightingContribution)
+			else if (selectedTexture)
 			{
-				ImGui::TextDisabled("Source: scene-referred linear Rec.709 lighting diagnostic (unit storage scale).");
-			}
-			else if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
-			{
-				ImGui::TextDisabled("Atmosphere: transmittance is dimensionless; multiple scattering is per unit solar illuminance.");
-				ImGui::TextDisabled("Only Sky View uses camera exposure. Magenta indicates an invalid generated value.");
-			}
-			else if (gtaoSelection)
-			{
-				ImGui::TextDisabled("Source: transient GTAO evaluation/filter surface.");
-			}
-			else if (temporalMotionSelection)
-			{
-				ImGui::TextDisabled(
-					"Source: active transient R16G16Float motion vectors in UV delta units.");
-			}
-			else if (temporalAASelection)
-			{
-				ImGui::TextDisabled("Source: active TAA history or reprojection diagnostics surface.");
-			}
-			else if (!selectedTexture || !selectedTexture->m_Available)
-			{
-				ImGui::TextDisabled(
-					"The selected tap is unavailable in the current pipeline configuration.");
-			}
-			else
-			{
-				ImGui::TextDisabled("Source: %u x %u, %s, pre-exposure %.6g", selectedTexture->m_Width,
-					selectedTexture->m_Height, GetRHIFormatInfo(selectedTexture->m_Format).m_Name,
+				ImGui::TextDisabled("Source: %u x %u | storage scale %.6g",
+					selectedTexture->m_Width, selectedTexture->m_Height,
 					selectedTexture->m_PreExposure);
-				ImGui::TextDisabled("Scene-linear Rec.709 storage; preview removes storage scale,"
-					" then applies camera exposure, tone mapping and sRGB encoding.");
 			}
 
-			if (preview.m_HasPublished && preview.m_Width && preview.m_Height)
+			if (preview.m_HasPublished && preview.m_Published == selection &&
+				preview.m_Width && preview.m_Height)
 			{
-				const auto published = preview.m_Published;
-				if (published != selection)
-				{
-					ImGui::TextDisabled("Preview update pending...");
-				}
+				ImGui::TextDisabled("%s | frame %llu | update %llu",
+					GetTapName(preview.m_Published.m_Tap),
+					static_cast<unsigned long long>(preview.m_FrameSerial),
+					static_cast<unsigned long long>(preview.m_UpdateCount));
 				const ImTextureID textureId =
 					devtools::ResolveImGuiTextureId(context.m_DevelopGuiSystem,
 						preview.m_SrvDescriptor);
@@ -331,21 +262,7 @@ namespace gglab
 		}
 
 		DrawPreview(context, *snapshot);
-		if (ImGui::CollapsingHeader("Atmosphere LUTs", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			ImGui::Text("Status: %s | Scheduled update mask: %u", snapshot->m_Atmosphere.m_Available ? "available" : "disabled or unavailable", snapshot->m_Atmosphere.m_DirtyMask);
-			for (uint32_t i=0; i<3; ++i)
-			{
-				ImGui::Text("%s: %u x %u RGBA32F | committed updates: %llu", AtmosphereLutNames[i], AtmosphereLutWidths[i], AtmosphereLutHeights[i],
-					static_cast<unsigned long long>(snapshot->m_Atmosphere.m_Generations[i]));
-			}
-			const auto& a = snapshot->m_Atmosphere.m_Parameters;
-			ImGui::Text("Observer altitude: %.3f km | Sun zenith cosine: %.4f", a.m_Observer.m_X-a.m_Radii.m_X, a.m_Observer.m_Y);
-			ImGui::TextDisabled("Magenta pixels signal non-finite or negative generated transport values.");
-			for (const auto& timing : snapshot->m_AtmosphereGpuPasses)
-				ImGui::Text("%s: %.3f ms", timing.m_Name.c_str(), timing.m_Milliseconds);
-		}
-		if (ImGui::CollapsingHeader("Exposure", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Advanced: Scene Pre-exposure"))
 		{
 			if (auto* overrides = context.m_ViewRenderSettingsOverrides)
 			{
@@ -360,41 +277,15 @@ namespace gglab
 				{
 					ImGui::Checkbox("Enable Scene Pre-exposure", &*overrides->m_ScenePreExposure);
 				}
-				ImGui::TextDisabled("Temporal history V2 rescales RGB when pre-exposure changes.");
 			}
 			const auto& exposure = snapshot->m_Exposure;
-			ImGui::Text("Manual / Compensation / Effective EV100: %.2f / %+.2f / %.2f",
-				exposure.m_ManualEV100, exposure.m_CompensationEV,
-				exposure.m_EffectiveEV100);
-			ImGui::Text("Exposure scale: %.6g | Frame pre-exposure: %.6g",
-				exposure.m_ExposureScale, exposure.m_PreExposure);
-			ImGui::Text("SceneColor storage pre-exposure: %.6g",
-				snapshot->m_SceneColor.m_PreExposure);
+			ImGui::Text("Camera exposure: %.2f EV100 | scale %.6g",
+				exposure.m_EffectiveEV100, exposure.m_ExposureScale);
+			ImGui::Text("Frame pre-exposure: %.6g | Scene Color storage: %.6g",
+				exposure.m_PreExposure, snapshot->m_SceneColor.m_PreExposure);
 		}
 
-		if (ImGui::CollapsingHeader("Scene Depth", ImGuiTreeNodeFlags_DefaultOpen))
-		{
-			const auto& depth = snapshot->m_SceneDepth;
-			if (!depth.m_Available)
-			{
-				ImGui::TextDisabled("Scene depth is unavailable.");
-			}
-			else
-			{
-				ImGui::Text("Extent: %u x %u", depth.m_Width, depth.m_Height);
-				ImGui::Text("Resource / DSV / SRV: %s / %s / %s",
-					GetRHIFormatInfo(depth.m_ResourceFormat).m_Name,
-					GetRHIFormatInfo(depth.m_DsvFormat).m_Name,
-					GetRHIFormatInfo(depth.m_SrvFormat).m_Name);
-				ImGui::Text("Clear: %.3f (%s) | Convention: %s", depth.m_ClearDepth,
-					depth.m_HasTypedClear ? "typed" : "none",
-					depth.m_Convention == DepthConvention::Reversed ? "Reversed-Z" : "Standard-Z");
-				ImGui::TextDisabled(
-					"Filter DisplayView.DepthBuffer in RenderGraph Inspector to inspect its access chain.");
-			}
-		}
-
-		if (ImGui::CollapsingHeader("Bloom Resources", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Diagnostics: Bloom Resources"))
 		{
 			ImGui::Text("Levels: %u | Logical footprint: %.1f KiB", snapshot->m_BloomLevelCount,
 				static_cast<double>(snapshot->m_BloomLogicalBytes) / 1024.0);
@@ -415,26 +306,13 @@ namespace gglab
 				DrawTextureRow("Result", snapshot->m_BloomResult);
 				ImGui::EndTable();
 			}
-			ImGui::TextDisabled(
-				"Logical footprint is format bytes x texels; allocator padding and aliasing are excluded.");
 		}
 
-		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("GPU Timing"))
 		{
-			if (context.m_GpuProfiling)
-			{
-				bool enabled = context.m_GpuProfiling->IsEnabled();
-				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
-				if (ImGui::Checkbox("GPU Profiling", &enabled) &&
-					context.m_GpuProfilingControl)
-				{
-					context.m_GpuProfilingControl->RequestEnabled(enabled);
-				}
-				ImGui::EndDisabled();
-			}
 			if (!snapshot->m_GpuProfilerEnabled)
 			{
-				ImGui::TextDisabled("Enable GPU profiling to collect per-pass timestamps.");
+				ImGui::TextDisabled("Enable GPU profiling in Diagnostics / Profiling.");
 			}
 			else if (!snapshot->m_GpuTimingAvailable)
 			{

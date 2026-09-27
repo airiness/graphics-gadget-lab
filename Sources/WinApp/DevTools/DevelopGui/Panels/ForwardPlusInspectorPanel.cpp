@@ -4,8 +4,6 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 
 #include <algorithm>
 #include <cmath>
@@ -273,19 +271,8 @@ namespace gglab
 				"Hardware occupancy and throughput require PIX or Nsight; they are not inferred here.");
 		}
 
-		if (ImGui::CollapsingHeader("Validation and GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Validation and GPU Timing"))
 		{
-			if (context.m_GpuProfiling)
-			{
-				bool enabled = context.m_GpuProfiling->IsEnabled();
-				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
-				if (ImGui::Checkbox("GPU Profiling", &enabled) &&
-					context.m_GpuProfilingControl)
-				{
-					context.m_GpuProfilingControl->RequestEnabled(enabled);
-				}
-				ImGui::EndDisabled();
-			}
 			if (snapshot->m_GpuTimingAvailable)
 			{
 				ImGui::Text("Current frame %llu: cull %.3f ms, opaque %.3f ms",

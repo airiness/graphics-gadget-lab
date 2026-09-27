@@ -110,7 +110,8 @@ namespace gglab
 		[[nodiscard]] ShadowPreviewDiagnostics GetShadowPreviewDiagnostics()
 			const noexcept override;
 		void EnsurePostProcessPreviewResources(uint32_t sourceWidth, uint32_t sourceHeight,
-			const RHIFencePoint* retireFenceOpt = nullptr) noexcept;
+			const RHIFencePoint* retireFenceOpt = nullptr,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
 
 		void MarkDirty(TextureIndex index) noexcept;
 		bool IsDirty(TextureIndex index) const noexcept;
@@ -159,39 +160,54 @@ namespace gglab
 		[[nodiscard]] bool IsIBLPreviewRequested(IBLPreviewType type) const noexcept;
 		[[nodiscard]] uint64_t GetIBLPreviewUpdateCount(IBLPreviewType type) const noexcept;
 
-		[[nodiscard]] PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+		[[nodiscard]] PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept override;
-		void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept override;
-		[[nodiscard]] PostProcessDebugSelection GetPostProcessPreviewSelection() const noexcept
+		void SetPostProcessPreviewSelection(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept override;
+		[[nodiscard]] PostProcessDebugSelection GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept
 		{
-			return m_PostProcessPreviewState.m_Selection;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_Selection;
 		}
-		void SetPostProcessPreviewExposureEV(float exposureEV) noexcept override;
-		[[nodiscard]] float GetPostProcessPreviewExposureEV() const noexcept
+		void SetPostProcessPreviewExposureEV(float exposureEV,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept override;
+		[[nodiscard]] float GetPostProcessPreviewExposureEV(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept
 		{
-			return m_PostProcessPreviewState.m_ExposureEV;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_ExposureEV;
 		}
-		void RequestPostProcessPreview() noexcept override;
-		[[nodiscard]] bool ConsumePostProcessPreviewRequest() noexcept;
-		void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept;
-		void InvalidatePostProcessPreview(PostProcessDebugSelection selection) noexcept;
-		[[nodiscard]] bool IsPostProcessPreviewRequested() const noexcept
+		void RequestPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept override;
+		[[nodiscard]] bool ConsumePostProcessPreviewRequest(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
+		void PublishPostProcessPreview(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel, uint64_t frameSerial) noexcept;
+		void InvalidatePostProcessPreview(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
+		[[nodiscard]] bool IsPostProcessPreviewRequested(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept
 		{
-			return m_PostProcessPreviewState.m_Requested;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_Requested;
 		}
-		[[nodiscard]] bool HasPublishedPostProcessPreview() const noexcept
+		[[nodiscard]] bool HasPublishedPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept
 		{
-			return m_PostProcessPreviewState.m_HasPublished;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_HasPublished;
 		}
-		[[nodiscard]] PostProcessDebugSelection GetPublishedPostProcessPreviewSelection()
+		[[nodiscard]] PostProcessDebugSelection GetPublishedPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept
 		{
-			return m_PostProcessPreviewState.m_PublishedSelection;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_PublishedSelection;
 		}
-		[[nodiscard]] uint64_t GetPostProcessPreviewUpdateCount() const noexcept
+		[[nodiscard]] uint64_t GetPostProcessPreviewUpdateCount(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept
 		{
-			return m_PostProcessPreviewState.m_UpdateCount;
+			return m_PostProcessPreviewStates[utils::ToIndex(channel)].m_UpdateCount;
 		}
+		[[nodiscard]] static TextureIndex GetPostProcessPreviewTextureIndex(
+			PostProcessPreviewChannel channel) noexcept;
 
 		void FillIBLBindlessGPU(IBLResourceGPU& out) const noexcept;
 
@@ -243,10 +259,12 @@ namespace gglab
 			PostProcessDebugSelection m_PublishedSelection{};
 			float m_ExposureEV = 0.0f;
 			uint64_t m_UpdateCount = 0;
+			uint64_t m_PublishedFrameSerial = 0;
 			bool m_Requested = false;
 			bool m_HasPublished = false;
 		};
-		PostProcessPreviewState m_PostProcessPreviewState{};
+		std::array<PostProcessPreviewState, utils::EnumCount<PostProcessPreviewChannel>()>
+			m_PostProcessPreviewStates{};
 		bool m_ShadowPreviewRequested = false;
 
 	};

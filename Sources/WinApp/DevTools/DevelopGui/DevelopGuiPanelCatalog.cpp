@@ -12,7 +12,9 @@
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/RenderViewPanel.h"
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
+#include "DevTools/DevelopGui/Panels/SceneDepthPanel.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/ShadowTemporalLabWidgets.h"
 #include "DevTools/DevelopGui/Panels/TransientResourcePoolPanel.h"
 #include "DevTools/DevelopGui/Panels/PersistentSceneBuffersPanel.h"
 #include "DevTools/DevelopGui/Panels/PipelineSystemPanel.h"
@@ -24,6 +26,7 @@
 #if GGLAB_ENABLE_VULKAN
 #include "DevTools/DevelopGui/Panels/VulkanBackendSummaryPanel.h"
 #endif
+#include "DevTools/DevelopGui/Panels/WorldLightingPanel.h"
 
 namespace gglab::devtools
 {
@@ -37,11 +40,13 @@ namespace gglab::devtools
 		registry.RegisterPanel(std::make_unique<ForwardPlusInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<GTAOInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<ImGuiToolsPanel>());
-		registry.RegisterPanel(std::make_unique<IBLViewerPanel>());
+		registry.RegisterPanel(std::make_unique<WorldLightingPanel>());
 		registry.RegisterPanel(std::make_unique<RenderGraphInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<RenderViewPanel>());
 		registry.RegisterPanel(std::make_unique<ResourceManagementPanel>());
+		registry.RegisterPanel(std::make_unique<SceneDepthPanel>());
 		registry.RegisterPanel(std::make_unique<ShadowInspectorPanel>());
+		registry.RegisterPanel(std::make_unique<ShadowStairsValidationPanel>());
 		registry.RegisterPanel(std::make_unique<TransientResourcePoolPanel>());
 		registry.RegisterPanel(std::make_unique<PersistentSceneBuffersPanel>());
 		registry.RegisterPanel(std::make_unique<PipelineSystemPanel>());

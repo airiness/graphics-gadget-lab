@@ -141,12 +141,12 @@ namespace gglab
 			return;
 		}
 		const PostProcessDebugSelection previewSelection =
-			resourceRegistry->GetPostProcessPreviewSelection();
+			resourceRegistry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::TemporalAA);
 		const bool historyColorPreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested() &&
+			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
 			UsesTemporalAAHistoryColorPreviewPayload(previewSelection.m_Tap);
 		const bool historyAgePreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested() &&
+			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
 			UsesTemporalAAHistoryAgePreviewPayload(previewSelection.m_Tap);
 
 		rg.AddPass<TemporalAAResolvedColorInitializePassData>(

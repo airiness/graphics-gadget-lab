@@ -6,6 +6,18 @@ namespace gglab
 {
 	inline constexpr uint32_t MaxBloomPyramidLevels = 8;
 
+	// Each inspector owns a preview request and a persistent output. The default
+	// PostProcessing channel also serves Lab actions that select diagnostic taps.
+	enum class PostProcessPreviewChannel : uint8_t
+	{
+		PostProcessing,
+		AmbientOcclusion,
+		TemporalAA,
+		Atmosphere,
+		SceneDepth,
+		Count
+	};
+
 	enum class PostProcessDebugTap : uint8_t
 	{
 		SceneColor = 0,

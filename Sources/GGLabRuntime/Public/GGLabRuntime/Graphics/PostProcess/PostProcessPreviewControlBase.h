@@ -14,10 +14,13 @@ namespace gglab
 		virtual ~PostProcessPreviewControlBase() = default;
 
 		// Invalid taps are ignored; bloom levels are clamped to the supported range.
-		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection)
+		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			noexcept = 0;
-		virtual void SetPostProcessPreviewExposureEV(float exposureEV) noexcept = 0;
+		virtual void SetPostProcessPreviewExposureEV(float exposureEV,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
 		// Idempotent request for a later graph build; setters alone do not request work.
-		virtual void RequestPostProcessPreview() noexcept = 0;
+		virtual void RequestPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
 	};
 }

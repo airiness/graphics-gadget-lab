@@ -390,7 +390,13 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp">
@@ -403,6 +409,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.cpp">
@@ -725,7 +734,13 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.h">
@@ -738,6 +753,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.h">

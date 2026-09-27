@@ -265,9 +265,11 @@ namespace gglab
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
-		const bool diagnosticOutputsEnabled = registry->IsPostProcessPreviewRequested() &&
+		const bool diagnosticOutputsEnabled =
+			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
 			m_DiagnosticPipelineAvailable &&
-			RequiresGTAODiagnosticOutputs(registry->GetPostProcessPreviewSelection().m_Tap);
+			RequiresGTAODiagnosticOutputs(registry->GetPostProcessPreviewSelection(
+				PostProcessPreviewChannel::AmbientOcclusion).m_Tap);
 		const RHIFormat finalAOFormat =
 			settings.m_FinalAOFormatPreference == GTAOFinalAOFormatPreference::ForceR16Float
 			? RHIFormat::R16Float

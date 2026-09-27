@@ -1,4 +1,5 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
+#include "Diagnostics/Builders/AtmosphereDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/AssetSnapshotRead.h"
 #include "Diagnostics/Builders/ForwardPlusDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/GTAODiagnosticsSnapshotBuilder.h"
@@ -7,6 +8,7 @@
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
+#include "Diagnostics/Builders/SceneDepthDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
 #include "Diagnostics/Builders/SamplerRegistrySnapshotBuilder.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
@@ -17,12 +19,14 @@
 #include "Diagnostics/SnapshotProvider.h"
 #include "Diagnostics/SnapshotStore.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/AssetSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/AtmosphereDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ForwardPlusDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/IBLDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/PersistentSceneBufferSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/SceneDepthDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/SamplerRegistrySnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/ShadowDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
@@ -182,6 +186,47 @@ namespace gglab
 						context.m_FrameSerial)
 					: ShadowDiagnosticsSnapshot{};
 			}
+		};
+
+		class SceneDepthDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<SceneDepthDiagnosticsSnapshot>
+		{
+		public:
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Scene Depth Diagnostics";
+			}
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<SceneDepthDiagnosticsSnapshot>();
+				snapshot = context.m_RenderGraph
+					? BuildSceneDepthDiagnosticsSnapshot(*context.m_RenderGraph)
+					: SceneDepthDiagnosticsSnapshot{};
+			}
+		};
+
+		class AtmosphereDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<AtmosphereDiagnosticsSnapshot>
+		{
+		public:
+			explicit AtmosphereDiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Atmosphere Diagnostics";
+			}
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
+			{
+				auto& snapshot = store.GetOrCreate<AtmosphereDiagnosticsSnapshot>();
+				snapshot = context.m_RenderHost && m_Renderer && context.m_RenderGraph
+					? BuildAtmosphereDiagnosticsSnapshot(*m_Renderer, *context.m_RenderGraph)
+					: AtmosphereDiagnosticsSnapshot{};
+			}
+
+		private:
+			Renderer* m_Renderer;
 		};
 
 		class PostProcessDiagnosticsSnapshotProvider final
@@ -416,6 +461,10 @@ namespace gglab
 		runtime.RegisterProvider(
 			std::make_unique<RenderGraphSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<ShadowDiagnosticsSnapshotProvider>(),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<AtmosphereDiagnosticsSnapshotProvider>(renderer),
+			SnapshotUpdatePolicy::EveryFrame);
+		runtime.RegisterProvider(std::make_unique<SceneDepthDiagnosticsSnapshotProvider>(),
 			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(std::make_unique<PostProcessDiagnosticsSnapshotProvider>(renderer),
 			SnapshotUpdatePolicy::EveryFrame);

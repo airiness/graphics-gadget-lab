@@ -258,8 +258,10 @@ namespace gglab
 	{
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
-		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
-		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount();
+		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel::AmbientOcclusion);
+		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount(
+			PostProcessPreviewChannel::AmbientOcclusion);
 		RequestSelectedPreview();
 	}
 
@@ -267,8 +269,9 @@ namespace gglab
 	{
 		if (auto* registry = m_Services.m_RenderServices.m_Resources)
 		{
-			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
-			registry->RequestPostProcessPreview();
+			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
+				PostProcessPreviewChannel::AmbientOcclusion);
+			registry->RequestPostProcessPreview(PostProcessPreviewChannel::AmbientOcclusion);
 		}
 	}
 
@@ -470,8 +473,9 @@ namespace gglab
 		{
 			return;
 		}
-		registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap });
-		registry->RequestPostProcessPreview();
+		registry->SetPostProcessPreviewSelection({ .m_Tap = m_SelectedTap },
+			PostProcessPreviewChannel::AmbientOcclusion);
+		registry->RequestPostProcessPreview(PostProcessPreviewChannel::AmbientOcclusion);
 	}
 
 	void GTAOLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
@@ -480,9 +484,12 @@ namespace gglab
 			MakeGTAOHalfResolutionExtent(m_ViewportWidth, m_ViewportHeight);
 		const GTAOSettings& settings = GetViewRenderProfile().m_Lighting.m_GTAO;
 		const auto* registry = m_Services.m_RenderServices.m_Resources;
-		const bool previewExecuted = registry && registry->HasPublishedPostProcessPreview() &&
-			registry->GetPostProcessPreviewUpdateCount() > m_PreviewUpdateCountOnEnter &&
-			registry->GetPublishedPostProcessPreviewSelection().m_Tap == m_SelectedTap;
+		const bool previewExecuted = registry && registry->HasPublishedPostProcessPreview(
+			PostProcessPreviewChannel::AmbientOcclusion) &&
+			registry->GetPostProcessPreviewUpdateCount(PostProcessPreviewChannel::AmbientOcclusion) >
+				m_PreviewUpdateCountOnEnter &&
+			registry->GetPublishedPostProcessPreviewSelection(
+				PostProcessPreviewChannel::AmbientOcclusion).m_Tap == m_SelectedTap;
 		diagnostics.m_Title = "GTAO Spatial Pipeline";
 		diagnostics.m_Metrics = {
 			{.m_Name = "Full extent",

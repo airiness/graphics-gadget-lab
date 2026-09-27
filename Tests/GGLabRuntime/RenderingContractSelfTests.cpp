@@ -870,7 +870,8 @@ namespace gglab
 				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
 				device.m_CreateTextureCount == 1,
 				"Preview observation distinguishes allocated descriptors from recorded contents");
-			registry.PublishPostProcessPreview(selected.m_Selected);
+			registry.PublishPostProcessPreview(selected.m_Selected,
+				PostProcessPreviewChannel::PostProcessing, 42);
 			const auto published = view.GetPostProcessPreviewDiagnostics();
 			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
 			control.SetPostProcessPreviewSelection(nextSelection);
@@ -878,7 +879,8 @@ namespace gglab
 			const auto pending = view.GetPostProcessPreviewDiagnostics();
 			context.Check(pending.m_Selected == nextSelection && pending.m_Requested &&
 				pending.m_HasPublished && pending.m_Published == selected.m_Selected &&
-				pending.m_UpdateCount == 1 && published.m_Selected == selected.m_Selected &&
+				pending.m_UpdateCount == 1 && pending.m_FrameSerial == 42 &&
+				published.m_Selected == selected.m_Selected &&
 				!published.m_Requested && device.m_CreateTextureCount == 1,
 				"A new preview request preserves published identity and independently copied observations");
 			registry.InvalidatePostProcessPreview(nextSelection);
@@ -890,7 +892,8 @@ namespace gglab
 				"Preview invalidation changes live availability without rewriting copied metadata");
 
 			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
-			registry.PublishPostProcessPreview(nextSelection);
+			registry.PublishPostProcessPreview(nextSelection,
+				PostProcessPreviewChannel::PostProcessing, 43);
 			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
 			const auto resized = view.GetPostProcessPreviewDiagnostics();
 			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
@@ -917,6 +920,21 @@ namespace gglab
 			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
 				retirement.m_TextureCounts.m_Available == 2,
 				"Retired preview resources become reusable only after fence completion");
+
+			const PostProcessDebugSelection aoSelection{ PostProcessDebugTap::GTAOFinalAO, 0 };
+			const PostProcessDebugSelection taaSelection{ PostProcessDebugTap::TemporalHistoryWeight, 0 };
+			control.SetPostProcessPreviewSelection(aoSelection, PostProcessPreviewChannel::AmbientOcclusion);
+			control.SetPostProcessPreviewSelection(taaSelection, PostProcessPreviewChannel::TemporalAA);
+			control.SetPostProcessPreviewExposureEV(2.0f, PostProcessPreviewChannel::TemporalAA);
+			control.RequestPostProcessPreview(PostProcessPreviewChannel::AmbientOcclusion);
+			const auto ao = view.GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel::AmbientOcclusion);
+			const auto taa = view.GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel::TemporalAA);
+			context.Check(ao.m_Selected == aoSelection && ao.m_Requested &&
+				taa.m_Selected == taaSelection && !taa.m_Requested && taa.m_ExposureEV == 2.0f &&
+				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::PostProcessing) &&
+				registry.ConsumePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion) &&
+				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA),
+				"Feature previews keep independent selections, exposure and requests");
 		}
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
@@ -6534,8 +6552,9 @@ namespace gglab
 					pass.AddPass(previewGraph, previewContext, previewServices);
 					const uint32_t expectedMask = phase == 0 ? 7u : phase == 1 ? 0u : 4u;
 					const bool expectedUpdate = previewAtmosphere.GetDiagnostics().m_DirtyMask == expectedMask;
-					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 });
-					registry.RequestPostProcessPreview();
+					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 },
+						PostProcessPreviewChannel::Atmosphere);
+					registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 					RenderPassPostProcessPreview preview;
 					preview.AddPass(previewGraph, previewContext, previewServices);
 					pass.AddFinishPass(previewGraph);
@@ -6543,7 +6562,7 @@ namespace gglab
 					RGSnapshot previewSnapshot;
 					BuildRenderGraphSnapshot(previewGraph, previewSnapshot);
 					const auto consumer = std::ranges::find(previewSnapshot.m_Passes,
-						"PostProcess.Preview", &RGSnapshotPassInfo::m_Name);
+						"Atmosphere.Preview", &RGSnapshotPassInfo::m_Name);
 					const auto finish = std::ranges::find(previewSnapshot.m_Passes,
 						"Atmosphere.Export", &RGSnapshotPassInfo::m_Name);
 					bool valid = previewCompiled && expectedUpdate && consumer != previewSnapshot.m_Passes.end() &&
@@ -6552,7 +6571,7 @@ namespace gglab
 					valid &= std::ranges::any_of(previewSnapshot.m_DependencyEdges,
 						[tap](const RGSnapshotDependencyEdge& edge)
 						{
-							return edge.m_FromPassName == "PostProcess.Preview" && edge.m_ToPassName == "Atmosphere.Export" &&
+							return edge.m_FromPassName == "Atmosphere.Preview" && edge.m_ToPassName == "Atmosphere.Export" &&
 								edge.m_ResourceName == AtmosphereLutNames[tap] && edge.m_Reason == RGDependencyReason::ExportReaderToExport;
 						});
 					for (const auto name : AtmosphereLutNames)
@@ -6585,15 +6604,18 @@ namespace gglab
 			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
 			const auto disabledContext = frame.MakeRenderFrameContext();
 			pass.AddPass(disabledGraph, disabledContext, previewServices);
-			registry.PublishPostProcessPreview({ previewTaps[0], 0 });
-			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 });
-			registry.RequestPostProcessPreview();
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 },
+				PostProcessPreviewChannel::Atmosphere, 42);
+			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 },
+				PostProcessPreviewChannel::Atmosphere);
+			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassPostProcessPreview unavailablePreview;
 			unavailablePreview.AddPass(disabledGraph, disabledContext, previewServices);
 			pass.AddFinishPass(disabledGraph);
 			RGSnapshot disabledSnapshot;
 			BuildRenderGraphSnapshot(disabledGraph, disabledSnapshot);
-			context.Check(disabledSnapshot.m_Passes.empty() && !registry.HasPublishedPostProcessPreview(),
+			context.Check(disabledSnapshot.m_Passes.empty() &&
+				!registry.HasPublishedPostProcessPreview(PostProcessPreviewChannel::Atmosphere),
 				"Disabled atmosphere creates no LUT exports and invalidates the unavailable preview");
 			device.m_CompletedFenceValue = fenceValue;
 			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });

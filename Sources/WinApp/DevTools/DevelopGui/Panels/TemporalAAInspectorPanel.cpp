@@ -5,8 +5,6 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
@@ -117,7 +115,8 @@ namespace gglab
 				ImGui::TextDisabled("Post-process preview is unavailable.");
 				return;
 			}
-			const auto preview = view->GetPostProcessPreviewDiagnostics();
+			constexpr auto Channel = PostProcessPreviewChannel::TemporalAA;
+			const auto preview = view->GetPostProcessPreviewDiagnostics(Channel);
 			ImGui::BeginDisabled(!control);
 			constexpr PostProcessDebugTap Taps[] = {
 				PostProcessDebugTap::TemporalHistoryColor,
@@ -134,7 +133,7 @@ namespace gglab
 				selection.m_Tap = PostProcessDebugTap::TemporalHistoryWeight;
 				if (control)
 				{
-					control->SetPostProcessPreviewSelection(selection);
+					control->SetPostProcessPreviewSelection(selection, Channel);
 				}
 			}
 			if (ImGui::BeginCombo("Tap##TemporalAA", TapName(selection.m_Tap)))
@@ -146,17 +145,26 @@ namespace gglab
 						selection.m_Tap = tap;
 						if (control)
 						{
-							control->SetPostProcessPreviewSelection(selection);
+							control->SetPostProcessPreviewSelection(selection, Channel);
 						}
 					}
 				}
 				ImGui::EndCombo();
 			}
+			if (selection.m_Tap == PostProcessDebugTap::TemporalHistoryColor)
+			{
+				float exposureEV = preview.m_ExposureEV;
+				if (ImGui::SliderFloat("Preview Exposure", &exposureEV,
+					-8.0f, 8.0f, "%+.2f EV") && control)
+				{
+					control->SetPostProcessPreviewExposureEV(exposureEV, Channel);
+				}
+			}
 			ImGui::EndDisabled();
 
 			if (control)
 			{
-				control->RequestPostProcessPreview();
+				control->RequestPostProcessPreview(Channel);
 			}
 			if (preview.m_Width && preview.m_Height && preview.m_HasPublished &&
 				preview.m_Published == selection)
@@ -170,6 +178,9 @@ namespace gglab
 					const float aspect = static_cast<float>(preview.m_Height) /
 						static_cast<float>(preview.m_Width);
 					ImGui::Image(textureId, ImVec2(width, width * aspect));
+					ImGui::TextDisabled("Frame %llu | update %llu",
+						static_cast<unsigned long long>(preview.m_FrameSerial),
+						static_cast<unsigned long long>(preview.m_UpdateCount));
 				}
 			}
 			else
@@ -196,11 +207,12 @@ namespace gglab
 		}
 
 		const auto& plan = snapshot->m_FramePlan;
-		ImGui::Text("Status: %s | Reason: %s", StatusName(plan.m_Status),
-			DisableReasonName(plan.m_DisableReason));
-		ImGui::Text("Requested / Core / Active: %s / %s / %s",
-			plan.m_Requested ? "yes" : "no", plan.m_CoreAvailable ? "yes" : "no",
-			plan.m_Active ? "yes" : "no");
+		ImGui::Text("Status: %s%s%s", StatusName(plan.m_Status),
+			plan.m_Active ? "" : " | ",
+			plan.m_Active ? "" : DisableReasonName(plan.m_DisableReason));
+		ImGui::Text("History: %s | last reset: %s",
+			snapshot->m_History.m_HistoryValid ? "Valid" : "Invalid",
+			ResetReasonName(snapshot->m_History.m_LastResetReason));
 
 		if (ImGui::CollapsingHeader("Controls", ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -238,7 +250,7 @@ namespace gglab
 			}
 		}
 
-		if (ImGui::CollapsingHeader("Temporal State", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Diagnostics: Temporal State"))
 		{
 			const auto& history = snapshot->m_History;
 			ImGui::Text("Frame pre-exposure: %.6g | Sampled history scale: %.6g",
@@ -261,8 +273,9 @@ namespace gglab
 				static_cast<double>(history.m_PendingRetirementBytes) / (1024.0 * 1024.0));
 			ImGui::Text("Last committed fence: %llu",
 				static_cast<unsigned long long>(history.m_LastCommitted.m_GraphicsFence.m_Value));
-			ImGui::Text("Color ABI: %u | Committed pre-exposure: %.6g",
-				static_cast<unsigned>(history.m_Compatibility.m_ColorAbi),
+			ImGui::Text("History color: %s | committed pre-exposure: %.6g",
+				history.m_Compatibility.m_ColorAbi == TemporalColorAbi::LinearRec709PreExposedV2
+					? "Pre-exposed scene linear" : "Scene linear",
 				history.m_LastCommitted.m_PreExposure);
 			if (!history.m_PendingRetirementFences.empty())
 			{
@@ -281,19 +294,8 @@ namespace gglab
 			DrawPreview(context, *snapshot);
 		}
 
-		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("GPU Timing"))
 		{
-			if (context.m_GpuProfiling)
-			{
-				bool enabled = context.m_GpuProfiling->IsEnabled();
-				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
-				if (ImGui::Checkbox("GPU Profiling##TemporalAA", &enabled) &&
-					context.m_GpuProfilingControl)
-				{
-					context.m_GpuProfilingControl->RequestEnabled(enabled);
-				}
-				ImGui::EndDisabled();
-			}
 			if (snapshot->m_GpuTimingAvailable)
 			{
 				ImGui::Text("Resolve %.3f ms | frame %llu", snapshot->m_ResolveGpuMilliseconds,
@@ -301,7 +303,7 @@ namespace gglab
 			}
 			else
 			{
-				ImGui::TextDisabled("Waiting for a completed GPU timestamp frame...");
+				ImGui::TextDisabled("GPU profiling: Diagnostics / Profiling");
 			}
 		}
 	}

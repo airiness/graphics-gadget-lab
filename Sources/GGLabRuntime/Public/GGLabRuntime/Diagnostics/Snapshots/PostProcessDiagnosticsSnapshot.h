@@ -6,9 +6,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
-#include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
-#include "GGLabRuntime/Graphics/Atmosphere.h"
 #include <array>
 #include <string>
 #include <vector>
@@ -33,27 +31,10 @@ namespace gglab
 		uint32_t m_CallCount = 0;
 	};
 
-	struct SceneDepthDiagnostics
-	{
-		uint32_t m_Width = 0;
-		uint32_t m_Height = 0;
-		RHIFormat m_ResourceFormat = RHIFormat::Unknown;
-		RHIFormat m_DsvFormat = RHIFormat::Unknown;
-		RHIFormat m_SrvFormat = RHIFormat::Unknown;
-		float m_ClearDepth = 0.0f;
-		DepthConvention m_Convention = DepthConvention::Standard;
-		bool m_HasTypedClear = false;
-		bool m_Available = false;
-	};
-
 	struct PostProcessDiagnosticsSnapshot
 	{
-		AtmosphereDiagnostics m_Atmosphere{};
-		std::array<PostProcessTextureDiagnostics, 3> m_AtmosphereLuts{};
-		std::vector<PostProcessGpuPassDiagnostics> m_AtmosphereGpuPasses;
 		ResolvedExposureSettings m_Exposure{};
 		PostProcessTextureDiagnostics m_SceneColor{};
-		SceneDepthDiagnostics m_SceneDepth{};
 		PostProcessTextureDiagnostics m_BloomPrefilter{};
 		std::array<PostProcessTextureDiagnostics, MaxBloomPyramidLevels> m_BloomPyramid{};
 		uint32_t m_BloomLevelCount = 0;

@@ -150,8 +150,8 @@ namespace gglab
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const bool gtaoContributionRequested = !transparent &&
-			registry->IsPostProcessPreviewRequested() &&
-			registry->GetPostProcessPreviewSelection().m_Tap ==
+			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
+			registry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::AmbientOcclusion).m_Tap ==
 				PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 
 		rg.AddPass<PassData>(

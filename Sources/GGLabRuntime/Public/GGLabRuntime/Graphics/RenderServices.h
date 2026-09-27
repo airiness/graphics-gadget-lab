@@ -117,22 +117,34 @@ namespace gglab
 			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFence = nullptr) noexcept = 0;
 		virtual void EnsurePostProcessPreviewResources(uint32_t sourceWidth,
-			uint32_t sourceHeight, const RHIFencePoint* retireFence = nullptr) noexcept = 0;
+			uint32_t sourceHeight, const RHIFencePoint* retireFence = nullptr,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
 
-		[[nodiscard]] virtual bool IsPostProcessPreviewRequested() const noexcept = 0;
-		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest() noexcept = 0;
-		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection()
+		[[nodiscard]] virtual bool IsPostProcessPreviewRequested(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
-		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept = 0;
-		virtual void RequestPostProcessPreview() noexcept = 0;
-		[[nodiscard]] virtual uint64_t GetPostProcessPreviewUpdateCount() const noexcept = 0;
-		[[nodiscard]] virtual PostProcessDebugSelection GetPublishedPostProcessPreviewSelection()
+		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		virtual void RequestPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetPostProcessPreviewUpdateCount(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		[[nodiscard]] virtual PostProcessDebugSelection GetPublishedPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
-		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV() const noexcept = 0;
-		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept = 0;
+		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel, uint64_t frameSerial) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(
-			PostProcessDebugSelection selection) noexcept = 0;
-		[[nodiscard]] virtual bool HasPublishedPostProcessPreview() const noexcept = 0;
+			PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual bool HasPublishedPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
 
 		virtual void RequestIBLPreview(IBLPreviewType type) noexcept = 0;
 		[[nodiscard]] virtual bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept = 0;

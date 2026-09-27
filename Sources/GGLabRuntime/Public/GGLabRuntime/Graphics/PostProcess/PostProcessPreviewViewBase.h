@@ -11,7 +11,8 @@ namespace gglab
 	public:
 		virtual ~PostProcessPreviewViewBase() = default;
 
-		[[nodiscard]] virtual PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+		[[nodiscard]] virtual PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
 	};
 }

@@ -6,8 +6,6 @@
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/GTAODiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingControlBase.h"
-#include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
@@ -290,7 +288,8 @@ namespace gglab
 				ImGui::TextDisabled("Post-process preview is unavailable.");
 				return;
 			}
-			const auto preview = view->GetPostProcessPreviewDiagnostics();
+			constexpr auto Channel = PostProcessPreviewChannel::AmbientOcclusion;
+			const auto preview = view->GetPostProcessPreviewDiagnostics(Channel);
 			ImGui::BeginDisabled(!control);
 			PostProcessDebugSelection selection = preview.m_Selected;
 			if (selection.m_Tap < PostProcessDebugTap::GTAORawAO ||
@@ -300,11 +299,11 @@ namespace gglab
 			}
 			if (DrawPreviewTapCombo(selection.m_Tap) && control)
 			{
-				control->SetPostProcessPreviewSelection(selection);
+				control->SetPostProcessPreviewSelection(selection, Channel);
 			}
 			if (control)
 			{
-				control->RequestPostProcessPreview();
+				control->RequestPostProcessPreview(Channel);
 			}
 			if (selection.m_Tap == PostProcessDebugTap::GTAOFinalAO)
 			{
@@ -316,7 +315,7 @@ namespace gglab
 				if (ImGui::SliderFloat(
 					"Contribution Exposure", &exposureEV, -8.0f, 8.0f, "%+.2f EV") && control)
 				{
-					control->SetPostProcessPreviewExposureEV(exposureEV);
+					control->SetPostProcessPreviewExposureEV(exposureEV, Channel);
 				}
 			}
 
@@ -342,6 +341,9 @@ namespace gglab
 					const float aspect = static_cast<float>(preview.m_Height) /
 						static_cast<float>(preview.m_Width);
 					ImGui::Image(textureId, ImVec2(width, width * aspect));
+					ImGui::TextDisabled("Frame %llu | update %llu",
+						static_cast<unsigned long long>(preview.m_FrameSerial),
+						static_cast<unsigned long long>(preview.m_UpdateCount));
 				}
 			}
 		}
@@ -361,8 +363,7 @@ namespace gglab
 			return;
 		}
 
-		ImGui::Text("Status: %s", GetStatusName(snapshot->m_Status));
-		ImGui::Text("Settings source: %s",
+		ImGui::Text("Status: %s | Settings: %s", GetStatusName(snapshot->m_Status),
 			snapshot->m_OverrideActive ? "DevTools override" : "Active profile");
 		if (snapshot->m_UsesFinalAOFormatFallback)
 		{
@@ -388,7 +389,6 @@ namespace gglab
 					}
 					overrides->m_GTAO.m_IsActive = overrideActive;
 				}
-				ImGui::TextDisabled("Controls apply to the active view on the next frame.");
 				if (!overrides->m_GTAO.m_IsActive)
 				{
 					GTAOSettings readOnlySettings = snapshot->m_RequestedSettings;
@@ -405,8 +405,11 @@ namespace gglab
 					}
 				}
 			}
-			ImGui::SeparatorText("Settings Layers");
-			DrawSettingsComparison(*snapshot);
+			if (ImGui::TreeNode("Diagnostics: Settings Layers"))
+			{
+				DrawSettingsComparison(*snapshot);
+				ImGui::TreePop();
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen))
@@ -414,7 +417,7 @@ namespace gglab
 			DrawPreview(context, *snapshot);
 		}
 
-		if (ImGui::CollapsingHeader("Resources", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Diagnostics: Resources"))
 		{
 			ImGui::Text("Logical footprint: %.2f MiB core + %.2f MiB diagnostics = %.2f MiB",
 				static_cast<double>(snapshot->m_CoreLogicalBytes) / (1024.0 * 1024.0),
@@ -459,22 +462,11 @@ namespace gglab
 			}
 		}
 
-		if (ImGui::CollapsingHeader("GPU Timing", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("GPU Timing"))
 		{
-			if (context.m_GpuProfiling)
-			{
-				bool enabled = context.m_GpuProfiling->IsEnabled();
-				ImGui::BeginDisabled(!context.m_GpuProfilingControl);
-				if (ImGui::Checkbox("GPU Profiling##GTAO", &enabled) &&
-					context.m_GpuProfilingControl)
-				{
-					context.m_GpuProfilingControl->RequestEnabled(enabled);
-				}
-				ImGui::EndDisabled();
-			}
 			if (!snapshot->m_GpuTimingAvailable)
 			{
-				ImGui::TextDisabled("Waiting for a completed GPU timestamp frame...");
+				ImGui::TextDisabled("GPU profiling: Diagnostics / Profiling");
 			}
 			else
 			{
@@ -483,8 +475,6 @@ namespace gglab
 					snapshot->m_DenoiseYGpuMilliseconds, snapshot->m_UpsampleGpuMilliseconds);
 				ImGui::Text("Total %.3f ms | Frame %llu", snapshot->m_TotalGpuMilliseconds,
 					static_cast<unsigned long long>(snapshot->m_GpuFrameIndex));
-				ImGui::TextDisabled(
-					"The 1440p default target is approximately 1.5 ms; it is not a cross-GPU correctness gate.");
 			}
 		}
 	}

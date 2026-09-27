@@ -283,10 +283,10 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("Near", &state.m_NearZ, 0.001f, 0.0001f, 100.0f);
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
 
-		ImGui::SeparatorText("Exposure");
+		ImGui::SeparatorText("Camera Exposure");
 		camChanged |= ImGui::SliderFloat("Manual EV100", &state.m_ManualEV100,
 			-16.0f, 24.0f, "%.2f EV", ImGuiSliderFlags_AlwaysClamp);
-		camChanged |= ImGui::SliderFloat("Exposure Compensation", &state.m_ExposureCompensationEV,
+		camChanged |= ImGui::SliderFloat("Compensation (EV)", &state.m_ExposureCompensationEV,
 			-10.0f, 10.0f, "%+.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
 		{

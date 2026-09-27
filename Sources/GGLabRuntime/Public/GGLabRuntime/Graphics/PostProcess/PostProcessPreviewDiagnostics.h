@@ -17,6 +17,7 @@ namespace gglab
 		PostProcessDebugSelection m_Published{};
 		RHIDescriptorHandle m_SrvDescriptor{};
 		uint64_t m_UpdateCount = 0;
+		uint64_t m_FrameSerial = 0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		RHIFormat m_Format = RHIFormat::Unknown;

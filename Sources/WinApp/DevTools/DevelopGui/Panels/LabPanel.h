@@ -16,7 +16,7 @@ namespace gglab
 		{
 		}
 
-		std::string_view GetPath() const noexcept override { return "Application/Lab"; }
+		std::string_view GetPath() const noexcept override { return "Application/Lab/Control"; }
 		std::string_view GetTitle() const noexcept override { return "Lab Control"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 		int32_t GetOrder() const noexcept override { return -90; }

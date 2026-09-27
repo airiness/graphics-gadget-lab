@@ -647,6 +647,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AtmosphereDiagnosticsSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SceneDepthDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TaskSystemSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\DiagnosticsRuntime.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\DirectionalLightTooling.cpp" />
@@ -679,10 +681,14 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PostProcessDiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AtmosphereDiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SceneDepthDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TaskSystemSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\IBLDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\LabSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\PostProcessDiagnosticsSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\AtmosphereDiagnosticsSnapshot.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SceneDepthDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ForwardPlusDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\GTAODiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h" />
