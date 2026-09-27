@@ -448,8 +448,6 @@ namespace gglab
 
 		DrawEnvironmentSettings(context);
 
-		ImGui::Spacing();
-
 		if (!context.m_IBLPreview)
 		{
 			ImGui::TextDisabled("IBL preview resources are not available.");
@@ -539,8 +537,6 @@ namespace gglab
 			ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
 		};
 		if (ImGui::CollapsingHeader("IBL BRDF LUT")) drawBrdfLut();
-
-		ImGui::Spacing();
 
 		const auto* environmentDesc = GetAllocatedTexture(resources.m_Environment);
 		const auto* environmentPreviewDesc =
@@ -680,8 +676,6 @@ namespace gglab
 			drawEnvironmentPreview();
 		}
 
-		ImGui::Spacing();
-
 		const auto* irradianceDesc = GetAllocatedTexture(resources.m_Irradiance);
 		const auto* irradiancePreviewDesc =
 			GetAllocatedTexture(resources.m_IrradiancePreview.m_Texture);
@@ -764,8 +758,6 @@ namespace gglab
 			}
 		};
 		if (ImGui::CollapsingHeader("IBL Irradiance")) drawIrradiancePreview();
-
-		ImGui::Spacing();
 
 		const auto* prefilteredSpecularDesc =
 			GetAllocatedTexture(resources.m_PrefilteredSpecular);
