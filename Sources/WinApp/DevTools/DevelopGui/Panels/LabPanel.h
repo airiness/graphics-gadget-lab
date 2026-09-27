@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
+#include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
 
 #include <optional>
 
@@ -36,5 +37,6 @@ namespace gglab
 		std::optional<LabRunConfigSnapshot> m_RunConfigDraft;
 		std::vector<DeferredParameterEdit> m_DeferredParameterEdits;
 		LabIdSnapshot m_RunConfigLabId;
+		CameraReferenceViewWidgetState m_ReferenceViews;
 	};
 }

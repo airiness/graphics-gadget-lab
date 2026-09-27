@@ -46,9 +46,10 @@ command path and retains retired session assets until their last-use GPU fence.
 Only the active session changes environment intensity/skybox visibility, restoring
 the previous values on exit. Pending or cancelled loads do not change them.
 
-`Scene > Camera > Reference Views` selects the three poses below; use
+`Lab Control > Reference Views` selects the three poses below; use
 `Restore Reference View` after navigating. Each restoration also sets Manual
-EV100 and compensation to zero and resets temporal history. The current viewport
+EV100 to 0 in legacy mode or 15 in Physical Sun mode, clears exposure compensation,
+and resets temporal history. The current viewport
 aspect is preserved, with 16:9 as the authored composition reference.
 
 | Reference | Runtime position | Runtime target | Vertical FOV (rad) |

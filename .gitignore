@@ -404,7 +404,5 @@ FodyWeavers.xsd
 *.sln.iml
 *.dat
 
-# Local build and verification products (including retired qualification outputs).
-/Build/EnvironmentQualification/
-/Build/Output/
-/Build/Verification/
+# Local build, shader cache and verification products.
+/Build/

@@ -306,6 +306,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiApplicationTooling.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
@@ -619,6 +622,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiBackendFactory.h">
       <Filter>DevTools\DevelopGui</Filter>

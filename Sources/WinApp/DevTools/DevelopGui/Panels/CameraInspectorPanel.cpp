@@ -1,4 +1,7 @@
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
@@ -29,8 +32,7 @@ namespace gglab
 			bool m_ShowMatrices = false;
 			uint64_t m_SelectedCameraId = 0;
 			uint64_t m_LastCameraId = 0;
-			uint64_t m_ReferenceMainId = 0;
-			std::string m_SelectedReferenceId;
+			CameraReferenceViewWidgetState m_ReferenceViews;
 
 			// cached edit values
 			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
@@ -84,59 +86,6 @@ namespace gglab
 			}
 		}
 
-		static void DrawReferenceViews(CameraPanelState& state, const CameraToolingSnapshot& snapshot,
-			CameraToolingControlBase* control) noexcept
-		{
-			if (snapshot.m_ReferenceViews.empty()) return;
-			const auto main = std::ranges::find(snapshot.m_Cameras, RenderViewID::Main,
-				&CameraToolingObservation::m_RenderViewId);
-			if (main == snapshot.m_Cameras.end()) return;
-			if (state.m_ReferenceMainId != main->m_Id)
-			{
-				state.m_ReferenceMainId = main->m_Id;
-				state.m_SelectedReferenceId = snapshot.m_LastRestoredReferenceId;
-			}
-			auto selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
-				&CameraReferenceView::m_Id);
-			if (selected == snapshot.m_ReferenceViews.end())
-			{
-				selected = snapshot.m_ReferenceViews.begin();
-				state.m_SelectedReferenceId = selected->m_Id;
-			}
-			const auto restore = [&](const CameraReferenceView& reference) noexcept
-				{
-					if (control && control->RestoreReferenceView(main->m_Id, reference.m_Id))
-					{
-						state.m_SelectedReferenceId = reference.m_Id;
-						state.m_SelectedCameraId = main->m_Id;
-						state.m_Initialized = false;
-					}
-				};
-			ImGui::SeparatorText("Reference Views");
-			ImGui::BeginDisabled(!control);
-			if (ImGui::BeginCombo("Reference View", selected->m_Name.c_str()))
-			{
-				for (const auto& reference : snapshot.m_ReferenceViews)
-				{
-					const bool current = reference.m_Id == state.m_SelectedReferenceId;
-					if (ImGui::Selectable(reference.m_Name.c_str(), current)) restore(reference);
-					if (current) ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-			selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
-				&CameraReferenceView::m_Id);
-			if (ImGui::Button("Restore Reference View")) restore(*selected);
-			ImGui::EndDisabled();
-			ImGui::TextWrapped("%s", selected->m_Purpose.c_str());
-			ImGui::TextDisabled("%s / profile %u", selected->m_Id.c_str(), selected->m_ProfileVersion);
-			if (std::abs(main->m_Aspect - selected->m_ReferenceAspect) > 0.001f)
-			{
-				ImGui::TextWrapped("Composition aspect: %.4f; current viewport: %.4f.",
-					selected->m_ReferenceAspect, main->m_Aspect);
-			}
-			ImGui::Spacing();
-		}
 
 		static std::string FormatCameraRecord(const CameraToolingObservation& camera,
 			const CameraToolingSnapshot& snapshot)
@@ -235,7 +184,15 @@ namespace gglab
 		const auto& view = *context.m_Cameras;
 		auto* control = context.m_CameraControl;
 		auto snapshot = view.GetCameras();
-		DrawReferenceViews(state, snapshot, control);
+		const auto* lab = context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<LabSnapshot>() : nullptr;
+		if (!lab || !ReferenceViewsBelongInLabPanel(*lab))
+		{
+			if (const auto restored = DrawCameraReferenceViews(state.m_ReferenceViews, snapshot, control))
+			{
+				state.m_SelectedCameraId = *restored;
+				state.m_Initialized = false;
+			}
+		}
 		snapshot = view.GetCameras();
 		if (!snapshot.FindCamera(state.m_SelectedCameraId))
 			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;

@@ -206,6 +206,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp" />
@@ -324,6 +325,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiContext.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiStyle.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />

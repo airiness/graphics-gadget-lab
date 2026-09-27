@@ -1,6 +1,7 @@
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Lab/LabInterfaces.h"
 #include "Lab/LabRuntime.h"
+#include "GGLabRuntime/Graphics/CameraTooling.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderQueueSnapshot.h"
 #include "DevTools/EnumText/EnumTextLab.h"
@@ -303,6 +304,13 @@ namespace gglab
 				commandQueued = true;
 			}
 			ImGui::PopID();
+		}
+
+		if (ReferenceViewsBelongInLabPanel(snapshot) && context.m_Cameras)
+		{
+			ImGui::BeginDisabled(commandQueued || snapshot.m_HasPendingCommands || snapshot.m_HasPendingSession);
+			DrawCameraReferenceViews(m_ReferenceViews, context.m_Cameras->GetCameras(), context.m_CameraControl);
+			ImGui::EndDisabled();
 		}
 
 		if (snapshot.m_HasPendingCommands || commandQueued)

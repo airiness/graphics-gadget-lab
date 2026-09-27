@@ -63,7 +63,7 @@ World Lighting development:
     GraphicsGadgetLab.exe --lab gglab.lab.lighting_contract --rhi dx12 --absolute-mouse
     GraphicsGadgetLab.exe --lab gglab.lab.lighting_contract --rhi vulkan --absolute-mouse
 
-Select its three reference views in `Scene > Camera > Reference Views`. The initial
+Select its three reference views in `Lab Control > Reference Views`. The initial
 preset uses legacy direct-light units with environment lighting, TAA, GTAO and
 Bloom disabled; physical sun/sky validation is separate.
 
