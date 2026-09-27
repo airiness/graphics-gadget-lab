@@ -54,6 +54,7 @@ namespace gglab
 		constexpr ShaderProgramBuildDefine GTAODenoiseXDefine{ L"GGLAB_GTAO_DENOISE_X" };
 		constexpr ShaderProgramBuildDefine GTAODenoiseYDefine{ L"GGLAB_GTAO_DENOISE_Y" };
 		constexpr ShaderProgramBuildDefine GTAOUpsampleDefine{ L"GGLAB_GTAO_UPSAMPLE" };
+		constexpr ShaderProgramBuildDefine AerialBuildDefine{ L"AERIAL_BUILD" };
 
 		constexpr std::array LegacyGTAODefines{ GTAOContributionDefine };
 		constexpr std::array ForwardPlusDefines{ ForwardPlusDefine };
@@ -70,6 +71,7 @@ namespace gglab
 		constexpr std::array GTAODenoiseXDefines{ GTAODenoiseXDefine };
 		constexpr std::array GTAODenoiseYDefines{ GTAODenoiseYDefine };
 		constexpr std::array GTAOUpsampleDefines{ GTAOUpsampleDefine };
+		constexpr std::array AerialBuildDefines{ AerialBuildDefine };
 
 		using namespace shader_programs;
 		const std::array BuildRecords{
@@ -88,6 +90,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &ForwardPlusValidationTilesCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceTiles", ValidationReduceTilesDefines },
 			ShaderProgramBuildRecord{ &ForwardPlusValidationFrameCompute, L"Passes/PassForwardPlusValidation.hlsl", L"CSReduceFrame", ValidationReduceFrameDefines },
 			ShaderProgramBuildRecord{ &AtmosphereLutCompute, L"Passes/PassAtmosphere.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &AerialPerspectiveBuildCompute, L"Passes/PassAerialPerspective.hlsl", L"CSBuild", AerialBuildDefines },
+			ShaderProgramBuildRecord{ &AerialPerspectiveCompositeCompute, L"Passes/PassAerialPerspective.hlsl", L"CSComposite" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },

@@ -57,6 +57,11 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 		float exposure = g_Pass.SourceMode == 23 ? viewData.ExposureMultiplier : 1.0;
 		return float4(LinearToSRGB(ACESFitted(color*exposure*g_Pass.PreviewExposureScale)),1);
 	}
+	if (g_Pass.SourceMode == 24)
+	{
+		return float4(saturate(GetTexture2DFloat4(g_Pass.SourceTextureIndex)
+			.SampleLevel(pointSampler, input.UV, 0).rgb), 1.0);
+	}
 	if (g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_DIRECTION ||
 		g_Pass.SourceMode == PREVIEW_SOURCE_TEMPORAL_MOTION_MAGNITUDE)
 	{

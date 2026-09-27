@@ -424,6 +424,11 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
+		if (depthCoverageFramePlan.AddsForwardOpaquePass())
+		{
+			m_AerialPerspectivePass.AddPass(rg, context, services);
+		}
+
 		if (context.GetTemporalFramePlan().m_Active)
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);

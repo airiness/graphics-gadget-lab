@@ -192,7 +192,8 @@ namespace gglab
 			{
 				constexpr auto Channel = PostProcessPreviewChannel::Atmosphere;
 				static constexpr const char* Names[] = {
-					"Transmittance", "Multiple Scattering", "Sky View"
+					"Transmittance LUT", "Multiple Scattering LUT", "Sky View LUT",
+					"Aerial Transmittance", "Aerial In-Scattering"
 				};
 				const auto* view = context.m_PostProcessPreview;
 				auto* previewControl = context.m_PostProcessPreviewControl;
@@ -202,15 +203,17 @@ namespace gglab
 					static constexpr PostProcessDebugTap Taps[] = {
 						PostProcessDebugTap::AtmosphereTransmittance,
 						PostProcessDebugTap::AtmosphereMultipleScattering,
-						PostProcessDebugTap::AtmosphereSkyView
+						PostProcessDebugTap::AtmosphereSkyView,
+						PostProcessDebugTap::AtmosphereAerialTransmittance,
+						PostProcessDebugTap::AtmosphereAerialInScattering
 					};
 					PostProcessDebugSelection selection = preview.m_Selected;
 					const int selectedIndex = static_cast<int>(selection.m_Tap) -
 						static_cast<int>(PostProcessDebugTap::AtmosphereTransmittance);
 					ImGui::BeginDisabled(!previewControl);
-					if (ImGui::BeginCombo("LUT", Names[std::clamp(selectedIndex, 0, 2)]))
+					if (ImGui::BeginCombo("Preview", Names[std::clamp(selectedIndex, 0, 4)]))
 					{
-						for (int index = 0; index < 3; ++index)
+						for (int index = 0; index < 5; ++index)
 						{
 							if (ImGui::Selectable(Names[index], selectedIndex == index))
 							{
@@ -240,13 +243,13 @@ namespace gglab
 								width * static_cast<float>(preview.m_Height) / preview.m_Width));
 						}
 						ImGui::TextDisabled("%s | frame %llu | update %llu",
-							Names[std::clamp(selectedIndex, 0, 2)],
+							Names[std::clamp(selectedIndex, 0, 4)],
 							static_cast<unsigned long long>(preview.m_FrameSerial),
 							static_cast<unsigned long long>(preview.m_UpdateCount));
 					}
-					else ImGui::TextDisabled("LUT preview pending.");
+					else ImGui::TextDisabled("Atmosphere preview pending.");
 				}
-				if (ImGui::CollapsingHeader("Diagnostics: LUT Updates"))
+				if (ImGui::CollapsingHeader("Diagnostics: Atmosphere GPU"))
 				{
 					ImGui::Text("Updating: %s%s%s",
 						(snapshot->m_State.m_DirtyMask & 1u) ? "Transmittance " : "",
@@ -266,7 +269,7 @@ namespace gglab
 							ImGui::Text("%s: %.3f ms", pass.m_Name.c_str(), pass.m_Milliseconds);
 						}
 					}
-					else ImGui::TextDisabled("LUT timings: enable Diagnostics / Profiling, then update the LUTs.");
+					else ImGui::TextDisabled("Atmosphere timings: enable Diagnostics / Profiling.");
 				}
 			}
 		}

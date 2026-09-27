@@ -2565,6 +2565,41 @@ namespace gglab
 				physicalSkyPixelDxil.IsSuccess() && physicalSkyPixelSpirV.IsSuccess(),
 				"Physical sky preview vertex and pixel shaders compile for DX12 and Vulkan");
 
+			desc.m_SourcePath = L"Passes/PassAerialPerspective.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSBuild";
+			desc.m_Defines = { {.m_Name = L"AERIAL_BUILD", .m_Value = L"1"} };
+			desc.m_Target = {};
+			const auto aerialBuildDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto aerialBuildSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"CSComposite";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const auto aerialCompositeDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto aerialCompositeSpirV = compiler.Compile(desc);
+			context.Check(aerialBuildDxil.IsSuccess() && aerialBuildSpirV.IsSuccess() &&
+				aerialCompositeDxil.IsSuccess() && aerialCompositeSpirV.IsSuccess(),
+				"Aerial perspective froxel build and depth composite compile for DX12 and Vulkan");
+			SpirVDecorationReflection aerialBuildReflection;
+			const bool aerialBuildReflected = aerialBuildSpirV.IsSuccess() &&
+				ReadSpirVDecorations(aerialBuildSpirV.m_Artifact.m_Binary, aerialBuildReflection);
+			const auto* aerialBuildLayout = aerialBuildReflected
+				? aerialBuildReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			SpirVDecorationReflection aerialCompositeReflection;
+			const bool aerialCompositeReflected = aerialCompositeSpirV.IsSuccess() &&
+				ReadSpirVDecorations(aerialCompositeSpirV.m_Artifact.m_Binary, aerialCompositeReflection);
+			const auto* aerialCompositeLayout = aerialCompositeReflected
+				? aerialCompositeReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			context.Check(aerialBuildLayout && aerialBuildLayout->m_Members.size() == 14 &&
+				aerialBuildLayout->m_Members[12].m_Offset == 48 &&
+				aerialCompositeLayout && aerialCompositeLayout->m_Members.size() == 16 &&
+				aerialCompositeLayout->m_Members[15].m_Offset == 60,
+				"Aerial pass root constants retain the 64-byte CPU and SPIR-V layout");
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+
 			struct IBLAbiCase
 			{
 				const wchar_t* m_Path;

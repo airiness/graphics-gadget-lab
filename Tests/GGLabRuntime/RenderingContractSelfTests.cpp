@@ -42,9 +42,11 @@
 #include "GGLabRuntime/Graphics/WorldSun.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "Graphics/RenderPass/RenderPassAerialPerspective.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include <numbers>
@@ -70,9 +72,11 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/TransferBatch.h"
@@ -6751,6 +6755,99 @@ namespace gglab
 			context.Check(activeAtmosphere.GetTexture(0) == newTexture && oldTexture != newTexture &&
 				pool.GetDiagnostics().m_PendingRetirementTextureCount == 3,
 				"Atomic LUT replacement retains the old set behind its last-use fence, independent of the bake fence");
+			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
+			frame.m_RenderSceneStatus = RenderSceneBuildStatus::Ready;
+			frame.m_RenderViews[0].m_Width = 1024;
+			frame.m_RenderViews[0].m_Height = 512;
+			frame.m_RenderViews[0].m_FovRadians = 1.0f;
+			frame.m_RenderViews[0].m_Aspect = 2.0f;
+			frame.m_RenderViews[0].m_Far = 10000.0f;
+			bakeEnvironment.m_Settings.m_EnableSkybox = true;
+			bakeEnvironment.m_Settings.m_BackgroundMode =
+				EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+			auto aerialServices = previewServices;
+			aerialServices.m_Atmosphere = &activeAtmosphere;
+			aerialServices.m_Environment = &bakeEnvironment;
+			RenderGraph aerialGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			struct AerialTargetData {};
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Opaque", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				const RHIExtent3D extent{ 1024, 512, 1 };
+				RHITextureDesc colorDesc{};
+				colorDesc.m_Format = RHIFormat::R16G16B16A16Float;
+				colorDesc.m_Extent = extent;
+				auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				targets.m_Width = extent.m_Width;
+				targets.m_Height = extent.m_Height;
+				targets.m_SceneColor = builder.CreateTexture("AerialTest.SceneColor", colorDesc);
+				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				RHITextureDesc depthDesc{};
+				depthDesc.m_Format = RHIFormat::R32Typeless;
+				depthDesc.m_Extent = extent;
+				auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(
+					SceneDepthResourcesName);
+				depth.m_Texture = builder.CreateTexture("AerialTest.Depth", depthDesc);
+				depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float,
+					0, 1, RHITextureAspect::Depth);
+				builder.WriteInPlace(depth.m_Texture, RGTextureAccess::DepthStencilWrite);
+			});
+			const auto aerialContext = frame.MakeRenderFrameContext();
+			pass.AddPass(aerialGraph, aerialContext, aerialServices);
+			registry.SetPostProcessPreviewSelection(
+				{ PostProcessDebugTap::AtmosphereAerialTransmittance, 0 },
+				PostProcessPreviewChannel::Atmosphere);
+			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
+			RenderPassAerialPerspective aerialPass;
+			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			RenderPassPostProcessPreview aerialPreview;
+			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
+			});
+			pass.AddFinishPass(aerialGraph);
+			const bool aerialCompiled = aerialGraph.Compile();
+			RGSnapshot aerialSnapshot;
+			BuildRenderGraphSnapshot(aerialGraph, aerialSnapshot);
+			const auto aerialEdge = [&aerialSnapshot](std::string_view from,
+				std::string_view to) noexcept
+				{
+					return std::ranges::any_of(aerialSnapshot.m_DependencyEdges,
+						[from, to](const RGSnapshotDependencyEdge& edge)
+						{
+							return edge.m_FromPassName == from && edge.m_ToPassName == to;
+						});
+				};
+			context.Check(aerialCompiled, "Aerial opaque graph compiles with sampled depth and LUT inputs");
+			const auto aerialBuild = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.Build", &RGSnapshotPassInfo::m_Name);
+			context.Check(aerialBuild != aerialSnapshot.m_Passes.end() && !aerialBuild->m_Culled &&
+				std::ranges::any_of(aerialBuild->m_Accesses,
+					[](const RGSnapshotAccessInfo& access)
+					{
+						return access.m_ResourceName == AtmosphereLutNames[0] &&
+							access.m_DependencyAccess == RGDependencyAccess::Read;
+					}) &&
+				std::ranges::any_of(aerialBuild->m_Accesses,
+					[](const RGSnapshotAccessInfo& access)
+					{
+						return access.m_ResourceName == AtmosphereLutNames[1] &&
+							access.m_DependencyAccess == RGDependencyAccess::Read;
+					}), "Aerial froxel build samples both active atmosphere transport LUTs");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Build", "Atmosphere.AerialPerspective.Composite"),
+				"Aerial composite reads the froxel output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.Consumer"),
+				"Downstream scene color reads the aerial composite output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "Atmosphere.Preview"),
+				"Aerial diagnostic preview reads the current composite result");
+			activeAtmosphere.EndFrame(false, {});
 			device.m_CompletedFenceValue = 200;
 			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
 			device.m_CompletedFenceValue = std::max(fenceValue, uint64_t{ 200 });

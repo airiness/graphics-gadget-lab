@@ -7,6 +7,7 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -164,6 +165,24 @@ namespace gglab
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const auto selection = registry->GetPostProcessPreviewSelection(channel);
+		if (selection.m_Tap == PostProcessDebugTap::AtmosphereAerialTransmittance ||
+			selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering)
+		{
+			const auto* aerial = rg.GetBlackboard().TryGet<RGAerialPerspectiveResources>(
+				AerialPerspectiveResourcesName);
+			if (!aerial || aerial->m_DiagnosticTap != selection.m_Tap ||
+				!aerial->m_Diagnostic.IsValid())
+			{
+				registry->InvalidatePostProcessPreview(selection, channel);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest(channel)) return;
+			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
+				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
+					? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
+				std::nullopt, selection, channel);
+			return;
+		}
 		if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
 		{
 			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);

@@ -784,6 +784,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

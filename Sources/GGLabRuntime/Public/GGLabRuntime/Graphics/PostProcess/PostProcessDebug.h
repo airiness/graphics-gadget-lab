@@ -45,8 +45,10 @@ namespace gglab
 		AtmosphereTransmittance = 21,
 		AtmosphereMultipleScattering = 22,
 		AtmosphereSkyView = 23,
+		AtmosphereAerialTransmittance = 24,
+		AtmosphereAerialInScattering = 25,
 
-		Count = 24
+		Count = 26
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -69,7 +71,7 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 24);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 26);
 
 	struct PostProcessDebugSelection
 	{

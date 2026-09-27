@@ -1521,12 +1521,12 @@ namespace gglab
 				first.m_ExitCode == 0 && IsSingleJsonDocument(first) &&
 					first.m_StdOut.find("\"command\":\"build-runtime\"") != std::string::npos &&
 					first.m_StdOut.find("\"success\":true") != std::string::npos &&
-					first.m_StdOut.find("\"programCount\":56") != std::string::npos &&
+					first.m_StdOut.find("\"programCount\":61") != std::string::npos &&
 					firstRegistryId.size() == 64 && firstActive.IsSuccess() &&
 					Sha256DigestToHex(
 						firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) ==
 							firstRegistryId && firstRegistry.IsSuccess() &&
-					firstRegistry.m_Artifact.m_Entries.size() == 56,
+					firstRegistry.m_Artifact.m_Entries.size() == 61,
 				"build-runtime publishes the complete immutable catalog and active RegistryId");
 
 			std::vector<std::wstring> vulkanArguments = arguments;
@@ -1549,9 +1549,9 @@ namespace gglab
 			context.Check(targetArgument != vulkanArguments.end() &&
 				vulkanBuild.m_ExitCode == 0 && IsSingleJsonDocument(vulkanBuild) &&
 				vulkanBuild.m_StdOut.find("\"success\":true") != std::string::npos &&
-				vulkanBuild.m_StdOut.find("\"programCount\":56") != std::string::npos &&
+				vulkanBuild.m_StdOut.find("\"programCount\":61") != std::string::npos &&
 				vulkanActive.IsSuccess() && vulkanRegistry.IsSuccess() &&
-				vulkanRegistry.m_Artifact.m_Entries.size() == 56,
+				vulkanRegistry.m_Artifact.m_Entries.size() == 61,
 				"build-runtime publishes the complete Vulkan 1.3 immutable catalog");
 
 			const CliRunResult second = RunCli(arguments);
