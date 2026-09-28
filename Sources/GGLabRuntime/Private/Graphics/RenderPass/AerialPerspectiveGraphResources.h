@@ -10,6 +10,7 @@ namespace gglab
 		RGTextureId m_RadianceAtlas{};
 		RGTextureId m_ThroughputAtlas{};
 		RGTextureId m_Diagnostic{};
+		RGBufferId m_ProbeBuffer{};
 		PostProcessDebugTap m_DiagnosticTap = PostProcessDebugTap::Count;
 	};
 }

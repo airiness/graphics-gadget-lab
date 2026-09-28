@@ -7533,9 +7533,12 @@ namespace gglab
 			const ResolvedViewRenderSettings defaultSettings =
 				ResolveViewRenderSettings(profile, camera);
 			profile.m_Lighting.m_EnableAerialPerspective = false;
+			profile.m_Lighting.m_EnableAerialProbe = true;
 			const auto baselineSettings = ResolveViewRenderSettings(profile, camera);
 			context.Check(defaultSettings.m_Lighting.m_EnableAerialPerspective &&
 				!baselineSettings.m_Lighting.m_EnableAerialPerspective &&
+				!defaultSettings.m_Lighting.m_EnableAerialProbe &&
+				baselineSettings.m_Lighting.m_EnableAerialProbe &&
 				baselineSettings.m_Exposure.m_PreExposure == defaultSettings.m_Exposure.m_PreExposure &&
 				baselineSettings.m_Lighting.m_GTAO.m_Enabled == defaultSettings.m_Lighting.m_GTAO.m_Enabled &&
 				baselineSettings.m_TemporalAA.m_Enabled == defaultSettings.m_TemporalAA.m_Enabled,

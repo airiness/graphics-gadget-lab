@@ -37,6 +37,8 @@ namespace gglab::shader_programs
 		"gglab.shader.aerial-perspective", "compute.build", ShaderStage::Compute };
 	inline const ShaderProgramRef AerialPerspectiveCompositeCompute{
 		"gglab.shader.aerial-perspective", "compute.composite", ShaderStage::Compute };
+	inline const ShaderProgramRef AerialPerspectiveProbeCompute{
+		"gglab.shader.aerial-probe", "compute", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateCompute{
 		"gglab.shader.gtao", "compute.evaluate", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateDiagnosticsCompute{

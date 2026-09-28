@@ -42,6 +42,7 @@ namespace gglab
 		profile.m_EnableScenePreExposure = true;
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
+		profile.m_Lighting.m_EnableAerialProbe = true;
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;
 		const bool registered = GetCameraRig().SetReferenceViews(
 			{ AtmosphereRangeReferenceViews.begin(), AtmosphereRangeReferenceViews.end() });

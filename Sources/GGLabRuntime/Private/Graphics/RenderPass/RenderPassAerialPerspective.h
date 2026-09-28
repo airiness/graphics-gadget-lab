@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
+#include "Graphics/RenderPass/AerialPerspectiveProbeReadback.h"
 
 namespace gglab
 {
@@ -19,5 +20,8 @@ namespace gglab
 		ComputePipelineRecipe m_CompositeRecipe{};
 		ComputePipelineSlot m_BuildSlot{};
 		ComputePipelineSlot m_CompositeSlot{};
+		ComputePipelineRecipe m_ProbeRecipe{};
+		ComputePipelineSlot m_ProbeSlot{};
+		AerialPerspectiveProbeReadback m_ProbeReadback{};
 	};
 }
