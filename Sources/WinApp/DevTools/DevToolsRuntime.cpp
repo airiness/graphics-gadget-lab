@@ -15,6 +15,11 @@ namespace gglab
 		const ViewRenderProfile& authoringProfile) const noexcept
 	{
 		ViewRenderProfile effectiveProfile = authoringProfile;
+		if (m_ViewRenderSettingsOverrides.m_ScenePreExposure.has_value())
+		{
+			effectiveProfile.m_EnableScenePreExposure =
+				*m_ViewRenderSettingsOverrides.m_ScenePreExposure;
+		}
 		if (m_ViewRenderSettingsOverrides.m_TemporalAA.m_IsActive)
 		{
 			effectiveProfile.m_TemporalAA =

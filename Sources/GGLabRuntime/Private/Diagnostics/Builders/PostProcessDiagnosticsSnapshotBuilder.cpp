@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/PostProcessDiagnosticsSnapshot.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/Profiling/GpuProfiler.h"
-#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/Renderer.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
@@ -42,6 +41,7 @@ namespace gglab
 			renderGraph.GetBlackboard().TryGet<RGPostProcessResources>(PostProcessResourcesName);
 		if (resources)
 		{
+			snapshot.m_Exposure = resources->m_Exposure;
 			snapshot.m_SceneColor =
 				BuildTextureDiagnostics(renderGraph, resources->m_Inputs.m_SceneColor);
 			snapshot.m_BloomPrefilter =
@@ -57,24 +57,6 @@ namespace gglab
 			snapshot.m_BloomResult =
 				BuildTextureDiagnostics(renderGraph, resources->m_Bloom.m_Result);
 		}
-		const auto* sceneDepth =
-			renderGraph.GetBlackboard().TryGet<RGSceneDepthResources>(SceneDepthResourcesName);
-		if (sceneDepth && sceneDepth->m_Texture.IsValid())
-		{
-			const auto& desc = renderGraph.GetTextureDesc(sceneDepth->m_Texture);
-			snapshot.m_SceneDepth = {
-				.m_Width = static_cast<uint32_t>(desc.m_Extent.m_Width),
-				.m_Height = desc.m_Extent.m_Height,
-				.m_ResourceFormat = desc.m_Format,
-				.m_DsvFormat = sceneDepth->m_DsvDesc.m_Format,
-				.m_SrvFormat = sceneDepth->m_SrvDesc.m_Format,
-				.m_ClearDepth = desc.m_ClearValue ? desc.m_ClearValue->m_Depth : 0.0f,
-				.m_Convention = sceneDepth->m_Convention,
-				.m_HasTypedClear = desc.m_ClearValue.has_value(),
-				.m_Available = true,
-			};
-		}
-
 		const auto* registry = renderer.GetRenderResourceRegistry();
 		if (registry)
 		{

@@ -27,6 +27,7 @@ namespace gglab
 	class AssetUploadScheduling;
 	class EnvironmentLightingSystem;
 	class IBLBakeScheduler;
+	class AtmosphereSystem;
 	class RenderResourceRegistry;
 	class SamplerRegistry;
 	class ShaderManager;
@@ -92,7 +93,8 @@ namespace gglab
 		[[nodiscard]] RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept override;
 		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept override;
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			float scenePreExposure) noexcept override;
 		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
 		void Render(Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
@@ -122,6 +124,8 @@ namespace gglab
 		{
 			return m_EnvironmentLightingSystem.get();
 		}
+		AtmosphereSystem* GetAtmosphereSystem() const noexcept { return m_Atmosphere.get(); }
+		AtmosphereSystem* GetBakeAtmosphereSystem() const noexcept { return m_BakeAtmosphere.get(); }
 		IBLBakeScheduler* GetIBLBakeScheduler() const noexcept { return m_IBLBakeScheduler.get(); }
 		RenderResourceRegistry* GetRenderResourceRegistry() const noexcept
 		{
@@ -189,6 +193,8 @@ namespace gglab
 		void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept override;
 		void NotifyBakeResourcesInitialized(uint64_t generation) noexcept override;
 		[[nodiscard]] const EnvironmentTextureSource& GetBakingSource() const noexcept override;
+		[[nodiscard]] const AtmosphereGPU* GetBakingAtmosphereParameters() const noexcept override;
+		[[nodiscard]] Vector3 GetBakingSunDirection() const noexcept override;
 		[[nodiscard]] const EnvironmentTextureSource& GetCommittedEnvironmentSource()
 			const noexcept override;
 		[[nodiscard]] ArtifactCacheCoreStatistics GetArtifactCacheStatistics()
@@ -333,6 +339,8 @@ namespace gglab
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;
+		std::unique_ptr<AtmosphereSystem> m_Atmosphere;
+		std::unique_ptr<AtmosphereSystem> m_BakeAtmosphere;
 		std::unique_ptr<RenderResourceRegistry> m_RenderResRegistry;
 		std::unique_ptr<SamplerRegistry> m_SamplerRegistry;
 		RHIBindingLayoutHandle m_CommonBindingLayout{};

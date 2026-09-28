@@ -9,9 +9,9 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Lighting/GTAO";
+			return "Rendering/Ambient Occlusion";
 		}
-		std::string_view GetTitle() const noexcept override { return "GTAO Inspector"; }
+		std::string_view GetTitle() const noexcept override { return "Ambient Occlusion"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 	};
 }

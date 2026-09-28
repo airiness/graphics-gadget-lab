@@ -1,148 +1,19 @@
 # Graphics Gadget Lab
 
-Graphics Gadget Lab (gglab) is a graphics research playground built
-with C++, Direct3D 12, and Vulkan 1.3.
+Graphics Gadget Lab (gglab) is a Windows graphics research playground built with
+C++20, Direct3D 12, Vulkan, DXC, and HLSL.
 
-It is used to experiment with rendering techniques, GPU resource management,
-render graphs, shaders, diagnostics, and small self-contained graphics Labs.
-
-## Start Demo
-
-[![Start Demo](Assets/Media/StartDemo.gif)](Assets/Media/StartDemo.mp4)
+It provides focused graphics Labs for exploring rendering techniques, improving
+visual quality, and experimenting with GPU resources, shaders, and diagnostics.
 
 ## Highlights
 
-- Runtime-selectable Direct3D 12 and Vulkan renderers with DXC and HLSL
-- Render graph and reusable render-pass pipeline
-- Runtime-selectable Labs for focused experiments
-- ImGui-based diagnostics, GPU profiling, and developer tools on both RHIs
-- GPU resource, asset, and shader management experiments
+- Runtime-selectable Direct3D 12 and Vulkan backends
+- Render graph and reusable render-pass pipelines
+- PBR rendering, physical sky lighting, shadows, and post processing
+- Focused Labs for graphics experiments
+- ImGui-based developer tools, diagnostics, and GPU profiling
 
-## Build
+## Demo
 
-Requirements:
-
-- Windows 10 or later
-- Visual Studio 18 Insiders with the v143 toolset
-- Windows SDK
-- Git submodules initialized
-- Vulkan SDK 1.3.296 (optional; required for the Vulkan backend)
-
-Open `GraphicsGadgetLab.sln`, then build the `WinApp` project for x64.
-
-The main executable is written to:
-
-    Build/Output/x64/Debug/GraphicsGadgetLab.exe
-
-The Vulkan backend is enabled by default (`GGLAB_ENABLE_VULKAN=1`). It uses
-the Vulkan SDK discovered through the `VULKAN_SDK` environment variable and
-links `vulkan-1.lib`; the runtime uses the system Vulkan loader. Set
-`GGLAB_ENABLE_VULKAN=0` for a DX12-only build that does not require the
-Vulkan SDK.
-
-## Run a Lab
-
-    GraphicsGadgetLab.exe --rhi dx12 --lab gglab.lab.mini_pbr_grid --absolute-mouse
-    GraphicsGadgetLab.exe --rhi vulkan --lab gglab.lab.mini_pbr_grid --absolute-mouse
-
-The Texture Contract Lab isolates UVs, color space, tangent normals and packed
-metallic/roughness inputs through the production asset and Forward PBR path:
-
-    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi dx12 --absolute-mouse
-    GraphicsGadgetLab.exe --lab gglab.lab.texture_contract --rhi vulkan --absolute-mouse
-
-It is also available as `Texture Contract` in `Lab Control > Active Lab` while
-`Demo.LabHost` is active. See the
-[texture contract reference](Assets/Models/GGLabTextureContract/README.md) for the
-board layout, numeric references and screenshots.
-
-Run with `--help` to see the available startup options.
-
-The application starts in FPS mouse mode. Press `T` to release the cursor and
-interact with the developer UI.
-
-## RHI backend selection
-
-The Blender island import fixture reuses `DemoPlayground` with a fixed camera
-and lighting preset:
-
-    GraphicsGadgetLab.exe --demo island --rhi dx12 --absolute-mouse
-    GraphicsGadgetLab.exe --demo island --rhi vulkan --absolute-mouse
-
-`--demo playground` keeps the Sponza/FlightHelmet preset. See the
-[island asset reference](Assets/Models/GGLabIslandPrototype/README.md)
-for export instructions, runtime settings and screenshots.
-
-The coastal atrium adds the architectural shadow study scene with basic concrete,
-stone and metal materials:
-
-    GraphicsGadgetLab.exe --demo atrium --rhi dx12 --absolute-mouse
-    GraphicsGadgetLab.exe --demo atrium --rhi vulkan --absolute-mouse
-
-It shares the Playground implementation and starts at the courtyard reference
-camera. `Scene > Camera > Reference Views` switches between the courtyard,
-shadow stairs and interior/exterior views; `Restore Reference View` returns to
-the selected pose after navigation. See the
-[atrium asset reference](Assets/Models/GGLabCoastalAtrium/README.md) for source
-provenance, dimensions, camera profiles and screenshots.
-
-[Rendering Baseline 1](Assets/Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
-records reproducible inputs and captures for static rendering comparisons.
-
-    GraphicsGadgetLab.exe --rhi vulkan
-    GraphicsGadgetLab.exe --rhi dx12
-    GraphicsGadgetLab.exe --list-adapters
-    GraphicsGadgetLab.exe --rhi vulkan --adapter <index|identity-prefix>
-
-The default backend is DX12. An explicit `--rhi vulkan` creates a Vulkan
-instance, Win32 surface, enumerates and evaluates every physical device
-against the GGLab Vulkan device profile, and creates a logical device and
-graphics/present queue; it never falls back to DX12. `--list-adapters` prints
-the profile evaluation for every adapter.
-
-Hardware qualification is a separate privileged executable:
-
-    GGLabVulkanQualification.exe [--adapter <index|identity-prefix>]
-
-`GGLabVulkanQualification` owns the authoring-time shader compiler and DXC
-dependencies required by the qualification probe. The normal `WinApp` target
-does not link the Shader Toolchain or DXC.
-
-Vulkan uses the normal Application, Renderer, RenderGraph, and backend-neutral
-RHI path. Production coverage includes graphics and direct-compute command
-encoding, bindless material resources, Texture2D/TextureCube sampling, depth
-and directional shadows, Forward PBR, IBL and skybox rendering, Forward+,
-GTAO, post processing and tone mapping, ImGui, and timestamp-based GPU
-profiling. Debug builds request `VK_LAYER_KHRONOS_validation`; validation
-availability, errors, and warnings are hard qualification gates.
-
-The Vulkan diagnostics panel reports adapter/profile identity, validation
-counts, descriptor publication and retained backing state, VMA heap budgets,
-resource retirement, pipeline/layout counts, frame-slot versus swapchain-image
-indices, timeline progress, and the first fatal/device-lost operation. Native
-Vulkan pipeline objects are cached only for the current process.
-
-CI installs the pinned SDK and runtime, then builds Debug, Release, and Debug
-without PCH. Each leg runs the Application, Foundation, Runtime, rendering,
-shader compile, and Vulkan contract suites. Hardware presentation qualification
-is performed separately on supported Windows adapters because hosted CI does
-not provide a conformant display GPU.
-
-## Self-tests
-
-First-party headless self-tests run as one executable per domain:
-
-| Executable | Command | Coverage |
-|---|---|---|
-| `GraphicsGadgetLab.exe` | `--self-test all` | Application-owned in-app suites (`app-launch-options`, `app-devtools-view-profile`, `napa-voxel`) |
-| `GGLabVulkanQualification.exe` | `--self-test` | Headless qualification launch and validation-gate contracts |
-| `GGLabRuntimeTests.exe` | `--suite all` | Runtime/Foundation contract suites (`artifact-cache`, `asset-data`, `asset-upload-scheduler`, `publication-accounting`, `shader-artifact-runtime`, `rendering-contracts`, `vulkan-contracts`) |
-| `GGLabAppRuntimeTests.exe` | (no arguments) | Host-neutral Application lifecycle and service-composition contracts |
-| `GGLabShaderToolchainTests.exe` | `--suite all` | Toolchain-owned CLI, compiler-process, and immutable artifact-publication contracts without Runtime/RHI dependencies |
-| `GGLabShaderRuntimeIntegrationTests.exe` | `--suite all` | Cross-domain Toolchain, Runtime/RHI ABI, production shader, and artifact-consumption integration contracts |
-| `NapaVoxelCoreTests.exe` | `--suite all` | Pure NapaVoxelCore suites compiled as C++20 (`build-contract`, `coordinate`, `damage`, `edit`, `hash`, `mesher`, `multi-chunk`, `mutation`, `primitive`, `restore`, `storage`, `publication-data-only`) |
-| `GGLabFoundationTests.exe` | (no arguments) | Foundation public-header link probe |
-
-Use `--suite <id>` to select one suite in the domain test executables. CI runs
-all eight executables on the applicable build legs; actual hardware qualification remains
-a manual gate on supported Windows adapters.
+[![Start Demo](Assets/Media/StartDemo.gif)](Assets/Media/StartDemo.mp4)

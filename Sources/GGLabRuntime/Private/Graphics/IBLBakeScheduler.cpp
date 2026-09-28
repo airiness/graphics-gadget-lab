@@ -1,4 +1,5 @@
 #include "Graphics/IBLBakeScheduler.h"
+#include "Graphics/AtmosphereSystem.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -18,6 +19,7 @@
 #include <format>
 #include <initializer_list>
 #include <memory>
+#include <limits>
 #include <stop_token>
 #include <string>
 #include <string_view>
@@ -151,6 +153,8 @@ namespace gglab
 			})
 	{
 		GGLAB_ASSERT_NOT_NULL(m_Device);
+		m_Atmosphere = createInfo.m_Atmosphere;
+		m_BakeAtmosphere = createInfo.m_BakeAtmosphere;
 		GGLAB_ASSERT_NOT_NULL(m_TaskSystem);
 		GGLAB_ASSERT_NOT_NULL(m_EnvironmentLightingSystem);
 		GGLAB_ASSERT_NOT_NULL(m_RenderResourceRegistry);
@@ -212,6 +216,12 @@ namespace gglab
 			}
 
 			m_InFlightFence = {};
+			if (m_AbortedSubmittedWork)
+			{
+				m_AbortedSubmittedWork = false;
+				StartRequestedBake(lastSubmittedFence);
+				return;
+			}
 			if (shaderRegistryChanged)
 			{
 				if (m_BakeResourceInitialization.IsInFlight())
@@ -277,7 +287,7 @@ namespace gglab
 
 	void IBLBakeScheduler::StartRequestedBake(const RHIFencePoint& retireFence) noexcept
 	{
-		GGLAB_UNUSED(retireFence);
+		if (m_BakeAtmosphere) m_BakeAtmosphere->Disable();
 		// A frame abort keeps initialization recordable for the same generation.
 		// A superseding bake must discard that state before adopting new resources.
 		const bool resetInitialization = m_BakeResourceInitialization.ResetForRequestedBake();
@@ -319,12 +329,32 @@ namespace gglab
 			.m_Attempt = bakeAttempt,
 			.m_Generation = m_Status.m_BakingGeneration,
 			.m_Source = m_EnvironmentLightingSystem->GetBakeSource(),
+			.m_PhysicalSky = m_EnvironmentLightingSystem->GetRequestedPhysicalSky(),
 			.m_Config = m_EnvironmentLightingSystem->GetBakeConfig(),
 			.m_ShaderRegistry = shaderRegistryRef,
 			.m_ShaderArtifacts = shaderArtifacts,
 			.m_IgnoreCache =
 				m_EnvironmentLightingSystem->ShouldIgnoreCache(m_Status.m_BakingGeneration),
 		};
+
+		if (m_BakingRequest.m_PhysicalSky)
+		{
+			m_BakingRequest.m_Source = {};
+			GGLAB_ASSERT(m_Atmosphere && m_BakeAtmosphere);
+			// Sky transport is scene-referred and can exceed FP16 even without the solar disk.
+			auto& config = m_BakingRequest.m_Config;
+			config.m_EnvironmentCubemapFormat = RHIFormat::R32G32B32A32Float;
+			config.m_IrradianceCubemapFormat = RHIFormat::R32G32B32A32Float;
+			config.m_PrefilteredSpecularCubemapFormat = RHIFormat::R32G32B32A32Float;
+			config.m_PrefilteredSpecularMaxSampleLuminance = std::numeric_limits<float>::max();
+			// Procedural provenance is runtime-only; skip asset retention and every texture cache operation.
+			auto work = std::make_shared<CacheLoadWork>();
+			work->m_Attempt = bakeAttempt;
+			work->m_Generation = m_Status.m_BakingGeneration;
+			work->m_ShaderRegistry = shaderRegistryRef;
+			BeginBakeResourceInitialization(retireFence, work);
+			return;
+		}
 
 		if (!m_BakingRequest.IsValid() || !m_BakingSourceOwner ||
 			!m_BakingSourceOwner->RetainTexture(
@@ -588,10 +618,17 @@ namespace gglab
 		SetStage(IBLBakeStage::WaitingForGpu, m_Status.m_Progress);
 	}
 
-	void IBLBakeScheduler::OnFrameAborted() noexcept
+	void IBLBakeScheduler::OnFrameAborted(const RHIFencePoint& submittedFence) noexcept
 	{
+		const bool bakeExecuted = m_ExecutedStage != IBLBakeStage::Idle || m_BakeResourceInitialization.HasExecuted();
 		m_ExecutedStage = IBLBakeStage::Idle;
 		m_BakeResourceInitialization.AbortFrame();
+		if (bakeExecuted && submittedFence.IsValid())
+		{
+			// Partial/fatal submissions cannot certify final states. Reinitialize only after their GPU work completes.
+			m_InFlightFence = submittedFence;
+			m_AbortedSubmittedWork = true;
+		}
 	}
 
 	IBLBakeStage IBLBakeScheduler::GetStageForRecording() const noexcept
@@ -650,7 +687,7 @@ namespace gglab
 			};
 		if (isMissing(IBLArtifactStage::Environment))
 		{
-			if (!m_BakingRequest.m_Source.IsValid())
+			if (!m_BakingRequest.m_Source.IsValid() && !m_BakingRequest.m_PhysicalSky)
 			{
 				ReleaseBakingSourceLease();
 				SetStage(IBLBakeStage::Failed, 0.0f);
@@ -676,7 +713,7 @@ namespace gglab
 		}
 
 		ReleaseBakingSourceLease();
-		if (m_Status.m_GpuBuildStageCount > 0)
+		if (m_Status.m_GpuBuildStageCount > 0 && !m_BakingRequest.m_PhysicalSky)
 		{
 			SetStage(IBLBakeStage::SavingCache, 0.95f);
 			GGLAB_UNUSED(StartCacheReadback());
@@ -866,14 +903,30 @@ namespace gglab
 			[](const IBLStageArtifactStatus& artifact) noexcept
 			{ return artifact.m_Resolution == IBLArtifactResolution::Miss; }),
 			"IBL staging resources must contain a complete generation before publication.");
+		if (m_BakingRequest.m_PhysicalSky && !m_BakeAtmosphere->CanPublish())
+		{
+			SetStage(IBLBakeStage::Failed, 0.0f);
+			return;
+		}
 		m_RenderResourceRegistry->PublishIBLBakeResources();
+		if (m_BakingRequest.m_PhysicalSky)
+		{
+			// Tick runs before scene/shadow extraction; the completed LUT/IBL/source switch is one frame boundary.
+			m_Atmosphere->SwapPublished(*m_BakeAtmosphere);
+			m_BakeAtmosphere->Disable();
+		}
+		const bool published = m_EnvironmentLightingSystem->PublishWorldLighting(
+			m_BakingRequest.m_PhysicalSky, m_Status.m_BakingGeneration);
+		GGLAB_ASSERT(published);
 		m_Status.m_ActiveGeneration = m_Status.m_BakingGeneration;
 		m_Status.m_HasActiveBake = true;
 		SetStage(IBLBakeStage::Ready, 1.0f);
 		GGLAB_LOG_GRAPHICS_INFO(
-			"IBL bake generation {} published atomically (cacheStages={}, gpuStages={}, gpuMs={:.3f}).",
+			"IBL bake generation {} published atomically (cacheStages={}, gpuStages={}, gpuMs={:.3f}, source={}, publicationMs={:.1f}).",
 			m_Status.m_ActiveGeneration, m_Status.m_CacheHitStageCount,
-			m_Status.m_GpuBuildStageCount, m_Status.m_GpuMilliseconds);
+			m_Status.m_GpuBuildStageCount, m_Status.m_GpuMilliseconds,
+			m_BakingRequest.m_PhysicalSky ? "Physical Sky" : "HDR Texture",
+			m_EnvironmentLightingSystem->GetPublicationMilliseconds());
 	}
 
 	void IBLBakeScheduler::CaptureGpuTime(IBLBakeStage stage) noexcept
@@ -911,7 +964,8 @@ namespace gglab
 		}
 		for (const auto& sample : snapshot.m_Samples)
 		{
-			if (sample.m_Name.starts_with(match))
+			if (sample.m_Name.starts_with(match) ||
+				(stage == IBLBakeStage::Environment && sample.m_Name.starts_with("IBL.Atmosphere.")))
 			{
 				m_Status.m_GpuMilliseconds += sample.m_Milliseconds;
 				m_Status.m_GpuTimingAvailable = true;

@@ -8,9 +8,9 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Lighting/Environment Lighting";
+			return "Scene/World Lighting/Environment & IBL";
 		}
-		std::string_view GetTitle() const noexcept override { return "IBL Viewer"; }
+		std::string_view GetTitle() const noexcept override { return "Environment & IBL"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 	};
 }

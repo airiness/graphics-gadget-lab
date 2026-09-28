@@ -7,14 +7,17 @@ namespace gglab
 {
 	Camera::Camera(const CreateInfo& info) noexcept :
 		m_Forward(info.m_Forward), m_Position(info.m_Position), m_Near(info.m_Near),
-		m_Far(info.m_Far), m_Fov(info.m_Fov),
+		m_Far(info.m_Far), m_Fov(info.m_Fov), m_ManualEV100(info.m_ManualEV100),
 		m_ExposureCompensationEV(info.m_ExposureCompensationEV)
 	{
 		// sanitize
 		m_Near = ClampNear(m_Near);
 		m_Far = ClampFar(m_Near, m_Far);
 		m_Fov = ClampFov(m_Fov);
-		m_ExposureCompensationEV = ClampExposureCompensationEV(m_ExposureCompensationEV);
+		m_ManualEV100 = math::IsFinite(m_ManualEV100)
+			? ClampManualEV100(m_ManualEV100) : 0.0f;
+		m_ExposureCompensationEV = math::IsFinite(m_ExposureCompensationEV)
+			? ClampExposureCompensationEV(m_ExposureCompensationEV) : 0.0f;
 
 		auto width = std::max(1u, info.m_Width);
 		auto height = std::max(1u, info.m_Height);
@@ -87,9 +90,14 @@ namespace gglab
 		MarkProjDirty();
 	}
 
-	float Camera::GetExposureMultiplier() const noexcept
+	void Camera::SetManualEV100(float ev) noexcept
 	{
-		return std::exp2(m_ExposureCompensationEV);
+		if (!math::IsFinite(ev))
+		{
+			return;
+		}
+
+		m_ManualEV100 = ClampManualEV100(ev);
 	}
 
 	void Camera::SetExposureCompensationEV(float ev) noexcept
@@ -141,6 +149,11 @@ namespace gglab
 	float Camera::ClampFov(float fov) noexcept
 	{
 		return std::clamp(fov, 1.0f, 179.0f);
+	}
+
+	float Camera::ClampManualEV100(float ev) noexcept
+	{
+		return std::clamp(ev, -16.0f, 24.0f);
 	}
 
 	float Camera::ClampExposureCompensationEV(float ev) noexcept

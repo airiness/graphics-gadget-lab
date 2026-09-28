@@ -18,7 +18,7 @@ namespace gglab
 				  .m_DisplayName = "Post Process Preview",
 				  .m_CategoryName = "PostProcess",
 				  .m_Description =
-					  "Publishes the selected HDR post-process tap to one persistent SDR preview texture.",
+					  "Publishes requested diagnostic taps to inspector-owned SDR preview textures.",
 				  .m_Category = RenderPassCategory::PostProcess,
 				  .m_Type = RenderPassType::Graphics,
 				})
@@ -33,10 +33,12 @@ namespace gglab
 			PostProcessDebugTap tap, uint32_t bloomPyramidLevel = 0) noexcept;
 
 	private:
+		void AddPassForChannel(RenderGraph& rg, const RenderFrameContext& context,
+			const RenderServices& services, PostProcessPreviewChannel channel) noexcept;
 		void AddResolvedPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services, RGTextureId source, float sourcePreExposure,
 			std::optional<RHITextureViewDesc> sourceViewDesc,
-			PostProcessDebugSelection selection) noexcept;
+			PostProcessDebugSelection selection, PostProcessPreviewChannel channel) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
 

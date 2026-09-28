@@ -21,6 +21,33 @@
 
 namespace gglab
 {
+	LightGPU RenderSceneBuilder::BuildLightData(uint64_t entityKey,
+		const components::TransformComponent& transform, const components::LightComponent& light,
+		const RenderDirectionalLight& mainLight) noexcept
+	{
+		LightGPU gpu{};
+		gpu.Position = math::ToVector4(transform.m_Position, 1.0f);
+		Vector3 direction = math::TransformDirection(Vector3::Forward, math::CreateFromQuaternion(transform.m_Rotation));
+		direction.Normalize();
+		gpu.Direction = math::ToVector4(direction, 0.0f);
+		gpu.Color = light.m_Color;
+		gpu.Intensity = light.m_Intensity;
+		gpu.Range = light.m_Range;
+		gpu.SpotAngle = light.m_SpotAngle;
+		gpu.LightType = static_cast<uint32_t>(light.m_Type);
+		if (mainLight.m_EntityKey == entityKey && light.m_Type == LightType::Directional)
+		{
+			gpu.Direction = math::ToVector4(mainLight.m_Direction, 0.0f);
+			if (const auto& sun = mainLight.m_WorldSun)
+			{
+				// The BRDF already supplies Lambert's 1/pi and the cosine term.
+				gpu.Color = Color(sun->m_Chromaticity.m_X, sun->m_Chromaticity.m_Y, sun->m_Chromaticity.m_Z, 1.0f);
+				gpu.Intensity = sun->m_PerpendicularIlluminanceLux;
+			}
+		}
+		return gpu;
+	}
+
 	namespace
 	{
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
@@ -69,6 +96,8 @@ namespace gglab
 			viewGpu.CurrentJitterUV = renderView.m_JitterUV;
 			viewGpu.PreviousJitterUV = renderView.m_PreviousJitterUV;
 			viewGpu.ExposureMultiplier = renderView.m_ExposureMultiplier;
+			viewGpu.ScenePreExposure = renderView.m_ScenePreExposure;
+			viewGpu.PreviousScenePreExposure = renderView.m_PreviousScenePreExposure;
 			viewGpu.Width = renderView.m_Width;
 			viewGpu.Height = renderView.m_Height;
 			viewGpu.DepthConvention = static_cast<uint32_t>(renderView.m_DepthConvention);
@@ -275,6 +304,17 @@ namespace gglab
 				}
 			});
 
+		result.m_RenderScene.m_Atmosphere = info.m_World.m_Atmosphere;
+		if (const auto& active = info.m_EnvironmentLightingSystem.GetActivePhysicalSky())
+		{
+			result.m_RenderScene.m_Atmosphere = active->m_Settings;
+		}
+		else if (info.m_EnvironmentLightingSystem.GetSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky)
+		{
+			// Keep the texture path until the first complete physical generation is available.
+			result.m_RenderScene.m_Atmosphere.reset();
+		}
+		result.m_RenderScene.m_WorldSun = info.m_MainDirectionalLight.m_WorldSun;
 		uint32_t directionalShadowLightSlot = LightTable::InvalidSlot;
 
 		// Light data
@@ -284,21 +324,8 @@ namespace gglab
 				registry.view<components::TransformComponent, components::LightComponent>();
 			for (auto&& [entity, transComp, lightComp] : lightView.each())
 			{
-				LightGPU lightGpu{};
-				lightGpu.Position = math::ToVector4(transComp.m_Position, 1.0f);
-
-				const Matrix rotation = math::CreateFromQuaternion(transComp.m_Rotation);
-				Vector3 forward = math::TransformDirection(Vector3::Forward, rotation);
-				forward.Normalize();
-				lightGpu.Direction = math::ToVector4(forward, 0.0f);
-
-				lightGpu.Color = lightComp.m_Color;
-				lightGpu.Intensity = lightComp.m_Intensity;
-				lightGpu.Range = lightComp.m_Range;
-				lightGpu.SpotAngle = lightComp.m_SpotAngle;
-				lightGpu.LightType = static_cast<uint32_t>(lightComp.m_Type);
-
 				const uint64_t lightKey = static_cast<uint64_t>(entt::to_integral(entity));
+				const LightGPU lightGpu = BuildLightData(lightKey, transComp, lightComp, info.m_MainDirectionalLight);
 				const uint32_t lightSlot = info.m_LightTable.Upsert(lightKey, lightGpu);
 				foundLight = foundLight || lightSlot != LightTable::InvalidSlot;
 				if (lightSlot != LightTable::InvalidSlot)
@@ -310,6 +337,11 @@ namespace gglab
 					{
 						++result.m_RenderScene.m_DirectionalLightCount;
 						result.m_RenderScene.m_GlobalLightIndices.push_back(lightSlot);
+						if (info.m_MainDirectionalLight.m_EntityKey == lightKey &&
+							info.m_MainDirectionalLight.m_WorldSun)
+						{
+							result.m_RenderScene.m_WorldSunLightIndex = lightSlot;
+						}
 					}
 					else
 					{
@@ -474,9 +506,21 @@ namespace gglab
 		sceneCB.LightBaseIndex = result.m_RenderScene.m_LightBaseIndex;
 		sceneCB.LightCount = result.m_RenderScene.m_LightCount;
 		sceneCB.DirectionalShadowLightIndex = result.m_RenderScene.m_DirectionalShadowLightIndex;
+		sceneCB.WorldSunLightIndex = result.m_RenderScene.m_WorldSunLightIndex;
+		if (result.m_RenderScene.m_WorldSun)
+		{
+			sceneCB.WorldSunAngularRadius = result.m_RenderScene.m_WorldSun->m_AngularRadiusRadians;
+		}
+		if (result.m_RenderScene.m_Atmosphere && result.m_RenderScene.m_WorldSun)
+		{
+			const auto atmosphere = ResolveAtmosphere(*result.m_RenderScene.m_Atmosphere,
+				*result.m_RenderScene.m_WorldSun, Vector3::Zero);
+			sceneCB.AtmosphereWorld = atmosphere.m_World;
+			sceneCB.AtmosphereRadii = atmosphere.m_Radii;
+		}
 
 		info.m_RenderResourceRegistry.FillIBLBindlessGPU(sceneCB.IBLResource);
-		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetSettings();
+		const auto& environmentSettings = info.m_EnvironmentLightingSystem.GetRenderSettings();
 		sceneCB.IBLResource.EnvironmentIntensity = environmentSettings.m_Intensity;
 		sceneCB.IBLResource.EnvironmentRotationRadians = environmentSettings.m_RotationRadians;
 

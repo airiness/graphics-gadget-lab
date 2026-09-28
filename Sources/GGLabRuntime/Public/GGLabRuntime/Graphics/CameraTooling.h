@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/CameraControllerSettings.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 
@@ -23,6 +24,7 @@ namespace gglab
 		float m_Fov = 60.0f;
 		float m_Near = 0.01f;
 		float m_Far = 1000.0f;
+		float m_ManualEV100 = 0.0f;
 		float m_ExposureCompensationEV = 0.0f;
 	};
 

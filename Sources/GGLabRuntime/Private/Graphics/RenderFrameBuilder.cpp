@@ -6,6 +6,10 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/EnvironmentLightingSystem.h"
+#include "Graphics/IBLBakeScheduler.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Scene/Components.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 
 #include <array>
@@ -151,6 +155,37 @@ namespace gglab
 		result.m_TemporalFrameTransaction = info.m_TemporalFrameTransaction;
 		result.m_ShadowVisualizationSettings = &info.m_ShadowVisualizationSettings;
 		result.m_WorldData = m_WorldExtractor.Extract(info.m_World);
+		auto& environment = *info.m_Renderer.GetEnvironmentLightingSystemService();
+		auto& mainLight = result.m_WorldData.m_MainDirectionalLight;
+		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+		// Observe this frame's authored request before completing any older bake.
+		info.m_Renderer.GetIBLBakeScheduler()->Tick(info.m_Renderer.GetLastSubmittedFencePoint());
+		environment.ResolveWorldLighting(info.m_World.m_Atmosphere, mainLight.m_WorldSun,
+			mainLight.m_EntityKey.value_or(0), info.m_TemporalFramePlan.m_SessionIdentity);
+		if (const auto& active = environment.GetActivePhysicalSky())
+		{
+			// Keep the published sun bound to its original entity while a new designation bakes.
+			// Deleted entities or retired sessions use the current light without retaining World pointers.
+			auto& registry = info.m_World.GetRegistry();
+			const auto entity = static_cast<entt::entity>(active->m_SunEntityKey);
+			if (active->m_SessionIdentity == info.m_TemporalFramePlan.m_SessionIdentity &&
+				registry.valid(entity) &&
+				registry.all_of<components::TransformComponent, components::LightComponent>(entity))
+			{
+				auto& light = registry.get<components::LightComponent>(entity);
+				if (light.m_Type == LightType::Directional)
+				{
+					mainLight.m_EntityKey = active->m_SunEntityKey;
+					mainLight.m_Transform = &registry.get<components::TransformComponent>(entity);
+					mainLight.m_Light = &light;
+					mainLight.m_ShadowSettings = light.m_DirectionalShadowSettings
+						? &*light.m_DirectionalShadowSettings : nullptr;
+				}
+			}
+			mainLight.m_WorldSun = active->m_Sun;
+			mainLight.m_Direction = active->m_Sun.m_Direction;
+		}
 
 		result.m_RenderViews.resize(utils::ToIndex(RenderViewID::Count));
 		for (size_t index = 0; index < result.m_RenderViews.size(); ++index)
@@ -161,7 +196,9 @@ namespace gglab
 
 		const Camera& mainCamera = info.m_CameraRig.GetMainCamera();
 		auto& mainViewSettings = result.m_ViewRenderSettings[utils::ToIndex(RenderViewID::Main)];
-		mainViewSettings = ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
+		mainViewSettings = info.m_DisplayViewId == RenderViewID::Main
+			? info.m_DisplayViewSettings
+			: ResolveViewRenderSettings(info.m_ViewRenderProfile, mainCamera);
 		const RenderViewBuildInfo<RenderViewID::Main> mainViewBuildInfo{
 			.m_Camera = mainCamera,
 			.m_RenderSettings = mainViewSettings,
@@ -184,7 +221,9 @@ namespace gglab
 
 			const RenderViewID viewId = slot->m_RenderViewId;
 			auto& viewSettings = result.m_ViewRenderSettings[utils::ToIndex(viewId)];
-			viewSettings = ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
+			viewSettings = viewId == info.m_DisplayViewId
+				? info.m_DisplayViewSettings
+				: ResolveViewRenderSettings(info.m_ViewRenderProfile, *slot->m_Camera);
 			result.m_RenderViews[utils::ToIndex(viewId)] = m_ViewBuilder.BuildDebugCameraView(
 				viewId, *slot->m_Camera, viewSettings, info.m_TemporalFramePlan,
 				info.m_WindowWidth, info.m_WindowHeight, StringID(std::string_view(slot->m_Name)));
@@ -202,6 +241,9 @@ namespace gglab
 		GGLAB_ASSERT_MSG(result.m_DisplayViewId == info.m_TemporalFramePlan.m_DisplayViewId,
 			"Temporal frame plan display view must match the built display view.");
 		GGLAB_ASSERT_NOT_NULL(info.m_TemporalFrameTransaction);
+		GGLAB_ASSERT_MSG(info.m_TemporalFrameTransaction->GetScenePreExposure() ==
+			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)].m_ScenePreExposure,
+			"Frame planning and scene writes must share one resolved pre-exposure.");
 		info.m_TemporalFrameTransaction->PrepareDisplayView(
 			result.m_RenderViews[utils::ToIndex(result.m_DisplayViewId)]);
 		GGLAB_ASSERT_MSG(info.m_TemporalFramePlan.m_Requested ==
@@ -240,6 +282,7 @@ namespace gglab
 			.m_DirectionalShadowLightKey =
 				shadowSettings.m_Enable ? result.m_WorldData.m_MainDirectionalLight.m_EntityKey
 										: std::nullopt,
+			.m_MainDirectionalLight = result.m_WorldData.m_MainDirectionalLight,
 			.m_ViewsSB = *info.m_Renderer.GetViewStructuredBuffer(),
 			.m_FrameSlotIndex = info.m_FrameSlotIndex,
 		};

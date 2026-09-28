@@ -6,8 +6,8 @@ namespace gglab
 	class ShadowInspectorPanel final : public DevelopGuiPanelBase
 	{
 	public:
-		std::string_view GetPath() const noexcept override { return "Rendering/Lighting/Shadows"; }
-		std::string_view GetTitle() const noexcept override { return "Shadow Inspector"; }
+		std::string_view GetPath() const noexcept override { return "Rendering/Shadows"; }
+		std::string_view GetTitle() const noexcept override { return "Shadows"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 	};
 }

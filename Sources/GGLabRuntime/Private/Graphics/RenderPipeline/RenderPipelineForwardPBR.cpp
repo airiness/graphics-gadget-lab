@@ -178,6 +178,9 @@ namespace gglab
 				depthCoverageFramePlan.m_Diagnostic);
 		}
 
+		m_AtmospherePass.AddPass(rg, context, services);
+		m_AtmospherePass.AddBakePass(rg, services);
+
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
@@ -421,6 +424,11 @@ namespace gglab
 			m_SkyboxPass.AddPass(rg, context, services);
 		}
 
+		if (depthCoverageFramePlan.AddsForwardOpaquePass())
+		{
+			m_AerialPerspectivePass.AddPass(rg, context, services);
+		}
+
 		if (context.GetTemporalFramePlan().m_Active)
 		{
 			m_TemporalAAPass.AddPass(rg, context, services);
@@ -467,6 +475,9 @@ namespace gglab
 		// Return persistent IBL resources to Common only after every consumer and
 		// preview pass has declared its final access for this frame.
 		m_IBLPass.AddFinishPass(rg);
+
+		// Atmosphere LUT previews must declare their reads before the persistent cache is exported.
+		m_AtmospherePass.AddFinishPass(rg);
 
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",

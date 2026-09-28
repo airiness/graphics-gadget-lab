@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 
 // struct member name without m_ for GPU using
@@ -58,11 +59,19 @@ namespace gglab
 		uint32_t LightBaseIndex;
 		uint32_t LightCount;
 		uint32_t DirectionalShadowLightIndex;
-		uint32_t Padding[3];
+		uint32_t WorldSunLightIndex = std::numeric_limits<uint32_t>::max();
+		float WorldSunAngularRadius = 0.0f;
+		uint32_t Padding;
 
 		IBLResourceGPU IBLResource;
+		Vector4 AtmosphereWorld; // planet center km, km per world unit
+		Vector4 AtmosphereRadii; // bottom and top radius km
 	};
-	static_assert(sizeof(SceneGPU) == 96);
+	static_assert(sizeof(SceneGPU) == 128);
+	static_assert(offsetof(SceneGPU, WorldSunLightIndex) == 36);
+	static_assert(offsetof(SceneGPU, WorldSunAngularRadius) == 40);
+	static_assert(offsetof(SceneGPU, AtmosphereWorld) == 96);
+	static_assert(offsetof(SceneGPU, AtmosphereRadii) == 112);
 
 	// Matches DirectionalShadowData in Lighting/DirectionalShadowData.hlsli (b3).
 	struct alignas(16) DirectionalShadowGPU
@@ -156,7 +165,9 @@ namespace gglab
 		uint32_t Height;
 		uint32_t DepthConvention;
 		uint32_t PreviousDepthConvention;
-		uint32_t Padding[3];
+		float ScenePreExposure;
+		float PreviousScenePreExposure;
+		uint32_t Padding;
 	};
 	static_assert(std::is_standard_layout_v<ObjectGPU>);
 	static_assert(offsetof(ObjectGPU, ModelMat) == 0);
@@ -186,7 +197,9 @@ namespace gglab
 	static_assert(offsetof(ViewGPU, Height) == 456);
 	static_assert(offsetof(ViewGPU, DepthConvention) == 460);
 	static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
-	static_assert(offsetof(ViewGPU, Padding) == 468);
+	static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
+	static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
+	static_assert(offsetof(ViewGPU, Padding) == 476);
 	static_assert(sizeof(ViewGPU) == 480);
 	static constexpr uint32_t MaxViewCapacity =
 		static_cast<uint32_t>(utils::ToIndex(RenderViewID::Count)) * 8;

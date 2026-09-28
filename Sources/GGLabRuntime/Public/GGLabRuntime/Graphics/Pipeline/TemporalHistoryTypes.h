@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
@@ -25,12 +26,14 @@ namespace gglab
 		SessionIdentityChanged,
 		ExtentChanged,
 		FormatChanged,
+		ColorAbiChanged,
 		AllocationFailure,
 		AvailabilityChanged,
 		ResolveProgramChanged,
 		FatalSubmission,
 		Resume,
 		Shutdown,
+		InvalidExposureMetadata,
 	};
 
 	struct TemporalHistoryCompatibilityIdentity
@@ -42,6 +45,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		RHIFormat m_ColorFormat = TemporalHistoryColorFormat;
 		RHIFormat m_DepthFormat = TemporalHistoryDepthFormat;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 
 		bool operator==(const TemporalHistoryCompatibilityIdentity&) const noexcept = default;
 	};
@@ -51,6 +55,7 @@ namespace gglab
 		TemporalHistoryCompatibilityIdentity m_Compatibility{};
 		Vector2 m_JitterUV = Vector2::Zero;
 		uint32_t m_JitterIndex = 0;
+		float m_PreExposure = SceneColorStoragePreExposureV1;
 		RHIFencePoint m_GraphicsFence{};
 	};
 
@@ -59,6 +64,8 @@ namespace gglab
 		uint64_t m_AllocationGeneration = 0;
 		uint32_t m_ReadIndex = 0;
 		uint32_t m_WriteIndex = 1;
+		// Latched from the successfully committed read generation, never the pending write.
+		float m_PreviousPreExposure = 1.0f;
 		bool m_Active = false;
 		bool m_PreviousValid = false;
 		bool m_RenderGraphImported = false;

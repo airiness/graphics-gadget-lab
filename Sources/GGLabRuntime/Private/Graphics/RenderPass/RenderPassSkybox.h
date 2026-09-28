@@ -11,10 +11,10 @@ namespace gglab
 		RenderPassSkybox() noexcept :
 			RenderPassBase({
 				  .m_TypeName = "Background.Skybox",
-				  .m_DisplayName = "Skybox",
+				  .m_DisplayName = "Background",
 				  .m_CategoryName = "Lighting",
 				  .m_Description =
-					  "Renders the active HDR environment only where main-view depth is still background.",
+					  "Renders the active background where main-view depth is still background.",
 				  .m_Category = RenderPassCategory::Lighting,
 				  .m_Type = RenderPassType::Graphics,
 				})
@@ -26,10 +26,12 @@ namespace gglab
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
-		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
+		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services, bool physicalPreview) noexcept;
 
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
+		GraphicsPhysicalPipelineKey m_PhysicalPreviewRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};
+		GraphicsPipelineSlot m_PhysicalPreviewPipelineSlot{};
 		bool m_IsInitialized = false;
 	};
 }

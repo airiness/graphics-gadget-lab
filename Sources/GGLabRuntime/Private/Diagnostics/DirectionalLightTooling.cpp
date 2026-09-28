@@ -1,4 +1,5 @@
 #include "Diagnostics/DirectionalLightTooling.h"
+#include "Graphics/RenderWorldExtractor.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Core/Math/Matrix.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
@@ -23,28 +24,41 @@ namespace gglab
 
 	std::optional<DirectionalLightObservation> DirectionalLightTooling::GetLight() const noexcept
 	{
-		const auto& registry = m_World.GetRegistry();
-		for (auto [entity, transform, light] :
-			registry.view<const components::TransformComponent, const components::LightComponent>().each())
+		const auto selected = RenderWorldExtractor{}.Extract(m_World).m_MainDirectionalLight;
+		if (!selected.m_EntityKey)
 		{
-			if (light.m_Type != LightType::Directional)
-			{
-				continue;
-			}
-			Vector3 direction = math::TransformDirection(
-				Vector3::Forward, math::CreateFromQuaternion(transform.m_Rotation));
-			if (direction.LengthSquared() <= 1.0e-8f)
-			{
-				direction = -Vector3::UnitY;
-			}
-			else
-			{
-				direction.Normalize();
-			}
-			return DirectionalLightObservation{ entt::to_integral(entity), direction,
-				light.m_Color, light.m_Intensity, light.m_DirectionalShadowSettings };
+			return std::nullopt;
 		}
-		return std::nullopt;
+		const auto& light = *selected.m_Light;
+		return DirectionalLightObservation{ static_cast<uint32_t>(*selected.m_EntityKey), selected.m_Direction,
+			light.m_Color, light.m_Intensity, light.m_DirectionalShadowSettings,
+			light.m_WorldSun, selected.m_WorldSun, m_World.m_Atmosphere };
+	}
+
+	void DirectionalLightTooling::SetAtmosphere(const std::optional<AtmosphereSettings>& settings) noexcept
+	{
+		m_World.m_Atmosphere = settings;
+	}
+
+	void DirectionalLightTooling::SetWorldSun(uint32_t id, const std::optional<WorldSunSettings>& settings) noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		const auto entity = static_cast<entt::entity>(id);
+		if (!IsDirectionalLight(registry, entity))
+		{
+			return;
+		}
+		if (settings)
+		{
+			for (auto [other, light] : registry.view<components::LightComponent>().each())
+			{
+				if (other != entity)
+				{
+					light.m_WorldSun.reset();
+				}
+			}
+		}
+		registry.get<components::LightComponent>(entity).m_WorldSun = settings;
 	}
 
 	void DirectionalLightTooling::SetDirection(uint32_t id, const Vector3& direction) noexcept

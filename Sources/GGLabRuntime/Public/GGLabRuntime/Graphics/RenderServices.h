@@ -31,6 +31,7 @@ namespace gglab
 	class AssetUploadScheduling;
 	class RenderPipelineOverlayExtensionBase;
 	class RHIDevice;
+	class RenderAtmosphereAccess;
 	class RHISwapChain;
 	template <typename T>
 	class DynamicStructuredBufferAllocator;
@@ -39,6 +40,7 @@ namespace gglab
 	struct ComputePipelineRecipe;
 	struct ComputePipelineSlot;
 	struct EnvironmentTextureSource;
+	struct AtmosphereGPU;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
 
@@ -116,22 +118,34 @@ namespace gglab
 			uint32_t previewSize = DefaultDirectionalShadowMapPreviewSize,
 			const RHIFencePoint* retireFence = nullptr) noexcept = 0;
 		virtual void EnsurePostProcessPreviewResources(uint32_t sourceWidth,
-			uint32_t sourceHeight, const RHIFencePoint* retireFence = nullptr) noexcept = 0;
+			uint32_t sourceHeight, const RHIFencePoint* retireFence = nullptr,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
 
-		[[nodiscard]] virtual bool IsPostProcessPreviewRequested() const noexcept = 0;
-		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest() noexcept = 0;
-		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection()
+		[[nodiscard]] virtual bool IsPostProcessPreviewRequested(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		[[nodiscard]] virtual bool ConsumePostProcessPreviewRequest(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual PostProcessDebugSelection GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
-		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection) noexcept = 0;
-		virtual void RequestPostProcessPreview() noexcept = 0;
-		[[nodiscard]] virtual uint64_t GetPostProcessPreviewUpdateCount() const noexcept = 0;
-		[[nodiscard]] virtual PostProcessDebugSelection GetPublishedPostProcessPreviewSelection()
+		virtual void SetPostProcessPreviewSelection(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		virtual void RequestPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual uint64_t GetPostProcessPreviewUpdateCount(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		[[nodiscard]] virtual PostProcessDebugSelection GetPublishedPostProcessPreviewSelection(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing)
 			const noexcept = 0;
-		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV() const noexcept = 0;
-		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection) noexcept = 0;
+		[[nodiscard]] virtual float GetPostProcessPreviewExposureEV(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
+		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel, uint64_t frameSerial) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(
-			PostProcessDebugSelection selection) noexcept = 0;
-		[[nodiscard]] virtual bool HasPublishedPostProcessPreview() const noexcept = 0;
+			PostProcessDebugSelection selection,
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
+		[[nodiscard]] virtual bool HasPublishedPostProcessPreview(
+			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) const noexcept = 0;
 
 		virtual void RequestIBLPreview(IBLPreviewType type) noexcept = 0;
 		[[nodiscard]] virtual bool ConsumeIBLPreviewRequest(IBLPreviewType type) noexcept = 0;
@@ -191,6 +205,8 @@ namespace gglab
 		[[nodiscard]] virtual IBLBakeStage GetStageForRecording() const noexcept = 0;
 		virtual void NotifyStageExecuted(IBLBakeStage stage, uint64_t generation) noexcept = 0;
 		virtual void NotifyBakeResourcesInitialized(uint64_t generation) noexcept = 0;
+		[[nodiscard]] virtual const AtmosphereGPU* GetBakingAtmosphereParameters() const noexcept { return nullptr; }
+		[[nodiscard]] virtual Vector3 GetBakingSunDirection() const noexcept { return Vector3::UnitY; }
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetBakingSource()
 			const noexcept = 0;
 		[[nodiscard]] virtual const EnvironmentTextureSource& GetCommittedEnvironmentSource()
@@ -253,6 +269,8 @@ namespace gglab
 		RenderPresentationAccess* m_Presentation = nullptr;
 		RenderBindingLayoutAccess* m_BindingLayout = nullptr;
 		RenderTemporalAccess* m_Temporal = nullptr;
+		RenderAtmosphereAccess* m_Atmosphere = nullptr;
+		RenderAtmosphereAccess* m_BakeAtmosphere = nullptr;
 		AssetUploadScheduling* m_AssetUpload = nullptr;
 		// Deliberate per-frame application injection; null when no developer
 		// overlay pass participates in the frame.

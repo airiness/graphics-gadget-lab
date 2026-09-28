@@ -3,6 +3,7 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
+#include "Application/Lab/Sessions/AtmosphereRangeLabSession.h"
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
@@ -10,6 +11,7 @@
 #include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "Application/Lab/Sessions/LightingContractLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
@@ -99,6 +101,9 @@ namespace gglab
 			{ CullingLabSession::GetDescriptor(), &CullingLabSession::Create },
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },
+			{ LightingContractLabSession::GetDescriptor(), &LightingContractLabSession::Create },
+			{ AtmosphereRangeLabSession::GetDescriptor(), &AtmosphereRangeLabSession::Create,
+				{ shader_programs::AerialPerspectiveProbeCompute } },
 			{ PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create },
 			{ RenderGraphComputeLabSession::GetDescriptor(),
 				&RenderGraphComputeLabSession::Create,

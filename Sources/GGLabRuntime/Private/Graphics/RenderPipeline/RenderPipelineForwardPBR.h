@@ -10,6 +10,8 @@
 #include "Graphics/RenderPass/RenderPassForwardPlusValidation.h"
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "Graphics/RenderPass/RenderPassAerialPerspective.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
 #include "Graphics/RenderPass/RenderPassIBLPreview.h"
 #include "Graphics/RenderPass/RenderPassShadowMapPreview.h"
@@ -77,6 +79,8 @@ namespace gglab
 		RenderPassForwardOpaque m_ForwardOpaquePass;
 		RenderPassForwardTransparent m_ForwardTransparentPass;
 		RenderPassGTAO m_GTAOPass;
+		RenderPassAtmosphere m_AtmospherePass;
+		RenderPassAerialPerspective m_AerialPerspectivePass;
 		RenderPassTemporalAA m_TemporalAAPass;
 		RenderPassDebugDraw m_DebugDrawScenePass{ DebugDrawPassMode::Scene };
 		PostProcessPipeline m_PostProcessPipeline;

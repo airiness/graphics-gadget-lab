@@ -365,12 +365,14 @@ namespace gglab
 			edit.m_Fov = 200.0f;
 			edit.m_Near = -1.0f;
 			edit.m_Far = -2.0f;
+			edit.m_ManualEV100 = 30.0f;
 			edit.m_ExposureCompensationEV = 20.0f;
 			const auto resetSerial = mainCamera.GetTemporalResetSerial();
 			context.Check(control.SetCamera(mainId, edit) &&
 				mainCamera.GetPosition().m_X == 2.0f &&
 				mainCamera.GetFov() == Camera::ClampFov(edit.m_Fov) &&
 				mainCamera.GetNear() > 0.0f && mainCamera.GetFar() > mainCamera.GetNear() &&
+				mainCamera.GetManualEV100() == Camera::ClampManualEV100(30.0f) &&
 				mainCamera.GetExposureCompensationEV() == Camera::ClampExposureCompensationEV(20.0f) &&
 				mainCamera.GetTemporalResetSerial() == resetSerial &&
 				original.m_Cameras.front().m_Settings.m_Position.m_X == 0.0f,
@@ -474,6 +476,9 @@ namespace gglab
 			invalid.m_VerticalFovDegrees = 200.0f;
 			rejected &= !rig.SetReferenceViews({ invalid });
 			invalid = reference;
+			invalid.m_ManualEV100 = std::numeric_limits<float>::quiet_NaN();
+			rejected &= !rig.SetReferenceViews({ invalid });
+			invalid = reference;
 			invalid.m_Target = invalid.m_Position + Vector3::UnitY;
 			rejected &= !rig.SetReferenceViews({ invalid });
 			context.Check(rejected && !rig.SetReferenceViews({ reference, reference }) &&
@@ -485,6 +490,7 @@ namespace gglab
 			controller.Update(camera, CameraInput{ .m_Front = true }, 0.1f);
 			camera.SetFov(80.0f);
 			camera.SetNearFar(1.0f, 20.0f);
+			camera.SetManualEV100(12.0f);
 			camera.SetExposureCompensationEV(2.0f);
 			const auto serial = camera.GetTemporalResetSerial();
 			context.Check(!tooling.RestoreReferenceView(debugId, reference.m_Id) &&
@@ -499,7 +505,9 @@ namespace gglab
 			context.Check(restored && (camera.GetPosition() - reference.m_Position).LengthSquared() == 0.0f &&
 				(camera.GetForward() - expectedForward).Length() < 0.00001f &&
 				camera.GetFov() == reference.m_VerticalFovDegrees && camera.GetNear() == reference.m_NearPlane &&
-				camera.GetFar() == reference.m_FarPlane && camera.GetExposureCompensationEV() == 0.0f &&
+				camera.GetFar() == reference.m_FarPlane &&
+				camera.GetManualEV100() == reference.m_ManualEV100 &&
+				camera.GetExposureCompensationEV() == 0.0f &&
 				camera.GetTemporalResetSerial() == serial + 1 && snapshot.m_ActiveCameraId == mainId &&
 				snapshot.m_DisplayViewId == RenderViewID::Main && snapshot.m_Cameras.size() == 2 &&
 				snapshot.m_LastRestoredReferenceId == reference.m_Id,
@@ -566,6 +574,27 @@ namespace gglab
 				context.Check(!view.GetLight()->m_ShadowSettings &&
 					edited && edited->m_ShadowSettings,
 					"Disabling shadows preserves previously copied settings");
+				control.SetWorldSun(id, WorldSunSettings{});
+				const auto shadowlessSun = RenderWorldExtractor{}.Extract(world).m_MainDirectionalLight;
+				control.SetShadowSettings(id, settings);
+				const auto shadowedSun = RenderWorldExtractor{}.Extract(world).m_MainDirectionalLight;
+				context.Check(shadowlessSun.m_WorldSun && shadowedSun.m_WorldSun &&
+					shadowlessSun.m_EntityKey == shadowedSun.m_EntityKey &&
+					shadowlessSun.m_Direction.m_Y == shadowedSun.m_Direction.m_Y &&
+					shadowlessSun.m_WorldSun->m_PerpendicularIlluminanceLux == shadowedSun.m_WorldSun->m_PerpendicularIlluminanceLux,
+					"World sun identity, direction and lux do not depend on shadow enablement");
+				const auto legacy = registry.create();
+				registry.emplace<components::TransformComponent>(legacy);
+				registry.emplace<components::LightComponent>(legacy);
+				context.Check(view.GetLight()->m_Id == id,
+					"An explicit world sun takes priority over registry traversal order");
+				control.SetWorldSun(entt::to_integral(legacy), WorldSunSettings{});
+				context.Check(view.GetLight()->m_Id == entt::to_integral(legacy) &&
+					!registry.get<components::LightComponent>(entity).m_WorldSun &&
+					registry.get<components::LightComponent>(entity).m_Intensity == 3.0f,
+					"World sun reassignment clears the prior designation and preserves legacy light authoring");
+				registry.destroy(legacy);
+
 				registry.get<components::LightComponent>(entity).m_Type = LightType::Point;
 				control.SetRadiance(id, Color::White, 9.0f);
 				context.Check(!view.GetLight() &&

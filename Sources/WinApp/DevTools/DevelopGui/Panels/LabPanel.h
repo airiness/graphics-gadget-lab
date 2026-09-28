@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
+#include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
 
 #include <optional>
 
@@ -15,7 +16,7 @@ namespace gglab
 		{
 		}
 
-		std::string_view GetPath() const noexcept override { return "Application/Lab"; }
+		std::string_view GetPath() const noexcept override { return "Application/Lab/Control"; }
 		std::string_view GetTitle() const noexcept override { return "Lab Control"; }
 		void Draw(DevelopGuiContext& context) noexcept override;
 		int32_t GetOrder() const noexcept override { return -90; }
@@ -36,5 +37,6 @@ namespace gglab
 		std::optional<LabRunConfigSnapshot> m_RunConfigDraft;
 		std::vector<DeferredParameterEdit> m_DeferredParameterEdits;
 		LabIdSnapshot m_RunConfigLabId;
+		CameraReferenceViewWidgetState m_ReferenceViews;
 	};
 }

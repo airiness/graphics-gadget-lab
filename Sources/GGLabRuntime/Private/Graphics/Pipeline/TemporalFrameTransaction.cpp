@@ -3,6 +3,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 
 namespace gglab
@@ -38,8 +39,13 @@ namespace gglab
 
 	void TemporalFrameTransaction::Begin(TemporalViewHistory& viewHistory,
 		TemporalObjectHistory& objectHistory, const ResolvedTemporalFramePlan& plan,
-		uint32_t width, uint32_t height, TemporalHistoryManager* historyManager) noexcept
+		uint32_t width, uint32_t height, TemporalHistoryManager* historyManager,
+		float scenePreExposure) noexcept
 	{
+		GGLAB_ASSERT_MSG(!plan.m_Active || IsTemporalColorCompatible(
+			ActiveTemporalColorAbi,
+			PostProcessColorState::SceneLinearRec709, scenePreExposure),
+			"The active temporal path requires positive finite scene pre-exposure.");
 		GGLAB_ASSERT_MSG(m_State != TemporalFrameTransactionState::Pending,
 			"A pending temporal frame transaction must be ended before "
 			"it can be reused.");
@@ -47,14 +53,17 @@ namespace gglab
 		m_ObjectHistory = &objectHistory;
 		m_HistoryManager = historyManager;
 		m_Plan = plan;
+		m_ColorAbi = ActiveTemporalColorAbi;
+		m_ScenePreExposure = scenePreExposure;
 		m_PendingView = {};
 		m_State = TemporalFrameTransactionState::Pending;
 		m_Width = width;
 		m_Height = height;
-		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, width, height)
+		m_HistoryFrame = historyManager ? historyManager->BeginFrame(plan, width, height, m_ColorAbi)
 										: TemporalHistoryFrameState{};
 		m_HasCompatiblePreviousView = plan.m_Active && IsCompatible(viewHistory) &&
-			(!historyManager || m_HistoryFrame.m_PreviousValid);
+			(!historyManager || (m_HistoryFrame.m_PreviousValid &&
+				m_HistoryFrame.m_PreviousPreExposure == viewHistory.m_Committed.m_PreExposure));
 		m_JitterIndex = m_HasCompatiblePreviousView ? viewHistory.m_NextJitterIndex : 0;
 		m_JitterPixels =
 			plan.m_Active ? temporal::GetJitterSamplePixels(m_JitterIndex) : Vector2::Zero;
@@ -73,6 +82,8 @@ namespace gglab
 
 		view.m_TemporalResetIdentity = m_Plan.m_ResetIdentity;
 		view.m_TemporalSessionIdentity = m_Plan.m_SessionIdentity;
+		view.m_PreviousScenePreExposure = m_HasCompatiblePreviousView
+			? m_ViewHistory->m_Committed.m_PreExposure : m_ScenePreExposure;
 		if (m_Plan.m_Active)
 		{
 			const Vector2 jitterNDC =
@@ -121,6 +132,8 @@ namespace gglab
 			.m_SessionIdentity = m_Plan.m_SessionIdentity,
 			.m_Width = m_Width,
 			.m_Height = m_Height,
+			.m_PreExposure = m_ScenePreExposure,
+			.m_ColorAbi = m_ColorAbi,
 		};
 		m_HasPendingView = true;
 	}
@@ -222,7 +235,8 @@ namespace gglab
 			m_State = TemporalFrameTransactionState::Committed;
 			return;
 		}
-		if (!m_HasPendingView || !m_ParticipatedInResolve)
+		if (!m_HasPendingView || !m_ParticipatedInResolve ||
+			!IsTemporalColorCompatible(m_ColorAbi, PostProcessColorState::SceneLinearRec709, m_ScenePreExposure))
 		{
 			if (m_HistoryManager)
 			{
@@ -240,9 +254,11 @@ namespace gglab
 					.m_SessionIdentity = m_PendingView.m_SessionIdentity,
 					.m_Width = m_PendingView.m_Width,
 					.m_Height = m_PendingView.m_Height,
+					.m_ColorAbi = m_ColorAbi,
 				},
 				.m_JitterUV = m_PendingView.m_JitterUV,
 				.m_JitterIndex = m_JitterIndex,
+				.m_PreExposure = m_ScenePreExposure,
 				}, submittedFence);
 			if (!historyCommitted)
 			{
@@ -289,7 +305,9 @@ namespace gglab
 	bool TemporalFrameTransaction::IsCompatible(const TemporalViewHistory& history) const noexcept
 	{
 		const TemporalCommittedViewState& committed = history.m_Committed;
-		return history.m_Valid && committed.m_DisplayViewId == m_Plan.m_DisplayViewId &&
+		return history.m_Valid && committed.m_ColorAbi == m_ColorAbi &&
+			IsTemporalColorCompatible(committed.m_ColorAbi,
+				PostProcessColorState::SceneLinearRec709, committed.m_PreExposure) && committed.m_DisplayViewId == m_Plan.m_DisplayViewId &&
 			   committed.m_ResetIdentity == m_Plan.m_ResetIdentity &&
 			   committed.m_SessionIdentity == m_Plan.m_SessionIdentity &&
 			   committed.m_Width == m_Width && committed.m_Height == m_Height;

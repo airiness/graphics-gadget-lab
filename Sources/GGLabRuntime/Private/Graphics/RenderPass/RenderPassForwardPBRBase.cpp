@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
@@ -46,8 +47,8 @@ namespace gglab
 			uint32_t m_ShadowMapSamplerIndex = 0;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowFlags = 0;
-			float m_ShadowBiasPadding = 0.0f;
-			uint32_t m_ShadowPadding = 0;
+			uint32_t m_AtmosphereTransmittanceIndex = std::numeric_limits<uint32_t>::max();
+			uint32_t m_AtmosphereSamplerIndex = 0;
 			uint32_t m_ForwardPlusTileCountX = 0;
 			uint32_t m_ForwardPlusTileCountY = 0;
 			uint32_t m_ForwardPlusGlobalLightCount = 0;
@@ -68,6 +69,7 @@ namespace gglab
 			RGTextureId m_BrdfLut{};
 			RGTextureId m_ShadowMap{};
 			RGTextureId m_GTAOFinalAO{};
+			RGTextureId m_AtmosphereTransmittance{};
 			RGTextureId m_GTAOContribution{};
 			RGTextureId m_LegacyReferenceColor{};
 			RGBufferId m_TileHeaders{};
@@ -77,6 +79,7 @@ namespace gglab
 			RGTextureViewId m_Dsv{};
 			RGTextureViewId m_ShadowSrv{};
 			RGTextureViewId m_GTAOFinalAOSrv{};
+			RGTextureViewId m_AtmosphereTransmittanceSrv{};
 			RGTextureViewId m_GTAOContributionRtv{};
 			RGTextureViewId m_LegacyReferenceRtv{};
 
@@ -150,8 +153,8 @@ namespace gglab
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const bool gtaoContributionRequested = !transparent &&
-			registry->IsPostProcessPreviewRequested() &&
-			registry->GetPostProcessPreviewSelection().m_Tap ==
+			registry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::AmbientOcclusion) &&
+			registry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::AmbientOcclusion).m_Tap ==
 				PostProcessDebugTap::GTAOAOOnlyLightingContribution;
 
 		rg.AddPass<PassData>(
@@ -182,6 +185,15 @@ namespace gglab
 				data.m_PrefilteredSpecularCubemap =
 					builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 				data.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
+				const auto* atmosphere = blackboard.TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
+				if (atmosphere && contextPtr->m_RenderScene.m_WorldSunLightIndex !=
+					std::numeric_limits<uint32_t>::max())
+				{
+					data.m_AtmosphereTransmittance = builder.Read(atmosphere->m_Luts[0],
+						RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_AtmosphereTransmittanceSrv =
+						builder.CreateView<RHITextureViewType::ShaderResource>(data.m_AtmosphereTransmittance);
+				}
 				if (contextPtr->GetDirectionalShadowFramePlan().m_ShadingEnabled)
 				{
 					data.m_ShadowMap = builder.Read(shadowRes.m_DirectionalShadowMap, RGTextureAccess::Sample);
@@ -380,6 +392,15 @@ namespace gglab
 					"Enabled shadow sampling requires a valid shadow descriptor.");
 
 				uint32_t gtaoTextureIndex = 0;
+				uint32_t atmosphereTransmittanceIndex = std::numeric_limits<uint32_t>::max();
+				if (data.m_AtmosphereTransmittanceSrv.IsValid())
+				{
+					const auto transmittanceSrv =
+						executeContext.GetViewDescriptor(data.m_AtmosphereTransmittanceSrv);
+					GGLAB_ASSERT_MSG(transmittanceSrv.IsValid(),
+						"Physical sun attenuation requires a transmittance descriptor.");
+					atmosphereTransmittanceIndex = transmittanceSrv.m_Index;
+				}
 				if (data.m_GTAOEnabled)
 				{
 					const auto gtaoSrv = executeContext.GetViewDescriptor(data.m_GTAOFinalAOSrv);
@@ -502,6 +523,8 @@ namespace gglab
 					.m_ShadowMapSamplerIndex = data.m_ShadowSamplerIndex,
 					.m_ShadowMapSize = data.m_ShadowMapSize,
 					.m_ShadowFlags = data.m_ShadowFlags,
+					.m_AtmosphereTransmittanceIndex = atmosphereTransmittanceIndex,
+					.m_AtmosphereSamplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp),
 					.m_ForwardPlusTileCountX = data.m_ForwardPlusTileGrid.m_TileCountX,
 					.m_ForwardPlusTileCountY = data.m_ForwardPlusTileGrid.m_TileCountY,
 					.m_ForwardPlusGlobalLightCount = data.m_LightingVariant ==

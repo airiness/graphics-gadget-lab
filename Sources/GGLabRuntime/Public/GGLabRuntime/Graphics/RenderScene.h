@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 
+#include "GGLabRuntime/Graphics/Atmosphere.h"
+#include <optional>
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -28,6 +30,8 @@ namespace gglab
 
 	struct RenderScene
 	{
+		std::optional<AtmosphereSettings> m_Atmosphere;
+		std::optional<ResolvedWorldSun> m_WorldSun;
 		uint32_t m_ObjectBaseIndex = 0;
 		uint32_t m_ObjectCount = 0;
 
@@ -40,6 +44,7 @@ namespace gglab
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightCount = 0;
 		uint32_t m_DirectionalShadowLightIndex = std::numeric_limits<uint32_t>::max();
+		uint32_t m_WorldSunLightIndex = std::numeric_limits<uint32_t>::max();
 		uint32_t m_DirectionalLightCount = 0;
 		uint32_t m_LocalLightCount = 0;
 		std::array<uint32_t, MaxLightCapacity> m_LightTypesByIndex{};

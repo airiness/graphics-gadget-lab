@@ -1,3 +1,4 @@
+#include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
@@ -38,6 +39,18 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
+#include "GGLabRuntime/Graphics/WorldSun.h"
+#include "Graphics/AtmosphereSystem.h"
+#include "Graphics/RenderPass/RenderPassAtmosphere.h"
+#include "Graphics/RenderPass/RenderPassAerialPerspective.h"
+#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
+#include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "Graphics/RenderPass/RenderPassPostProcessPreview.h"
+#include "GGLabRuntime/Scene/Components.h"
+#include <numbers>
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -60,9 +73,11 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
 #include "GGLabRuntime/Graphics/TransferBatch.h"
@@ -191,6 +206,7 @@ namespace gglab
 			value.SetPrefilteredSpecularSampleCount(512);
 			value.SetPrefilteredSpecularMaxSampleLuminance(1000.0f);
 			value.SetSkyboxEnabled(true);
+			value.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
 			value.RequestRebake();
 		};
 		template <typename T>
@@ -337,6 +353,10 @@ namespace gglab
 		class RecordingDevice final : public RHIDevice
 		{
 		public:
+			bool m_AtmosphereBuffersEnabled = false;
+			uint32_t m_AtmosphereBufferCount = 0;
+			uint32_t m_AtmosphereDestroyedBufferCount = 0;
+			std::array<std::byte, 256> m_AtmosphereUpload{};
 			RHIBackendType GetBackendType() const noexcept override { return {}; }
 			std::string_view GetAdapterCompatibilityIdentity() const noexcept override
 			{
@@ -373,7 +393,7 @@ namespace gglab
 			RHIBufferHandle CreateBuffer(
 				const RHIBufferDesc&, const RHIResourceDebugIdentityDesc&) noexcept override
 			{
-				return {};
+				return m_AtmosphereBuffersEnabled ? RHIBufferHandle{ ++m_AtmosphereBufferCount, 1 } : RHIBufferHandle{};
 			}
 			RHITextureViewHandle CreateTextureView(
 				RHITextureHandle, const RHITextureViewDesc&) noexcept override
@@ -395,7 +415,7 @@ namespace gglab
 			{
 				++m_DestroyTextureCount;
 			}
-			void DestroyBuffer(RHIBufferHandle) noexcept override {}
+			void DestroyBuffer(RHIBufferHandle) noexcept override { ++m_AtmosphereDestroyedBufferCount; }
 			void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 			void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
 			void DestroySampler(RHISamplerHandle) noexcept override {}
@@ -417,7 +437,7 @@ namespace gglab
 			}
 			void* MapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override
 			{
-				return nullptr;
+				return m_AtmosphereBuffersEnabled ? m_AtmosphereUpload.data() : nullptr;
 			}
 			void UnmapBuffer(RHIBufferHandle, RHIMappedBufferRange) noexcept override {}
 			uint32_t GetBufferViewAlignment(RHIBufferViewType) const noexcept override { return 1; }
@@ -498,7 +518,8 @@ namespace gglab
 			EnvironmentLightingControlBase& control = environment;
 			const auto initial = view.GetEnvironmentLightingSettings();
 			context.Check(initial.m_Intensity == 1.0f && initial.m_RotationRadians == 0.0f &&
-				initial.m_EnableSkybox && initial.m_QualityPreset == IBLQualityPreset::Medium &&
+				initial.m_EnableSkybox && initial.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment &&
+				initial.m_QualityPreset == IBLQualityPreset::Medium &&
 				initial.m_BakeConfig == GetIBLBakeConfig(IBLQualityPreset::Medium) &&
 				environment.GetBakeRequestGeneration() == 0,
 				"Environment query preserves initial settings without requesting a bake");
@@ -548,12 +569,16 @@ namespace gglab
 			control.SetRotationRadians(std::numeric_limits<float>::quiet_NaN());
 			control.SetRotationRadians(std::numeric_limits<float>::infinity());
 			control.SetSkyboxEnabled(false);
+			control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalAtmospherePreview);
+			control.SetBackgroundMode(static_cast<EnvironmentBackgroundMode>(255));
 			context.Check(view.GetEnvironmentLightingSettings().m_RotationRadians ==
 				rotated.m_RotationRadians && !view.GetEnvironmentLightingSettings().m_EnableSkybox &&
+				view.GetEnvironmentLightingSettings().m_BackgroundMode ==
+					EnvironmentBackgroundMode::PhysicalAtmospherePreview &&
 				environment.GetBakeRequestGeneration() == 0 &&
 				std::ranges::none_of(PreviewTypes,
 					[&](auto type) { return registry.IsIBLPreviewDirty(type); }),
-				"Unchanged or non-finite yaw and skybox toggles preserve bake and preview state");
+				"Background preview selection does not alter texture IBL bake or preview state");
 
 			control.SetQualityPreset(IBLQualityPreset::Low);
 			const auto low = view.GetEnvironmentLightingSettings();
@@ -610,6 +635,52 @@ namespace gglab
 				!environment.ShouldIgnoreCache(8) &&
 				device.m_CreateTextureCount == 0 && device.m_RecordTextureUseCount == 0,
 				"Explicit rebuild requests advance independently without allocating or submitting GPU work");
+
+			control.SetBackgroundMode(EnvironmentBackgroundMode::PhysicalSky);
+			const AtmosphereSettings earth{};
+			auto sun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			environment.ResolveWorldLighting(earth, sun, 42);
+			const auto firstPhysical = environment.GetRequestedPhysicalSky();
+			const uint64_t firstGeneration = environment.GetBakeRequestGeneration();
+			context.Check(firstPhysical && !environment.GetActivePhysicalSky() &&
+				std::abs(firstPhysical->m_ReferenceObserverWorld.m_Y - 1.0f) < 0.01f,
+				"Physical sky captures a fixed one-meter observer without fabricating texture provenance");
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(environment.GetBakeRequestGeneration() == firstGeneration,
+				"Unchanged physical parameters do not rebake; camera pose and exposure are absent from the request");
+			context.Check(environment.PublishWorldLighting(firstPhysical, firstGeneration),
+				"A complete current world-lighting snapshot can be published");
+			sun = ResolveWorldSun(WorldSunSettings{ .m_PerpendicularIlluminanceLux = 60000.0f }, Vector3(1.0f, -1.0f, 0.0f));
+			environment.ResolveWorldLighting(earth, sun, 42);
+			const auto pending = environment.GetRequestedPhysicalSky();
+			const auto& active = environment.GetActivePhysicalSky();
+			context.Check(pending && active && pending->m_Sun.m_PerpendicularIlluminanceLux == 60000.0f &&
+				active->m_Sun.m_PerpendicularIlluminanceLux == 120000.0f &&
+				environment.GetRenderSettings().m_Intensity == 1.0f &&
+				environment.GetRenderSettings().m_RotationRadians == 0.0f,
+				"Sun edits remain pending while physical IBL retains the active sun, neutral intensity and world alignment");
+			context.Check(!environment.PublishWorldLighting(firstPhysical, firstGeneration) &&
+				environment.GetActivePhysicalSky()->m_Sun.m_PerpendicularIlluminanceLux == 120000.0f,
+				"Superseded world-lighting publications cannot change the active generation");
+			context.Check(environment.PublishWorldLighting(pending, environment.GetBakeRequestGeneration()),
+				"The replacement snapshot switches after the publication gate");
+			const uint64_t beforeSessionChange = environment.GetBakeRequestGeneration();
+			environment.ResolveWorldLighting(earth, sun, 42, 1);
+			context.Check(environment.GetBakeRequestGeneration() == beforeSessionChange + 1 &&
+				environment.GetRequestedPhysicalSky()->m_SessionIdentity == 1 &&
+				environment.GetActivePhysicalSky()->m_SessionIdentity == 0,
+				"A replacement Lab session cannot reuse the old sun entity identity while its lighting remains pending");
+			control.SetBackgroundMode(EnvironmentBackgroundMode::TextureEnvironment);
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(!environment.GetRequestedPhysicalSky() && environment.GetActivePhysicalSky() &&
+				environment.GetRenderSettings().m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky,
+				"A source-mode switch retains the complete physical generation while texture IBL is pending");
+			context.Check(environment.PublishWorldLighting(std::nullopt, environment.GetBakeRequestGeneration()),
+				"Texture IBL completion clears the linked physical source");
+			environment.ResolveWorldLighting(earth, sun, 42);
+			context.Check(!environment.GetActivePhysicalSky() &&
+				environment.GetRenderSettings().m_Intensity == view.GetEnvironmentLightingSettings().m_Intensity,
+				"Texture mode restores its authored artistic intensity only after publication");
 		}
 
 		void RunIBLPreviewContractTests(SelfTestContext& context) noexcept
@@ -859,7 +930,8 @@ namespace gglab
 				allocated.m_SrvDescriptor.IsValid() && !allocated.m_HasPublished &&
 				device.m_CreateTextureCount == 1,
 				"Preview observation distinguishes allocated descriptors from recorded contents");
-			registry.PublishPostProcessPreview(selected.m_Selected);
+			registry.PublishPostProcessPreview(selected.m_Selected,
+				PostProcessPreviewChannel::PostProcessing, 42);
 			const auto published = view.GetPostProcessPreviewDiagnostics();
 			const PostProcessDebugSelection nextSelection{ PostProcessDebugTap::SceneDepthRaw, 0 };
 			control.SetPostProcessPreviewSelection(nextSelection);
@@ -867,7 +939,8 @@ namespace gglab
 			const auto pending = view.GetPostProcessPreviewDiagnostics();
 			context.Check(pending.m_Selected == nextSelection && pending.m_Requested &&
 				pending.m_HasPublished && pending.m_Published == selected.m_Selected &&
-				pending.m_UpdateCount == 1 && published.m_Selected == selected.m_Selected &&
+				pending.m_UpdateCount == 1 && pending.m_FrameSerial == 42 &&
+				published.m_Selected == selected.m_Selected &&
 				!published.m_Requested && device.m_CreateTextureCount == 1,
 				"A new preview request preserves published identity and independently copied observations");
 			registry.InvalidatePostProcessPreview(nextSelection);
@@ -879,7 +952,8 @@ namespace gglab
 				"Preview invalidation changes live availability without rewriting copied metadata");
 
 			const RHIFencePoint retireFence{ RHIFenceHandle{ 1, 1 }, 9 };
-			registry.PublishPostProcessPreview(nextSelection);
+			registry.PublishPostProcessPreview(nextSelection,
+				PostProcessPreviewChannel::PostProcessing, 43);
 			registry.EnsurePostProcessPreviewResources(512, 512, &retireFence);
 			const auto resized = view.GetPostProcessPreviewDiagnostics();
 			context.Check(!resized.m_HasPublished && resized.m_Width == 512 &&
@@ -906,6 +980,21 @@ namespace gglab
 			context.Check(retirement.m_TextureCounts.m_PendingRetirement == 0 &&
 				retirement.m_TextureCounts.m_Available == 2,
 				"Retired preview resources become reusable only after fence completion");
+
+			const PostProcessDebugSelection aoSelection{ PostProcessDebugTap::GTAOFinalAO, 0 };
+			const PostProcessDebugSelection taaSelection{ PostProcessDebugTap::TemporalHistoryWeight, 0 };
+			control.SetPostProcessPreviewSelection(aoSelection, PostProcessPreviewChannel::AmbientOcclusion);
+			control.SetPostProcessPreviewSelection(taaSelection, PostProcessPreviewChannel::TemporalAA);
+			control.SetPostProcessPreviewExposureEV(2.0f, PostProcessPreviewChannel::TemporalAA);
+			control.RequestPostProcessPreview(PostProcessPreviewChannel::AmbientOcclusion);
+			const auto ao = view.GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel::AmbientOcclusion);
+			const auto taa = view.GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel::TemporalAA);
+			context.Check(ao.m_Selected == aoSelection && ao.m_Requested &&
+				taa.m_Selected == taaSelection && !taa.m_Requested && taa.m_ExposureEV == 2.0f &&
+				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::PostProcessing) &&
+				registry.ConsumePostProcessPreviewRequest(PostProcessPreviewChannel::AmbientOcclusion) &&
+				!registry.IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA),
+				"Feature previews keep independent selections, exposure and requests");
 		}
 
 		class RecordingGraphicsCommandContext final : public RHIGraphicsCommandContext
@@ -1118,11 +1207,6 @@ namespace gglab
 				.m_UV = screen_space::NDCToUV(ndc),
 				.m_RawDepth = clipPosition.m_Z * inverseW,
 			};
-		}
-
-		void RunSuiteSmokeTests(SelfTestContext& context) noexcept
-		{
-			context.Check(true, "Rendering contract suite executes deterministic checks");
 		}
 
 		void RunOpaqueSceneExtensionContractTests(SelfTestContext& context) noexcept
@@ -4898,6 +4982,7 @@ namespace gglab
 				view.m_Width = 64;
 				view.m_Height = 64;
 				view.m_IsValid = true;
+				view.m_ScenePreExposure = transaction.GetScenePreExposure();
 				transaction.PrepareDisplayView(view);
 				return view;
 			};
@@ -4998,7 +5083,7 @@ namespace gglab
 
 			TemporalFrameTransaction firstTransaction;
 			firstTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 0.25f);
 			const RenderView firstView = prepareDisplayView(firstTransaction);
 			const bool coldStartGraphValid = buildHistoryGraph(firstTransaction, false, true);
 			const RHIFencePoint firstFence{ RHIFenceHandle{ 1, 1 }, 10 };
@@ -5011,6 +5096,8 @@ namespace gglab
 				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
 				firstCommitted.m_ReadIndex == 1 && firstCommitted.m_ActiveBytes > 0 &&
 				firstCommitted.m_LastCommitted.m_JitterIndex == 0 &&
+				firstCommitted.m_Compatibility.m_ColorAbi == ActiveTemporalColorAbi &&
+				firstCommitted.m_LastCommitted.m_PreExposure == 0.25f &&
 				firstCommitted.m_LastCommitted.m_GraphicsFence == firstFence &&
 				device.m_CreateTextureCount == 4,
 				"Temporal history cold start imports four persistent textures and commits one write pair");
@@ -5033,16 +5120,19 @@ namespace gglab
 
 			TemporalFrameTransaction abortedTransaction;
 			abortedTransaction.Begin(
-				viewHistory, objectHistory, activePlan, 64, 64, &historyManager);
+				viewHistory, objectHistory, activePlan, 64, 64, &historyManager, 8.0f);
 			const RenderView abortedView = prepareDisplayView(abortedTransaction);
 			const bool abortGraphValid = buildHistoryGraph(abortedTransaction, true, false);
 			const RHIFencePoint vulkanAbortFence{ RHIFenceHandle{ 1, 1 }, 20 };
 			abortedTransaction.Abort(vulkanAbortFence);
 			const TemporalHistoryManagerDiagnostics afterAbort = historyManager.GetDiagnostics();
 			context.Check(abortGraphValid && abortedView.m_HasPreviousTemporalState &&
+				abortedView.m_PreviousScenePreExposure == 0.25f &&
 				abortedTransaction.GetState() == TemporalFrameTransactionState::Aborted &&
 				afterAbort.m_HistoryValid && afterAbort.m_ReadIndex == 1 &&
 				afterAbort.m_AllocationGeneration == firstGeneration &&
+				afterAbort.m_LastCommitted.m_PreExposure ==
+					firstCommitted.m_LastCommitted.m_PreExposure &&
 				afterAbort.m_LastCommitted.m_GraphicsFence == firstFence &&
 				viewHistory.m_Valid && viewHistory.m_NextJitterIndex == 1,
 				"Vulkan abort fences gate lifetime without advancing logical temporal history");
@@ -5177,6 +5267,75 @@ namespace gglab
 				texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
 				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
 				"Temporal history shutdown leaves no active or pending persistent allocation");
+
+			TemporalHistoryManager exposureManager(&texturePool);
+			viewHistory.Invalidate();
+			float previousScale = 1.0f;
+			uint64_t exposureFence = 100;
+			bool sweepValid = true;
+			bool expectPrevious = false;
+			for (const float scale : { 0.5f, 4.0f, 0.00000001f, 1024.0f, 1.0f })
+			{
+				TemporalFrameTransaction transaction;
+				transaction.Begin(viewHistory, objectHistory, activePlan, 64, 64, &exposureManager, scale);
+				const auto view = prepareDisplayView(transaction);
+				sweepValid &= view.m_HasPreviousTemporalState == expectPrevious &&
+					view.m_PreviousScenePreExposure == (expectPrevious ? previousScale : scale) &&
+					buildHistoryGraph(transaction, expectPrevious, false);
+				transaction.CommitCompleted({ RHIFenceHandle{ 1, 1 }, exposureFence++ });
+				sweepValid &= transaction.GetState() == TemporalFrameTransactionState::Committed &&
+					exposureManager.GetDiagnostics().m_LastCommitted.m_PreExposure == scale;
+				previousScale = scale;
+				expectPrevious = true;
+			}
+			context.Check(sweepValid, "Exposure sweeps sample the prior committed scale and commit only the new submitted scale");
+			exposureManager.Invalidate(TemporalHistoryResetReason::Disabled);
+			auto writeManagerFrame = [&](TemporalHistoryFrameState& frame)
+			{
+				RenderGraph graph({ .m_Device = &device,
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}) });
+				bool written = false;
+				graph.AddPass<TemporalHistoryContractPassData>("TemporalHistory.ExposureMetadata",
+					[&](RenderGraph::RGBuilder& builder, TemporalHistoryContractPassData& data)
+					{
+						if (!exposureManager.ImportRenderGraphResources(frame, builder, data.m_History)) return;
+						builder.WriteInPlace(data.m_History.m_NextColor, RGTextureAccess::StorageWrite);
+						builder.WriteInPlace(data.m_History.m_NextDepth, RGTextureAccess::StorageWrite);
+						written = exposureManager.ExportRenderGraphResources(frame, builder, data.m_History);
+					});
+				return graph.Compile() && written;
+			};
+			auto legacyFrame = exposureManager.BeginFrame(activePlan, 64, 64,
+				TemporalColorAbi::LinearRec709SceneReferredV1);
+			const bool legacyWritten = writeManagerFrame(legacyFrame);
+			const bool legacyCommitted = exposureManager.CommitFrame(legacyFrame, {
+				.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
+				.m_PreExposure = 1.0f }, { RHIFenceHandle{ 1, 1 }, exposureFence++ });
+			auto migratedFrame = exposureManager.BeginFrame(activePlan, 64, 64);
+			context.Check(legacyWritten && legacyCommitted && !migratedFrame.m_PreviousValid &&
+				exposureManager.GetDiagnostics().m_LastResetReason == TemporalHistoryResetReason::ColorAbiChanged,
+				"V1 history is retired rather than sampled after migration to active V2");
+			exposureManager.AbortFrame(migratedFrame, {});
+			bool invalidScalesRejected = true;
+			for (const float invalidScale : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(),
+				std::numeric_limits<float>::quiet_NaN() })
+			{
+				auto frame = exposureManager.BeginFrame(activePlan, 64, 64);
+				invalidScalesRejected &= writeManagerFrame(frame);
+				invalidScalesRejected &= !exposureManager.CommitFrame(frame, {
+					.m_Compatibility = exposureManager.GetDiagnostics().m_Compatibility,
+					.m_PreExposure = invalidScale }, { RHIFenceHandle{ 1, 1 }, exposureFence++ });
+				const auto diagnostics = exposureManager.GetDiagnostics();
+				invalidScalesRejected &= !diagnostics.m_HistoryValid && !diagnostics.m_HasActiveHistory &&
+					diagnostics.m_LastResetReason == TemporalHistoryResetReason::InvalidExposureMetadata;
+			}
+			context.Check(invalidScalesRejected, "Zero, negative, infinite and NaN scales cannot publish history and retire submitted resources");
+			exposureManager.Shutdown();
+			device.m_CompletedFenceValue = exposureFence;
+			texturePool.Tick();
+			context.Check(texturePool.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				texturePool.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Exposure migration and invalid-metadata paths retain no allocations after their fences complete");
 		}
 
 		void RunResourceStateAndPortabilityContractTests(SelfTestContext& context) noexcept
@@ -6283,6 +6442,585 @@ namespace gglab
 			return false;
 		}
 
+		void RunAtmosphereContractTests(SelfTestContext& context) noexcept
+		{
+			World authoredWorld;
+			authoredWorld.m_Atmosphere = AtmosphereSettings{};
+			authoredWorld.m_Atmosphere->m_MieAnisotropy = 0.6f;
+			World movedWorld(std::move(authoredWorld));
+			context.Check(movedWorld.m_Atmosphere && movedWorld.m_Atmosphere->m_MieAnisotropy == 0.6f &&
+				!authoredWorld.m_Atmosphere, "World movement preserves authored atmosphere and clears the moved-away owner");
+			AtmosphereSettings settings{};
+			const auto sun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			const auto a = ResolveAtmosphere(settings, sun, Vector3(0.0f, 1000.0f, 0.0f));
+			context.Check(std::abs(a.m_Observer.m_X-a.m_Radii.m_X-1.0f)<0.001f &&
+				std::abs(a.m_Rayleigh.m_X-0.005802f)<1e-7f && a.m_Rayleigh.m_W==8.0f,
+				"Atmosphere boundary converts meters and inverse meters to kilometers and resolves radial altitude");
+			const auto shortPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,1000.0f);
+			const auto longPath = EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,50000.0f);
+			context.Check(shortPath.m_X<=1.0f && longPath.m_X>0.0f && longPath.m_X<shortPath.m_X &&
+				longPath.m_Y<shortPath.m_Y && longPath.m_Z<shortPath.m_Z &&
+				EvaluateAtmosphereTransmittance(a,1000.0f,1.0f,0.0f).m_X==1.0f &&
+				EvaluateAtmosphereTransmittance(a,1000.0f,-1.0f,2000.0f).m_X==0.0f,
+				"Earth transmittance is finite, bounded, decreases with path length, and rejects planet-occluded sun paths");
+			settings.m_WorldUnitsToMeters=1000.0f;
+			const auto scaled = ResolveAtmosphere(settings,sun,Vector3(0.0f,1.0f,0.0f));
+			context.Check(scaled.m_Observer.m_X==a.m_Observer.m_X && AtmosphereDirtyMask(a,scaled)==0,
+				"Equivalent meter and kilometer worlds resolve identical atmosphere transport");
+			context.Check(a.m_World.m_W == 0.001f && scaled.m_World.m_W == 1.0f &&
+				std::abs(a.m_World.m_Y + 6360.0f) < 0.001f,
+				"Physical sky and direct sunlight use the same resolved world-to-atmosphere transform");
+			auto changed=a; changed.m_Sun.m_X*=2.0f;
+			bool invalidation=AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Observer.m_X+=1.0f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Ground.m_X+=0.1f; invalidation &= AtmosphereDirtyMask(a,changed)==6;
+			changed=a; changed.m_Mie.m_W=0.5f; invalidation &= AtmosphereDirtyMask(a,changed)==4;
+			changed=a; changed.m_Rayleigh.m_X*=2.0f; invalidation &= AtmosphereDirtyMask(a,changed)==7;
+			context.Check(invalidation,"Atmosphere dirty masks preserve transmittance and unit-sun scattering when only the sun or observer changes");
+			settings.m_MieExtinction=-1.0f;
+			settings.m_MieAnisotropy=std::numeric_limits<float>::quiet_NaN();
+			settings.m_RayleighScaleHeightMeters=0.0f;
+			const auto sanitized=ResolveAtmosphere(settings,sun,Vector3::Zero);
+			context.Check(sanitized.m_Mie.m_Y>=sanitized.m_Mie.m_X && std::isfinite(sanitized.m_Mie.m_W) &&
+				sanitized.m_Rayleigh.m_W>0.0f,"Atmosphere sanitization preserves nonnegative absorption and finite density scales");
+
+			RecordingDevice device;
+			device.m_AtmosphereBuffersEnabled=true;
+			device.m_TextureViewsSupported=true;
+			device.m_UseControlledFenceCompletion=true;
+			PersistentTexturePool pool(&device);
+			AtmosphereSystem system(&device,&pool);
+			class ShaderAccess final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef&) noexcept override { return ShaderID{ 1 }; }
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class BindingAccess final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return {}; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+			} bindings;
+			class PipelineAccess final : public RenderPipelineResolver
+			{
+			public:
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey&,
+					const RenderPassInfo&) noexcept override { return {}; }
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
+					const RenderPassInfo&) noexcept override { return RHIPipelineHandle{ 1, 1 }; }
+				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+			} pipelines;
+			class SamplerAccess final : public RenderSamplerAccess
+			{
+			public:
+				SamplerID GetOrCreateSampler(const SamplerKey&) noexcept override { return {}; }
+				SamplerID GetPresetSamplerId(SamplerPreset) const noexcept override { return {}; }
+				uint32_t GetSamplerIndex(SamplerPreset) const noexcept override { return 0; }
+				uint32_t GetSamplerIndex(const SamplerID&) const noexcept override { return 0; }
+				uint32_t ResolveSamplerIndex(SamplerID, SamplerPreset) const noexcept override { return 0; }
+			} samplers;
+			const RenderServices services{ .m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
+				.m_Samplers = &samplers, .m_BindingLayout = &bindings, .m_Atmosphere = &system };
+			RenderFrameBuildResult frame{};
+			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
+			frame.m_RenderScene.m_WorldSun = sun;
+			frame.m_RenderViews.resize(1);
+			RenderGraph graph({ .m_Device = &device,
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
+			RenderPassAtmosphere pass;
+			pass.AddPass(graph, frame.MakeRenderFrameContext(), services);
+			pass.AddFinishPass(graph);
+			const bool compiled = graph.Compile();
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			bool dependencies = compiled && snapshot.m_Passes.size() == 5;
+			for (size_t i = 1; dependencies && i < 4; ++i)
+			{
+				dependencies &= !snapshot.m_Passes[i].m_Culled && snapshot.m_Passes[i].m_Accesses.size() == i &&
+					snapshot.m_Passes[i].m_ExecutionOrder < snapshot.m_Passes[i + 1].m_ExecutionOrder;
+			}
+			context.Check(dependencies, "Production atmosphere graph retains ordered transmittance, multiple scattering, sky and export dependencies");
+			system.EndFrame(false, {});
+			device.m_AtmosphereDestroyedBufferCount = 0;
+			const bool first=system.Begin(a,{1,1,1});
+			context.Check(first && system.GetDiagnostics().m_DirtyMask==7,"Cold atmosphere allocation requires all three LUT producers");
+			if (first) { for (uint32_t i=0;i<3;++i) system.NotifyExecuted(i); }
+			system.EndFrame(true,{RHIFenceHandle{1,1},10});
+			const bool cached=system.Begin(a,{1,1,1},true);
+			context.Check(cached && system.GetDiagnostics().m_DirtyMask==0 && system.GetDiagnostics().m_Generations[0]==1 &&
+				system.GetConstants().IsValid(),
+				"Physical sky preview retains frame constants without recomputing cached atmosphere LUTs");
+			system.EndFrame(true,{RHIFenceHandle{1,1},11});
+			changed=a; changed.m_Observer.m_X+=1.0f;
+			const bool updated=system.Begin(changed,{1,1,1});
+			context.Check(updated && system.GetDiagnostics().m_DirtyMask==4,"Observer edits schedule only the sky-view producer");
+			if (updated) system.NotifyExecuted(2);
+			system.EndFrame(false,{RHIFenceHandle{1,1},12});
+			context.Check(!system.GetDiagnostics().m_Available && system.GetDiagnostics().m_Generations[2]==1 &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount==3 && device.m_AtmosphereDestroyedBufferCount==0,
+				"Cancelled submitted atmosphere work publishes no generation and retains textures and constants until its fence");
+			device.m_CompletedFenceValue=12;
+			system.Tick(); pool.Tick();
+			context.Check(device.m_AtmosphereDestroyedBufferCount==3 && pool.GetDiagnostics().m_PendingRetirementTextureCount==0,
+				"Atmosphere constants and textures retire after GPU completion");
+			const bool retry=system.Begin(a,{1,1,1});
+			if (retry) system.NotifyExecuted(0);
+			system.EndFrame(false,{});
+			device.m_CompletedFenceValue=12;
+			system.Shutdown(); pool.Tick();
+			context.Check(pool.GetDiagnostics().m_ActiveTextureCount==0 && device.m_AtmosphereDestroyedBufferCount==4,
+				"Unsubmitted atmosphere cancellation destroys its upload and leaves no active resources");
+
+			// Exercise the actual inspector consumer between LUT production and final export.
+			// A producer-only graph cannot detect reads declared after an early Export.
+			device.m_CreateValidDescriptors = true;
+			TransientResourcePool previewPool(&device);
+			SamplerRegistry previewSamplers({ .m_Device = &device });
+			RenderResourceRegistry registry({ .m_Device = &device,
+				.m_TransientResourcePool = &previewPool, .m_SamplerRegistry = &previewSamplers });
+			class PresentationAccess final : public RenderPresentationAccess
+			{
+			public:
+				RHIContext* GetRHIContext() const noexcept override { return nullptr; }
+				RHIDevice* GetDevice() const noexcept override { return nullptr; }
+				RHISwapChain* GetSwapChain() const noexcept override { return nullptr; }
+				const std::array<float, 4>& GetBackBufferClearColor() const noexcept override { return m_Clear; }
+				RHIFencePoint GetLastSubmittedFencePoint() const noexcept override { return {}; }
+			private:
+				std::array<float, 4> m_Clear{};
+			} presentation;
+			AtmosphereSystem previewAtmosphere(&device, &pool);
+			auto previewServices = services;
+			previewServices.m_Resources = &registry;
+			previewServices.m_Presentation = &presentation;
+			previewServices.m_Atmosphere = &previewAtmosphere;
+			frame.m_RenderViews[0].m_Width = 1024;
+			frame.m_RenderViews[0].m_Height = 512;
+			const std::array previewTaps{ PostProcessDebugTap::AtmosphereTransmittance,
+				PostProcessDebugTap::AtmosphereMultipleScattering, PostProcessDebugTap::AtmosphereSkyView };
+			uint64_t fenceValue = 20;
+			for (size_t tap = 0; tap < previewTaps.size(); ++tap)
+			{
+				frame.m_RenderViews[0].m_CameraPosition = Vector3::Zero;
+				for (uint32_t phase = 0; phase < 3; ++phase)
+				{
+					if (phase == 2) frame.m_RenderViews[0].m_CameraPosition = Vector3(0.0f, 1000.0f, 0.0f);
+					RenderGraph previewGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+					const auto previewContext = frame.MakeRenderFrameContext();
+					pass.AddPass(previewGraph, previewContext, previewServices);
+					const uint32_t expectedMask = phase == 0 ? 7u : phase == 1 ? 0u : 4u;
+					const bool expectedUpdate = previewAtmosphere.GetDiagnostics().m_DirtyMask == expectedMask;
+					registry.SetPostProcessPreviewSelection({ previewTaps[tap], 0 },
+						PostProcessPreviewChannel::Atmosphere);
+					registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
+					RenderPassPostProcessPreview preview;
+					preview.AddPass(previewGraph, previewContext, previewServices);
+					pass.AddFinishPass(previewGraph);
+					const bool previewCompiled = previewGraph.Compile();
+					RGSnapshot previewSnapshot;
+					BuildRenderGraphSnapshot(previewGraph, previewSnapshot);
+					const auto consumer = std::ranges::find(previewSnapshot.m_Passes,
+						"Atmosphere.Preview", &RGSnapshotPassInfo::m_Name);
+					const auto finish = std::ranges::find(previewSnapshot.m_Passes,
+						"Atmosphere.Export", &RGSnapshotPassInfo::m_Name);
+					bool valid = previewCompiled && expectedUpdate && consumer != previewSnapshot.m_Passes.end() &&
+						finish != previewSnapshot.m_Passes.end() && !consumer->m_Culled && !finish->m_Culled &&
+						consumer->m_ExecutionOrder < finish->m_ExecutionOrder;
+					valid &= std::ranges::any_of(previewSnapshot.m_DependencyEdges,
+						[tap](const RGSnapshotDependencyEdge& edge)
+						{
+							return edge.m_FromPassName == "Atmosphere.Preview" && edge.m_ToPassName == "Atmosphere.Export" &&
+								edge.m_ResourceName == AtmosphereLutNames[tap] && edge.m_Reason == RGDependencyReason::ExportReaderToExport;
+						});
+					for (const auto name : AtmosphereLutNames)
+					{
+						const auto resource = std::ranges::find(previewSnapshot.m_Resources, name, &RGSnapshotResourceInfo::m_Name);
+						valid &= resource != previewSnapshot.m_Resources.end() && resource->m_HasFinalBarrierState &&
+							resource->m_FinalBarrierState == CommonRHIResourceState();
+					}
+					if (valid)
+					{
+						valid &= std::ranges::any_of(finish->m_PostBarriers,
+							[tap](const RGSnapshotBarrierInfo& barrier)
+							{
+								return barrier.m_ResourceName == AtmosphereLutNames[tap] &&
+									barrier.m_After == CommonRHIResourceState();
+							});
+					}
+					context.Check(valid, std::format("Atmosphere preview {} reads before export with dirty mask {} and returns to Common",
+						AtmosphereLutNames[tap], expectedMask));
+					// Simulate a successful submission to exercise cache reuse in the next graph.
+					for (uint32_t i = 0; i < 3; ++i)
+					{
+						if (expectedMask & (1u << i)) previewAtmosphere.NotifyExecuted(i);
+					}
+					previewAtmosphere.EndFrame(previewCompiled, { RHIFenceHandle{ 1, 1 }, ++fenceValue });
+				}
+				previewAtmosphere.Disable();
+			}
+			frame.m_RenderScene.m_Atmosphere.reset();
+			RenderGraph disabledGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			const auto disabledContext = frame.MakeRenderFrameContext();
+			pass.AddPass(disabledGraph, disabledContext, previewServices);
+			registry.PublishPostProcessPreview({ previewTaps[0], 0 },
+				PostProcessPreviewChannel::Atmosphere, 42);
+			registry.SetPostProcessPreviewSelection({ previewTaps[0], 0 },
+				PostProcessPreviewChannel::Atmosphere);
+			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
+			RenderPassPostProcessPreview unavailablePreview;
+			unavailablePreview.AddPass(disabledGraph, disabledContext, previewServices);
+			pass.AddFinishPass(disabledGraph);
+			RGSnapshot disabledSnapshot;
+			BuildRenderGraphSnapshot(disabledGraph, disabledSnapshot);
+			context.Check(disabledSnapshot.m_Passes.empty() &&
+				!registry.HasPublishedPostProcessPreview(PostProcessPreviewChannel::Atmosphere),
+				"Disabled atmosphere creates no LUT exports and invalidates the unavailable preview");
+
+			class BakeEnvironmentAccess final : public RenderEnvironmentAccess
+			{
+			public:
+				AtmosphereGPU m_Parameters{};
+				EnvironmentLightingSettings m_Settings{};
+				IBLBakeStatus m_Status{};
+				EnvironmentTextureSource m_TextureSource{};
+				const EnvironmentLightingSettings& GetEnvironmentLightingSettings() const noexcept override { return m_Settings; }
+				bool ShouldInitializeBakeResources() const noexcept override { return false; }
+				uint64_t GetBakingGeneration() const noexcept override { return 1; }
+				const IBLBakeConfig& GetBakingConfig() const noexcept override { return m_Settings.m_BakeConfig; }
+				const IBLBakeStatus& GetBakingStatus() const noexcept override { return m_Status; }
+				IBLBakeStage GetStageForRecording() const noexcept override { return IBLBakeStage::Environment; }
+				void NotifyStageExecuted(IBLBakeStage, uint64_t) noexcept override {}
+				void NotifyBakeResourcesInitialized(uint64_t) noexcept override {}
+				const EnvironmentTextureSource& GetBakingSource() const noexcept override { return m_TextureSource; }
+				const EnvironmentTextureSource& GetCommittedEnvironmentSource() const noexcept override { return m_TextureSource; }
+				ArtifactCacheCoreStatistics GetArtifactCacheStatistics() const noexcept override { return {}; }
+				LocalDerivedDataStoreStatistics GetDerivedDataStoreStatistics() const noexcept override { return {}; }
+				const AtmosphereGPU* GetBakingAtmosphereParameters() const noexcept override { return &m_Parameters; }
+			} bakeEnvironment;
+			bakeEnvironment.m_Parameters = a;
+			registry.EnsureIBLBakeResources(bakeEnvironment.m_Settings.m_BakeConfig);
+			AtmosphereSystem bakeAtmosphere(&device, &pool);
+			auto bakeServices = services;
+			bakeServices.m_Environment = &bakeEnvironment;
+			bakeServices.m_BakeAtmosphere = &bakeAtmosphere;
+			bakeServices.m_Resources = &registry;
+			RenderGraph bakeGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			struct BakeImportData {};
+			bakeGraph.AddPass<BakeImportData>("IBL.Import.Contract", [&registry](RenderGraph::RGBuilder& builder, BakeImportData&)
+				{
+					auto& resources = builder.GetBlackboard().Create<RGIBLResources>(IBLResourcesName);
+					resources.m_BakeEnvironmentCubemap = builder.ImportTexture("IBL.Bake.Environment",
+						registry.GetIBLBakeTextureHandle(RenderTextureIndex::IBL_EnvironmentCubemap),
+						*registry.GetIBLBakeTextureDesc(RenderTextureIndex::IBL_EnvironmentCubemap),
+						UndefinedRHITextureState(), RGContentValidity::Undefined);
+				});
+			pass.AddBakePass(bakeGraph, bakeServices);
+			RenderPassIBLEnvironment environmentPass;
+			environmentPass.AddPass(bakeGraph, disabledContext, bakeServices);
+			pass.AddFinishPass(bakeGraph);
+			const bool bakeCompiled = bakeGraph.Compile();
+			RGSnapshot bakeSnapshot;
+			BuildRenderGraphSnapshot(bakeGraph, bakeSnapshot);
+			context.Check(bakeCompiled && std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+				[](const RGSnapshotDependencyEdge& edge)
+				{
+					return edge.m_FromPassName == BakeAtmosphereLutNames[2] && edge.m_ToPassName == "IBL.Environment";
+				}), "Production procedural IBL depends on the pending sky LUT with no texture asset service");
+			context.Check(std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+				[](const RGSnapshotDependencyEdge& edge)
+				{
+					return edge.m_FromPassName == "IBL.Environment" && edge.m_ToPassName == "IBL.Atmosphere.Export" &&
+						edge.m_Reason == RGDependencyReason::ExportReaderToExport;
+				}), "Pending atmosphere export follows its IBL consumer and restores the persistent state contract");
+			for (uint32_t i = 0; i < 3; ++i) bakeAtmosphere.NotifyExecuted(i);
+			bakeAtmosphere.EndFrame(bakeCompiled, { RHIFenceHandle{ 1, 1 }, 100 });
+			device.m_CompletedFenceValue = 99;
+			context.Check(!bakeAtmosphere.CanPublish(), "A submitted physical sky remains unpublished until its GPU fence completes");
+			device.m_CompletedFenceValue = 100;
+			context.Check(bakeAtmosphere.CanPublish(), "GPU completion unlocks a complete pending atmosphere generation");
+			AtmosphereSystem activeAtmosphere(&device, &pool);
+			const bool activeBegun = activeAtmosphere.Begin(a, { 1,1,1 });
+			if (activeBegun) for (uint32_t i = 0; i < 3; ++i) activeAtmosphere.NotifyExecuted(i);
+			activeAtmosphere.EndFrame(activeBegun, { RHIFenceHandle{ 1, 1 }, 200 });
+			const auto oldTexture = activeAtmosphere.GetTexture(0);
+			const auto newTexture = bakeAtmosphere.GetTexture(0);
+			activeAtmosphere.SwapPublished(bakeAtmosphere);
+			bakeAtmosphere.Disable();
+			pool.Tick();
+			context.Check(activeAtmosphere.GetTexture(0) == newTexture && oldTexture != newTexture &&
+				pool.GetDiagnostics().m_PendingRetirementTextureCount == 3,
+				"Atomic LUT replacement retains the old set behind its last-use fence, independent of the bake fence");
+			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
+			frame.m_RenderSceneStatus = RenderSceneBuildStatus::Ready;
+			frame.m_RenderViews[0].m_Width = 1024;
+			frame.m_RenderViews[0].m_Height = 512;
+			frame.m_RenderViews[0].m_FovRadians = 1.0f;
+			frame.m_RenderViews[0].m_Aspect = 2.0f;
+			frame.m_RenderViews[0].m_Far = 10000.0f;
+			bakeEnvironment.m_Settings.m_EnableSkybox = true;
+			bakeEnvironment.m_Settings.m_BackgroundMode =
+				EnvironmentBackgroundMode::PhysicalAtmospherePreview;
+			auto aerialServices = previewServices;
+			aerialServices.m_Atmosphere = &activeAtmosphere;
+			aerialServices.m_Environment = &bakeEnvironment;
+			RenderGraph aerialGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
+			struct AerialTargetData {};
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Opaque", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				const RHIExtent3D extent{ 1024, 512, 1 };
+				RHITextureDesc colorDesc{};
+				colorDesc.m_Format = RHIFormat::R16G16B16A16Float;
+				colorDesc.m_Extent = extent;
+				auto& targets = builder.GetBlackboard().Create<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				targets.m_Width = extent.m_Width;
+				targets.m_Height = extent.m_Height;
+				targets.m_SceneColor = builder.CreateTexture("AerialTest.SceneColor", colorDesc);
+				builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				RHITextureDesc depthDesc{};
+				depthDesc.m_Format = RHIFormat::R32Typeless;
+				depthDesc.m_Extent = extent;
+				auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(
+					SceneDepthResourcesName);
+				depth.m_Texture = builder.CreateTexture("AerialTest.Depth", depthDesc);
+				depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float,
+					0, 1, RHITextureAspect::Depth);
+				builder.WriteInPlace(depth.m_Texture, RGTextureAccess::DepthStencilWrite);
+			});
+			const auto aerialContext = frame.MakeRenderFrameContext();
+			pass.AddPass(aerialGraph, aerialContext, aerialServices);
+			registry.SetPostProcessPreviewSelection(
+				{ PostProcessDebugTap::AtmosphereAerialTransmittance, 0 },
+				PostProcessPreviewChannel::Atmosphere);
+			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
+			RenderPassAerialPerspective aerialPass;
+			const auto baselineColor = aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(
+				ViewTargetsTableName).GetViewTargets(RenderViewID::Main).m_SceneColor;
+			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = false;
+			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			context.Check(!aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName) &&
+				aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).
+				GetViewTargets(RenderViewID::Main).m_SceneColor == baselineColor &&
+				activeAtmosphere.GetTexture(0) == newTexture && bakeEnvironment.m_Settings.m_EnableSkybox,
+				"Disabling aerial transport preserves surface scene color, active atmosphere and sky settings");
+			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = true;
+			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			RenderPassPostProcessPreview aerialPreview;
+			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
+			});
+			pass.AddFinishPass(aerialGraph);
+			const bool aerialCompiled = aerialGraph.Compile();
+			RGSnapshot aerialSnapshot;
+			BuildRenderGraphSnapshot(aerialGraph, aerialSnapshot);
+			const auto aerialEdge = [&aerialSnapshot](std::string_view from,
+				std::string_view to) noexcept
+				{
+					return std::ranges::any_of(aerialSnapshot.m_DependencyEdges,
+						[from, to](const RGSnapshotDependencyEdge& edge)
+						{
+							return edge.m_FromPassName == from && edge.m_ToPassName == to;
+						});
+				};
+			context.Check(aerialCompiled, "Aerial opaque graph compiles with sampled depth and LUT inputs");
+			const auto aerialBuild = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.Build", &RGSnapshotPassInfo::m_Name);
+			context.Check(aerialBuild != aerialSnapshot.m_Passes.end() && !aerialBuild->m_Culled &&
+				std::ranges::any_of(aerialBuild->m_Accesses,
+					[](const RGSnapshotAccessInfo& access)
+					{
+						return access.m_ResourceName == AtmosphereLutNames[0] &&
+							access.m_DependencyAccess == RGDependencyAccess::Read;
+					}) &&
+				std::ranges::any_of(aerialBuild->m_Accesses,
+					[](const RGSnapshotAccessInfo& access)
+					{
+						return access.m_ResourceName == AtmosphereLutNames[1] &&
+							access.m_DependencyAccess == RGDependencyAccess::Read;
+					}), "Aerial froxel build samples both active atmosphere transport LUTs");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Build", "Atmosphere.AerialPerspective.Composite"),
+				"Aerial composite reads the froxel output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.Consumer"),
+				"Downstream scene color reads the aerial composite output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "Atmosphere.Preview"),
+				"Aerial diagnostic preview reads the current composite result");
+			activeAtmosphere.EndFrame(false, {});
+			device.m_CompletedFenceValue = 200;
+			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
+			device.m_CompletedFenceValue = std::max(fenceValue, uint64_t{ 200 });
+			registry.ReleaseAll({ RHIFenceHandle{ 1, 1 }, fenceValue });
+			previewAtmosphere.Shutdown();
+			previewPool.Tick();
+			pool.Tick();
+		}
+
+		void RunWorldSunContractTests(SelfTestContext& context) noexcept
+		{
+			const auto luminance = [](const Vector3& rgb)
+			{
+				return 0.2126 * rgb.m_X + 0.7152 * rgb.m_Y + 0.0722 * rgb.m_Z;
+			};
+			WorldSunSettings settings{};
+			settings.m_Chromaticity = Vector3(1.0f, 0.8f, 0.6f);
+			const auto sun = ResolveWorldSun(settings, Vector3(0.0f, -2.0f, 0.0f));
+			context.Check(std::abs(luminance(sun.m_Chromaticity) - 1.0) < 1.0e-6 &&
+				sun.m_Direction.m_Y == -1.0f && sun.m_PerpendicularIlluminanceLux == 120000.0f,
+				"World sun resolves unit direction and luminance-normalized chromaticity independently of exposure");
+			bool integratedLuxMatches = true;
+			for (float radius : { 0.01f, 0.2666f, 1.0f, 5.0f })
+			{
+				settings.m_AngularRadiusDegrees = radius;
+				const auto disk = ResolveWorldSun(settings, -Vector3::UnitY);
+				double projectedIntegral = 0.0;
+				constexpr int samples = 4096;
+				const double step = disk.m_AngularRadiusRadians / static_cast<double>(samples);
+				for (int i = 0; i < samples; ++i)
+				{
+					const double theta = (i + 0.5) * step;
+					projectedIntegral += std::cos(theta) * std::sin(theta) * step * 2.0 * std::numbers::pi;
+				}
+				const double integratedLux = luminance(disk.m_DiskRadiance) * projectedIntegral;
+				integratedLuxMatches &= std::abs(integratedLux / settings.m_PerpendicularIlluminanceLux - 1.0) < 1.0e-5;
+			}
+			context.Check(integratedLuxMatches,
+				"Numerical RGB solar disk integration recovers configured perpendicular lux across angular radii");
+			const auto whiteSun = ResolveWorldSun(WorldSunSettings{}, -Vector3::UnitY);
+			components::TransformComponent transform{};
+			components::LightComponent light{};
+			light.m_Color = Color::Red;
+			light.m_Intensity = 3.0f;
+			RenderDirectionalLight selected{};
+			selected.m_EntityKey = 42;
+			selected.m_Direction = sun.m_Direction;
+			selected.m_WorldSun = sun;
+			const auto physicalGpu = RenderSceneBuilder::BuildLightData(42, transform, light, selected);
+			const auto legacyGpu = RenderSceneBuilder::BuildLightData(43, transform, light, selected);
+			light.m_Type = LightType::Point;
+			const auto localGpu = RenderSceneBuilder::BuildLightData(42, transform, light, selected);
+			context.Check(physicalGpu.Intensity == 120000.0f && physicalGpu.Direction.m_Y == -1.0f &&
+				physicalGpu.Color.m_Y == sun.m_Chromaticity.m_Y && legacyGpu.Intensity == 3.0f &&
+				legacyGpu.Color.m_Y == 0.0f && localGpu.Intensity == 3.0f && localGpu.Color.m_Y == 0.0f,
+				"GPU light encoding applies physical units only to the designated directional sun");
+			const float radiance = whiteSun.m_DirectIlluminance.m_X * 0.18f / std::numbers::pi_v<float>;
+			const auto ev15 = ResolveManualExposureSettings(15.0f, 0.0f, true);
+			const auto ev16 = ResolveManualExposureSettings(16.0f, 0.0f, true);
+			context.Check(std::abs(radiance - 6875.4935f) < 0.01f &&
+				std::abs(radiance * ev15.m_ExposureScale - 2.0f * radiance * ev16.m_ExposureScale) < 1.0e-6f,
+				"Neutral 18 percent Lambert reference is rho E over pi and one exposure stop halves exposed radiance");
+			WorldSunSettings invalid{};
+			invalid.m_PerpendicularIlluminanceLux = std::numeric_limits<float>::infinity();
+			invalid.m_Chromaticity = Vector3::Zero;
+			invalid.m_AngularRadiusDegrees = std::numeric_limits<float>::quiet_NaN();
+			const auto sanitized = ResolveWorldSun(invalid, Vector3(std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f));
+			context.Check(sanitized.m_PerpendicularIlluminanceLux == 0.0f &&
+				sanitized.m_Direction.m_Y == -1.0f && sanitized.m_Chromaticity.m_X == 1.0f &&
+				std::isfinite(sanitized.m_DiskRadiance.m_X) && sanitized.m_ProjectedSolidAngle > 0.0f,
+				"Invalid sun input resolves finite darkness, neutral chromaticity and a valid angular radius");
+		}
+
+		void RunExposureContractTests(SelfTestContext& context) noexcept
+		{
+			Camera camera(Camera::CreateInfo{});
+			const ResolvedExposureSettings defaultExposure =
+				ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure;
+			context.Check(NearlyEqual(defaultExposure.m_ExposureScale,
+				1.0f / ManualExposureSaturationNormalization, 0.000001f) &&
+				defaultExposure.m_ManualEV100 == 0.0f &&
+				defaultExposure.m_CompensationEV == 0.0f &&
+				defaultExposure.m_PreExposure == defaultExposure.m_ExposureScale,
+				"Zero manual EV100 uses saturation-normalized default exposure");
+
+			bool compensationResponseMatches = true;
+			for (float compensation : { -10.0f, -2.0f, 0.0f, 2.0f, 10.0f })
+			{
+				camera.SetExposureCompensationEV(compensation);
+				const float exposureScale =
+					ResolveViewRenderSettings(ViewRenderProfile{}, camera).m_Exposure.m_ExposureScale;
+				compensationResponseMatches &= NearlyEqual(
+					exposureScale / std::exp2(compensation),
+					defaultExposure.m_ExposureScale, 0.000001f);
+			}
+			context.Check(compensationResponseMatches,
+				"Exposure compensation retains its stop response at zero manual EV100");
+
+			camera.SetManualEV100(16.0f);
+			camera.SetExposureCompensationEV(0.0f);
+			ViewRenderProfile preExposedProfile{};
+			preExposedProfile.m_EnableScenePreExposure = true;
+			const auto preExposedSettings = ResolveViewRenderSettings(preExposedProfile, camera);
+			preExposedProfile.m_TemporalAA.m_Enabled = true;
+			const auto temporalSettings = ResolveViewRenderSettings(preExposedProfile, camera);
+			context.Check(preExposedSettings.m_Exposure.m_PreExposure ==
+				preExposedSettings.m_Exposure.m_ExposureScale &&
+				preExposedSettings.m_Exposure.m_PreExposure < 0.0001f &&
+				temporalSettings.m_Exposure.m_PreExposure == temporalSettings.m_Exposure.m_ExposureScale &&
+				temporalSettings.m_Exposure.m_ExposureScale ==
+				preExposedSettings.m_Exposure.m_ExposureScale,
+				"Scene pre-exposure remains enabled with a TAA request under the V2 ABI");
+			const ResolvedTemporalFramePlan noTemporalFrame{};
+			const RenderView preExposedView = RenderViewBuildTraits<RenderViewID::Main>::Build({
+				.m_Camera = camera,
+				.m_RenderSettings = preExposedSettings,
+				.m_TemporalFramePlan = noTemporalFrame,
+				.m_Width = 64,
+				.m_Height = 64,
+			});
+			const auto upload = RenderSceneBuilder::BuildViewData(
+				std::span<const RenderView>(&preExposedView, 1), {});
+			context.Check(upload.m_Views.size() == 1 &&
+				preExposedView.m_ScenePreExposure == preExposedSettings.m_Exposure.m_PreExposure &&
+				upload.m_Views[0].ScenePreExposure == preExposedView.m_ScenePreExposure &&
+				upload.m_Views[0].ExposureMultiplier == preExposedSettings.m_Exposure.m_ExposureScale,
+				"The resolved view uploads one unchanged scene storage scale for every scene writer");
+
+			const ResolvedExposureSettings base = ResolveManualExposureSettings(12.0f, 0.0f);
+			const ResolvedExposureSettings plusStop = ResolveManualExposureSettings(13.0f, 0.0f);
+			const ResolvedExposureSettings minusStop = ResolveManualExposureSettings(11.0f, 0.0f);
+			const ResolvedExposureSettings plusCompensation =
+				ResolveManualExposureSettings(12.0f, 1.0f);
+			context.Check(NearlyEqual(plusStop.m_ExposureScale / base.m_ExposureScale, 0.5f) &&
+				NearlyEqual(minusStop.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
+				NearlyEqual(plusCompensation.m_ExposureScale / base.m_ExposureScale, 2.0f) &&
+				base.m_EffectiveEV100 == 12.0f &&
+				plusCompensation.m_EffectiveEV100 == 11.0f,
+				"Manual exposure and compensation move exposed-linear brightness by exact stops");
+
+			const float nan = std::numeric_limits<float>::quiet_NaN();
+			const ResolvedExposureSettings sanitized =
+				ResolveManualExposureSettings(nan, std::numeric_limits<float>::infinity());
+			const ResolvedExposureSettings clamped =
+				ResolveManualExposureSettings(1000.0f, -1000.0f);
+			camera.SetManualEV100(nan);
+			context.Check(sanitized.m_ManualEV100 == 0.0f &&
+				sanitized.m_CompensationEV == 0.0f &&
+				std::isfinite(sanitized.m_ExposureScale) && sanitized.m_ExposureScale > 0.0f &&
+				clamped.m_ManualEV100 == Camera::ClampManualEV100(1000.0f) &&
+				clamped.m_CompensationEV == Camera::ClampExposureCompensationEV(-1000.0f) &&
+				std::isfinite(clamped.m_ExposureScale) && clamped.m_ExposureScale > 0.0f &&
+				camera.GetManualEV100() == 16.0f,
+				"Exposure resolution clamps finite ranges and rejects non-finite camera input");
+
+			TemporalViewHistory viewHistory;
+			TemporalObjectHistory objectHistory;
+			TemporalFrameTransaction disabledTransaction;
+			disabledTransaction.Begin(viewHistory, objectHistory, {}, 64, 64, nullptr, 0.5f);
+			const bool retainedDisabledScale =
+				disabledTransaction.GetScenePreExposure() == 0.5f;
+			disabledTransaction.Abort();
+			context.Check(retainedDisabledScale &&
+				disabledTransaction.GetState() == TemporalFrameTransactionState::Aborted,
+				"A TAA-disabled frame can carry a non-unit storage scale without committing history");
+		}
+
 		void RunTemporalCompatibilityAndHistoryContractTests(SelfTestContext& context) noexcept
 		{
 			static_assert(sizeof(ViewGPU) == 480);
@@ -6290,6 +7028,8 @@ namespace gglab
 			static_assert(offsetof(ViewGPU, PreviousDepthReconstructionParams) == 400);
 			static_assert(offsetof(ViewGPU, CurrentJitterUV) == 432);
 			static_assert(offsetof(ViewGPU, PreviousDepthConvention) == 464);
+			static_assert(offsetof(ViewGPU, ScenePreExposure) == 468);
+			static_assert(offsetof(ViewGPU, PreviousScenePreExposure) == 472);
 
 			const Vector2 staticMotion = ComputeTemporalMotionUV(
 				Vector4(0.0f, 0.0f, 0.5f, 1.0f), Vector4(0.0f, 0.0f, 0.5f, 1.0f));
@@ -6724,8 +7464,10 @@ namespace gglab
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
 					PostProcessColorState::DisplayLinearRec709, 1.0f) &&
 				!IsTemporalColorCompatible(TemporalColorAbi::LinearRec709SceneReferredV1,
+					PostProcessColorState::SceneLinearRec709, 0.5f) &&
+				IsTemporalColorCompatible(TemporalColorAbi::LinearRec709PreExposedV2,
 					PostProcessColorState::SceneLinearRec709, 0.5f),
-				"Temporal color ABI accepts only linear scene Rec.709 at unit pre-exposure");
+				"V1 remains unit-only while V2 accepts pre-exposed scene-linear Rec.709");
 
 			Camera rigCamera(Camera::CreateInfo{});
 			CameraController rigController(CameraController::CreateInfo{});
@@ -6785,6 +7527,17 @@ namespace gglab
 			const Camera camera(Camera::CreateInfo{});
 			const ResolvedViewRenderSettings defaultSettings =
 				ResolveViewRenderSettings(profile, camera);
+			profile.m_Lighting.m_EnableAerialPerspective = false;
+			profile.m_Lighting.m_EnableAerialProbe = true;
+			const auto baselineSettings = ResolveViewRenderSettings(profile, camera);
+			context.Check(defaultSettings.m_Lighting.m_EnableAerialPerspective &&
+				!baselineSettings.m_Lighting.m_EnableAerialPerspective &&
+				!defaultSettings.m_Lighting.m_EnableAerialProbe &&
+				baselineSettings.m_Lighting.m_EnableAerialProbe &&
+				baselineSettings.m_Exposure.m_PreExposure == defaultSettings.m_Exposure.m_PreExposure &&
+				baselineSettings.m_Lighting.m_GTAO.m_Enabled == defaultSettings.m_Lighting.m_GTAO.m_Enabled &&
+				baselineSettings.m_TemporalAA.m_Enabled == defaultSettings.m_TemporalAA.m_Enabled,
+				"Aerial baseline switch resolves independently of exposure, AO and TAA");
 			profile.m_TemporalAA.m_Enabled = true;
 			const ResolvedViewRenderSettings enabledSettings =
 				ResolveViewRenderSettings(profile, camera);
@@ -7318,7 +8071,6 @@ namespace gglab
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);
-		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);
@@ -7337,6 +8089,9 @@ namespace gglab
 		RunTextureFormatCapabilityTests(context);
 		RunPersistentTexturePoolContractTests(context);
 		RunTemporalHistoryTransactionContractTests(context);
+		RunAtmosphereContractTests(context);
+		RunWorldSunContractTests(context);
+		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);

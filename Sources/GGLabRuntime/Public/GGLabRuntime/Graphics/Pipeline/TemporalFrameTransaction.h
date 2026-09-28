@@ -32,6 +32,8 @@ namespace gglab
 		uint64_t m_SessionIdentity = 0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+		float m_PreExposure = 1.0f;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 	};
 
 	struct TemporalViewHistory
@@ -115,7 +117,8 @@ namespace gglab
 	public:
 		void Begin(TemporalViewHistory& viewHistory, TemporalObjectHistory& objectHistory,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
-			TemporalHistoryManager* historyManager = nullptr) noexcept;
+			TemporalHistoryManager* historyManager = nullptr,
+			float scenePreExposure = SceneColorStoragePreExposureV1) noexcept;
 		void PrepareDisplayView(RenderView& view) noexcept;
 		[[nodiscard]] Matrix ResolvePreviousObjectModel(
 			const RenderObjectHistoryKey& key, const Matrix& currentModel) const noexcept;
@@ -132,6 +135,8 @@ namespace gglab
 
 		[[nodiscard]] TemporalFrameTransactionState GetState() const noexcept { return m_State; }
 		[[nodiscard]] uint32_t GetJitterIndex() const noexcept { return m_JitterIndex; }
+		[[nodiscard]] float GetScenePreExposure() const noexcept { return m_ScenePreExposure; }
+		[[nodiscard]] TemporalColorAbi GetColorAbi() const noexcept { return m_ColorAbi; }
 		[[nodiscard]] const Vector2& GetJitterPixels() const noexcept { return m_JitterPixels; }
 		[[nodiscard]] bool HasCompatiblePreviousView() const noexcept
 		{
@@ -167,6 +172,8 @@ namespace gglab
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		uint32_t m_JitterIndex = 0;
+		float m_ScenePreExposure = SceneColorStoragePreExposureV1;
+		TemporalColorAbi m_ColorAbi = ActiveTemporalColorAbi;
 		bool m_HasCompatiblePreviousView = false;
 		bool m_HasPendingView = false;
 		bool m_ParticipatedInResolve = false;

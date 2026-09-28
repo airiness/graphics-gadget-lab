@@ -88,6 +88,7 @@ namespace gglab
 			void SetPrefilteredSpecularSampleCount(uint32_t) noexcept override {}
 			void SetPrefilteredSpecularMaxSampleLuminance(float) noexcept override {}
 			void SetSkyboxEnabled(bool) noexcept override {}
+			void SetBackgroundMode(EnvironmentBackgroundMode) noexcept override {}
 			void RequestRebake(bool) noexcept override {}
 		};
 
@@ -114,16 +115,17 @@ namespace gglab
 		class TestPostProcessPreviewView final : public PostProcessPreviewViewBase
 		{
 		public:
-			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics()
+			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel)
 				const noexcept override { return {}; }
 		};
 
 		class TestPostProcessPreviewControl final : public PostProcessPreviewControlBase
 		{
 		public:
-			void SetPostProcessPreviewSelection(PostProcessDebugSelection) noexcept override {}
-			void SetPostProcessPreviewExposureEV(float) noexcept override {}
-			void RequestPostProcessPreview() noexcept override {}
+			void SetPostProcessPreviewSelection(
+				PostProcessDebugSelection, PostProcessPreviewChannel) noexcept override {}
+			void SetPostProcessPreviewExposureEV(float, PostProcessPreviewChannel) noexcept override {}
+			void RequestPostProcessPreview(PostProcessPreviewChannel) noexcept override {}
 		};
 
 		class TestShadowPreviewView final : public ShadowPreviewViewBase

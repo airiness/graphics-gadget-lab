@@ -16,6 +16,10 @@ namespace gglab
 		Preview_IBL_PrefilteredSpecularCubemap,
 		Preview_Shadow_DirectionalShadowMap,
 		Preview_PostProcess,
+		Preview_AmbientOcclusion,
+		Preview_TemporalAA,
+		Preview_Atmosphere,
+		Preview_SceneDepth,
 
 		Count
 	};

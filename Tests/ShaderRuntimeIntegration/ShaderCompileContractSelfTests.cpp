@@ -59,6 +59,13 @@ namespace shader_shadow_math
 #include "../../Shaders/Lighting/ShadowReceiverPlaneMath.hlsli"
 }
 
+namespace shader_hdr_math
+{
+	using std::clamp;
+	using std::isfinite;
+#include "../../Shaders/Common/HDRColorMath.hlsli"
+}
+
 namespace gglab
 {
 	namespace
@@ -2038,6 +2045,53 @@ namespace gglab
 
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
+			bool historyRescalingMatches = true;
+			for (const float previous : { 0.00000001f, 0.25f, 1.0f, 1024.0f })
+			{
+				for (const float current : { 0.00000001f, 0.5f, 1.0f, 1024.0f })
+				{
+					const float expected = 2.0f * current;
+					const float actual = shader_hdr_math::RescaleHistoryColorChannel(2.0f * previous, current, previous);
+					historyRescalingMatches &= std::abs(actual - expected) <= expected * 0.00001f;
+					// Bloom thresholds use exposed-linear units regardless of storage scaling.
+					const float exposed = actual * shader_hdr_math::ExposureScaleOverPreExposure(0.125f, current);
+					historyRescalingMatches &= std::abs(exposed - 0.25f) < 0.00001f;
+				}
+			}
+			context.Check(historyRescalingMatches,
+				"Production history rescaling and Bloom exposure normalization preserve radiance across storage scales");
+			const float daylightRadiance = 1000000.0f;
+			const float storageScale = 1.0f / (1.2f * std::exp2(16.0f));
+			const float stored = shader_hdr_math::EncodeSceneColorChannel(daylightRadiance, storageScale);
+			context.Check(shader_hdr_math::SanitizeSceneRadianceChannel(1000000.0f) == 1000000.0f &&
+				shader_hdr_math::SanitizeSceneRadianceChannel(-1.0f) == 0.0f &&
+				shader_hdr_math::SanitizeSceneRadianceChannel(std::numeric_limits<float>::infinity()) == 0.0f,
+				"Persistent physical IBL preserves scene radiance above FP16 without admitting invalid transport");
+			context.Check(stored > 12.0f && stored < 13.0f &&
+				std::abs(stored / storageScale - daylightRadiance) < 1.0f &&
+				shader_hdr_math::SanitizeHDRChannel(daylightRadiance) * storageScale < 1.0f,
+				"Production scene-color math pre-exposes daylight radiance before FP16 saturation");
+			bool exposureInvariant = true;
+			for (const float ev : { -4.0f, 0.0f, 8.0f, 16.0f, 24.0f })
+			{
+				const float exposure = 1.0f / (1.2f * std::exp2(ev));
+				const float source = 0.25f / exposure;
+				const float exposed = shader_hdr_math::EncodeSceneColorChannel(source, exposure) *
+					shader_hdr_math::ExposureScaleOverPreExposure(exposure, exposure);
+				exposureInvariant &= std::abs(exposed - 0.25f) < 0.000001f;
+			}
+			context.Check(exposureInvariant,
+				"Final-color and preview conversion preserve exposure even below a 1e-6 storage scale");
+			const float alpha = 0.35f;
+			const float blended =
+				shader_hdr_math::EncodeSceneColorChannel(150000.0f, storageScale) * alpha +
+				shader_hdr_math::EncodeSceneColorChannel(90000.0f, storageScale) * (1.0f - alpha);
+			const float expected = (150000.0f * alpha + 90000.0f * (1.0f - alpha)) * storageScale;
+			context.Check(std::abs(blended - expected) < 0.000001f &&
+				shader_hdr_math::EncodeSceneColorChannel(-1.0f, storageScale) == 0.0f &&
+				shader_hdr_math::EncodeSceneColorChannel(
+					std::numeric_limits<float>::infinity(), storageScale) == 0.0f,
+				"Pre-exposed RGB preserves alpha blending and rejects invalid HDR channels");
 			const std::filesystem::path runtimeRoot = win32::GetExecutableDirectory();
 			const std::filesystem::path shaderSourceRoot = ResolveShaderSourceRoot(runtimeRoot);
 			ShaderCompiler compiler(shaderSourceRoot, ResolveShaderCacheRoot(runtimeRoot));
@@ -2106,6 +2160,8 @@ namespace gglab
 				GPUAbiMember{ "Height", offsetof(ViewGPU, Height) },
 				GPUAbiMember{ "DepthConvention", offsetof(ViewGPU, DepthConvention) },
 				GPUAbiMember{ "PreviousDepthConvention", offsetof(ViewGPU, PreviousDepthConvention) },
+				GPUAbiMember{ "ScenePreExposure", offsetof(ViewGPU, ScenePreExposure) },
+				GPUAbiMember{ "PreviousScenePreExposure", offsetof(ViewGPU, PreviousScenePreExposure) },
 				GPUAbiMember{ "Padding", offsetof(ViewGPU, Padding) },
 			};
 			for (const GPUAbiMember& member : viewGPUAbiMembers)
@@ -2462,6 +2518,145 @@ namespace gglab
 				gtaoDenoiseYArtifact.IsSuccess() && gtaoUpsampleArtifact.IsSuccess(),
 				"Production DXC compiles GTAO core, diagnostics, denoise, and upsample variants");
 
+			desc.m_SourcePath = L"Passes/PassAtmosphere.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSMain";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+			const auto atmosphereDxil = compiler.Compile(desc);
+			std::string atmosphereDisassembly;
+			const bool atmosphereDxilReflected = atmosphereDxil.IsSuccess() && DisassembleDxil(atmosphereDxil.m_Artifact.m_Binary,atmosphereDisassembly);
+			const std::array<const char*,8> atmosphereMembers{ "Radii", "Rayleigh", "Mie", "Absorption", "Ground", "Sun", "Observer", "World" };
+			bool atmosphereDxilOffsets = atmosphereDxilReflected;
+			for (size_t i=0;i<atmosphereMembers.size();++i)
+				atmosphereDxilOffsets &= FindDxilMemberOffset(atmosphereDisassembly,atmosphereMembers[i])==i*16;
+			context.Check(atmosphereDxilOffsets,"DXIL atmosphere parameter offsets match the explicit CPU float4 layout");
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto atmosphereSpirV = compiler.Compile(desc);
+			context.Check(atmosphereDxil.IsSuccess() && atmosphereSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile atmosphere transmittance, multiple scattering and sky-view transport");
+			SpirVDecorationReflection atmosphereReflection;
+			const bool atmosphereReflected = atmosphereSpirV.IsSuccess() &&
+				ReadSpirVDecorations(atmosphereSpirV.m_Artifact.m_Binary,atmosphereReflection);
+			const auto* atmosphereLayout = atmosphereReflected
+				? atmosphereReflection.FindStructLayout("type.ConstantBuffer.AtmosphereParameters") : nullptr;
+			bool atmosphereOffsets = atmosphereLayout && atmosphereLayout->m_Members.size()==8;
+			if (atmosphereOffsets)
+			{
+				for (size_t i=0;i<8;++i) atmosphereOffsets &= atmosphereLayout->m_Members[i].m_Offset==i*16;
+			}
+			context.Check(atmosphereOffsets,"Atmosphere constant buffer has eight explicitly aligned float4 rows in SPIR-V");
+
+			desc.m_SourcePath = L"Passes/PassPhysicalSky.hlsl";
+			desc.m_Stage = ShaderStage::Vertex;
+			desc.m_Entry = L"VSMain";
+			desc.m_Target = {};
+			const auto physicalSkyVertexDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Vertex);
+			const auto physicalSkyVertexSpirV = compiler.Compile(desc);
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+			desc.m_Target = {};
+			const auto physicalSkyPixelDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const auto physicalSkyPixelSpirV = compiler.Compile(desc);
+			context.Check(physicalSkyVertexDxil.IsSuccess() && physicalSkyVertexSpirV.IsSuccess() &&
+				physicalSkyPixelDxil.IsSuccess() && physicalSkyPixelSpirV.IsSuccess(),
+				"Physical sky preview vertex and pixel shaders compile for DX12 and Vulkan");
+
+			desc.m_SourcePath = L"Passes/PassAerialPerspective.hlsl";
+			desc.m_Stage = ShaderStage::Compute;
+			desc.m_Entry = L"CSBuild";
+			desc.m_Defines = { {.m_Name = L"AERIAL_BUILD", .m_Value = L"1"} };
+			desc.m_Target = {};
+			const auto aerialBuildDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto aerialBuildSpirV = compiler.Compile(desc);
+			desc.m_Entry = L"CSComposite";
+			desc.m_Defines.clear();
+			desc.m_Target = {};
+			const auto aerialCompositeDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto aerialCompositeSpirV = compiler.Compile(desc);
+			context.Check(aerialBuildDxil.IsSuccess() && aerialBuildSpirV.IsSuccess() &&
+				aerialCompositeDxil.IsSuccess() && aerialCompositeSpirV.IsSuccess(),
+				"Aerial perspective froxel build and depth composite compile for DX12 and Vulkan");
+			SpirVDecorationReflection aerialBuildReflection;
+			const bool aerialBuildReflected = aerialBuildSpirV.IsSuccess() &&
+				ReadSpirVDecorations(aerialBuildSpirV.m_Artifact.m_Binary, aerialBuildReflection);
+			const auto* aerialBuildLayout = aerialBuildReflected
+				? aerialBuildReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			SpirVDecorationReflection aerialCompositeReflection;
+			const bool aerialCompositeReflected = aerialCompositeSpirV.IsSuccess() &&
+				ReadSpirVDecorations(aerialCompositeSpirV.m_Artifact.m_Binary, aerialCompositeReflection);
+			const auto* aerialCompositeLayout = aerialCompositeReflected
+				? aerialCompositeReflection.FindStructLayout("type.ConstantBuffer.AerialPerspectiveParameters") : nullptr;
+			context.Check(aerialBuildLayout && aerialBuildLayout->m_Members.size() == 14 &&
+				aerialBuildLayout->m_Members[12].m_Offset == 48 &&
+				aerialCompositeLayout && aerialCompositeLayout->m_Members.size() == 16 &&
+				aerialCompositeLayout->m_Members[15].m_Offset == 60,
+				"Aerial pass root constants retain the 64-byte CPU and SPIR-V layout");
+			desc.m_SourcePath = L"Passes/PassAerialProbe.hlsl";
+			desc.m_Entry = L"CSMain";
+			desc.m_Target = {};
+			const auto aerialProbeDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
+			const auto aerialProbeSpirV = compiler.Compile(desc);
+			context.Check(aerialProbeDxil.IsSuccess() && aerialProbeSpirV.IsSuccess(),
+				"Aerial linear GPU probe compiles for DX12 and Vulkan");
+			SpirVDecorationReflection aerialProbeReflection;
+			const bool aerialProbeReflected = aerialProbeSpirV.IsSuccess() &&
+				ReadSpirVDecorations(aerialProbeSpirV.m_Artifact.m_Binary, aerialProbeReflection);
+			const auto* aerialProbeParameters = aerialProbeReflected
+				? aerialProbeReflection.FindStructLayout("type.ConstantBuffer.AerialProbeParameters") : nullptr;
+			const auto* aerialProbeSample = aerialProbeReflected
+				? aerialProbeReflection.FindStructLayout("AerialProbeSample") : nullptr;
+			context.Check(aerialProbeParameters && aerialProbeParameters->m_Members.size() == 16 &&
+				aerialProbeParameters->m_Members[14].m_Offset == 56 &&
+				aerialProbeParameters->m_Members[15].m_Offset == 60 &&
+				aerialProbeSample && aerialProbeSample->m_Members.size() == 7 &&
+				aerialProbeSample->m_Members[1].m_Offset == 12 &&
+				aerialProbeSample->m_Members[3].m_Offset == 28 &&
+				aerialProbeSample->m_Members[6].m_Offset == 64,
+				"Aerial probe frame serial and sample layout match the CPU ABI");
+			desc.m_Stage = ShaderStage::Pixel;
+			desc.m_Entry = L"PSMain";
+
+			struct IBLAbiCase
+			{
+				const wchar_t* m_Path;
+				const char* m_StructName;
+				const char* m_Member;
+				uint32_t m_Offset;
+			};
+			const IBLAbiCase iblCases[] = {
+				{ L"Passes/PassIBLEnvironment.hlsl", "type.ConstantBuffer.IBLEnvironmentPassParameters", "SunDirection", 16 },
+				{ L"Passes/PassIBLEnvironmentMip.hlsl", "type.ConstantBuffer.IBLEnvironmentMipPassParameters", "PhysicalSky", 12 },
+				{ L"Passes/PassIBLIrradiance.hlsl", "type.ConstantBuffer.IBLIrradiancePassParameters", "PhysicalSky", 24 },
+				{ L"Passes/PassIBLPrefilteredSpecular.hlsl", "type.ConstantBuffer.IBLPrefilteredSpecularPassParameters", "PhysicalSky", 36 },
+			};
+			for (const auto& abi : iblCases)
+			{
+				desc.m_SourcePath = abi.m_Path;
+				desc.m_Target = {};
+				desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
+				const auto dxil = compiler.Compile(desc);
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				const auto spirV = compiler.Compile(desc);
+				std::string disassembly;
+				SpirVDecorationReflection reflection;
+				const bool reflected = spirV.IsSuccess() && ReadSpirVDecorations(spirV.m_Artifact.m_Binary, reflection);
+				const auto* layout = reflected ? reflection.FindStructLayout(abi.m_StructName) : nullptr;
+				const bool matchingSpirV = layout && std::ranges::any_of(layout->m_Members,
+					[&abi](const auto& member) { return member.m_Name == abi.m_Member && member.m_Offset == abi.m_Offset; });
+				const bool matchingDxil = dxil.IsSuccess() && DisassembleDxil(dxil.m_Artifact.m_Binary, disassembly) &&
+					FindDxilMemberOffset(disassembly, abi.m_Member) == abi.m_Offset;
+				context.Check(dxil.IsSuccess() && spirV.IsSuccess() && matchingSpirV && matchingDxil,
+					std::format("Physical IBL member {} at offset {} (DXIL compile/layout: {}/{}, SPIR-V compile/layout: {}/{})",
+						abi.m_Member, abi.m_Offset, dxil.IsSuccess(), matchingDxil, spirV.IsSuccess(), matchingSpirV));
+			}
+
 			desc.m_SourcePath = L"Passes/PassTemporalAA.hlsl";
 			desc.m_Stage = ShaderStage::Compute;
 			desc.m_Entry = L"CSMain";
@@ -2497,6 +2692,21 @@ namespace gglab
 			context.Check(napaVoxelVertexArtifact.IsSuccess() &&
 				napaVoxelPixelArtifact.IsSuccess(),
 				"Production DXC compiles the Napa voxel static mesh shader");
+
+			bool exposureShadersCompile = true;
+			for (const wchar_t* source : { L"Passes/PassForwardPBR.hlsl", L"Passes/PassSkybox.hlsl",
+				L"Passes/PassNapaVoxel.hlsl", L"Passes/PassDebugDraw.hlsl",
+				L"Passes/PassFinalColor.hlsl", L"Passes/PassPostProcessPreview.hlsl" })
+			{
+				desc.m_SourcePath = source;
+				desc.m_Defines.clear();
+				desc.m_Target = {};
+				exposureShadersCompile &= compiler.Compile(desc).IsSuccess();
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				exposureShadersCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(exposureShadersCompile,
+				"DXIL and SPIR-V compile every scene-color writer and exposure conversion consumer");
 		}
 
 	}

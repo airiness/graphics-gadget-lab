@@ -264,6 +264,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AssetSnapshotBuilder.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AtmosphereDiagnosticsSnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BackendSnapshotProviders.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
@@ -295,6 +298,9 @@
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SceneDepthDiagnosticsSnapshotBuilder.cpp">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp">
@@ -453,6 +459,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureLoader.cpp">
       <Filter>Private\Graphics\Asset</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Atmosphere.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\DynamicBufferAllocator.cpp">
       <Filter>Private\Graphics\Buffer</Filter>
     </ClCompile>
@@ -539,6 +551,15 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
       <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveProbeReadback.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAerialPerspective.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAtmosphere.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
@@ -891,6 +912,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Utility\DXGIFormatUtils.cpp">
       <Filter>Private\Graphics\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\WorldSun.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Externals\Vender\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
@@ -913,6 +937,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\AssetToolingControl.h">
       <Filter>Private\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\AtmosphereDiagnosticsSnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BackendSnapshotProviders.h">
       <Filter>Private\Diagnostics\Builders</Filter>
@@ -945,6 +972,9 @@
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h">
+      <Filter>Private\Diagnostics\Builders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SceneDepthDiagnosticsSnapshotBuilder.h">
       <Filter>Private\Diagnostics\Builders</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h">
@@ -1076,6 +1106,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Private\Graphics\Buffer</Filter>
     </ClInclude>
@@ -1142,6 +1175,15 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.h">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveProbeReadback.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AtmosphereGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPBRShaderSet.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1152,6 +1194,12 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GTAOGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAerialPerspective.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAtmosphere.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.h">
@@ -1574,6 +1622,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\AssetSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\AtmosphereDiagnosticsSnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\DX12BackendSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
@@ -1611,6 +1662,9 @@
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SamplerRegistrySnapshot.h">
+      <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\SceneDepthDiagnosticsSnapshot.h">
       <Filter>Public\GGLabRuntime\Diagnostics\Snapshots</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h">
@@ -1726,6 +1780,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureLoader.h">
       <Filter>Public\GGLabRuntime\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Atmosphere.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Buffer\Buffer.h">
       <Filter>Public\GGLabRuntime\Graphics\Buffer</Filter>
@@ -2112,6 +2169,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\VertexData.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\WorldSun.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\Components.h">

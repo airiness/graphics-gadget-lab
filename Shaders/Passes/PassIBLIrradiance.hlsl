@@ -13,7 +13,8 @@ struct IBLIrradiancePassParameters
 	uint EnvironmentResolution;
 	uint EnvironmentMipLevels;
 	uint SampleCount;
-	uint2 Padding;
+	uint PhysicalSky;
+	uint Padding;
 };
 
 ConstantBuffer<IBLIrradiancePassParameters> g_Pass : register(b2);
@@ -48,11 +49,12 @@ float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 
 		float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
 		sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
 
-		irradiance += SanitizeHDRColor(
-			SampleTextureCubeLevel(environmentBinding, directionWS, sourceMip).rgb);
+		float3 radiance = SampleTextureCubeLevel(environmentBinding, directionWS, sourceMip).rgb;
+		irradiance += g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
 	}
 
-	return SanitizeHDRColor(PI * irradiance / SAMPLE_COUNT);
+	float3 result = PI * irradiance / SAMPLE_COUNT;
+	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

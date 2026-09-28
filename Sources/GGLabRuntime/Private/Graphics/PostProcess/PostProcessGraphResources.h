@@ -2,6 +2,7 @@
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/PostProcess/PostProcessOutput.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 
 #include <array>
 
@@ -18,6 +19,7 @@ namespace gglab
 
 	struct RGPostProcessResources
 	{
+		ResolvedExposureSettings m_Exposure{};
 		RGPostProcessInputs m_Inputs{};
 		RGBloomResources m_Bloom{};
 		RGPostProcessOutputTarget m_Output{};

@@ -1,13 +1,12 @@
 #pragma once
 
+#include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 
 #include <cstdint>
 
 namespace gglab
 {
-	class Camera;
-
 	enum class ToneMappingOperator : uint8_t
 	{
 		AcesFitted,
@@ -71,20 +70,33 @@ namespace gglab
 	{
 		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
+		// Surface transport only; disabling this preserves physical sun, sky and IBL.
+		bool m_EnableAerialPerspective = true;
+		// Diagnostic GPU readback is opt-in so ordinary rendering has no probe cost.
+		bool m_EnableAerialProbe = false;
 	};
 
 	// Authoring settings owned above the renderer by the active Demo or Lab.
 	struct ViewRenderProfile
 	{
 		TemporalAASettings m_TemporalAA{};
+		// The V2 temporal ABI rescales committed history into this frame's storage scale.
+		bool m_EnableScenePreExposure = true;
 		LightingProfile m_Lighting{};
 		PostProcessProfile m_PostProcess{};
 	};
 
+	// Saturation-based normalization for the manual EV100 exposure contract.
+	inline constexpr float ManualExposureSaturationNormalization = 1.2f;
+
 	struct ResolvedExposureSettings
 	{
+		float m_ManualEV100 = 0.0f;
 		float m_CompensationEV = 0.0f;
-		float m_ExposureScale = 1.0f;
+		float m_EffectiveEV100 = 0.0f;
+		float m_ExposureScale = 1.0f / ManualExposureSaturationNormalization;
+		// Actual frame/view storage scale applied before writing scene color.
+		float m_PreExposure = 1.0f;
 	};
 
 	struct ResolvedPostProcessSettings
@@ -97,6 +109,8 @@ namespace gglab
 	{
 		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
+		bool m_EnableAerialPerspective = true;
+		bool m_EnableAerialProbe = false;
 	};
 
 	// Immutable settings resolved for one RenderView and one frame.
@@ -110,4 +124,6 @@ namespace gglab
 
 	[[nodiscard]] ResolvedViewRenderSettings ResolveViewRenderSettings(
 		const ViewRenderProfile& profile, const Camera& camera) noexcept;
+	[[nodiscard]] ResolvedExposureSettings ResolveManualExposureSettings(
+		float manualEV100, float compensationEV, bool enablePreExposure = false) noexcept;
 }

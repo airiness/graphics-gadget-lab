@@ -2,6 +2,8 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
+#include "GGLabRuntime/Graphics/WorldSun.h"
+
 #include <cstdint>
 #include <optional>
 
@@ -22,6 +24,7 @@ namespace gglab
 		components::LightComponent* m_Light = nullptr;
 		DirectionalShadowSettings* m_ShadowSettings = nullptr;
 		Vector3 m_Direction = -Vector3::UnitY;
+		std::optional<ResolvedWorldSun> m_WorldSun;
 	};
 
 	struct RenderWorldData

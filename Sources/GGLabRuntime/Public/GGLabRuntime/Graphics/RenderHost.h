@@ -154,6 +154,7 @@ namespace gglab
 		CameraRig& m_CameraRig;
 		const ViewRenderProfile& m_ViewRenderProfile;
 		ShadowVisualizationSettings& m_ShadowVisualizationSettings;
+		ResolvedViewRenderSettings m_DisplayViewSettings{};
 		ResolvedTemporalFramePlan m_TemporalFramePlan{};
 		TemporalFrameTransaction& m_TemporalFrameTransaction;
 		RenderViewID m_DisplayViewId = RenderViewID::Main;
@@ -189,7 +190,8 @@ namespace gglab
 		[[nodiscard]] virtual RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept = 0;
 		[[nodiscard]] virtual TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
-			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height) noexcept = 0;
+			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
+			float scenePreExposure) noexcept = 0;
 		virtual void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept = 0;
 		virtual void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept = 0;
 		[[nodiscard]] virtual RenderGraph::CreateInfo CreateRenderGraphCreateInfo()

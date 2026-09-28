@@ -1,8 +1,12 @@
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiMathWidgets.h"
 #include "GGLabRuntime/Graphics/CameraTooling.h"
+#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 
 #include <algorithm>
@@ -28,8 +32,7 @@ namespace gglab
 			bool m_ShowMatrices = false;
 			uint64_t m_SelectedCameraId = 0;
 			uint64_t m_LastCameraId = 0;
-			uint64_t m_ReferenceMainId = 0;
-			std::string m_SelectedReferenceId;
+			CameraReferenceViewWidgetState m_ReferenceViews;
 
 			// cached edit values
 			float m_Pos[3] = { 0.0f, 0.0f, 0.0f };
@@ -39,6 +42,7 @@ namespace gglab
 			float m_FovDegree = 60.0f;
 			float m_NearZ = 0.01f;
 			float m_FarZ = 1000.0f;
+			float m_ManualEV100 = 0.0f;
 			float m_ExposureCompensationEV = 0.0f;
 
 			// controller params
@@ -61,6 +65,7 @@ namespace gglab
 			state.m_FovDegree = camera.m_Settings.m_Fov;
 			state.m_NearZ = camera.m_Settings.m_Near;
 			state.m_FarZ = camera.m_Settings.m_Far;
+			state.m_ManualEV100 = camera.m_Settings.m_ManualEV100;
 			state.m_ExposureCompensationEV = camera.m_Settings.m_ExposureCompensationEV;
 		}
 
@@ -71,7 +76,8 @@ namespace gglab
 			const CameraEditSettings settings{
 				Vector3(state.m_Pos[0], state.m_Pos[1], state.m_Pos[2]),
 				math::ToRadians(state.m_YawDegree), math::ToRadians(state.m_PitchDegree),
-				state.m_FovDegree, state.m_NearZ, state.m_FarZ, state.m_ExposureCompensationEV
+				state.m_FovDegree, state.m_NearZ, state.m_FarZ, state.m_ManualEV100,
+				state.m_ExposureCompensationEV
 			};
 			if (control.SetCamera(id, settings))
 			{
@@ -80,59 +86,6 @@ namespace gglab
 			}
 		}
 
-		static void DrawReferenceViews(CameraPanelState& state, const CameraToolingSnapshot& snapshot,
-			CameraToolingControlBase* control) noexcept
-		{
-			if (snapshot.m_ReferenceViews.empty()) return;
-			const auto main = std::ranges::find(snapshot.m_Cameras, RenderViewID::Main,
-				&CameraToolingObservation::m_RenderViewId);
-			if (main == snapshot.m_Cameras.end()) return;
-			if (state.m_ReferenceMainId != main->m_Id)
-			{
-				state.m_ReferenceMainId = main->m_Id;
-				state.m_SelectedReferenceId = snapshot.m_LastRestoredReferenceId;
-			}
-			auto selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
-				&CameraReferenceView::m_Id);
-			if (selected == snapshot.m_ReferenceViews.end())
-			{
-				selected = snapshot.m_ReferenceViews.begin();
-				state.m_SelectedReferenceId = selected->m_Id;
-			}
-			const auto restore = [&](const CameraReferenceView& reference) noexcept
-				{
-					if (control && control->RestoreReferenceView(main->m_Id, reference.m_Id))
-					{
-						state.m_SelectedReferenceId = reference.m_Id;
-						state.m_SelectedCameraId = main->m_Id;
-						state.m_Initialized = false;
-					}
-				};
-			ImGui::SeparatorText("Reference Views");
-			ImGui::BeginDisabled(!control);
-			if (ImGui::BeginCombo("Reference View", selected->m_Name.c_str()))
-			{
-				for (const auto& reference : snapshot.m_ReferenceViews)
-				{
-					const bool current = reference.m_Id == state.m_SelectedReferenceId;
-					if (ImGui::Selectable(reference.m_Name.c_str(), current)) restore(reference);
-					if (current) ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-			selected = std::ranges::find(snapshot.m_ReferenceViews, state.m_SelectedReferenceId,
-				&CameraReferenceView::m_Id);
-			if (ImGui::Button("Restore Reference View")) restore(*selected);
-			ImGui::EndDisabled();
-			ImGui::TextWrapped("%s", selected->m_Purpose.c_str());
-			ImGui::TextDisabled("%s / profile %u", selected->m_Id.c_str(), selected->m_ProfileVersion);
-			if (std::abs(main->m_Aspect - selected->m_ReferenceAspect) > 0.001f)
-			{
-				ImGui::TextWrapped("Composition aspect: %.4f; current viewport: %.4f.",
-					selected->m_ReferenceAspect, main->m_Aspect);
-			}
-			ImGui::Spacing();
-		}
 
 		static std::string FormatCameraRecord(const CameraToolingObservation& camera,
 			const CameraToolingSnapshot& snapshot)
@@ -231,7 +184,15 @@ namespace gglab
 		const auto& view = *context.m_Cameras;
 		auto* control = context.m_CameraControl;
 		auto snapshot = view.GetCameras();
-		DrawReferenceViews(state, snapshot, control);
+		const auto* lab = context.m_Diagnostics ? context.m_Diagnostics->GetSnapshot<LabSnapshot>() : nullptr;
+		if (!lab || !ReferenceViewsBelongInLabPanel(*lab))
+		{
+			if (const auto restored = DrawCameraReferenceViews(state.m_ReferenceViews, snapshot, control))
+			{
+				state.m_SelectedCameraId = *restored;
+				state.m_Initialized = false;
+			}
+		}
 		snapshot = view.GetCameras();
 		if (!snapshot.FindCamera(state.m_SelectedCameraId))
 			state.m_SelectedCameraId = snapshot.m_ActiveCameraId;
@@ -322,17 +283,23 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("Near", &state.m_NearZ, 0.001f, 0.0001f, 100.0f);
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
 
-		ImGui::SeparatorText("Exposure");
-		camChanged |= ImGui::SliderFloat("Exposure Compensation", &state.m_ExposureCompensationEV,
+		ImGui::SeparatorText("Camera Exposure");
+		camChanged |= ImGui::SliderFloat("Manual EV100", &state.m_ManualEV100,
+			-16.0f, 24.0f, "%.2f EV", ImGuiSliderFlags_AlwaysClamp);
+		camChanged |= ImGui::SliderFloat("Compensation (EV)", &state.m_ExposureCompensationEV,
 			-10.0f, 10.0f, "%+.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
 		{
 			ImGui::SetTooltip("Adjusts image brightness in photographic stops.\n"
 				"+1 EV doubles exposure; -1 EV halves it.");
 		}
-		ImGui::Text("Exposure Multiplier: %.4fx", std::exp2(state.m_ExposureCompensationEV));
+		const ResolvedExposureSettings exposure = ResolveManualExposureSettings(
+			state.m_ManualEV100, state.m_ExposureCompensationEV);
+		ImGui::Text("Effective EV100: %.2f | Exposure Scale: %.4fx",
+			exposure.m_EffectiveEV100, exposure.m_ExposureScale);
 		if (ImGui::Button("Reset Exposure"))
 		{
+			state.m_ManualEV100 = 0.0f;
 			state.m_ExposureCompensationEV = 0.0f;
 			camChanged = true;
 		}

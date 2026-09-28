@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
+#include "Graphics/RenderWorldExtractor.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
@@ -61,6 +62,7 @@ namespace gglab
 			PersistentStructuredBufferTable<uint64_t, LightGPU>& m_LightTable;
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			std::optional<uint64_t> m_DirectionalShadowLightKey;
+			RenderDirectionalLight m_MainDirectionalLight{};
 			DynamicStructuredBufferAllocator<ViewGPU>& m_ViewsSB;
 			uint32_t m_FrameSlotIndex = 0;
 		};
@@ -82,6 +84,10 @@ namespace gglab
 
 	public:
 		BuildResult Build(const BuildInfo& info) noexcept;
+
+		[[nodiscard]] static LightGPU BuildLightData(uint64_t entityKey,
+			const components::TransformComponent& transform, const components::LightComponent& light,
+			const RenderDirectionalLight& mainLight) noexcept;
 
 		[[nodiscard]] static ViewUploadData BuildViewData(
 			std::span<const RenderView> cameraViews, const DirectionalShadowFramePlan& cascades) noexcept;

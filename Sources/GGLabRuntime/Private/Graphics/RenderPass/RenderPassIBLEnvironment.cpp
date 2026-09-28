@@ -1,5 +1,6 @@
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "Graphics/IBLBakeScheduler.h"
@@ -8,9 +9,11 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 
@@ -22,6 +25,7 @@ namespace gglab
 		{
 			Equirectangular,
 			Cubemap,
+			PhysicalSky,
 		};
 
 		struct IBLEnvironmentPassParameters
@@ -30,13 +34,17 @@ namespace gglab
 			uint32_t SourceTextureIndex = 0;
 			uint32_t SourceSamplerIndex = 0;
 			uint32_t SourceMode = 0;
+			Vector3 SunDirection = Vector3::UnitY;
+			float Padding = 0.0f;
 		};
 		static_assert(IsPassRootConstantStruct<IBLEnvironmentPassParameters>);
-		static_assert(sizeof(IBLEnvironmentPassParameters) == 16);
+		static_assert(sizeof(IBLEnvironmentPassParameters) == 32);
+		static_assert(offsetof(IBLEnvironmentPassParameters, SunDirection) == 16);
 
 		struct PassData
 		{
 			RGTextureId m_SourceTexture{};
+			RGTextureViewId m_SourceSrv{};
 			RGTextureId m_EnvironmentCubemap{};
 			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
 
@@ -55,7 +63,6 @@ namespace gglab
 		GGLAB_UNUSED(context);
 
 		auto* assetManager = services.m_TextureAssets;
-		GGLAB_ASSERT_NOT_NULL(assetManager);
 
 		auto* renderResRegistry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(renderResRegistry);
@@ -68,9 +75,18 @@ namespace gglab
 		uint32_t sourceSamplerIndex = 0;
 		bool hasSource = false;
 		EnvironmentSourceMode sourceMode = EnvironmentSourceMode::Equirectangular;
+		const bool physical = bakeScheduler->GetBakingAtmosphereParameters() != nullptr;
 		const EnvironmentTextureSource source = bakeScheduler->GetBakingSource();
-		if (source.IsValid())
+		if (physical)
 		{
+			if (!rg.GetBlackboard().TryGet<RGAtmosphereResources>(BakeAtmosphereResourcesName)) return;
+			sourceMode = EnvironmentSourceMode::PhysicalSky;
+			sourceSamplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
+			hasSource = true;
+		}
+		else if (source.IsValid())
+		{
+			GGLAB_ASSERT_NOT_NULL(assetManager);
 			const auto sourceResource = assetManager->GetResidentTextureResource(source.m_Content);
 			if (sourceResource)
 			{
@@ -101,7 +117,13 @@ namespace gglab
 			hasSource](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
-				if (hasSource)
+				if (sourceMode == EnvironmentSourceMode::PhysicalSky)
+				{
+					const auto& atmosphere = builder.GetBlackboard().Get<RGAtmosphereResources>(BakeAtmosphereResourcesName);
+					data.m_SourceTexture = builder.Read(atmosphere.m_Luts[2], RGTextureAccess::Sample, RHIStage::PixelShader);
+					data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SourceTexture);
+				}
+				else if (hasSource)
 				{
 					data.m_SourceTexture = builder.ImportTexture("IBL.SourceEnvironment",
 						sourceTextureHandle, sourceTextureDesc, RGTextureAccess::Sample,
@@ -166,9 +188,11 @@ namespace gglab
 
 					const IBLEnvironmentPassParameters passParameters{
 						.CubemapFaceIndex = face,
-						.SourceTextureIndex = data.m_SourceTextureIndex,
+						.SourceTextureIndex = data.m_SourceSrv.IsValid()
+							? executeContext.GetViewDescriptor(data.m_SourceSrv).m_Index : data.m_SourceTextureIndex,
 						.SourceSamplerIndex = data.m_SourceSamplerIndex,
 						.SourceMode = data.m_SourceMode,
+						.SunDirection = bakeScheduler->GetBakingSunDirection(),
 					};
 					commandContext->SetPushConstants(
 						static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

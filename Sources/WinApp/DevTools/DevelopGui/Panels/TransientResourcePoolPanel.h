@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Resources/Transient Resource Pool";
+			return "Diagnostics/Resources/Transient Resource Pool";
 		}
 		std::string_view GetTitle() const noexcept override { return "Transient Resource Pool"; }
 		void Draw(DevelopGuiContext& context) noexcept override;

@@ -192,6 +192,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.cpp" />
@@ -206,6 +209,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp" />
@@ -244,6 +248,8 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\LabPanel.cpp" />
@@ -304,6 +310,9 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.h" />
@@ -323,6 +332,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiContext.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiStyle.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />
@@ -366,6 +376,10 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\AtmosphereRangeReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TextureContractLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\DemoLabRuntimeLocator.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\LoadingOverlay.h" />
@@ -411,6 +425,7 @@
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
     <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli" />
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
     <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
     <None Include="..\..\Shaders\Common\Sampling.hlsli" />
@@ -422,6 +437,7 @@
     <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
     <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli" />
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
@@ -431,6 +447,9 @@
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialProbe.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
@@ -449,6 +468,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />

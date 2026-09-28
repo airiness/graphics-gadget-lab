@@ -1,6 +1,5 @@
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 
-#include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 
@@ -41,7 +40,12 @@ namespace gglab
 			profileWithBothOverrides.m_TemporalAA.m_MaxHistoryFeedback == 0.75f &&
 			!activeProfile.m_TemporalAA.m_Enabled,
 			"Temporal AA DevTools override is explicit and does not mutate authoring state");
-		context.Check(TemporalAALabSession::GetDescriptor().m_SchemaVersion == 2,
-			"Temporal AA Lab schema rejects presets that used fixed history-weight semantics");
+		devTools.GetViewRenderSettingsOverrides().m_ScenePreExposure = false;
+		const auto unitStorageProfile = devTools.ResolveViewRenderProfile(activeProfile);
+		devTools.Reset();
+		context.Check(!unitStorageProfile.m_EnableScenePreExposure &&
+			activeProfile.m_EnableScenePreExposure &&
+			devTools.ResolveViewRenderProfile(activeProfile).m_EnableScenePreExposure,
+			"Scene pre-exposure override leaves authoring state unchanged and resets with DevTools");
 	}
 }

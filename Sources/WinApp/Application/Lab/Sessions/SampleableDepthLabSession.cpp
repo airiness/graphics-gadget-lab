@@ -107,12 +107,14 @@ namespace gglab
 	{
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
-		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection();
-		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount();
+		m_PreviousPreviewSelection = registry->GetPostProcessPreviewSelection(
+			PostProcessPreviewChannel::SceneDepth);
+		m_PreviewUpdateCountOnEnter = registry->GetPostProcessPreviewUpdateCount(
+			PostProcessPreviewChannel::SceneDepth);
 		registry->SetPostProcessPreviewSelection({
 			.m_Tap = PostProcessDebugTap::SceneDepthRaw,
-			});
-		registry->RequestPostProcessPreview();
+			}, PostProcessPreviewChannel::SceneDepth);
+		registry->RequestPostProcessPreview(PostProcessPreviewChannel::SceneDepth);
 	}
 
 	void SampleableDepthLabSession::OnExit() noexcept
@@ -120,8 +122,9 @@ namespace gglab
 		auto* registry = m_Services.m_RenderServices.m_Resources;
 		if (registry)
 		{
-			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection);
-			registry->RequestPostProcessPreview();
+			registry->SetPostProcessPreviewSelection(m_PreviousPreviewSelection,
+				PostProcessPreviewChannel::SceneDepth);
+			registry->RequestPostProcessPreview(PostProcessPreviewChannel::SceneDepth);
 		}
 	}
 
@@ -135,7 +138,8 @@ namespace gglab
 		{
 			GetCamera().Update();
 		}
-		m_Services.m_RenderServices.m_Resources->RequestPostProcessPreview();
+		m_Services.m_RenderServices.m_Resources->RequestPostProcessPreview(
+			PostProcessPreviewChannel::SceneDepth);
 	}
 
 	void SampleableDepthLabSession::OnResize(uint32_t width, uint32_t height) noexcept
@@ -305,11 +309,15 @@ namespace gglab
 			std::abs(camera.GetAspect() - expectedAspect) <= 1.0e-6f;
 		const auto* registry = m_Services.m_RenderServices.m_Resources;
 		const bool depthPreviewExecuted =
-			registry && registry->HasPublishedPostProcessPreview() &&
-			registry->GetPostProcessPreviewUpdateCount() > m_PreviewUpdateCountOnEnter &&
-			(registry->GetPublishedPostProcessPreviewSelection().m_Tap ==
+			registry && registry->HasPublishedPostProcessPreview(
+				PostProcessPreviewChannel::SceneDepth) &&
+			registry->GetPostProcessPreviewUpdateCount(PostProcessPreviewChannel::SceneDepth) >
+				m_PreviewUpdateCountOnEnter &&
+			(registry->GetPublishedPostProcessPreviewSelection(
+				PostProcessPreviewChannel::SceneDepth).m_Tap ==
 				PostProcessDebugTap::SceneDepthRaw ||
-				registry->GetPublishedPostProcessPreviewSelection().m_Tap ==
+				registry->GetPublishedPostProcessPreviewSelection(
+					PostProcessPreviewChannel::SceneDepth).m_Tap ==
 				PostProcessDebugTap::SceneDepthLinearViewZ);
 		LabDiagnosticCheckStatus fixtureStatus = LabDiagnosticCheckStatus::Pending;
 		std::string fixtureDetail = "Asset preparation is still in progress.";

@@ -287,6 +287,12 @@ namespace gglab
 				return;
 			}
 			const auto settings = context.m_EnvironmentLighting->GetEnvironmentLightingSettings();
+			if (settings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalAtmospherePreview)
+			{
+				ImGui::TextDisabled("Background: Physical Sky preview | IBL: HDR texture");
+			}
+			const bool physicalSky = settings.m_BackgroundMode == EnvironmentBackgroundMode::PhysicalSky;
+			if (physicalSky) ImGui::TextDisabled("Physical Sky: calibrated intensity, world-aligned IBL, FP32 radiance.");
 
 			auto* control = context.m_EnvironmentLightingControl;
 			ImGui::BeginDisabled(!control);
@@ -297,60 +303,64 @@ namespace gglab
 				control->SetSkyboxEnabled(skyboxEnabled);
 			}
 
-			float intensity = settings.m_Intensity;
+			float intensity = physicalSky ? 1.0f : settings.m_Intensity;
+			ImGui::BeginDisabled(physicalSky);
 			if (ImGui::DragFloat(
 				"Environment Intensity", &intensity, 0.01f, 0.0f, 100.0f, "%.3f") && control)
 			{
 				control->SetIntensity(intensity);
 			}
 
-			float rotationDegrees = math::ToDegrees(settings.m_RotationRadians);
+			float rotationDegrees = physicalSky ? 0.0f : math::ToDegrees(settings.m_RotationRadians);
 			if (ImGui::SliderFloat(
 				"Environment Yaw", &rotationDegrees, -180.0f, 180.0f, "%.1f deg") && control)
 			{
 				control->SetRotationRadians(math::ToRadians(rotationDegrees));
 			}
+			ImGui::EndDisabled();
 
-			IBLQualityPreset qualityPreset = settings.m_QualityPreset;
-			if (DrawQualityPresetCombo(qualityPreset) && control)
+			if (ImGui::TreeNode("Advanced: Bake Quality"))
 			{
-				control->SetQualityPreset(qualityPreset);
-			}
-			const auto& bakeConfig = settings.m_BakeConfig;
-			ImGui::TextDisabled(
-				"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
-				bakeConfig.m_EnvironmentCubemapSize, bakeConfig.m_IrradianceCubemapSize,
-				bakeConfig.m_IrradianceSampleCount, bakeConfig.m_PrefilteredSpecularCubemapSize,
-				bakeConfig.m_PrefilteredSpecularMipLevels);
+				IBLQualityPreset qualityPreset = settings.m_QualityPreset;
+				if (DrawQualityPresetCombo(qualityPreset) && control)
+				{
+					control->SetQualityPreset(qualityPreset);
+				}
+				const auto& bakeConfig = settings.m_BakeConfig;
+				ImGui::TextDisabled(
+					"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
+					bakeConfig.m_EnvironmentCubemapSize, bakeConfig.m_IrradianceCubemapSize,
+					bakeConfig.m_IrradianceSampleCount, bakeConfig.m_PrefilteredSpecularCubemapSize,
+					bakeConfig.m_PrefilteredSpecularMipLevels);
 
-			uint32_t sampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
-			if (DrawPrefilterSampleCountCombo(sampleCount) && control)
-			{
-				control->SetPrefilteredSpecularSampleCount(sampleCount);
+				uint32_t sampleCount = settings.m_BakeConfig.m_PrefilteredSpecularSampleCount;
+				if (DrawPrefilterSampleCountCombo(sampleCount) && control)
+				{
+					control->SetPrefilteredSpecularSampleCount(sampleCount);
+				}
+
+				float maxSampleLuminance =
+					settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
+				ImGui::BeginDisabled(physicalSky);
+				if (ImGui::DragFloat(
+					"Prefilter Firefly Clamp", &maxSampleLuminance, 10.0f, 1.0f, 65000.0f, "%.0f") && control)
+				{
+					control->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
+				}
+				ImGui::EndDisabled();
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip(
+						"Limits individual HDR samples while baking rough specular mips.\n"
+						"Mip 0 remains an exact copy of the environment.");
+				}
+				ImGui::TreePop();
 			}
 
-			float maxSampleLuminance =
-				settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance;
-			if (ImGui::DragFloat(
-				"Prefilter Firefly Clamp", &maxSampleLuminance, 10.0f, 1.0f, 65000.0f, "%.0f") && control)
-			{
-				control->SetPrefilteredSpecularMaxSampleLuminance(maxSampleLuminance);
-			}
-			if (ImGui::IsItemHovered())
-			{
-				ImGui::SetTooltip(
-					"Limits individual HDR samples while baking rough specular mips.\n"
-					"Mip 0 remains an exact copy of the environment.");
-			}
-
-			ImGui::TextDisabled(
-				"Skybox, diffuse IBL, specular IBL, and previews share these settings.");
 			if (ImGui::Button("Rebuild IBL") && control)
 			{
 				control->RequestRebake(true);
 			}
-			ImGui::TextDisabled(
-				"Bake changes are generated in staging resources and published atomically.");
 			ImGui::EndDisabled();
 		}
 	}
@@ -358,9 +368,6 @@ namespace gglab
 	void IBLViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		auto& state = context.PanelState<IBLViewerPanelState>();
-
-		ImGui::TextUnformatted("IBL Viewer");
-		ImGui::Separator();
 
 		auto* environmentSelection = context.m_EnvironmentSelectionControl;
 		const auto* diagnosticsSnapshot =
@@ -371,12 +378,11 @@ namespace gglab
 			ImGui::CollapsingHeader("Environment Source", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			const auto activeIndex = diagnosticsSnapshot->m_ActiveEnvironmentIndex;
-			const char* activeLabel = "<Procedural Fallback>";
-			if (activeIndex < diagnosticsSnapshot->m_Environments.size())
-			{
-				activeLabel =
-					diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str();
-			}
+			const bool hasActiveEnvironment =
+				activeIndex < diagnosticsSnapshot->m_Environments.size();
+			const char* activeLabel = hasActiveEnvironment
+				? diagnosticsSnapshot->m_Environments[activeIndex].m_DisplayName.c_str()
+				: "<Procedural Fallback>";
 
 			ImGui::BeginDisabled(!environmentSelection);
 			if (ImGui::BeginCombo("HDR Environment", activeLabel))
@@ -402,10 +408,11 @@ namespace gglab
 			}
 			ImGui::EndDisabled();
 
-			if (activeIndex < diagnosticsSnapshot->m_Environments.size())
+			if (hasActiveEnvironment && ImGui::TreeNode("Diagnostics: Source Path"))
 			{
 				ImGui::TextWrapped(
 					"%s", diagnosticsSnapshot->m_Environments[activeIndex].m_Path.string().c_str());
+				ImGui::TreePop();
 			}
 			const IBLEnvironmentEntryDiagnostics* latestSelection = nullptr;
 			for (const auto& entry : diagnosticsSnapshot->m_Environments)
@@ -444,14 +451,12 @@ namespace gglab
 		}
 
 		if (diagnosticsSnapshot &&
-			ImGui::CollapsingHeader("Bake Pipeline", ImGuiTreeNodeFlags_DefaultOpen))
+			ImGui::CollapsingHeader("Diagnostics: Bake Pipeline"))
 		{
 			DrawBakePipelineStatus(*diagnosticsSnapshot, context.m_IBLCacheControl);
 		}
 
 		DrawEnvironmentSettings(context);
-
-		ImGui::Spacing();
 
 		if (!context.m_IBLPreview)
 		{
@@ -462,16 +467,15 @@ namespace gglab
 		const auto resources = context.m_IBLPreview->GetIBLPreviewResourcesDiagnostics();
 		auto* previewControl = context.m_IBLPreviewControl;
 
-		const auto* brdfLutDesc = GetAllocatedTexture(resources.m_BrdfLut);
-		if (!brdfLutDesc)
+		const auto drawBrdfLut = [&]() noexcept
 		{
-			ImGui::TextColored(
-				devtools::style::ErrorTextColor, "BRDF LUT texture is not allocated.");
-			return;
-		}
-
-		if (ImGui::CollapsingHeader("IBL BRDF LUT"))
-		{
+			const auto* brdfLutDesc = GetAllocatedTexture(resources.m_BrdfLut);
+			if (!brdfLutDesc)
+			{
+				ImGui::TextColored(
+					devtools::style::ErrorTextColor, "BRDF LUT texture is not allocated.");
+				return;
+			}
 			DrawBakeState(resources.m_BrdfLut.m_BakeState);
 
 			ImGui::Checkbox("Show Metadata", &state.m_ShowMetadata);
@@ -541,15 +545,14 @@ namespace gglab
 			}
 
 			ImGui::TextDisabled("Expected axis: X = NoV, Y = perceptual roughness.");
-		}
-
-		ImGui::Spacing();
+		};
+		if (ImGui::CollapsingHeader("IBL BRDF LUT")) drawBrdfLut();
 
 		const auto* environmentDesc = GetAllocatedTexture(resources.m_Environment);
 		const auto* environmentPreviewDesc =
 			GetAllocatedTexture(resources.m_EnvironmentPreview.m_Texture);
 
-		if (ImGui::CollapsingHeader("IBL Environment"))
+		const auto drawEnvironmentPreview = [&]() noexcept
 		{
 			if (previewControl)
 			{
@@ -677,14 +680,16 @@ namespace gglab
 					static_cast<unsigned long long>(preview.m_UpdateCount),
 					preview.m_Dirty ? " (refresh pending)" : "");
 			}
+		};
+		if (ImGui::CollapsingHeader("Environment Preview", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			drawEnvironmentPreview();
 		}
-
-		ImGui::Spacing();
 
 		const auto* irradianceDesc = GetAllocatedTexture(resources.m_Irradiance);
 		const auto* irradiancePreviewDesc =
 			GetAllocatedTexture(resources.m_IrradiancePreview.m_Texture);
-		if (ImGui::CollapsingHeader("IBL Irradiance"))
+		const auto drawIrradiancePreview = [&]() noexcept
 		{
 			if (previewControl)
 			{
@@ -761,16 +766,15 @@ namespace gglab
 					static_cast<unsigned long long>(preview.m_UpdateCount),
 					preview.m_Dirty ? " (refresh pending)" : "");
 			}
-		}
-
-		ImGui::Spacing();
+		};
+		if (ImGui::CollapsingHeader("IBL Irradiance")) drawIrradiancePreview();
 
 		const auto* prefilteredSpecularDesc =
 			GetAllocatedTexture(resources.m_PrefilteredSpecular);
 		const auto* prefilteredSpecularPreviewDesc =
 			GetAllocatedTexture(resources.m_PrefilteredSpecularPreview.m_Texture);
 
-		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
+		const auto drawPrefilteredSpecularPreview = [&]() noexcept
 		{
 			if (previewControl)
 			{
@@ -899,6 +903,10 @@ namespace gglab
 					static_cast<unsigned long long>(preview.m_UpdateCount),
 					preview.m_Dirty ? " (refresh pending)" : "");
 			}
+		};
+		if (ImGui::CollapsingHeader("IBL Prefiltered Specular"))
+		{
+			drawPrefilteredSpecularPreview();
 		}
 	}
 }

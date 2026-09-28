@@ -52,5 +52,10 @@ float4 PSMain(VSOutput input) : SV_Target
 	{
 		color.rgb = LinearToSRGB(color.rgb);
 	}
+	else
+	{
+		const ViewData viewData = g_Views[g_Scene.ViewBaseIndex + g_Pass.ViewIndex];
+		color.rgb = EncodeSceneColor(color.rgb, viewData.ScenePreExposure);
+	}
 	return color;
 }

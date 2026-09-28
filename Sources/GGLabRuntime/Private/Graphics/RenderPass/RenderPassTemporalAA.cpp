@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "Graphics/Pipeline/TemporalAACapability.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -114,6 +115,14 @@ namespace gglab
 		{
 			return;
 		}
+		GGLAB_ASSERT_MSG(IsTemporalColorCompatible(transaction->GetColorAbi(),
+			PostProcessColorState::SceneLinearRec709, transaction->GetScenePreExposure()),
+			"Temporal AA cannot read scene color outside its active color ABI.");
+		if (!IsTemporalColorCompatible(transaction->GetColorAbi(),
+			PostProcessColorState::SceneLinearRec709, transaction->GetScenePreExposure()))
+		{
+			return;
+		}
 		const uint32_t viewIndex =
 			static_cast<uint32_t>(utils::ToIndex(context.GetDisplayViewId()));
 		GGLAB_ASSERT_MSG((viewIndex & TemporalAAViewFlagMask) == 0,
@@ -132,12 +141,12 @@ namespace gglab
 			return;
 		}
 		const PostProcessDebugSelection previewSelection =
-			resourceRegistry->GetPostProcessPreviewSelection();
+			resourceRegistry->GetPostProcessPreviewSelection(PostProcessPreviewChannel::TemporalAA);
 		const bool historyColorPreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested() &&
+			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
 			UsesTemporalAAHistoryColorPreviewPayload(previewSelection.m_Tap);
 		const bool historyAgePreviewRequested =
-			resourceRegistry->IsPostProcessPreviewRequested() &&
+			resourceRegistry->IsPostProcessPreviewRequested(PostProcessPreviewChannel::TemporalAA) &&
 			UsesTemporalAAHistoryAgePreviewPayload(previewSelection.m_Tap);
 
 		rg.AddPass<TemporalAAResolvedColorInitializePassData>(

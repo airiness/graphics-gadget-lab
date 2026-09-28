@@ -31,6 +31,14 @@ namespace gglab::shader_programs
 		"gglab.shader.forward-plus-validation", "compute.tiles", ShaderStage::Compute };
 	inline const ShaderProgramRef ForwardPlusValidationFrameCompute{
 		"gglab.shader.forward-plus-validation", "compute.frame", ShaderStage::Compute };
+	inline const ShaderProgramRef AtmosphereLutCompute{
+		"gglab.shader.atmosphere-luts", "compute", ShaderStage::Compute };
+	inline const ShaderProgramRef AerialPerspectiveBuildCompute{
+		"gglab.shader.aerial-perspective", "compute.build", ShaderStage::Compute };
+	inline const ShaderProgramRef AerialPerspectiveCompositeCompute{
+		"gglab.shader.aerial-perspective", "compute.composite", ShaderStage::Compute };
+	inline const ShaderProgramRef AerialPerspectiveProbeCompute{
+		"gglab.shader.aerial-probe", "compute", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateCompute{
 		"gglab.shader.gtao", "compute.evaluate", ShaderStage::Compute };
 	inline const ShaderProgramRef GTAOEvaluateDiagnosticsCompute{
@@ -72,6 +80,10 @@ namespace gglab::shader_programs
 		"gglab.shader.skybox", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef SkyboxPixel{
 		"gglab.shader.skybox", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef PhysicalSkyPreviewVertex{
+		"gglab.shader.physical-sky-preview", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef PhysicalSkyPreviewPixel{
+		"gglab.shader.physical-sky-preview", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLEnvironmentVertex{
 		"gglab.shader.ibl-environment", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLEnvironmentPixel{

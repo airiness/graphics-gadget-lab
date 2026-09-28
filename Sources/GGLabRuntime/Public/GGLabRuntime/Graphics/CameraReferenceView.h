@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GGLabRuntime/Core/Math/Vector.h"
+#include "GGLabRuntime/Graphics/Camera.h"
 
 #include <cstdint>
 #include <string>
@@ -20,6 +20,7 @@ namespace gglab
 		float m_VerticalFovDegrees = 60.0f;
 		float m_NearPlane = 0.1f;
 		float m_FarPlane = 1000.0f;
+		float m_ManualEV100 = 0.0f;
 		float m_ExposureCompensationEV = 0.0f;
 		float m_ReferenceAspect = 16.0f / 9.0f;
 	};

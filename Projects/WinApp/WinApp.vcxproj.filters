@@ -168,6 +168,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -181,6 +184,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.cpp">
@@ -303,6 +309,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiApplicationTooling.cpp">
       <Filter>DevTools\DevelopGui</Filter>
     </ClCompile>
@@ -384,7 +393,13 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp">
@@ -397,6 +412,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.cpp">
@@ -449,6 +467,12 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\AtmosphereRangeReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
       <Filter>Application\Lab\NapaVoxel</Filter>
     </ClInclude>
@@ -476,6 +500,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -489,6 +516,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.h">
@@ -611,6 +641,9 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
       <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\CameraReferenceViewWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\DevelopGuiBackendFactory.h">
       <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
@@ -710,7 +743,13 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ResourceManagementPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\TaskSystemPanel.h">
@@ -723,6 +762,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.h">
@@ -751,6 +793,15 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialProbe.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -803,6 +854,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">
@@ -861,6 +915,9 @@
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
     <None Include="..\..\Shaders\Common\MaterialSampling.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
@@ -892,6 +949,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">

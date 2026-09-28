@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstddef>
 #include <span>
 #include <string>
 
@@ -24,10 +25,11 @@ namespace gglab
 			uint32_t CubemapFaceIndex = 0;
 			uint32_t SourceTextureIndex = 0;
 			uint32_t SourceSamplerIndex = 0;
-			uint32_t Padding = 0;
+			uint32_t PhysicalSky = 0;
 		};
 		static_assert(IsPassRootConstantStruct<IBLEnvironmentMipPassParameters>);
 		static_assert(sizeof(IBLEnvironmentMipPassParameters) == 16);
+		static_assert(offsetof(IBLEnvironmentMipPassParameters, PhysicalSky) == 12);
 
 		struct PassData
 		{
@@ -152,9 +154,10 @@ namespace gglab
 						commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 						const IBLEnvironmentMipPassParameters passParameters{
-							.CubemapFaceIndex = face,
+						.CubemapFaceIndex = face,
 							.SourceTextureIndex = sourceSrv.m_Index,
 							.SourceSamplerIndex = data.m_SourceSamplerIndex,
+							.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
 						};
 						commandContext->SetPushConstants(
 							static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),

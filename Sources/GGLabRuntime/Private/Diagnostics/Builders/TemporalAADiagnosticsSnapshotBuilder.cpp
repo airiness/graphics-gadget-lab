@@ -33,6 +33,8 @@ namespace gglab
 		}
 		if (displayView)
 		{
+			snapshot.m_CurrentPreExposure = displayView->m_ScenePreExposure;
+			snapshot.m_PreviousPreExposure = displayView->m_PreviousScenePreExposure;
 			snapshot.m_CurrentJitterPixels = displayView->m_JitterPixels;
 			snapshot.m_CurrentJitterUV = displayView->m_JitterUV;
 			snapshot.m_PreviousJitterUV = displayView->m_PreviousJitterUV;

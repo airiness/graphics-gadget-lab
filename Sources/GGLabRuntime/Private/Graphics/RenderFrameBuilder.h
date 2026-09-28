@@ -29,6 +29,7 @@ namespace gglab
 			AssetManager& m_AssetManager;
 			ShadowVisualizationSettings& m_ShadowVisualizationSettings;
 			const ViewRenderProfile& m_ViewRenderProfile;
+			ResolvedViewRenderSettings m_DisplayViewSettings{};
 			ResolvedTemporalFramePlan m_TemporalFramePlan{};
 			TemporalFrameTransaction* m_TemporalFrameTransaction = nullptr;
 			RenderViewID m_DisplayViewId = RenderViewID::Main;

@@ -3,6 +3,7 @@
 #include <Common/Cubemap.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/MaterialSampling.hlsli>
+#include <Lighting/Atmosphere.hlsli>
 
 struct IBLEnvironmentPassParameters
 {
@@ -10,6 +11,8 @@ struct IBLEnvironmentPassParameters
 	uint SourceTextureIndex;
 	uint SourceSamplerIndex;
 	uint SourceMode;
+	float3 SunDirection;
+	float Padding;
 };
 
 ConstantBuffer<IBLEnvironmentPassParameters> g_Pass : register(b2);
@@ -27,6 +30,12 @@ float2 EquirectangularUvFromDirection(float3 dir)
 
 float3 SampleEnvironmentSource(float3 dir)
 {
+	if (g_Pass.SourceMode == 2)
+	{
+		// Only atmospheric radiance: the calibrated direct solar disk is never indirect lighting.
+		float2 skyUV = AtmosphereSkyViewUV(dir, float3(0,1,0), g_Pass.SunDirection);
+		return SampleTexture2DLevel(g_Pass.SourceTextureIndex, g_Pass.SourceSamplerIndex, skyUV, 0).rgb;
+	}
 	if (g_Pass.SourceMode == ENVIRONMENT_SOURCE_CUBEMAP)
 	{
 		return SampleTextureCubeLevel(
@@ -46,5 +55,6 @@ FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)
 float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 {
 	float3 dir = CubemapFaceUvToDirection(g_Pass.CubemapFaceIndex, IN.UV);
-	return float4(SanitizeHDRColor(SampleEnvironmentSource(dir)), 1.0);
+	float3 radiance = SampleEnvironmentSource(dir);
+	return float4(g_Pass.SourceMode == 2 ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance), 1.0);
 }

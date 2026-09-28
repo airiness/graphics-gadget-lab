@@ -12,11 +12,17 @@ Load the `.gltf` with its adjacent `.bin` and `Textures/` directory.
 - Generator: `Scripts/create_coastal_atrium.py`.
 - Material authoring: `Scripts/apply_coastal_atrium_materials.py`.
 - Exporter: `Scripts/export_gltf.py`, Blender 5.1.1 / glTF I/O 5.1.19.
-- Source SHA-256: `b9db2295a3e0376265f60d031ab83851ccdf539afcb8396d122996f93439c677`.
-- glTF SHA-256: `9653f683b198613b8795fcb28cb1fac2e1b5b3f5761bd3ccb3a60e1c6417624b`.
+- Source SHA-256: `709cf13a6ef7b827736b7978c949608659624b519b882dc2519ae7920a9cbfaf`.
+- glTF SHA-256: `7bcfc2ecf7e4f48446128d73af936d5147dafd8756d83ed56ce24ce892c14192`.
 - Buffer SHA-256: `b31b36f65c0eb2aaca8ca280aa50ebe2446138bcf0ef4c957c4e4bcffbe52e7e`.
 
 No third-party assets are used. The island import fixture is a separate asset.
+
+This export matches the Content working-tree camera extension based on revision
+`9fcc3132834cfd3de3234d89607583ea5ce84a9d`, identified by the hashes above.
+`Scripts/extend_lighting_references.py --scene atrium` adds `CAM_SkyHorizon`
+without regenerating the saved source. Geometry buffer, nine image files,
+materials, transforms, original cameras and the reference Sun are preserved.
 
 From the code repository root:
 
@@ -78,7 +84,7 @@ one runtime unit, with Blender `(X, Y, Z)` mapped to runtime `(X, Z, Y)`.
 | Exposure / tone mapping | 0 EV / ACES fitted |
 | TAA / GTAO / bloom | Disabled / disabled / disabled |
 
-The default runtime view reproduces `CAM_Courtyard`. All three source cameras
+The default runtime view reproduces `CAM_Courtyard`. All four source cameras
 have explicit runtime profiles described below. glTF cameras and Sun remain
 reference data; the Demo configures its camera and light separately. The Blender
 World and AgX previews are not runtime baselines. Interior darkness with
@@ -106,6 +112,7 @@ vertical FOV at the reference aspect, independently of window size.
 | `CAM_Courtyard` | `(23, 19, -28)` | `(-1, 1.8, -2)` | Courtyard scale, connected levels and primary lighting; initial hero view |
 | `CAM_ShadowStairs` | `(5.5, 3.4, -14)` | `(0, 2.8, 1)` | Near railings and stair contacts, mid-distance slat shadows and distant columns |
 | `CAM_InteriorExterior` | `(-12, 4, -2.9)` | `(2, 2.5, -5)` | Thick doorway occlusion and the corridor-to-courtyard brightness transition |
+| `CAM_SkyHorizon` | `(20, 5.5, -26)` | `(0, 3, 0)` | Broad sky region above architecture, coastal platform and shoreline; vertical FOV 0.7984415392 radians |
 
 The runtime camera angles and vertical field of view for each profile are:
 
@@ -114,6 +121,7 @@ The runtime camera angles and vertical field of view for each profile are:
 | `CAM_Courtyard` | -0.745419502 | -0.452466518 | 37.2990761 |
 | `CAM_ShadowStairs` | -0.351444811 | -0.037537422 | 39.7607002 |
 | `CAM_InteriorExterior` | 1.71968627 | -0.105563588 | 45.7473259 |
+| `CAM_SkyHorizon` | -0.655695626 | -0.076066793 | 45.7473259 |
 
 `Copy Camera Record` copies the selected camera's actual runtime position, basis,
 yaw/pitch, projection, vertical FOV, aspect, clip planes and exposure. Its
@@ -127,13 +135,43 @@ runtime preset. Re-entering the Demo restores those startup settings.
 The camera record is not a complete render capture manifest, and temporal reset
 does not promise identical jitter, frame sequence or deterministic replay.
 
+For physical sky/IBL inspection in `CAM_SkyHorizon`, designate the existing
+Runtime directional light as World Sun, set physical illuminance (for example
+120000 lux), enable Atmosphere, select Physical Sky and enable the skybox. Set
+Manual EV100 15 after restoring the view: the unchanged profile policy restores
+legacy 0 EV. The exported reference Sun and Blender World do not configure
+physical lighting. The bounded ocean remains an opaque foreground placeholder.
+
+Debug DX12 and Vulkan presentation was inspected at 16:9 after restoring
+`CAM_SkyHorizon`, with the existing Sun direction, physical illuminance 120000
+lux, Manual EV100 15, Earth Atmosphere, Physical Sky, environment intensity 1 and
+yaw 0. The camera pose, sky region, architecture and shoreline composition
+matched across backends. TAA, GTAO and Bloom remained disabled; scene
+pre-exposure remained at the Demo default. Active/requested lighting generations
+matched, and switching from Lighting Contract and normal shutdown completed
+without assertion, shader or GPU lifetime errors. This inspection does not add
+frozen captures to Rendering Baseline 1 or establish numeric lighting accuracy.
+
 ## Known limitations
 
 Current directional shadows can show wave patterns from PCF self-shadowing.
 Environment lighting is disabled in this preset, so interior surfaces and metal
 away from direct highlights can appear dark.
 
+With Physical Sky enabled, `CAM_SkyHorizon` exposes a black band between the sky
+horizon and the far edge of the finite ocean plane on both DX12 and Vulkan.
+The new camera preserves this visible limitation; the ocean remains a local
+placeholder and does not extend to the physical horizon. The camera addition
+does not change sky/ground rendering or supply distant atmospheric geometry.
+
 ## Screenshots
+
+[Physical Sky capture settings and identities](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
+record `CAM_SkyHorizon` at EV100 15:
+[DirectX 12](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-dx12.png)
+and [Vulkan](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-vulkan.png).
+These cursor-free 1920 by 1060 crops preserve the known horizon black band and
+exclude window chrome and the top menu without resampling.
 
 [Rendering Baseline 1](../../Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
 provides frozen asset and renderer references, capture settings, three paired
@@ -154,6 +192,6 @@ DX12/Vulkan views, and GPU timing observations.
 | Vulkan | [Courtyard overview](../../Media/GGLabCoastalAtrium/atrium-vulkan-overview.png) |
 | DirectX 12 | [Courtyard overview](../../Media/GGLabCoastalAtrium/atrium-dx12-overview.png) |
 
-The PNGs are 1922 by 1112, including window chrome and DevTools. They show the
-scene on each backend and are visual references, not pixel-comparison golden
-images.
+The basic-material and greybox PNGs are 1922 by 1112, including window chrome
+and DevTools. They show the scene on each backend and are visual references,
+not pixel-comparison golden images.

@@ -5,6 +5,8 @@
 #include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
+#include "GGLabRuntime/Graphics/WorldSun.h"
+
 #include <optional>
 
 namespace gglab::components
@@ -35,5 +37,6 @@ namespace gglab::components
 		float m_Range = 1000.0f;
 		float m_SpotAngle = 60.0f;
 		std::optional<DirectionalShadowSettings> m_DirectionalShadowSettings;
+		std::optional<WorldSunSettings> m_WorldSun;
 	};
 }

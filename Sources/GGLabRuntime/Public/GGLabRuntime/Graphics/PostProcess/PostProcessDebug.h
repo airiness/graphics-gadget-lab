@@ -6,6 +6,18 @@ namespace gglab
 {
 	inline constexpr uint32_t MaxBloomPyramidLevels = 8;
 
+	// Each inspector owns a preview request and a persistent output. The default
+	// PostProcessing channel also serves Lab actions that select diagnostic taps.
+	enum class PostProcessPreviewChannel : uint8_t
+	{
+		PostProcessing,
+		AmbientOcclusion,
+		TemporalAA,
+		Atmosphere,
+		SceneDepth,
+		Count
+	};
+
 	enum class PostProcessDebugTap : uint8_t
 	{
 		SceneColor = 0,
@@ -30,7 +42,13 @@ namespace gglab
 		TemporalHistoryWeight = 19,
 		TemporalHistoryAge = 20,
 
-		Count = 21
+		AtmosphereTransmittance = 21,
+		AtmosphereMultipleScattering = 22,
+		AtmosphereSkyView = 23,
+		AtmosphereAerialTransmittance = 24,
+		AtmosphereAerialInScattering = 25,
+
+		Count = 26
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -53,7 +71,7 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalRejection) == 18);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryWeight) == 19);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryAge) == 20);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 21);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 26);
 
 	struct PostProcessDebugSelection
 	{

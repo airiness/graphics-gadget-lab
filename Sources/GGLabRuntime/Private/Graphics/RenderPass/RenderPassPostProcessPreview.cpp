@@ -6,6 +6,8 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -146,9 +148,50 @@ namespace gglab
 	void RenderPassPostProcessPreview::AddPass(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
+		for (uint32_t index = 0; index < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++index)
+		{
+			const auto channel = static_cast<PostProcessPreviewChannel>(index);
+			if (services.m_Resources->IsPostProcessPreviewRequested(channel))
+			{
+				AddPassForChannel(rg, context, services, channel);
+			}
+		}
+	}
+
+	void RenderPassPostProcessPreview::AddPassForChannel(RenderGraph& rg,
+		const RenderFrameContext& context, const RenderServices& services,
+		PostProcessPreviewChannel channel) noexcept
+	{
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
-		const auto selection = registry->GetPostProcessPreviewSelection();
+		const auto selection = registry->GetPostProcessPreviewSelection(channel);
+		if (selection.m_Tap == PostProcessDebugTap::AtmosphereAerialTransmittance ||
+			selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering)
+		{
+			const auto* aerial = rg.GetBlackboard().TryGet<RGAerialPerspectiveResources>(
+				AerialPerspectiveResourcesName);
+			if (!aerial || aerial->m_DiagnosticTap != selection.m_Tap ||
+				!aerial->m_Diagnostic.IsValid())
+			{
+				registry->InvalidatePostProcessPreview(selection, channel);
+				return;
+			}
+			if (!registry->ConsumePostProcessPreviewRequest(channel)) return;
+			AddResolvedPass(rg, context, services, aerial->m_Diagnostic,
+				selection.m_Tap == PostProcessDebugTap::AtmosphereAerialInScattering
+					? context.GetDisplayRenderView().m_ScenePreExposure : 1.0f,
+				std::nullopt, selection, channel);
+			return;
+		}
+		if (selection.m_Tap >= PostProcessDebugTap::AtmosphereTransmittance && selection.m_Tap <= PostProcessDebugTap::AtmosphereSkyView)
+		{
+			const auto* atmosphere = rg.GetBlackboard().TryGet<RGAtmosphereResources>(AtmosphereResourcesName);
+			if (!atmosphere) { registry->InvalidatePostProcessPreview(selection, channel); return; }
+			const auto index = static_cast<uint32_t>(selection.m_Tap) - static_cast<uint32_t>(PostProcessDebugTap::AtmosphereTransmittance);
+			if (!registry->ConsumePostProcessPreviewRequest(channel)) return;
+			AddResolvedPass(rg, context, services, atmosphere->m_Luts[index], 1.0f, std::nullopt, selection, channel);
+			return;
+		}
 		if (IsTemporalAAPreview(selection.m_Tap))
 		{
 			const auto* temporalAA = rg.GetBlackboard().TryGet<RGTemporalAAResources>(
@@ -158,14 +201,14 @@ namespace gglab
 				: RGTextureId{};
 			if (!temporalAA || !source.IsValid())
 			{
-				registry->InvalidatePostProcessPreview(selection);
+				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest())
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{
 				return;
 			}
-			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection);
+			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection, channel);
 			return;
 		}
 		if (IsTemporalMotionPreview(selection.m_Tap))
@@ -174,15 +217,15 @@ namespace gglab
 				RGTemporalGeometryResources>(TemporalGeometryResourcesName);
 			if (!temporalGeometry || !temporalGeometry->IsValid())
 			{
-				registry->InvalidatePostProcessPreview(selection);
+				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest())
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{
 				return;
 			}
 			AddResolvedPass(rg, context, services, temporalGeometry->m_MotionVectors, 1.0f,
-				temporalGeometry->m_MotionSrvDesc, selection);
+				temporalGeometry->m_MotionSrvDesc, selection, channel);
 			return;
 		}
 		if (IsGTAOPreview(selection.m_Tap))
@@ -192,26 +235,26 @@ namespace gglab
 			const RGTextureId source = ResolveGTAOPreviewSource(gtaoResources, selection.m_Tap);
 			if (!source.IsValid())
 			{
-				registry->InvalidatePostProcessPreview(selection);
+				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
 			}
-			if (!registry->ConsumePostProcessPreviewRequest())
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{
 				return;
 			}
-			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection);
+			AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection, channel);
 			return;
 		}
 		if (IsDepthPreview(selection.m_Tap))
 		{
-			if (!registry->ConsumePostProcessPreviewRequest())
+			if (!registry->ConsumePostProcessPreviewRequest(channel))
 			{
 				return;
 			}
 			const auto& sceneDepth =
 				rg.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 			AddResolvedPass(
-				rg, context, services, sceneDepth.m_Texture, 1.0f, sceneDepth.m_SrvDesc, selection);
+				rg, context, services, sceneDepth.m_Texture, 1.0f, sceneDepth.m_SrvDesc, selection, channel);
 			return;
 		}
 		if (selection.m_Tap != PostProcessDebugTap::SceneColor &&
@@ -223,8 +266,18 @@ namespace gglab
 		const auto& resources =
 			rg.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 		const RGPostProcessColor source = ResolvePreviewSource(resources, selection);
-		AddPassForTap(
-			rg, context, services, source, selection.m_Tap, selection.m_BloomPyramidLevel);
+		if (!source.m_Texture.IsValid())
+		{
+			registry->InvalidatePostProcessPreview(selection, channel);
+			return;
+		}
+		GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
+			"Post-process preview requires scene-linear Rec.709 input.");
+		if (registry->ConsumePostProcessPreviewRequest(channel))
+		{
+			AddResolvedPass(rg, context, services, source.m_Texture, source.m_PreExposure,
+				std::nullopt, selection, channel);
+		}
 	}
 
 	void RenderPassPostProcessPreview::AddPassForTap(RenderGraph& rg,
@@ -234,33 +287,26 @@ namespace gglab
 	{
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
-		if (!registry->IsPostProcessPreviewRequested())
+		for (uint32_t index = 0; index < static_cast<uint32_t>(PostProcessPreviewChannel::Count); ++index)
 		{
-			return;
+			const auto channel = static_cast<PostProcessPreviewChannel>(index);
+			if (!registry->IsPostProcessPreviewRequested(channel)) continue;
+			const auto selection = registry->GetPostProcessPreviewSelection(channel);
+			const bool levelMatches = tap != PostProcessDebugTap::BloomPyramid ||
+				selection.m_BloomPyramidLevel == bloomPyramidLevel;
+			if (selection.m_Tap != tap || !levelMatches || !source.m_Texture.IsValid()) continue;
+			GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
+				"Post-process preview requires scene-linear Rec.709 input.");
+			if (!registry->ConsumePostProcessPreviewRequest(channel)) continue;
+			AddResolvedPass(rg, context, services, source.m_Texture, source.m_PreExposure,
+				std::nullopt, selection, channel);
 		}
-
-		const auto selection = registry->GetPostProcessPreviewSelection();
-		const bool levelMatches = tap != PostProcessDebugTap::BloomPyramid ||
-			selection.m_BloomPyramidLevel == bloomPyramidLevel;
-		if (selection.m_Tap != tap || !levelMatches || !source.m_Texture.IsValid())
-		{
-			return;
-		}
-		GGLAB_ASSERT_MSG(source.m_State == PostProcessColorState::SceneLinearRec709,
-			"Post-process preview requires scene-linear Rec.709 input.");
-		if (!registry->ConsumePostProcessPreviewRequest())
-		{
-			return;
-		}
-
-		AddResolvedPass(
-			rg, context, services, source.m_Texture, source.m_PreExposure, std::nullopt, selection);
 	}
 
 	void RenderPassPostProcessPreview::AddResolvedPass(RenderGraph& rg,
 		const RenderFrameContext& context, const RenderServices& services, RGTextureId source,
 		float sourcePreExposure, std::optional<RHITextureViewDesc> sourceViewDesc,
-		PostProcessDebugSelection selection) noexcept
+		PostProcessDebugSelection selection, PostProcessPreviewChannel channel) noexcept
 	{
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
@@ -269,40 +315,49 @@ namespace gglab
 			return;
 		}
 		GGLAB_ASSERT_MSG(
-			sourcePreExposure > 0.0f, "Post-process preview requires positive pre-exposure.");
+			std::isfinite(sourcePreExposure) && sourcePreExposure > 0.0f,
+			"Post-process preview requires positive finite pre-exposure.");
 
 		EnsureInitialized(services);
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const RenderView& displayView = context.GetDisplayRenderView();
 		const RHIFencePoint retireFence = services.m_Presentation->GetLastSubmittedFencePoint();
 		registry->EnsurePostProcessPreviewResources(displayView.m_Width, displayView.m_Height,
-			retireFence.IsValid() ? &retireFence : nullptr);
+			retireFence.IsValid() ? &retireFence : nullptr, channel);
 
 		using TextureIndex = RenderResourceRegistry::TextureIndex;
-		constexpr TextureIndex PreviewIndex = TextureIndex::Preview_PostProcess;
+		const TextureIndex PreviewIndex = RenderResourceRegistry::GetPostProcessPreviewTextureIndex(channel);
 		const auto* outputDesc = registry->GetTextureDesc(PreviewIndex);
 		GGLAB_ASSERT_NOT_NULL(outputDesc);
 		const RGPersistentTextureImportContract outputImport =
 			ResolveRGPersistentTextureImportContract(
-				registry->HasPublishedPostProcessPreview() && !registry->IsDirty(PreviewIndex),
+				registry->HasPublishedPostProcessPreview(channel) && !registry->IsDirty(PreviewIndex),
 				ToRHIResourceState(RGTextureAccess::Sample, RHIStage::PixelShader));
 		const bool pointSampledPreview =
 			IsDepthPreview(selection.m_Tap) || IsGTAOPreview(selection.m_Tap) ||
 			IsTemporalMotionPreview(selection.m_Tap) || IsTemporalAAPreview(selection.m_Tap);
 		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(
 			pointSampledPreview ? SamplerPreset::PointClamp : SamplerPreset::LinearClamp);
-		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV());
+		const float previewExposureScale = std::exp2(registry->GetPostProcessPreviewExposureEV(channel));
 		const auto* contextPtr = &context;
 
+		static constexpr const char* PassNames[] = {
+			"PostProcess.Preview", "AmbientOcclusion.Preview", "TemporalAA.Preview",
+			"Atmosphere.Preview", "SceneDepth.Preview"
+		};
 		rg.AddPass<PassData>(
-			GetRenderGraphPassName(),
+			PassNames[static_cast<uint32_t>(channel)],
 			[source, sourcePreExposure, sourceViewDesc, selection, outputDesc, outputImport,
 			samplerIndex, previewExposureScale,
-			registry](RenderGraph::RGBuilder& builder, PassData& data)
+			registry, PreviewIndex, channel](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				data.m_Source = builder.Read(source, RGTextureAccess::Sample);
-				data.m_Output = builder.ImportTexture("PostProcess.Preview.SelectedTap",
-					registry->GetTextureHandle(TextureIndex::Preview_PostProcess), *outputDesc,
+				constexpr const char* PreviewNames[] = {
+					"Preview.PostProcessing", "Preview.AmbientOcclusion", "Preview.TemporalAA",
+					"Preview.Atmosphere", "Preview.SceneDepth"
+				};
+				data.m_Output = builder.ImportTexture(PreviewNames[static_cast<uint32_t>(channel)],
+					registry->GetTextureHandle(PreviewIndex), *outputDesc,
 					outputImport.m_InitialState, outputImport.m_InitialContentValidity);
 				builder.WriteInPlace(data.m_Output, RGTextureAccess::RenderTarget);
 				if (!sourceViewDesc)
@@ -325,7 +380,7 @@ namespace gglab
 				data.m_SourcePreExposure = sourcePreExposure;
 				data.m_PreviewExposureScale = previewExposureScale;
 			},
-			[this, services, registry, contextPtr, displayViewId](
+			[this, services, registry, contextPtr, displayViewId, channel](
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
@@ -367,7 +422,8 @@ namespace gglab
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), parameters);
 				commandContext->DrawFullscreenTriangle();
-				registry->PublishPostProcessPreview(data.m_Selection);
+				registry->PublishPostProcessPreview(data.m_Selection, channel,
+					contextPtr->m_FrameSerial);
 			});
 	}
 

@@ -8,7 +8,7 @@ namespace gglab
 	public:
 		std::string_view GetPath() const noexcept override
 		{
-			return "Rendering/Resources/RHI Resource Manager";
+			return "Diagnostics/Resources/RHI Resource Manager";
 		}
 		std::string_view GetTitle() const noexcept override { return "Resource Management"; }
 		void Draw(DevelopGuiContext& context) noexcept override;

@@ -17,7 +17,8 @@ struct IBLPrefilteredSpecularPassParameters
 	uint EnvironmentMipLevels;
 	uint SampleCount;
 	float MaxSampleLuminance;
-	uint3 Padding;
+	uint PhysicalSky;
+	uint2 Padding;
 };
 
 ConstantBuffer<IBLPrefilteredSpecularPassParameters> g_Pass : register(b2);
@@ -36,6 +37,7 @@ float GetPerceptualRoughness()
 
 float3 ClampSampleLuminance(float3 radiance)
 {
+	if (g_Pass.PhysicalSky) return SanitizeSceneRadiance(radiance);
 	radiance = SanitizeHDRColor(radiance);
 	const float luminance = dot(radiance, float3(0.2126, 0.7152, 0.0722));
 	const float maxLuminance = max(g_Pass.MaxSampleLuminance, 1.0);
@@ -49,7 +51,8 @@ float3 IntegratePrefilteredSpecular(
 	// original environment texel instead of integrating an ill-conditioned PDF.
 	if (g_Pass.MipLevel == 0u || perceptualRoughness <= 0.0)
 	{
-		return SanitizeHDRColor(SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb);
+		float3 radiance = SampleTextureCubeLevel(environmentBinding, normalWS, 0.0).rgb;
+		return g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
 	}
 
 	const uint sampleCount = max(g_Pass.SampleCount, 1u);
@@ -90,7 +93,8 @@ float3 IntegratePrefilteredSpecular(
 		}
 	}
 
-	return SanitizeHDRColor(prefilteredColor / max(totalWeight, 1e-5));
+	float3 result = prefilteredColor / max(totalWeight, 1e-5);
+	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
 }
 
 FullscreenTriangleVSOutput VSMain(uint vid : SV_VertexID)

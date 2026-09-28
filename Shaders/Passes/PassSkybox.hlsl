@@ -46,5 +46,5 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target0
 	float3 color = SampleTextureCubeLevel(g_Pass.EnvironmentTextureIndex,
 		g_Pass.EnvironmentSamplerIndex, environmentDirection, 0.0).rgb *
 		g_Scene.IBLResource.EnvironmentIntensity;
-	return float4(SanitizeHDRColor(color), 1.0);
+	return float4(EncodeSceneColor(color, viewData.ScenePreExposure), 1.0);
 }
