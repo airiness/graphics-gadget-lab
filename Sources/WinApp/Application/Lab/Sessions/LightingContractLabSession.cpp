@@ -30,7 +30,7 @@ namespace gglab
 			.m_DefaultValue = false,
 			}));
 		auto& profile = GetMutableViewRenderProfile();
-		// Preserve the validated C0 unit-storage baseline; the inspector can override it.
+		// Keep reference colors in unit storage; the inspector can override pre-exposure.
 		profile.m_EnableScenePreExposure = false;
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -129,7 +129,7 @@ namespace gglab
 		registry.emplace<components::TransformComponent>(lightEntity, lightTransform);
 
 		components::LightComponent light{};
-		// C0 uses legacy renderer units; this is not the WL3 physical sun contract.
+		// Keep the authored intensity; world-sun interpretation is enabled separately.
 		light.m_Intensity = 3.0f;
 		light.m_Color = Color::White;
 		light.m_Type = LightType::Directional;

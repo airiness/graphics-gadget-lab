@@ -381,7 +381,7 @@ namespace gglab
 					reference.m_ProfileVersion == 2;
 			}
 			context.Check(physicalRestored && LightingContractReferenceViews.front().m_ManualEV100 == 0.0f,
-				"Physical sun reference views restore daylight exposure without mutating the C0 baseline");
+				"Physical sun reference views restore daylight exposure without mutating the default zero-EV reference");
 
 		}
 

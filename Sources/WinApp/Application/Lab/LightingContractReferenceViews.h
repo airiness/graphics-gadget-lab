@@ -7,7 +7,7 @@
 
 namespace gglab
 {
-	// Content C0: Blender (X, Y, Z) -> runtime (X, Z, Y), meters, 16:9 reference aspect.
+	// Blender (X, Y, Z) maps to runtime (X, Z, Y); positions use meters and a 16:9 reference aspect.
 	inline const std::array<CameraReferenceView, 4> LightingContractReferenceViews = { {
 		{
 			.m_Id = "CAM_ExposureChart",

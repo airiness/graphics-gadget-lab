@@ -429,8 +429,8 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 		illuminance *= WorldSunTransmittance(positionWS, L);
 	}
 	float3 directResponse = (diffuse + specular) * NoL;
-	// Above perceptual roughness 0.2, the center approximation stayed within 1% in
-	// the WL5 sweep (0-60 degree incidence, up to two solar radii off reflection).
+	// Above perceptual roughness 0.2, the center approximation stayed within 1%
+	// over 0-60 degree incidence and offsets up to two solar radii from reflection.
 	if (lightIndex == g_Scene.WorldSunLightIndex && physicalRoughness < 0.04)
 	{
 		directResponse = diffuse * NoL + WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
