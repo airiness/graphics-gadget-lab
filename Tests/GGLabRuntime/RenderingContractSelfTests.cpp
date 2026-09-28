@@ -86,6 +86,7 @@
 #include <array>
 #include <concepts>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <numbers>
@@ -8054,8 +8055,66 @@ namespace gglab
 		}
 	}
 
+	void RunMaterialBaselineContractTests(SelfTestContext& context) noexcept
+	{
+		constexpr double Pi = std::numbers::pi_v<double>;
+		constexpr uint32_t PolarSamples = 512;
+		// Independent midpoint integration of the current direct GGX BRDF under
+		// uniform unit radiance. The result is scene-linear directional albedo;
+		// no exposure, IBL prefilter or tone map participates.
+		auto integrate = [=](double perceptualRoughness, double f0) noexcept
+		{
+			const double alpha = perceptualRoughness * perceptualRoughness;
+			const double alphaSquared = alpha * alpha;
+			double total = 0.0;
+			for (uint32_t polar = 0; polar < PolarSamples; ++polar)
+			{
+				const double theta = (static_cast<double>(polar) + 0.5) * (0.5 * Pi / PolarSamples);
+				const double noL = std::cos(theta);
+				const double noH = std::sqrt((1.0 + noL) * 0.5);
+				const double voH = noH;
+				const double denominator = noH * noH * (alphaSquared - 1.0) + 1.0;
+				const double distribution = alphaSquared / (Pi * denominator * denominator);
+				const double ggxL = std::sqrt(noL * noL * (1.0 - alphaSquared) + alphaSquared);
+				const double ggxV = noL;
+				const double visibility = 0.5 / (ggxL + ggxV);
+				const double fresnelEdge = std::pow(1.0 - voH, 5.0);
+				const double fresnel = f0 * (1.0 - fresnelEdge) + fresnelEdge;
+				const double brdf = distribution * visibility * fresnel;
+				const double solidAngle = std::sin(theta) * (0.5 * Pi / PolarSamples) *
+					(2.0 * Pi); // isotropic azimuth integrates analytically
+				total += brdf * noL * solidAngle;
+			}
+			return total;
+		};
+
+		const double defaultIorF0 = std::pow((1.5 - 1.0) / (1.5 + 1.0), 2.0);
+		context.Check(std::abs(defaultIorF0 - 0.04) < 1e-12 &&
+			std::abs(std::pow((2.0 - 1.0) / (2.0 + 1.0), 2.0) - 1.0 / 9.0) < 1e-12,
+			"IOR 1.5 preserves the legacy dielectric F0 = 0.04 reference");
+		context.Check(std::abs(0.045 * 0.045 - 0.002025) < 1e-12,
+			"Minimum perceptual roughness converts to GGX alpha before evaluation");
+
+		const double smooth = integrate(0.25, 1.0);
+		const double medium = integrate(0.5, 1.0);
+		const double rough = integrate(1.0, 1.0);
+		context.Check(std::isfinite(smooth) && std::isfinite(medium) && std::isfinite(rough) &&
+			smooth > medium && medium > rough && smooth < 1.01 && smooth > 0.9 &&
+			std::abs(rough - (1.0 - std::log(2.0))) < 0.001,
+			"Single-scattering GGX white furnace loses energy with roughness (512 polar midpoints)");
+
+		const double lutB = integrate(1.0, 0.0);
+		const double lutA = rough - lutB;
+		const double dielectric = integrate(1.0, defaultIorF0);
+		context.Check(std::abs(lutA - 0.30682) < 0.001 &&
+			std::abs(lutB - 0.000033615) < 0.000002 &&
+			std::abs(defaultIorF0 * lutA + lutB - dielectric) < 1e-6,
+			"BRDF LUT A integrates (1-Fc), B integrates Fc, and F0*A+B reconstructs the direct reference");
+	}
+
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunMaterialBaselineContractTests(context);
 		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
 		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),
 			"DX12 composition rejects a missing window before creating backend objects");

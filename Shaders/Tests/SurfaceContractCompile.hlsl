@@ -11,7 +11,11 @@ float4 PSMain() : SV_Target
 	// Keep the profile fields observable so this contract cannot be dropped
 	// wholesale by dead-code elimination.
 	const float checksum = dot(surface.BaseColor, 1.0.xxx) + dot(surface.Emissive, 1.0.xxx) +
-		surface.Metallic + surface.Roughness + surface.Opacity;
+		surface.Metallic + surface.Roughness + surface.Opacity + matData.NormalScale +
+		matData.OcclusionStrength + matData.AlphaCutoff + matData.AlphaMode +
+		matData.Flags + matData.DebugView +
+		dot(matData.NormalBinding.UVTransformU, 1.0.xxxx) +
+		dot(matData.OcclusionBinding.UVTransformV, 1.0.xxxx);
 
 	return float4(surface.BaseColor + float3(checksum, 0.0, 0.0), surface.Opacity);
 }

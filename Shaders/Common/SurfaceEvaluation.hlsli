@@ -11,6 +11,18 @@ struct SurfaceData
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
+// Shading values are derived per pixel and never written back to imported
+// material state. Optional lobes can extend this seam in later slices.
+struct BaseShadingState
+{
+	float3 NormalWS;
+	float AuthoredPerceptualRoughness;
+	float EffectivePerceptualRoughness;
+	float BRDFAlpha;
+	float3 F0;
+	uint FeatureFlags;
+};
+
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 {
 	SurfaceData surface;
@@ -30,7 +42,8 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	surface.Metallic = saturate(matData.MetallicFactor * metallicRoughnessSampled.b);
 	surface.Roughness = saturate(matData.RoughnessFactor * metallicRoughnessSampled.g);
 
-	// Emissive: sampled emissive texture multiplied by the runtime factor.
+	// Emissive retains the pre-World-Lighting legacy factor scale in this baseline.
+	// A scene-referred emissive-unit migration requires a separate contract.
 	const float2 emissiveUV = SelectUV(matData.EmissiveBinding, uv0, uv1);
 	surface.Emissive = SampleTextureBinding(
 		matData.EmissiveBinding.TextureSamplerBinding, emissiveUV).rgb *

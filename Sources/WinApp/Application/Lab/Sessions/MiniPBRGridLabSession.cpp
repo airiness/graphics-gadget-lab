@@ -179,6 +179,10 @@ namespace gglab
 					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
 					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
+					{.m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
+					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({

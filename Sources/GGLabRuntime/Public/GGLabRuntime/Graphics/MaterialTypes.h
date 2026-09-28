@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/EnumFlags.h"
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
@@ -42,6 +43,10 @@ namespace gglab
 		Metallic,
 		Roughness,
 		Normal,
+		AuthoredRoughness,
+		EffectiveRoughness,
+		F0,
+		FeatureFlags,
 	};
 
 	enum class MaterialTextureSlot : uint32_t
@@ -137,6 +142,10 @@ namespace gglab
 		TextureID m_TextureId{};
 		SamplerID m_SamplerId{};
 		uint32_t m_TexCoordIndex = 0;
+		// glTF KHR_texture_transform: offset + rotation * scale * selected UV.
+		Vector2 m_UVOffset{ 0.0f, 0.0f };
+		Vector2 m_UVScale{ 1.0f, 1.0f };
+		float m_UVRotation = 0.0f;
 	};
 
 	struct MaterialProperties

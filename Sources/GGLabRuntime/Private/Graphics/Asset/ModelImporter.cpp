@@ -9,6 +9,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <format>
 #include <limits>
 #include <memory>
@@ -50,12 +52,112 @@ namespace gglab
 			case MaterialTextureSlot::Normal:
 				return aiTextureType_NORMALS;
 			case MaterialTextureSlot::Occlusion:
-				return aiTextureType_AMBIENT_OCCLUSION;
+				// Assimp's glTF2 importer publishes core occlusionTexture as LIGHTMAP.
+				return aiTextureType_LIGHTMAP;
 			case MaterialTextureSlot::Emissive:
 				return aiTextureType_EMISSIVE;
 			default:
 				return aiTextureType_NONE;
 			}
+		}
+
+		using Json = nlohmann::json;
+
+		[[nodiscard]] const Json* FindObjectField(const Json& parent, const char* name) noexcept
+		{
+			if (!parent.is_object()) return nullptr;
+			const auto found = parent.find(name);
+			return found != parent.end() && found->is_object() ? &*found : nullptr;
+		}
+
+		[[nodiscard]] const Json* FindMaterialTextureInfo(
+			const Json& material, MaterialTextureSlot slot) noexcept
+		{
+			switch (slot)
+			{
+			case MaterialTextureSlot::BaseColor:
+				if (const Json* pbr = FindObjectField(material, "pbrMetallicRoughness"))
+					return FindObjectField(*pbr, "baseColorTexture");
+				break;
+			case MaterialTextureSlot::MetallicRoughness:
+				if (const Json* pbr = FindObjectField(material, "pbrMetallicRoughness"))
+					return FindObjectField(*pbr, "metallicRoughnessTexture");
+				break;
+			case MaterialTextureSlot::Normal:
+				return FindObjectField(material, "normalTexture");
+			case MaterialTextureSlot::Occlusion:
+				return FindObjectField(material, "occlusionTexture");
+			case MaterialTextureSlot::Emissive:
+				return FindObjectField(material, "emissiveTexture");
+			default:
+				break;
+			}
+			return nullptr;
+		}
+
+		[[nodiscard]] bool ReadTextureTransform(const Json& textureInfo,
+			ImportedMaterialTextureBinding& binding, std::string& error) noexcept
+		{
+			const Json* extensions = FindObjectField(textureInfo, "extensions");
+			if (extensions)
+			{
+				const auto declared = extensions->find("KHR_texture_transform");
+				if (declared != extensions->end() && !declared->is_object())
+				{
+					error = "KHR_texture_transform must be an object.";
+					return false;
+				}
+			}
+			const Json* transform = extensions ? FindObjectField(*extensions, "KHR_texture_transform") : nullptr;
+			if (!transform) return true;
+
+			auto readPair = [&](const char* name, Vector2& destination) noexcept
+			{
+				const auto found = transform->find(name);
+				if (found == transform->end()) return true;
+				if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
+					!(*found)[1].is_number()) return false;
+				destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
+				return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
+			};
+			if (!readPair("offset", binding.m_UVOffset) || !readPair("scale", binding.m_UVScale))
+			{
+				error = "Invalid KHR_texture_transform offset or scale.";
+				return false;
+			}
+			if (const auto rotation = transform->find("rotation"); rotation != transform->end())
+			{
+				if (!rotation->is_number() || !std::isfinite(rotation->get<float>()))
+				{
+					error = "Invalid KHR_texture_transform rotation.";
+					return false;
+				}
+				binding.m_UVRotation = rotation->get<float>();
+			}
+			if (const auto texCoord = transform->find("texCoord"); texCoord != transform->end())
+			{
+				if (!texCoord->is_number_unsigned() || texCoord->get<uint64_t>() > 1u)
+				{
+					error = "KHR_texture_transform requires unsupported TEXCOORD set.";
+					return false;
+				}
+				binding.m_TexCoordIndex = texCoord->get<uint32_t>();
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool ReadTextureScalar(const Json& textureInfo, const char* name,
+			float& destination, std::string& error) noexcept
+		{
+			const auto found = textureInfo.find(name);
+			if (found == textureInfo.end()) return true;
+			if (!found->is_number() || !std::isfinite(found->get<float>()))
+			{
+				error = std::format("Invalid glTF texture {}.", name);
+				return false;
+			}
+			destination = found->get<float>();
+			return true;
 		}
 
 		[[nodiscard]] RHITextureAddressMode ToRHITextureAddressMode(aiTextureMapMode mode) noexcept
@@ -237,11 +339,51 @@ namespace gglab
 			return result;
 		}
 
+		// Assimp does not preserve KHR_texture_transform's texCoord override. Read the
+		// material JSON once at the import boundary; shading still consumes one
+		// ImportedMaterial representation.
+		std::ifstream sourceStream(canonicalPath, std::ios::binary);
+		const Json gltf = sourceStream ? Json::parse(sourceStream, nullptr, false) : Json{};
+		if (!gltf.is_object())
+		{
+			result.m_Error = "Model source is not a valid glTF JSON object.";
+			return result;
+		}
+		const auto materials = gltf.find("materials");
+		const Json* sourceMaterials = materials != gltf.end() && materials->is_array() ? &*materials : nullptr;
+		for (const char* field : { "extensionsUsed", "extensionsRequired" })
+		{
+			const auto extensions = gltf.find(field);
+			if (extensions == gltf.end()) continue;
+			if (!extensions->is_array())
+			{
+				result.m_Error = std::format("glTF {} must be an array.", field);
+				return result;
+			}
+			for (const Json& entry : *extensions)
+			{
+				if (!entry.is_string())
+				{
+					result.m_Error = std::format("glTF {} contains a non-string entry.", field);
+					return result;
+				}
+				const std::string name = entry.get<std::string>();
+				if (!name.starts_with("KHR_materials_")) continue;
+				if (std::string_view(field) == "extensionsRequired")
+				{
+					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
+					return result;
+				}
+				GGLAB_LOG_GRAPHICS_WARN(
+					"Optional material extension '{}' uses the core glTF fallback.", name);
+			}
+		}
+
 		Assimp::Importer importer;
 		constexpr uint32_t importFlags =
 			aiProcess_ConvertToLeftHanded | aiProcess_Triangulate | aiProcess_GenSmoothNormals |
 			aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices |
-			aiProcess_ImproveCacheLocality | aiProcess_RemoveRedundantMaterials |
+			aiProcess_ImproveCacheLocality |
 			aiProcess_SortByPType | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph;
 		progress.Report(
 			0.08f, "Parsing model with Assimp", canonicalPath.filename().generic_string());
@@ -282,6 +424,13 @@ namespace gglab
 		{
 			result.m_Error = std::format(
 				"Model file '{}' does not contain a scene hierarchy.", canonicalPath.string());
+			return result;
+		}
+		// glTF material indices are positional. Preserve them through Assimp so
+		// per-binding source semantics can be merged without a name heuristic.
+		if (scene->mNumMaterials != (sourceMaterials ? sourceMaterials->size() : 0u) + 1u)
+		{
+			result.m_Error = "Assimp material indices do not match the glTF material table.";
 			return result;
 		}
 		progress.Report(0.25f, "Model structure parsed",
@@ -353,13 +502,23 @@ namespace gglab
 				binding.m_SamplerKey = MakeSamplerKey(mapMode, magFilter, minFilter, settings);
 				if (uvIndex > 1)
 				{
-					GGLAB_LOG_GRAPHICS_WARN(
-						"Texture '{}' requests TEXCOORD{}, but only TEXCOORD0/1 are "
-						"supported. Falling back to TEXCOORD0.",
+					result.m_Error = std::format(
+						"Texture '{}' requests unsupported TEXCOORD{}.",
 						canonicalTexturePath.string(), uvIndex);
-					uvIndex = 0;
+					return result;
 				}
 				binding.m_TexCoordIndex = uvIndex;
+				if (sourceMaterials && materialIndex < sourceMaterials->size())
+				{
+					if (const Json* textureInfo =
+						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot))
+					{
+						if (!ReadTextureTransform(*textureInfo, binding, result.m_Error))
+						{
+							return result;
+						}
+					}
+				}
 			}
 
 			aiColor4D baseColor{};
@@ -372,6 +531,23 @@ namespace gglab
 				source->Get(AI_MATKEY_METALLIC_FACTOR, destination.m_Properties.m_MetallicFactor));
 			GGLAB_UNUSED(source->Get(
 				AI_MATKEY_ROUGHNESS_FACTOR, destination.m_Properties.m_RoughnessFactor));
+			if (sourceMaterials && materialIndex < sourceMaterials->size())
+			{
+				const Json& material = (*sourceMaterials)[materialIndex];
+				if (const Json* normal = FindMaterialTextureInfo(material, MaterialTextureSlot::Normal))
+				{
+					if (!ReadTextureScalar(*normal, "scale", destination.m_Properties.m_NormalScale,
+						result.m_Error)) return result;
+				}
+				// Assimp's glTF2 importer writes occlusion strength under
+				// "$tex.file.strength", which its public glTF macro does not query.
+				if (const Json* occlusion =
+					FindMaterialTextureInfo(material, MaterialTextureSlot::Occlusion))
+				{
+					if (!ReadTextureScalar(*occlusion, "strength",
+						destination.m_Properties.m_OcclusionStrength, result.m_Error)) return result;
+				}
+			}
 
 			aiColor3D emissiveColor{};
 			if (source->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor) == aiReturn_SUCCESS)

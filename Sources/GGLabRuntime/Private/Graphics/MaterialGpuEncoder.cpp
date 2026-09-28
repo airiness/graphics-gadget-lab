@@ -2,10 +2,24 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 
+#include <cmath>
 #include <cstdint>
 
 namespace gglab
 {
+	MaterialUVTransformRows EncodeMaterialUVTransform(
+		const MaterialTextureBinding& binding) noexcept
+	{
+		const float cosine = std::cos(binding.m_UVRotation);
+		const float sine = std::sin(binding.m_UVRotation);
+		return {
+			.m_U = Vector4(cosine * binding.m_UVScale.m_X,
+				-sine * binding.m_UVScale.m_Y, binding.m_UVOffset.m_X, 0.0f),
+			.m_V = Vector4(sine * binding.m_UVScale.m_X,
+				cosine * binding.m_UVScale.m_Y, binding.m_UVOffset.m_Y, 0.0f),
+		};
+	}
+
 	namespace
 	{
 		[[nodiscard]] MaterialTextureBindingGPU EncodeTextureBinding(
@@ -13,6 +27,7 @@ namespace gglab
 			SamplerPreset fallbackSampler, const AssetManager& assetManager,
 			const RenderSamplerAccess& samplerRegistry) noexcept
 		{
+			const MaterialUVTransformRows transform = EncodeMaterialUVTransform(binding);
 			return {
 				.TextureSamplerBinding =
 					{
@@ -22,6 +37,8 @@ namespace gglab
 					},
 				.TexCoordIndex = binding.m_TexCoordIndex,
 				.Padding = 0,
+				.UVTransformU = transform.m_U,
+				.UVTransformV = transform.m_V,
 			};
 		}
 	}

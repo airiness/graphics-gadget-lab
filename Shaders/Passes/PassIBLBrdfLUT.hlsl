@@ -45,6 +45,8 @@ float2 IntegrateBRDF(float NoV, float perceptualRoughness)
 		}
 	}
 
+	// GGLab LUT contract: A integrates (1 - Fc), B integrates Fc. The forward
+	// path reconstructs the single-scattering directional response as F0*A + B.
 	return float2(A, B) / SAMPLE_COUNT;
 }
 

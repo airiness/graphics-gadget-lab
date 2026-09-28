@@ -10,6 +10,7 @@
 #include "Graphics/Asset/DerivedData/Platform/Win/Win32LocalDerivedDataPlatform.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
@@ -19,11 +20,17 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
 
+#include <assimp/Importer.hpp>
+#include <assimp/GltfMaterial.h>
+#include <assimp/material.h>
+#include <assimp/scene.h>
+
 #include <Windows.h>
 
 #include <atomic>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <concepts>
 #include <cwctype>
 #include <deque>
@@ -32,6 +39,7 @@
 #include <format>
 #include <memory>
 #include <mutex>
+#include <numbers>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -1039,6 +1047,178 @@ namespace gglab
 			std::filesystem::remove(root, errorCode);
 		}
 
+		void RunGltfMaterialImportTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const auto root = std::filesystem::temp_directory_path(errorCode) /
+				std::format("gglab-material-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
+			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
+			context.Check(created && !errorCode, "Material import creates an isolated glTF fixture directory");
+			if (!created || errorCode) return;
+
+			const std::array<float, 30> vertices = {
+				0, 0, 0, 1, 0, 0, 0, 1, 0,
+				0, 0, 1, 0, 0, 1, 0, 0, 1,
+				0, 0, 1, 0, 0, 1,
+				0, 1, 1, 1, 0, 0,
+			};
+			{
+				std::ofstream buffer(root / "probe.bin", std::ios::binary);
+				buffer.write(reinterpret_cast<const char*>(vertices.data()), sizeof(vertices));
+			}
+
+			auto writeSource = [&](std::string_view extensions, std::string_view material) noexcept
+			{
+				std::ofstream gltf(root / "probe.gltf");
+				gltf << R"({"asset":{"version":"2.0"},)" << extensions << R"(
+"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+"buffers":[{"uri":"probe.bin","byteLength":120}],
+"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},
+{"buffer":0,"byteOffset":36,"byteLength":36},
+{"buffer":0,"byteOffset":72,"byteLength":24},
+{"buffer":0,"byteOffset":96,"byteLength":24}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},
+{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+{"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
+{"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
+"images":[{"uri":"map.png"}],"textures":[{"source":0}],
+"materials":[)" << material << R"(],
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":0}]}]})";
+			};
+
+			writeSource(R"("extensionsUsed":["KHR_texture_transform"],)",
+				R"({"name":"MaterialProbe","pbrMetallicRoughness":{"baseColorTexture":{"index":0,"texCoord":0,"extensions":{"KHR_texture_transform":{"offset":[0.2,0.3],"rotation":0.5,"scale":[2,3],"texCoord":1}}},"metallicRoughnessTexture":{"index":0,"extensions":{"KHR_texture_transform":{"offset":[0.11,0]}}}},"normalTexture":{"index":0,"scale":0.35,"extensions":{"KHR_texture_transform":{"rotation":0.25}}},"occlusionTexture":{"index":0,"strength":0.4,"extensions":{"KHR_texture_transform":{"scale":[0.8,-1]}}},"emissiveTexture":{"index":0,"extensions":{"KHR_texture_transform":{"offset":[0,0.17]}}}})");
+			const ModelImportResult imported = ModelImporter::Import(root / "probe.gltf", {});
+			bool valid = imported.Succeeded() && imported.m_Model.m_Materials.size() == 2;
+			std::string importDetail = imported.m_Error;
+			if (valid)
+			{
+				const ImportedMaterial& material = imported.m_Model.m_Materials.front();
+				const auto& base = material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::BaseColor)];
+				const auto& normal = material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Normal)];
+				const auto& occlusion = material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Occlusion)];
+				const auto& metallicRoughness = material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::MetallicRoughness)];
+				const auto& emissive = material.m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Emissive)];
+				valid = base.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					base.m_TexCoordIndex == 1 && std::abs(base.m_UVOffset.m_X - 0.2f) < 0.00001f &&
+					std::abs(base.m_UVOffset.m_Y - 0.3f) < 0.00001f &&
+					std::abs(base.m_UVScale.m_X - 2.0f) < 0.00001f &&
+					std::abs(base.m_UVScale.m_Y - 3.0f) < 0.00001f &&
+					std::abs(base.m_UVRotation - 0.5f) < 0.00001f &&
+					normal.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					occlusion.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					metallicRoughness.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					emissive.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					std::abs(metallicRoughness.m_UVOffset.m_X - 0.11f) < 0.00001f &&
+					std::abs(normal.m_UVRotation - 0.25f) < 0.00001f &&
+					std::abs(occlusion.m_UVScale.m_X - 0.8f) < 0.00001f &&
+					std::abs(occlusion.m_UVScale.m_Y + 1.0f) < 0.00001f &&
+					std::abs(emissive.m_UVOffset.m_Y - 0.17f) < 0.00001f &&
+					std::abs(material.m_Properties.m_NormalScale - 0.35f) < 0.00001f &&
+					std::abs(material.m_Properties.m_OcclusionStrength - 0.4f) < 0.00001f;
+				importDetail = std::format("base UV{}, offset=({}, {}), scale=({}, {}), rotation={}, normal={}, occlusion={}",
+					base.m_TexCoordIndex, base.m_UVOffset.m_X, base.m_UVOffset.m_Y,
+					base.m_UVScale.m_X, base.m_UVScale.m_Y, base.m_UVRotation,
+					material.m_Properties.m_NormalScale, material.m_Properties.m_OcclusionStrength);
+			}
+			context.Check(valid, std::format(
+				"Core normal/occlusion inputs and per-texture transform survive import: {}", importDetail));
+
+			writeSource(R"("extensionsUsed":["KHR_texture_transform"],"extensionsRequired":["KHR_texture_transform"],)",
+				R"({"pbrMetallicRoughness":{"baseColorTexture":{"index":0,"extensions":{"KHR_texture_transform":false}}}})");
+			const ModelImportResult invalidTransform = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidTransform.Succeeded() &&
+				invalidTransform.m_Error.find("KHR_texture_transform") != std::string::npos,
+				"Malformed required texture transform is rejected visibly");
+			writeSource(R"("extensionsUsed":["KHR_texture_transform"],"extensionsRequired":["KHR_texture_transform"],)",
+				R"({"pbrMetallicRoughness":{"baseColorTexture":{"index":0,"extensions":{"KHR_texture_transform":{"texCoord":4294967296}}}}})");
+			const ModelImportResult largeTexCoord = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!largeTexCoord.Succeeded() &&
+				largeTexCoord.m_Error.find("TEXCOORD") != std::string::npos,
+				"Out-of-range UV override cannot wrap into a supported TEXCOORD set");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.3,0.4,1]},"extensions":{"KHR_materials_ior":{"ior":1.7}}})");
+			const ModelImportResult optional = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(optional.Succeeded(),
+				"Unsupported optional material extension keeps the core glTF fallback");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],"extensionsRequired":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":1.7}}})");
+			const ModelImportResult required = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!required.Succeeded() &&
+				required.m_Error.find("KHR_materials_ior") != std::string::npos,
+				"Unsupported required material extension is rejected visibly");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy","KHR_materials_sheen"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}},"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0},"sheenRoughnessTexture":{"index":0}}}})");
+			Assimp::Importer assimp;
+			const aiScene* extensionScene = assimp.ReadFile((root / "probe.gltf").string(), 0);
+			bool extensionFactors = extensionScene && extensionScene->mNumMaterials > 0;
+			bool extensionTextures = extensionFactors;
+			if (extensionFactors)
+			{
+				const aiMaterial* source = extensionScene->mMaterials[0];
+				float ior = 0.0f;
+				float coat = 0.0f;
+				float coatRoughness = 0.0f;
+				float anisotropy = 0.0f;
+				float rotation = 0.0f;
+				float sheenRoughness = 0.0f;
+				float coatNormalScale = 0.0f;
+				aiColor4D sheenColor{};
+				extensionFactors = source->Get(AI_MATKEY_REFRACTI, ior) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_CLEARCOAT_FACTOR, coat) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_CLEARCOAT_ROUGHNESS_FACTOR, coatRoughness) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_ANISOTROPY_FACTOR, anisotropy) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_ANISOTROPY_ROTATION, rotation) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_SHEEN_COLOR_FACTOR, sheenColor) == aiReturn_SUCCESS &&
+					source->Get(AI_MATKEY_SHEEN_ROUGHNESS_FACTOR, sheenRoughness) == aiReturn_SUCCESS &&
+					std::abs(ior - 1.7f) < 0.0001f && std::abs(coat - 0.6f) < 0.0001f &&
+					std::abs(coatRoughness - 0.25f) < 0.0001f &&
+					std::abs(anisotropy - 0.75f) < 0.0001f &&
+					std::abs(rotation - 0.4f) < 0.0001f &&
+					std::abs(sheenColor.r - 0.2f) < 0.0001f &&
+					std::abs(sheenRoughness - 0.7f) < 0.0001f;
+				extensionTextures = source->GetTextureCount(aiTextureType_CLEARCOAT) == 3 &&
+					source->GetTextureCount(aiTextureType_ANISOTROPY) == 1 &&
+					source->GetTextureCount(aiTextureType_SHEEN) == 2 &&
+					source->Get(AI_MATKEY_GLTF_TEXTURE_SCALE(aiTextureType_CLEARCOAT, 2),
+						coatNormalScale) == aiReturn_SUCCESS &&
+					std::abs(coatNormalScale - 0.8f) < 0.0001f;
+			}
+			context.Check(extensionFactors,
+				"Pinned Assimp exposes IOR, clearcoat, anisotropy and sheen factors");
+			context.Check(extensionTextures,
+				"Pinned Assimp exposes targeted lobe texture slots and coat normal scale");
+
+			std::filesystem::remove(root / "probe.gltf", errorCode);
+			std::filesystem::remove(root / "probe.bin", errorCode);
+			std::filesystem::remove(root, errorCode);
+		}
+
+		void RunMaterialUVTransformTests(SelfTestContext& context) noexcept
+		{
+			const MaterialTextureBinding identity{};
+			const MaterialUVTransformRows identityRows = EncodeMaterialUVTransform(identity);
+			context.Check(identityRows.m_U.m_X == 1.0f && identityRows.m_U.m_Y == 0.0f &&
+				identityRows.m_U.m_Z == 0.0f && identityRows.m_V.m_X == 0.0f &&
+				identityRows.m_V.m_Y == 1.0f && identityRows.m_V.m_Z == 0.0f,
+				"Default material UV transform preserves authored texture coordinates");
+
+			MaterialTextureBinding binding{};
+			binding.m_UVOffset = Vector2(0.1f, 0.2f);
+			binding.m_UVScale = Vector2(2.0f, 3.0f);
+			binding.m_UVRotation = std::numbers::pi_v<float> * 0.5f;
+			const MaterialUVTransformRows rows = EncodeMaterialUVTransform(binding);
+			const Vector2 uv(0.25f, 0.75f);
+			const Vector2 transformed(rows.m_U.m_X * uv.m_X + rows.m_U.m_Y * uv.m_Y +
+				rows.m_U.m_Z, rows.m_V.m_X * uv.m_X + rows.m_V.m_Y * uv.m_Y + rows.m_V.m_Z);
+			context.Check(std::abs(transformed.m_X + 2.15f) < 0.00001f &&
+				std::abs(transformed.m_Y - 0.7f) < 0.00001f,
+				"GPU UV rows implement glTF offset + rotation * scale * selected UV");
+		}
+
 		void RunModelImportArtifactTests(SelfTestContext& context) noexcept
 		{
 			{
@@ -1106,6 +1286,39 @@ namespace gglab
 				changedSource->m_ContentDigest != artifact->m_ContentDigest,
 				"Model artifact identity includes the resolved texture derived-data key");
 			changedSource.reset();
+
+			auto materialFixture = []() noexcept
+			{
+				ImportedModel model = MakeModelImportFixture();
+				model.m_Materials.emplace_back();
+				model.m_Materials.front().m_TextureBindings[0].m_TextureIndex = 0;
+				return model;
+			};
+			ModelImportArtifactHandle materialBaseline = CreateModelImportArtifact(
+				materialFixture(), MakeResolvedModelTextureFixture(), textureCache);
+			bool materialDigestValid = materialBaseline && materialBaseline->IsValid();
+			for (uint32_t variant = 0; variant < 6; ++variant)
+			{
+				ImportedModel changed = materialFixture();
+				auto& binding = changed.m_Materials.front().m_TextureBindings[0];
+				switch (variant)
+				{
+				case 0: binding.m_UVOffset.m_X = 0.25f; break;
+				case 1: binding.m_UVScale.m_Y = 2.0f; break;
+				case 2: binding.m_UVRotation = 0.5f; break;
+				case 3: binding.m_TexCoordIndex = 1; break;
+				case 4: changed.m_Materials.front().m_Properties.m_NormalScale = 0.5f; break;
+				case 5: changed.m_Materials.front().m_Properties.m_OcclusionStrength = 0.5f; break;
+				default: break;
+				}
+				const ModelImportArtifactHandle changedArtifact = CreateModelImportArtifact(
+				std::move(changed), MakeResolvedModelTextureFixture(), textureCache);
+				materialDigestValid &= changedArtifact && materialBaseline &&
+					changedArtifact->m_ContentDigest != materialBaseline->m_ContentDigest;
+			}
+			context.Check(materialDigestValid,
+				"Material artifact digest tracks UV transform, UV set and core glTF factors");
+			materialBaseline.reset();
 
 			const uint64_t textureBytes =
 				artifact ? artifact->m_Textures.front().m_Artifact->GetAllocatedBytes() : 0;
@@ -1557,6 +1770,8 @@ namespace gglab
 		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
 		RunGltfTangentImportTests(context);
+		RunGltfMaterialImportTests(context);
+		RunMaterialUVTransformTests(context);
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
 		RunIBLCacheControlTests(context);

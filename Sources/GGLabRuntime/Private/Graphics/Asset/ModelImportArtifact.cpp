@@ -89,6 +89,11 @@ namespace gglab
 			writer.U32(binding.m_TextureId.Value());
 			writer.U32(binding.m_SamplerId.Value());
 			writer.U32(binding.m_TexCoordIndex);
+			writer.Float(binding.m_UVOffset.m_X);
+			writer.Float(binding.m_UVOffset.m_Y);
+			writer.Float(binding.m_UVScale.m_X);
+			writer.Float(binding.m_UVScale.m_Y);
+			writer.Float(binding.m_UVRotation);
 		}
 
 		void AddMaterialProperties(
@@ -193,6 +198,11 @@ namespace gglab
 				writer.U32(binding.m_TextureIndex);
 				AddSampler(writer, binding.m_SamplerKey);
 				writer.U32(binding.m_TexCoordIndex);
+				writer.Float(binding.m_UVOffset.m_X);
+				writer.Float(binding.m_UVOffset.m_Y);
+				writer.Float(binding.m_UVScale.m_X);
+				writer.Float(binding.m_UVScale.m_Y);
+				writer.Float(binding.m_UVRotation);
 			}
 		}
 

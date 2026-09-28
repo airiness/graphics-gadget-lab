@@ -2306,11 +2306,18 @@ namespace gglab
 			const ShaderCompileResult velocityOpaqueSpirV = compiler.Compile(desc);
 			desc.m_Entry = L"PSVelocityAlphaTest";
 			const ShaderCompileResult velocityAlphaSpirV = compiler.Compile(desc);
+			desc.m_SourcePath = L"Passes/PassDirectionalShadowMap.hlsl";
+			desc.m_Entry = L"PSMain";
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult shadowAlphaDxil = compiler.Compile(desc);
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult shadowAlphaSpirV = compiler.Compile(desc);
 			context.Check(coverageVertexDxil.IsSuccess() && depthAlphaDxil.IsSuccess() &&
 				velocityOpaqueDxil.IsSuccess() && velocityAlphaDxil.IsSuccess() &&
 				coverageVertexSpirV.IsSuccess() && depthAlphaSpirV.IsSuccess() &&
-				velocityOpaqueSpirV.IsSuccess() && velocityAlphaSpirV.IsSuccess(),
-				"DXIL and SPIR-V compile one shared coverage vertex program and matching opaque/alpha velocity pixels");
+				velocityOpaqueSpirV.IsSuccess() && velocityAlphaSpirV.IsSuccess() &&
+				shadowAlphaDxil.IsSuccess() && shadowAlphaSpirV.IsSuccess(),
+				"DXIL and SPIR-V compile shared depth, velocity and shadow alpha coverage");
 
 			desc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
@@ -2441,11 +2448,81 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
 			desc.m_Defines.clear();
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			desc.m_Target.m_Flags = ShaderCompileFlags::Debug | ShaderCompileFlags::Optimization;
 			const ShaderCompileResult surfaceContractArtifact =
 				compiler.Compile(desc);
 			context.Check(surfaceContractArtifact.IsSuccess(),
 				"Production DXC compiles the Forward PBR surface evaluation "
 				"contract with runtime MaterialData input");
+			std::string materialDisassembly;
+			const bool materialDxilDisassembled = surfaceContractArtifact.IsSuccess() &&
+				DisassembleDxil(surfaceContractArtifact.m_Artifact.m_Binary, materialDisassembly);
+			const size_t materialStart = materialDisassembly.find("struct struct.MaterialData");
+			const size_t materialEnd = materialDisassembly.find("} $Element;", materialStart);
+			const size_t materialLineEnd = materialDisassembly.find('\n', materialEnd);
+			const std::string_view materialLayout =
+				materialStart != std::string::npos && materialEnd != std::string::npos &&
+				materialLineEnd != std::string::npos
+				? std::string_view(materialDisassembly).substr(materialStart,
+					materialLineEnd - materialStart)
+				: std::string_view{};
+			const std::array materialMembers{
+				GPUAbiMember{ "BaseColorBinding", offsetof(MaterialGPU, BaseColorBinding) },
+				GPUAbiMember{ "EmissiveBinding", offsetof(MaterialGPU, EmissiveBinding) },
+				GPUAbiMember{ "MetallicRoughnessBinding", offsetof(MaterialGPU, MetallicRoughnessBinding) },
+				GPUAbiMember{ "NormalBinding", offsetof(MaterialGPU, NormalBinding) },
+				GPUAbiMember{ "OcclusionBinding", offsetof(MaterialGPU, OcclusionBinding) },
+				GPUAbiMember{ "BaseColorFactor", offsetof(MaterialGPU, BaseColorFactor) },
+				GPUAbiMember{ "EmissiveColorFactor", offsetof(MaterialGPU, EmissiveColorFactor) },
+				GPUAbiMember{ "MetallicFactor", offsetof(MaterialGPU, MetallicFactor) },
+				GPUAbiMember{ "RoughnessFactor", offsetof(MaterialGPU, RoughnessFactor) },
+				GPUAbiMember{ "NormalScale", offsetof(MaterialGPU, NormalScale) },
+				GPUAbiMember{ "OcclusionStrength", offsetof(MaterialGPU, OcclusionStrength) },
+				GPUAbiMember{ "AlphaMode", offsetof(MaterialGPU, AlphaMode) },
+				GPUAbiMember{ "AlphaCutoff", offsetof(MaterialGPU, AlphaCutoff) },
+				GPUAbiMember{ "Flags", offsetof(MaterialGPU, Flags) },
+				GPUAbiMember{ "DebugView", offsetof(MaterialGPU, DebugView) },
+			};
+			bool dxilMaterialLayoutMatches = materialDxilDisassembled && !materialLayout.empty() &&
+				ParseUnsignedAfter(materialLayout, "Size:") == sizeof(MaterialGPU);
+			std::string materialMismatch;
+			for (const GPUAbiMember& member : materialMembers)
+			{
+				const auto actual = FindDxilMemberOffset(materialLayout, member.m_Name);
+				if (actual != member.m_Offset)
+				{
+					dxilMaterialLayoutMatches = false;
+					materialMismatch += std::format(" {}:{}->{},", member.m_Name,
+						member.m_Offset, actual.value_or(9999));
+				}
+			}
+			context.Check(dxilMaterialLayoutMatches, std::format(
+				"DXIL MaterialData offsets and stride match MaterialGPU (size={}, mismatch={})",
+				ParseUnsignedAfter(materialLayout, "Size:").value_or(0), materialMismatch));
+
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const ShaderCompileResult surfaceContractSpirV = compiler.Compile(desc);
+			SpirVDecorationReflection materialReflection;
+			const bool reflectedMaterial = surfaceContractSpirV.IsSuccess() &&
+				ReadSpirVDecorations(surfaceContractSpirV.m_Artifact.m_Binary, materialReflection);
+			const SpirVStructLayoutReflection* spirVMaterial = reflectedMaterial
+				? materialReflection.FindStructLayout("MaterialData") : nullptr;
+			bool spirVMaterialLayoutMatches = spirVMaterial &&
+				spirVMaterial->m_ArrayStride == sizeof(MaterialGPU) &&
+				spirVMaterial->m_Members.size() == materialMembers.size();
+			if (spirVMaterialLayoutMatches)
+			{
+				for (size_t index = 0; index < materialMembers.size(); ++index)
+				{
+					spirVMaterialLayoutMatches &=
+						spirVMaterial->m_Members[index].m_Name == materialMembers[index].m_Name &&
+						spirVMaterial->m_Members[index].m_Offset == materialMembers[index].m_Offset;
+				}
+			}
+			context.Check(spirVMaterialLayoutMatches,
+				"SPIR-V MaterialData member offsets and ArrayStride match MaterialGPU");
+			desc.m_Target = {};
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
 			desc.m_Stage = ShaderStage::Compute;

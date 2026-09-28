@@ -38,6 +38,9 @@ namespace gglab
 		uint32_t m_TextureIndex = InvalidTextureIndex;
 		SamplerKey m_SamplerKey{};
 		uint32_t m_TexCoordIndex = 0;
+		Vector2 m_UVOffset{ 0.0f, 0.0f };
+		Vector2 m_UVScale{ 1.0f, 1.0f };
+		float m_UVRotation = 0.0f;
 	};
 
 	struct ImportedMaterial

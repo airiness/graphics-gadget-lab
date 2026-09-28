@@ -117,7 +117,12 @@ namespace gglab
 		TextureSamplerBindingGPU TextureSamplerBinding;
 		uint32_t TexCoordIndex;
 		uint32_t Padding;
+		Vector4 UVTransformU;
+		Vector4 UVTransformV;
 	};
+	static_assert(sizeof(MaterialTextureBindingGPU) == 48);
+	static_assert(offsetof(MaterialTextureBindingGPU, UVTransformU) == 16);
+	static_assert(offsetof(MaterialTextureBindingGPU, UVTransformV) == 32);
 
 	struct MaterialGPU
 	{
@@ -140,7 +145,9 @@ namespace gglab
 		uint32_t Flags; // bit 0: doubleSided
 		uint32_t DebugView;
 	};
-	static_assert(sizeof(MaterialGPU) == 144);
+	static_assert(sizeof(MaterialGPU) == 304);
+	static_assert(offsetof(MaterialGPU, BaseColorFactor) == 240);
+	static_assert(offsetof(MaterialGPU, NormalScale) == 280);
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 

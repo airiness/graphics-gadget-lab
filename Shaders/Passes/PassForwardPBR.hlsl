@@ -105,6 +105,10 @@ static const uint MaterialDebugViewBaseColor = 1u;
 static const uint MaterialDebugViewMetallic = 2u;
 static const uint MaterialDebugViewRoughness = 3u;
 static const uint MaterialDebugViewNormal = 4u;
+static const uint MaterialDebugViewAuthoredRoughness = 5u;
+static const uint MaterialDebugViewEffectiveRoughness = 6u;
+static const uint MaterialDebugViewF0 = 7u;
+static const uint MaterialDebugViewFeatureFlags = 8u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -145,9 +149,16 @@ float3 SampleNormalWS(
 	// rebuild z, avoid normalization issues
 	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
 
-	// Build TBN matrix
-	float3x3 TBN = BuildTBNFromTangent(
-		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)), tangentWS, positionWS, uv);
+	// Authored tangents describe UV0. A different UV set or a transformed normal
+	// map needs a frame derived from the actual sampled coordinates, including
+	// rotations and mirrored scales.
+	const MaterialTextureBindingData binding = matData.NormalBinding;
+	const bool transformedFrame = binding.TexCoordIndex != 0u ||
+		any(abs(binding.UVTransformU.xy - float2(1.0, 0.0)) > 1.0e-6) ||
+		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
+	float3x3 TBN = transformedFrame
+		? BuildTBN(normalWS, positionWS, uv)
+		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
 
 	// Transform normal from tangent space to world space
 	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled.xyz, TBN), TBN[2]);
@@ -164,6 +175,19 @@ float FilterPerceptualRoughness(float perceptualRoughness, float3 normalWS)
 	float kernelAlpha = min(2.0 * normalVariance, 0.18);
 	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
 	return sqrt(saturate(alpha + kernelAlpha));
+}
+
+BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
+{
+	BaseShadingState state;
+	state.NormalWS = normalWS;
+	state.AuthoredPerceptualRoughness = surface.Roughness;
+	state.EffectivePerceptualRoughness = FilterPerceptualRoughness(
+		ClampPerceptualRoughnessForBRDF(surface.Roughness), normalWS);
+	state.BRDFAlpha = PerceptualRoughnessToAlpha(state.EffectivePerceptualRoughness);
+	state.F0 = lerp(0.04.xxx, surface.BaseColor, surface.Metallic);
+	state.FeatureFlags = 0u;
+	return state;
 }
 
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
@@ -525,7 +549,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// Metallic and Roughness (linear, resolved by the surface seam;
 	// B=metallic, G=roughness)
 	const float metallic = surface.Metallic;
-	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(surface.Roughness);
+	const float authoredRoughness = surface.Roughness;
 
 	// Normal (linear)
 	float3 normalWS = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0));
@@ -536,6 +560,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	}
 	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
 	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
+	const BaseShadingState shading = BuildBaseShadingState(surface, N);
+	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
 
 	if (matData.DebugView == MaterialDebugViewBaseColor)
 	{
@@ -557,16 +583,38 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 normalColor = float4(N * 0.5 + 0.5, alpha);
 		return MakeForwardPBRPixelOutput(normalColor, normalColor, 0.0.xxxx);
 	}
-	perceptualRoughness = FilterPerceptualRoughness(perceptualRoughness, N);
+	if (matData.DebugView == MaterialDebugViewAuthoredRoughness)
+	{
+		const float4 color = float4(shading.AuthoredPerceptualRoughness.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewEffectiveRoughness)
+	{
+		const float4 color = float4(shading.EffectivePerceptualRoughness.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewF0)
+	{
+		const float4 color = float4(shading.F0, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewFeatureFlags)
+	{
+		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
+			(shading.FeatureFlags & 2u) != 0u, (shading.FeatureFlags & 4u) != 0u);
+		const float4 color = float4(enabled, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	perceptualRoughness = shading.EffectivePerceptualRoughness;
 
 	// Shading
 	float3 V = SafeNormalize(viewData.CameraPos.xyz - IN.PositionWS, N); // View direction
 	float NoV = saturate(dot(N, V));
 
 	// convert artistic roughness to physical roughness
-	float a = PerceptualRoughnessToAlpha(perceptualRoughness);
+	float a = shading.BRDFAlpha;
 
-	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
+	float3 F0 = shading.F0; // dielectric F0 is 0.04, metal F0 is baseColor
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
 		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
