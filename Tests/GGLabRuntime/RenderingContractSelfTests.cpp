@@ -1209,11 +1209,6 @@ namespace gglab
 			};
 		}
 
-		void RunSuiteSmokeTests(SelfTestContext& context) noexcept
-		{
-			context.Check(true, "Rendering contract suite executes deterministic checks");
-		}
-
 		void RunOpaqueSceneExtensionContractTests(SelfTestContext& context) noexcept
 		{
 			static_assert(std::is_abstract_v<RenderPipelineSceneExtensionBase>);
@@ -8076,7 +8071,6 @@ namespace gglab
 		RunPostProcessPreviewContractTests(context);
 		RunShadowPreviewContractTests(context);
 		RunEnvironmentLightingSettingsTests(context);
-		RunSuiteSmokeTests(context);
 		RunOpaqueSceneExtensionContractTests(context);
 		RunOverlayExtensionContractTests(context);
 		RunRuntimePathConfigurationContractTests(context);

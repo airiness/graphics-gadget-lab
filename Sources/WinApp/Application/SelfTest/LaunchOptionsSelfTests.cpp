@@ -55,15 +55,9 @@ namespace gglab
 						RHIBackendType::DX12 : RHIBackendType::Vulkan),
 					"Texture contract starts through LabHost on the requested backend");
 			}
-			for (const auto alias : { "texture-contract", "Demo.Playground.TextureContract" })
-			{
-				const std::vector<std::string_view> args = { "--demo", alias };
-				context.Check(!ParseApplicationLaunchOptions(args).IsValid(),
-					"Texture contract has no duplicate standalone Demo entry");
-			}
 		}
 
-		void RunVulkanCliContractTests(SelfTestContext& context) noexcept
+		void RunLaunchOptionContractTests(SelfTestContext& context) noexcept
 		{
 			const auto parse = [](std::initializer_list<std::string_view> arguments)
 				{
@@ -123,17 +117,21 @@ namespace gglab
 					"--rhi dx12 with --list-adapters is a parse error");
 			}
 
-			// Standalone qualification has its own executable and is not a WinApp mode.
-			{
-				const auto result = parse({ "--vulkan-qualification" });
-				context.Check(!result.IsValid(),
-					"WinApp rejects the standalone qualification executable's former option");
-			}
 			{
 				const auto result = parse({ "--self-test", "app-path-composition" });
 				context.Check(result.IsValid() && result.m_Options.m_SelfTestSelection ==
 					"app-path-composition",
 					"Path-composition proof is an explicit self-test exit mode");
+			}
+			{
+				const auto unknownSuite = parse({ "--self-test", "unknown-suite" });
+				const auto interactiveConflict = parse({ "--self-test", "all", "--lab", "gglab.lab.culling" });
+				context.Check(!unknownSuite.IsValid() &&
+					unknownSuite.m_Error.find("Unknown self-test selection") != std::string::npos,
+					"Self-test selection rejects unknown suites");
+				context.Check(!interactiveConflict.IsValid() &&
+					interactiveConflict.m_Error.find("cannot be combined") != std::string::npos,
+					"Self-test selection rejects interactive startup options");
 			}
 			{
 				const auto result = parse({ "--no-devtools" });
@@ -146,21 +144,24 @@ namespace gglab
 				context.Check(!result.IsValid(),
 					"--no-devtools rejects duplicate specification");
 			}
+			{
+				const auto unknownOption = parse({ "--unknown-option" });
+				const auto unknownDemo = parse({ "--demo", "unknown" });
+				context.Check(!unknownOption.IsValid() &&
+					unknownOption.m_Error.find("Unknown option") != std::string::npos,
+					"Launch options reject unknown flags");
+				context.Check(!unknownDemo.IsValid() &&
+					unknownDemo.m_Error.find("Unknown demo") != std::string::npos,
+					"Launch options reject unknown demo names");
+			}
 		}
 
 	}
 
 	void RunLaunchOptionsSelfTests(SelfTestContext& context) noexcept
 	{
-		RunVulkanCliContractTests(context);
+		RunLaunchOptionContractTests(context);
 		RunPlaygroundContentCliContractTests(context);
 		RunTextureContractLabCliTests(context);
-		const std::vector<std::string_view> retiredPreviewOption{
-			"--shader-preview-session", "0123456789abcdef0123456789abcdef" };
-		const ApplicationLaunchParseResult retiredPreviewResult =
-			ParseApplicationLaunchOptions(retiredPreviewOption);
-		context.Check(!retiredPreviewResult.IsValid() &&
-			retiredPreviewResult.m_Error.find("Unknown option") != std::string::npos,
-			"Archived shader editor session option is rejected");
 	}
 }

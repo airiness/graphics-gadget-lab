@@ -45,7 +45,9 @@ namespace gglab
 			"validation-requested qualification requires an active messenger");
 		context.Check(PassesVulkanQualificationValidationGate(true, true, 0, 0),
 			"validation-requested qualification accepts a clean messenger");
-		context.Check(!PassesVulkanQualificationValidationGate(true, true, 1, 1),
-			"validation warnings and errors fail qualification");
+		context.Check(!PassesVulkanQualificationValidationGate(true, true, 1, 0),
+			"validation errors fail qualification");
+		context.Check(!PassesVulkanQualificationValidationGate(true, true, 0, 1),
+			"validation warnings fail qualification");
 	}
 }

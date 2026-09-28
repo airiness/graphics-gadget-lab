@@ -1474,6 +1474,9 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
+			constexpr size_t ExpectedRuntimeProgramCount = 62;
+			const std::string expectedProgramCountField =
+				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
 				L"build-runtime", L"--result-format", L"json",
 			});
@@ -1521,13 +1524,17 @@ namespace gglab
 				first.m_ExitCode == 0 && IsSingleJsonDocument(first) &&
 					first.m_StdOut.find("\"command\":\"build-runtime\"") != std::string::npos &&
 					first.m_StdOut.find("\"success\":true") != std::string::npos &&
-					first.m_StdOut.find("\"programCount\":61") != std::string::npos &&
-					firstRegistryId.size() == 64 && firstActive.IsSuccess() &&
+					first.m_StdOut.find(expectedProgramCountField) != std::string::npos,
+				"build-runtime reports the complete DX12 catalog in JSON");
+			context.Check(firstRegistryId.size() == 64 && firstActive.IsSuccess() &&
 					Sha256DigestToHex(
 						firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) ==
 							firstRegistryId && firstRegistry.IsSuccess() &&
-					firstRegistry.m_Artifact.m_Entries.size() == 61,
-				"build-runtime publishes the complete immutable catalog and active RegistryId");
+					firstRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount &&
+					ResolveShaderProgramRegistryArtifact(firstRegistry.m_Artifact,
+						shader_programs::AerialPerspectiveProbeCompute,
+						ShaderTargetProfile::GGLabDX12).has_value(),
+				"build-runtime activates the complete DX12 registry including the aerial probe");
 
 			std::vector<std::wstring> vulkanArguments = arguments;
 			const auto targetArgument = std::ranges::find(vulkanArguments, L"gglab-dx12");
@@ -1549,10 +1556,14 @@ namespace gglab
 			context.Check(targetArgument != vulkanArguments.end() &&
 				vulkanBuild.m_ExitCode == 0 && IsSingleJsonDocument(vulkanBuild) &&
 				vulkanBuild.m_StdOut.find("\"success\":true") != std::string::npos &&
-				vulkanBuild.m_StdOut.find("\"programCount\":61") != std::string::npos &&
-				vulkanActive.IsSuccess() && vulkanRegistry.IsSuccess() &&
-				vulkanRegistry.m_Artifact.m_Entries.size() == 61,
-				"build-runtime publishes the complete Vulkan 1.3 immutable catalog");
+				vulkanBuild.m_StdOut.find(expectedProgramCountField) != std::string::npos,
+				"build-runtime reports the complete Vulkan 1.3 catalog in JSON");
+			context.Check(vulkanActive.IsSuccess() && vulkanRegistry.IsSuccess() &&
+				vulkanRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount &&
+				ResolveShaderProgramRegistryArtifact(vulkanRegistry.m_Artifact,
+					shader_programs::AerialPerspectiveProbeCompute,
+					ShaderTargetProfile::GGLabVulkan13).has_value(),
+				"build-runtime activates the complete Vulkan 1.3 registry including the aerial probe");
 
 			const CliRunResult second = RunCli(arguments);
 			const ActiveShaderProgramRegistryReadResult secondActive = activeReader.Read();
