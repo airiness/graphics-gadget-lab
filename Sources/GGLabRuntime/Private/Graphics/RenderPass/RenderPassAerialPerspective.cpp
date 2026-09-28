@@ -87,7 +87,9 @@ namespace gglab
 	void RenderPassAerialPerspective::AddPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		if (!context.IsRenderSceneReady() || !context.m_RenderScene.m_Atmosphere ||
+		if (!context.IsRenderSceneReady() ||
+			!context.GetDisplayViewRenderSettings().m_Lighting.m_EnableAerialPerspective ||
+			!context.m_RenderScene.m_Atmosphere ||
 			!context.m_RenderScene.m_WorldSun || !services.m_Atmosphere ||
 			!services.m_Atmosphere->GetConstants().IsValid() || !services.m_Environment)
 		{

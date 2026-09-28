@@ -60,9 +60,12 @@ float3 WorldDirection(float2 uv, ViewData viewData)
 
 float2 AtlasUV(float2 screenUV, uint slice)
 {
-	float2 cell = saturate(screenUV) * float2(g_Pass.GridWidth - 1, g_Pass.GridHeight - 1);
-	return float2((cell.x + 0.5) / g_Pass.GridWidth,
-		(float(slice * g_Pass.GridHeight) + cell.y + 0.5) /
+	// Build rays use (pixel + 0.5) / grid. Preserve that mapping while clamping
+	// to slice-interior texel centers so bilinear filtering cannot cross slices.
+	float2 grid = float2(g_Pass.GridWidth, g_Pass.GridHeight);
+	float2 cell = clamp(saturate(screenUV) * grid, 0.5, grid - 0.5);
+	return float2(cell.x / g_Pass.GridWidth,
+		(float(slice * g_Pass.GridHeight) + cell.y) /
 		float(g_Pass.GridHeight * g_Pass.SliceCount));
 }
 

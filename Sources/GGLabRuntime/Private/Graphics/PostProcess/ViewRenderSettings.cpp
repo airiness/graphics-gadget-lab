@@ -59,6 +59,7 @@ namespace gglab
 				{
 					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,
 					.m_GTAO = gtao,
+					.m_EnableAerialPerspective = profile.m_Lighting.m_EnableAerialPerspective,
 				},
 			.m_PostProcess =
 				{

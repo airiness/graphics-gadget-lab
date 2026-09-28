@@ -168,6 +168,9 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -464,6 +467,9 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Demo\StartDemo.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\AtmosphereRangeReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h">
       <Filter>Application\Lab</Filter>
     </ClInclude>
@@ -492,6 +498,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CoordinateConformanceLabSession.h">

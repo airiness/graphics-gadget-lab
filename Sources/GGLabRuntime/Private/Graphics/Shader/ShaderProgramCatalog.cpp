@@ -13,6 +13,8 @@ namespace gglab::shader_programs
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,
 			TemporalAAReprojectionCompute,
+			AerialPerspectiveBuildCompute,
+			AerialPerspectiveCompositeCompute,
 			ForwardPlusCullCompute,
 			DirectionalShadowMapVertex,
 			DirectionalShadowMapPixel,

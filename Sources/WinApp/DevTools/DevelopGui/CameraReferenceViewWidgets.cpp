@@ -10,7 +10,8 @@ namespace gglab
 {
 	bool ReferenceViewsBelongInLabPanel(const LabSnapshot& lab) noexcept
 	{
-		return lab.m_IsHostActive && lab.m_ActiveLabId.m_Name == "gglab.lab.lighting_contract";
+		return lab.m_IsHostActive && (lab.m_ActiveLabId.m_Name == "gglab.lab.lighting_contract" ||
+			lab.m_ActiveLabId.m_Name == "gglab.lab.atmosphere_range");
 	}
 
 	std::optional<uint64_t> DrawCameraReferenceViews(CameraReferenceViewWidgetState& state,

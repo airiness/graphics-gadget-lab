@@ -70,6 +70,8 @@ namespace gglab
 	{
 		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
+		// Surface transport only; disabling this preserves physical sun, sky and IBL.
+		bool m_EnableAerialPerspective = true;
 	};
 
 	// Authoring settings owned above the renderer by the active Demo or Lab.
@@ -105,6 +107,7 @@ namespace gglab
 	{
 		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
+		bool m_EnableAerialPerspective = true;
 	};
 
 	// Immutable settings resolved for one RenderView and one frame.

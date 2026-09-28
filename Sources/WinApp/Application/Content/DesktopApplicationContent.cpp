@@ -3,6 +3,7 @@
 #include "Application/Demo/DemoPlayground.h"
 #include "Application/Demo/StartDemo.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
+#include "Application/Lab/Sessions/AtmosphereRangeLabSession.h"
 #include "Application/Lab/Sessions/AssetPublicationLabSession.h"
 #include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
@@ -101,6 +102,7 @@ namespace gglab
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },
 			{ LightingContractLabSession::GetDescriptor(), &LightingContractLabSession::Create },
+			{ AtmosphereRangeLabSession::GetDescriptor(), &AtmosphereRangeLabSession::Create },
 			{ PostProcessLabSession::GetDescriptor(), &PostProcessLabSession::Create },
 			{ RenderGraphComputeLabSession::GetDescriptor(),
 				&RenderGraphComputeLabSession::Create,

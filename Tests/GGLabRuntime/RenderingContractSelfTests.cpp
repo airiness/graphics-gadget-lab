@@ -43,6 +43,7 @@
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
+#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
@@ -6801,6 +6802,16 @@ namespace gglab
 				PostProcessPreviewChannel::Atmosphere);
 			registry.RequestPostProcessPreview(PostProcessPreviewChannel::Atmosphere);
 			RenderPassAerialPerspective aerialPass;
+			const auto baselineColor = aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(
+				ViewTargetsTableName).GetViewTargets(RenderViewID::Main).m_SceneColor;
+			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = false;
+			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			context.Check(!aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName) &&
+				aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).
+				GetViewTargets(RenderViewID::Main).m_SceneColor == baselineColor &&
+				activeAtmosphere.GetTexture(0) == newTexture && bakeEnvironment.m_Settings.m_EnableSkybox,
+				"Disabling aerial transport preserves surface scene color, active atmosphere and sky settings");
+			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = true;
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
@@ -7521,6 +7532,14 @@ namespace gglab
 			const Camera camera(Camera::CreateInfo{});
 			const ResolvedViewRenderSettings defaultSettings =
 				ResolveViewRenderSettings(profile, camera);
+			profile.m_Lighting.m_EnableAerialPerspective = false;
+			const auto baselineSettings = ResolveViewRenderSettings(profile, camera);
+			context.Check(defaultSettings.m_Lighting.m_EnableAerialPerspective &&
+				!baselineSettings.m_Lighting.m_EnableAerialPerspective &&
+				baselineSettings.m_Exposure.m_PreExposure == defaultSettings.m_Exposure.m_PreExposure &&
+				baselineSettings.m_Lighting.m_GTAO.m_Enabled == defaultSettings.m_Lighting.m_GTAO.m_Enabled &&
+				baselineSettings.m_TemporalAA.m_Enabled == defaultSettings.m_TemporalAA.m_Enabled,
+				"Aerial baseline switch resolves independently of exposure, AO and TAA");
 			profile.m_TemporalAA.m_Enabled = true;
 			const ResolvedViewRenderSettings enabledSettings =
 				ResolveViewRenderSettings(profile, camera);
