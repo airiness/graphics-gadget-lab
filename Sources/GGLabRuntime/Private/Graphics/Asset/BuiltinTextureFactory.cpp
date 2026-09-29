@@ -86,7 +86,7 @@ namespace gglab
 	std::vector<BuiltinTextureAsset> BuiltinTextureFactory::BuildBootstrapTextures() noexcept
 	{
 		std::vector<BuiltinTextureAsset> textures;
-		textures.reserve(9);
+		textures.reserve(10);
 
 		const auto addGeneratedTexture =
 			[&textures](ReservedTextureIDIndex id, std::string_view name, TextureSemantic semantic,
@@ -136,6 +136,10 @@ namespace gglab
 		addGeneratedTexture(ReservedTextureIDIndex::EmissiveWhite, "EmissiveWhite",
 			TextureSemantic::Emissive, 1, 1,
 			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 255, 255, 255 }; });
+
+		addGeneratedTexture(ReservedTextureIDIndex::AnisotropyDefault, "AnisotropyDefault",
+			TextureSemantic::Anisotropy, 1, 1,
+			[](uint32_t, uint32_t) -> std::array<uint8_t, 4> { return { 255, 128, 255, 255 }; });
 
 		addGeneratedTexture(ReservedTextureIDIndex::ErrorRed, "ErrorRed",
 			TextureSemantic::BaseColor, 1, 1,

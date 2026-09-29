@@ -113,6 +113,9 @@ static const uint MaterialDebugViewIor = 9u;
 static const uint MaterialDebugViewClearcoatFactor = 10u;
 static const uint MaterialDebugViewClearcoatRoughness = 11u;
 static const uint MaterialDebugViewClearcoatNormal = 12u;
+static const uint MaterialDebugViewAnisotropyStrength = 13u;
+static const uint MaterialDebugViewAnisotropyDirectionTangent = 14u;
+static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -197,6 +200,36 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 	{
 		state.FeatureFlags |= 1u;
 	}
+	if (surface.AnisotropyStrength > 0.0)
+	{
+		state.FeatureFlags |= 2u;
+	}
+	return state;
+}
+
+AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 normalWS,
+	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 uv0, float baseAlpha)
+{
+	AnisotropyShadingState state;
+	state.Strength = surface.AnisotropyStrength;
+	state.TangentWS = 0.0.xxx;
+	state.BitangentWS = 0.0.xxx;
+	state.AlphaT = baseAlpha;
+	state.AlphaB = baseAlpha;
+	if (state.Strength <= 0.0) return state;
+
+	const float3x3 frame = BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv0);
+	const float2 direction = surface.AnisotropyDirectionTS;
+	const float3 tangent = frame[0] * direction.x + frame[1] * direction.y;
+	const float3 projected = tangent - shadingNormalWS * dot(shadingNormalWS, tangent);
+	const float3 fallbackTangent = SafeNormalize(cross(frame[1], shadingNormalWS), frame[0]);
+	state.TangentWS = SafeNormalize(projected, fallbackTangent);
+	const float handedness = dot(cross(frame[0], frame[1]), normalWS) < 0.0 ? -1.0 : 1.0;
+	state.BitangentWS = SafeNormalize(cross(shadingNormalWS, state.TangentWS), frame[1]) * handedness;
+	// Opposing widths preserve the base alpha until the BRDF width limits apply.
+	const float aspect = sqrt(1.0 - 0.9 * state.Strength);
+	state.AlphaT = clamp(baseAlpha / aspect, MIN_PERCEPTUAL_ROUGHNESS * MIN_PERCEPTUAL_ROUGHNESS, 1.0);
+	state.AlphaB = max(baseAlpha * aspect, MIN_PERCEPTUAL_ROUGHNESS * MIN_PERCEPTUAL_ROUGHNESS);
 	return state;
 }
 
@@ -229,6 +262,22 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCubeLevel(binding, direction, lod).rgb *
 		   g_Scene.IBLResource.EnvironmentIntensity;
+}
+
+float3 SampleAnisotropicIBL(float3 reflectWS, AnisotropyShadingState anisotropy)
+{
+	// The environment is prefiltered isotropically. Three normalized taps at the
+	// minor-axis mip approximate the elongated major-axis reflection footprint.
+	const float3 axis = anisotropy.TangentWS - reflectWS * dot(anisotropy.TangentWS, reflectWS);
+	const float3 majorDirection = SafeNormalize(axis, anisotropy.TangentWS);
+	const float spread = 0.5 * max(anisotropy.AlphaT - anisotropy.AlphaB, 0.0);
+	const float minorRoughness = sqrt(anisotropy.AlphaB);
+	const float3 center = SampleIBLPrefilteredSpecular(reflectWS, minorRoughness);
+	const float3 positive = SampleIBLPrefilteredSpecular(
+		SafeNormalize(reflectWS + majorDirection * spread, reflectWS), minorRoughness);
+	const float3 negative = SampleIBLPrefilteredSpecular(
+		SafeNormalize(reflectWS - majorDirection * spread, reflectWS), minorRoughness);
+	return 0.5 * center + 0.25 * (positive + negative);
 }
 
 float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
@@ -426,6 +475,37 @@ float3 WorldSunDiskSpecular(float3 centerDirection, float3 N, float3 V, float3 F
 	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
 }
 
+float3 WorldSunDiskAnisotropicSpecular(float3 centerDirection, float3 N, float3 V,
+	float3 F0, AnisotropyShadingState anisotropy)
+{
+	const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
+	const float sineRadiusSquared = sineRadius * sineRadius;
+	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
+		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
+	const float3 bitangent = cross(centerDirection, tangent);
+	float3 integrated = 0.0.xxx;
+	[unroll]
+	for (uint sampleIndex = 0; sampleIndex < 32u; ++sampleIndex)
+	{
+		const float radial = sqrt((sampleIndex + 0.5) / 32.0 * sineRadiusSquared);
+		const float phase = sampleIndex * 2.39996322973;
+		const float3 L = centerDirection * sqrt(1.0 - radial * radial) +
+			(tangent * cos(phase) + bitangent * sin(phase)) * radial;
+		const float NoL = saturate(dot(N, L));
+		const float3 H = SafeNormalize(L + V, N);
+		const float VoH = saturate(dot(V, H));
+		integrated += D_GGXAnisotropic(H, N, anisotropy.TangentWS,
+			anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB) *
+			V_SmithGGXCorrelatedAnisotropic(V, L, N, anisotropy.TangentWS,
+				anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB) *
+			F_Schlick(F0, 1.0.xxx, VoH) * NoL;
+	}
+	// The same 32 solid-angle samples and perpendicular-illuminance normalization
+	// as the isotropic world-sun lobe keep the two paths comparable.
+	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
+}
+
 float3 EvaluateClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
 	bool worldSun)
 {
@@ -448,7 +528,7 @@ float3 EvaluateClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
 
 float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, ClearcoatShadingState coat)
+	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
 {
 	const LightData light = g_Lights[lightIndex];
 	float3 L = 0.0.xxx;
@@ -467,8 +547,20 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	const float3 H = SafeNormalize(L + V, N);
 	const float NoH = saturate(dot(N, H));
 	const float VoH = saturate(dot(V, H));
-	const float D = D_GGX(NoH, physicalRoughness);
-	const float visibility = V_SmithGGXCorrelated(NoV, NoL, physicalRoughness);
+	float D;
+	float visibility;
+	if (anisotropy.Strength > 0.0)
+	{
+		D = D_GGXAnisotropic(H, N, anisotropy.TangentWS,
+			anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB);
+		visibility = V_SmithGGXCorrelatedAnisotropic(V, L, N,
+			anisotropy.TangentWS, anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB);
+	}
+	else
+	{
+		D = D_GGX(NoH, physicalRoughness);
+		visibility = V_SmithGGXCorrelated(NoV, NoL, physicalRoughness);
+	}
 	const float3 F = F_Schlick(F0, 1.0.xxx, VoH);
 	const float3 specular = D * visibility * F * energyCompensation;
 	const float3 diffuse = diffuseWeight * Fd_Lambert(baseColor);
@@ -487,12 +579,15 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 		illuminance *= WorldSunTransmittance(positionWS, L);
 	}
 	float3 directResponse = (diffuse + specular) * NoL;
-	// Above perceptual roughness 0.2, the center approximation stayed within 1%
-	// over 0-60 degree incidence and offsets up to two solar radii from reflection.
-	if (lightIndex == g_Scene.WorldSunLightIndex && physicalRoughness < 0.04)
+	// The isotropic center approximation stayed within 1% above perceptual
+	// roughness 0.2. The anisotropic lobe uses its narrower width for the disk gate.
+	if (lightIndex == g_Scene.WorldSunLightIndex &&
+		(anisotropy.Strength > 0.0 ? anisotropy.AlphaB : physicalRoughness) < 0.04)
 	{
-		directResponse = diffuse * NoL +
-			WorldSunDiskSpecular(L, N, V, F0, physicalRoughness) * energyCompensation;
+		const float3 diskSpecular = anisotropy.Strength > 0.0
+			? WorldSunDiskAnisotropicSpecular(L, N, V, F0, anisotropy)
+			: WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
+		directResponse = diffuse * NoL + diskSpecular * energyCompensation;
 	}
 	if (coat.Factor > 0.0)
 	{
@@ -511,14 +606,14 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 
 float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, ClearcoatShadingState coat)
+	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
 	}
 	return lighting;
 }
@@ -532,7 +627,8 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 
 float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
 	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor,
-	float3 diffuseWeight, float3 energyCompensation, ClearcoatShadingState coat)
+	float3 diffuseWeight, float3 energyCompensation, AnisotropyShadingState anisotropy,
+	ClearcoatShadingState coat)
 {
 	float3 lighting = 0.0.xxx;
 	const uint globalLightCount = min(
@@ -544,7 +640,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
 			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-				physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
+				physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
 		}
 	}
 
@@ -566,7 +662,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			continue;
 		}
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
 	}
 	return lighting;
 }
@@ -617,6 +713,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 			matData.ClearcoatNormalScale, normalWS, tangentWS, IN.PositionWS, clearcoatUV);
 	}
 	const BaseShadingState shading = BuildBaseShadingState(surface, N);
+	const AnisotropyShadingState anisotropy = BuildAnisotropyShadingState(surface,
+		normalWS, N, tangentWS, IN.PositionWS, IN.UV0, shading.BRDFAlpha);
 	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
 
 	if (matData.DebugView == MaterialDebugViewBaseColor)
@@ -676,6 +774,22 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(clearcoatNormalWS * 0.5 + 0.5, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewAnisotropyStrength)
+	{
+		const float4 color = float4(surface.AnisotropyStrength.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewAnisotropyDirectionTangent)
+	{
+		const float2 direction = surface.AnisotropyDirectionTS * 0.5 + 0.5;
+		const float4 color = float4(direction, 0.5, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld)
+	{
+		const float4 color = float4(anisotropy.TangentWS * 0.5 + 0.5, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewFeatureFlags)
 	{
 		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
@@ -693,6 +807,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float a = shading.BRDFAlpha;
 
 	float3 F0 = shading.F0;
+	// The isotropic split-sum LUT estimates directional energy for the
+	// anisotropic lobe using its unmodified base roughness.
 	const float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
 	const float3 energyCompensation = GGXEnergyCompensation(F0, brdfLUT);
 	const float3 specularDirectionalAlbedo =
@@ -721,17 +837,17 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
 		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight,
-		energyCompensation, coat);
+		energyCompensation, anisotropy, coat);
 #else
 	const float3 directLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, coat);
+			diffuseWeight, energyCompensation, anisotropy, coat);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	const float3 legacyDirectLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, coat);
+			diffuseWeight, energyCompensation, anisotropy, coat);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
@@ -741,7 +857,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseWeight * Fd_Lambert(baseColor);
 
 	float3 reflectWS = reflect(-V, N);
-	float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
+	float3 prefilteredEnv = anisotropy.Strength > 0.0
+		? SampleAnisotropicIBL(reflectWS, anisotropy)
+		: SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
 	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
 	if (coat.Factor > 0.0)
 	{

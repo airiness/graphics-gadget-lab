@@ -60,6 +60,8 @@ namespace gglab
 			case MaterialTextureSlot::ClearcoatRoughness:
 			case MaterialTextureSlot::ClearcoatNormal:
 				return aiTextureType_CLEARCOAT;
+			case MaterialTextureSlot::Anisotropy:
+				return aiTextureType_ANISOTROPY;
 			default:
 				return aiTextureType_NONE;
 			}
@@ -114,6 +116,15 @@ namespace gglab
 							? "clearcoatTexture" : slot == MaterialTextureSlot::ClearcoatRoughness
 								? "clearcoatRoughnessTexture" : "clearcoatNormalTexture";
 						return FindObjectField(*coat, name);
+					}
+				}
+				break;
+			case MaterialTextureSlot::Anisotropy:
+				if (const Json* extensions = FindObjectField(material, "extensions"))
+				{
+					if (const Json* anisotropy = FindObjectField(*extensions, "KHR_materials_anisotropy"))
+					{
+						return FindObjectField(*anisotropy, "anisotropyTexture");
 					}
 				}
 				break;
@@ -397,7 +408,8 @@ namespace gglab
 				}
 				const std::string name = entry.get<std::string>();
 				if (!name.starts_with("KHR_materials_")) continue;
-				if (name == "KHR_materials_ior" || name == "KHR_materials_clearcoat") continue;
+				if (name == "KHR_materials_ior" || name == "KHR_materials_clearcoat" ||
+					name == "KHR_materials_anisotropy") continue;
 				if (std::string_view(field) == "extensionsRequired")
 				{
 					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
@@ -518,12 +530,14 @@ namespace gglab
 				if (source->GetTexture(textureType, textureIndex, &texturePath, &mapping, &uvIndex, &blend,
 					&operation, mapMode) != aiReturn_SUCCESS)
 				{
-					if (textureType == aiTextureType_CLEARCOAT && sourceMaterials &&
+					if ((textureType == aiTextureType_CLEARCOAT ||
+						textureType == aiTextureType_ANISOTROPY) && sourceMaterials &&
 						materialIndex < sourceMaterials->size() &&
-						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot) &&
-						source->Get(AI_MATKEY_CLEARCOAT_FACTOR, blend) == aiReturn_SUCCESS)
+						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot))
 					{
-						result.m_Error = "Assimp did not preserve a clearcoat texture binding.";
+						result.m_Error = std::format(
+							"Assimp did not preserve a {} texture binding.",
+							textureType == aiTextureType_CLEARCOAT ? "clearcoat" : "anisotropy");
 						return result;
 					}
 					continue;
@@ -580,6 +594,58 @@ namespace gglab
 				}
 				if (const Json* extensions = FindObjectField(material, "extensions"))
 				{
+					const auto anisotropyExtension = extensions->find("KHR_materials_anisotropy");
+					if (anisotropyExtension != extensions->end())
+					{
+						if (!anisotropyExtension->is_object())
+						{
+							result.m_Error = "KHR_materials_anisotropy must be an object.";
+							return result;
+						}
+						const auto strength = anisotropyExtension->find("anisotropyStrength");
+						if (strength != anisotropyExtension->end())
+						{
+							if (!strength->is_number() || !std::isfinite(strength->get<float>()) ||
+								strength->get<float>() < 0.0f || strength->get<float>() > 1.0f)
+							{
+								result.m_Error = "KHR_materials_anisotropy.anisotropyStrength must be in [0, 1].";
+								return result;
+							}
+							destination.m_Properties.m_AnisotropyStrength = strength->get<float>();
+						}
+						const auto rotation = anisotropyExtension->find("anisotropyRotation");
+						if (rotation != anisotropyExtension->end())
+						{
+							if (!rotation->is_number() || !std::isfinite(rotation->get<float>()))
+							{
+								result.m_Error = "KHR_materials_anisotropy.anisotropyRotation must be finite.";
+								return result;
+							}
+							destination.m_Properties.m_AnisotropyRotation = rotation->get<float>();
+						}
+						const auto texture = anisotropyExtension->find("anisotropyTexture");
+						if (texture != anisotropyExtension->end())
+						{
+							const auto index = texture->is_object()
+								? texture->find("index") : Json::const_iterator{};
+							if (!texture->is_object() || index == texture->end() ||
+								!index->is_number_unsigned())
+							{
+								result.m_Error = "KHR_materials_anisotropy.anisotropyTexture requires a texture index.";
+								return result;
+							}
+						}
+						float importedStrength = 0.0f;
+						float importedRotation = 0.0f;
+						if (source->Get(AI_MATKEY_ANISOTROPY_FACTOR, importedStrength) != aiReturn_SUCCESS ||
+							source->Get(AI_MATKEY_ANISOTROPY_ROTATION, importedRotation) != aiReturn_SUCCESS ||
+							std::abs(importedStrength - destination.m_Properties.m_AnisotropyStrength) > 0.0001f ||
+							std::abs(importedRotation - destination.m_Properties.m_AnisotropyRotation) > 0.0001f)
+						{
+							result.m_Error = "Assimp did not preserve KHR_materials_anisotropy factors.";
+							return result;
+						}
+					}
 					const auto clearcoatExtension = extensions->find("KHR_materials_clearcoat");
 					if (clearcoatExtension != extensions->end())
 					{

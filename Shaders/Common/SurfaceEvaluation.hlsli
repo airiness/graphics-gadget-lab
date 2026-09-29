@@ -11,6 +11,8 @@ struct SurfaceData
 	float Ior;
 	float ClearcoatFactor;
 	float ClearcoatRoughness;
+	float AnisotropyStrength;
+	float2 AnisotropyDirectionTS;
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
@@ -35,6 +37,15 @@ struct ClearcoatShadingState
 	float NoV;
 	float DirectionalAlbedo;
 	float3 EnergyCompensation;
+};
+
+struct AnisotropyShadingState
+{
+	float Strength;
+	float3 TangentWS;
+	float3 BitangentWS;
+	float AlphaT;
+	float AlphaB;
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
@@ -70,6 +81,25 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		surface.ClearcoatRoughness *= SampleTextureBinding(
 			matData.ClearcoatRoughnessBinding.TextureSamplerBinding, roughnessUV).g;
 	}
+	surface.AnisotropyStrength = saturate(matData.AnisotropyStrength);
+	float2 direction = float2(1.0, 0.0);
+	if (surface.AnisotropyStrength > 0.0 && matData.AnisotropyTextureEnabled != 0u)
+	{
+		const float2 anisotropyUV = SelectUV(matData.AnisotropyBinding, uv0, uv1);
+		const float3 anisotropySample = SampleTextureBinding(
+			matData.AnisotropyBinding.TextureSamplerBinding, anisotropyUV).rgb;
+		surface.AnisotropyStrength *= anisotropySample.b;
+		const float2 sampledDirection = anisotropySample.rg * 2.0 - 1.0;
+		if (dot(sampledDirection, sampledDirection) > 1.0e-8)
+		{
+			direction = normalize(sampledDirection);
+		}
+	}
+	const float cosine = cos(matData.AnisotropyRotation);
+	const float sine = sin(matData.AnisotropyRotation);
+	surface.AnisotropyDirectionTS = float2(
+		cosine * direction.x - sine * direction.y,
+		sine * direction.x + cosine * direction.y);
 
 	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.

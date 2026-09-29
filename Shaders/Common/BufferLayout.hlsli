@@ -98,6 +98,11 @@ struct MaterialData
 	MaterialTextureBindingData ClearcoatBinding;
 	MaterialTextureBindingData ClearcoatRoughnessBinding;
 	MaterialTextureBindingData ClearcoatNormalBinding;
+	float AnisotropyStrength;
+	float AnisotropyRotation;
+	uint AnisotropyTextureEnabled;
+	uint AnisotropyPadding;
+	MaterialTextureBindingData AnisotropyBinding;
 };
 
 struct ViewData

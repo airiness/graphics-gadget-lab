@@ -1218,6 +1218,43 @@ namespace gglab
 				invalidCoat.m_Error.find("KHR_materials_clearcoat") != std::string::npos,
 				"Out-of-range clearcoat factor is rejected visibly");
 
+			writeSource(R"("extensionsUsed":["KHR_materials_anisotropy"],"extensionsRequired":["KHR_materials_anisotropy"],)",
+				R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyStrength":0.7,"anisotropyRotation":0.785398,"anisotropyTexture":{"index":0,"texCoord":1,"extensions":{"KHR_texture_transform":{"rotation":0.25}}}}}})");
+			const ModelImportResult requiredAnisotropy = ModelImporter::Import(root / "probe.gltf", {});
+			bool anisotropyValid = requiredAnisotropy.Succeeded();
+			if (anisotropyValid)
+			{
+				const auto& material = requiredAnisotropy.m_Model.m_Materials.front();
+				const auto& binding = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::Anisotropy)];
+				anisotropyValid =
+					std::abs(material.m_Properties.m_AnisotropyStrength - 0.7f) < 0.0001f &&
+					std::abs(material.m_Properties.m_AnisotropyRotation - 0.785398f) < 0.0001f &&
+					binding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					binding.m_TextureIndex < requiredAnisotropy.m_Model.m_TextureSources.size() &&
+					binding.m_TexCoordIndex == 1 &&
+					std::abs(binding.m_UVRotation - 0.25f) < 0.0001f &&
+					requiredAnisotropy.m_Model.m_TextureSources[binding.m_TextureIndex].m_Semantic ==
+						TextureSemantic::Anisotropy;
+			}
+			context.Check(anisotropyValid, std::format(
+				"Required anisotropy factors, linear texture and UV transform survive import: {}",
+				requiredAnisotropy.m_Error));
+
+			writeSource(R"("extensionsUsed":["KHR_materials_anisotropy"],)",
+				R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyStrength":0,"anisotropyRotation":1.2}}})");
+			const ModelImportResult disabledAnisotropy = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(disabledAnisotropy.Succeeded() &&
+				disabledAnisotropy.m_Model.m_Materials.front().m_Properties.m_AnisotropyStrength == 0.0f &&
+				std::abs(disabledAnisotropy.m_Model.m_Materials.front().m_Properties.m_AnisotropyRotation - 1.2f) < 0.0001f,
+				"Zero anisotropy strength preserves rotation without enabling the lobe");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_anisotropy"],)",
+				R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyStrength":1.2}}})");
+			const ModelImportResult invalidAnisotropy = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidAnisotropy.Succeeded() &&
+				invalidAnisotropy.m_Error.find("KHR_materials_anisotropy") != std::string::npos,
+				"Out-of-range anisotropy strength is rejected visibly");
+
 			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy","KHR_materials_sheen"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}},"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0},"sheenRoughnessTexture":{"index":0}}}})");
 			Assimp::Importer assimp;
@@ -1375,7 +1412,7 @@ namespace gglab
 			ModelImportArtifactHandle materialBaseline = CreateModelImportArtifact(
 				materialFixture(), MakeResolvedModelTextureFixture(), textureCache);
 			bool materialDigestValid = materialBaseline && materialBaseline->IsValid();
-			for (uint32_t variant = 0; variant < 11; ++variant)
+			for (uint32_t variant = 0; variant < 14; ++variant)
 			{
 				ImportedModel changed = materialFixture();
 				auto& binding = changed.m_Materials.front().m_TextureBindings[0];
@@ -1392,6 +1429,9 @@ namespace gglab
 				case 8: changed.m_Materials.front().m_Properties.m_ClearcoatRoughness = 0.2f; break;
 				case 9: changed.m_Materials.front().m_Properties.m_ClearcoatNormalScale = 0.5f; break;
 				case 10: changed.m_Materials.front().m_Properties.m_ClearcoatNormalBinding.m_UVOffset.m_X = 0.1f; break;
+				case 11: changed.m_Materials.front().m_Properties.m_AnisotropyStrength = 0.7f; break;
+				case 12: changed.m_Materials.front().m_Properties.m_AnisotropyRotation = 0.4f; break;
+				case 13: changed.m_Materials.front().m_Properties.m_AnisotropyBinding.m_UVScale.m_Y = 0.5f; break;
 				default: break;
 				}
 				const ModelImportArtifactHandle changedArtifact = CreateModelImportArtifact(
@@ -1400,7 +1440,7 @@ namespace gglab
 					changedArtifact->m_ContentDigest != materialBaseline->m_ContentDigest;
 			}
 			context.Check(materialDigestValid,
-				"Material artifact digest tracks UV transform, UV set, core factors and IOR");
+				"Material artifact digest tracks UV transforms, lobe factors and IOR");
 			materialBaseline.reset();
 
 			const uint64_t textureBytes =

@@ -52,6 +52,9 @@ namespace gglab
 		ClearcoatFactor,
 		ClearcoatRoughness,
 		ClearcoatNormal,
+		AnisotropyStrength,
+		AnisotropyDirectionTangent,
+		AnisotropyDirectionWorld,
 	};
 
 	inline constexpr float DefaultDielectricIor = 1.5f;
@@ -71,6 +74,7 @@ namespace gglab
 		Clearcoat,
 		ClearcoatRoughness,
 		ClearcoatNormal,
+		Anisotropy,
 
 		Count
 	};
@@ -94,6 +98,8 @@ namespace gglab
 			return TextureSemantic::Clearcoat;
 		case MaterialTextureSlot::ClearcoatNormal:
 			return TextureSemantic::ClearcoatNormal;
+		case MaterialTextureSlot::Anisotropy:
+			return TextureSemantic::Anisotropy;
 		default:
 			return TextureSemantic::Unknown;
 		}
@@ -178,6 +184,7 @@ namespace gglab
 		MaterialTextureBinding m_ClearcoatBinding{};
 		MaterialTextureBinding m_ClearcoatRoughnessBinding{};
 		MaterialTextureBinding m_ClearcoatNormalBinding{};
+		MaterialTextureBinding m_AnisotropyBinding{};
 
 		Color m_BaseColor = Color::White;
 		Color m_EmissiveColor = Color::Black;
@@ -189,6 +196,8 @@ namespace gglab
 		float m_ClearcoatFactor = 0.0f;
 		float m_ClearcoatRoughness = 0.0f;
 		float m_ClearcoatNormalScale = 1.0f;
+		float m_AnisotropyStrength = 0.0f;
+		float m_AnisotropyRotation = 0.0f;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

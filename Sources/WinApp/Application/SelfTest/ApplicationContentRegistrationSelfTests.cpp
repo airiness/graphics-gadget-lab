@@ -422,6 +422,19 @@ namespace gglab
 					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TexCoordIndex == 1;
 				context.Check(coatBindings,
 					"Blender clearcoat channels, independent UV sets and normal scale survive Assimp import");
+				const auto factor = std::ranges::find(model.m_Materials,
+					"MAT_AnisotropyFactor", &ImportedMaterial::m_Name);
+				const auto textured = std::ranges::find(model.m_Materials,
+					"MAT_AnisotropyTexture", &ImportedMaterial::m_Name);
+				context.Check(factor != model.m_Materials.end() &&
+					textured != model.m_Materials.end() &&
+					std::abs(factor->m_Properties.m_AnisotropyStrength - 0.7f) < 0.0001f &&
+					std::abs(factor->m_Properties.m_AnisotropyRotation - 0.785398f) < 0.0001f &&
+					textured->m_Properties.m_AnisotropyStrength == 1.0f &&
+					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TexCoordIndex == 1 &&
+					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					"Blender anisotropy factors and textured UV1 direction survive Assimp import");
 			}
 
 			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,

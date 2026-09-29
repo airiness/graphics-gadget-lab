@@ -49,7 +49,7 @@ namespace gglab
 				kind == AssetKind::Mesh;
 		}
 
-		[[nodiscard]] std::array<TextureID, 8> GetMaterialTextureIds(
+		[[nodiscard]] std::array<TextureID, 9> GetMaterialTextureIds(
 			const MaterialProperties& material) noexcept
 		{
 			return {
@@ -61,6 +61,7 @@ namespace gglab
 				material.m_ClearcoatBinding.m_TextureId,
 				material.m_ClearcoatRoughnessBinding.m_TextureId,
 				material.m_ClearcoatNormalBinding.m_TextureId,
+				material.m_AnisotropyBinding.m_TextureId,
 			};
 		}
 
@@ -3121,6 +3122,9 @@ namespace gglab
 			break;
 		case MaterialTextureSlot::ClearcoatNormal:
 			material.m_ClearcoatNormalBinding = binding;
+			break;
+		case MaterialTextureSlot::Anisotropy:
+			material.m_AnisotropyBinding = binding;
 			break;
 		default:
 			GGLAB_UNREACHABLE("Unknown MaterialTextureSlot.");

@@ -17,6 +17,7 @@ namespace gglab
 		UVTestTexture1K,
 		UVTestTexture4K,
 		FallbackEnvironmentCubemap,
+		AnisotropyDefault,
 
 		Count,
 

@@ -63,6 +63,27 @@ float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 	return 0.5 / max(GGXV + GGXL, 1e-6);
 }
 
+float D_GGXAnisotropic(float3 H, float3 N, float3 T, float3 B, float alphaT, float alphaB)
+{
+	const float NoH = saturate(dot(N, H));
+	if (NoH <= 0.0) return 0.0;
+	const float ToH = dot(T, H) / alphaT;
+	const float BoH = dot(B, H) / alphaB;
+	const float denominator = ToH * ToH + BoH * BoH + NoH * NoH;
+	return rcp(max(PI * alphaT * alphaB * denominator * denominator, 1.0e-12));
+}
+
+float V_SmithGGXCorrelatedAnisotropic(float3 V, float3 L, float3 N,
+	float3 T, float3 B, float alphaT, float alphaB)
+{
+	const float NoV = saturate(dot(N, V));
+	const float NoL = saturate(dot(N, L));
+	if (NoV <= 0.0 || NoL <= 0.0) return 0.0;
+	const float viewLength = length(float3(alphaT * dot(T, V), alphaB * dot(B, V), NoV));
+	const float lightLength = length(float3(alphaT * dot(T, L), alphaB * dot(B, L), NoL));
+	return 0.5 / max(NoL * viewLength + NoV * lightLength, 1.0e-6);
+}
+
 // Lambertian diffuse BRDF.
 // Converts diffuse color / albedo to a constant diffuse reflectance over the hemisphere.
 float3 Fd_Lambert(float3 DiffuseColor)

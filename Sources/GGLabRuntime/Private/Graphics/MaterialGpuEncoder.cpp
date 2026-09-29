@@ -72,6 +72,9 @@ namespace gglab
 		gpu.ClearcoatNormalBinding = EncodeTextureBinding(material.m_ClearcoatNormalBinding,
 			ReservedTextureIDIndex::NormalFlat, SamplerPreset::LinearWrap, assetManager,
 			samplerRegistry);
+		gpu.AnisotropyBinding = EncodeTextureBinding(material.m_AnisotropyBinding,
+			ReservedTextureIDIndex::AnisotropyDefault, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
 
 		gpu.BaseColorFactor = material.m_BaseColor;
 		gpu.EmissiveColorFactor = material.m_EmissiveColor;
@@ -90,6 +93,11 @@ namespace gglab
 			? std::clamp(material.m_ClearcoatRoughness, 0.0f, 1.0f) : 0.0f;
 		gpu.ClearcoatNormalScale = std::isfinite(material.m_ClearcoatNormalScale)
 			? material.m_ClearcoatNormalScale : 1.0f;
+		gpu.AnisotropyStrength = std::isfinite(material.m_AnisotropyStrength)
+			? std::clamp(material.m_AnisotropyStrength, 0.0f, 1.0f) : 0.0f;
+		gpu.AnisotropyRotation = std::isfinite(material.m_AnisotropyRotation)
+			? material.m_AnisotropyRotation : 0.0f;
+		gpu.AnisotropyTextureEnabled = material.m_AnisotropyBinding.m_TextureId.IsValid() ? 1u : 0u;
 		return gpu;
 	}
 }
