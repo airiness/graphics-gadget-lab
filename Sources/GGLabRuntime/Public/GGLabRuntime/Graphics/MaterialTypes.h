@@ -58,6 +58,11 @@ namespace gglab
 		SheenColor,
 		SheenRoughness,
 		SheenContribution,
+		NormalVariance,
+		SpecularAAContribution,
+		EffectiveClearcoatRoughness,
+		AnisotropicAlpha,
+		UnfilteredLit,
 	};
 
 	inline constexpr float DefaultDielectricIor = 1.5f;

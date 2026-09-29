@@ -972,6 +972,9 @@
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">
       <Filter>Shaders</Filter>
     </None>

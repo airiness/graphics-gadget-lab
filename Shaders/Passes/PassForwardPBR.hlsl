@@ -10,6 +10,7 @@
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/BRDF.hlsli>
+#include <PBR/SpecularAA.hlsli>
 
 struct ForwardPBRPassParameters
 {
@@ -154,26 +155,18 @@ float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
 	return perturbedNormalWS;
 }
 
-float FilterPerceptualRoughness(float perceptualRoughness, float3 normalWS)
-{
-	// Normal-map frequencies above the pixel footprint otherwise turn a small,
-	// intense environment light into unstable sub-pixel specular highlights.
-	float3 normalDx = ddx(normalWS);
-	float3 normalDy = ddy(normalWS);
-	float normalVariance = dot(normalDx, normalDx) + dot(normalDy, normalDy);
-	float kernelAlpha = min(2.0 * normalVariance, 0.18);
-	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
-	return sqrt(saturate(alpha + kernelAlpha));
-}
-
-BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
+BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS,
+	bool specularAAEnabled)
 {
 	BaseShadingState state;
 	state.NormalWS = normalWS;
 	state.AuthoredPerceptualRoughness = surface.Roughness;
-	state.EffectivePerceptualRoughness = FilterPerceptualRoughness(
-		ClampPerceptualRoughnessForBRDF(surface.Roughness), normalWS);
+	const SpecularAAResult specularAA = EvaluateSpecularAA(surface.Roughness, normalWS,
+		specularAAEnabled);
+	state.EffectivePerceptualRoughness = specularAA.EffectivePerceptualRoughness;
 	state.BRDFAlpha = PerceptualRoughnessToAlpha(state.EffectivePerceptualRoughness);
+	state.NormalVariance = specularAA.NormalVariance;
+	state.SpecularAAKernelAlpha = specularAA.KernelAlpha;
 	// glTF reserves zero for an infinite-IOR Fresnel response (F0 = 1).
 	const float ior = surface.Ior == 0.0 ? 0.0 : max(surface.Ior, 1.0);
 	const float dielectricReflectance = (ior - 1.0) / (ior + 1.0);
@@ -197,15 +190,19 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 
 AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 normalWS,
 	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 normalUV,
-	float baseAlpha, bool evaluateFrame)
+	float authoredBaseAlpha, float kernelAlpha, bool evaluateFrame)
 {
 	AnisotropyShadingState state;
 	state.Strength = surface.AnisotropyStrength;
 	state.TangentWS = 0.0.xxx;
 	state.BitangentWS = 0.0.xxx;
-	state.AlphaT = baseAlpha;
-	state.AlphaB = baseAlpha;
+	state.AlphaB = saturate(authoredBaseAlpha + kernelAlpha);
+	state.AlphaT = state.AlphaB;
 	if (!evaluateFrame) return state;
+	const float2 filteredAlpha = FilterAnisotropicAlpha(authoredBaseAlpha,
+		state.Strength, kernelAlpha);
+	state.AlphaT = filteredAlpha.x;
+	state.AlphaB = filteredAlpha.y;
 
 	// A missing mesh tangent uses the same normal-map coordinates as normal
 	// perturbation, including the selected UV set and texture transform.
@@ -217,10 +214,6 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 	state.TangentWS = SafeNormalize(projected, fallbackTangent);
 	const float handedness = dot(cross(frame[0], frame[1]), normalWS) < 0.0 ? -1.0 : 1.0;
 	state.BitangentWS = SafeNormalize(cross(shadingNormalWS, state.TangentWS), frame[1]) * handedness;
-	// Strength increases roughness only along the anisotropy direction; both
-	// axes coincide when the base roughness reaches one.
-	state.AlphaT = lerp(baseAlpha, 1.0, state.Strength * state.Strength);
-	state.AlphaB = baseAlpha;
 	return state;
 }
 
@@ -774,16 +767,23 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		normalWS, tangentWS, IN.PositionWS, normalUV);
 	float3 clearcoatNormalWS = normalWS;
 	if ((matData.ClearcoatFactor > 0.0 ||
-		matData.DebugView == MaterialDebugViewClearcoatNormal) &&
+		(matData.DebugView == MaterialDebugViewClearcoatNormal ||
+			matData.DebugView == MaterialDebugViewEffectiveClearcoatRoughness)) &&
 		matData.ClearcoatNormalBinding.TextureEnabled != 0u)
 	{
 		const float2 clearcoatUV = SelectUV(matData.ClearcoatNormalBinding, IN.UV0, IN.UV1);
 		clearcoatNormalWS = SampleNormalWS(matData.ClearcoatNormalBinding,
 			matData.ClearcoatNormalScale, normalWS, tangentWS, IN.PositionWS, clearcoatUV);
 	}
-	const BaseShadingState shading = BuildBaseShadingState(surface, N);
+	const bool specularAAEnabled = matData.DebugView != MaterialDebugViewUnfilteredLit;
+	const BaseShadingState shading = BuildBaseShadingState(surface, N, specularAAEnabled);
+	// Derivatives are evaluated before feature and debug-view branches.
+	const SpecularAAResult coatSpecularAA = EvaluateSpecularAA(
+		surface.ClearcoatRoughness, clearcoatNormalWS, specularAAEnabled);
 	const AnisotropyShadingState anisotropy = BuildAnisotropyShadingState(surface,
-		normalWS, N, tangentWS, IN.PositionWS, normalUV, shading.BRDFAlpha,
+		normalWS, N, tangentWS, IN.PositionWS, normalUV,
+		PerceptualRoughnessToAlpha(ClampPerceptualRoughnessForBRDF(authoredRoughness)),
+		shading.SpecularAAKernelAlpha,
 		matData.AnisotropyStrength > 0.0 ||
 		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld);
 	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
@@ -818,6 +818,21 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(shading.EffectivePerceptualRoughness.xxx, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewNormalVariance)
+	{
+		const float4 color = float4(shading.NormalVariance,
+			surface.ClearcoatFactor > 0.0 ? coatSpecularAA.NormalVariance : 0.0,
+			0.0, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewSpecularAAContribution)
+	{
+		const float4 color = float4(shading.SpecularAAKernelAlpha,
+			surface.ClearcoatFactor > 0.0 ? coatSpecularAA.KernelAlpha : 0.0,
+			shading.EffectivePerceptualRoughness -
+				ClampPerceptualRoughnessForBRDF(authoredRoughness), alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewF0)
 	{
 		const float4 color = float4(shading.F0, alpha);
@@ -841,6 +856,11 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(surface.ClearcoatRoughness.xxx, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewEffectiveClearcoatRoughness)
+	{
+		const float4 color = float4(coatSpecularAA.EffectivePerceptualRoughness.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewClearcoatNormal)
 	{
 		const float4 color = float4(clearcoatNormalWS * 0.5 + 0.5, alpha);
@@ -849,6 +869,11 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	if (matData.DebugView == MaterialDebugViewAnisotropyStrength)
 	{
 		const float4 color = float4(surface.AnisotropyStrength.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewAnisotropicAlpha)
+	{
+		const float4 color = float4(anisotropy.AlphaT, anisotropy.AlphaB, 0.0, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
 	if (matData.DebugView == MaterialDebugViewAnisotropyDirectionTangent)
@@ -903,9 +928,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	coat.NormalWS = clearcoatNormalWS;
 	coat.DirectionalAlbedo = 0.0;
 	coat.EnergyCompensation = 1.0.xxx;
-	// Keep normal derivatives outside the texture-dependent factor branch.
-	coat.PerceptualRoughness = FilterPerceptualRoughness(
-		ClampPerceptualRoughnessForBRDF(surface.ClearcoatRoughness), clearcoatNormalWS);
+	coat.PerceptualRoughness = coatSpecularAA.EffectivePerceptualRoughness;
 	coat.BRDFAlpha = PerceptualRoughnessToAlpha(coat.PerceptualRoughness);
 	coat.NoV = saturate(dot(clearcoatNormalWS, V));
 	if (coat.Factor > 0.0)
@@ -924,6 +947,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	sheen.DirectionalAlbedoFitHigh = 0.0.xxx;
 	if (any(sheen.Color > 0.0.xxx))
 	{
+		// Charlie sheen retains independent authored roughness: the GGX alpha
+		// footprint is not calibrated for this grazing microfiber lobe.
 		sheen.PerceptualRoughness = ClampPerceptualRoughnessForBRDF(
 			surface.SheenRoughness);
 		sheen.Alpha = PerceptualRoughnessToAlpha(sheen.PerceptualRoughness);

@@ -444,6 +444,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">

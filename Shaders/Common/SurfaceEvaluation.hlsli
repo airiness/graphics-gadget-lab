@@ -21,6 +21,11 @@ static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
 static const uint MaterialDebugViewSheenColor = 16u;
 static const uint MaterialDebugViewSheenRoughness = 17u;
 static const uint MaterialDebugViewSheenContribution = 18u;
+static const uint MaterialDebugViewNormalVariance = 19u;
+static const uint MaterialDebugViewSpecularAAContribution = 20u;
+static const uint MaterialDebugViewEffectiveClearcoatRoughness = 21u;
+static const uint MaterialDebugViewAnisotropicAlpha = 22u;
+static const uint MaterialDebugViewUnfilteredLit = 23u;
 
 // Resolves runtime material factors and texture bindings for Forward PBR.
 struct SurfaceData
@@ -47,6 +52,8 @@ struct BaseShadingState
 	float AuthoredPerceptualRoughness;
 	float EffectivePerceptualRoughness;
 	float BRDFAlpha;
+	float NormalVariance;
+	float SpecularAAKernelAlpha;
 	float3 F0;
 	uint FeatureFlags;
 };
@@ -114,7 +121,8 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	// The factor texture can vary within a pixel quad. Do not use its result
 	// to guard another implicit-derivative texture sample.
 	if ((matData.ClearcoatFactor > 0.0 ||
-		matData.DebugView == MaterialDebugViewClearcoatRoughness) &&
+		(matData.DebugView == MaterialDebugViewClearcoatRoughness ||
+			matData.DebugView == MaterialDebugViewEffectiveClearcoatRoughness)) &&
 		matData.ClearcoatRoughnessBinding.TextureEnabled != 0u)
 	{
 		const float2 roughnessUV = SelectUV(matData.ClearcoatRoughnessBinding, uv0, uv1);

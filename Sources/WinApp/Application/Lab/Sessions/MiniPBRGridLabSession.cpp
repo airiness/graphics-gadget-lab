@@ -34,6 +34,8 @@ namespace gglab
 			"Assets/Models/SheenTestGrid/SheenTestGrid.gltf";
 		constexpr std::string_view SheenClothPath =
 			"Assets/Models/SheenCloth/SheenCloth.gltf";
+		constexpr std::string_view NormalTangentTestPath =
+			"Assets/Models/NormalTangentTest/NormalTangentTest.gltf";
 
 		enum class SceneSource : int32_t
 		{
@@ -45,6 +47,7 @@ namespace gglab
 			AnisotropyDiscTest,
 			SheenTestGrid,
 			SheenCloth,
+			NormalTangentTest,
 		};
 
 		[[nodiscard]] std::string_view AssetModelPath(SceneSource source) noexcept
@@ -58,6 +61,7 @@ namespace gglab
 			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
 			case SceneSource::SheenTestGrid: return SheenTestGridPath;
 			case SceneSource::SheenCloth: return SheenClothPath;
+			case SceneSource::NormalTangentTest: return NormalTangentTestPath;
 			case SceneSource::ProceduralGrid: return {};
 			}
 			return {};
@@ -148,6 +152,8 @@ namespace gglab
 						.m_Name = "SheenTestGrid"},
 					{.m_Value = int32_t(SceneSource::SheenCloth),
 						.m_Name = "SheenCloth"},
+					{.m_Value = int32_t(SceneSource::NormalTangentTest),
+						.m_Name = "NormalTangentTest"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -236,19 +242,24 @@ namespace gglab
 			.m_EnumItems =
 				{
 					{.m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit"},
+					{.m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)"},
 					{.m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color"},
 					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
 					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
 					{.m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)"},
+					{.m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)"},
 					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
 					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
 					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
 					{.m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor"},
 					{.m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength"},
+					{.m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
 					{.m_Value = int32_t(MaterialDebugView::SheenColor), .m_Name = "Sheen Color"},
@@ -476,7 +487,7 @@ namespace gglab
 		if (!FinalizeAssetModel())
 		{
 			m_LoadingProgress.m_Status = LoadingStatus::Failed;
-			m_LoadingProgress.m_Detail = "The model has no usable bounds.";
+			m_LoadingProgress.m_Detail = "The model instance could not be created.";
 			return;
 		}
 		BuildLighting();
@@ -549,6 +560,13 @@ namespace gglab
 			material.m_Properties.m_SheenColor = parameters.Get(SheenColorId, Color::Black);
 			material.m_Properties.m_SheenRoughness = parameters.Get(SheenRoughnessId, 0.5f);
 			material.m_Properties.m_DebugView = debugView;
+		}
+		auto modelMaterialView = m_World.GetRegistry().view<components::ModelComponent,
+			components::MaterialInstanceComponent>();
+		for (const entt::entity entity : modelMaterialView)
+		{
+			modelMaterialView.get<components::MaterialInstanceComponent>(entity)
+				.m_Properties.m_DebugView = debugView;
 		}
 
 		auto lightView = m_World.GetRegistry().view<components::LightComponent>();
@@ -672,6 +690,21 @@ namespace gglab
 		const float scale = TargetAssetModelExtent / maxExtent;
 		transform.m_Scale = Vector3::One * scale;
 		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) - boundsCenter * scale;
+		const MaterialProperties* diagnosticMaterial = nullptr;
+		if (m_PendingModelPath == NormalTangentTestPath)
+		{
+			if (model->m_MeshInstance.size() == 1)
+			{
+				diagnosticMaterial =
+					assetManager.GetMaterial(model->m_MeshInstance.front().m_MaterialId);
+			}
+			if (!diagnosticMaterial)
+			{
+				GGLAB_LOG_ERROR("Mini PBR Grid diagnostic model '{}' needs one material.",
+					m_PendingModelPath);
+				return false;
+			}
+		}
 
 		auto& registry = m_World.GetRegistry();
 		const entt::entity entity = registry.create();
@@ -679,6 +712,14 @@ namespace gglab
 		registry.emplace<components::ModelComponent>(entity, components::ModelComponent{
 																 .m_ModelId = m_PendingModelId,
 			});
+		if (diagnosticMaterial)
+		{
+			registry.emplace<components::MaterialInstanceComponent>(entity,
+				components::MaterialInstanceComponent{
+					.m_Key = RuntimeMaterialKey("gglab.lab.mini_pbr_grid.normal_tangent"),
+					.m_Properties = *diagnosticMaterial,
+				});
+		}
 		m_PendingModelId.Reset();
 		m_PendingModelPath.clear();
 		return true;
