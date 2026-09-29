@@ -482,12 +482,57 @@ namespace gglab
 				"Model file '{}' does not contain a scene hierarchy.", canonicalPath.string());
 			return result;
 		}
-		// glTF material indices are positional. Preserve them through Assimp so
-		// per-binding source semantics can be merged without a name heuristic.
+		// Assimp may load referenced glTF materials in first-use order. Its material
+		// count still matches the JSON table plus one default, but indices can differ.
 		if (scene->mNumMaterials != (sourceMaterials ? sourceMaterials->size() : 0u) + 1u)
 		{
 			result.m_Error = "Assimp material indices do not match the glTF material table.";
 			return result;
+		}
+		std::vector<const Json*> materialSources(scene->mNumMaterials, nullptr);
+		if (sourceMaterials)
+		{
+			bool reordered = false;
+			for (size_t index = 0; index < sourceMaterials->size(); ++index)
+			{
+				const Json& material = (*sourceMaterials)[index];
+				materialSources[index] = &material;
+				const auto name = material.find("name");
+				if (name != material.end() && name->is_string() &&
+					name->get<std::string>() != scene->mMaterials[index]->GetName().C_Str())
+				{
+					reordered = true;
+				}
+			}
+			if (reordered)
+			{
+				std::vector<bool> matched(sourceMaterials->size(), false);
+				for (size_t assimpIndex = 0; assimpIndex < sourceMaterials->size(); ++assimpIndex)
+				{
+					const std::string name = scene->mMaterials[assimpIndex]->GetName().C_Str();
+					size_t sourceIndex = sourceMaterials->size();
+					for (size_t candidate = 0; candidate < sourceMaterials->size(); ++candidate)
+					{
+						const Json& candidateMaterial = (*sourceMaterials)[candidate];
+						const auto sourceName = candidateMaterial.find("name");
+						if (sourceName == candidateMaterial.end() || !sourceName->is_string() ||
+							sourceName->get<std::string>() != name) continue;
+						if (sourceIndex != sourceMaterials->size())
+						{
+							result.m_Error = "Reordered glTF materials have ambiguous names.";
+							return result;
+						}
+						sourceIndex = candidate;
+					}
+					if (name.empty() || sourceIndex == sourceMaterials->size() || matched[sourceIndex])
+					{
+						result.m_Error = "Reordered glTF materials cannot be matched by unique names.";
+						return result;
+					}
+					materialSources[assimpIndex] = &(*sourceMaterials)[sourceIndex];
+					matched[sourceIndex] = true;
+				}
+			}
 		}
 		progress.Report(0.25f, "Model structure parsed",
 			std::format("{} meshes, {} materials", scene->mNumMeshes, scene->mNumMaterials));
@@ -517,6 +562,7 @@ namespace gglab
 			const aiMaterial* source = scene->mMaterials[materialIndex];
 			ImportedMaterial& destination = model.m_Materials[materialIndex];
 			destination.m_Name = source->GetName().C_Str();
+			const Json* sourceMaterial = materialSources[materialIndex];
 
 			for (uint32_t slotIndex = 0; slotIndex < utils::ToIndex(MaterialTextureSlot::Count);
 				++slotIndex)
@@ -547,9 +593,8 @@ namespace gglab
 				{
 					if ((textureType == aiTextureType_CLEARCOAT ||
 						textureType == aiTextureType_ANISOTROPY ||
-						textureType == aiTextureType_SHEEN) && sourceMaterials &&
-						materialIndex < sourceMaterials->size() &&
-						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot))
+						textureType == aiTextureType_SHEEN) && sourceMaterial &&
+						FindMaterialTextureInfo(*sourceMaterial, slot))
 					{
 						result.m_Error = std::format(
 							"Assimp did not preserve a {} texture binding.",
@@ -577,10 +622,10 @@ namespace gglab
 					return result;
 				}
 				binding.m_TexCoordIndex = uvIndex;
-				if (sourceMaterials && materialIndex < sourceMaterials->size())
+				if (sourceMaterial)
 				{
 					if (const Json* textureInfo =
-						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot))
+						FindMaterialTextureInfo(*sourceMaterial, slot))
 					{
 						if (!ReadTextureTransform(*textureInfo, binding, result.m_Error))
 						{
@@ -600,9 +645,9 @@ namespace gglab
 				source->Get(AI_MATKEY_METALLIC_FACTOR, destination.m_Properties.m_MetallicFactor));
 			GGLAB_UNUSED(source->Get(
 				AI_MATKEY_ROUGHNESS_FACTOR, destination.m_Properties.m_RoughnessFactor));
-			if (sourceMaterials && materialIndex < sourceMaterials->size())
+			if (sourceMaterial)
 			{
-				const Json& material = (*sourceMaterials)[materialIndex];
+				const Json& material = *sourceMaterial;
 				const auto extensionsEntry = material.find("extensions");
 				if (extensionsEntry != material.end() && !extensionsEntry->is_object())
 				{
@@ -724,14 +769,23 @@ namespace gglab
 						{
 							aiColor3D importedColor{};
 							float importedRoughness = 0.0f;
-							if (source->Get(AI_MATKEY_SHEEN_COLOR_FACTOR, importedColor) != aiReturn_SUCCESS ||
-								source->Get(AI_MATKEY_SHEEN_ROUGHNESS_FACTOR, importedRoughness) != aiReturn_SUCCESS ||
+							const bool colorRead =
+								source->Get(AI_MATKEY_SHEEN_COLOR_FACTOR, importedColor) == aiReturn_SUCCESS;
+							const bool roughnessRead =
+								source->Get(AI_MATKEY_SHEEN_ROUGHNESS_FACTOR, importedRoughness) == aiReturn_SUCCESS;
+							if (!colorRead || !roughnessRead ||
 								std::abs(importedColor.r - expected.m_R) > 0.0001f ||
 								std::abs(importedColor.g - expected.m_G) > 0.0001f ||
 								std::abs(importedColor.b - expected.m_B) > 0.0001f ||
 								std::abs(importedRoughness - destination.m_Properties.m_SheenRoughness) > 0.0001f)
 							{
-								result.m_Error = "Assimp did not preserve KHR_materials_sheen factors.";
+								result.m_Error = std::format(
+									"Assimp did not preserve KHR_materials_sheen factors for '{}': "
+									"color {} [{}, {}, {}] vs [{}, {}, {}], roughness {} {} vs {}.",
+									destination.m_Name, colorRead, importedColor.r, importedColor.g,
+									importedColor.b, expected.m_R, expected.m_G, expected.m_B,
+									roughnessRead, importedRoughness,
+									destination.m_Properties.m_SheenRoughness);
 								return result;
 							}
 						}

@@ -30,6 +30,10 @@ namespace gglab
 			"Assets/Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf";
 		constexpr std::string_view AnisotropyDiscTestPath =
 			"Assets/Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf";
+		constexpr std::string_view SheenTestGridPath =
+			"Assets/Models/SheenTestGrid/SheenTestGrid.gltf";
+		constexpr std::string_view SheenClothPath =
+			"Assets/Models/SheenCloth/SheenCloth.gltf";
 
 		enum class SceneSource : int32_t
 		{
@@ -39,6 +43,8 @@ namespace gglab
 			AnisotropyStrengthTest,
 			AnisotropyRotationTest,
 			AnisotropyDiscTest,
+			SheenTestGrid,
+			SheenCloth,
 		};
 
 		[[nodiscard]] std::string_view AssetModelPath(SceneSource source) noexcept
@@ -50,6 +56,8 @@ namespace gglab
 			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
 			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
 			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
+			case SceneSource::SheenTestGrid: return SheenTestGridPath;
+			case SceneSource::SheenCloth: return SheenClothPath;
 			case SceneSource::ProceduralGrid: return {};
 			}
 			return {};
@@ -136,6 +144,10 @@ namespace gglab
 						.m_Name = "AnisotropyRotationTest"},
 					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
 						.m_Name = "AnisotropyDiscTest"},
+					{.m_Value = int32_t(SceneSource::SheenTestGrid),
+						.m_Name = "SheenTestGrid"},
+					{.m_Value = int32_t(SceneSource::SheenCloth),
+						.m_Name = "SheenCloth"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -693,8 +705,9 @@ namespace gglab
 	{
 		const auto sceneSource = static_cast<SceneSource>(
 			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
-		// The disc reference spans the ground plane, so its texture quadrants need an elevated view.
-		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
+		// Ground-oriented references need an elevated view to show their surface detail.
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest ||
+			sceneSource == SceneSource::SheenCloth
 			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
 		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
@@ -712,7 +725,7 @@ namespace gglab
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
 			.m_Description =
-				"Compares procedural PBR, metallic-roughness and anisotropy reference models.",
+				"Compares procedural PBR, metallic-roughness, anisotropy and sheen references.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

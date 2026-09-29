@@ -618,6 +618,69 @@ namespace gglab
 			}
 		}
 
+		void CheckSheenReferenceImports(SelfTestContext& context) noexcept
+		{
+			const auto assetRoot = GetApplicationSelfTestAssetRoot();
+			const auto grid = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/SheenTestGrid/SheenTestGrid.gltf"), {});
+			context.Check(grid.Succeeded() && grid.m_Model.m_MeshInstances.size() >= 16,
+				std::format("Sheen grid imports with its reference spheres: {}", grid.m_Error));
+			if (grid.Succeeded())
+			{
+				const auto& materials = grid.m_Model.m_Materials;
+				const auto hasReference = [&](float color, float roughness)
+				{
+					return std::ranges::any_of(materials,
+						[&](const ImportedMaterial& material) noexcept
+						{
+							const Color& sheen = material.m_Properties.m_SheenColor;
+							return material.m_Name.starts_with("sheenColor") &&
+								std::abs(sheen.m_R) < 0.0001f &&
+								std::abs(sheen.m_G - color) < 0.0001f &&
+								std::abs(sheen.m_B - color) < 0.0001f &&
+								std::abs(material.m_Properties.m_SheenRoughness - roughness) < 0.0001f;
+						});
+				};
+				context.Check(hasReference(0.0f, 0.0f) && hasReference(1.0f, 0.0f) &&
+					hasReference(0.0f, 1.0f) && hasReference(1.0f, 1.0f),
+					"Sheen grid retains disabled, color and roughness endpoints");
+			}
+
+			const auto cloth = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/SheenCloth/SheenCloth.gltf"), {});
+			context.Check(cloth.Succeeded() && cloth.m_Model.m_MeshInstances.size() == 1,
+				std::format("Sheen cloth imports with its folded mesh: {}", cloth.m_Error));
+			if (!cloth.Succeeded() || cloth.m_Model.m_Materials.empty()) return;
+
+			const auto& material = cloth.m_Model.m_Materials.front();
+			const auto& color = material.m_TextureBindings[
+				static_cast<size_t>(MaterialTextureSlot::SheenColor)];
+			const auto& roughness = material.m_TextureBindings[
+				static_cast<size_t>(MaterialTextureSlot::SheenRoughness)];
+			const bool validBindings = color.m_TextureIndex < cloth.m_Model.m_TextureSources.size() &&
+				roughness.m_TextureIndex < cloth.m_Model.m_TextureSources.size();
+			context.Check(validBindings && std::abs(color.m_UVScale.m_X - 30.0f) < 0.0001f &&
+				std::abs(color.m_UVScale.m_Y + 30.0f) < 0.0001f &&
+				std::abs(roughness.m_UVScale.m_X - 30.0f) < 0.0001f &&
+				std::abs(roughness.m_UVScale.m_Y + 30.0f) < 0.0001f,
+				"Sheen cloth retains independently bound tiled color and roughness channels");
+			if (!validBindings) return;
+
+			const auto& colorSource = cloth.m_Model.m_TextureSources[color.m_TextureIndex];
+			const auto& roughnessSource = cloth.m_Model.m_TextureSources[roughness.m_TextureIndex];
+			const auto colorTexture = TextureLoader::LoadTextureData(
+				colorSource.m_CanonicalPath, colorSource.m_ImportSettings);
+			const auto roughnessTexture = TextureLoader::LoadTextureData(
+				roughnessSource.m_CanonicalPath, roughnessSource.m_ImportSettings);
+			context.Check(colorSource.m_CanonicalPath == roughnessSource.m_CanonicalPath &&
+				colorSource.m_Semantic == TextureSemantic::SheenColor &&
+				roughnessSource.m_Semantic == TextureSemantic::SheenRoughness &&
+				colorTexture.IsValid() && roughnessTexture.IsValid() &&
+				colorTexture.m_ColorSpace == TextureColorSpace::SRGB &&
+				roughnessTexture.m_ColorSpace == TextureColorSpace::Linear,
+				"Sheen cloth shares one image with sRGB color and linear roughness views");
+		}
+
 		void CheckTextureContractContent(SelfTestContext& context) noexcept
 		{
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
@@ -1118,6 +1181,7 @@ namespace gglab
 				const auto workerContext = win32::Win32TaskWorkerLifecycle{}.CreateContext(0);
 				CheckMaterialReferenceImports(context);
 				CheckAnisotropyReferenceImports(context);
+				CheckSheenReferenceImports(context);
 				CheckCoastalAtriumContent(context);
 				CheckTextureContractContent(context);
 			});
