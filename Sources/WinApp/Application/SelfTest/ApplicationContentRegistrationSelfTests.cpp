@@ -385,6 +385,70 @@ namespace gglab
 
 		}
 
+		void CheckMaterialReferenceImports(SelfTestContext& context) noexcept
+		{
+			const auto assetRoot = GetApplicationSelfTestAssetRoot();
+			for (const auto path : {
+				"Models/GGLabMaterialExportProbe/GGLabMaterialExportProbe.gltf",
+				"Models/GGLabMaterialExportProbe/GGLabMaterialIOROnly.gltf" })
+			{
+				const auto imported = ModelImporter::Import(ResolveAssetPath(assetRoot, path), {});
+				context.Check(imported.Succeeded(),
+					std::format("Installed Blender material probe imports through Assimp ({}): {}",
+						path, imported.m_Error));
+				if (!imported.Succeeded()) continue;
+				const auto& model = imported.m_Model;
+				const bool hasIor = std::ranges::any_of(model.m_Materials,
+					[](const ImportedMaterial& material) noexcept
+					{ return std::abs(material.m_Properties.m_Ior - 1.33f) < 0.0001f; });
+				const bool hasCoreInputs = std::ranges::any_of(model.m_Materials,
+					[](const ImportedMaterial& material) noexcept
+					{
+						return std::abs(material.m_Properties.m_NormalScale - 0.35f) < 0.0001f &&
+							std::abs(material.m_Properties.m_OcclusionStrength - 0.6f) < 0.0001f;
+					});
+				context.Check(hasIor && hasCoreInputs && !model.m_MeshInstances.empty() &&
+					!model.m_TextureSources.empty(),
+					"Blender IOR, core texture scalars, geometry and external images reach one imported model");
+			}
+
+			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/GGLabLightingContractClearcoat/GGLabLightingContract.gltf"), {});
+			context.Check(lighting.Succeeded(),
+				std::format("Extended lighting contract imports: {}", lighting.m_Error));
+			if (lighting.Succeeded())
+			{
+				const auto& model = lighting.m_Model;
+				bool iorRow = true;
+				std::string iorDetail;
+				for (const float ior : { 1.0f, 1.33f, 1.5f, 1.7f, 2.0f })
+				{
+					const bool found = std::ranges::any_of(model.m_Materials,
+						[ior](const ImportedMaterial& material) noexcept
+						{
+							const auto& properties = material.m_Properties;
+							return std::abs(properties.m_Ior - ior) < 0.0001f &&
+								std::abs(properties.m_RoughnessFactor - 0.25f) < 0.0001f &&
+								properties.m_MetallicFactor == 0.0f;
+						});
+					iorRow &= found;
+					iorDetail += std::format(" {}:{}", ior, found);
+				}
+				context.Check(iorRow, std::format(
+					"Extended lighting contract retains five matched opaque dielectric IOR references "
+					"(instances={}, materials={}, found={})",
+					model.m_MeshInstances.size(), model.m_Materials.size(), iorDetail));
+			}
+
+			const auto atrium = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf"), {});
+			context.Check(atrium.Succeeded() && !atrium.m_Model.m_MeshInstances.empty() &&
+				atrium.m_Model.m_TextureSources.size() == 9,
+				std::format("Research lounge geometry and core textures import "
+					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
+					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
+		}
+
 		void CheckTextureContractContent(SelfTestContext& context) noexcept
 		{
 			const auto imported = ModelImporter::Import(ResolveAssetPath(GetApplicationSelfTestAssetRoot(),
@@ -874,6 +938,7 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.lighting_contract", 37,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
+		CheckMaterialReferenceImports(context);
 		checkSelectedDemand("gglab.lab.atmosphere_range", 38,
 			"Atmosphere range includes the aerial measurement probe shader demand");
 		CheckAtmosphereRangeContent(context);

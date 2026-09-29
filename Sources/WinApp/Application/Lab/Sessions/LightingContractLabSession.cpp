@@ -8,19 +8,44 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <cstdint>
+
 namespace gglab
 {
 	namespace
 	{
 		const LabParameterId PhysicalSunId("lighting_contract.physical_sun");
+		const LabParameterId SceneSourceId("lighting_contract.scene.source");
 		constexpr const char* LightingContractModelPath =
 			"Assets/Models/GGLabLightingContract/GGLabLightingContract.gltf";
+		constexpr const char* MaterialReferenceModelPath =
+			"Assets/Models/GGLabLightingContractClearcoat/GGLabLightingContract.gltf";
+
+		enum class SceneSource : int32_t
+		{
+			Original,
+			MaterialReferences,
+		};
 	}
 
 	LightingContractLabSession::LightingContractLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
 	{
+		GGLAB_UNUSED(GetMutableParameters().Add({
+			.m_Id = SceneSourceId,
+			.m_Name = "Reference Scene",
+			.m_Group = "Scene",
+			.m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::RebuildScene,
+			.m_DefaultValue = int32_t(SceneSource::Original),
+			.m_EnumItems =
+				{
+					{.m_Value = int32_t(SceneSource::Original), .m_Name = "Original Contract"},
+					{.m_Value = int32_t(SceneSource::MaterialReferences),
+						.m_Name = "Extended Material References"},
+				},
+			}));
 		GGLAB_UNUSED(GetMutableParameters().Add({
 			.m_Id = PhysicalSunId,
 			.m_Name = "Physical Sun (120000 lux / EV15 preset)",
@@ -78,12 +103,16 @@ namespace gglab
 	{
 		ResetAssetInterests();
 		m_World.GetRegistry().clear();
-		m_PendingModelId = GetAssetOwnerScope().LoadModelAsync(LightingContractModelPath).m_ModelId;
+		const auto sceneSource = static_cast<SceneSource>(
+			GetParameters().Get(SceneSourceId, int32_t(SceneSource::Original)));
+		m_PendingModelPath = sceneSource == SceneSource::MaterialReferences
+			? MaterialReferenceModelPath : LightingContractModelPath;
+		m_PendingModelId = GetAssetOwnerScope().LoadModelAsync(m_PendingModelPath).m_ModelId;
 		m_LoadingProgress = {
 			.m_Status = m_PendingModelId.IsValid() ? LoadingStatus::Preparing : LoadingStatus::Failed,
 			.m_Fraction = 0.05f,
 			.m_Stage = m_PendingModelId.IsValid() ? "Loading lighting contract scene" : "Model request failed",
-			.m_Detail = LightingContractModelPath,
+			.m_Detail = m_PendingModelPath,
 		};
 	}
 
@@ -106,7 +135,7 @@ namespace gglab
 		progress.AddCompletedStep(0.05f);
 		progress.AddAssetStep(0.95f,
 			GetAssetLoadProgress(model->m_State, AssetLoadKind::Model, model->m_LoadProgress),
-			LightingContractModelPath);
+			m_PendingModelPath);
 		m_LoadingProgress = progress.Build();
 	}
 

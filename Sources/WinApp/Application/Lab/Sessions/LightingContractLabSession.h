@@ -33,6 +33,7 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
 		bool m_PhysicalSun = false;
+		const char* m_PendingModelPath = nullptr;
 		ModelID m_PendingModelId{};
 		LoadingProgress m_LoadingProgress{};
 		float m_PreviousEnvironmentIntensity = 1.0f;
