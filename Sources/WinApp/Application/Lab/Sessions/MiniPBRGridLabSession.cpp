@@ -37,6 +37,7 @@ namespace gglab
 		const LabParameterId MetallicMaxId("mini_pbr.material.metallic_max");
 		const LabParameterId RoughnessMinId("mini_pbr.material.roughness_min");
 		const LabParameterId RoughnessMaxId("mini_pbr.material.roughness_max");
+		const LabParameterId IorId("mini_pbr.material.ior");
 		const LabParameterId DebugViewId("mini_pbr.material.debug_view");
 		const LabParameterId LightIntensityId("mini_pbr.lighting.intensity");
 
@@ -166,6 +167,16 @@ namespace gglab
 			.m_MaxValue = LabValue(1.0f),
 			}));
 		GGLAB_UNUSED(parameters.Add({
+			.m_Id = IorId,
+			.m_Name = "Dielectric IOR",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = DefaultDielectricIor,
+			.m_MinValue = LabValue(1.0f),
+			.m_MaxValue = LabValue(10.0f),
+			}));
+		GGLAB_UNUSED(parameters.Add({
 			.m_Id = DebugViewId,
 			.m_Name = "Debug View",
 			.m_Group = "Procedural Material",
@@ -183,6 +194,7 @@ namespace gglab
 					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
 					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
+					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -413,6 +425,7 @@ namespace gglab
 				std::lerp(metallicMin, metallicMax, GridFactor(cell.m_Column));
 			material.m_Properties.m_RoughnessFactor =
 				std::lerp(roughnessMin, roughnessMax, GridFactor(cell.m_Row));
+			material.m_Properties.m_Ior = parameters.Get(IorId, DefaultDielectricIor);
 			material.m_Properties.m_DebugView = debugView;
 		}
 

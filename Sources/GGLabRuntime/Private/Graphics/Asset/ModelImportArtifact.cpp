@@ -110,6 +110,7 @@ namespace gglab
 			writer.Float(properties.m_RoughnessFactor);
 			writer.Float(properties.m_NormalScale);
 			writer.Float(properties.m_OcclusionStrength);
+			writer.Float(properties.m_Ior);
 			writer.U32(static_cast<uint32_t>(properties.m_Flags));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaMode));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaCutoffMode));

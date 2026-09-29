@@ -73,6 +73,7 @@ namespace gglab
 		gpu.AlphaCutoff = material.m_AlphaCutoff;
 		gpu.Flags = static_cast<uint32_t>(material.m_Flags);
 		gpu.DebugView = static_cast<uint32_t>(material.m_DebugView);
+		gpu.Ior = SanitizeMaterialIor(material.m_Ior);
 		return gpu;
 	}
 }

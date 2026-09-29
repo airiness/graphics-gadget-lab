@@ -2483,6 +2483,10 @@ namespace gglab
 				GPUAbiMember{ "AlphaCutoff", offsetof(MaterialGPU, AlphaCutoff) },
 				GPUAbiMember{ "Flags", offsetof(MaterialGPU, Flags) },
 				GPUAbiMember{ "DebugView", offsetof(MaterialGPU, DebugView) },
+				GPUAbiMember{ "Ior", offsetof(MaterialGPU, Ior) },
+				GPUAbiMember{ "Padding0", offsetof(MaterialGPU, Padding0) },
+				GPUAbiMember{ "Padding1", offsetof(MaterialGPU, Padding1) },
+				GPUAbiMember{ "Padding2", offsetof(MaterialGPU, Padding2) },
 			};
 			bool dxilMaterialLayoutMatches = materialDxilDisassembled && !materialLayout.empty() &&
 				ParseUnsignedAfter(materialLayout, "Size:") == sizeof(MaterialGPU);

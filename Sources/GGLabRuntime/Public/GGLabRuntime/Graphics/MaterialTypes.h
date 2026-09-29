@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
+#include <cmath>
 #include <compare>
 #include <cstdint>
 #include <functional>
@@ -47,7 +48,15 @@ namespace gglab
 		EffectiveRoughness,
 		F0,
 		FeatureFlags,
+		Ior,
 	};
+
+	inline constexpr float DefaultDielectricIor = 1.5f;
+
+	[[nodiscard]] inline float SanitizeMaterialIor(float ior) noexcept
+	{
+		return std::isfinite(ior) && ior >= 1.0f ? ior : DefaultDielectricIor;
+	}
 
 	enum class MaterialTextureSlot : uint32_t
 	{
@@ -162,6 +171,7 @@ namespace gglab
 		float m_RoughnessFactor = 1.0f;
 		float m_NormalScale = 1.0f;
 		float m_OcclusionStrength = 1.0f;
+		float m_Ior = DefaultDielectricIor;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

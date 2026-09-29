@@ -99,7 +99,7 @@ float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoCo
 }
 #endif
 
-// Keep these values synchronized with MaterialDebugView in GraphicsTypes.h.
+// Keep these values synchronized with MaterialDebugView in MaterialTypes.h.
 static const uint MaterialDebugViewLit = 0u;
 static const uint MaterialDebugViewBaseColor = 1u;
 static const uint MaterialDebugViewMetallic = 2u;
@@ -109,6 +109,7 @@ static const uint MaterialDebugViewAuthoredRoughness = 5u;
 static const uint MaterialDebugViewEffectiveRoughness = 6u;
 static const uint MaterialDebugViewF0 = 7u;
 static const uint MaterialDebugViewFeatureFlags = 8u;
+static const uint MaterialDebugViewIor = 9u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -185,7 +186,10 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 	state.EffectivePerceptualRoughness = FilterPerceptualRoughness(
 		ClampPerceptualRoughnessForBRDF(surface.Roughness), normalWS);
 	state.BRDFAlpha = PerceptualRoughnessToAlpha(state.EffectivePerceptualRoughness);
-	state.F0 = lerp(0.04.xxx, surface.BaseColor, surface.Metallic);
+	const float ior = max(surface.Ior, 1.0);
+	const float dielectricReflectance = (ior - 1.0) / (ior + 1.0);
+	state.F0 = lerp((dielectricReflectance * dielectricReflectance).xxx,
+		surface.BaseColor, surface.Metallic);
 	state.FeatureFlags = 0u;
 	return state;
 }
@@ -603,6 +607,13 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(shading.F0, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewIor)
+	{
+		// Preserve an unbounded IOR range in a bounded grayscale diagnostic.
+		const float mappedIor = 1.0 - 1.0 / max(surface.Ior, 1.0);
+		const float4 color = float4(mappedIor.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewFeatureFlags)
 	{
 		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
@@ -619,7 +630,7 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// convert artistic roughness to physical roughness
 	float a = shading.BRDFAlpha;
 
-	float3 F0 = shading.F0; // dielectric F0 is 0.04, metal F0 is baseColor
+	float3 F0 = shading.F0;
 	const float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
 	const float3 energyCompensation = GGXEnergyCompensation(F0, brdfLUT);
 	const float3 specularDirectionalAlbedo =

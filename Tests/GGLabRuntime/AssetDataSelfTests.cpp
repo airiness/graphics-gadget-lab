@@ -37,6 +37,7 @@
 #include <fstream>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <numbers>
@@ -1140,15 +1141,52 @@ namespace gglab
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.3,0.4,1]},"extensions":{"KHR_materials_ior":{"ior":1.7}}})");
 			const ModelImportResult optional = ModelImporter::Import(root / "probe.gltf", {});
-			context.Check(optional.Succeeded(),
-				"Unsupported optional material extension keeps the core glTF fallback");
+			context.Check(optional.Succeeded() && optional.m_Model.m_Materials.size() == 2 &&
+				std::abs(optional.m_Model.m_Materials.front().m_Properties.m_Ior - 1.7f) < 0.0001f &&
+				optional.m_Model.m_Materials.back().m_Properties.m_Ior == DefaultDielectricIor,
+				"Optional KHR_materials_ior survives Assimp import; absent IOR uses 1.5");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],"extensionsRequired":["KHR_materials_ior"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7}}})");
 			const ModelImportResult required = ModelImporter::Import(root / "probe.gltf", {});
-			context.Check(!required.Succeeded() &&
-				required.m_Error.find("KHR_materials_ior") != std::string::npos,
-				"Unsupported required material extension is rejected visibly");
+			context.Check(required.Succeeded() &&
+				std::abs(required.m_Model.m_Materials.front().m_Properties.m_Ior - 1.7f) < 0.0001f,
+				"Required KHR_materials_ior survives Assimp import");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],"extensionsRequired":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{}}})");
+			const ModelImportResult emptyIor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(emptyIor.Succeeded() &&
+				emptyIor.m_Model.m_Materials.front().m_Properties.m_Ior == DefaultDielectricIor,
+				"Empty KHR_materials_ior uses the physical default");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":2.4}}})");
+			const ModelImportResult highIor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(highIor.Succeeded() &&
+				std::abs(highIor.m_Model.m_Materials.front().m_Properties.m_Ior - 2.4f) < 0.0001f,
+				"Valid IOR above common dielectric values is preserved");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":0.9}}})");
+			const ModelImportResult invalidIor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidIor.Succeeded() &&
+				invalidIor.m_Error.find("KHR_materials_ior") != std::string::npos,
+				"IOR below the glTF physical range is rejected visibly");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":"glass"}}})");
+			const ModelImportResult malformedIor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!malformedIor.Succeeded() &&
+				malformedIor.m_Error.find("KHR_materials_ior") != std::string::npos,
+				"Non-numeric IOR is rejected visibly");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],"extensionsRequired":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0.6}}})");
+			const ModelImportResult unsupportedRequired = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!unsupportedRequired.Succeeded() &&
+				unsupportedRequired.m_Error.find("KHR_materials_clearcoat") != std::string::npos,
+				"Unsupported required material extensions still fail visibly");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy","KHR_materials_sheen"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}},"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0},"sheenRoughnessTexture":{"index":0}}}})");
@@ -1199,6 +1237,16 @@ namespace gglab
 
 		void RunMaterialUVTransformTests(SelfTestContext& context) noexcept
 		{
+			context.Check(SanitizeMaterialIor(DefaultDielectricIor) == 1.5f &&
+				SanitizeMaterialIor(1.0f) == 1.0f &&
+				SanitizeMaterialIor(2.4f) == 2.4f &&
+				SanitizeMaterialIor(0.9f) == DefaultDielectricIor &&
+				SanitizeMaterialIor(std::numeric_limits<float>::infinity()) ==
+					DefaultDielectricIor &&
+				SanitizeMaterialIor(std::numeric_limits<float>::quiet_NaN()) ==
+					DefaultDielectricIor,
+				"Runtime material IOR preserves valid values and sanitizes invalid inputs");
+
 			const MaterialTextureBinding identity{};
 			const MaterialUVTransformRows identityRows = EncodeMaterialUVTransform(identity);
 			context.Check(identityRows.m_U.m_X == 1.0f && identityRows.m_U.m_Y == 0.0f &&
@@ -1297,7 +1345,7 @@ namespace gglab
 			ModelImportArtifactHandle materialBaseline = CreateModelImportArtifact(
 				materialFixture(), MakeResolvedModelTextureFixture(), textureCache);
 			bool materialDigestValid = materialBaseline && materialBaseline->IsValid();
-			for (uint32_t variant = 0; variant < 6; ++variant)
+			for (uint32_t variant = 0; variant < 7; ++variant)
 			{
 				ImportedModel changed = materialFixture();
 				auto& binding = changed.m_Materials.front().m_TextureBindings[0];
@@ -1309,6 +1357,7 @@ namespace gglab
 				case 3: binding.m_TexCoordIndex = 1; break;
 				case 4: changed.m_Materials.front().m_Properties.m_NormalScale = 0.5f; break;
 				case 5: changed.m_Materials.front().m_Properties.m_OcclusionStrength = 0.5f; break;
+				case 6: changed.m_Materials.front().m_Properties.m_Ior = 1.7f; break;
 				default: break;
 				}
 				const ModelImportArtifactHandle changedArtifact = CreateModelImportArtifact(
@@ -1317,7 +1366,7 @@ namespace gglab
 					changedArtifact->m_ContentDigest != materialBaseline->m_ContentDigest;
 			}
 			context.Check(materialDigestValid,
-				"Material artifact digest tracks UV transform, UV set and core glTF factors");
+				"Material artifact digest tracks UV transform, UV set, core factors and IOR");
 			materialBaseline.reset();
 
 			const uint64_t textureBytes =

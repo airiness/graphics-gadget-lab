@@ -8,6 +8,7 @@ struct SurfaceData
 	float3 Emissive;
 	float Metallic;
 	float Roughness; // perceived roughness; BRDF clamping stays in the lighting path
+	float Ior;
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
@@ -41,6 +42,7 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		matData.MetallicRoughnessBinding.TextureSamplerBinding, metallicRoughnessUV);
 	surface.Metallic = saturate(matData.MetallicFactor * metallicRoughnessSampled.b);
 	surface.Roughness = saturate(matData.RoughnessFactor * metallicRoughnessSampled.g);
+	surface.Ior = matData.Ior;
 
 	// Emissive retains the pre-World-Lighting legacy factor scale in this baseline.
 	// A scene-referred emissive-unit migration requires a separate contract.

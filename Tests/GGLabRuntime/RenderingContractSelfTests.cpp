@@ -8107,6 +8107,14 @@ namespace gglab
 		const double lutB = integrate(1.0, 0.0);
 		const double lutA = rough - lutB;
 		const double dielectric = integrate(1.0, defaultIorF0);
+		const double iorOneF0 = 0.0;
+		const double iorTwoF0 = 1.0 / 9.0;
+		context.Check(integrate(1.0, iorOneF0) < dielectric &&
+			dielectric < integrate(1.0, iorTwoF0) &&
+			std::abs(iorOneF0 * lutA + lutB - integrate(1.0, iorOneF0)) < 1e-6 &&
+			std::abs(iorTwoF0 * lutA + lutB - integrate(1.0, iorTwoF0)) < 1e-6 &&
+			std::lerp(iorOneF0, 0.8, 1.0) == std::lerp(iorTwoF0, 0.8, 1.0),
+			"IOR changes direct and split-sum dielectric response while metallic F0 remains base color");
 		context.Check(std::abs(lutA - 0.30682) < 0.001 &&
 			std::abs(lutB - 0.000033615) < 0.000002 &&
 			std::abs(defaultIorF0 * lutA + lutB - dielectric) < 1e-6,

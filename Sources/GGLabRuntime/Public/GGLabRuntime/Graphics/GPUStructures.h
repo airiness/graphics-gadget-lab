@@ -144,10 +144,15 @@ namespace gglab
 		float AlphaCutoff;
 		uint32_t Flags; // bit 0: doubleSided
 		uint32_t DebugView;
+		float Ior;
+		uint32_t Padding0;
+		uint32_t Padding1;
+		uint32_t Padding2;
 	};
-	static_assert(sizeof(MaterialGPU) == 304);
+	static_assert(sizeof(MaterialGPU) == 320);
 	static_assert(offsetof(MaterialGPU, BaseColorFactor) == 240);
 	static_assert(offsetof(MaterialGPU, NormalScale) == 280);
+	static_assert(offsetof(MaterialGPU, Ior) == 304);
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 

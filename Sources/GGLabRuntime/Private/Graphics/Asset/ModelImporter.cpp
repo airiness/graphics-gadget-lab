@@ -369,6 +369,7 @@ namespace gglab
 				}
 				const std::string name = entry.get<std::string>();
 				if (!name.starts_with("KHR_materials_")) continue;
+				if (name == "KHR_materials_ior") continue;
 				if (std::string_view(field) == "extensionsRequired")
 				{
 					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
@@ -534,6 +535,45 @@ namespace gglab
 			if (sourceMaterials && materialIndex < sourceMaterials->size())
 			{
 				const Json& material = (*sourceMaterials)[materialIndex];
+				const auto extensionsEntry = material.find("extensions");
+				if (extensionsEntry != material.end() && !extensionsEntry->is_object())
+				{
+					result.m_Error = "glTF material extensions must be an object.";
+					return result;
+				}
+				if (const Json* extensions = FindObjectField(material, "extensions"))
+				{
+					const auto iorExtension = extensions->find("KHR_materials_ior");
+					if (iorExtension != extensions->end())
+					{
+						if (!iorExtension->is_object())
+						{
+							result.m_Error = "KHR_materials_ior must be an object.";
+							return result;
+						}
+						const auto iorValue = iorExtension->find("ior");
+						if (iorValue != iorExtension->end())
+						{
+							const float authoredIor = iorValue->is_number()
+								? iorValue->get<float>() : 0.0f;
+							if (!std::isfinite(authoredIor) || authoredIor < 1.0f)
+							{
+								result.m_Error = "KHR_materials_ior.ior must be a finite number >= 1.";
+								return result;
+							}
+							float importedIor = 0.0f;
+							if (source->Get(AI_MATKEY_REFRACTI, importedIor) != aiReturn_SUCCESS ||
+								!std::isfinite(importedIor) || importedIor < 1.0f ||
+								std::abs(importedIor - authoredIor) >
+									std::max(0.0001f, authoredIor * 0.0001f))
+							{
+								result.m_Error = "Assimp did not preserve KHR_materials_ior.ior.";
+								return result;
+							}
+							destination.m_Properties.m_Ior = importedIor;
+						}
+					}
+				}
 				if (const Json* normal = FindMaterialTextureInfo(material, MaterialTextureSlot::Normal))
 				{
 					if (!ReadTextureScalar(*normal, "scale", destination.m_Properties.m_NormalScale,
