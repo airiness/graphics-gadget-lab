@@ -226,10 +226,10 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 	state.TangentWS = SafeNormalize(projected, fallbackTangent);
 	const float handedness = dot(cross(frame[0], frame[1]), normalWS) < 0.0 ? -1.0 : 1.0;
 	state.BitangentWS = SafeNormalize(cross(shadingNormalWS, state.TangentWS), frame[1]) * handedness;
-	// Opposing widths preserve the base alpha until the BRDF width limits apply.
-	const float aspect = sqrt(1.0 - 0.9 * state.Strength);
-	state.AlphaT = clamp(baseAlpha / aspect, MIN_PERCEPTUAL_ROUGHNESS * MIN_PERCEPTUAL_ROUGHNESS, 1.0);
-	state.AlphaB = max(baseAlpha * aspect, MIN_PERCEPTUAL_ROUGHNESS * MIN_PERCEPTUAL_ROUGHNESS);
+	// Strength increases roughness only along the anisotropy direction; both
+	// axes coincide when the base roughness reaches one.
+	state.AlphaT = lerp(baseAlpha, 1.0, state.Strength * state.Strength);
+	state.AlphaB = baseAlpha;
 	return state;
 }
 
