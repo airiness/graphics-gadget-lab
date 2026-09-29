@@ -1,6 +1,27 @@
 #pragma once
 #include <Common/MaterialUtils.hlsli>
 
+// Keep these values synchronized with MaterialDebugView in MaterialTypes.h.
+static const uint MaterialDebugViewLit = 0u;
+static const uint MaterialDebugViewBaseColor = 1u;
+static const uint MaterialDebugViewMetallic = 2u;
+static const uint MaterialDebugViewRoughness = 3u;
+static const uint MaterialDebugViewNormal = 4u;
+static const uint MaterialDebugViewAuthoredRoughness = 5u;
+static const uint MaterialDebugViewEffectiveRoughness = 6u;
+static const uint MaterialDebugViewF0 = 7u;
+static const uint MaterialDebugViewFeatureFlags = 8u;
+static const uint MaterialDebugViewIor = 9u;
+static const uint MaterialDebugViewClearcoatFactor = 10u;
+static const uint MaterialDebugViewClearcoatRoughness = 11u;
+static const uint MaterialDebugViewClearcoatNormal = 12u;
+static const uint MaterialDebugViewAnisotropyStrength = 13u;
+static const uint MaterialDebugViewAnisotropyDirectionTangent = 14u;
+static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
+static const uint MaterialDebugViewSheenColor = 16u;
+static const uint MaterialDebugViewSheenRoughness = 17u;
+static const uint MaterialDebugViewSheenContribution = 18u;
+
 // Resolves runtime material factors and texture bindings for Forward PBR.
 struct SurfaceData
 {
@@ -78,14 +99,21 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	surface.Roughness = saturate(matData.RoughnessFactor * metallicRoughnessSampled.g);
 	surface.Ior = matData.Ior;
 	surface.ClearcoatFactor = saturate(matData.ClearcoatFactor);
-	if (surface.ClearcoatFactor > 0.0)
+	if (matData.ClearcoatFactor > 0.0 || matData.DebugView == MaterialDebugViewClearcoatFactor)
 	{
-		const float2 factorUV = SelectUV(matData.ClearcoatBinding, uv0, uv1);
-		surface.ClearcoatFactor *= SampleTextureBinding(
-			matData.ClearcoatBinding.TextureSamplerBinding, factorUV).r;
+		if (matData.ClearcoatBinding.TextureEnabled != 0u)
+		{
+			const float2 factorUV = SelectUV(matData.ClearcoatBinding, uv0, uv1);
+			surface.ClearcoatFactor *= SampleTextureBinding(
+				matData.ClearcoatBinding.TextureSamplerBinding, factorUV).r;
+		}
 	}
 	surface.ClearcoatRoughness = saturate(matData.ClearcoatRoughness);
-	if (surface.ClearcoatFactor > 0.0)
+	// The factor texture can vary within a pixel quad. Do not use its result
+	// to guard another implicit-derivative texture sample.
+	if ((matData.ClearcoatFactor > 0.0 ||
+		matData.DebugView == MaterialDebugViewClearcoatRoughness) &&
+		matData.ClearcoatRoughnessBinding.TextureEnabled != 0u)
 	{
 		const float2 roughnessUV = SelectUV(matData.ClearcoatRoughnessBinding, uv0, uv1);
 		surface.ClearcoatRoughness *= SampleTextureBinding(
@@ -93,7 +121,10 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	}
 	surface.AnisotropyStrength = saturate(matData.AnisotropyStrength);
 	float2 direction = float2(1.0, 0.0);
-	if (surface.AnisotropyStrength > 0.0 && matData.AnisotropyTextureEnabled != 0u)
+	if ((matData.AnisotropyStrength > 0.0 ||
+		matData.DebugView == MaterialDebugViewAnisotropyDirectionTangent ||
+		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld) &&
+		matData.AnisotropyTextureEnabled != 0u)
 	{
 		const float2 anisotropyUV = SelectUV(matData.AnisotropyBinding, uv0, uv1);
 		const float3 anisotropySample = SampleTextureBinding(
@@ -112,12 +143,17 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 		sine * direction.x + cosine * direction.y);
 	surface.SheenColor = saturate(matData.SheenColorFactor.rgb);
 	surface.SheenRoughness = saturate(matData.SheenRoughnessFactor);
-	if (any(surface.SheenColor > 0.0.xxx))
+	if (any(matData.SheenColorFactor.rgb > 0.0.xxx) ||
+		matData.DebugView == MaterialDebugViewSheenRoughness)
 	{
-		const float2 colorUV = SelectUV(matData.SheenColorBinding, uv0, uv1);
-		surface.SheenColor *= SampleTextureBinding(
-			matData.SheenColorBinding.TextureSamplerBinding, colorUV).rgb;
-		if (any(surface.SheenColor > 0.0.xxx))
+		if (any(matData.SheenColorFactor.rgb > 0.0.xxx))
+		{
+			const float2 colorUV = SelectUV(matData.SheenColorBinding, uv0, uv1);
+			surface.SheenColor *= SampleTextureBinding(
+				matData.SheenColorBinding.TextureSamplerBinding, colorUV).rgb;
+		}
+		if (any(matData.SheenColorFactor.rgb > 0.0.xxx) ||
+			matData.DebugView == MaterialDebugViewSheenRoughness)
 		{
 			const float2 roughnessUV = SelectUV(matData.SheenRoughnessBinding, uv0, uv1);
 			surface.SheenRoughness *= SampleTextureBinding(

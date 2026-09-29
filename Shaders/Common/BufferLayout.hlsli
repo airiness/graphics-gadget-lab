@@ -66,7 +66,7 @@ struct MaterialTextureBindingData
 {
 	TextureSamplerBindingData TextureSamplerBinding;
 	uint TexCoordIndex;
-	uint Padding;
+	uint TextureEnabled;
 	float4 UVTransformU;
 	float4 UVTransformV;
 };

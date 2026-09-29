@@ -116,7 +116,7 @@ namespace gglab
 	{
 		TextureSamplerBindingGPU TextureSamplerBinding;
 		uint32_t TexCoordIndex;
-		uint32_t Padding;
+		uint32_t TextureEnabled;
 		Vector4 UVTransformU;
 		Vector4 UVTransformV;
 	};

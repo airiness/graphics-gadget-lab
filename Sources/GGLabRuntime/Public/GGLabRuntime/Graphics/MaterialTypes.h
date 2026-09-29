@@ -64,7 +64,8 @@ namespace gglab
 
 	[[nodiscard]] inline float SanitizeMaterialIor(float ior) noexcept
 	{
-		return std::isfinite(ior) && ior >= 1.0f ? ior : DefaultDielectricIor;
+		return std::isfinite(ior) && (ior == 0.0f || ior >= 1.0f)
+			? ior : DefaultDielectricIor;
 	}
 
 	enum class MaterialTextureSlot : uint32_t

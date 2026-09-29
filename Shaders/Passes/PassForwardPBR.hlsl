@@ -99,26 +99,6 @@ float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoCo
 }
 #endif
 
-// Keep these values synchronized with MaterialDebugView in MaterialTypes.h.
-static const uint MaterialDebugViewLit = 0u;
-static const uint MaterialDebugViewBaseColor = 1u;
-static const uint MaterialDebugViewMetallic = 2u;
-static const uint MaterialDebugViewRoughness = 3u;
-static const uint MaterialDebugViewNormal = 4u;
-static const uint MaterialDebugViewAuthoredRoughness = 5u;
-static const uint MaterialDebugViewEffectiveRoughness = 6u;
-static const uint MaterialDebugViewF0 = 7u;
-static const uint MaterialDebugViewFeatureFlags = 8u;
-static const uint MaterialDebugViewIor = 9u;
-static const uint MaterialDebugViewClearcoatFactor = 10u;
-static const uint MaterialDebugViewClearcoatRoughness = 11u;
-static const uint MaterialDebugViewClearcoatNormal = 12u;
-static const uint MaterialDebugViewAnisotropyStrength = 13u;
-static const uint MaterialDebugViewAnisotropyDirectionTangent = 14u;
-static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
-static const uint MaterialDebugViewSheenColor = 16u;
-static const uint MaterialDebugViewSheenRoughness = 17u;
-static const uint MaterialDebugViewSheenContribution = 18u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -194,7 +174,8 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 	state.EffectivePerceptualRoughness = FilterPerceptualRoughness(
 		ClampPerceptualRoughnessForBRDF(surface.Roughness), normalWS);
 	state.BRDFAlpha = PerceptualRoughnessToAlpha(state.EffectivePerceptualRoughness);
-	const float ior = max(surface.Ior, 1.0);
+	// glTF reserves zero for an infinite-IOR Fresnel response (F0 = 1).
+	const float ior = surface.Ior == 0.0 ? 0.0 : max(surface.Ior, 1.0);
 	const float dielectricReflectance = (ior - 1.0) / (ior + 1.0);
 	state.F0 = lerp((dielectricReflectance * dielectricReflectance).xxx,
 		surface.BaseColor, surface.Metallic);
@@ -215,7 +196,8 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 }
 
 AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 normalWS,
-	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 uv0, float baseAlpha)
+	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 normalUV,
+	float baseAlpha, bool evaluateFrame)
 {
 	AnisotropyShadingState state;
 	state.Strength = surface.AnisotropyStrength;
@@ -223,9 +205,11 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 	state.BitangentWS = 0.0.xxx;
 	state.AlphaT = baseAlpha;
 	state.AlphaB = baseAlpha;
-	if (state.Strength <= 0.0) return state;
+	if (!evaluateFrame) return state;
 
-	const float3x3 frame = BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv0);
+	// A missing mesh tangent uses the same normal-map coordinates as normal
+	// perturbation, including the selected UV set and texture transform.
+	const float3x3 frame = BuildTBNFromTangent(normalWS, tangentWS, positionWS, normalUV);
 	const float2 direction = surface.AnisotropyDirectionTS;
 	const float3 tangent = frame[0] * direction.x + frame[1] * direction.y;
 	const float3 projected = tangent - shadingNormalWS * dot(shadingNormalWS, tangent);
@@ -271,7 +255,14 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		   g_Scene.IBLResource.EnvironmentIntensity;
 }
 
-float3 SampleAnisotropicIBL(float3 reflectWS, AnisotropyShadingState anisotropy)
+float3 ProjectToTangentHemisphere(float3 direction, float3 normalWS)
+{
+	const float NoD = dot(direction, normalWS);
+	return SafeNormalize(direction + normalWS * max(0.01 - NoD, 0.0), normalWS);
+}
+
+float3 SampleAnisotropicIBL(float3 reflectWS, float3 normalWS,
+	AnisotropyShadingState anisotropy)
 {
 	// The environment is prefiltered isotropically. Three normalized taps at the
 	// minor-axis mip approximate the elongated major-axis reflection footprint.
@@ -279,11 +270,14 @@ float3 SampleAnisotropicIBL(float3 reflectWS, AnisotropyShadingState anisotropy)
 	const float3 majorDirection = SafeNormalize(axis, anisotropy.TangentWS);
 	const float spread = 0.5 * max(anisotropy.AlphaT - anisotropy.AlphaB, 0.0);
 	const float minorRoughness = sqrt(anisotropy.AlphaB);
-	const float3 center = SampleIBLPrefilteredSpecular(reflectWS, minorRoughness);
+	const float3 center = SampleIBLPrefilteredSpecular(
+		ProjectToTangentHemisphere(reflectWS, normalWS), minorRoughness);
 	const float3 positive = SampleIBLPrefilteredSpecular(
-		SafeNormalize(reflectWS + majorDirection * spread, reflectWS), minorRoughness);
+		ProjectToTangentHemisphere(
+			SafeNormalize(reflectWS + majorDirection * spread, reflectWS), normalWS), minorRoughness);
 	const float3 negative = SampleIBLPrefilteredSpecular(
-		SafeNormalize(reflectWS - majorDirection * spread, reflectWS), minorRoughness);
+		ProjectToTangentHemisphere(
+			SafeNormalize(reflectWS - majorDirection * spread, reflectWS), normalWS), minorRoughness);
 	return 0.5 * center + 0.25 * (positive + negative);
 }
 
@@ -778,7 +772,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 N = SampleNormalWS(matData.NormalBinding, matData.NormalScale,
 		normalWS, tangentWS, IN.PositionWS, normalUV);
 	float3 clearcoatNormalWS = normalWS;
-	if (surface.ClearcoatFactor > 0.0 || matData.DebugView == MaterialDebugViewClearcoatNormal)
+	if ((matData.ClearcoatFactor > 0.0 ||
+		matData.DebugView == MaterialDebugViewClearcoatNormal) &&
+		matData.ClearcoatNormalBinding.TextureEnabled != 0u)
 	{
 		const float2 clearcoatUV = SelectUV(matData.ClearcoatNormalBinding, IN.UV0, IN.UV1);
 		clearcoatNormalWS = SampleNormalWS(matData.ClearcoatNormalBinding,
@@ -786,7 +782,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	}
 	const BaseShadingState shading = BuildBaseShadingState(surface, N);
 	const AnisotropyShadingState anisotropy = BuildAnisotropyShadingState(surface,
-		normalWS, N, tangentWS, IN.PositionWS, IN.UV0, shading.BRDFAlpha);
+		normalWS, N, tangentWS, IN.PositionWS, normalUV, shading.BRDFAlpha,
+		matData.AnisotropyStrength > 0.0 ||
+		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld);
 	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
 
 	if (matData.DebugView == MaterialDebugViewBaseColor)
@@ -827,7 +825,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	if (matData.DebugView == MaterialDebugViewIor)
 	{
 		// Preserve an unbounded IOR range in a bounded grayscale diagnostic.
-		const float mappedIor = 1.0 - 1.0 / max(surface.Ior, 1.0);
+		const float mappedIor = surface.Ior == 0.0 ? 1.0 :
+			1.0 - 1.0 / max(surface.Ior, 1.0);
 		const float4 color = float4(mappedIor.xxx, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
@@ -900,17 +899,15 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ClearcoatShadingState coat;
 	coat.Factor = surface.ClearcoatFactor;
 	coat.NormalWS = clearcoatNormalWS;
-	coat.PerceptualRoughness = 0.0;
-	coat.BRDFAlpha = 0.0;
-	coat.NoV = 0.0;
 	coat.DirectionalAlbedo = 0.0;
 	coat.EnergyCompensation = 1.0.xxx;
+	// Keep normal derivatives outside the texture-dependent factor branch.
+	coat.PerceptualRoughness = FilterPerceptualRoughness(
+		ClampPerceptualRoughnessForBRDF(surface.ClearcoatRoughness), clearcoatNormalWS);
+	coat.BRDFAlpha = PerceptualRoughnessToAlpha(coat.PerceptualRoughness);
+	coat.NoV = saturate(dot(clearcoatNormalWS, V));
 	if (coat.Factor > 0.0)
 	{
-		coat.PerceptualRoughness = FilterPerceptualRoughness(
-			ClampPerceptualRoughnessForBRDF(surface.ClearcoatRoughness), clearcoatNormalWS);
-		coat.BRDFAlpha = PerceptualRoughnessToAlpha(coat.PerceptualRoughness);
-		coat.NoV = saturate(dot(clearcoatNormalWS, V));
 		const float2 coatLUT = SampleIBLBrdfLUT(coat.NoV, coat.PerceptualRoughness);
 		coat.EnergyCompensation = GGXEnergyCompensation(0.04.xxx, coatLUT);
 		coat.DirectionalAlbedo = saturate(
@@ -946,14 +943,16 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
-	const float3 emissive = surface.Emissive;
+	// The clearcoat layer sits above emission and attenuates its outgoing light.
+	const float coatFresnel = F_Schlick(0.04.xxx, 1.0.xxx, coat.NoV).x;
+	const float3 emissive = surface.Emissive * (1.0 - coat.Factor * coatFresnel);
 
 	// IBL
 	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseWeight * Fd_Lambert(baseColor);
 
 	float3 reflectWS = reflect(-V, N);
 	float3 prefilteredEnv = anisotropy.Strength > 0.0
-		? SampleAnisotropicIBL(reflectWS, anisotropy)
+		? SampleAnisotropicIBL(reflectWS, N, anisotropy)
 		: SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
 	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
 	float3 sheenIBL = 0.0.xxx;

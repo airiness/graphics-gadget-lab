@@ -37,7 +37,7 @@ namespace gglab
 							binding.m_SamplerId, fallbackSampler),
 					},
 				.TexCoordIndex = binding.m_TexCoordIndex,
-				.Padding = 0,
+				.TextureEnabled = binding.m_TextureId.IsValid() ? 1u : 0u,
 				.UVTransformU = transform.m_U,
 				.UVTransformV = transform.m_V,
 			};

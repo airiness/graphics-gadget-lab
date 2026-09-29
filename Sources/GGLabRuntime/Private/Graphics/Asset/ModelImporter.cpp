@@ -854,23 +854,37 @@ namespace gglab
 						const auto iorValue = iorExtension->find("ior");
 						if (iorValue != iorExtension->end())
 						{
-							const float authoredIor = iorValue->is_number()
-								? iorValue->get<float>() : 0.0f;
-							if (!std::isfinite(authoredIor) || authoredIor < 1.0f)
+							if (!iorValue->is_number())
 							{
-								result.m_Error = "KHR_materials_ior.ior must be a finite number >= 1.";
+								result.m_Error = "KHR_materials_ior.ior must be numeric.";
 								return result;
 							}
-							float importedIor = 0.0f;
-							if (source->Get(AI_MATKEY_REFRACTI, importedIor) != aiReturn_SUCCESS ||
-								!std::isfinite(importedIor) || importedIor < 1.0f ||
-								std::abs(importedIor - authoredIor) >
-									std::max(0.0001f, authoredIor * 0.0001f))
+							const float authoredIor = iorValue->get<float>();
+							if (!std::isfinite(authoredIor) ||
+								(authoredIor != 0.0f && authoredIor < 1.0f))
 							{
-								result.m_Error = "Assimp did not preserve KHR_materials_ior.ior.";
+								result.m_Error = "KHR_materials_ior.ior must be 0 or a finite number >= 1.";
 								return result;
 							}
-							destination.m_Properties.m_Ior = importedIor;
+							// Zero is glTF's special infinite-Fresnel mode. Use the authored
+							// value directly because Assimp may normalize it to a physical IOR.
+							if (authoredIor == 0.0f)
+							{
+								destination.m_Properties.m_Ior = 0.0f;
+							}
+							else
+							{
+								float importedIor = 0.0f;
+								if (source->Get(AI_MATKEY_REFRACTI, importedIor) != aiReturn_SUCCESS ||
+									!std::isfinite(importedIor) || importedIor < 1.0f ||
+									std::abs(importedIor - authoredIor) >
+										std::max(0.0001f, authoredIor * 0.0001f))
+								{
+									result.m_Error = "Assimp did not preserve KHR_materials_ior.ior.";
+									return result;
+								}
+								destination.m_Properties.m_Ior = importedIor;
+							}
 						}
 					}
 				}

@@ -1168,6 +1168,13 @@ namespace gglab
 				"Valid IOR above common dielectric values is preserved");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":0}}})");
+			const ModelImportResult infiniteIor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(infiniteIor.Succeeded() &&
+				infiniteIor.m_Model.m_Materials.front().m_Properties.m_Ior == 0.0f,
+				"Zero IOR preserves the glTF infinite-Fresnel mode");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":0.9}}})");
 			const ModelImportResult invalidIor = ModelImporter::Import(root / "probe.gltf", {});
 			context.Check(!invalidIor.Succeeded() &&
@@ -1370,6 +1377,7 @@ namespace gglab
 		void RunMaterialUVTransformTests(SelfTestContext& context) noexcept
 		{
 			context.Check(SanitizeMaterialIor(DefaultDielectricIor) == 1.5f &&
+				SanitizeMaterialIor(0.0f) == 0.0f &&
 				SanitizeMaterialIor(1.0f) == 1.0f &&
 				SanitizeMaterialIor(2.4f) == 2.4f &&
 				SanitizeMaterialIor(0.9f) == DefaultDielectricIor &&
