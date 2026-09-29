@@ -110,6 +110,9 @@ static const uint MaterialDebugViewEffectiveRoughness = 6u;
 static const uint MaterialDebugViewF0 = 7u;
 static const uint MaterialDebugViewFeatureFlags = 8u;
 static const uint MaterialDebugViewIor = 9u;
+static const uint MaterialDebugViewClearcoatFactor = 10u;
+static const uint MaterialDebugViewClearcoatRoughness = 11u;
+static const uint MaterialDebugViewClearcoatNormal = 12u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -133,19 +136,19 @@ float LoadGTAO(uint2 pixel)
 }
 
 // Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(
-	MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
+float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
+	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
 {
 	// TODO: flip Y for normal map?
 
 	// Sample normal texture
-	float4 normalSampled = SampleTextureBinding(matData.NormalBinding.TextureSamplerBinding, uv);
+	float4 normalSampled = SampleTextureBinding(binding.TextureSamplerBinding, uv);
 
 	// Remap from [0,1] to [-1,1], xy only
 	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
 
 	// Apply normal scale xy
-	normalSampled.xy *= matData.NormalScale; // apply normal scale
+	normalSampled.xy *= normalScale;
 
 	// rebuild z, avoid normalization issues
 	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
@@ -153,7 +156,6 @@ float3 SampleNormalWS(
 	// Authored tangents describe UV0. A different UV set or a transformed normal
 	// map needs a frame derived from the actual sampled coordinates, including
 	// rotations and mirrored scales.
-	const MaterialTextureBindingData binding = matData.NormalBinding;
 	const bool transformedFrame = binding.TexCoordIndex != 0u ||
 		any(abs(binding.UVTransformU.xy - float2(1.0, 0.0)) > 1.0e-6) ||
 		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
@@ -191,6 +193,10 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 	state.F0 = lerp((dielectricReflectance * dielectricReflectance).xxx,
 		surface.BaseColor, surface.Metallic);
 	state.FeatureFlags = 0u;
+	if (surface.ClearcoatFactor > 0.0)
+	{
+		state.FeatureFlags |= 1u;
+	}
 	return state;
 }
 
@@ -420,8 +426,29 @@ float3 WorldSunDiskSpecular(float3 centerDirection, float3 N, float3 V, float3 F
 	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
 }
 
+float3 EvaluateClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
+	bool worldSun)
+{
+	const float NoL = saturate(dot(coat.NormalWS, L));
+	if (NoL <= 0.0) return 0.0.xxx;
+	const float3 F0 = 0.04.xxx;
+	if (worldSun && coat.BRDFAlpha < 0.04)
+	{
+		// Integrate the finite solar disk with the coat's own normal and GGX width.
+		return WorldSunDiskSpecular(L, coat.NormalWS, V, F0, coat.BRDFAlpha) *
+			coat.EnergyCompensation;
+	}
+	const float3 H = SafeNormalize(L + V, coat.NormalWS);
+	const float NoH = saturate(dot(coat.NormalWS, H));
+	const float VoH = saturate(dot(V, H));
+	return D_GGX(NoH, coat.BRDFAlpha) *
+		V_SmithGGXCorrelated(coat.NoV, NoL, coat.BRDFAlpha) *
+		F_Schlick(F0, 1.0.xxx, VoH) * coat.EnergyCompensation * NoL;
+}
+
 float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight, float3 energyCompensation)
+	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
+	float3 energyCompensation, ClearcoatShadingState coat)
 {
 	const LightData light = g_Lights[lightIndex];
 	float3 L = 0.0.xxx;
@@ -432,7 +459,7 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	}
 
 	const float NoL = saturate(dot(N, L));
-	if (NoL <= 0.0)
+	if (NoL <= 0.0 && (coat.Factor <= 0.0 || dot(coat.NormalWS, L) <= 0.0))
 	{
 		return 0.0.xxx;
 	}
@@ -467,19 +494,31 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 		directResponse = diffuse * NoL +
 			WorldSunDiskSpecular(L, N, V, F0, physicalRoughness) * energyCompensation;
 	}
+	if (coat.Factor > 0.0)
+	{
+		const float coatNoL = saturate(dot(coat.NormalWS, L));
+		// Two interface crossings attenuate the base; the reflected coat lobe is
+		// evaluated once. The LUT carries the rough coat's outgoing reflectance.
+		const float incidentReflectance = F_Schlick(0.04.xxx, 1.0.xxx, coatNoL).x;
+		const float transmission = (1.0 - coat.Factor * coat.DirectionalAlbedo) *
+			(1.0 - coat.Factor * incidentReflectance);
+		directResponse = directResponse * transmission + coat.Factor *
+			EvaluateClearcoatDirect(L, V, coat, lightIndex == g_Scene.WorldSunLightIndex);
+	}
 	return directResponse * illuminance * attenuation *
 		shadowVisibility;
 }
 
 float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight, float3 energyCompensation)
+	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
+	float3 energyCompensation, ClearcoatShadingState coat)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
 	}
 	return lighting;
 }
@@ -493,7 +532,7 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 
 float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
 	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor,
-	float3 diffuseWeight, float3 energyCompensation)
+	float3 diffuseWeight, float3 energyCompensation, ClearcoatShadingState coat)
 {
 	float3 lighting = 0.0.xxx;
 	const uint globalLightCount = min(
@@ -505,7 +544,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
 			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-				physicalRoughness, baseColor, diffuseWeight, energyCompensation);
+				physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
 		}
 	}
 
@@ -527,7 +566,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			continue;
 		}
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation, coat);
 	}
 	return lighting;
 }
@@ -568,7 +607,15 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		normalWS = -normalWS;
 	}
 	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
-	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
+	float3 N = SampleNormalWS(matData.NormalBinding, matData.NormalScale,
+		normalWS, tangentWS, IN.PositionWS, normalUV);
+	float3 clearcoatNormalWS = normalWS;
+	if (surface.ClearcoatFactor > 0.0 || matData.DebugView == MaterialDebugViewClearcoatNormal)
+	{
+		const float2 clearcoatUV = SelectUV(matData.ClearcoatNormalBinding, IN.UV0, IN.UV1);
+		clearcoatNormalWS = SampleNormalWS(matData.ClearcoatNormalBinding,
+			matData.ClearcoatNormalScale, normalWS, tangentWS, IN.PositionWS, clearcoatUV);
+	}
 	const BaseShadingState shading = BuildBaseShadingState(surface, N);
 	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
 
@@ -614,6 +661,21 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(mappedIor.xxx, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewClearcoatFactor)
+	{
+		const float4 color = float4(surface.ClearcoatFactor.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewClearcoatRoughness)
+	{
+		const float4 color = float4(surface.ClearcoatRoughness.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewClearcoatNormal)
+	{
+		const float4 color = float4(clearcoatNormalWS * 0.5 + 0.5, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewFeatureFlags)
 	{
 		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
@@ -637,19 +699,39 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		saturate((F0 * brdfLUT.x + brdfLUT.y) * energyCompensation);
 	// The compensated directional albedo allocates the remaining energy to diffuse.
 	const float3 diffuseWeight = (1.0.xxx - specularDirectionalAlbedo) * (1.0 - metallic);
+	ClearcoatShadingState coat;
+	coat.Factor = surface.ClearcoatFactor;
+	coat.NormalWS = clearcoatNormalWS;
+	coat.PerceptualRoughness = 0.0;
+	coat.BRDFAlpha = 0.0;
+	coat.NoV = 0.0;
+	coat.DirectionalAlbedo = 0.0;
+	coat.EnergyCompensation = 1.0.xxx;
+	if (coat.Factor > 0.0)
+	{
+		coat.PerceptualRoughness = FilterPerceptualRoughness(
+			ClampPerceptualRoughnessForBRDF(surface.ClearcoatRoughness), clearcoatNormalWS);
+		coat.BRDFAlpha = PerceptualRoughnessToAlpha(coat.PerceptualRoughness);
+		coat.NoV = saturate(dot(clearcoatNormalWS, V));
+		const float2 coatLUT = SampleIBLBrdfLUT(coat.NoV, coat.PerceptualRoughness);
+		coat.EnergyCompensation = GGXEnergyCompensation(0.04.xxx, coatLUT);
+		coat.DirectionalAlbedo = saturate(
+			(0.04 * coatLUT.x + coatLUT.y) * coat.EnergyCompensation.x);
+	}
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight, energyCompensation);
+		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight,
+		energyCompensation, coat);
 #else
 	const float3 directLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation);
+			diffuseWeight, energyCompensation, coat);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	const float3 legacyDirectLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation);
+			diffuseWeight, energyCompensation, coat);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
@@ -661,6 +743,16 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float3 reflectWS = reflect(-V, N);
 	float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
 	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
+	if (coat.Factor > 0.0)
+	{
+		const float baseTransmission = 1.0 - coat.Factor * coat.DirectionalAlbedo;
+		diffuseIBL *= baseTransmission * baseTransmission;
+		specularIBL *= baseTransmission * baseTransmission;
+		const float3 coatReflection = reflect(-V, clearcoatNormalWS);
+		const float3 coatEnvironment = SampleIBLPrefilteredSpecular(
+			coatReflection, coat.PerceptualRoughness);
+		specularIBL += coatEnvironment * (coat.Factor * coat.DirectionalAlbedo);
+	}
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);

@@ -1182,11 +1182,41 @@ namespace gglab
 				"Non-numeric IOR is rejected visibly");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],"extensionsRequired":["KHR_materials_clearcoat"],)",
-				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0.6}}})");
-			const ModelImportResult unsupportedRequired = ModelImporter::Import(root / "probe.gltf", {});
-			context.Check(!unsupportedRequired.Succeeded() &&
-				unsupportedRequired.m_Error.find("KHR_materials_clearcoat") != std::string::npos,
-				"Unsupported required material extensions still fail visibly");
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0,"texCoord":1,"extensions":{"KHR_texture_transform":{"offset":[0.1,0.2]}}},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.45}}}})");
+			const ModelImportResult requiredCoat = ModelImporter::Import(root / "probe.gltf", {});
+			bool coatValid = requiredCoat.Succeeded();
+			if (coatValid)
+			{
+				const auto& material = requiredCoat.m_Model.m_Materials.front();
+				const auto& factor = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::Clearcoat)];
+				const auto& roughness = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::ClearcoatRoughness)];
+				const auto& normal = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::ClearcoatNormal)];
+				coatValid = std::abs(material.m_Properties.m_ClearcoatFactor - 0.6f) < 0.0001f &&
+					std::abs(material.m_Properties.m_ClearcoatRoughness - 0.25f) < 0.0001f &&
+					std::abs(material.m_Properties.m_ClearcoatNormalScale - 0.45f) < 0.0001f &&
+					factor.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					roughness.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					normal.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					factor.m_TexCoordIndex == 1 && std::abs(factor.m_UVOffset.m_X - 0.1f) < 0.0001f &&
+					requiredCoat.m_Model.m_TextureSources.size() == 2;
+			}
+			context.Check(coatValid,
+				std::format("Required clearcoat factors and three texture roles survive import: {}", requiredCoat.m_Error));
+
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0,"clearcoatRoughnessFactor":0.4}}})");
+			const ModelImportResult disabledCoat = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(disabledCoat.Succeeded() &&
+				disabledCoat.m_Model.m_Materials.front().m_Properties.m_ClearcoatFactor == 0.0f &&
+				std::abs(disabledCoat.m_Model.m_Materials.front().m_Properties.m_ClearcoatRoughness - 0.4f) < 0.0001f,
+				"Zero clearcoat factor retains the authored roughness without enabling the layer");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":1.2}}})");
+			const ModelImportResult invalidCoat = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidCoat.Succeeded() &&
+				invalidCoat.m_Error.find("KHR_materials_clearcoat") != std::string::npos,
+				"Out-of-range clearcoat factor is rejected visibly");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy","KHR_materials_sheen"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}},"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0},"sheenRoughnessTexture":{"index":0}}}})");
@@ -1345,7 +1375,7 @@ namespace gglab
 			ModelImportArtifactHandle materialBaseline = CreateModelImportArtifact(
 				materialFixture(), MakeResolvedModelTextureFixture(), textureCache);
 			bool materialDigestValid = materialBaseline && materialBaseline->IsValid();
-			for (uint32_t variant = 0; variant < 7; ++variant)
+			for (uint32_t variant = 0; variant < 11; ++variant)
 			{
 				ImportedModel changed = materialFixture();
 				auto& binding = changed.m_Materials.front().m_TextureBindings[0];
@@ -1358,6 +1388,10 @@ namespace gglab
 				case 4: changed.m_Materials.front().m_Properties.m_NormalScale = 0.5f; break;
 				case 5: changed.m_Materials.front().m_Properties.m_OcclusionStrength = 0.5f; break;
 				case 6: changed.m_Materials.front().m_Properties.m_Ior = 1.7f; break;
+				case 7: changed.m_Materials.front().m_Properties.m_ClearcoatFactor = 0.8f; break;
+				case 8: changed.m_Materials.front().m_Properties.m_ClearcoatRoughness = 0.2f; break;
+				case 9: changed.m_Materials.front().m_Properties.m_ClearcoatNormalScale = 0.5f; break;
+				case 10: changed.m_Materials.front().m_Properties.m_ClearcoatNormalBinding.m_UVOffset.m_X = 0.1f; break;
 				default: break;
 				}
 				const ModelImportArtifactHandle changedArtifact = CreateModelImportArtifact(

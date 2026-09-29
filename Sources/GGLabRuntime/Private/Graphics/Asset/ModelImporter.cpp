@@ -56,8 +56,22 @@ namespace gglab
 				return aiTextureType_LIGHTMAP;
 			case MaterialTextureSlot::Emissive:
 				return aiTextureType_EMISSIVE;
+			case MaterialTextureSlot::Clearcoat:
+			case MaterialTextureSlot::ClearcoatRoughness:
+			case MaterialTextureSlot::ClearcoatNormal:
+				return aiTextureType_CLEARCOAT;
 			default:
 				return aiTextureType_NONE;
+			}
+		}
+
+		[[nodiscard]] unsigned int ToAssimpTextureIndex(MaterialTextureSlot slot) noexcept
+		{
+			switch (slot)
+			{
+			case MaterialTextureSlot::ClearcoatRoughness: return 1u;
+			case MaterialTextureSlot::ClearcoatNormal: return 2u;
+			default: return 0u;
 			}
 		}
 
@@ -89,6 +103,20 @@ namespace gglab
 				return FindObjectField(material, "occlusionTexture");
 			case MaterialTextureSlot::Emissive:
 				return FindObjectField(material, "emissiveTexture");
+			case MaterialTextureSlot::Clearcoat:
+			case MaterialTextureSlot::ClearcoatRoughness:
+			case MaterialTextureSlot::ClearcoatNormal:
+				if (const Json* extensions = FindObjectField(material, "extensions"))
+				{
+					if (const Json* coat = FindObjectField(*extensions, "KHR_materials_clearcoat"))
+					{
+						const char* name = slot == MaterialTextureSlot::Clearcoat
+							? "clearcoatTexture" : slot == MaterialTextureSlot::ClearcoatRoughness
+								? "clearcoatRoughnessTexture" : "clearcoatNormalTexture";
+						return FindObjectField(*coat, name);
+					}
+				}
+				break;
 			default:
 				break;
 			}
@@ -369,7 +397,7 @@ namespace gglab
 				}
 				const std::string name = entry.get<std::string>();
 				if (!name.starts_with("KHR_materials_")) continue;
-				if (name == "KHR_materials_ior") continue;
+				if (name == "KHR_materials_ior" || name == "KHR_materials_clearcoat") continue;
 				if (std::string_view(field) == "extensionsRequired")
 				{
 					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
@@ -469,6 +497,7 @@ namespace gglab
 				const auto slot = static_cast<MaterialTextureSlot>(slotIndex);
 				const TextureSemantic semantic = GetMaterialTextureSlotSemantic(slot);
 				const aiTextureType textureType = ToAssimpTextureType(slot);
+				const unsigned int textureIndex = ToAssimpTextureIndex(slot);
 				if (textureType == aiTextureType_NONE)
 				{
 					continue;
@@ -486,15 +515,23 @@ namespace gglab
 				};
 				int magFilter = GltfLinear;
 				int minFilter = GltfLinearMipmapLinear;
-				if (source->GetTexture(textureType, 0, &texturePath, &mapping, &uvIndex, &blend,
+				if (source->GetTexture(textureType, textureIndex, &texturePath, &mapping, &uvIndex, &blend,
 					&operation, mapMode) != aiReturn_SUCCESS)
 				{
+					if (textureType == aiTextureType_CLEARCOAT && sourceMaterials &&
+						materialIndex < sourceMaterials->size() &&
+						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot) &&
+						source->Get(AI_MATKEY_CLEARCOAT_FACTOR, blend) == aiReturn_SUCCESS)
+					{
+						result.m_Error = "Assimp did not preserve a clearcoat texture binding.";
+						return result;
+					}
 					continue;
 				}
 				GGLAB_UNUSED(
-					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(textureType, 0), magFilter));
+					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(textureType, textureIndex), magFilter));
 				GGLAB_UNUSED(
-					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(textureType, 0), minFilter));
+					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(textureType, textureIndex), minFilter));
 
 				const auto canonicalTexturePath = utils::Canonical(directory / texturePath.C_Str());
 				ImportedMaterialTextureBinding& binding = destination.m_TextureBindings[slotIndex];
@@ -543,6 +580,59 @@ namespace gglab
 				}
 				if (const Json* extensions = FindObjectField(material, "extensions"))
 				{
+					const auto clearcoatExtension = extensions->find("KHR_materials_clearcoat");
+					if (clearcoatExtension != extensions->end())
+					{
+						if (!clearcoatExtension->is_object())
+						{
+							result.m_Error = "KHR_materials_clearcoat must be an object.";
+							return result;
+						}
+						auto readCoatFactor = [&](const char* name, float& value) noexcept
+						{
+							const auto found = clearcoatExtension->find(name);
+							if (found == clearcoatExtension->end()) return true;
+							if (!found->is_number() || !std::isfinite(found->get<float>()) ||
+								found->get<float>() < 0.0f || found->get<float>() > 1.0f)
+							{
+								result.m_Error = std::format("KHR_materials_clearcoat.{} must be in [0, 1].", name);
+								return false;
+							}
+							value = found->get<float>();
+							return true;
+						};
+						if (!readCoatFactor("clearcoatFactor", destination.m_Properties.m_ClearcoatFactor) ||
+							!readCoatFactor("clearcoatRoughnessFactor", destination.m_Properties.m_ClearcoatRoughness))
+						{
+							return result;
+						}
+						for (const char* name : { "clearcoatTexture", "clearcoatRoughnessTexture",
+							"clearcoatNormalTexture" })
+						{
+							const auto texture = clearcoatExtension->find(name);
+							if (texture == clearcoatExtension->end()) continue;
+							const auto index = texture->is_object() ? texture->find("index") : Json::const_iterator{};
+							if (!texture->is_object() || index == texture->end() ||
+								!index->is_number_unsigned())
+							{
+								result.m_Error = std::format("KHR_materials_clearcoat.{} requires a texture index.", name);
+								return result;
+							}
+						}
+						if (destination.m_Properties.m_ClearcoatFactor > 0.0f)
+						{
+							float importedFactor = 0.0f;
+							float importedRoughness = 0.0f;
+							if (source->Get(AI_MATKEY_CLEARCOAT_FACTOR, importedFactor) != aiReturn_SUCCESS ||
+								source->Get(AI_MATKEY_CLEARCOAT_ROUGHNESS_FACTOR, importedRoughness) != aiReturn_SUCCESS ||
+								std::abs(importedFactor - destination.m_Properties.m_ClearcoatFactor) > 0.0001f ||
+								std::abs(importedRoughness - destination.m_Properties.m_ClearcoatRoughness) > 0.0001f)
+							{
+								result.m_Error = "Assimp did not preserve KHR_materials_clearcoat factors.";
+								return result;
+							}
+						}
+					}
 					const auto iorExtension = extensions->find("KHR_materials_ior");
 					if (iorExtension != extensions->end())
 					{
@@ -578,6 +668,12 @@ namespace gglab
 				{
 					if (!ReadTextureScalar(*normal, "scale", destination.m_Properties.m_NormalScale,
 						result.m_Error)) return result;
+				}
+				if (const Json* coatNormal =
+					FindMaterialTextureInfo(material, MaterialTextureSlot::ClearcoatNormal))
+				{
+					if (!ReadTextureScalar(*coatNormal, "scale",
+						destination.m_Properties.m_ClearcoatNormalScale, result.m_Error)) return result;
 				}
 				// Assimp's glTF2 importer writes occlusion strength under
 				// "$tex.file.strength", which its public glTF macro does not query.

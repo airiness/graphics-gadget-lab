@@ -60,6 +60,9 @@ namespace gglab
 			assetManager.MarkTextureUsed(material.m_MetallicRoughnessBinding.m_TextureId);
 			assetManager.MarkTextureUsed(material.m_NormalBinding.m_TextureId);
 			assetManager.MarkTextureUsed(material.m_OcclusionBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_ClearcoatBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_ClearcoatRoughnessBinding.m_TextureId);
+			assetManager.MarkTextureUsed(material.m_ClearcoatNormalBinding.m_TextureId);
 		}
 
 		struct MaterialUploadRecord

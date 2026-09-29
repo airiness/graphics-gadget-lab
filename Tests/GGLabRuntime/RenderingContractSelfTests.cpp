@@ -8198,6 +8198,36 @@ namespace gglab
 		const double roughNormalGain = 1.0 / directionalAlbedo(1.0, 1.0, 1.0);
 		context.Check(roughNormalGain > 3.2 && roughNormalGain < 3.3,
 			"Rough F0=1 GGX receives the expected measurable white-furnace recovery");
+		// A uniform unit environment gives a white Lambert base one unit of
+		// directional energy. The coat returns its integrated GGX reflectance;
+		// the remainder crosses the interface in both directions.
+		constexpr double meanIncidentCoatFresnel = 0.04 + 0.96 / 21.0;
+		bool coatLayerBounded = true;
+		bool coatOffPreservesBase = true;
+		for (const double noV : { 0.05, 0.5, 1.0 })
+		{
+			for (const double roughness : { 0.25, 0.5, 1.0 })
+			{
+				const double singleScatter = directionalAlbedo(noV, roughness, 0.04);
+				const double unityScatter = directionalAlbedo(noV, roughness, 1.0);
+				const double gain = 1.0 + 0.04 *
+					(1.0 / std::clamp(unityScatter, 1.0e-4, 1.0) - 1.0);
+				const double coatReflectance = std::clamp(singleScatter * gain, 0.0, 1.0);
+				for (const double factor : { 0.0, 0.5, 1.0 })
+				{
+					const double base = (1.0 - factor * coatReflectance) *
+						(1.0 - factor * meanIncidentCoatFresnel);
+					const double layered = base + factor * coatReflectance;
+					coatLayerBounded &= std::isfinite(layered) && layered >= 0.0 &&
+						layered <= 1.0001 && base <= 1.0;
+					if (factor == 0.0) coatOffPreservesBase &= layered == 1.0;
+				}
+			}
+		}
+		context.Check(coatLayerBounded,
+			"Clearcoat white-furnace sweep keeps the reflected coat and transmitted base within unit energy");
+		context.Check(coatOffPreservesBase,
+			"Zero clearcoat factor reproduces the white Lambert base reference");
 	}
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept

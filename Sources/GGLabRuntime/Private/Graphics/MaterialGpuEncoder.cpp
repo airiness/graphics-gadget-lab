@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -62,6 +63,15 @@ namespace gglab
 		gpu.OcclusionBinding = EncodeTextureBinding(material.m_OcclusionBinding,
 			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
 			samplerRegistry);
+		gpu.ClearcoatBinding = EncodeTextureBinding(material.m_ClearcoatBinding,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
+		gpu.ClearcoatRoughnessBinding = EncodeTextureBinding(material.m_ClearcoatRoughnessBinding,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
+		gpu.ClearcoatNormalBinding = EncodeTextureBinding(material.m_ClearcoatNormalBinding,
+			ReservedTextureIDIndex::NormalFlat, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
 
 		gpu.BaseColorFactor = material.m_BaseColor;
 		gpu.EmissiveColorFactor = material.m_EmissiveColor;
@@ -74,6 +84,12 @@ namespace gglab
 		gpu.Flags = static_cast<uint32_t>(material.m_Flags);
 		gpu.DebugView = static_cast<uint32_t>(material.m_DebugView);
 		gpu.Ior = SanitizeMaterialIor(material.m_Ior);
+		gpu.ClearcoatFactor = std::isfinite(material.m_ClearcoatFactor)
+			? std::clamp(material.m_ClearcoatFactor, 0.0f, 1.0f) : 0.0f;
+		gpu.ClearcoatRoughness = std::isfinite(material.m_ClearcoatRoughness)
+			? std::clamp(material.m_ClearcoatRoughness, 0.0f, 1.0f) : 0.0f;
+		gpu.ClearcoatNormalScale = std::isfinite(material.m_ClearcoatNormalScale)
+			? material.m_ClearcoatNormalScale : 1.0f;
 		return gpu;
 	}
 }

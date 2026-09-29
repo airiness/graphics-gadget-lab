@@ -9,11 +9,13 @@ struct SurfaceData
 	float Metallic;
 	float Roughness; // perceived roughness; BRDF clamping stays in the lighting path
 	float Ior;
+	float ClearcoatFactor;
+	float ClearcoatRoughness;
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
 // Shading values are derived per pixel and never written back to imported
-// material state. Optional lobes can extend this seam in later slices.
+// material state.
 struct BaseShadingState
 {
 	float3 NormalWS;
@@ -22,6 +24,17 @@ struct BaseShadingState
 	float BRDFAlpha;
 	float3 F0;
 	uint FeatureFlags;
+};
+
+struct ClearcoatShadingState
+{
+	float Factor;
+	float3 NormalWS;
+	float PerceptualRoughness;
+	float BRDFAlpha;
+	float NoV;
+	float DirectionalAlbedo;
+	float3 EnergyCompensation;
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
@@ -43,8 +56,22 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	surface.Metallic = saturate(matData.MetallicFactor * metallicRoughnessSampled.b);
 	surface.Roughness = saturate(matData.RoughnessFactor * metallicRoughnessSampled.g);
 	surface.Ior = matData.Ior;
+	surface.ClearcoatFactor = saturate(matData.ClearcoatFactor);
+	if (surface.ClearcoatFactor > 0.0)
+	{
+		const float2 factorUV = SelectUV(matData.ClearcoatBinding, uv0, uv1);
+		surface.ClearcoatFactor *= SampleTextureBinding(
+			matData.ClearcoatBinding.TextureSamplerBinding, factorUV).r;
+	}
+	surface.ClearcoatRoughness = saturate(matData.ClearcoatRoughness);
+	if (surface.ClearcoatFactor > 0.0)
+	{
+		const float2 roughnessUV = SelectUV(matData.ClearcoatRoughnessBinding, uv0, uv1);
+		surface.ClearcoatRoughness *= SampleTextureBinding(
+			matData.ClearcoatRoughnessBinding.TextureSamplerBinding, roughnessUV).g;
+	}
 
-	// Emissive retains the pre-World-Lighting legacy factor scale in this baseline.
+	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.
 	const float2 emissiveUV = SelectUV(matData.EmissiveBinding, uv0, uv1);
 	surface.Emissive = SampleTextureBinding(

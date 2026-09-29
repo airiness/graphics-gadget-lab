@@ -49,6 +49,9 @@ namespace gglab
 		F0,
 		FeatureFlags,
 		Ior,
+		ClearcoatFactor,
+		ClearcoatRoughness,
+		ClearcoatNormal,
 	};
 
 	inline constexpr float DefaultDielectricIor = 1.5f;
@@ -65,6 +68,9 @@ namespace gglab
 		Normal,
 		Occlusion,
 		Emissive,
+		Clearcoat,
+		ClearcoatRoughness,
+		ClearcoatNormal,
 
 		Count
 	};
@@ -83,6 +89,11 @@ namespace gglab
 			return TextureSemantic::Occlusion;
 		case MaterialTextureSlot::Emissive:
 			return TextureSemantic::Emissive;
+		case MaterialTextureSlot::Clearcoat:
+		case MaterialTextureSlot::ClearcoatRoughness:
+			return TextureSemantic::Clearcoat;
+		case MaterialTextureSlot::ClearcoatNormal:
+			return TextureSemantic::ClearcoatNormal;
 		default:
 			return TextureSemantic::Unknown;
 		}
@@ -164,6 +175,9 @@ namespace gglab
 		MaterialTextureBinding m_MetallicRoughnessBinding{};
 		MaterialTextureBinding m_NormalBinding{};
 		MaterialTextureBinding m_OcclusionBinding{};
+		MaterialTextureBinding m_ClearcoatBinding{};
+		MaterialTextureBinding m_ClearcoatRoughnessBinding{};
+		MaterialTextureBinding m_ClearcoatNormalBinding{};
 
 		Color m_BaseColor = Color::White;
 		Color m_EmissiveColor = Color::Black;
@@ -172,6 +186,9 @@ namespace gglab
 		float m_NormalScale = 1.0f;
 		float m_OcclusionStrength = 1.0f;
 		float m_Ior = DefaultDielectricIor;
+		float m_ClearcoatFactor = 0.0f;
+		float m_ClearcoatRoughness = 0.0f;
+		float m_ClearcoatNormalScale = 1.0f;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

@@ -38,6 +38,8 @@ namespace gglab
 		const LabParameterId RoughnessMinId("mini_pbr.material.roughness_min");
 		const LabParameterId RoughnessMaxId("mini_pbr.material.roughness_max");
 		const LabParameterId IorId("mini_pbr.material.ior");
+		const LabParameterId ClearcoatFactorId("mini_pbr.material.clearcoat_factor");
+		const LabParameterId ClearcoatRoughnessId("mini_pbr.material.clearcoat_roughness");
 		const LabParameterId DebugViewId("mini_pbr.material.debug_view");
 		const LabParameterId LightIntensityId("mini_pbr.lighting.intensity");
 
@@ -195,8 +197,31 @@ namespace gglab
 					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
 					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
 					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal"},
 				},
 			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ClearcoatFactorId,
+			.m_Name = "Clearcoat Factor",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.0f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ClearcoatRoughnessId,
+			.m_Name = "Clearcoat Roughness",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.1f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -426,6 +451,8 @@ namespace gglab
 			material.m_Properties.m_RoughnessFactor =
 				std::lerp(roughnessMin, roughnessMax, GridFactor(cell.m_Row));
 			material.m_Properties.m_Ior = parameters.Get(IorId, DefaultDielectricIor);
+			material.m_Properties.m_ClearcoatFactor = parameters.Get(ClearcoatFactorId, 0.0f);
+			material.m_Properties.m_ClearcoatRoughness = parameters.Get(ClearcoatRoughnessId, 0.1f);
 			material.m_Properties.m_DebugView = debugView;
 		}
 

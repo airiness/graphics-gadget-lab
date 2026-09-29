@@ -20,7 +20,9 @@ namespace gglab
 		Environment,
 		GenericColor,
 		GenericData,
-		Unknown
+		Unknown,
+		Clearcoat,
+		ClearcoatNormal
 	};
 
 	enum class TextureMipPolicy : uint8_t

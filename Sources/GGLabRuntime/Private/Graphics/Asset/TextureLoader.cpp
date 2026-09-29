@@ -282,7 +282,8 @@ namespace gglab
 				return false;
 			}
 
-			if (settings.m_Semantic == TextureSemantic::Normal)
+			if (settings.m_Semantic == TextureSemantic::Normal ||
+				settings.m_Semantic == TextureSemantic::ClearcoatNormal)
 			{
 				progress.Report(0.72f, "Renormalizing normal-map mipmaps",
 					std::format("{} mip levels", mipChain.GetMetadata().mipLevels));

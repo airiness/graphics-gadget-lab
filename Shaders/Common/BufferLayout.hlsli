@@ -92,9 +92,12 @@ struct MaterialData
 	uint Flags;		// bit 0: doubleSided
 	uint DebugView; // Matches MaterialDebugView in MaterialTypes.h.
 	float Ior;
-	uint Padding0;
-	uint Padding1;
-	uint Padding2;
+	float ClearcoatFactor;
+	float ClearcoatRoughness;
+	float ClearcoatNormalScale;
+	MaterialTextureBindingData ClearcoatBinding;
+	MaterialTextureBindingData ClearcoatRoughnessBinding;
+	MaterialTextureBindingData ClearcoatNormalBinding;
 };
 
 struct ViewData

@@ -2484,9 +2484,12 @@ namespace gglab
 				GPUAbiMember{ "Flags", offsetof(MaterialGPU, Flags) },
 				GPUAbiMember{ "DebugView", offsetof(MaterialGPU, DebugView) },
 				GPUAbiMember{ "Ior", offsetof(MaterialGPU, Ior) },
-				GPUAbiMember{ "Padding0", offsetof(MaterialGPU, Padding0) },
-				GPUAbiMember{ "Padding1", offsetof(MaterialGPU, Padding1) },
-				GPUAbiMember{ "Padding2", offsetof(MaterialGPU, Padding2) },
+				GPUAbiMember{ "ClearcoatFactor", offsetof(MaterialGPU, ClearcoatFactor) },
+				GPUAbiMember{ "ClearcoatRoughness", offsetof(MaterialGPU, ClearcoatRoughness) },
+				GPUAbiMember{ "ClearcoatNormalScale", offsetof(MaterialGPU, ClearcoatNormalScale) },
+				GPUAbiMember{ "ClearcoatBinding", offsetof(MaterialGPU, ClearcoatBinding) },
+				GPUAbiMember{ "ClearcoatRoughnessBinding", offsetof(MaterialGPU, ClearcoatRoughnessBinding) },
+				GPUAbiMember{ "ClearcoatNormalBinding", offsetof(MaterialGPU, ClearcoatNormalBinding) },
 			};
 			bool dxilMaterialLayoutMatches = materialDxilDisassembled && !materialLayout.empty() &&
 				ParseUnsignedAfter(materialLayout, "Size:") == sizeof(MaterialGPU);

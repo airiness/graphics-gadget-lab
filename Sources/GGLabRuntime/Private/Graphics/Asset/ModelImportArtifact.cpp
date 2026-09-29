@@ -104,6 +104,9 @@ namespace gglab
 			AddMaterialBinding(writer, properties.m_MetallicRoughnessBinding);
 			AddMaterialBinding(writer, properties.m_NormalBinding);
 			AddMaterialBinding(writer, properties.m_OcclusionBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatRoughnessBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatNormalBinding);
 			AddColor(writer, properties.m_BaseColor);
 			AddColor(writer, properties.m_EmissiveColor);
 			writer.Float(properties.m_MetallicFactor);
@@ -111,6 +114,9 @@ namespace gglab
 			writer.Float(properties.m_NormalScale);
 			writer.Float(properties.m_OcclusionStrength);
 			writer.Float(properties.m_Ior);
+			writer.Float(properties.m_ClearcoatFactor);
+			writer.Float(properties.m_ClearcoatRoughness);
+			writer.Float(properties.m_ClearcoatNormalScale);
 			writer.U32(static_cast<uint32_t>(properties.m_Flags));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaMode));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaCutoffMode));

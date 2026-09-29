@@ -410,6 +410,18 @@ namespace gglab
 				context.Check(hasIor && hasCoreInputs && !model.m_MeshInstances.empty() &&
 					!model.m_TextureSources.empty(),
 					"Blender IOR, core texture scalars, geometry and external images reach one imported model");
+				const auto coat = std::ranges::find(model.m_Materials,
+					"MAT_ClearcoatTexture", &ImportedMaterial::m_Name);
+				const bool coatBindings = coat != model.m_Materials.end() &&
+					coat->m_Properties.m_ClearcoatFactor == 1.0f &&
+					coat->m_Properties.m_ClearcoatRoughness == 1.0f &&
+					std::abs(coat->m_Properties.m_ClearcoatNormalScale - 0.42f) < 0.0001f &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatRoughness)].m_TexCoordIndex == 1 &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TexCoordIndex == 1;
+				context.Check(coatBindings,
+					"Blender clearcoat channels, independent UV sets and normal scale survive Assimp import");
 			}
 
 			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,
@@ -438,6 +450,24 @@ namespace gglab
 					"Extended lighting contract retains five matched opaque dielectric IOR references "
 					"(instances={}, materials={}, found={})",
 					model.m_MeshInstances.size(), model.m_Materials.size(), iorDetail));
+				const auto findCoat = [&](std::string_view name) -> const ImportedMaterial*
+				{
+					const auto found = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
+					return found == model.m_Materials.end() ? nullptr : &*found;
+				};
+				const auto* off = findCoat("MAT_Clearcoat_Off");
+				const auto* smooth = findCoat("MAT_Clearcoat_Smooth");
+				const auto* rough = findCoat("MAT_Clearcoat_Rough");
+				const auto* normal = findCoat("MAT_Clearcoat_NormalScale");
+				context.Check(off && smooth && rough && normal &&
+					off->m_Properties.m_ClearcoatFactor == 0.0f &&
+					std::abs(smooth->m_Properties.m_ClearcoatFactor - 0.8f) < 0.0001f &&
+					std::abs(smooth->m_Properties.m_ClearcoatRoughness - 0.08f) < 0.0001f &&
+					std::abs(rough->m_Properties.m_ClearcoatRoughness - 0.32f) < 0.0001f &&
+					std::abs(normal->m_Properties.m_ClearcoatNormalScale - 0.45f) < 0.0001f &&
+					normal->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					"Extended lighting contract preserves off, smooth, rough and coat-normal references");
 			}
 
 			const auto atrium = ModelImporter::Import(ResolveAssetPath(assetRoot,
@@ -447,6 +477,12 @@ namespace gglab
 				std::format("Research lounge geometry and core textures import "
 					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
 					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
+			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
+				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
+			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
+				std::abs(coatedShell->m_Properties.m_ClearcoatFactor - 0.82f) < 0.0001f &&
+				std::abs(coatedShell->m_Properties.m_ClearcoatRoughness - 0.11f) < 0.0001f,
+				"Research lounge coated shell retains its authored clearcoat layer");
 		}
 
 		void CheckTextureContractContent(SelfTestContext& context) noexcept

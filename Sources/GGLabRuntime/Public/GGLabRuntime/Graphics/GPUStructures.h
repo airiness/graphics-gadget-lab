@@ -145,14 +145,23 @@ namespace gglab
 		uint32_t Flags; // bit 0: doubleSided
 		uint32_t DebugView;
 		float Ior;
-		uint32_t Padding0;
-		uint32_t Padding1;
-		uint32_t Padding2;
+		float ClearcoatFactor;
+		float ClearcoatRoughness;
+		float ClearcoatNormalScale;
+		MaterialTextureBindingGPU ClearcoatBinding;
+		MaterialTextureBindingGPU ClearcoatRoughnessBinding;
+		MaterialTextureBindingGPU ClearcoatNormalBinding;
 	};
-	static_assert(sizeof(MaterialGPU) == 320);
+	static_assert(sizeof(MaterialGPU) == 464);
 	static_assert(offsetof(MaterialGPU, BaseColorFactor) == 240);
 	static_assert(offsetof(MaterialGPU, NormalScale) == 280);
 	static_assert(offsetof(MaterialGPU, Ior) == 304);
+	static_assert(offsetof(MaterialGPU, ClearcoatFactor) == 308);
+	static_assert(offsetof(MaterialGPU, ClearcoatRoughness) == 312);
+	static_assert(offsetof(MaterialGPU, ClearcoatNormalScale) == 316);
+	static_assert(offsetof(MaterialGPU, ClearcoatBinding) == 320);
+	static_assert(offsetof(MaterialGPU, ClearcoatRoughnessBinding) == 368);
+	static_assert(offsetof(MaterialGPU, ClearcoatNormalBinding) == 416);
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 
