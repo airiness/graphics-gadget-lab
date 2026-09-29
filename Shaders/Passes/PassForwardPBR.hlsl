@@ -637,7 +637,7 @@ DirectLightingResult EvaluateDirectLight(uint lightIndex, float3 positionWS, flo
 	if (any(sheen.Color > 0.0.xxx))
 	{
 		const float incidentEnergy = SheenDirectionalAlbedo(
-			NoL, sheen.PerceptualRoughness);
+			NoL, sheen.DirectionalAlbedoFitLow, sheen.DirectionalAlbedoFitHigh);
 		const float baseTransmission = 1.0 - max(sheen.Color.r,
 			max(sheen.Color.g, sheen.Color.b)) * max(sheen.ViewDirectionalAlbedo, incidentEnergy);
 		result.Sheen = EvaluateSheenDirect(L, V, N, NoV, sheen,
@@ -920,13 +920,17 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	sheen.PerceptualRoughness = 0.0;
 	sheen.Alpha = 0.0;
 	sheen.ViewDirectionalAlbedo = 0.0;
+	sheen.DirectionalAlbedoFitLow = 0.0.xxxx;
+	sheen.DirectionalAlbedoFitHigh = 0.0.xxx;
 	if (any(sheen.Color > 0.0.xxx))
 	{
 		sheen.PerceptualRoughness = ClampPerceptualRoughnessForBRDF(
 			surface.SheenRoughness);
 		sheen.Alpha = PerceptualRoughnessToAlpha(sheen.PerceptualRoughness);
+		PrepareSheenDirectionalAlbedo(sheen.PerceptualRoughness,
+			sheen.DirectionalAlbedoFitLow, sheen.DirectionalAlbedoFitHigh);
 		sheen.ViewDirectionalAlbedo = SheenDirectionalAlbedo(NoV,
-			sheen.PerceptualRoughness);
+			sheen.DirectionalAlbedoFitLow, sheen.DirectionalAlbedoFitHigh);
 	}
 #if defined(GGLAB_FORWARD_PLUS)
 	const DirectLightingResult directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,

@@ -128,22 +128,18 @@ float CharlieSheenNormalization(float NoV, float NoL, float perceptualRoughness)
 }
 
 // Chebyshev fit to the reciprocal Charlie BRDF integrated over a white
-// hemisphere. The small positive bias bounds the sampled fit residual while
-// keeping the GGX DFG texture's two-channel contract unchanged.
-float SheenDirectionalAlbedo(float NoV, float perceptualRoughness)
+// hemisphere. Prepare its roughness-dependent rows once per shaded pixel;
+// direct lights then evaluate only the view-axis polynomial.
+void PrepareSheenDirectionalAlbedo(float perceptualRoughness,
+	out float4 fitLow, out float3 fitHigh)
 {
-	const float x = 2.0 * log(1.0 + max(NoV, 0.001) * 50.0) / log(51.0) - 1.0;
 	const float y = 2.0 * ClampPerceptualRoughnessForBRDF(perceptualRoughness) - 1.0;
-	float tx[7];
 	float ty[7];
-	tx[0] = 1.0;
-	tx[1] = x;
 	ty[0] = 1.0;
 	ty[1] = y;
 	[unroll]
 	for (uint index = 2u; index < 7u; ++index)
 	{
-		tx[index] = 2.0 * x * tx[index - 1u] - tx[index - 2u];
 		ty[index] = 2.0 * y * ty[index - 1u] - ty[index - 2u];
 	}
 	static const float coefficients[49] =
@@ -156,19 +152,37 @@ float SheenDirectionalAlbedo(float NoV, float perceptualRoughness)
 		0.002019475767, 0.008140849677, 0.01012986063, -0.02356920128, 0.02254739397, -0.0177240175, 0.01245039065,
 		0.009723827867, -0.02778271004, 0.01832648501, -0.01192787424, 0.008339719302, -0.004460323995, 0.001011952775
 	};
-	float estimate = 0.0;
+	float rows[7];
 	[unroll]
 	for (uint row = 0u; row < 7u; ++row)
 	{
-		float rowValue = 0.0;
+		rows[row] = 0.0;
 		[unroll]
 		for (uint column = 0u; column < 7u; ++column)
 		{
-			rowValue += coefficients[row * 7u + column] * ty[column];
+			rows[row] += coefficients[row * 7u + column] * ty[column];
 		}
-		estimate += rowValue * tx[row];
 	}
-	return saturate(estimate + 0.026);
+	fitLow = float4(rows[0], rows[1], rows[2], rows[3]);
+	fitHigh = float3(rows[4], rows[5], rows[6]);
+}
+
+// The positive bias bounds the sampled fit residual while preserving the
+// existing two-channel GGX DFG texture contract.
+float SheenDirectionalAlbedo(float NoV, float4 fitLow, float3 fitHigh)
+{
+	const float x = 2.0 * log(1.0 + max(NoV, 0.001) * 50.0) / log(51.0) - 1.0;
+	float next = 0.0;
+	float nextNext = 0.0;
+	[unroll]
+	for (int row = 6; row > 0; --row)
+	{
+		const float coefficient = row >= 4 ? fitHigh[row - 4] : fitLow[row];
+		const float current = coefficient + 2.0 * x * next - nextNext;
+		nextNext = next;
+		next = current;
+	}
+	return saturate(fitLow.x + x * next - nextNext + 0.026);
 }
 
 // Lambertian diffuse BRDF.

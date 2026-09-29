@@ -34,6 +34,9 @@ albedo, and white-environment layered energy. CI runs this numeric contract.
 The sixth-order Chebyshev fit uses 49 coefficients and a small positive bias;
 it was fitted to a 16-by-19 view/roughness grid with 256-by-256 midpoint
 hemisphere integration and is evaluated on a separate midpoint grid in CI.
+The shader reduces the 49 coefficients to seven roughness-dependent values once
+per shaded pixel, then evaluates the direction-dependent polynomial for each
+light. This keeps the full fit out of the per-light loop.
 The validation grid bounds its directional-albedo error to 0.08 and layered
 white-environment response to 1.03. These bounds do not establish visual
 quality for an arbitrary environment.

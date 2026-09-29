@@ -49,14 +49,18 @@ def energy_estimate(view_cosine: float, roughness: float) -> float:
 def fitted_directional_albedo(view_cosine: float, roughness: float) -> float:
     x = 2.0 * log(1.0 + max(view_cosine, 0.001) * 50.0) / log(51.0) - 1.0
     y = 2.0 * max(0.045, min(roughness, 1.0)) - 1.0
-    tx = [1.0, x]
     ty = [1.0, y]
     for index in range(2, 7):
-        tx.append(2.0 * x * tx[index - 1] - tx[index - 2])
         ty.append(2.0 * y * ty[index - 1] - ty[index - 2])
-    estimate = sum(tx[row] * sum(FIT_COEFFICIENTS[row][column] * ty[column]
-                                 for column in range(7)) for row in range(7))
-    return max(0.0, min(1.0, estimate + 0.026))
+    rows = [sum(FIT_COEFFICIENTS[row][column] * ty[column]
+                for column in range(7)) for row in range(7)]
+    next_value = 0.0
+    next_next_value = 0.0
+    for row in range(6, 0, -1):
+        current = rows[row] + 2.0 * x * next_value - next_next_value
+        next_next_value = next_value
+        next_value = current
+    return max(0.0, min(1.0, rows[0] + x * next_value - next_next_value + 0.026))
 
 
 def sheen_brdf(view_cosine: float, light_cosine: float,
