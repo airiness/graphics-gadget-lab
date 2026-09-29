@@ -24,13 +24,36 @@ namespace gglab
 			"Assets/Models/MetalRoughSpheres/MetalRoughSpheres.gltf";
 		constexpr std::string_view MetalRoughSpheresNoTexturesPath =
 			"Assets/Models/MetalRoughSpheresNoTextures/MetalRoughSpheresNoTextures.gltf";
+		constexpr std::string_view AnisotropyStrengthTestPath =
+			"Assets/Models/AnisotropyStrengthTest/AnisotropyStrengthTest.gltf";
+		constexpr std::string_view AnisotropyRotationTestPath =
+			"Assets/Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf";
+		constexpr std::string_view AnisotropyDiscTestPath =
+			"Assets/Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf";
 
 		enum class SceneSource : int32_t
 		{
 			ProceduralGrid,
 			MetalRoughSpheres,
 			MetalRoughSpheresNoTextures,
+			AnisotropyStrengthTest,
+			AnisotropyRotationTest,
+			AnisotropyDiscTest,
 		};
+
+		[[nodiscard]] std::string_view AssetModelPath(SceneSource source) noexcept
+		{
+			switch (source)
+			{
+			case SceneSource::MetalRoughSpheres: return MetalRoughSpheresPath;
+			case SceneSource::MetalRoughSpheresNoTextures: return MetalRoughSpheresNoTexturesPath;
+			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
+			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
+			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
+			case SceneSource::ProceduralGrid: return {};
+			}
+			return {};
+		}
 
 		const LabParameterId SceneSourceId("mini_pbr.scene.source");
 		const LabParameterId EnableCameraInputId("mini_pbr.camera.enable_input");
@@ -105,6 +128,12 @@ namespace gglab
 						.m_Name = "MetalRoughSpheres"},
 					{.m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures),
 						.m_Name = "MetalRoughSpheresNoTextures"},
+					{.m_Value = int32_t(SceneSource::AnisotropyStrengthTest),
+						.m_Name = "AnisotropyStrengthTest"},
+					{.m_Value = int32_t(SceneSource::AnisotropyRotationTest),
+						.m_Name = "AnisotropyRotationTest"},
+					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
+						.m_Name = "AnisotropyDiscTest"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -288,9 +317,7 @@ namespace gglab
 			return;
 		}
 
-		const std::string_view modelPath = sceneSource == SceneSource::MetalRoughSpheres
-			? MetalRoughSpheresPath
-			: MetalRoughSpheresNoTexturesPath;
+		const std::string_view modelPath = AssetModelPath(sceneSource);
 		m_PrepareMode = PrepareMode::AssetModel;
 		m_LoadingProgress = {
 			.m_Status = LoadingStatus::Preparing,
@@ -639,7 +666,12 @@ namespace gglab
 
 	void MiniPBRGridLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(Vector3(0.0f, 1.8f, -20.0f), Vector3(0.0f, 0.0f, GridDepth));
+		const auto sceneSource = static_cast<SceneSource>(
+			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
+		// The disc reference spans the ground plane, so its texture quadrants need an elevated view.
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
+			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
+		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
 	}
 
@@ -655,7 +687,7 @@ namespace gglab
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
 			.m_Description =
-				"Compares runtime, textured and factor-only metallic-roughness sphere grids.",
+				"Compares procedural PBR, metallic-roughness and anisotropy reference models.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

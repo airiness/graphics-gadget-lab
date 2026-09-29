@@ -28,6 +28,7 @@
 #include <numbers>
 #include <string_view>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -496,6 +497,87 @@ namespace gglab
 				std::abs(coatedShell->m_Properties.m_ClearcoatFactor - 0.82f) < 0.0001f &&
 				std::abs(coatedShell->m_Properties.m_ClearcoatRoughness - 0.11f) < 0.0001f,
 				"Research lounge coated shell retains its authored clearcoat layer");
+		}
+
+		void CheckAnisotropyReferenceImports(SelfTestContext& context) noexcept
+		{
+			const auto assetRoot = GetApplicationSelfTestAssetRoot();
+			const auto import = [&](const char* path)
+			{
+				return ModelImporter::Import(ResolveAssetPath(assetRoot, path), {});
+			};
+			const auto checkDirectionTextures = [&](const ImportedModel& model, std::string_view name)
+			{
+				bool found = false;
+				bool valid = true;
+				for (const auto& source : model.m_TextureSources)
+				{
+					if (source.m_Semantic != TextureSemantic::Anisotropy) continue;
+					found = true;
+					const auto texture = TextureLoader::LoadTextureData(
+						source.m_CanonicalPath, source.m_ImportSettings);
+					valid &= texture.IsValid() && texture.m_ColorSpace == TextureColorSpace::Linear &&
+						texture.m_ViewFormat == RHIFormat::R8G8B8A8Unorm;
+				}
+				context.Check(found && valid,
+					std::format("{} direction textures decode as linear data", name));
+			};
+			const auto strength = import("Models/AnisotropyStrengthTest/AnisotropyStrengthTest.gltf");
+			context.Check(strength.Succeeded() && strength.m_Model.m_MeshInstances.size() >= 49,
+				std::format("Anisotropy strength grid imports with its geometry: {}", strength.m_Error));
+			if (strength.Succeeded())
+			{
+				const auto hasEndpoint = [&](float roughness, float anisotropy)
+				{
+					return std::ranges::any_of(strength.m_Model.m_Materials,
+						[&](const ImportedMaterial& material) noexcept
+						{
+							return std::abs(material.m_Properties.m_RoughnessFactor - roughness) < 0.0001f &&
+								std::abs(material.m_Properties.m_AnisotropyStrength - anisotropy) < 0.0001f;
+						});
+				};
+				context.Check(hasEndpoint(0.0f, 0.0f) && hasEndpoint(0.0f, 1.0f) &&
+					hasEndpoint(1.0f, 0.0f) && hasEndpoint(1.0f, 1.0f),
+					"Anisotropy strength grid retains the roughness and strength endpoints");
+			}
+
+			const auto rotation = import("Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf");
+			context.Check(rotation.Succeeded() && rotation.m_Model.m_MeshInstances.size() >= 6,
+				std::format("Anisotropy rotation reference imports with its geometry: {}", rotation.m_Error));
+			if (rotation.Succeeded())
+			{
+				const auto rotated = std::ranges::find(rotation.m_Model.m_Materials,
+					"Aniso Tan + Rotation", &ImportedMaterial::m_Name);
+				const auto combined = std::ranges::find(rotation.m_Model.m_Materials,
+					"Aniso Tan + Rotation + Texture", &ImportedMaterial::m_Name);
+				const bool hasDirectionTexture = combined != rotation.m_Model.m_Materials.end() &&
+					combined->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex;
+				context.Check(rotated != rotation.m_Model.m_Materials.end() &&
+					std::abs(rotated->m_Properties.m_AnisotropyRotation - 0.523599f) < 0.0001f &&
+					combined != rotation.m_Model.m_Materials.end() &&
+					std::abs(combined->m_Properties.m_AnisotropyRotation - 0.349066f) < 0.0001f &&
+					hasDirectionTexture,
+					"Anisotropy rotation reference retains factor and texture direction paths");
+				checkDirectionTextures(rotation.m_Model, "Anisotropy rotation reference");
+			}
+
+			const auto disc = import("Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf");
+			context.Check(disc.Succeeded() && disc.m_Model.m_MeshInstances.size() >= 12,
+				std::format("Anisotropy disc reference imports with its geometry: {}", disc.m_Error));
+			if (disc.Succeeded())
+			{
+				const bool anisotropyTexture = std::ranges::any_of(disc.m_Model.m_TextureSources,
+					[](const ImportedTextureSource& source) noexcept
+					{
+						std::error_code error;
+						return source.m_Semantic == TextureSemantic::Anisotropy &&
+							std::filesystem::exists(source.m_CanonicalPath, error) && !error;
+					});
+				context.Check(anisotropyTexture,
+					"Anisotropy disc reference resolves its direction and strength texture");
+				checkDirectionTextures(disc.m_Model, "Anisotropy disc reference");
+			}
 		}
 
 		void CheckTextureContractContent(SelfTestContext& context) noexcept
@@ -997,6 +1079,7 @@ namespace gglab
 		std::thread textureWorker([&]
 			{
 				const auto workerContext = win32::Win32TaskWorkerLifecycle{}.CreateContext(0);
+				CheckAnisotropyReferenceImports(context);
 				CheckCoastalAtriumContent(context);
 				CheckTextureContractContent(context);
 			});
