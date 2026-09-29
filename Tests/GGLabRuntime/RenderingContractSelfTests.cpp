@@ -88,6 +88,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <limits>
 #include <numbers>
 #include <ranges>
@@ -8112,9 +8113,89 @@ namespace gglab
 			"BRDF LUT A integrates (1-Fc), B integrates Fc, and F0*A+B reconstructs the direct reference");
 	}
 
+	void RunGGXEnergyCompensationContractTests(SelfTestContext& context) noexcept
+	{
+		constexpr double Pi = std::numbers::pi_v<double>;
+		constexpr uint32_t PolarSamples = 192;
+		constexpr uint32_t AzimuthSamples = 256;
+		// Integrate the direct BRDF independently of the importance-sampled GPU LUT.
+		auto directionalAlbedo = [=](double noV, double roughness, double f0) noexcept
+		{
+			const double alpha = roughness * roughness;
+			const double alphaSquared = alpha * alpha;
+			const double viewX = std::sqrt(1.0 - noV * noV);
+			double total = 0.0;
+			for (uint32_t polar = 0; polar < PolarSamples; ++polar)
+			{
+				const double theta = (static_cast<double>(polar) + 0.5) * (0.5 * Pi / PolarSamples);
+				const double noL = std::cos(theta);
+				const double sinTheta = std::sin(theta);
+				const double ggxL = noV * std::sqrt(noL * noL * (1.0 - alphaSquared) + alphaSquared);
+				const double ggxV = noL * std::sqrt(noV * noV * (1.0 - alphaSquared) + alphaSquared);
+				const double visibility = 0.5 / (ggxL + ggxV);
+				for (uint32_t azimuth = 0; azimuth < AzimuthSamples; ++azimuth)
+				{
+					const double phi = (static_cast<double>(azimuth) + 0.5) * (2.0 * Pi / AzimuthSamples);
+					const double lightX = sinTheta * std::cos(phi);
+					const double halfX = lightX + viewX;
+					const double halfY = sinTheta * std::sin(phi);
+					const double halfZ = noL + noV;
+					const double halfLength = std::sqrt(halfX * halfX + halfY * halfY + halfZ * halfZ);
+					const double noH = halfZ / halfLength;
+					const double voH = (viewX * halfX + noV * halfZ) / halfLength;
+					const double denominator = noH * noH * (alphaSquared - 1.0) + 1.0;
+					const double distribution = alphaSquared / (Pi * denominator * denominator);
+					const double fresnelEdge = std::pow(1.0 - voH, 5.0);
+					const double fresnel = f0 * (1.0 - fresnelEdge) + fresnelEdge;
+					total += distribution * visibility * fresnel * noL * sinTheta;
+				}
+			}
+			return total * (0.5 * Pi / PolarSamples) * (2.0 * Pi / AzimuthSamples);
+		};
+
+		bool whiteFurnace = true;
+		bool dielectricAndConductor = true;
+		bool grazingBounded = true;
+		for (const double noV : { 0.05, 0.5, 1.0 })
+		{
+			for (const double roughness : { 0.25, 0.5, 1.0 })
+			{
+				const double f0Zero = directionalAlbedo(noV, roughness, 0.0);
+				const double f0One = directionalAlbedo(noV, roughness, 1.0);
+				const double lutA = f0One - f0Zero;
+				const double lutB = f0Zero;
+				const double gainAtOne = 1.0 / std::clamp(lutA + lutB, 1.0e-4, 1.0);
+				whiteFurnace &= std::isfinite(gainAtOne) && f0One > 0.1 && f0One <= 1.01 &&
+					std::abs(f0One * gainAtOne - 1.0) < 0.01;
+				for (const double f0 : { 0.04, 0.08, 0.7 })
+				{
+					const double direct = directionalAlbedo(noV, roughness, f0);
+					const double gain = 1.0 + f0 * (gainAtOne - 1.0);
+					const double specular = std::min(1.0, (f0 * lutA + lutB) * gain);
+					const double diffuse = 1.0 - specular;
+					dielectricAndConductor &= std::abs(direct - (f0 * lutA + lutB)) < 1.0e-6 &&
+						gain >= 1.0 && specular >= 0.0 && diffuse >= 0.0 &&
+						std::abs(specular + diffuse - 1.0) < 1.0e-12;
+					grazingBounded &= std::isfinite(gain) && std::isfinite(specular) &&
+						direct * gain <= 1.01;
+				}
+			}
+		}
+		context.Check(whiteFurnace,
+			"Compensated F0=1 GGX returns unit directional energy across view and roughness sweeps");
+		context.Check(dielectricAndConductor,
+			"Dielectric and conductor Fresnel terms retain bounded diffuse/specular partition");
+		context.Check(grazingBounded,
+			"GGX energy gain stays finite without grazing-angle energy explosion");
+		const double roughNormalGain = 1.0 / directionalAlbedo(1.0, 1.0, 1.0);
+		context.Check(roughNormalGain > 3.2 && roughNormalGain < 3.3,
+			"Rough F0=1 GGX receives the expected measurable white-furnace recovery");
+	}
+
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunMaterialBaselineContractTests(context);
+		RunGGXEnergyCompensationContractTests(context);
 		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
 		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),
 			"DX12 composition rejects a missing window before creating backend objects");

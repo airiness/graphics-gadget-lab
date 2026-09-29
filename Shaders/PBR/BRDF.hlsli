@@ -33,6 +33,21 @@ float3 F_Schlick(float3 F0, float3 F90, float cosTheta)
 	return F0 + (F90 - F0) * Pow5(1.0 - cosTheta);
 }
 
+// The split-sum LUT stores A = integral(1 - Fc) and B = integral(Fc).
+// A + B is the single-scattering directional albedo at F0 = 1.
+// Filament's DFG approximation restores the missing energy with
+// 1 + F0 * (1 / directionalAlbedo - 1).
+float3 GGXEnergyCompensation(float3 F0, float2 brdfLUT)
+{
+	const float directionalAlbedo = saturate(brdfLUT.x + brdfLUT.y);
+	if (directionalAlbedo <= 1.0e-4)
+	{
+		// An unbaked LUT cannot provide a trustworthy energy estimate.
+		return 1.0.xxx;
+	}
+	return 1.0.xxx + saturate(F0) * (rcp(directionalAlbedo) - 1.0);
+}
+
 // Height-correlated Smith visibility term for GGX.
 // Approximates the combined masking and shadowing effect for view and light directions.
 float V_SmithGGXCorrelated(float NoV, float NoL, float a)

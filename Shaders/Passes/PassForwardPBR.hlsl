@@ -231,7 +231,7 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 		return 1.0;
 	}
 	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
-	SamplerComparisonState sampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
+	SamplerComparisonState samplerState = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 	const float2 texelSize = 1.0.xx / max((float) g_Pass.ShadowMapSize, 1.0);
 	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
 	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
@@ -241,9 +241,9 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 	const float compareDepth = projection.ReceiverDepth - residualBias - bilinearBias;
 	if (!IsShadowPCFEnabled())
 	{
-		return SampleShadowHard(shadowMap, sampler, projection.UV, cascadeIndex, saturate(compareDepth));
+		return SampleShadowHard(shadowMap, samplerState, projection.UV, cascadeIndex, saturate(compareDepth));
 	}
-	return SampleShadowPCF3x3(shadowMap, sampler, projection.UV, cascadeIndex,
+	return SampleShadowPCF3x3(shadowMap, samplerState, projection.UV, cascadeIndex,
 		compareDepth, texelSize, gradient);
 }
 
@@ -285,7 +285,8 @@ float3 ApplyShadowDiagnosticsOverlay(float3 color, float3 positionWS)
 	{
 		return color;
 	}
-	const float3 cascadeColors[4] = {
+	const float3 cascadeColors[4] =
+	{
 		float3(0.15, 0.65, 1.0), float3(0.35, 1.0, 0.25),
 		float3(1.0, 0.45, 0.15), float3(0.8, 0.3, 1.0)
 	};
@@ -362,7 +363,10 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 
 float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 {
-	if (g_Pass.AtmosphereTransmittanceIndex == 0xffffffffu) return 1.0.xxx;
+	if (g_Pass.AtmosphereTransmittanceIndex == 0xffffffffu)
+	{
+		return 1.0.xxx;
+	}
 	float3 positionKm = positionWS * g_Scene.AtmosphereWorld.w - g_Scene.AtmosphereWorld.xyz;
 	float radiusKm = length(positionKm);
 	float bottomKm = g_Scene.AtmosphereRadii.x;
@@ -413,7 +417,7 @@ float3 WorldSunDiskSpecular(float3 centerDirection, float3 N, float3 V, float3 F
 }
 
 float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
+	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight, float3 energyCompensation)
 {
 	const LightData light = g_Lights[lightIndex];
 	float3 L = 0.0.xxx;
@@ -435,9 +439,8 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	const float D = D_GGX(NoH, physicalRoughness);
 	const float visibility = V_SmithGGXCorrelated(NoV, NoL, physicalRoughness);
 	const float3 F = F_Schlick(F0, 1.0.xxx, VoH);
-	const float3 specular = D * visibility * F;
-	const float3 kd = (1.0.xxx - F) * (1.0 - metallic);
-	const float3 diffuse = kd * Fd_Lambert(baseColor);
+	const float3 specular = D * visibility * F * energyCompensation;
+	const float3 diffuse = diffuseWeight * Fd_Lambert(baseColor);
 
 	float shadowVisibility = 1.0;
 	if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
@@ -457,21 +460,22 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	// over 0-60 degree incidence and offsets up to two solar radii from reflection.
 	if (lightIndex == g_Scene.WorldSunLightIndex && physicalRoughness < 0.04)
 	{
-		directResponse = diffuse * NoL + WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
+		directResponse = diffuse * NoL +
+			WorldSunDiskSpecular(L, N, V, F0, physicalRoughness) * energyCompensation;
 	}
 	return directResponse * illuminance * attenuation *
 		shadowVisibility;
 }
 
 float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
+	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight, float3 energyCompensation)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, metallic);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation);
 	}
 	return lighting;
 }
@@ -484,7 +488,8 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 }
 
 float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
-	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor, float metallic)
+	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor,
+	float3 diffuseWeight, float3 energyCompensation)
 {
 	float3 lighting = 0.0.xxx;
 	const uint globalLightCount = min(
@@ -496,7 +501,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
 			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-				physicalRoughness, baseColor, metallic);
+				physicalRoughness, baseColor, diffuseWeight, energyCompensation);
 		}
 	}
 
@@ -518,7 +523,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 			continue;
 		}
 		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, metallic);
+			physicalRoughness, baseColor, diffuseWeight, energyCompensation);
 	}
 	return lighting;
 }
@@ -615,34 +620,36 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	float a = shading.BRDFAlpha;
 
 	float3 F0 = shading.F0; // dielectric F0 is 0.04, metal F0 is baseColor
+	const float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
+	const float3 energyCompensation = GGXEnergyCompensation(F0, brdfLUT);
+	const float3 specularDirectionalAlbedo =
+		saturate((F0 * brdfLUT.x + brdfLUT.y) * energyCompensation);
+	// The compensated directional albedo allocates the remaining energy to diffuse.
+	const float3 diffuseWeight = (1.0.xxx - specularDirectionalAlbedo) * (1.0 - metallic);
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight, energyCompensation);
 #else
 	const float3 directLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
+			diffuseWeight, energyCompensation);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	const float3 legacyDirectLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
+			diffuseWeight, energyCompensation);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
 	const float3 emissive = surface.Emissive;
 
 	// IBL
-	float3 iblF = F_Schlick(F0, max((1.0 - perceptualRoughness).xxx, F0), NoV);
-
-	float3 diffuseIBLFactor = (1.0.xxx - iblF) * (1.0 - metallic);
-	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseIBLFactor * Fd_Lambert(baseColor);
-
-	float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
-	float3 specularIBLFactor = F0 * brdfLUT.x + brdfLUT.y;
+	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseWeight * Fd_Lambert(baseColor);
 
 	float3 reflectWS = reflect(-V, N);
 	float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
-	float3 specularIBL = prefilteredEnv * specularIBLFactor;
+	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
