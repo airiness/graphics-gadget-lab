@@ -1068,7 +1068,8 @@ namespace gglab
 				buffer.write(reinterpret_cast<const char*>(vertices.data()), sizeof(vertices));
 			}
 
-			auto writeSource = [&](std::string_view extensions, std::string_view material) noexcept
+			auto writeSource = [&](std::string_view extensions, std::string_view material,
+				int firstMaterial = 0, int secondMaterial = -1) noexcept
 			{
 				std::ofstream gltf(root / "probe.gltf");
 				gltf << R"({"asset":{"version":"2.0"},)" << extensions << R"(
@@ -1084,7 +1085,14 @@ namespace gglab
 {"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
 "images":[{"uri":"map.png"}],"textures":[{"source":0}],
 "materials":[)" << material << R"(],
-"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":0}]}]})";
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
+					<< firstMaterial << '}';
+				if (secondMaterial >= 0)
+				{
+					gltf << R"(,{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
+						<< secondMaterial << '}';
+				}
+				gltf << R"(]}]})";
 			};
 
 			writeSource(R"("extensionsUsed":["KHR_texture_transform"],)",
@@ -1166,6 +1174,41 @@ namespace gglab
 			context.Check(highIor.Succeeded() &&
 				std::abs(highIor.m_Model.m_Materials.front().m_Properties.m_Ior - 2.4f) < 0.0001f,
 				"Valid IOR above common dielectric values is preserved");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"name":"Repeated","extensions":{"KHR_materials_ior":{"ior":1.2}}},{"name":"Repeated","extensions":{"KHR_materials_ior":{"ior":2.2}}})", 1, 0);
+			const ModelImportResult duplicateNames = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(duplicateNames.Succeeded() &&
+				duplicateNames.m_Model.m_Materials.size() == 3u &&
+				std::abs(duplicateNames.m_Model.m_Materials[0].m_Properties.m_Ior - 2.2f) < 0.0001f &&
+				std::abs(duplicateNames.m_Model.m_Materials[1].m_Properties.m_Ior - 1.2f) < 0.0001f,
+				std::format("Duplicate material names retain their glTF index identities (error='{}', count={})",
+					duplicateNames.m_Error, duplicateNames.m_Model.m_Materials.size()));
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":1.25}}},{"extensions":{"KHR_materials_ior":{"ior":2.25}}})", 0, 1);
+			const ModelImportResult unnamedMaterials = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(unnamedMaterials.Succeeded() &&
+				unnamedMaterials.m_Model.m_Materials.size() == 3u &&
+				std::abs(unnamedMaterials.m_Model.m_Materials[0].m_Properties.m_Ior - 1.25f) < 0.0001f &&
+				std::abs(unnamedMaterials.m_Model.m_Materials[1].m_Properties.m_Ior - 2.25f) < 0.0001f,
+				std::format("Unnamed materials retain their glTF index identities (error='{}', count={})",
+					unnamedMaterials.m_Error, unnamedMaterials.m_Model.m_Materials.size()));
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":1.3}}},{"extensions":{"KHR_materials_ior":{"ior":2.3}}})");
+			const ModelImportResult unreferencedMaterial = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(unreferencedMaterial.Succeeded() &&
+				unreferencedMaterial.m_Model.m_Materials.size() == 2u &&
+				std::abs(unreferencedMaterial.m_Model.m_Materials[0].m_Properties.m_Ior - 1.3f) < 0.0001f,
+				"Unreferenced glTF materials do not shift Assimp's dense material indices");
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"extensions":{"KHR_materials_ior":{"ior":1.3}}},{"extensions":{"KHR_materials_ior":{"ior":2.3}}})", 1);
+			const ModelImportResult laterMaterial = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(laterMaterial.Succeeded() &&
+				laterMaterial.m_Model.m_Materials.size() == 2u &&
+				std::abs(laterMaterial.m_Model.m_Materials[0].m_Properties.m_Ior - 2.3f) < 0.0001f,
+				"A later glTF material can occupy the first dense Assimp index");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":0}}})");

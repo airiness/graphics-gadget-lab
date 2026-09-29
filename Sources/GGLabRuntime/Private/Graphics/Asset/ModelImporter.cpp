@@ -90,6 +90,116 @@ namespace gglab
 			return found != parent.end() && found->is_object() ? &*found : nullptr;
 		}
 
+		[[nodiscard]] const Json* FindArrayField(const Json& parent, const char* name) noexcept
+		{
+			if (!parent.is_object()) return nullptr;
+			const auto found = parent.find(name);
+			return found != parent.end() && found->is_array() ? &*found : nullptr;
+		}
+
+		[[nodiscard]] std::vector<size_t> CollectAssimpMaterialOrder(
+			const Json& gltf, size_t materialCount)
+		{
+			// The pinned glTF2 Asset lazily loads materials on the first mesh
+			// primitive reference. Its dense indices follow that encounter order.
+			const Json* nodes = FindArrayField(gltf, "nodes");
+			const Json* meshes = FindArrayField(gltf, "meshes");
+			std::vector<bool> visitedNodes(nodes ? nodes->size() : 0u, false);
+			std::vector<bool> visitedMeshes(meshes ? meshes->size() : 0u, false);
+			std::vector<bool> visitedMaterials(materialCount, false);
+			std::vector<size_t> order;
+			const auto visitMesh = [&](size_t index)
+			{
+				if (!meshes || index >= meshes->size() || visitedMeshes[index]) return;
+				visitedMeshes[index] = true;
+				if (const Json* primitives = FindArrayField((*meshes)[index], "primitives"))
+				{
+					for (const Json& primitive : *primitives)
+					{
+						if (!primitive.is_object()) continue;
+						const auto material = primitive.find("material");
+						if (material == primitive.end() || !material->is_number_unsigned()) continue;
+						const size_t materialIndex = material->get<size_t>();
+						if (materialIndex >= materialCount || visitedMaterials[materialIndex]) continue;
+						visitedMaterials[materialIndex] = true;
+						order.push_back(materialIndex);
+					}
+				}
+			};
+			const auto visitNode = [&](auto&& self, size_t index) -> void
+			{
+				if (!nodes || index >= nodes->size() || visitedNodes[index]) return;
+				visitedNodes[index] = true;
+				const Json& node = (*nodes)[index];
+				if (const Json* children = FindArrayField(node, "children"))
+				{
+					for (const Json& child : *children)
+					{
+						if (child.is_number_unsigned()) self(self, child.get<size_t>());
+					}
+				}
+				if (!node.is_object()) return;
+				const auto mesh = node.find("mesh");
+				if (mesh != node.end() && mesh->is_number_unsigned())
+				{
+					visitMesh(mesh->get<size_t>());
+				}
+			};
+			if (const Json* scenes = FindArrayField(gltf, "scenes"); scenes && !scenes->empty())
+			{
+				size_t sceneIndex = 0u;
+				const auto scene = gltf.find("scene");
+				if (scene != gltf.end() && scene->is_number_unsigned())
+				{
+					sceneIndex = scene->get<size_t>();
+				}
+				if (sceneIndex < scenes->size())
+				{
+					if (const Json* roots = FindArrayField((*scenes)[sceneIndex], "nodes"))
+					{
+						for (const Json& root : *roots)
+						{
+							if (root.is_number_unsigned()) visitNode(visitNode, root.get<size_t>());
+						}
+					}
+				}
+			}
+			if (const Json* skins = FindArrayField(gltf, "skins"))
+			{
+				for (const Json& skin : *skins)
+				{
+					if (const Json* joints = FindArrayField(skin, "joints"))
+					{
+						for (const Json& joint : *joints)
+						{
+							if (joint.is_number_unsigned()) visitNode(visitNode, joint.get<size_t>());
+						}
+					}
+				}
+			}
+			if (const Json* animations = FindArrayField(gltf, "animations"))
+			{
+				for (const Json& animation : *animations)
+				{
+					if (const Json* channels = FindArrayField(animation, "channels"))
+					{
+						for (const Json& channel : *channels)
+						{
+							if (const Json* target = FindObjectField(channel, "target"))
+							{
+								const auto node = target->find("node");
+								if (node != target->end() && node->is_number_unsigned())
+								{
+									visitNode(visitNode, node->get<size_t>());
+								}
+							}
+						}
+					}
+				}
+			}
+			return order;
+		}
+
 		[[nodiscard]] const Json* FindMaterialTextureInfo(
 			const Json& material, MaterialTextureSlot slot) noexcept
 		{
@@ -482,56 +592,22 @@ namespace gglab
 				"Model file '{}' does not contain a scene hierarchy.", canonicalPath.string());
 			return result;
 		}
-		// Assimp may load referenced glTF materials in first-use order. Its material
-		// count still matches the JSON table plus one default, but indices can differ.
-		if (scene->mNumMaterials != (sourceMaterials ? sourceMaterials->size() : 0u) + 1u)
+		const std::vector<size_t> materialOrder = CollectAssimpMaterialOrder(
+			gltf, sourceMaterials ? sourceMaterials->size() : 0u);
+		// The pinned Assimp glTF2 importer lazily loads referenced materials in
+		// first-use order, then appends one default material. Optional names do
+		// not identify a source entry, even when they happen to be unique.
+		if (scene->mNumMaterials != materialOrder.size() + 1u)
 		{
-			result.m_Error = "Assimp material indices do not match the glTF material table.";
+			result.m_Error = "Assimp material indices do not match referenced glTF materials.";
 			return result;
 		}
 		std::vector<const Json*> materialSources(scene->mNumMaterials, nullptr);
 		if (sourceMaterials)
 		{
-			bool reordered = false;
-			for (size_t index = 0; index < sourceMaterials->size(); ++index)
+			for (size_t index = 0; index < materialOrder.size(); ++index)
 			{
-				const Json& material = (*sourceMaterials)[index];
-				materialSources[index] = &material;
-				const auto name = material.find("name");
-				if (name != material.end() && name->is_string() &&
-					name->get<std::string>() != scene->mMaterials[index]->GetName().C_Str())
-				{
-					reordered = true;
-				}
-			}
-			if (reordered)
-			{
-				std::vector<bool> matched(sourceMaterials->size(), false);
-				for (size_t assimpIndex = 0; assimpIndex < sourceMaterials->size(); ++assimpIndex)
-				{
-					const std::string name = scene->mMaterials[assimpIndex]->GetName().C_Str();
-					size_t sourceIndex = sourceMaterials->size();
-					for (size_t candidate = 0; candidate < sourceMaterials->size(); ++candidate)
-					{
-						const Json& candidateMaterial = (*sourceMaterials)[candidate];
-						const auto sourceName = candidateMaterial.find("name");
-						if (sourceName == candidateMaterial.end() || !sourceName->is_string() ||
-							sourceName->get<std::string>() != name) continue;
-						if (sourceIndex != sourceMaterials->size())
-						{
-							result.m_Error = "Reordered glTF materials have ambiguous names.";
-							return result;
-						}
-						sourceIndex = candidate;
-					}
-					if (name.empty() || sourceIndex == sourceMaterials->size() || matched[sourceIndex])
-					{
-						result.m_Error = "Reordered glTF materials cannot be matched by unique names.";
-						return result;
-					}
-					materialSources[assimpIndex] = &(*sourceMaterials)[sourceIndex];
-					matched[sourceIndex] = true;
-				}
+				materialSources[index] = &(*sourceMaterials)[materialOrder[index]];
 			}
 		}
 		progress.Report(0.25f, "Model structure parsed",

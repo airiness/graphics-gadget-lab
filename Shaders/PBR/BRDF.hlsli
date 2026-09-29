@@ -118,21 +118,57 @@ float V_Charlie(float NoV, float NoL, float alpha)
 }
 
 // The Charlie visibility fit can integrate above one at very smooth grazing
-// angles. This view-dependent normalization is fitted against hemispherical
-// integration so a white microfiber layer remains bounded.
-float CharlieSheenNormalization(float NoV, float perceptualRoughness)
+// angles. The correction must be symmetric in the two directions so the BRDF
+// remains reciprocal.
+float CharlieSheenNormalization(float NoV, float NoL, float perceptualRoughness)
 {
 	const float smoothness = 1.0 - perceptualRoughness;
 	return 1.0 + 5.0 * smoothness * smoothness * smoothness * smoothness *
-		exp(-NoV / 0.02);
+		exp(-min(NoV, NoL) / 0.02);
 }
 
-// A conservative analytic envelope for Charlie directional albedo. It avoids
-// changing the existing two-channel GGX DFG LUT while reserving energy for sheen.
-float SheenDirectionalEnergyEstimate(float NoV, float perceptualRoughness)
+// Chebyshev fit to the reciprocal Charlie BRDF integrated over a white
+// hemisphere. The small positive bias bounds the sampled fit residual while
+// keeping the GGX DFG texture's two-channel contract unchanged.
+float SheenDirectionalAlbedo(float NoV, float perceptualRoughness)
 {
-	const float grazing = 1.0 - saturate(NoV);
-	return saturate(grazing * grazing + 0.25 * perceptualRoughness + 0.1);
+	const float x = 2.0 * log(1.0 + max(NoV, 0.001) * 50.0) / log(51.0) - 1.0;
+	const float y = 2.0 * ClampPerceptualRoughnessForBRDF(perceptualRoughness) - 1.0;
+	float tx[7];
+	float ty[7];
+	tx[0] = 1.0;
+	tx[1] = x;
+	ty[0] = 1.0;
+	ty[1] = y;
+	[unroll]
+	for (uint index = 2u; index < 7u; ++index)
+	{
+		tx[index] = 2.0 * x * tx[index - 1u] - tx[index - 2u];
+		ty[index] = 2.0 * y * ty[index - 1u] - ty[index - 2u];
+	}
+	static const float coefficients[49] =
+	{
+		0.4662008734, 0.1421159035, 0.05200258402, -0.05125628079, 0.006825325422, -0.004605599776, 0.002613252967,
+		-0.4067666558, 0.06915140574, -0.1195616388, 0.1024846881, -0.04368122318, 0.02249280341, -0.01160481628,
+		-0.04041981132, -0.1105422938, 0.1245469551, -0.1063839573, 0.06729718862, -0.03703415321, 0.02134558657,
+		0.06907690518, -0.04916388234, 0.003350617615, 0.02625226625, -0.02702190985, 0.02009724266, -0.01436163036,
+		-0.03666481275, 0.04569041403, -0.05400284215, 0.04947314302, -0.03266691141, 0.01681106069, -0.006804344716,
+		0.002019475767, 0.008140849677, 0.01012986063, -0.02356920128, 0.02254739397, -0.0177240175, 0.01245039065,
+		0.009723827867, -0.02778271004, 0.01832648501, -0.01192787424, 0.008339719302, -0.004460323995, 0.001011952775
+	};
+	float estimate = 0.0;
+	[unroll]
+	for (uint row = 0u; row < 7u; ++row)
+	{
+		float rowValue = 0.0;
+		[unroll]
+		for (uint column = 0u; column < 7u; ++column)
+		{
+			rowValue += coefficients[row * 7u + column] * ty[column];
+		}
+		estimate += rowValue * tx[row];
+	}
+	return saturate(estimate + 0.026);
 }
 
 // Lambertian diffuse BRDF.

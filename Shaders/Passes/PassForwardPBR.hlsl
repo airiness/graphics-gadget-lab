@@ -532,7 +532,6 @@ float3 EvaluateSheenDirect(float3 L, float3 V, float3 N, float NoV,
 {
 	const float NoL = saturate(dot(N, L));
 	if (NoL <= 0.0 || !any(sheen.Color > 0.0.xxx)) return 0.0.xxx;
-	const float normalization = CharlieSheenNormalization(NoV, sheen.PerceptualRoughness);
 	if (worldSun && sheen.Alpha < 0.04)
 	{
 		const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
@@ -552,14 +551,16 @@ float3 EvaluateSheenDirect(float3 L, float3 V, float3 N, float NoV,
 			const float sampleNoL = saturate(dot(N, sampleDirection));
 			const float3 H = SafeNormalize(sampleDirection + V, N);
 			integrated += D_Charlie(saturate(dot(N, H)), sheen.Alpha) *
-				V_Charlie(NoV, sampleNoL, sheen.Alpha) * sampleNoL;
+				V_Charlie(NoV, sampleNoL, sheen.Alpha) * sampleNoL /
+				CharlieSheenNormalization(NoV, sampleNoL, sheen.PerceptualRoughness);
 		}
-		return sheen.Color * (integrated / normalization) *
+		return sheen.Color * integrated *
 			(2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
 	}
 	const float3 H = SafeNormalize(L + V, N);
 	return sheen.Color * D_Charlie(saturate(dot(N, H)), sheen.Alpha) *
-		V_Charlie(NoV, NoL, sheen.Alpha) * NoL / normalization;
+		V_Charlie(NoV, NoL, sheen.Alpha) * NoL /
+		CharlieSheenNormalization(NoV, NoL, sheen.PerceptualRoughness);
 }
 
 struct DirectLightingResult
@@ -635,10 +636,10 @@ DirectLightingResult EvaluateDirectLight(uint lightIndex, float3 positionWS, flo
 	}
 	if (any(sheen.Color > 0.0.xxx))
 	{
-		const float incidentEnergy = SheenDirectionalEnergyEstimate(
+		const float incidentEnergy = SheenDirectionalAlbedo(
 			NoL, sheen.PerceptualRoughness);
 		const float baseTransmission = 1.0 - max(sheen.Color.r,
-			max(sheen.Color.g, sheen.Color.b)) * max(sheen.ViewAlbedoBound, incidentEnergy);
+			max(sheen.Color.g, sheen.Color.b)) * max(sheen.ViewDirectionalAlbedo, incidentEnergy);
 		result.Sheen = EvaluateSheenDirect(L, V, N, NoV, sheen,
 			lightIndex == g_Scene.WorldSunLightIndex);
 		directResponse = directResponse * baseTransmission + result.Sheen;
@@ -894,7 +895,8 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float3 energyCompensation = GGXEnergyCompensation(F0, brdfLUT);
 	const float3 specularDirectionalAlbedo =
 		saturate((F0 * brdfLUT.x + brdfLUT.y) * energyCompensation);
-	// The compensated directional albedo allocates the remaining energy to diffuse.
+	// The view-integrated GGX albedo also weights direct diffuse. This is a
+	// directional approximation until incident-angle coupling is modeled.
 	const float3 diffuseWeight = (1.0.xxx - specularDirectionalAlbedo) * (1.0 - metallic);
 	ClearcoatShadingState coat;
 	coat.Factor = surface.ClearcoatFactor;
@@ -917,13 +919,13 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	sheen.Color = surface.SheenColor;
 	sheen.PerceptualRoughness = 0.0;
 	sheen.Alpha = 0.0;
-	sheen.ViewAlbedoBound = 0.0;
+	sheen.ViewDirectionalAlbedo = 0.0;
 	if (any(sheen.Color > 0.0.xxx))
 	{
 		sheen.PerceptualRoughness = ClampPerceptualRoughnessForBRDF(
 			surface.SheenRoughness);
 		sheen.Alpha = PerceptualRoughnessToAlpha(sheen.PerceptualRoughness);
-		sheen.ViewAlbedoBound = SheenDirectionalEnergyEstimate(NoV,
+		sheen.ViewDirectionalAlbedo = SheenDirectionalAlbedo(NoV,
 			sheen.PerceptualRoughness);
 	}
 #if defined(GGLAB_FORWARD_PLUS)
@@ -959,13 +961,13 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	if (any(sheen.Color > 0.0.xxx))
 	{
 		const float maxSheenColor = max(sheen.Color.r, max(sheen.Color.g, sheen.Color.b));
-		const float baseTransmission = 1.0 - maxSheenColor * sheen.ViewAlbedoBound;
+		const float baseTransmission = 1.0 - maxSheenColor * sheen.ViewDirectionalAlbedo;
 		diffuseIBL *= baseTransmission;
 		specularIBL *= baseTransmission;
 		// The GGX-prefiltered environment is sampled in the backscatter direction.
 		// This is a roughness-aware approximation of Charlie IBL, not a Charlie prefilter.
 		sheenIBL = SampleIBLPrefilteredSpecular(V, sheen.PerceptualRoughness) *
-			sheen.Color * sheen.ViewAlbedoBound;
+			sheen.Color * sheen.ViewDirectionalAlbedo;
 	}
 	if (coat.Factor > 0.0)
 	{

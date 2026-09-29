@@ -76,7 +76,7 @@ struct SheenShadingState
 	float3 Color;
 	float PerceptualRoughness;
 	float Alpha;
-	float ViewAlbedoBound;
+	float ViewDirectionalAlbedo;
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
