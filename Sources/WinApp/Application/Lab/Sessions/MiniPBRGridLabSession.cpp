@@ -68,6 +68,8 @@ namespace gglab
 		const LabParameterId ClearcoatRoughnessId("mini_pbr.material.clearcoat_roughness");
 		const LabParameterId AnisotropyStrengthId("mini_pbr.material.anisotropy_strength");
 		const LabParameterId AnisotropyRotationId("mini_pbr.material.anisotropy_rotation");
+		const LabParameterId SheenColorId("mini_pbr.material.sheen_color");
+		const LabParameterId SheenRoughnessId("mini_pbr.material.sheen_roughness");
 		const LabParameterId DebugViewId("mini_pbr.material.debug_view");
 		const LabParameterId LightIntensityId("mini_pbr.lighting.intensity");
 
@@ -237,6 +239,9 @@ namespace gglab
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
+					{.m_Value = int32_t(MaterialDebugView::SheenColor), .m_Name = "Sheen Color"},
+					{.m_Value = int32_t(MaterialDebugView::SheenRoughness), .m_Name = "Sheen Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::SheenContribution), .m_Name = "Sheen Contribution"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -278,6 +283,24 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(-180.0f),
 			.m_MaxValue = LabValue(180.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = SheenColorId,
+			.m_Name = "Sheen Color",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Color,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = Color::Black,
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = SheenRoughnessId,
+			.m_Name = "Sheen Roughness",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.5f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
 		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
@@ -511,6 +534,8 @@ namespace gglab
 			material.m_Properties.m_AnisotropyStrength = parameters.Get(AnisotropyStrengthId, 0.0f);
 			material.m_Properties.m_AnisotropyRotation =
 				parameters.Get(AnisotropyRotationId, 0.0f) * std::numbers::pi_v<float> / 180.0f;
+			material.m_Properties.m_SheenColor = parameters.Get(SheenColorId, Color::Black);
+			material.m_Properties.m_SheenRoughness = parameters.Get(SheenRoughnessId, 0.5f);
 			material.m_Properties.m_DebugView = debugView;
 		}
 

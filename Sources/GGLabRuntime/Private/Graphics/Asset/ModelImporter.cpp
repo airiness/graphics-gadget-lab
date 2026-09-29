@@ -62,6 +62,9 @@ namespace gglab
 				return aiTextureType_CLEARCOAT;
 			case MaterialTextureSlot::Anisotropy:
 				return aiTextureType_ANISOTROPY;
+			case MaterialTextureSlot::SheenColor:
+			case MaterialTextureSlot::SheenRoughness:
+				return aiTextureType_SHEEN;
 			default:
 				return aiTextureType_NONE;
 			}
@@ -73,6 +76,7 @@ namespace gglab
 			{
 			case MaterialTextureSlot::ClearcoatRoughness: return 1u;
 			case MaterialTextureSlot::ClearcoatNormal: return 2u;
+			case MaterialTextureSlot::SheenRoughness: return 1u;
 			default: return 0u;
 			}
 		}
@@ -125,6 +129,17 @@ namespace gglab
 					if (const Json* anisotropy = FindObjectField(*extensions, "KHR_materials_anisotropy"))
 					{
 						return FindObjectField(*anisotropy, "anisotropyTexture");
+					}
+				}
+				break;
+			case MaterialTextureSlot::SheenColor:
+			case MaterialTextureSlot::SheenRoughness:
+				if (const Json* extensions = FindObjectField(material, "extensions"))
+				{
+					if (const Json* sheen = FindObjectField(*extensions, "KHR_materials_sheen"))
+					{
+						return FindObjectField(*sheen, slot == MaterialTextureSlot::SheenColor
+							? "sheenColorTexture" : "sheenRoughnessTexture");
 					}
 				}
 				break;
@@ -409,7 +424,7 @@ namespace gglab
 				const std::string name = entry.get<std::string>();
 				if (!name.starts_with("KHR_materials_")) continue;
 				if (name == "KHR_materials_ior" || name == "KHR_materials_clearcoat" ||
-					name == "KHR_materials_anisotropy") continue;
+					name == "KHR_materials_anisotropy" || name == "KHR_materials_sheen") continue;
 				if (std::string_view(field) == "extensionsRequired")
 				{
 					result.m_Error = std::format("Required material extension '{}' is not yet supported.", name);
@@ -531,13 +546,15 @@ namespace gglab
 					&operation, mapMode) != aiReturn_SUCCESS)
 				{
 					if ((textureType == aiTextureType_CLEARCOAT ||
-						textureType == aiTextureType_ANISOTROPY) && sourceMaterials &&
+						textureType == aiTextureType_ANISOTROPY ||
+						textureType == aiTextureType_SHEEN) && sourceMaterials &&
 						materialIndex < sourceMaterials->size() &&
 						FindMaterialTextureInfo((*sourceMaterials)[materialIndex], slot))
 					{
 						result.m_Error = std::format(
 							"Assimp did not preserve a {} texture binding.",
-							textureType == aiTextureType_CLEARCOAT ? "clearcoat" : "anisotropy");
+							textureType == aiTextureType_CLEARCOAT ? "clearcoat" :
+							textureType == aiTextureType_ANISOTROPY ? "anisotropy" : "sheen");
 						return result;
 					}
 					continue;
@@ -644,6 +661,79 @@ namespace gglab
 						{
 							result.m_Error = "Assimp did not preserve KHR_materials_anisotropy factors.";
 							return result;
+						}
+					}
+					const auto sheenExtension = extensions->find("KHR_materials_sheen");
+					if (sheenExtension != extensions->end())
+					{
+						if (!sheenExtension->is_object())
+						{
+							result.m_Error = "KHR_materials_sheen must be an object.";
+							return result;
+						}
+						const auto color = sheenExtension->find("sheenColorFactor");
+						if (color != sheenExtension->end())
+						{
+							if (!color->is_array() || color->size() != 3u)
+							{
+								result.m_Error = "KHR_materials_sheen.sheenColorFactor must contain three values.";
+								return result;
+							}
+							float channels[3]{};
+							for (size_t channel = 0; channel < 3u; ++channel)
+							{
+								const Json& value = (*color)[channel];
+								if (!value.is_number() || !std::isfinite(value.get<float>()) ||
+									value.get<float>() < 0.0f || value.get<float>() > 1.0f)
+								{
+									result.m_Error = "KHR_materials_sheen.sheenColorFactor must be in [0, 1].";
+									return result;
+								}
+								channels[channel] = value.get<float>();
+							}
+							destination.m_Properties.m_SheenColor = Color(
+								channels[0], channels[1], channels[2], 1.0f);
+						}
+						const auto roughness = sheenExtension->find("sheenRoughnessFactor");
+						if (roughness != sheenExtension->end())
+						{
+							if (!roughness->is_number() || !std::isfinite(roughness->get<float>()) ||
+								roughness->get<float>() < 0.0f || roughness->get<float>() > 1.0f)
+							{
+								result.m_Error = "KHR_materials_sheen.sheenRoughnessFactor must be in [0, 1].";
+								return result;
+							}
+							destination.m_Properties.m_SheenRoughness = roughness->get<float>();
+						}
+						for (const char* name : { "sheenColorTexture", "sheenRoughnessTexture" })
+						{
+							const auto texture = sheenExtension->find(name);
+							if (texture == sheenExtension->end()) continue;
+							const auto index = texture->is_object()
+								? texture->find("index") : Json::const_iterator{};
+							if (!texture->is_object() || index == texture->end() ||
+								!index->is_number_unsigned())
+							{
+								result.m_Error = std::format(
+									"KHR_materials_sheen.{} requires a texture index.", name);
+								return result;
+							}
+						}
+						const Color& expected = destination.m_Properties.m_SheenColor;
+						if (expected.m_R > 0.0f || expected.m_G > 0.0f || expected.m_B > 0.0f)
+						{
+							aiColor3D importedColor{};
+							float importedRoughness = 0.0f;
+							if (source->Get(AI_MATKEY_SHEEN_COLOR_FACTOR, importedColor) != aiReturn_SUCCESS ||
+								source->Get(AI_MATKEY_SHEEN_ROUGHNESS_FACTOR, importedRoughness) != aiReturn_SUCCESS ||
+								std::abs(importedColor.r - expected.m_R) > 0.0001f ||
+								std::abs(importedColor.g - expected.m_G) > 0.0001f ||
+								std::abs(importedColor.b - expected.m_B) > 0.0001f ||
+								std::abs(importedRoughness - destination.m_Properties.m_SheenRoughness) > 0.0001f)
+							{
+								result.m_Error = "Assimp did not preserve KHR_materials_sheen factors.";
+								return result;
+							}
 						}
 					}
 					const auto clearcoatExtension = extensions->find("KHR_materials_clearcoat");

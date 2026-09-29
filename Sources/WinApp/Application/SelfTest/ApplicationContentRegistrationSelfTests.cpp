@@ -436,6 +436,44 @@ namespace gglab
 					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
 						ImportedMaterialTextureBinding::InvalidTextureIndex,
 					"Blender anisotropy factors and textured UV1 direction survive Assimp import");
+				const auto sheenFactor = std::ranges::find(model.m_Materials,
+					"MAT_SheenFactor", &ImportedMaterial::m_Name);
+				const auto sheenTexture = std::ranges::find(model.m_Materials,
+					"MAT_SheenTexture", &ImportedMaterial::m_Name);
+				context.Check(sheenFactor != model.m_Materials.end() &&
+					sheenTexture != model.m_Materials.end() &&
+					std::abs(sheenFactor->m_Properties.m_SheenColor.m_R - 0.3f) < 0.0001f &&
+					std::abs(sheenFactor->m_Properties.m_SheenColor.m_G - 0.1f) < 0.0001f &&
+					std::abs(sheenFactor->m_Properties.m_SheenColor.m_B - 0.05f) < 0.0001f &&
+					std::abs(sheenFactor->m_Properties.m_SheenRoughness - 0.6f) < 0.0001f &&
+					sheenTexture->m_Properties.m_SheenColor.m_R == 1.0f &&
+					sheenTexture->m_Properties.m_SheenRoughness == 1.0f &&
+					sheenTexture->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::SheenColor)].m_TexCoordIndex == 1 &&
+					sheenTexture->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::SheenRoughness)].m_TexCoordIndex == 0 &&
+					sheenTexture->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::SheenColor)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					sheenTexture->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::SheenRoughness)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					"Blender sheen factors and independent texture UV sets survive Assimp import");
+				bool sheenTextures = true;
+				uint32_t sheenTextureCount = 0;
+				for (const auto& source : model.m_TextureSources)
+				{
+				if (source.m_Semantic != TextureSemantic::SheenColor &&
+					source.m_Semantic != TextureSemantic::SheenRoughness) continue;
+				const auto texture = TextureLoader::LoadTextureData(
+					source.m_CanonicalPath, source.m_ImportSettings);
+				const bool color = source.m_Semantic == TextureSemantic::SheenColor;
+				++sheenTextureCount;
+				sheenTextures &= texture.IsValid() &&
+					texture.m_ColorSpace == (color ? TextureColorSpace::SRGB : TextureColorSpace::Linear) &&
+					texture.m_ViewFormat == (color ? RHIFormat::R8G8B8A8UnormSrgb : RHIFormat::R8G8B8A8Unorm) &&
+					texture.m_Pixels.size() >= 4u &&
+					(color || (texture.m_Pixels[0] == std::byte{ 0 } &&
+						texture.m_Pixels[3] == std::byte{ 160 }));
+			}
+			context.Check(sheenTextureCount == 2u && sheenTextures,
+				"Sheen color decodes as sRGB while roughness alpha remains linear");
 			}
 
 			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,
@@ -1069,7 +1107,6 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.lighting_contract", 37,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		CheckMaterialReferenceImports(context);
 		checkSelectedDemand("gglab.lab.atmosphere_range", 38,
 			"Atmosphere range includes the aerial measurement probe shader demand");
 		CheckAtmosphereRangeContent(context);
@@ -1079,6 +1116,7 @@ namespace gglab
 		std::thread textureWorker([&]
 			{
 				const auto workerContext = win32::Win32TaskWorkerLifecycle{}.CreateContext(0);
+				CheckMaterialReferenceImports(context);
 				CheckAnisotropyReferenceImports(context);
 				CheckCoastalAtriumContent(context);
 				CheckTextureContractContent(context);

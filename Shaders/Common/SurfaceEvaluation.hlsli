@@ -13,6 +13,8 @@ struct SurfaceData
 	float ClearcoatRoughness;
 	float AnisotropyStrength;
 	float2 AnisotropyDirectionTS;
+	float3 SheenColor;
+	float SheenRoughness;
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
@@ -46,6 +48,14 @@ struct AnisotropyShadingState
 	float3 BitangentWS;
 	float AlphaT;
 	float AlphaB;
+};
+
+struct SheenShadingState
+{
+	float3 Color;
+	float PerceptualRoughness;
+	float Alpha;
+	float ViewAlbedoBound;
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
@@ -100,6 +110,20 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	surface.AnisotropyDirectionTS = float2(
 		cosine * direction.x - sine * direction.y,
 		sine * direction.x + cosine * direction.y);
+	surface.SheenColor = saturate(matData.SheenColorFactor.rgb);
+	surface.SheenRoughness = saturate(matData.SheenRoughnessFactor);
+	if (any(surface.SheenColor > 0.0.xxx))
+	{
+		const float2 colorUV = SelectUV(matData.SheenColorBinding, uv0, uv1);
+		surface.SheenColor *= SampleTextureBinding(
+			matData.SheenColorBinding.TextureSamplerBinding, colorUV).rgb;
+		if (any(surface.SheenColor > 0.0.xxx))
+		{
+			const float2 roughnessUV = SelectUV(matData.SheenRoughnessBinding, uv0, uv1);
+			surface.SheenRoughness *= SampleTextureBinding(
+				matData.SheenRoughnessBinding.TextureSamplerBinding, roughnessUV).a;
+		}
+	}
 
 	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.

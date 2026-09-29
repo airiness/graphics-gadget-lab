@@ -116,6 +116,9 @@ static const uint MaterialDebugViewClearcoatNormal = 12u;
 static const uint MaterialDebugViewAnisotropyStrength = 13u;
 static const uint MaterialDebugViewAnisotropyDirectionTangent = 14u;
 static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
+static const uint MaterialDebugViewSheenColor = 16u;
+static const uint MaterialDebugViewSheenRoughness = 17u;
+static const uint MaterialDebugViewSheenContribution = 18u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -203,6 +206,10 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS)
 	if (surface.AnisotropyStrength > 0.0)
 	{
 		state.FeatureFlags |= 2u;
+	}
+	if (any(surface.SheenColor > 0.0.xxx))
+	{
+		state.FeatureFlags |= 4u;
 	}
 	return state;
 }
@@ -526,22 +533,65 @@ float3 EvaluateClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
 		F_Schlick(F0, 1.0.xxx, VoH) * coat.EnergyCompensation * NoL;
 }
 
-float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
+float3 EvaluateSheenDirect(float3 L, float3 V, float3 N, float NoV,
+	SheenShadingState sheen, bool worldSun)
 {
+	const float NoL = saturate(dot(N, L));
+	if (NoL <= 0.0 || !any(sheen.Color > 0.0.xxx)) return 0.0.xxx;
+	const float normalization = CharlieSheenNormalization(NoV, sheen.PerceptualRoughness);
+	if (worldSun && sheen.Alpha < 0.04)
+	{
+		const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
+		const float sineRadiusSquared = sineRadius * sineRadius;
+		const float3 referenceAxis = abs(L.y) < 0.99 ?
+			float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
+		const float3 tangent = normalize(cross(referenceAxis, L));
+		const float3 bitangent = cross(L, tangent);
+		float integrated = 0.0;
+		[unroll]
+		for (uint sampleIndex = 0; sampleIndex < 32u; ++sampleIndex)
+		{
+			const float radial = sqrt((sampleIndex + 0.5) / 32.0 * sineRadiusSquared);
+			const float phase = sampleIndex * 2.39996322973;
+			const float3 sampleDirection = L * sqrt(1.0 - radial * radial) +
+				(tangent * cos(phase) + bitangent * sin(phase)) * radial;
+			const float sampleNoL = saturate(dot(N, sampleDirection));
+			const float3 H = SafeNormalize(sampleDirection + V, N);
+			integrated += D_Charlie(saturate(dot(N, H)), sheen.Alpha) *
+				V_Charlie(NoV, sampleNoL, sheen.Alpha) * sampleNoL;
+		}
+		return sheen.Color * (integrated / normalization) *
+			(2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
+	}
+	const float3 H = SafeNormalize(L + V, N);
+	return sheen.Color * D_Charlie(saturate(dot(N, H)), sheen.Alpha) *
+		V_Charlie(NoV, NoL, sheen.Alpha) * NoL / normalization;
+}
+
+struct DirectLightingResult
+{
+	float3 Total;
+	float3 Sheen;
+};
+
+DirectLightingResult EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
+	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
+	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat,
+	SheenShadingState sheen)
+{
+	DirectLightingResult result = { 0.0.xxx, 0.0.xxx };
 	const LightData light = g_Lights[lightIndex];
 	float3 L = 0.0.xxx;
 	float attenuation = 1.0;
 	if (!ResolveLightVector(light, positionWS, L, attenuation))
 	{
-		return 0.0.xxx;
+		return result;
 	}
 
 	const float NoL = saturate(dot(N, L));
 	if (NoL <= 0.0 && (coat.Factor <= 0.0 || dot(coat.NormalWS, L) <= 0.0))
 	{
-		return 0.0.xxx;
+		return result;
 	}
 
 	const float3 H = SafeNormalize(L + V, N);
@@ -589,6 +639,16 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 			: WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
 		directResponse = diffuse * NoL + diskSpecular * energyCompensation;
 	}
+	if (any(sheen.Color > 0.0.xxx))
+	{
+		const float incidentEnergy = SheenDirectionalEnergyEstimate(
+			NoL, sheen.PerceptualRoughness);
+		const float baseTransmission = 1.0 - max(sheen.Color.r,
+			max(sheen.Color.g, sheen.Color.b)) * max(sheen.ViewAlbedoBound, incidentEnergy);
+		result.Sheen = EvaluateSheenDirect(L, V, N, NoV, sheen,
+			lightIndex == g_Scene.WorldSunLightIndex);
+		directResponse = directResponse * baseTransmission + result.Sheen;
+	}
 	if (coat.Factor > 0.0)
 	{
 		const float coatNoL = saturate(dot(coat.NormalWS, L));
@@ -599,21 +659,27 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 			(1.0 - coat.Factor * incidentReflectance);
 		directResponse = directResponse * transmission + coat.Factor *
 			EvaluateClearcoatDirect(L, V, coat, lightIndex == g_Scene.WorldSunLightIndex);
+		result.Sheen *= transmission;
 	}
-	return directResponse * illuminance * attenuation *
-		shadowVisibility;
+	result.Total = directResponse * illuminance * attenuation * shadowVisibility;
+	result.Sheen *= illuminance * attenuation * shadowVisibility;
+	return result;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
+DirectLightingResult EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
+	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat,
+	SheenShadingState sheen)
 {
-	float3 lighting = 0.0.xxx;
+	DirectLightingResult lighting = { 0.0.xxx, 0.0.xxx };
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
+		const DirectLightingResult light = EvaluateDirectLight(lightIndex, positionWS, N,
+			shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
+			energyCompensation, anisotropy, coat, sheen);
+		lighting.Total += light.Total;
+		lighting.Sheen += light.Sheen;
 	}
 	return lighting;
 }
@@ -625,12 +691,12 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
-float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
+DirectLightingResult EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
 	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor,
 	float3 diffuseWeight, float3 energyCompensation, AnisotropyShadingState anisotropy,
-	ClearcoatShadingState coat)
+	ClearcoatShadingState coat, SheenShadingState sheen)
 {
-	float3 lighting = 0.0.xxx;
+	DirectLightingResult lighting = { 0.0.xxx, 0.0.xxx };
 	const uint globalLightCount = min(
 		g_Pass.ForwardPlusGlobalLightCount, FORWARD_PLUS_GLOBAL_LIGHT_CAPACITY);
 	for (uint listOffset = 0; listOffset < globalLightCount; ++listOffset)
@@ -639,8 +705,11 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		if (lightIndex >= g_Scene.LightBaseIndex &&
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
-			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-				physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
+			const DirectLightingResult light = EvaluateDirectLight(lightIndex, positionWS, N,
+				shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
+				energyCompensation, anisotropy, coat, sheen);
+			lighting.Total += light.Total;
+			lighting.Sheen += light.Sheen;
 		}
 	}
 
@@ -661,8 +730,11 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		{
 			continue;
 		}
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, diffuseWeight, energyCompensation, anisotropy, coat);
+		const DirectLightingResult light = EvaluateDirectLight(lightIndex, positionWS, N,
+			shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
+			energyCompensation, anisotropy, coat, sheen);
+		lighting.Total += light.Total;
+		lighting.Sheen += light.Sheen;
 	}
 	return lighting;
 }
@@ -790,6 +862,16 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		const float4 color = float4(anisotropy.TangentWS * 0.5 + 0.5, alpha);
 		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
 	}
+	if (matData.DebugView == MaterialDebugViewSheenColor)
+	{
+		const float4 color = float4(surface.SheenColor, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
+	if (matData.DebugView == MaterialDebugViewSheenRoughness)
+	{
+		const float4 color = float4(surface.SheenRoughness.xxx, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 	if (matData.DebugView == MaterialDebugViewFeatureFlags)
 	{
 		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
@@ -834,20 +916,33 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		coat.DirectionalAlbedo = saturate(
 			(0.04 * coatLUT.x + coatLUT.y) * coat.EnergyCompensation.x);
 	}
+	SheenShadingState sheen;
+	sheen.Color = surface.SheenColor;
+	sheen.PerceptualRoughness = 0.0;
+	sheen.Alpha = 0.0;
+	sheen.ViewAlbedoBound = 0.0;
+	if (any(sheen.Color > 0.0.xxx))
+	{
+		sheen.PerceptualRoughness = ClampPerceptualRoughnessForBRDF(
+			surface.SheenRoughness);
+		sheen.Alpha = PerceptualRoughnessToAlpha(sheen.PerceptualRoughness);
+		sheen.ViewAlbedoBound = SheenDirectionalEnergyEstimate(NoV,
+			sheen.PerceptualRoughness);
+	}
 #if defined(GGLAB_FORWARD_PLUS)
-	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
+	const DirectLightingResult directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
 		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight,
-		energyCompensation, anisotropy, coat);
+		energyCompensation, anisotropy, coat, sheen);
 #else
-	const float3 directLighting =
+	const DirectLightingResult directLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, anisotropy, coat);
+			diffuseWeight, energyCompensation, anisotropy, coat, sheen);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	const float3 legacyDirectLighting =
+	const DirectLightingResult legacyDirectLighting =
 		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, anisotropy, coat);
+			diffuseWeight, energyCompensation, anisotropy, coat, sheen);
 #endif
 
 	// Emissive (resolved by the surface seam from the emissive texture)
@@ -861,11 +956,24 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		? SampleAnisotropicIBL(reflectWS, anisotropy)
 		: SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
 	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
+	float3 sheenIBL = 0.0.xxx;
+	if (any(sheen.Color > 0.0.xxx))
+	{
+		const float maxSheenColor = max(sheen.Color.r, max(sheen.Color.g, sheen.Color.b));
+		const float baseTransmission = 1.0 - maxSheenColor * sheen.ViewAlbedoBound;
+		diffuseIBL *= baseTransmission;
+		specularIBL *= baseTransmission;
+		// The GGX-prefiltered environment is sampled in the backscatter direction.
+		// This is a roughness-aware approximation of Charlie IBL, not a Charlie prefilter.
+		sheenIBL = SampleIBLPrefilteredSpecular(V, sheen.PerceptualRoughness) *
+			sheen.Color * sheen.ViewAlbedoBound;
+	}
 	if (coat.Factor > 0.0)
 	{
 		const float baseTransmission = 1.0 - coat.Factor * coat.DirectionalAlbedo;
 		diffuseIBL *= baseTransmission * baseTransmission;
 		specularIBL *= baseTransmission * baseTransmission;
+		sheenIBL *= baseTransmission * baseTransmission;
 		const float3 coatReflection = reflect(-V, clearcoatNormalWS);
 		const float3 coatEnvironment = SampleIBLPrefilteredSpecular(
 			coatReflection, coat.PerceptualRoughness);
@@ -884,16 +992,22 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);
 	diffuseIBL *= ResolveDiffuseIBLVisibility(ao, gtao);
 	specularIBL *= ResolveSpecularIBLVisibility(ao);
+	sheenIBL *= ResolveSpecularIBLVisibility(ao);
+	if (matData.DebugView == MaterialDebugViewSheenContribution)
+	{
+		const float4 color = float4(directLighting.Sheen + sheenIBL, alpha);
+		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
+	}
 
-	float3 outputLighting = directLighting;
+	float3 outputLighting = directLighting.Total;
 	outputLighting += emissive;
-	outputLighting += diffuseIBL + specularIBL;
+	outputLighting += diffuseIBL + specularIBL + sheenIBL;
 	const float4 outputColor = float4(
 		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	float3 legacyOutputLighting = legacyDirectLighting;
+	float3 legacyOutputLighting = legacyDirectLighting.Total;
 	legacyOutputLighting += emissive;
-	legacyOutputLighting += diffuseIBL + specularIBL;
+	legacyOutputLighting += diffuseIBL + specularIBL + sheenIBL;
 	const float4 legacyColor = float4(
 		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,

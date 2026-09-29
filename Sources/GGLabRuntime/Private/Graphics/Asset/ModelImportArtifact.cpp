@@ -108,6 +108,8 @@ namespace gglab
 			AddMaterialBinding(writer, properties.m_ClearcoatRoughnessBinding);
 			AddMaterialBinding(writer, properties.m_ClearcoatNormalBinding);
 			AddMaterialBinding(writer, properties.m_AnisotropyBinding);
+			AddMaterialBinding(writer, properties.m_SheenColorBinding);
+			AddMaterialBinding(writer, properties.m_SheenRoughnessBinding);
 			AddColor(writer, properties.m_BaseColor);
 			AddColor(writer, properties.m_EmissiveColor);
 			writer.Float(properties.m_MetallicFactor);
@@ -120,6 +122,8 @@ namespace gglab
 			writer.Float(properties.m_ClearcoatNormalScale);
 			writer.Float(properties.m_AnisotropyStrength);
 			writer.Float(properties.m_AnisotropyRotation);
+			AddColor(writer, properties.m_SheenColor);
+			writer.Float(properties.m_SheenRoughness);
 			writer.U32(static_cast<uint32_t>(properties.m_Flags));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaMode));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaCutoffMode));

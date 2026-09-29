@@ -23,7 +23,9 @@ namespace gglab
 		Unknown,
 		Clearcoat,
 		ClearcoatNormal,
-		Anisotropy
+		Anisotropy,
+		SheenColor,
+		SheenRoughness
 	};
 
 	enum class TextureMipPolicy : uint8_t

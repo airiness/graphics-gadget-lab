@@ -2495,6 +2495,11 @@ namespace gglab
 				GPUAbiMember{ "AnisotropyTextureEnabled", offsetof(MaterialGPU, AnisotropyTextureEnabled) },
 				GPUAbiMember{ "AnisotropyPadding", offsetof(MaterialGPU, AnisotropyPadding) },
 				GPUAbiMember{ "AnisotropyBinding", offsetof(MaterialGPU, AnisotropyBinding) },
+				GPUAbiMember{ "SheenColorFactor", offsetof(MaterialGPU, SheenColorFactor) },
+				GPUAbiMember{ "SheenRoughnessFactor", offsetof(MaterialGPU, SheenRoughnessFactor) },
+				GPUAbiMember{ "SheenPadding", offsetof(MaterialGPU, SheenPadding) },
+				GPUAbiMember{ "SheenColorBinding", offsetof(MaterialGPU, SheenColorBinding) },
+				GPUAbiMember{ "SheenRoughnessBinding", offsetof(MaterialGPU, SheenRoughnessBinding) },
 			};
 			bool dxilMaterialLayoutMatches = materialDxilDisassembled && !materialLayout.empty() &&
 				ParseUnsignedAfter(materialLayout, "Size:") == sizeof(MaterialGPU);

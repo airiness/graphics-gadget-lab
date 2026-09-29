@@ -75,6 +75,12 @@ namespace gglab
 		gpu.AnisotropyBinding = EncodeTextureBinding(material.m_AnisotropyBinding,
 			ReservedTextureIDIndex::AnisotropyDefault, SamplerPreset::LinearWrap, assetManager,
 			samplerRegistry);
+		gpu.SheenColorBinding = EncodeTextureBinding(material.m_SheenColorBinding,
+			ReservedTextureIDIndex::BaseColorWhite, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
+		gpu.SheenRoughnessBinding = EncodeTextureBinding(material.m_SheenRoughnessBinding,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			samplerRegistry);
 
 		gpu.BaseColorFactor = material.m_BaseColor;
 		gpu.EmissiveColorFactor = material.m_EmissiveColor;
@@ -98,6 +104,14 @@ namespace gglab
 		gpu.AnisotropyRotation = std::isfinite(material.m_AnisotropyRotation)
 			? material.m_AnisotropyRotation : 0.0f;
 		gpu.AnisotropyTextureEnabled = material.m_AnisotropyBinding.m_TextureId.IsValid() ? 1u : 0u;
+		const auto sanitizeSheen = [](float value) noexcept
+		{
+			return std::isfinite(value) ? std::clamp(value, 0.0f, 1.0f) : 0.0f;
+		};
+		gpu.SheenColorFactor = Color(sanitizeSheen(material.m_SheenColor.m_R),
+			sanitizeSheen(material.m_SheenColor.m_G),
+			sanitizeSheen(material.m_SheenColor.m_B), 1.0f);
+		gpu.SheenRoughnessFactor = sanitizeSheen(material.m_SheenRoughness);
 		return gpu;
 	}
 }

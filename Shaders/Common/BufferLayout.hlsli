@@ -103,6 +103,11 @@ struct MaterialData
 	uint AnisotropyTextureEnabled;
 	uint AnisotropyPadding;
 	MaterialTextureBindingData AnisotropyBinding;
+	float4 SheenColorFactor;
+	float SheenRoughnessFactor;
+	float3 SheenPadding;
+	MaterialTextureBindingData SheenColorBinding;
+	MaterialTextureBindingData SheenRoughnessBinding;
 };
 
 struct ViewData

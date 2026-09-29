@@ -1255,6 +1255,57 @@ namespace gglab
 				invalidAnisotropy.m_Error.find("KHR_materials_anisotropy") != std::string::npos,
 				"Out-of-range anisotropy strength is rejected visibly");
 
+			writeSource(R"("extensionsUsed":["KHR_materials_sheen"],"extensionsRequired":["KHR_materials_sheen"],)",
+				R"({"extensions":{"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0,"texCoord":1,"extensions":{"KHR_texture_transform":{"offset":[0.1,0.2]}}},"sheenRoughnessTexture":{"index":0,"extensions":{"KHR_texture_transform":{"rotation":0.25}}}}}})");
+			const ModelImportResult requiredSheen = ModelImporter::Import(root / "probe.gltf", {});
+			bool sheenValid = requiredSheen.Succeeded();
+			if (sheenValid)
+			{
+				const auto& material = requiredSheen.m_Model.m_Materials.front();
+				const auto& color = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::SheenColor)];
+				const auto& roughness = material.m_TextureBindings[static_cast<uint32_t>(MaterialTextureSlot::SheenRoughness)];
+				sheenValid = std::abs(material.m_Properties.m_SheenColor.m_R - 0.2f) < 0.0001f &&
+					std::abs(material.m_Properties.m_SheenColor.m_G - 0.3f) < 0.0001f &&
+					std::abs(material.m_Properties.m_SheenColor.m_B - 0.4f) < 0.0001f &&
+					std::abs(material.m_Properties.m_SheenRoughness - 0.7f) < 0.0001f &&
+					color.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					roughness.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					color.m_TextureIndex < requiredSheen.m_Model.m_TextureSources.size() &&
+					roughness.m_TextureIndex < requiredSheen.m_Model.m_TextureSources.size() &&
+					color.m_TexCoordIndex == 1 &&
+					std::abs(color.m_UVOffset.m_X - 0.1f) < 0.0001f &&
+					std::abs(roughness.m_UVRotation - 0.25f) < 0.0001f &&
+					requiredSheen.m_Model.m_TextureSources[color.m_TextureIndex].m_Semantic ==
+						TextureSemantic::SheenColor &&
+					requiredSheen.m_Model.m_TextureSources[roughness.m_TextureIndex].m_Semantic ==
+						TextureSemantic::SheenRoughness;
+			}
+			context.Check(sheenValid, std::format(
+				"Required sheen factors, independent texture semantics and UV transforms survive import: {}",
+				requiredSheen.m_Error));
+
+			writeSource(R"("extensionsUsed":["KHR_materials_sheen"],)",
+				R"({"extensions":{"KHR_materials_sheen":{"sheenColorFactor":[0,0,0],"sheenRoughnessFactor":0.4}}})");
+			const ModelImportResult disabledSheen = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(disabledSheen.Succeeded() &&
+				disabledSheen.m_Model.m_Materials.front().m_Properties.m_SheenColor.m_R == 0.0f &&
+				std::abs(disabledSheen.m_Model.m_Materials.front().m_Properties.m_SheenRoughness - 0.4f) < 0.0001f,
+				"Zero sheen color preserves authored roughness without enabling the lobe");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_sheen"],)",
+				R"({"extensions":{"KHR_materials_sheen":{"sheenColorFactor":[0.2,1.1,0.4]}}})");
+			const ModelImportResult invalidSheenColor = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidSheenColor.Succeeded() &&
+				invalidSheenColor.m_Error.find("KHR_materials_sheen") != std::string::npos,
+				"Out-of-range sheen color is rejected visibly");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_sheen"],)",
+				R"({"extensions":{"KHR_materials_sheen":{"sheenRoughnessFactor":1.2}}})");
+			const ModelImportResult invalidSheenRoughness = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidSheenRoughness.Succeeded() &&
+				invalidSheenRoughness.m_Error.find("KHR_materials_sheen") != std::string::npos,
+				"Out-of-range sheen roughness is rejected visibly");
+
 			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy","KHR_materials_sheen"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}},"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4],"sheenRoughnessFactor":0.7,"sheenColorTexture":{"index":0},"sheenRoughnessTexture":{"index":0}}}})");
 			Assimp::Importer assimp;
@@ -1296,6 +1347,20 @@ namespace gglab
 				"Pinned Assimp exposes IOR, clearcoat, anisotropy and sheen factors");
 			context.Check(extensionTextures,
 				"Pinned Assimp exposes targeted lobe texture slots and coat normal scale");
+			const ModelImportResult combined = ModelImporter::Import(root / "probe.gltf", {});
+			bool combinedValid = combined.Succeeded();
+			if (combinedValid)
+			{
+				const auto& properties = combined.m_Model.m_Materials.front().m_Properties;
+				combinedValid = std::abs(properties.m_ClearcoatFactor - 0.6f) < 0.0001f &&
+					std::abs(properties.m_AnisotropyStrength - 0.75f) < 0.0001f &&
+					std::abs(properties.m_SheenColor.m_B - 0.4f) < 0.0001f &&
+					std::abs(properties.m_SheenRoughness - 0.7f) < 0.0001f &&
+					combined.m_Model.m_TextureSources.size() == 5u;
+			}
+			context.Check(combinedValid, std::format(
+				"Layered clearcoat, anisotropy and sheen share one imported material: {}",
+				combined.m_Error));
 
 			std::filesystem::remove(root / "probe.gltf", errorCode);
 			std::filesystem::remove(root / "probe.bin", errorCode);

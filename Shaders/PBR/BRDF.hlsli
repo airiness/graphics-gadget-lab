@@ -84,6 +84,57 @@ float V_SmithGGXCorrelatedAnisotropic(float3 V, float3 L, float3 N,
 	return 0.5 / max(NoL * viewLength + NoV * lightLength, 1.0e-6);
 }
 
+// Charlie microfiber distribution and visibility for glTF sheen.
+float D_Charlie(float NoH, float alpha)
+{
+	const float inverseAlpha = rcp(max(alpha, 0.002));
+	const float sinThetaSquared = saturate(1.0 - NoH * NoH);
+	return (2.0 + inverseAlpha) * pow(sinThetaSquared, 0.5 * inverseAlpha) /
+		(2.0 * PI);
+}
+
+float CharlieLambdaFit(float cosine, float alpha)
+{
+	const float oneMinusAlphaSquared = (1.0 - alpha) * (1.0 - alpha);
+	const float a = lerp(21.5473, 25.3245, oneMinusAlphaSquared);
+	const float b = lerp(3.82987, 3.32435, oneMinusAlphaSquared);
+	const float c = lerp(0.19823, 0.16801, oneMinusAlphaSquared);
+	const float d = lerp(-1.97760, -1.27393, oneMinusAlphaSquared);
+	const float e = lerp(-4.32054, -4.85967, oneMinusAlphaSquared);
+	return a / (1.0 + b * pow(cosine, c)) + d * cosine + e;
+}
+
+float CharlieLambda(float cosine, float alpha)
+{
+	return cosine < 0.5 ? exp(CharlieLambdaFit(cosine, alpha)) :
+		exp(2.0 * CharlieLambdaFit(0.5, alpha) - CharlieLambdaFit(1.0 - cosine, alpha));
+}
+
+float V_Charlie(float NoV, float NoL, float alpha)
+{
+	if (NoV <= 0.0 || NoL <= 0.0) return 0.0;
+	return rcp(max((1.0 + CharlieLambda(NoV, alpha) + CharlieLambda(NoL, alpha)) *
+		4.0 * NoV * NoL, 1.0e-6));
+}
+
+// The Charlie visibility fit can integrate above one at very smooth grazing
+// angles. This view-dependent normalization is fitted against hemispherical
+// integration so a white microfiber layer remains bounded.
+float CharlieSheenNormalization(float NoV, float perceptualRoughness)
+{
+	const float smoothness = 1.0 - perceptualRoughness;
+	return 1.0 + 5.0 * smoothness * smoothness * smoothness * smoothness *
+		exp(-NoV / 0.02);
+}
+
+// A conservative analytic envelope for Charlie directional albedo. It avoids
+// changing the existing two-channel GGX DFG LUT while reserving energy for sheen.
+float SheenDirectionalEnergyEstimate(float NoV, float perceptualRoughness)
+{
+	const float grazing = 1.0 - saturate(NoV);
+	return saturate(grazing * grazing + 0.25 * perceptualRoughness + 0.1);
+}
+
 // Lambertian diffuse BRDF.
 // Converts diffuse color / albedo to a constant diffuse reflectance over the hemisphere.
 float3 Fd_Lambert(float3 DiffuseColor)
