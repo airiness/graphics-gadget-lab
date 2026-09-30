@@ -2655,6 +2655,34 @@ namespace gglab
 			context.Check(compiler.Compile(desc).IsSuccess(),
 				"Production RGB normal decoding numeric contract also compiles to SPIR-V");
 
+			desc.m_SourcePath = L"Tests/AnisotropicIBLContractCompile.hlsl";
+			desc.m_Entry = L"PSMain";
+			const std::array anisotropicIBLCases{
+				"zero strength", "fully rough lobe", "normal incidence", "bent reflection",
+				"rotated frame", "mirrored frame", "view along bitangent", "near-grazing view",
+				"isotropic continuity", "specular-AA width contrast", "back-face frame",
+			};
+			bool anisotropicIBLSpirVContractsCompile = true;
+			for (uint32_t testCase = 0; testCase < anisotropicIBLCases.size(); ++testCase)
+			{
+				desc.m_Defines = { { L"GGLAB_ANISOTROPIC_IBL_TEST_CASE", std::to_wstring(testCase) } };
+				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const auto numericDxil = compiler.Compile(desc);
+				std::string disassembly;
+				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+				for (uint32_t component = 0; component < 4; ++component)
+				{
+					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				}
+				context.Check(matches, std::format("Production anisotropic IBL reflection preserves its numeric contract: {}", anisotropicIBLCases[testCase]));
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				anisotropicIBLSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(anisotropicIBLSpirVContractsCompile,
+				"Production anisotropic IBL reflection numeric contracts also compile to SPIR-V");
+
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
 			const std::array sunDiskCases{

@@ -874,6 +874,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -977,6 +980,9 @@
     </None>
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">
+      <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
       <Filter>Shaders\PBR</Filter>

@@ -10,6 +10,7 @@
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/DirectLighting.hlsli>
+#include <PBR/AnisotropicIBL.hlsli>
 #include <PBR/SpecularAA.hlsli>
 #include <PBR/MaterialDiagnostics.hlsli>
 
@@ -233,32 +234,6 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCubeLevel(binding, direction, lod).rgb *
 		   g_Scene.IBLResource.EnvironmentIntensity;
-}
-
-float3 ProjectToTangentHemisphere(float3 direction, float3 normalWS)
-{
-	const float NoD = dot(direction, normalWS);
-	return SafeNormalize(direction + normalWS * max(0.01 - NoD, 0.0), normalWS);
-}
-
-float3 SampleAnisotropicIBL(float3 reflectWS, float3 normalWS,
-	AnisotropyShadingState anisotropy)
-{
-	// The environment is prefiltered isotropically. Three normalized taps at the
-	// minor-axis mip approximate the elongated major-axis reflection footprint.
-	const float3 axis = anisotropy.TangentWS - reflectWS * dot(anisotropy.TangentWS, reflectWS);
-	const float3 majorDirection = SafeNormalize(axis, anisotropy.TangentWS);
-	const float spread = 0.5 * max(anisotropy.AlphaT - anisotropy.AlphaB, 0.0);
-	const float minorRoughness = sqrt(anisotropy.AlphaB);
-	const float3 center = SampleIBLPrefilteredSpecular(
-		ProjectToTangentHemisphere(reflectWS, normalWS), minorRoughness);
-	const float3 positive = SampleIBLPrefilteredSpecular(
-		ProjectToTangentHemisphere(
-			SafeNormalize(reflectWS + majorDirection * spread, reflectWS), normalWS), minorRoughness);
-	const float3 negative = SampleIBLPrefilteredSpecular(
-		ProjectToTangentHemisphere(
-			SafeNormalize(reflectWS - majorDirection * spread, reflectWS), normalWS), minorRoughness);
-	return 0.5 * center + 0.25 * (positive + negative);
 }
 
 float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
@@ -664,10 +639,13 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// IBL
 	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseWeight * Fd_Lambert(baseColor);
 
-	float3 reflectWS = reflect(-V, N);
-	float3 prefilteredEnv = anisotropy.Strength > 0.0
-		? SampleAnisotropicIBL(reflectWS, N, anisotropy)
-		: SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
+	// Use one reflection direction: offset environment taps duplicate sharp
+	// landmarks instead of producing a continuous anisotropic reflection.
+	const float3 reflectWS = anisotropy.Strength > 0.0
+		? GetAnisotropicIBLReflection(N, V, anisotropy.BitangentWS,
+			anisotropy.AlphaT, anisotropy.AlphaB)
+		: reflect(-V, N);
+	const float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
 	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
 	if (coat.Factor > 0.0)
 	{
