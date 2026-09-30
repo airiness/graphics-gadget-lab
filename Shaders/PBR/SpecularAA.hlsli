@@ -1,8 +1,9 @@
 #pragma once
 #include <PBR/BRDF.hlsli>
 
-// The normal footprint is converted to an additive GGX alpha floor. Keep this
-// spatial filter independent of authored material roughness and temporal AA.
+// Squared normal derivatives form the pixel footprint. Add its scaled, capped variance
+// to GGX alpha (roughness squared), then convert back to perceptual roughness;
+// authored roughness stays unchanged and TAA remains a separate filter.
 static const float SpecularAAVarianceScale = 2.0;
 static const float SpecularAAMaxKernelAlpha = 0.18;
 
@@ -20,6 +21,7 @@ SpecularAAResult EvaluateSpecularAA(float authoredPerceptualRoughness, float3 no
 	const float3 normalDy = ddy(normalWS);
 	SpecularAAResult result;
 	result.NormalVariance = dot(normalDx, normalDx) + dot(normalDy, normalDy);
+	// The comparison view suppresses the contribution, but still pays for derivatives.
 	const float enabledScale = enabled ? 1.0 : 0.0;
 	result.KernelAlpha = min(SpecularAAVarianceScale * result.NormalVariance,
 		SpecularAAMaxKernelAlpha) * enabledScale;

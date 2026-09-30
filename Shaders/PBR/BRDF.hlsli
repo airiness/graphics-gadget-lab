@@ -130,6 +130,8 @@ float CharlieSheenNormalization(float NoV, float NoL, float perceptualRoughness)
 // Chebyshev fit to the reciprocal Charlie BRDF integrated over a white
 // hemisphere. Prepare its roughness-dependent rows once per shaded pixel;
 // direct lights then evaluate only the view-axis polynomial.
+// Coefficients use a 16x19 view/roughness grid with 256x256 midpoint integration.
+// ValidateSheenEnergy.py checks its fit error and layered white-furnace energy.
 void PrepareSheenDirectionalAlbedo(float perceptualRoughness,
 	out float4 fitLow, out float3 fitHigh)
 {
