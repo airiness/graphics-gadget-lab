@@ -30,10 +30,6 @@ namespace gglab
 			"Assets/Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf";
 		constexpr std::string_view AnisotropyDiscTestPath =
 			"Assets/Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf";
-		constexpr std::string_view SheenTestGridPath =
-			"Assets/Models/SheenTestGrid/SheenTestGrid.gltf";
-		constexpr std::string_view SheenClothPath =
-			"Assets/Models/SheenCloth/SheenCloth.gltf";
 		constexpr std::string_view NormalTangentTestPath =
 			"Assets/Models/NormalTangentTest/NormalTangentTest.gltf";
 
@@ -45,9 +41,7 @@ namespace gglab
 			AnisotropyStrengthTest,
 			AnisotropyRotationTest,
 			AnisotropyDiscTest,
-			SheenTestGrid,
-			SheenCloth,
-			NormalTangentTest,
+			NormalTangentTest = 8,
 		};
 
 		[[nodiscard]] std::string_view AssetModelPath(SceneSource source) noexcept
@@ -59,8 +53,6 @@ namespace gglab
 			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
 			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
 			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
-			case SceneSource::SheenTestGrid: return SheenTestGridPath;
-			case SceneSource::SheenCloth: return SheenClothPath;
 			case SceneSource::NormalTangentTest: return NormalTangentTestPath;
 			case SceneSource::ProceduralGrid: return {};
 			}
@@ -80,8 +72,6 @@ namespace gglab
 		const LabParameterId ClearcoatRoughnessId("mini_pbr.material.clearcoat_roughness");
 		const LabParameterId AnisotropyStrengthId("mini_pbr.material.anisotropy_strength");
 		const LabParameterId AnisotropyRotationId("mini_pbr.material.anisotropy_rotation");
-		const LabParameterId SheenColorId("mini_pbr.material.sheen_color");
-		const LabParameterId SheenRoughnessId("mini_pbr.material.sheen_roughness");
 		const LabParameterId DebugViewId("mini_pbr.material.debug_view");
 		const LabParameterId LightIntensityId("mini_pbr.lighting.intensity");
 
@@ -148,10 +138,6 @@ namespace gglab
 						.m_Name = "AnisotropyRotationTest"},
 					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
 						.m_Name = "AnisotropyDiscTest"},
-					{.m_Value = int32_t(SceneSource::SheenTestGrid),
-						.m_Name = "SheenTestGrid"},
-					{.m_Value = int32_t(SceneSource::SheenCloth),
-						.m_Name = "SheenCloth"},
 					{.m_Value = int32_t(SceneSource::NormalTangentTest),
 						.m_Name = "NormalTangentTest"},
 				},
@@ -262,9 +248,6 @@ namespace gglab
 					{.m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
 					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
-					{.m_Value = int32_t(MaterialDebugView::SheenColor), .m_Name = "Sheen Color"},
-					{.m_Value = int32_t(MaterialDebugView::SheenRoughness), .m_Name = "Sheen Roughness"},
-					{.m_Value = int32_t(MaterialDebugView::SheenContribution), .m_Name = "Sheen Contribution"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -306,24 +289,6 @@ namespace gglab
 			.m_DefaultValue = 0.0f,
 			.m_MinValue = LabValue(-180.0f),
 			.m_MaxValue = LabValue(180.0f),
-		}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = SheenColorId,
-			.m_Name = "Sheen Color",
-			.m_Group = "Procedural Material",
-			.m_Type = LabParameterType::Color,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = Color::Black,
-		}));
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = SheenRoughnessId,
-			.m_Name = "Sheen Roughness",
-			.m_Group = "Procedural Material",
-			.m_Type = LabParameterType::Float,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = 0.5f,
-			.m_MinValue = LabValue(0.0f),
-			.m_MaxValue = LabValue(1.0f),
 		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
@@ -557,8 +522,6 @@ namespace gglab
 			material.m_Properties.m_AnisotropyStrength = parameters.Get(AnisotropyStrengthId, 0.0f);
 			material.m_Properties.m_AnisotropyRotation =
 				parameters.Get(AnisotropyRotationId, 0.0f) * std::numbers::pi_v<float> / 180.0f;
-			material.m_Properties.m_SheenColor = parameters.Get(SheenColorId, Color::Black);
-			material.m_Properties.m_SheenRoughness = parameters.Get(SheenRoughnessId, 0.5f);
 			material.m_Properties.m_DebugView = debugView;
 		}
 		auto modelMaterialView = m_World.GetRegistry().view<components::ModelComponent,
@@ -747,8 +710,7 @@ namespace gglab
 		const auto sceneSource = static_cast<SceneSource>(
 			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
 		// Ground-oriented references need an elevated view to show their surface detail.
-		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest ||
-			sceneSource == SceneSource::SheenCloth
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
 			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
 		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
@@ -766,7 +728,7 @@ namespace gglab
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
 			.m_Description =
-				"Compares procedural PBR, metallic-roughness, anisotropy and sheen references.",
+				"Compares procedural PBR, metallic-roughness and anisotropy references.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};

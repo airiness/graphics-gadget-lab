@@ -18,9 +18,6 @@ static const uint MaterialDebugViewClearcoatNormal = 12u;
 static const uint MaterialDebugViewAnisotropyStrength = 13u;
 static const uint MaterialDebugViewAnisotropyDirectionTangent = 14u;
 static const uint MaterialDebugViewAnisotropyDirectionWorld = 15u;
-static const uint MaterialDebugViewSheenColor = 16u;
-static const uint MaterialDebugViewSheenRoughness = 17u;
-static const uint MaterialDebugViewSheenContribution = 18u;
 static const uint MaterialDebugViewNormalVariance = 19u;
 static const uint MaterialDebugViewSpecularAAContribution = 20u;
 static const uint MaterialDebugViewEffectiveClearcoatRoughness = 21u;
@@ -39,8 +36,6 @@ struct SurfaceData
 	float ClearcoatRoughness;
 	float AnisotropyStrength;
 	float2 AnisotropyDirectionTS;
-	float3 SheenColor;
-	float SheenRoughness;
 	float Opacity; // sampled surface alpha; the pass owns alpha mode/cutoff policy
 };
 
@@ -76,16 +71,6 @@ struct AnisotropyShadingState
 	float3 BitangentWS;
 	float AlphaT;
 	float AlphaB;
-};
-
-struct SheenShadingState
-{
-	float3 Color;
-	float PerceptualRoughness;
-	float Alpha;
-	float ViewDirectionalAlbedo;
-	float4 DirectionalAlbedoFitLow;
-	float3 DirectionalAlbedoFitHigh;
 };
 
 SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
@@ -151,25 +136,6 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 	surface.AnisotropyDirectionTS = float2(
 		cosine * direction.x - sine * direction.y,
 		sine * direction.x + cosine * direction.y);
-	surface.SheenColor = saturate(matData.SheenColorFactor.rgb);
-	surface.SheenRoughness = saturate(matData.SheenRoughnessFactor);
-	if (any(matData.SheenColorFactor.rgb > 0.0.xxx) ||
-		matData.DebugView == MaterialDebugViewSheenRoughness)
-	{
-		if (any(matData.SheenColorFactor.rgb > 0.0.xxx))
-		{
-			const float2 colorUV = SelectUV(matData.SheenColorBinding, uv0, uv1);
-			surface.SheenColor *= SampleTextureBinding(
-				matData.SheenColorBinding.TextureSamplerBinding, colorUV).rgb;
-		}
-		if (any(matData.SheenColorFactor.rgb > 0.0.xxx) ||
-			matData.DebugView == MaterialDebugViewSheenRoughness)
-		{
-			const float2 roughnessUV = SelectUV(matData.SheenRoughnessBinding, uv0, uv1);
-			surface.SheenRoughness *= SampleTextureBinding(
-				matData.SheenRoughnessBinding.TextureSamplerBinding, roughnessUV).a;
-		}
-	}
 
 	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.

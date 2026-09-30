@@ -17,7 +17,6 @@ namespace gglab
 		switch (semantic)
 		{
 		case TextureSemantic::BaseColor:
-		case TextureSemantic::SheenColor:
 		case TextureSemantic::Emissive:
 		case TextureSemantic::UVTest:
 		case TextureSemantic::GenericColor:

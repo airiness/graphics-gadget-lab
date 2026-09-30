@@ -55,10 +55,7 @@ namespace gglab
 		AnisotropyStrength,
 		AnisotropyDirectionTangent,
 		AnisotropyDirectionWorld,
-		SheenColor,
-		SheenRoughness,
-		SheenContribution,
-		NormalVariance,
+		NormalVariance = 19,
 		SpecularAAContribution,
 		EffectiveClearcoatRoughness,
 		AnisotropicAlpha,
@@ -84,8 +81,6 @@ namespace gglab
 		ClearcoatRoughness,
 		ClearcoatNormal,
 		Anisotropy,
-		SheenColor,
-		SheenRoughness,
 
 		Count
 	};
@@ -111,10 +106,6 @@ namespace gglab
 			return TextureSemantic::ClearcoatNormal;
 		case MaterialTextureSlot::Anisotropy:
 			return TextureSemantic::Anisotropy;
-		case MaterialTextureSlot::SheenColor:
-			return TextureSemantic::SheenColor;
-		case MaterialTextureSlot::SheenRoughness:
-			return TextureSemantic::SheenRoughness;
 		default:
 			return TextureSemantic::Unknown;
 		}
@@ -200,8 +191,6 @@ namespace gglab
 		MaterialTextureBinding m_ClearcoatRoughnessBinding{};
 		MaterialTextureBinding m_ClearcoatNormalBinding{};
 		MaterialTextureBinding m_AnisotropyBinding{};
-		MaterialTextureBinding m_SheenColorBinding{};
-		MaterialTextureBinding m_SheenRoughnessBinding{};
 
 		Color m_BaseColor = Color::White;
 		Color m_EmissiveColor = Color::Black;
@@ -215,8 +204,6 @@ namespace gglab
 		float m_ClearcoatNormalScale = 1.0f;
 		float m_AnisotropyStrength = 0.0f;
 		float m_AnisotropyRotation = 0.0f;
-		Color m_SheenColor = Color::Black;
-		float m_SheenRoughness = 0.0f;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

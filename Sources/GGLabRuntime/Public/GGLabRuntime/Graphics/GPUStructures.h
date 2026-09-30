@@ -156,13 +156,8 @@ namespace gglab
 		uint32_t AnisotropyTextureEnabled;
 		uint32_t AnisotropyPadding;
 		MaterialTextureBindingGPU AnisotropyBinding;
-		Color SheenColorFactor;
-		float SheenRoughnessFactor;
-		float SheenPadding[3];
-		MaterialTextureBindingGPU SheenColorBinding;
-		MaterialTextureBindingGPU SheenRoughnessBinding;
 	};
-	static_assert(sizeof(MaterialGPU) == 656);
+	static_assert(sizeof(MaterialGPU) == 528);
 	static_assert(offsetof(MaterialGPU, BaseColorFactor) == 240);
 	static_assert(offsetof(MaterialGPU, NormalScale) == 280);
 	static_assert(offsetof(MaterialGPU, Ior) == 304);
@@ -174,10 +169,6 @@ namespace gglab
 	static_assert(offsetof(MaterialGPU, ClearcoatNormalBinding) == 416);
 	static_assert(offsetof(MaterialGPU, AnisotropyStrength) == 464);
 	static_assert(offsetof(MaterialGPU, AnisotropyBinding) == 480);
-	static_assert(offsetof(MaterialGPU, SheenColorFactor) == 528);
-	static_assert(offsetof(MaterialGPU, SheenRoughnessFactor) == 544);
-	static_assert(offsetof(MaterialGPU, SheenColorBinding) == 560);
-	static_assert(offsetof(MaterialGPU, SheenRoughnessBinding) == 608);
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 

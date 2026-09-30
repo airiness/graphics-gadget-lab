@@ -56,10 +56,6 @@ namespace gglab
 				return "ClearcoatNormal";
 			case TextureSemantic::Anisotropy:
 				return "Anisotropy";
-			case TextureSemantic::SheenColor:
-				return "SheenColor";
-			case TextureSemantic::SheenRoughness:
-				return "SheenRoughness";
 			case TextureSemantic::Environment:
 				return "Environment";
 			case TextureSemantic::UVTest:

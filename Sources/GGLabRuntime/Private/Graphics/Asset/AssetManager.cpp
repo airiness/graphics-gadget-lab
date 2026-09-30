@@ -62,8 +62,6 @@ namespace gglab
 				material.m_ClearcoatRoughnessBinding.m_TextureId,
 				material.m_ClearcoatNormalBinding.m_TextureId,
 				material.m_AnisotropyBinding.m_TextureId,
-				material.m_SheenColorBinding.m_TextureId,
-				material.m_SheenRoughnessBinding.m_TextureId,
 			};
 		}
 
@@ -3127,12 +3125,6 @@ namespace gglab
 			break;
 		case MaterialTextureSlot::Anisotropy:
 			material.m_AnisotropyBinding = binding;
-			break;
-		case MaterialTextureSlot::SheenColor:
-			material.m_SheenColorBinding = binding;
-			break;
-		case MaterialTextureSlot::SheenRoughness:
-			material.m_SheenRoughnessBinding = binding;
 			break;
 		default:
 			GGLAB_UNREACHABLE("Unknown MaterialTextureSlot.");

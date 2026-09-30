@@ -302,9 +302,7 @@ namespace gglab
 				material->m_ClearcoatBinding.m_TextureId,
 				material->m_ClearcoatRoughnessBinding.m_TextureId,
 				material->m_ClearcoatNormalBinding.m_TextureId,
-				material->m_AnisotropyBinding.m_TextureId,
-				material->m_SheenColorBinding.m_TextureId,
-				material->m_SheenRoughnessBinding.m_TextureId })
+				material->m_AnisotropyBinding.m_TextureId })
 			{
 				if (textureId.IsValid() && !IsReservedTextureId(textureId))
 				{
@@ -1208,9 +1206,7 @@ namespace gglab
 				material->m_ClearcoatBinding.m_TextureId,
 				material->m_ClearcoatRoughnessBinding.m_TextureId,
 				material->m_ClearcoatNormalBinding.m_TextureId,
-				material->m_AnisotropyBinding.m_TextureId,
-				material->m_SheenColorBinding.m_TextureId,
-				material->m_SheenRoughnessBinding.m_TextureId })
+				material->m_AnisotropyBinding.m_TextureId })
 			{
 				if (textureId.IsValid() && !IsReservedTextureId(textureId))
 				{

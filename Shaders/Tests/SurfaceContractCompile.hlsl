@@ -20,7 +20,7 @@ float4 PSMain() : SV_Target
 		surface.Metallic + surface.Roughness + surface.Ior + surface.Opacity +
 		surface.ClearcoatFactor + surface.ClearcoatRoughness +
 		surface.AnisotropyStrength + dot(surface.AnisotropyDirectionTS, 1.0.xx) +
-		dot(surface.SheenColor, 1.0.xxx) + surface.SheenRoughness + matData.NormalScale +
+		matData.NormalScale +
 		matData.OcclusionStrength + matData.AlphaCutoff + matData.AlphaMode +
 		matData.Flags + matData.DebugView + specularAA.NormalVariance +
 		specularAA.EffectivePerceptualRoughness + dot(anisotropicAlpha, 1.0.xx) +
@@ -29,8 +29,6 @@ float4 PSMain() : SV_Target
 		matData.ClearcoatRoughnessBinding.TextureEnabled +
 		matData.ClearcoatNormalBinding.TextureEnabled +
 		matData.AnisotropyTextureEnabled +
-		matData.SheenColorBinding.TextureEnabled +
-		matData.SheenRoughnessBinding.TextureEnabled +
 		dot(matData.NormalBinding.UVTransformU, 1.0.xxxx) +
 		dot(matData.OcclusionBinding.UVTransformV, 1.0.xxxx);
 

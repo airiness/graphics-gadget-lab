@@ -7,8 +7,7 @@
     "KHR_materials_clearcoat",
     "KHR_materials_anisotropy",
     "KHR_materials_ior",
-    "KHR_texture_transform",
-    "KHR_materials_sheen"
+    "KHR_texture_transform"
   ],
   "extensionsRequired": [
     "KHR_texture_transform"
@@ -24,9 +23,7 @@
         3,
         4,
         5,
-        6,
-        7,
-        8
+        6
       ]
     }
   ],
@@ -85,24 +82,6 @@
       "name": "Probe_MAT_AnisotropyTexture",
       "translation": [
         9,
-        0,
-        0
-      ]
-    },
-    {
-      "mesh": 7,
-      "name": "Probe_MAT_SheenFactor",
-      "translation": [
-        10.5,
-        0,
-        0
-      ]
-    },
-    {
-      "mesh": 8,
-      "name": "Probe_MAT_SheenTexture",
-      "translation": [
-        12,
         0,
         0
       ]
@@ -286,61 +265,6 @@
         ],
         "roughnessFactor": 0.6000000238418579
       }
-    },
-    {
-      "doubleSided": true,
-      "extensions": {
-        "KHR_materials_sheen": {
-          "sheenColorFactor": [
-            0.30000001192092896,
-            0.10000000149011612,
-            0.05000000074505806
-          ],
-          "sheenRoughnessFactor": 0.6000000238418579
-        }
-      },
-      "name": "MAT_SheenFactor",
-      "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.6000000238418579,
-          0.4000000059604645,
-          0.20000000298023224,
-          1
-        ],
-        "metallicFactor": 0.25,
-        "roughnessFactor": 0.6000000238418579
-      }
-    },
-    {
-      "doubleSided": true,
-      "extensions": {
-        "KHR_materials_sheen": {
-          "sheenColorFactor": [
-            1,
-            1,
-            1
-          ],
-          "sheenColorTexture": {
-            "index": 7,
-            "texCoord": 1
-          },
-          "sheenRoughnessFactor": 1,
-          "sheenRoughnessTexture": {
-            "index": 8
-          }
-        }
-      },
-      "name": "MAT_SheenTexture",
-      "pbrMetallicRoughness": {
-        "baseColorFactor": [
-          0.6000000238418579,
-          0.4000000059604645,
-          0.20000000298023224,
-          1
-        ],
-        "metallicFactor": 0.25,
-        "roughnessFactor": 0.6000000238418579
-      }
     }
   ],
   "meshes": [
@@ -455,38 +379,6 @@
           "material": 6
         }
       ]
-    },
-    {
-      "name": "Plane.007",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 36,
-            "NORMAL": 37,
-            "TEXCOORD_0": 38,
-            "TEXCOORD_1": 39,
-            "TANGENT": 40
-          },
-          "indices": 5,
-          "material": 7
-        }
-      ]
-    },
-    {
-      "name": "Plane.008",
-      "primitives": [
-        {
-          "attributes": {
-            "POSITION": 41,
-            "NORMAL": 42,
-            "TEXCOORD_0": 43,
-            "TEXCOORD_1": 44,
-            "TANGENT": 45
-          },
-          "indices": 5,
-          "material": 8
-        }
-      ]
     }
   ],
   "textures": [
@@ -517,14 +409,6 @@
     {
       "sampler": 0,
       "source": 5
-    },
-    {
-      "sampler": 0,
-      "source": 6
-    },
-    {
-      "sampler": 0,
-      "source": 7
     }
   ],
   "images": [
@@ -557,16 +441,6 @@
       "mimeType": "image/png",
       "name": "Image",
       "uri": "Textures/Image.png"
-    },
-    {
-      "mimeType": "image/png",
-      "name": "SheenColor",
-      "uri": "Textures/SheenColor.png"
-    },
-    {
-      "mimeType": "image/png",
-      "name": "SheenRoughness",
-      "uri": "Textures/SheenRoughness.png"
     }
   ],
   "accessors": [
@@ -855,86 +729,6 @@
       "componentType": 5126,
       "count": 4,
       "type": "VEC4"
-    },
-    {
-      "bufferView": 36,
-      "componentType": 5126,
-      "count": 4,
-      "max": [
-        0.5,
-        0,
-        0.5
-      ],
-      "min": [
-        -0.5,
-        0,
-        -0.5
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 37,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 38,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 39,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 40,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC4"
-    },
-    {
-      "bufferView": 41,
-      "componentType": 5126,
-      "count": 4,
-      "max": [
-        0.5,
-        0,
-        0.5
-      ],
-      "min": [
-        -0.5,
-        0,
-        -0.5
-      ],
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 42,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC3"
-    },
-    {
-      "bufferView": 43,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 44,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC2"
-    },
-    {
-      "bufferView": 45,
-      "componentType": 5126,
-      "count": 4,
-      "type": "VEC4"
     }
   ],
   "bufferViews": [
@@ -1153,66 +947,6 @@
       "byteLength": 64,
       "byteOffset": 1516,
       "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 48,
-      "byteOffset": 1580,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 48,
-      "byteOffset": 1628,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 32,
-      "byteOffset": 1676,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 32,
-      "byteOffset": 1708,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 64,
-      "byteOffset": 1740,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 48,
-      "byteOffset": 1804,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 48,
-      "byteOffset": 1852,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 32,
-      "byteOffset": 1900,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 32,
-      "byteOffset": 1932,
-      "target": 34962
-    },
-    {
-      "buffer": 0,
-      "byteLength": 64,
-      "byteOffset": 1964,
-      "target": 34962
     }
   ],
   "samplers": [
@@ -1229,7 +963,7 @@
   ],
   "buffers": [
     {
-      "byteLength": 2028,
+      "byteLength": 1580,
       "uri": "GGLabMaterialExportProbe.bin"
     }
   ]

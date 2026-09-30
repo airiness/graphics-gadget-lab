@@ -1,9 +1,9 @@
 # Material glTF import fixture
 
 This small asset is for importer-contract validation. It is not a Runtime
-image-quality scene or a material gallery. The nine one-material planes test
+image-quality scene or a material gallery. The seven one-material planes test
 normal scale, occlusion strength, per-texture UV transforms, IOR, clearcoat,
-anisotropy and sheen. Keep each `.gltf`, the shared `.bin` and the complete
+and anisotropy. Keep each `.gltf`, the shared `.bin` and the complete
 `Textures/` directory together so either document resolves all external URIs.
 
 `GGLabMaterialExportProbe.gltf` is the unchanged Blender 5.1.1 export.
@@ -19,23 +19,22 @@ supports.
 All geometry, material values and tiny textures are original project work; no
 third-party assets are included. The saved source and exporter/validator are in
 `GraphicsGadgetLabContent/Scenes/GGLabMaterialExportProbe/` and its `Scripts/`
-directory, at Content revision `9a7527d072ee00d4606b8bf098ca162e0ed163e1`.
+directory. The probe was revised on 2026-09-30 to remove the deferred fiber
+response, from Content baseline `df187bb`; the source hash identifies this generation.
 The saved `.blend` SHA-256 is
-`ea01ac90bf3d3d44afc8276a9ae7eded22d1cf9e0647d03ed7d6ed20dd694ad2`.
+`a3d08657745f90ff4186c844d1196d32348b78928bd4bceb7f1cdbb09fb44dc7`.
 
 | Installed file | SHA-256 |
 | --- | --- |
-| `GGLabMaterialExportProbe.gltf` | `655279b78e3cfb6325ac05726bec37547f7e7c0c692fc2526ec0a3893ba61604` |
-| `GGLabMaterialExportProbe.bin` | `b8b6233f6096a0137e47eb28fc6c4b096c99d97b7f4d01572c88bcb22118cbe1` |
-| `GGLabMaterialIOROnly.gltf` | `4a746a9fd69d2f23a3ac5b3d05afd6027aa5d46491fac84f7b699408f766fad0` |
+| `GGLabMaterialExportProbe.gltf` | `fd933d0944e4cbd1188c449cb052de6c0ca78f051e5f5d5794f849a8118bb7f6` |
+| `GGLabMaterialExportProbe.bin` | `a46a8b888b9c6232ed15bdc23e8baee92fd43672ef8fd588dabbbc4b1eb055fd` |
+| `GGLabMaterialIOROnly.gltf` | `b7e7e1f5272cecf6e457f0ac7a24b1fb6f704e9b370aa560e2a018597d865379` |
 | `Textures/BaseColor.png` | `705b2917b1de0d52294971453f4d3b6f455c816d9ba3ffb9c70ec77150dd151f` |
 | `Textures/CoatFactor-CoatRoughness.png` | `33d268e6a2a72eeeb061d51d034592ab4b39aaefd042ed04755038f3646f0850` |
 | `Textures/CoatNormal.png` | `36555540203b2810de0141a6dada635e1e6d38bd9596e10e5fb152bb79760942` |
 | `Textures/Image.png` | `865e64e7ce75d7d58d0d1f6f987cc2126327de4004e50282bf1eed249bdb6676` |
 | `Textures/Normal.png` | `e80418f9a0d051e6af54e4069fa92520b973fcb88905fc024a95d7f6de16543e` |
 | `Textures/Occlusion.png` | `ee518438a6c5f8d0e8eb9dc25001432ef5d2c14d90a6fe690e6967387471652e` |
-| `Textures/SheenColor.png` | `19082b12f924f91f4d5ac13befd5caacca1caba3a547d4764edba9cc4c3223df` |
-| `Textures/SheenRoughness.png` | `4c6b0ecb042830578cc09d8578ab4174c20594256b99b2e9948bf600dc28d428` |
 
 ## Reproduce
 

@@ -24,21 +24,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  sheen-numeric-contract:
-    name: Sheen numeric contract
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Validate Charlie sheen energy and reciprocity
-        run: python Scripts/ValidateSheenEnergy.py
-
   build:
     name: Build / ${{ matrix.display_name }}
     runs-on: windows-2022
