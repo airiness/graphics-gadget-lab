@@ -552,6 +552,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveProbeReadback.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
@@ -1174,6 +1177,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.h">
       <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.h">
+      <Filter>Private\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>

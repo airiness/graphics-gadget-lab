@@ -4,7 +4,7 @@
 
 namespace gglab
 {
-	class AssetManager;
+	class RenderTextureAssetAccess;
 	class RenderSamplerAccess;
 
 	struct MaterialUVTransformRows
@@ -20,6 +20,6 @@ namespace gglab
 	{
 	public:
 		[[nodiscard]] static MaterialGPU Encode(const MaterialProperties& material,
-			const AssetManager& assetManager, const RenderSamplerAccess& samplerRegistry) noexcept;
+			const RenderTextureAssetAccess& textureAssets, const RenderSamplerAccess& samplerRegistry) noexcept;
 	};
 }

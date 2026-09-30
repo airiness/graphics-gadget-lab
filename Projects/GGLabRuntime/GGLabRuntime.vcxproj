@@ -208,6 +208,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\PersistentTexturePool.cpp" />
@@ -503,6 +504,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderSceneTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.h" />

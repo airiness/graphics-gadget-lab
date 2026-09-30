@@ -45,7 +45,7 @@ namespace gglab
 		std::string m_StartupDemoId;
 		std::optional<std::string> m_StartupLabId;
 		AppRuntimeExtent m_InitialExtent{};
-		AppRuntimePointerMode m_InitialPointerMode = AppRuntimePointerMode::Relative;
+		AppRuntimePointerMode m_InitialPointerMode = AppRuntimePointerMode::Absolute;
 		AppRuntimeCapability m_Capabilities = AppRuntimeCapability::None;
 		bool m_RequestRuntimeValidation = false;
 

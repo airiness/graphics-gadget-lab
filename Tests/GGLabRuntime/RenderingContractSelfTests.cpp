@@ -39,6 +39,9 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/RenderFrameGpuResources.h"
 #include "Graphics/RenderSceneBuilder.h"
+#include "Graphics/RenderMaterialFrameCache.h"
+#include "GGLabRuntime/Graphics/RenderTextureAssetAccess.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/WorldSun.h"
 #include "Graphics/AtmosphereSystem.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
@@ -8056,6 +8059,227 @@ namespace gglab
 		}
 	}
 
+	void RunMaterialFrameCacheContractTests(SelfTestContext& context) noexcept
+	{
+		class TextureAccess final : public RenderTextureAssetAccess
+		{
+		public:
+			TextureContentRef GetTextureContentRef(TextureID) const noexcept override { return {}; }
+			std::optional<ResidentTextureResource> GetResidentTextureResource(
+				TextureContentRef) const noexcept override { return std::nullopt; }
+			void MarkTextureUsed(TextureID) noexcept override { ++m_UsageCount; }
+			uint32_t ResolveSrvIndex(TextureID id, ReservedTextureIDIndex fallback) const noexcept override
+			{
+				++m_ResolveCount;
+				return id.IsValid() && m_Resident ? m_DescriptorBase + id.Value()
+					: static_cast<uint32_t>(fallback);
+			}
+
+			uint32_t m_UsageCount = 0;
+			mutable uint32_t m_ResolveCount = 0;
+			uint32_t m_DescriptorBase = 100;
+			bool m_Resident = true;
+		} textures;
+		class SamplerAccess final : public RenderSamplerAccess
+		{
+		public:
+			SamplerID GetOrCreateSampler(const SamplerKey&) noexcept override { return {}; }
+			SamplerID GetPresetSamplerId(SamplerPreset) const noexcept override { return {}; }
+			uint32_t GetSamplerIndex(SamplerPreset) const noexcept override { return 1; }
+			uint32_t GetSamplerIndex(const SamplerID&) const noexcept override { return 1; }
+			uint32_t ResolveSamplerIndex(SamplerID, SamplerPreset) const noexcept override
+			{
+				++m_ResolveCount;
+				return 1;
+			}
+
+			mutable uint32_t m_ResolveCount = 0;
+		} samplers;
+
+		using MaterialTable = RenderMaterialFrameCache::MaterialTable;
+		constexpr uint32_t TextureSlotCount = 9;
+		constexpr uint32_t InstanceCount = 2048;
+		MaterialTable table(4, 3);
+		MaterialProperties material;
+		material.m_BaseColorBinding.m_TextureId = TextureID{ 70 };
+		material.m_NormalBinding.m_TextureId = TextureID{ 71 };
+		material.m_RoughnessFactor = 0.4f;
+		const auto key = RenderMaterialKey::FromAsset(MaterialID{ 100 });
+		const auto runtimeKey = RenderMaterialKey::FromRuntime(RuntimeMaterialKey{ 100 });
+		uint32_t materialIndex = MaterialTable::InvalidSlot;
+		table.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(table, textures, samplers);
+			const auto first = cache.Resolve(key, material);
+			materialIndex = first.m_Index;
+			bool shared = first.m_Index != MaterialTable::InvalidSlot && !first.m_KeyCollision;
+			for (uint32_t instance = 0; instance < InstanceCount; ++instance)
+			{
+				const auto resolved = cache.Resolve(key, material);
+				shared &= resolved.m_Index == first.m_Index && !resolved.m_KeyCollision &&
+					resolved.m_Flags == first.m_Flags && resolved.m_AlphaMode == first.m_AlphaMode;
+			}
+			context.Check(shared && table.GetLiveCount() == 1 &&
+				textures.m_UsageCount == TextureSlotCount &&
+				textures.m_ResolveCount == TextureSlotCount && samplers.m_ResolveCount == TextureSlotCount,
+				"Thousands of shared mesh instances encode and mark material textures once per scene build");
+			const auto original = table.GetData({ materialIndex, 1 })[0];
+			context.Check(original.BaseColorBinding.TextureSamplerBinding.TextureIndex == 170 &&
+				original.NormalBinding.TextureSamplerBinding.TextureIndex == 171 &&
+				original.NormalBinding.TextureSamplerBinding.SamplerIndex == 1 &&
+				original.RoughnessFactor == 0.4f,
+				"Frame material preparation uses the production encoder and published binding indices");
+
+			MaterialProperties runtimeMaterial = material;
+			runtimeMaterial.m_RoughnessFactor = 0.7f;
+			const auto runtime = cache.Resolve(runtimeKey, runtimeMaterial);
+			context.Check(runtime.m_Index != first.m_Index && !runtime.m_KeyCollision &&
+				table.GetLiveCount() == 2 && textures.m_ResolveCount == 2 * TextureSlotCount,
+				"Asset and runtime material keys with the same value retain distinct GPU slots");
+
+			MaterialProperties identical = material;
+			bool equivalent = true;
+			for (uint32_t instance = 0; instance < InstanceCount; ++instance)
+			{
+				const auto resolved = cache.Resolve(key, identical);
+				equivalent &= resolved.m_Index == first.m_Index && !resolved.m_KeyCollision;
+			}
+			context.Check(equivalent && textures.m_UsageCount == 3 * TextureSlotCount &&
+				textures.m_ResolveCount == 3 * TextureSlotCount && samplers.m_ResolveCount == 3 * TextureSlotCount,
+				"Distinct equivalent material objects sharing a key are checked once and reuse the first slot");
+
+			MaterialProperties conflicting = material;
+			conflicting.m_RoughnessFactor = 0.9f;
+			conflicting.m_Flags = MaterialFlags::DoubleSided;
+			conflicting.m_AlphaMode = AlphaMode::Blend;
+			const auto collision = cache.Resolve(key, conflicting);
+			const auto preserved = table.GetData({ materialIndex, 1 })[0];
+			context.Check(collision.m_KeyCollision && collision.m_Index == first.m_Index &&
+				collision.m_Flags == first.m_Flags && collision.m_AlphaMode == first.m_AlphaMode &&
+				preserved.RoughnessFactor == original.RoughnessFactor && preserved.Flags == original.Flags &&
+				preserved.AlphaMode == original.AlphaMode,
+				"A conflicting material key reports the mismatch and preserves the first GPU data and draw metadata");
+			bool repeatedCollision = false;
+			for (uint32_t instance = 0; instance < InstanceCount; ++instance)
+			{
+				const auto resolved = cache.Resolve(key, conflicting);
+				repeatedCollision |= resolved.m_KeyCollision || resolved.m_Index != first.m_Index;
+			}
+			context.Check(!repeatedCollision && textures.m_UsageCount == 4 * TextureSlotCount &&
+				textures.m_ResolveCount == 4 * TextureSlotCount && samplers.m_ResolveCount == 4 * TextureSlotCount,
+				"Repeated references to a conflicting source do not re-encode or repeat its collision diagnostic");
+			const auto runtimeCollision = cache.Resolve(runtimeKey, conflicting);
+			context.Check(runtimeCollision.m_KeyCollision && runtimeCollision.m_Index == runtime.m_Index &&
+				textures.m_ResolveCount == 5 * TextureSlotCount,
+				"Conflict deduplication includes the render key when one source appears under multiple keys");
+
+			constexpr uint32_t AliasCount = 128;
+			std::array<MaterialProperties, AliasCount> aliases;
+			aliases.fill(material);
+			bool aliasCollisions = false;
+			for (uint32_t iteration = 0; iteration < 16; ++iteration)
+			{
+				for (const auto& alias : aliases)
+				{
+					const auto resolved = cache.Resolve(key, alias);
+					aliasCollisions |= resolved.m_KeyCollision || resolved.m_Index != first.m_Index;
+				}
+			}
+			context.Check(!aliasCollisions && table.GetLiveCount() == 2 &&
+				textures.m_UsageCount == (5 + AliasCount) * TextureSlotCount &&
+				textures.m_ResolveCount == (5 + AliasCount) * TextureSlotCount &&
+				samplers.m_ResolveCount == (5 + AliasCount) * TextureSlotCount,
+				"Many equivalent sources retain deduplication across cache growth and interleaved references");
+		}
+		table.EndUpdate();
+		for (uint32_t buffer = 0; buffer < table.GetBufferCount(); ++buffer)
+		{
+			const auto ranges = table.BuildDirtyRanges(buffer);
+			table.Commit(buffer, ranges);
+		}
+
+		material.m_RoughnessFactor = 0.2f;
+		material.m_ClearcoatFactor = 0.8f;
+		material.m_NormalBinding.m_UVOffset = Vector2(0.25f, 0.5f);
+		material.m_Flags = MaterialFlags::DoubleSided;
+		material.m_AlphaMode = AlphaMode::Mask;
+		textures.m_Resident = false;
+		const uint32_t previousUsage = textures.m_UsageCount;
+		const uint32_t previousResolves = textures.m_ResolveCount;
+		table.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(table, textures, samplers);
+			const auto edited = cache.Resolve(key, material);
+			for (uint32_t instance = 0; instance < InstanceCount; ++instance)
+			{
+				GGLAB_UNUSED(cache.Resolve(key, material));
+			}
+			const auto gpu = table.GetData({ edited.m_Index, 1 })[0];
+			context.Check(edited.m_Index == materialIndex && !edited.m_KeyCollision &&
+				edited.m_Flags == MaterialFlags::DoubleSided && edited.m_AlphaMode == AlphaMode::Mask &&
+				gpu.RoughnessFactor == 0.2f && gpu.ClearcoatFactor == 0.8f &&
+				gpu.NormalBinding.UVTransformU.m_Z == 0.25f && gpu.NormalBinding.UVTransformV.m_Z == 0.5f &&
+				gpu.NormalBinding.TextureSamplerBinding.TextureIndex ==
+					static_cast<uint32_t>(ReservedTextureIDIndex::NormalFlat) &&
+				textures.m_UsageCount == previousUsage + TextureSlotCount &&
+				textures.m_ResolveCount == previousResolves + TextureSlotCount,
+				"The next scene build refreshes edited factors, transforms, draw metadata and evicted texture bindings");
+		}
+		table.EndUpdate();
+		bool allBuffersDirty = true;
+		for (uint32_t buffer = 0; buffer < table.GetBufferCount(); ++buffer)
+		{
+			const auto ranges = table.BuildDirtyRanges(buffer);
+			allBuffersDirty &= !ranges.empty();
+			table.Commit(buffer, ranges);
+		}
+		context.Check(allBuffersDirty && table.GetLiveCount() == 1,
+			"Changed prepared data reaches every frame buffer while disappeared material keys retire");
+
+		textures.m_Resident = true;
+		textures.m_DescriptorBase = 200;
+		table.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(table, textures, samplers);
+			const auto restored = cache.Resolve(key, material);
+			const auto gpu = table.GetData({ restored.m_Index, 1 })[0];
+			context.Check(restored.m_Index == materialIndex &&
+				gpu.BaseColorBinding.TextureSamplerBinding.TextureIndex == 270 &&
+				gpu.NormalBinding.TextureSamplerBinding.TextureIndex == 271 &&
+				!table.BuildDirtyRanges(0).empty(),
+				"A re-resident texture publishes its new descriptor on the next build without a material edit");
+		}
+		table.EndUpdate();
+		const auto restoredRanges = table.BuildDirtyRanges(0);
+		table.Commit(0, restoredRanges);
+		const uint64_t restoredRevision = table.GetRevision(materialIndex);
+		table.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(table, textures, samplers);
+			GGLAB_UNUSED(cache.Resolve(key, material));
+		}
+		table.EndUpdate();
+		context.Check(table.GetRevision(materialIndex) == restoredRevision && table.BuildDirtyRanges(0).empty(),
+			"Refreshing an unchanged material preserves persistent table revisions and avoids redundant uploads");
+
+		MaterialTable fullTable(1, 1);
+		fullTable.BeginUpdate();
+		const uint32_t beforeExhaustion = textures.m_ResolveCount;
+		{
+			RenderMaterialFrameCache cache(fullTable, textures, samplers);
+			GGLAB_UNUSED(cache.Resolve(key, material));
+			bool exhausted = true;
+			for (uint32_t instance = 0; instance < InstanceCount; ++instance)
+			{
+				exhausted &= cache.Resolve(runtimeKey, material).m_Index == MaterialTable::InvalidSlot;
+			}
+			context.Check(exhausted && fullTable.GetLiveCount() == 1 &&
+				textures.m_ResolveCount == beforeExhaustion + 2 * TextureSlotCount,
+				"An exhausted material table retains the invalid slot and avoids repeated preparation attempts");
+		}
+		fullTable.EndUpdate();
+	}
+
 	void RunMaterialBaselineContractTests(SelfTestContext& context) noexcept
 	{
 		constexpr double Pi = std::numbers::pi_v<double>;
@@ -8233,6 +8457,7 @@ namespace gglab
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
 		RunMaterialBaselineContractTests(context);
+		RunMaterialFrameCacheContractTests(context);
 		RunGGXEnergyCompensationContractTests(context);
 		RHIContextDesc nativeContextDesc{ .m_Width = 64, .m_Height = 64 };
 		context.Check(!CreateDX12Context(nativeContextDesc, nullptr),

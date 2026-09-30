@@ -1,5 +1,5 @@
 #include "Graphics/MaterialGpuEncoder.h"
-#include "GGLabRuntime/Graphics/Asset/AssetManager.h"
+#include "GGLabRuntime/Graphics/RenderTextureAssetAccess.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 
 #include <algorithm>
@@ -25,14 +25,14 @@ namespace gglab
 	{
 		[[nodiscard]] MaterialTextureBindingGPU EncodeTextureBinding(
 			const MaterialTextureBinding& binding, ReservedTextureIDIndex fallback,
-			SamplerPreset fallbackSampler, const AssetManager& assetManager,
+			SamplerPreset fallbackSampler, const RenderTextureAssetAccess& textureAssets,
 			const RenderSamplerAccess& samplerRegistry) noexcept
 		{
 			const MaterialUVTransformRows transform = EncodeMaterialUVTransform(binding);
 			return {
 				.TextureSamplerBinding =
 					{
-						.TextureIndex = assetManager.ResolveSrvIndex(binding.m_TextureId, fallback),
+						.TextureIndex = textureAssets.ResolveSrvIndex(binding.m_TextureId, fallback),
 						.SamplerIndex = samplerRegistry.ResolveSamplerIndex(
 							binding.m_SamplerId, fallbackSampler),
 					},
@@ -45,35 +45,35 @@ namespace gglab
 	}
 
 	MaterialGPU MaterialGpuEncoder::Encode(const MaterialProperties& material,
-		const AssetManager& assetManager, const RenderSamplerAccess& samplerRegistry) noexcept
+		const RenderTextureAssetAccess& textureAssets, const RenderSamplerAccess& samplerRegistry) noexcept
 	{
 		MaterialGPU gpu{};
 		gpu.BaseColorBinding = EncodeTextureBinding(material.m_BaseColorBinding,
-			ReservedTextureIDIndex::BaseColorWhite, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::BaseColorWhite, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 		gpu.EmissiveBinding =
 			EncodeTextureBinding(material.m_EmissiveBinding, ReservedTextureIDIndex::EmissiveWhite,
-				SamplerPreset::LinearWrap, assetManager, samplerRegistry);
+				SamplerPreset::LinearWrap, textureAssets, samplerRegistry);
 		gpu.MetallicRoughnessBinding = EncodeTextureBinding(material.m_MetallicRoughnessBinding,
 			ReservedTextureIDIndex::DefaultMetallicRoughness, SamplerPreset::LinearWrap,
-			assetManager, samplerRegistry);
+			textureAssets, samplerRegistry);
 		gpu.NormalBinding =
 			EncodeTextureBinding(material.m_NormalBinding, ReservedTextureIDIndex::NormalFlat,
-				SamplerPreset::LinearWrap, assetManager, samplerRegistry);
+				SamplerPreset::LinearWrap, textureAssets, samplerRegistry);
 		gpu.OcclusionBinding = EncodeTextureBinding(material.m_OcclusionBinding,
-			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 		gpu.ClearcoatBinding = EncodeTextureBinding(material.m_ClearcoatBinding,
-			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 		gpu.ClearcoatRoughnessBinding = EncodeTextureBinding(material.m_ClearcoatRoughnessBinding,
-			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::OcclusionWhite, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 		gpu.ClearcoatNormalBinding = EncodeTextureBinding(material.m_ClearcoatNormalBinding,
-			ReservedTextureIDIndex::NormalFlat, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::NormalFlat, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 		gpu.AnisotropyBinding = EncodeTextureBinding(material.m_AnisotropyBinding,
-			ReservedTextureIDIndex::AnisotropyDefault, SamplerPreset::LinearWrap, assetManager,
+			ReservedTextureIDIndex::AnisotropyDefault, SamplerPreset::LinearWrap, textureAssets,
 			samplerRegistry);
 
 		gpu.BaseColorFactor = material.m_BaseColor;

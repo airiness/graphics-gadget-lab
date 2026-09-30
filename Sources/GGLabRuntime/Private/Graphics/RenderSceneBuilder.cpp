@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/EnvironmentLightingSystem.h"
-#include "Graphics/MaterialGpuEncoder.h"
+#include "Graphics/RenderMaterialFrameCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
@@ -13,10 +13,8 @@
 #include "GGLabRuntime/Graphics/TransferManager.h"
 #include "GGLabRuntime/Scene/Components.h"
 
-#include <cstring>
 #include <limits>
 #include <span>
-#include <unordered_map>
 #include <vector>
 
 namespace gglab
@@ -52,27 +50,6 @@ namespace gglab
 	{
 		constexpr uint64_t DefaultLightKey = std::numeric_limits<uint64_t>::max();
 
-		void MarkMaterialTexturesUsed(
-			const MaterialProperties& material, AssetManager& assetManager) noexcept
-		{
-			assetManager.MarkTextureUsed(material.m_BaseColorBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_EmissiveBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_MetallicRoughnessBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_NormalBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_OcclusionBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_ClearcoatBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_ClearcoatRoughnessBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_ClearcoatNormalBinding.m_TextureId);
-			assetManager.MarkTextureUsed(material.m_AnisotropyBinding.m_TextureId);
-		}
-
-		struct MaterialUploadRecord
-		{
-			MaterialGPU m_Gpu{};
-			uint32_t m_Index = 0;
-			MaterialFlags m_Flags = MaterialFlags::None;
-			AlphaMode m_AlphaMode = AlphaMode::Opaque;
-		};
 	}
 
 	RenderSceneBuilder::ViewUploadData RenderSceneBuilder::BuildViewData(
@@ -138,7 +115,6 @@ namespace gglab
 		result.m_RenderScene.m_RenderInstances.clear();
 
 		using ObjectTable = PersistentStructuredBufferTable<uint64_t, ObjectGPU>;
-		using MaterialTable = PersistentStructuredBufferTable<RenderMaterialKey, MaterialGPU>;
 		using LightTable = PersistentStructuredBufferTable<uint64_t, LightGPU>;
 		GGLAB_ASSERT(info.m_FrameSlotIndex < info.m_ObjectsSB.GetBufferCount());
 		GGLAB_ASSERT(info.m_FrameSlotIndex < info.m_MaterialsSB.GetBufferCount());
@@ -151,10 +127,11 @@ namespace gglab
 		const auto& viewData = viewUpload.m_Views;
 		result.m_ShadowViewBaseOffset = viewUpload.m_ShadowViewBaseOffset;
 
-		std::unordered_map<RenderMaterialKey, MaterialUploadRecord> materialRecords;
+		RenderMaterialFrameCache materialCache(
+			info.m_MaterialTable, assetManager, info.m_SamplerRegistry);
 
 		registry.view<components::TransformComponent, components::ModelComponent>().each(
-			[&result, &assetManager, &info, &registry, &materialRecords](auto entity,
+			[&result, &assetManager, &info, &registry, &materialCache](auto entity,
 				const components::TransformComponent& transformComp,
 				const components::ModelComponent& modelComp)
 			{
@@ -210,36 +187,16 @@ namespace gglab
 						continue;
 					}
 
-					MarkMaterialTexturesUsed(*material, assetManager);
-					const MaterialGPU materialGpu =
-						MaterialGpuEncoder::Encode(*material, assetManager, info.m_SamplerRegistry);
-					auto iter = materialRecords.find(materialKey);
-					if (iter == materialRecords.end())
-					{
-						const uint32_t materialIndex =
-							info.m_MaterialTable.Upsert(materialKey, materialGpu);
-						if (materialIndex == MaterialTable::InvalidSlot)
-						{
-							continue;
-						}
-						iter = materialRecords
-							.emplace(materialKey,
-								MaterialUploadRecord{
-									.m_Gpu = materialGpu,
-									.m_Index = materialIndex,
-									.m_Flags = material->m_Flags,
-									.m_AlphaMode = material->m_AlphaMode,
-								})
-								.first;
-					}
-					else if (std::memcmp(&iter->second.m_Gpu, &materialGpu, sizeof(MaterialGPU)) !=
-						0 ||
-						iter->second.m_Flags != material->m_Flags ||
-						iter->second.m_AlphaMode != material->m_AlphaMode)
+					const auto resolvedMaterial = materialCache.Resolve(materialKey, *material);
+					if (resolvedMaterial.m_KeyCollision)
 					{
 						GGLAB_LOG_GRAPHICS_WARN(
 							"Render material key collision for domain={} value=0x{:016X}.",
 							static_cast<uint32_t>(materialKey.m_Domain), materialKey.m_Value);
+					}
+					if (resolvedMaterial.m_Index == RenderMaterialFrameCache::MaterialTable::InvalidSlot)
+					{
+						continue;
 					}
 
 					ObjectGPU objectGpu{};
@@ -267,7 +224,7 @@ namespace gglab
 						objectGpu.PreviousModelMat = world;
 					}
 					objectGpu.NormalMat = normalMat;
-					objectGpu.MaterialIndex = iter->second.m_Index;
+					objectGpu.MaterialIndex = resolvedMaterial.m_Index;
 
 					const uint64_t objectKey =
 						(static_cast<uint64_t>(entt::to_integral(entity)) << 32) | modelMeshIndex;
@@ -297,10 +254,10 @@ namespace gglab
 					RenderInstance renderInstance{};
 					renderInstance.m_MeshId = modelMesh.m_MeshId;
 					renderInstance.m_MaterialKey = materialKey;
-					renderInstance.m_MaterialFlags = iter->second.m_Flags;
-					renderInstance.m_AlphaMode = iter->second.m_AlphaMode;
+					renderInstance.m_MaterialFlags = resolvedMaterial.m_Flags;
+					renderInstance.m_AlphaMode = resolvedMaterial.m_AlphaMode;
 					renderInstance.m_ObjectOffset = objectOffset;
-					renderInstance.m_MaterialOffset = iter->second.m_Index;
+					renderInstance.m_MaterialOffset = resolvedMaterial.m_Index;
 					renderInstance.m_WorldCenterPos = worldCenter;
 					renderInstance.m_WorldBounds = worldBounds;
 					renderInstance.m_HasWorldBounds = hasWorldBounds;
