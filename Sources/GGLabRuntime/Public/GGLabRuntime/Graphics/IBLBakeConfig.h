@@ -25,6 +25,7 @@ namespace gglab
 
 		uint32_t m_IrradianceCubemapSize = 32;
 		RHIFormat m_IrradianceCubemapFormat = RHIFormat::R16G16B16A16Float;
+		// Controls the fixed environment grid density; visible texels supply the samples.
 		uint32_t m_IrradianceSampleCount = 256;
 
 		uint32_t m_PrefilteredSpecularCubemapSize = 128;

@@ -442,6 +442,7 @@
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
+    <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli" />
@@ -480,6 +481,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />

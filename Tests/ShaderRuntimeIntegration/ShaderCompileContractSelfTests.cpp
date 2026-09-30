@@ -13,6 +13,8 @@
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
+#include "GGLabRuntime/Graphics/IBLBakeConfig.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/RHI/RHICoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanCoordinatePolicy.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
@@ -64,6 +66,16 @@ namespace shader_hdr_math
 	using std::clamp;
 	using std::isfinite;
 #include "../../Shaders/Common/HDRColorMath.hlsli"
+}
+
+namespace shader_irradiance_math
+{
+	using uint = uint32_t;
+	using std::atan2;
+	using std::ceil;
+	using std::max;
+	using std::sqrt;
+#include "../../Shaders/Lighting/IrradianceIntegrationMath.hlsli"
 }
 
 namespace gglab
@@ -2043,8 +2055,137 @@ namespace gglab
 				"Legacy schema=1 documents are rejected as the intentional cache epoch");
 		}
 
+		void RunIrradianceIntegrationMathTests(SelfTestContext& context) noexcept
+		{
+			constexpr double pi = 3.141592653589793;
+			bool gridSelectionMatches = true;
+			for (uint32_t preset = 0; preset < 4; ++preset)
+			{
+				const auto config = GetIBLBakeConfig(static_cast<IBLQualityPreset>(preset));
+				gridSelectionMatches &= shader_irradiance_math::GetIrradianceSourceMip(
+					config.m_IrradianceSampleCount, config.m_EnvironmentCubemapSize, 12u) == 6u;
+			}
+			gridSelectionMatches &= shader_irradiance_math::GetIrradianceSourceMip(256u, 512u, 3u) == 2u &&
+				shader_irradiance_math::GetIrradianceSourceMip(65536u, 8u, 4u) == 0u &&
+				shader_irradiance_math::GetIrradianceSourceMip(384u, 512u, 10u) == 6u &&
+				shader_irradiance_math::GetIrradianceSourceMip(385u, 512u, 10u) == 5u &&
+				shader_irradiance_math::GetIrradianceSourceMip(0u, 1u, 1u) == 0u;
+			context.Check(gridSelectionMatches,
+				"Production irradiance grid selects preset densities, available mips and budget boundaries");
+
+			bool solidAnglesMatch = true;
+			for (uint32_t resolution : { 1u, 4u, 8u, 16u, 32u })
+			{
+				double faceSolidAngle = 0.0;
+				for (uint32_t y = 0; y < resolution; ++y)
+				{
+					for (uint32_t x = 0; x < resolution; ++x)
+					{
+						const float weight = shader_irradiance_math::GetIrradianceTexelSolidAngle(x, y, resolution);
+						faceSolidAngle += weight;
+						solidAnglesMatch &= std::isfinite(weight) && weight > 0.0f &&
+							std::abs(weight - shader_irradiance_math::GetIrradianceTexelSolidAngle(
+								resolution - 1u - x, resolution - 1u - y, resolution)) < 0.000001f;
+					}
+				}
+				solidAnglesMatch &= std::abs(6.0 * faceSolidAngle - 4.0 * pi) < 0.00002;
+			}
+			context.Check(solidAnglesMatch,
+				"Production cubemap texel weights are positive, symmetric and cover exactly four PI steradians");
+
+			const std::array normals{
+				Vector3::UnitX, -Vector3::UnitX, Vector3::UnitY, -Vector3::UnitY,
+				Vector3::UnitZ, -Vector3::UnitZ, Vector3(1.0f, 1.0f, 1.0f).Normalized(),
+				Vector3(0.17f, -0.31f, 0.935f).Normalized(),
+			};
+			auto integrate = [](const Vector3& normal, uint32_t resolution, const auto& radiance,
+				float* outCosineIntegral = nullptr) noexcept
+				{
+					double result = 0.0;
+					float cosineIntegral = 0.0f;
+					const float inverseResolution = 1.0f / static_cast<float>(resolution);
+					for (uint32_t y = 0; y < resolution; ++y)
+					{
+						for (uint32_t x = 0; x < resolution; ++x)
+						{
+							const float solidAngle = shader_irradiance_math::GetIrradianceTexelSolidAngle(x, y, resolution);
+							const float u = (static_cast<float>(x) + 0.5f) * inverseResolution * 2.0f - 1.0f;
+							const float v = (static_cast<float>(y) + 0.5f) * inverseResolution * 2.0f - 1.0f;
+							// Permutations of (+/-1, u, v) form a reference sphere grid.
+							// Face orientation is immaterial to these analytic integrals.
+							const std::array directions{
+								Vector3(1.0f, u, v), Vector3(-1.0f, u, v),
+								Vector3(u, 1.0f, v), Vector3(u, -1.0f, v),
+								Vector3(u, v, 1.0f), Vector3(u, v, -1.0f),
+							};
+							for (uint32_t face = 0; face < 6; ++face)
+							{
+								const Vector3 direction = directions[face].Normalized();
+								const float weight = std::max(normal.Dot(direction), 0.0f) * solidAngle;
+								result += radiance(direction, face, x, y) * weight;
+								cosineIntegral += weight;
+							}
+						}
+					}
+					if (outCosineIntegral) *outCosineIntegral = cosineIntegral;
+					return result * shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
+				};
+			bool constantEnvironmentMatches = true;
+			for (uint32_t resolution : { 1u, 4u, 8u, 16u })
+			{
+				for (const auto& normal : normals)
+				{
+					for (double radiance : { 0.0, 0.25, 120000.0 })
+					{
+						const double actual = integrate(normal, resolution,
+							[radiance](const auto&, auto, auto, auto) { return radiance; });
+						constantEnvironmentMatches &= std::isfinite(actual) &&
+							std::abs(actual - pi * radiance) <= std::max(1.0, radiance) * 0.00003;
+					}
+				}
+			}
+			context.Check(constantEnvironmentMatches,
+				"Irradiance quadrature preserves PI times constant radiance for every tested grid and normal, including physical HDR");
+
+			bool directionalEnvironmentMatches = true;
+			for (const auto& light : normals)
+			{
+				for (const auto& normal : normals)
+				{
+					// The analytic Lambertian convolution of 1 + 0.5 * dot(L, light).
+					const double expected = pi + pi / 3.0 * normal.Dot(light);
+					const double actual = integrate(normal, 8u,
+						[&light](const Vector3& direction, auto, auto, auto)
+						{ return 1.0 + 0.5 * direction.Dot(light); });
+					directionalEnvironmentMatches &= std::abs(actual - expected) / pi < 0.003;
+				}
+			}
+			context.Check(directionalEnvironmentMatches,
+				"Fixed irradiance directions follow the analytic linear-environment response under rotated normals and lighting");
+
+			const Vector3 peakDirection = Vector3(0.125f, 0.125f, 1.0f).Normalized();
+			const float peakSolidAngle = shader_irradiance_math::GetIrradianceTexelSolidAngle(4u, 4u, 8u);
+			bool concentratedLightMatches = true;
+			for (int step = -12; step <= 12; ++step)
+			{
+				const float angle = static_cast<float>(step) * 0.12f;
+				const Vector3 normal(std::sin(angle), 0.0f, std::cos(angle));
+				const double expected = 1000000.0 * peakSolidAngle * std::max(normal.Dot(peakDirection), 0.0f);
+				float cosineIntegral = 0.0f;
+				const double actual = integrate(normal, 8u, [](const auto&, uint32_t face, uint32_t x, uint32_t y)
+					{ return face == 4u && x == 4u && y == 4u ? 1000000.0 : 0.0; }, &cosineIntegral);
+				// Remove the finite-grid white-environment calibration (checked above)
+				// before comparing the fixed texel's analytic cosine response.
+				const double uncalibrated = actual / shader_irradiance_math::GetIrradianceNormalization(cosineIntegral);
+				concentratedLightMatches &= std::abs(uncalibrated - expected) <= std::max(1.0, expected) * 0.00001;
+			}
+			context.Check(concentratedLightMatches,
+				"A concentrated HDR texel follows its fixed cosine response independently of finite-grid energy calibration");
+		}
+
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
+			RunIrradianceIntegrationMathTests(context);
 			bool historyRescalingMatches = true;
 			for (const float previous : { 0.00000001f, 0.25f, 1.0f, 1024.0f })
 			{
@@ -2682,6 +2823,29 @@ namespace gglab
 			}
 			context.Check(anisotropicIBLSpirVContractsCompile,
 				"Production anisotropic IBL reflection numeric contracts also compile to SPIR-V");
+
+			desc.m_SourcePath = L"Tests/IrradianceIntegrationContractCompile.hlsl";
+			desc.m_Entry = L"PSMain";
+			bool irradianceSpirVContractsCompile = true;
+			for (uint32_t testCase = 0; testCase < 8u; ++testCase)
+			{
+				desc.m_Defines = { { L"GGLAB_IRRADIANCE_TEST_CASE", std::to_wstring(testCase) } };
+				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const auto numericDxil = compiler.Compile(desc);
+				std::string disassembly;
+				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+				for (uint32_t component = 0; component < 4; ++component)
+				{
+					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				}
+				context.Check(matches, std::format("Production irradiance grid and normalization contract case {}", testCase));
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				irradianceSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(irradianceSpirVContractsCompile,
+				"Production irradiance grid and normalization numeric contracts also compile to SPIR-V");
 
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";

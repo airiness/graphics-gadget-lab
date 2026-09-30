@@ -1,9 +1,9 @@
 #include <Common/Common.hlsli>
-#include <Common/Sampling.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/Cubemap.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
+#include <Lighting/IrradianceIntegrationMath.hlsli>
 
 struct IBLIrradiancePassParameters
 {
@@ -27,33 +27,41 @@ TextureSamplerBindingData GetEnvironmentBinding()
 
 float3 IntegrateIrradiance(TextureSamplerBindingData environmentBinding, float3 normalWS)
 {
-	const uint SAMPLE_COUNT = max(g_Pass.SampleCount, 1u);
-	const float environmentResolution = max((float)g_Pass.EnvironmentResolution, 1.0);
-	const float environmentTexelSolidAngle =
-		4.0 * PI / (6.0 * environmentResolution * environmentResolution);
-	const float maxEnvironmentMip = (float)(max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
+	const uint sourceMip = GetIrradianceSourceMip(
+		g_Pass.SampleCount, g_Pass.EnvironmentResolution, g_Pass.EnvironmentMipLevels);
+	const uint resolution = g_Pass.EnvironmentResolution >> sourceMip;
 	float3 irradiance = 0.0.xxx;
+	float cosineIntegral = 0.0;
 
-	for (uint i = 0; i < SAMPLE_COUNT; ++i)
+	// Keep environment directions fixed across output normals. Rotating a sparse
+	// hemisphere pattern makes small HDR lights appear as spatial irradiance patches.
+	[loop]
+	for (uint y = 0u; y < resolution; ++y)
 	{
-		float2 Xi = Hammersley(i, SAMPLE_COUNT);
-		// Directions are sampled using a cosine-weighted hemisphere PDF:
-		// p(L) = NoL / PI.
-		// Therefore the NoL term in the irradiance integral is cancelled
-		// by the PDF denominator, leaving only PI * average(radiance).
-		float3 directionTS = CosineSampleHemisphere(Xi);
-		float3 directionWS = TangentToWorld(directionTS, normalWS);
-		float NoL = saturate(directionTS.z);
-		float pdf = NoL * INV_PI;
-		float sampleSolidAngle = 1.0 / max((float)SAMPLE_COUNT * pdf, 1.0e-6);
-		float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
-		sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
-
-		float3 radiance = SampleTextureCubeLevel(environmentBinding, directionWS, sourceMip).rgb;
-		irradiance += g_Pass.PhysicalSky ? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
+		[loop]
+		for (uint x = 0u; x < resolution; ++x)
+		{
+			const float2 uv = (float2(x, y) + 0.5) / (float)resolution;
+			const float solidAngle = GetIrradianceTexelSolidAngle(x, y, resolution);
+			[unroll]
+			for (uint face = 0u; face < CUBEMAP_FACE_COUNT; ++face)
+			{
+				const float3 directionWS = CubemapFaceUvToDirection(face, uv);
+				const float weight = saturate(dot(normalWS, directionWS)) * solidAngle;
+				if (weight > 0.0)
+				{
+					float3 radiance = SampleTextureCubeLevel(
+						environmentBinding, directionWS, (float)sourceMip).rgb;
+					radiance = g_Pass.PhysicalSky
+						? SanitizeSceneRadiance(radiance) : SanitizeHDRColor(radiance);
+					irradiance += radiance * weight;
+					cosineIntegral += weight;
+				}
+			}
+		}
 	}
 
-	float3 result = PI * irradiance / SAMPLE_COUNT;
+	float3 result = irradiance * GetIrradianceNormalization(cosineIntegral);
 	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
 }
 
