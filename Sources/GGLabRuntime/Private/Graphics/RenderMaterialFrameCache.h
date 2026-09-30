@@ -28,6 +28,7 @@ namespace gglab
 			MaterialFlags m_Flags = MaterialFlags::None;
 			AlphaMode m_AlphaMode = AlphaMode::Opaque;
 			bool m_KeyCollision = false;
+			bool m_HasDiagnosticView = false;
 		};
 
 		RenderMaterialFrameCache(MaterialTable& materialTable,

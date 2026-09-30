@@ -11,6 +11,7 @@
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/DirectLighting.hlsli>
 #include <PBR/SpecularAA.hlsli>
+#include <PBR/MaterialDiagnostics.hlsli>
 
 struct ForwardPBRPassParameters
 {
@@ -44,57 +45,58 @@ float4 EncodeForwardSceneColor(float4 color)
 	return float4(EncodeSceneColor(color.rgb, preExposure), color.a);
 }
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
-struct ForwardPBRPixelOutput
-{
-	float4 ForwardPlusColor : SV_Target0;
-	float4 LegacyColor : SV_Target1;
-	float4 GTAOContribution : SV_Target2;
-};
-
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
-{
-	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
-	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
-	output.GTAOContribution = gtaoContribution;
-	return output;
-}
-#elif defined(GGLAB_FORWARD_PLUS_VALIDATION)
-struct ForwardPBRPixelOutput
-{
-	float4 ForwardPlusColor : SV_Target0;
-	float4 LegacyColor : SV_Target1;
-};
-
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
-{
-	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
-	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
-	return output;
-}
-#elif defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 struct ForwardPBRPixelOutput
 {
 	float4 Color : SV_Target0;
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	float4 LegacyColor : SV_Target1;
+#endif
+#if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	float4 GTAOContribution : SV_Target2;
+#else
 	float4 GTAOContribution : SV_Target1;
+#endif
+#endif
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+	float4 MaterialDiagnosticColor : SV_Target3;
+	float4 MaterialDiagnosticCoverage : SV_Target4;
+#elif defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+	float4 MaterialDiagnosticColor : SV_Target2;
+	float4 MaterialDiagnosticCoverage : SV_Target3;
+#else
+	float4 MaterialDiagnosticColor : SV_Target1;
+	float4 MaterialDiagnosticCoverage : SV_Target2;
+#endif
+#endif
 };
 
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 color, float4 legacyColor, float4 gtaoContribution)
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 legacyColor,
+	float4 gtaoContribution, float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	ForwardPBRPixelOutput output;
 	output.Color = EncodeForwardSceneColor(color);
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
+#endif
+#if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	output.GTAOContribution = gtaoContribution;
+#endif
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+	// Actual surface opacity blends both targets. Lit transparent surfaces
+	// contribute zero diagnostics while attenuating diagnostics behind them.
+	output.MaterialDiagnosticColor = float4(diagnosticColor, color.a);
+	output.MaterialDiagnosticCoverage = float4(diagnostic ? 1.0 : 0.0, 0.0, 0.0, color.a);
+#endif
 	return output;
 }
 #else
 #define ForwardPBRPixelOutput float4
 
-float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution)
+float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution,
+	float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	return EncodeForwardSceneColor(color);
 }
@@ -535,7 +537,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 }
 #endif
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace)
 #else
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
@@ -595,112 +597,15 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld);
 	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
 
-	if (matData.DebugView == MaterialDebugViewBaseColor)
-	{
-		return MakeForwardPBRPixelOutput(
-			float4(baseColor, alpha), float4(baseColor, alpha), 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewMetallic)
-	{
-		return MakeForwardPBRPixelOutput(float4(metallic.xxx, alpha),
-			float4(metallic.xxx, alpha), 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewRoughness)
-	{
-		return MakeForwardPBRPixelOutput(float4(perceptualRoughness.xxx, alpha),
-			float4(perceptualRoughness.xxx, alpha), 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewNormal)
-	{
-		const float4 normalColor = float4(N * 0.5 + 0.5, alpha);
-		return MakeForwardPBRPixelOutput(normalColor, normalColor, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewAuthoredRoughness)
-	{
-		const float4 color = float4(shading.AuthoredPerceptualRoughness.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewEffectiveRoughness)
-	{
-		const float4 color = float4(shading.EffectivePerceptualRoughness.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewNormalVariance)
-	{
-		const float4 color = float4(shading.NormalVariance,
-			surface.ClearcoatFactor > 0.0 ? coatSpecularAA.NormalVariance : 0.0,
-			0.0, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewSpecularAAContribution)
-	{
-		const float4 color = float4(shading.SpecularAAKernelAlpha,
-			surface.ClearcoatFactor > 0.0 ? coatSpecularAA.KernelAlpha : 0.0,
-			shading.EffectivePerceptualRoughness -
-				ClampPerceptualRoughnessForBRDF(authoredRoughness), alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewF0)
-	{
-		const float4 color = float4(shading.F0, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewIor)
-	{
-		// Preserve an unbounded IOR range in a bounded grayscale diagnostic.
-		const float mappedIor = surface.Ior == 0.0 ? 1.0 :
-			1.0 - 1.0 / max(surface.Ior, 1.0);
-		const float4 color = float4(mappedIor.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewClearcoatFactor)
-	{
-		const float4 color = float4(surface.ClearcoatFactor.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewClearcoatRoughness)
-	{
-		const float4 color = float4(surface.ClearcoatRoughness.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewEffectiveClearcoatRoughness)
-	{
-		const float4 color = float4(coatSpecularAA.EffectivePerceptualRoughness.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewClearcoatNormal)
-	{
-		const float4 color = float4(clearcoatNormalWS * 0.5 + 0.5, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewAnisotropyStrength)
-	{
-		const float4 color = float4(surface.AnisotropyStrength.xxx, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewAnisotropicAlpha)
-	{
-		const float4 color = float4(anisotropy.AlphaT, anisotropy.AlphaB, 0.0, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewAnisotropyDirectionTangent)
-	{
-		const float2 direction = surface.AnisotropyDirectionTS * 0.5 + 0.5;
-		const float4 color = float4(direction, 0.5, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld)
-	{
-		const float4 color = float4(anisotropy.TangentWS * 0.5 + 0.5, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewFeatureFlags)
-	{
-		const float3 enabled = float3((shading.FeatureFlags & 1u) != 0u,
-			(shading.FeatureFlags & 2u) != 0u, 0.0);
-		const float4 color = float4(enabled, alpha);
-		return MakeForwardPBRPixelOutput(color, color, 0.0.xxxx);
-	}
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+	// Scene extraction requests diagnostic MRTs for every parameter debug view.
+	float3 diagnosticColor;
+	const bool diagnostic = TryEvaluateMaterialDiagnostic(matData.DebugView, surface,
+		shading, coatSpecularAA, clearcoatNormalWS, anisotropy, diagnosticColor);
+#else
+	const float3 diagnosticColor = 0.0.xxx;
+	const bool diagnostic = false;
+#endif
 	perceptualRoughness = shading.EffectivePerceptualRoughness;
 
 	// Shading
@@ -800,9 +705,9 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	const float4 legacyColor = float4(
 		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0));
+		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
 #else
 	return MakeForwardPBRPixelOutput(outputColor, outputColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0));
+		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
 #endif
 }

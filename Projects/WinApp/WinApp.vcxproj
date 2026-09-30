@@ -422,6 +422,7 @@
     <None Include="..\..\Shaders\Common\Common.hlsli" />
     <None Include="..\..\Shaders\Common\Cubemap.hlsli" />
     <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli" />
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli" />
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
     <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli" />
     <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
@@ -445,6 +446,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\PBR\DirectLighting.hlsli" />
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli" />
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
@@ -476,6 +478,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />

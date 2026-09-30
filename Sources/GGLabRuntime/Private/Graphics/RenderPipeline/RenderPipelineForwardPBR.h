@@ -63,7 +63,7 @@ namespace gglab
 			const RenderServices& services) noexcept override;
 
 	private:
-		void PrepareForwardPasses(const RenderServices& services) noexcept;
+		void PrepareForwardPasses(const RenderServices& services, bool materialDiagnostics) noexcept;
 		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
 			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
 

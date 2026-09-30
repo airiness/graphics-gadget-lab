@@ -128,6 +128,16 @@ namespace gglab
 				rt0.m_SrcAlpha = RHIBlendFactor::One;
 				rt0.m_DstAlpha = RHIBlendFactor::OneMinusSrcAlpha;
 				break;
+			case BlendPreset::AlphaBlendAllTargets:
+				for (auto& target : desc.m_RenderTargets)
+				{
+					target.m_BlendEnable = true;
+					target.m_SrcColor = RHIBlendFactor::SrcAlpha;
+					target.m_DstColor = RHIBlendFactor::OneMinusSrcAlpha;
+					target.m_SrcAlpha = RHIBlendFactor::One;
+					target.m_DstAlpha = RHIBlendFactor::OneMinusSrcAlpha;
+				}
+				break;
 			case BlendPreset::Additive:
 				rt0.m_BlendEnable = true;
 				rt0.m_SrcColor = RHIBlendFactor::One;

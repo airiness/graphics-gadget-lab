@@ -94,7 +94,7 @@ namespace gglab
 		const bool forwardPlusAvailable = forwardPlusEnabled &&
 			IsForwardPlusGlobalLightCountSupported(
 				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()));
-		PrepareForwardPasses(services);
+		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
 		const DepthCoverageFramePlan depthCoverageFramePlan =
 			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
 		ForwardPlusFrameStatus forwardPlusStatus = ForwardPlusFrameStatus::Disabled;
@@ -184,7 +184,8 @@ namespace gglab
 		// DisplayView Setup
 		rg.AddPass<DisplayViewSetupPassData>("DisplayView.Setup",
 			[swapChain, frameBackBufferIndex, displayViewId, displayDepthConvention,
-			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active](
+			depthCoverageFramePlan, temporalActive = context.GetTemporalFramePlan().m_Active,
+			materialDiagnostics = context.m_RenderScene.m_HasMaterialDiagnostics](
 				RenderGraph::RGBuilder& builder, DisplayViewSetupPassData&)
 			{
 				builder.SideEffect();
@@ -212,6 +213,24 @@ namespace gglab
 				sceneColorDesc.m_Format = RHIFormat::R16G16B16A16Float;
 				targets.m_SceneColor =
 					builder.CreateTexture("DisplayView.SceneColor", sceneColorDesc);
+
+				if (materialDiagnostics)
+				{
+					RHITextureDesc diagnosticColorDesc = sceneColorDesc;
+					// Diagnostic attachments clear to zero coverage, including alpha.
+					// The optimized clear value must match ClearViewTargets on DX12.
+					diagnosticColorDesc.m_ClearValue = RHIClearValue{
+						.m_Format = diagnosticColorDesc.m_Format,
+						.m_Color = { 0.0f, 0.0f, 0.0f, 0.0f },
+					};
+					targets.m_MaterialDiagnosticColor =
+						builder.CreateTexture("DisplayView.MaterialDiagnosticColor", diagnosticColorDesc);
+					RHITextureDesc coverageDesc = diagnosticColorDesc;
+					coverageDesc.m_Format = RHIFormat::R16Float;
+					coverageDesc.m_ClearValue->m_Format = coverageDesc.m_Format;
+					targets.m_MaterialDiagnosticCoverage =
+						builder.CreateTexture("DisplayView.MaterialDiagnosticCoverage", coverageDesc);
+				}
 
 				// Import backbuffer
 				RHITextureDesc backBufferDesc{};
@@ -516,7 +535,7 @@ namespace gglab
 		{
 			return false;
 		}
-		PrepareForwardPasses(services);
+		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
 		m_TemporalAAPass.Prepare(services);
 		if (!m_TemporalAAPass.ValidatePipelineClosure(services))
 		{
@@ -538,7 +557,8 @@ namespace gglab
 		return true;
 	}
 
-	void RenderPipelineForwardPBR::PrepareForwardPasses(const RenderServices& services) noexcept
+	void RenderPipelineForwardPBR::PrepareForwardPasses(
+		const RenderServices& services, bool materialDiagnostics) noexcept
 	{
 		auto* shaderManager = services.m_ShaderPrograms;
 		GGLAB_ASSERT_NOT_NULL(shaderManager);
@@ -574,6 +594,23 @@ namespace gglab
 			GGLAB_LOG_GRAPHICS_ERROR(
 				"Forward renderer failed to prepare its required shared shader set.");
 			GGLAB_UNREACHABLE("Forward renderer production shaders are unavailable.");
+		}
+		if (materialDiagnostics && !m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid())
+		{
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[0] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyMaterialDiagnosticsPixel);
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[1] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRLegacyGTAOMaterialDiagnosticsPixel);
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[2] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel);
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[3] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel);
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[4] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
+			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[5] =
+				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
+			GGLAB_ASSERT_MSG(m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid(),
+				"Material diagnostic output requires all shared Forward shader variants.");
 		}
 		m_DepthPrepassPass.Prepare(services, m_ForwardPBRShaderSet);
 		m_ForwardOpaquePass.Prepare(services, m_ForwardPBRShaderSet);

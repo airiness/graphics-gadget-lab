@@ -2466,6 +2466,85 @@ namespace gglab
 			context.Check(forwardDxilVariantsCompile,
 				"DXIL compiles all six Forward PBR lighting and diagnostic variants with shared sun-disk integration");
 
+			bool diagnosticVariantsCompile = true;
+			for (uint32_t variant = 0; variant < 8u; ++variant)
+			{
+				if ((variant & 4u) != 0u && (variant & 1u) == 0u) continue;
+				forwardDxilDesc.m_Defines = { { L"GGLAB_MATERIAL_DIAGNOSTICS", L"1" } };
+				if ((variant & 1u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS", L"1" });
+				if ((variant & 2u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_GTAO_CONTRIBUTION_OUTPUT", L"1" });
+				if ((variant & 4u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS_VALIDATION", L"1" });
+				for (const auto& target : { MakeDX12CompileTarget(ShaderStage::Pixel),
+					MakeVulkan13CompileTarget(ShaderStage::Pixel) })
+				{
+					forwardDxilDesc.m_Target = target;
+					forwardDxilDesc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+					diagnosticVariantsCompile &= compiler.Compile(forwardDxilDesc).IsSuccess();
+				}
+			}
+			context.Check(diagnosticVariantsCompile,
+				"DXIL and SPIR-V compile all six optional material diagnostic MRT variants");
+
+			desc.m_SourcePath = L"Tests/MaterialDiagnosticContractCompile.hlsl";
+			desc.m_Entry = L"PSMain";
+			bool materialDiagnosticSpirVCompiles = true;
+			for (uint32_t testCase = 0; testCase < 25u; ++testCase)
+			{
+				desc.m_Defines = { { L"GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE", std::to_wstring(testCase) } };
+				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const auto numericDxil = compiler.Compile(desc);
+				std::string disassembly;
+				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+				for (uint32_t component = 0; component < 4; ++component)
+				{
+					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				}
+				context.Check(matches, std::format("Material diagnostic color and exposure contract case {}", testCase));
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				materialDiagnosticSpirVCompiles &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(materialDiagnosticSpirVCompiles,
+				"SPIR-V compiles parameter diagnostics, lit fallthrough, display composition and bounded colors");
+			desc.m_Defines.clear();
+			desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+			desc.m_Entry = L"LitDisplayPS";
+			const auto litDisplayDxil = compiler.Compile(desc);
+			desc.m_Entry = L"LitReferencePS";
+			const auto litReferenceDxil = compiler.Compile(desc);
+			std::string litDisplayText;
+			std::string litReferenceText;
+			const bool litDisassembled = litDisplayDxil.IsSuccess() && litReferenceDxil.IsSuccess() &&
+				DisassembleDxil(litDisplayDxil.m_Artifact.m_Binary, litDisplayText) &&
+				DisassembleDxil(litReferenceDxil.m_Artifact.m_Binary, litReferenceText);
+			auto entryBody = [](const std::string& text, std::string_view entry) -> std::string_view
+				{
+					const size_t function = text.find(std::format("define void @{}() {{", entry));
+					if (function == std::string::npos) return {};
+					const size_t begin = text.find('\n', function);
+					const size_t end = text.find("\n}", begin);
+					return begin != std::string::npos && end != std::string::npos
+						? std::string_view(text).substr(begin, end - begin) : std::string_view{};
+				};
+			const auto litBody = entryBody(litDisplayText, "LitDisplayPS");
+			bool litSpirVCompiles = true;
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+			for (const wchar_t* entry : { L"LitDisplayPS", L"LitReferencePS" })
+			{
+				desc.m_Entry = entry;
+				litSpirVCompiles &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(litDisassembled && !litBody.empty() &&
+				litBody == entryBody(litReferenceText, "LitReferencePS") && litSpirVCompiles,
+				"Lit display preserves the exact optimized DXIL exposure/ACES/sRGB body and compiles to SPIR-V");
+			desc.m_Entry = L"PSMain";
+
 			desc.m_SourcePath = L"Tests/SurfaceContractCompile.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
@@ -2867,6 +2946,20 @@ namespace gglab
 				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
 				exposureShadersCompile &= compiler.Compile(desc).IsSuccess();
 			}
+			desc.m_SourcePath = L"Passes/PassFinalColor.hlsl";
+			desc.m_Defines.clear();
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			const auto finalColorArtifact = compiler.Compile(desc);
+			SpirVDecorationReflection finalColorReflection;
+			const bool finalColorReflected = finalColorArtifact.IsSuccess() &&
+				ReadSpirVDecorations(finalColorArtifact.m_Artifact.m_Binary, finalColorReflection);
+			const auto* finalColorLayout = finalColorReflected
+				? finalColorReflection.FindStructLayout("type.ConstantBuffer.FinalColorPassParameters") : nullptr;
+			context.Check(finalColorLayout && finalColorLayout->m_Size == 48u &&
+				finalColorLayout->m_Members.size() == 12u && finalColorLayout->m_Members[8].m_Offset == 32u &&
+				finalColorLayout->m_Members[9].m_Offset == 36u && finalColorLayout->m_Members[10].m_Offset == 40u &&
+				finalColorLayout->m_Members[11].m_Offset == 44u,
+				"FinalColor diagnostic indices, enable flag and explicit padding match the 48-byte CPU constants");
 			context.Check(exposureShadersCompile,
 				"DXIL and SPIR-V compile every scene-color writer and exposure conversion consumer");
 		}

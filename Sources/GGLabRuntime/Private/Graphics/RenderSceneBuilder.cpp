@@ -262,6 +262,7 @@ namespace gglab
 					renderInstance.m_WorldBounds = worldBounds;
 					renderInstance.m_HasWorldBounds = hasWorldBounds;
 					result.m_RenderScene.m_RenderInstances.push_back(renderInstance);
+					result.m_RenderScene.m_HasMaterialDiagnostics |= resolvedMaterial.m_HasDiagnosticView;
 				}
 			});
 

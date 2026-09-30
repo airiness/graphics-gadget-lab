@@ -874,6 +874,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -907,6 +910,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
@@ -976,6 +982,9 @@
       <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">

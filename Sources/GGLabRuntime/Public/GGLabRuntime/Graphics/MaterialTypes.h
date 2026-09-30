@@ -62,6 +62,13 @@ namespace gglab
 		UnfilteredLit,
 	};
 
+	[[nodiscard]] constexpr bool IsMaterialDiagnosticView(MaterialDebugView view) noexcept
+	{
+		// Persisted IDs 16..18 remain reserved; UnfilteredLit is still a lit view.
+		return (view >= MaterialDebugView::BaseColor && view <= MaterialDebugView::AnisotropyDirectionWorld) ||
+			(view >= MaterialDebugView::NormalVariance && view <= MaterialDebugView::AnisotropicAlpha);
+	}
+
 	inline constexpr float DefaultDielectricIor = 1.5f;
 
 	[[nodiscard]] inline float SanitizeMaterialIor(float ior) noexcept

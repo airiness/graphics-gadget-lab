@@ -61,6 +61,7 @@
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
+#include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "Graphics/RenderPass/TemporalGeometryGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
@@ -8278,6 +8279,102 @@ namespace gglab
 				"An exhausted material table retains the invalid slot and avoids repeated preparation attempts");
 		}
 		fullTable.EndUpdate();
+
+		bool diagnosticIds = true;
+		for (uint32_t id = 0; id < 25; ++id)
+		{
+			diagnosticIds &= IsMaterialDiagnosticView(static_cast<MaterialDebugView>(id)) ==
+				((id >= 1 && id <= 15) || (id >= 19 && id <= 22));
+		}
+		context.Check(diagnosticIds && !IsMaterialDiagnosticView(static_cast<MaterialDebugView>(255)),
+			"Only parameter diagnostic IDs request attachments; Lit, UnfilteredLit and reserved IDs do not");
+		MaterialTable diagnosticTable(2, 1);
+		material.m_DebugView = MaterialDebugView::Normal;
+		diagnosticTable.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(diagnosticTable, textures, samplers);
+			const auto first = cache.Resolve(key, material);
+			MaterialProperties conflicting = material;
+			conflicting.m_DebugView = MaterialDebugView::UnfilteredLit;
+			const auto collision = cache.Resolve(key, conflicting);
+			context.Check(first.m_HasDiagnosticView && collision.m_HasDiagnosticView && collision.m_KeyCollision,
+				"Diagnostic demand follows the first uploaded material when an alternate source collides");
+		}
+		diagnosticTable.EndUpdate();
+		material.m_DebugView = MaterialDebugView::UnfilteredLit;
+		diagnosticTable.BeginUpdate();
+		{
+			RenderMaterialFrameCache cache(diagnosticTable, textures, samplers);
+			context.Check(!cache.Resolve(key, material).m_HasDiagnosticView,
+				"Returning to UnfilteredLit removes diagnostic demand on the next frame");
+		}
+		diagnosticTable.EndUpdate();
+		GraphicsPhysicalPipelineKey diagnosticRecipe{};
+		diagnosticRecipe.m_BlendPreset = BlendPreset::AlphaBlendAllTargets;
+		const auto diagnosticBlend = BuildRHIGraphicsPipelineDesc(diagnosticRecipe).m_Blend;
+		bool opacityBlending = true;
+		for (const auto& target : diagnosticBlend.m_RenderTargets)
+		{
+			opacityBlending &= target.m_BlendEnable && target.m_SrcColor == RHIBlendFactor::SrcAlpha &&
+				target.m_DstColor == RHIBlendFactor::OneMinusSrcAlpha && target.m_SrcAlpha == RHIBlendFactor::One &&
+				target.m_DstAlpha == RHIBlendFactor::OneMinusSrcAlpha;
+		}
+		context.Check(opacityBlending,
+			"Transparent diagnostic color and coverage use surface opacity on every render target");
+		for (const bool diagnostics : {false, true})
+		{
+			struct FixturePassData {};
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{1}),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{1}),
+				});
+			graph.AddPass<FixturePassData>("MaterialDiagnostics.Setup",
+				[diagnostics](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					auto& targets = builder.GetBlackboard().GetOrCreate<RGViewTargetsTable>(ViewTargetsTableName)
+						.GetViewTargets(RenderViewID::Main);
+					RHITextureDesc desc{};
+					desc.m_Extent = { 16, 16, 1 };
+					desc.m_Format = RHIFormat::R16G16B16A16Float;
+					targets.m_SceneColor = builder.CreateTexture("MaterialDiagnostics.Scene", desc);
+					if (diagnostics)
+					{
+						targets.m_MaterialDiagnosticColor = builder.CreateTexture("MaterialDiagnostics.Color", desc);
+						desc.m_Format = RHIFormat::R16Float;
+						targets.m_MaterialDiagnosticCoverage = builder.CreateTexture("MaterialDiagnostics.Coverage", desc);
+						builder.WriteInPlace(targets.m_MaterialDiagnosticColor, RGTextureAccess::RenderTarget);
+						builder.WriteInPlace(targets.m_MaterialDiagnosticCoverage, RGTextureAccess::RenderTarget);
+					}
+					// Seed a prior writer so the production clear must publish a new version.
+					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				});
+			const auto original = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+				.GetViewTargets(RenderViewID::Main);
+			const RenderScene scene{};
+			const RenderFrameContext frame{ .m_RenderScene = scene };
+			RenderPassClearViewTargets{}.AddPass(graph, frame, RenderServices{});
+			const auto cleared = graph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+				.GetViewTargets(RenderViewID::Main);
+			graph.AddPass<FixturePassData>("MaterialDiagnostics.DisplayRead",
+				[diagnostics](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+						.GetViewTargets(RenderViewID::Main);
+					builder.Read(targets.m_SceneColor, RGTextureAccess::Sample);
+					if (diagnostics)
+					{
+						builder.Read(targets.m_MaterialDiagnosticColor, RGTextureAccess::Sample);
+						builder.Read(targets.m_MaterialDiagnosticCoverage, RGTextureAccess::Sample);
+					}
+					builder.SideEffect();
+				});
+			const bool versionsPublished = cleared.m_SceneColor.GetVersion() > original.m_SceneColor.GetVersion() &&
+				(!diagnostics || (cleared.m_MaterialDiagnosticColor.GetVersion() > original.m_MaterialDiagnosticColor.GetVersion() &&
+					cleared.m_MaterialDiagnosticCoverage.GetVersion() > original.m_MaterialDiagnosticCoverage.GetVersion()));
+			context.Check(versionsPublished && graph.Compile(), diagnostics
+				? "Production clear publishes defined diagnostic color and coverage versions to display consumers"
+				: "Production clear preserves the original scene-only graph when diagnostics are absent");
+		}
 	}
 
 	void RunMaterialBaselineContractTests(SelfTestContext& context) noexcept

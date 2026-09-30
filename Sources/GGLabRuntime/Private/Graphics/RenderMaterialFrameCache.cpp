@@ -43,6 +43,7 @@ namespace gglab
 				.m_Index = m_MaterialTable.Upsert(key, gpu),
 				.m_Flags = material.m_Flags,
 				.m_AlphaMode = material.m_AlphaMode,
+				.m_HasDiagnosticView = IsMaterialDiagnosticView(static_cast<MaterialDebugView>(gpu.DebugView)),
 			};
 			m_Records.emplace(key, Record{ gpu, resolution, &material });
 			return resolution;

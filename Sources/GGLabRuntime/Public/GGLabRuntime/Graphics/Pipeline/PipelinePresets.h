@@ -18,6 +18,7 @@ namespace gglab
 		Additive,
 		PremultipliedAlpha,
 		ColorWriteDisable,
+		AlphaBlendAllTargets,
 	};
 
 	enum class DepthPreset : uint8_t
