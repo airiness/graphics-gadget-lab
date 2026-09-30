@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <format>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <ranges>
@@ -40,6 +41,9 @@ namespace gglab
 		constexpr int GltfLinearMipmapNearest = 9985;
 		constexpr int GltfNearestMipmapLinear = 9986;
 		constexpr int GltfLinearMipmapLinear = 9987;
+		constexpr int GltfRepeat = 10497;
+		constexpr int GltfClampToEdge = 33071;
+		constexpr int GltfMirroredRepeat = 33648;
 
 		[[nodiscard]] aiTextureType ToAssimpTextureType(MaterialTextureSlot slot) noexcept
 		{
@@ -78,6 +82,17 @@ namespace gglab
 		}
 
 		using Json = nlohmann::json;
+
+		struct TextureBindingSource
+		{
+			aiString m_Path;
+			unsigned int m_UVIndex = 0;
+			aiTextureMapMode m_MapMode[3] = {
+				aiTextureMapMode_Wrap, aiTextureMapMode_Wrap, aiTextureMapMode_Wrap,
+			};
+			int m_MagFilter = GltfLinear;
+			int m_MinFilter = GltfLinearMipmapLinear;
+		};
 
 		[[nodiscard]] const Json* FindObjectField(const Json& parent, const char* name) noexcept
 		{
@@ -390,6 +405,80 @@ namespace gglab
 			return key;
 		}
 
+		[[nodiscard]] const Json* ReadIndexedObject(const Json& gltf, const char* arrayName,
+			const Json& source, const char* indexName, std::string& error) noexcept
+		{
+			const auto index = source.find(indexName);
+			const Json* objects = FindArrayField(gltf, arrayName);
+			if (index == source.end() || !index->is_number_unsigned() || !objects ||
+				index->get<uint64_t>() >= objects->size() ||
+				!(*objects)[index->get<size_t>()].is_object())
+			{
+				error = std::format("Invalid glTF {} index '{}'.", arrayName, indexName);
+				return nullptr;
+			}
+			return &(*objects)[index->get<size_t>()];
+		}
+
+		[[nodiscard]] bool ReadGltfTextureBindingSource(const Json& gltf, const Json& textureInfo,
+			TextureBindingSource& destination, std::string& error) noexcept
+		{
+			const Json* texture = ReadIndexedObject(gltf, "textures", textureInfo, "index", error);
+			if (!texture) return false;
+			const Json* image = ReadIndexedObject(gltf, "images", *texture, "source", error);
+			if (!image) return false;
+			const auto uri = image->find("uri");
+			if (uri == image->end() || !uri->is_string() || uri->get_ref<const std::string&>().empty() ||
+				uri->get_ref<const std::string&>().starts_with("data:"))
+			{
+				error = "glTF clearcoat texture binding requires an external image URI.";
+				return false;
+			}
+			destination.m_Path = aiString(uri->get_ref<const std::string&>());
+			if (const auto texCoord = textureInfo.find("texCoord"); texCoord != textureInfo.end())
+			{
+				if (!texCoord->is_number_unsigned() || texCoord->get<uint64_t>() > 1u)
+				{
+					error = "glTF texture binding requires unsupported TEXCOORD set.";
+					return false;
+				}
+				destination.m_UVIndex = texCoord->get<unsigned int>();
+			}
+			if (!texture->contains("sampler")) return true;
+			const Json* sampler = ReadIndexedObject(gltf, "samplers", *texture, "sampler", error);
+			if (!sampler) return false;
+			auto readSamplerValue = [&](const char* name, int& value,
+				std::initializer_list<int> allowed) noexcept
+			{
+				const auto found = sampler->find(name);
+				if (found == sampler->end()) return true;
+				if (!found->is_number_unsigned() ||
+					std::ranges::find(allowed, found->get<uint64_t>()) == allowed.end())
+				{
+					error = std::format("Invalid glTF sampler {}.", name);
+					return false;
+				}
+				value = found->get<int>();
+				return true;
+			};
+			int wrapS = GltfRepeat;
+			int wrapT = GltfRepeat;
+			if (!readSamplerValue("wrapS", wrapS, { GltfRepeat, GltfClampToEdge, GltfMirroredRepeat }) ||
+				!readSamplerValue("wrapT", wrapT, { GltfRepeat, GltfClampToEdge, GltfMirroredRepeat }) ||
+				!readSamplerValue("magFilter", destination.m_MagFilter, { GltfNearest, GltfLinear }) ||
+				!readSamplerValue("minFilter", destination.m_MinFilter,
+					{ GltfNearest, GltfLinear, GltfNearestMipmapNearest, GltfLinearMipmapNearest,
+					GltfNearestMipmapLinear, GltfLinearMipmapLinear })) return false;
+			const auto mapMode = [](int wrap) noexcept
+			{
+				return wrap == GltfClampToEdge ? aiTextureMapMode_Clamp :
+					wrap == GltfMirroredRepeat ? aiTextureMapMode_Mirror : aiTextureMapMode_Wrap;
+			};
+			destination.m_MapMode[0] = mapMode(wrapS);
+			destination.m_MapMode[1] = mapMode(wrapT);
+			return true;
+		}
+
 		[[nodiscard]] Vector4 MakeFallbackTangent(const Vector3& normal) noexcept
 		{
 			Vector3 n = normal;
@@ -637,59 +726,54 @@ namespace gglab
 					continue;
 				}
 
-				aiString texturePath{};
+				TextureBindingSource textureSource;
 				aiTextureMapping mapping = aiTextureMapping_UV;
-				unsigned int uvIndex = 0;
 				ai_real blend = 1.0f;
 				aiTextureOp operation = aiTextureOp_Multiply;
-				aiTextureMapMode mapMode[3] = {
-					aiTextureMapMode_Wrap,
-					aiTextureMapMode_Wrap,
-					aiTextureMapMode_Wrap,
-				};
-				int magFilter = GltfLinear;
-				int minFilter = GltfLinearMipmapLinear;
-				if (source->GetTexture(textureType, textureIndex, &texturePath, &mapping, &uvIndex, &blend,
-					&operation, mapMode) != aiReturn_SUCCESS)
+				const Json* textureInfo = sourceMaterial ? FindMaterialTextureInfo(*sourceMaterial, slot) : nullptr;
+				if (source->GetTexture(textureType, textureIndex, &textureSource.m_Path, &mapping,
+					&textureSource.m_UVIndex, &blend, &operation, textureSource.m_MapMode) == aiReturn_SUCCESS)
 				{
-					if ((textureType == aiTextureType_CLEARCOAT ||
-						textureType == aiTextureType_ANISOTROPY) && sourceMaterial &&
-						FindMaterialTextureInfo(*sourceMaterial, slot))
+					GGLAB_UNUSED(source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(textureType, textureIndex),
+						textureSource.m_MagFilter));
+					GGLAB_UNUSED(source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(textureType, textureIndex),
+						textureSource.m_MinFilter));
+				}
+				else if (textureType == aiTextureType_CLEARCOAT && textureInfo)
+				{
+					// Assimp omits all coat bindings when clearcoatFactor is zero.
+					// Keep authored bindings and dependencies even while the layer is disabled.
+					if (!ReadGltfTextureBindingSource(gltf, *textureInfo, textureSource, result.m_Error)) return result;
+				}
+				else
+				{
+					if (textureType == aiTextureType_ANISOTROPY && textureInfo)
 					{
-						result.m_Error = std::format(
-							"Assimp did not preserve a {} texture binding.",
-							textureType == aiTextureType_CLEARCOAT ? "clearcoat" : "anisotropy");
+						result.m_Error = "Assimp did not preserve an anisotropy texture binding.";
 						return result;
 					}
 					continue;
 				}
-				GGLAB_UNUSED(
-					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MAG(textureType, textureIndex), magFilter));
-				GGLAB_UNUSED(
-					source->Get(AI_MATKEY_GLTF_MAPPINGFILTER_MIN(textureType, textureIndex), minFilter));
 
-				const auto canonicalTexturePath = utils::Canonical(directory / texturePath.C_Str());
+				const auto canonicalTexturePath = utils::Canonical(directory / textureSource.m_Path.C_Str());
 				ImportedMaterialTextureBinding& binding = destination.m_TextureBindings[slotIndex];
 				binding.m_TextureIndex =
 					RegisterTextureSource(model, canonicalTexturePath, semantic);
-				binding.m_SamplerKey = MakeSamplerKey(mapMode, magFilter, minFilter, settings);
-				if (uvIndex > 1)
+				binding.m_SamplerKey = MakeSamplerKey(textureSource.m_MapMode,
+					textureSource.m_MagFilter, textureSource.m_MinFilter, settings);
+				if (textureSource.m_UVIndex > 1)
 				{
 					result.m_Error = std::format(
 						"Texture '{}' requests unsupported TEXCOORD{}.",
-						canonicalTexturePath.string(), uvIndex);
+						canonicalTexturePath.string(), textureSource.m_UVIndex);
 					return result;
 				}
-				binding.m_TexCoordIndex = uvIndex;
-				if (sourceMaterial)
+				binding.m_TexCoordIndex = textureSource.m_UVIndex;
+				if (textureInfo)
 				{
-					if (const Json* textureInfo =
-						FindMaterialTextureInfo(*sourceMaterial, slot))
+					if (!ReadTextureTransform(*textureInfo, binding, result.m_Error))
 					{
-						if (!ReadTextureTransform(*textureInfo, binding, result.m_Error))
-						{
-							return result;
-						}
+						return result;
 					}
 				}
 			}

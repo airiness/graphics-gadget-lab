@@ -2534,6 +2534,25 @@ namespace gglab
 			}
 			context.Check(spirVMaterialLayoutMatches,
 				"SPIR-V MaterialData member offsets and ArrayStride match MaterialGPU");
+
+			desc.m_Entry = L"NormalDecodeContractPS";
+			desc.m_Target = {};
+			desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+			const ShaderCompileResult normalDecodeDxil = compiler.Compile(desc);
+			std::string normalDecodeDisassembly;
+			bool normalDecodeMatches = normalDecodeDxil.IsSuccess() &&
+				DisassembleDxil(normalDecodeDxil.m_Artifact.m_Binary, normalDecodeDisassembly);
+			for (uint32_t component = 0; component < 4; ++component)
+			{
+				normalDecodeMatches &= normalDecodeDisassembly.find(
+					std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+			}
+			context.Check(normalDecodeMatches,
+				"Production RGB normal decoding preserves authored Z for zero, fractional, unit, "
+				"amplified and signed scales, with flat and degenerate fallbacks");
+			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			context.Check(compiler.Compile(desc).IsSuccess(),
+				"Production RGB normal decoding numeric contract also compiles to SPIR-V");
 			desc.m_Target = {};
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";

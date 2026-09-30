@@ -34,3 +34,23 @@ float4 PSMain() : SV_Target
 
 	return float4(surface.BaseColor + float3(checksum, 0.0, 0.0), surface.Opacity);
 }
+
+// Constant inputs exercise the production decoder without a GPU or a CPU copy.
+// The optimized DXIL must fold every component to zero on success.
+float4 NormalDecodeContractPS() : SV_Target
+{
+	const float3 sampledRGB = float3(0.8, 0.3, 0.75);
+	const bool matches =
+		all(abs(DecodeNormalTexture(sampledRGB, 0.0) - float3(0.0, 0.0, 1.0)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(sampledRGB, 0.5) -
+			float3(0.4866642634, -0.3244428423, 0.8111071057)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(sampledRGB, 1.0) -
+			float3(0.6837634588, -0.4558423058, 0.5698028823)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(sampledRGB, 2.0) -
+			float3(0.7861461385, -0.5240974257, 0.3275608911)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(sampledRGB, -1.0) -
+			float3(-0.6837634588, 0.4558423058, 0.5698028823)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(float3(0.5, 0.5, 1.0), 2.0) - float3(0.0, 0.0, 1.0)) < 1.0e-5) &&
+		all(abs(DecodeNormalTexture(0.5.xxx, 1.0) - float3(0.0, 0.0, 1.0)) < 1.0e-5);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}

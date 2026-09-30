@@ -1,5 +1,13 @@
 #pragma once
+#include <Common/Common.hlsli>
 #include <Common/MaterialUtils.hlsli>
+
+float3 DecodeNormalTexture(float3 sampledRGB, float normalScale)
+{
+	// glTF RGB normals retain the authored Z when scaling tangent-space XY.
+	const float3 normalTS = (sampledRGB * 2.0 - 1.0) * float3(normalScale, normalScale, 1.0);
+	return SafeNormalize(normalTS, float3(0.0, 0.0, 1.0));
+}
 
 // Keep these values synchronized with MaterialDebugView in MaterialTypes.h.
 static const uint MaterialDebugViewLit = 0u;

@@ -1069,7 +1069,9 @@ namespace gglab
 			}
 
 			auto writeSource = [&](std::string_view extensions, std::string_view material,
-				int firstMaterial = 0, int secondMaterial = -1) noexcept
+				int firstMaterial = 0, int secondMaterial = -1,
+				std::string_view textureDeclarations =
+				R"("images":[{"uri":"map.png"}],"textures":[{"source":0}],)") noexcept
 			{
 				std::ofstream gltf(root / "probe.gltf");
 				gltf << R"({"asset":{"version":"2.0"},)" << extensions << R"(
@@ -1083,8 +1085,7 @@ namespace gglab
 {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
 {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
 {"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
-"images":[{"uri":"map.png"}],"textures":[{"source":0}],
-"materials":[)" << material << R"(],
+)" << textureDeclarations << R"("materials":[)" << material << R"(],
 "meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
 					<< firstMaterial << '}';
 				if (secondMaterial >= 0)
@@ -1260,6 +1261,93 @@ namespace gglab
 				disabledCoat.m_Model.m_Materials.front().m_Properties.m_ClearcoatFactor == 0.0f &&
 				std::abs(disabledCoat.m_Model.m_Materials.front().m_Properties.m_ClearcoatRoughness - 0.4f) < 0.0001f,
 				"Zero clearcoat factor retains the authored roughness without enabling the layer");
+
+			constexpr std::string_view coatTextureDeclarations = R"(
+"images":[{"uri":"unused.png"},{"uri":"coat.png"}],
+"samplers":[{}, {"wrapS":33071,"wrapT":33648,"magFilter":9728,"minFilter":9728}],
+"textures":[{"source":0},{"source":1,"sampler":1}],)";
+			auto writeCoatWithTextures = [&](std::string_view factor) noexcept
+			{
+				const std::string material =
+					std::string(R"({"normalTexture":{"index":1,"scale":0.35},"extensions":{"KHR_materials_clearcoat":{)") +
+					std::string(factor) + R"("clearcoatRoughnessFactor":0.4,
+"clearcoatTexture":{"index":1,"texCoord":0,"extensions":{"KHR_texture_transform":{"texCoord":1,"offset":[0.1,0.2],"scale":[-2,0.5],"rotation":0.25}}},
+"clearcoatRoughnessTexture":{"index":1},"clearcoatNormalTexture":{"index":1,"scale":2}}}})";
+				writeSource(R"("extensionsUsed":["KHR_materials_clearcoat","KHR_texture_transform"],"extensionsRequired":["KHR_materials_clearcoat"],)",
+					material, 0, -1, coatTextureDeclarations);
+			};
+			writeCoatWithTextures(R"("clearcoatFactor":1,)");
+			const ModelImportResult coatBindingReference = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(coatBindingReference.Succeeded() && coatBindingReference.m_Model.m_TextureSources.size() == 3u,
+				std::format("Enabled clearcoat establishes the authored texture binding reference: {}",
+					coatBindingReference.m_Error));
+			for (const std::string_view factor : { std::string_view(R"("clearcoatFactor":0,)"), std::string_view{} })
+			{
+				writeCoatWithTextures(factor);
+				const ModelImportResult disabledTexturedCoat = ModelImporter::Import(root / "probe.gltf", {});
+				bool bindingsMatch = disabledTexturedCoat.Succeeded() && coatBindingReference.Succeeded();
+				if (bindingsMatch)
+				{
+					const ImportedMaterial& material = disabledTexturedCoat.m_Model.m_Materials.front();
+					const ImportedMaterial& reference = coatBindingReference.m_Model.m_Materials.front();
+					bindingsMatch = material.m_Properties.m_ClearcoatFactor == 0.0f &&
+						material.m_Properties.m_ClearcoatRoughness == 0.4f &&
+						material.m_Properties.m_ClearcoatNormalScale == 2.0f &&
+						material.m_Properties.m_NormalScale == 0.35f &&
+						disabledTexturedCoat.m_Model.m_TextureSources.size() == 3u;
+					for (const MaterialTextureSlot slot : { MaterialTextureSlot::Clearcoat,
+						MaterialTextureSlot::ClearcoatRoughness, MaterialTextureSlot::ClearcoatNormal })
+					{
+						const auto& binding = material.m_TextureBindings[static_cast<size_t>(slot)];
+						const auto& expected = reference.m_TextureBindings[static_cast<size_t>(slot)];
+						bindingsMatch &= binding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex &&
+							binding.m_TextureIndex < disabledTexturedCoat.m_Model.m_TextureSources.size() &&
+							binding.m_TextureIndex == expected.m_TextureIndex &&
+							binding.m_SamplerKey == expected.m_SamplerKey &&
+							binding.m_TexCoordIndex == expected.m_TexCoordIndex &&
+							binding.m_UVOffset.m_X == expected.m_UVOffset.m_X &&
+							binding.m_UVOffset.m_Y == expected.m_UVOffset.m_Y &&
+							binding.m_UVScale.m_X == expected.m_UVScale.m_X &&
+							binding.m_UVScale.m_Y == expected.m_UVScale.m_Y &&
+							binding.m_UVRotation == expected.m_UVRotation;
+						if (binding.m_TextureIndex < disabledTexturedCoat.m_Model.m_TextureSources.size())
+						{
+							bindingsMatch &= disabledTexturedCoat.m_Model.m_TextureSources[binding.m_TextureIndex].m_CanonicalPath ==
+								utils::Canonical(root / "coat.png");
+						}
+					}
+				}
+				context.Check(bindingsMatch, std::format(
+					"{} zero clearcoat retains all texture bindings, samplers, UV transforms and independent normal scales: {}",
+					factor.empty() ? "Default" : "Explicit", disabledTexturedCoat.m_Error));
+			}
+
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatTexture":{"index":0}}}})");
+			const ModelImportResult defaultCoatSampler = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(defaultCoatSampler.Succeeded() && requiredCoat.Succeeded() &&
+				defaultCoatSampler.m_Model.m_Materials.front().m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_SamplerKey ==
+				requiredCoat.m_Model.m_Materials.front().m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_SamplerKey,
+				"Disabled clearcoat without a sampler uses the same defaults as the enabled Assimp path");
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatTexture":{"index":0}}}})", 0, -1,
+				R"("images":[{"uri":"map.png"}],"samplers":[{"wrapS":999}],"textures":[{"source":0,"sampler":0}],)");
+			const ModelImportResult invalidCoatSampler = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidCoatSampler.Succeeded() &&
+				invalidCoatSampler.m_Error.find("sampler") != std::string::npos,
+				"Disabled clearcoat still rejects invalid sampler values");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0,"clearcoatTexture":{"index":999}}}})");
+			const ModelImportResult invalidDisabledCoatTexture = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidDisabledCoatTexture.Succeeded() && !invalidDisabledCoatTexture.m_Error.empty(),
+				"Disabled clearcoat still rejects invalid texture indices");
+			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat","KHR_texture_transform"],)",
+				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0,"clearcoatTexture":{"index":0,"extensions":{"KHR_texture_transform":{"texCoord":2}}}}}})");
+			const ModelImportResult invalidDisabledCoatUV = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidDisabledCoatUV.Succeeded() &&
+				invalidDisabledCoatUV.m_Error.find("TEXCOORD") != std::string::npos,
+				"Disabled clearcoat still rejects unsupported transformed UV sets");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
 				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":1.2}}})");

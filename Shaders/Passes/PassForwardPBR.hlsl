@@ -126,19 +126,8 @@ float LoadGTAO(uint2 pixel)
 float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
 	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
 {
-	// TODO: flip Y for normal map?
-
-	// Sample normal texture
-	float4 normalSampled = SampleTextureBinding(binding.TextureSamplerBinding, uv);
-
-	// Remap from [0,1] to [-1,1], xy only
-	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
-
-	// Apply normal scale xy
-	normalSampled.xy *= normalScale;
-
-	// rebuild z, avoid normalization issues
-	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
+	const float3 normalSampled = DecodeNormalTexture(
+		SampleTextureBinding(binding.TextureSamplerBinding, uv).rgb, normalScale);
 
 	// Authored tangents describe UV0. A different UV set or a transformed normal
 	// map needs a frame derived from the actual sampled coordinates, including
@@ -151,7 +140,7 @@ float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
 		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
 
 	// Transform normal from tangent space to world space
-	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled.xyz, TBN), TBN[2]);
+	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled, TBN), TBN[2]);
 	return perturbedNormalWS;
 }
 
