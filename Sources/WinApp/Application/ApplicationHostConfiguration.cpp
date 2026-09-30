@@ -26,9 +26,9 @@ namespace gglab
 		config.m_StartupLabId =
 			options.m_StartupLabId.value_or(std::string(DesktopDefaultLabId));
 		config.m_InitialExtent = initialExtent;
-		config.m_InitialPointerMode = options.m_StartWithAbsoluteMouse
-			? AppRuntimePointerMode::Absolute
-			: AppRuntimePointerMode::Relative;
+		config.m_InitialPointerMode = options.m_StartWithRelativeMouse
+			? AppRuntimePointerMode::Relative
+			: AppRuntimePointerMode::Absolute;
 		if (!options.m_DisableDevelopmentTools)
 		{
 			config.m_Capabilities = AppRuntimeCapability::DevelopmentTools;

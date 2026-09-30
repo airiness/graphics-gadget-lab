@@ -167,7 +167,7 @@ Select checks according to the change:
   in both Debug and Release.
 - Graphics/runtime changes: run the relevant smoke test when supported. For
   deterministic Lab selection, use
-  `GraphicsGadgetLab.exe --rhi <dx12|vulkan> --lab <stable-lab-id> --absolute-mouse`.
+  `GraphicsGadgetLab.exe --rhi <dx12|vulkan> --lab <stable-lab-id>`.
   Exercise both backends for shared rendering changes; inspect assertions,
   validation output, shader failures, lifetime/synchronization errors and the
   visual result. Qualification's `--self-test` checks headless contracts;

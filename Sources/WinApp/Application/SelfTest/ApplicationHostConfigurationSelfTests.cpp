@@ -12,7 +12,7 @@ namespace gglab
 		ApplicationLaunchOptions options{};
 		options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		options.m_StartupLabId = "gglab.lab.culling";
-		options.m_StartWithAbsoluteMouse = true;
+		options.m_StartWithRelativeMouse = true;
 		options.m_RhiBackend = RHIBackendType::Vulkan;
 		options.m_AdapterSelector = "0";
 		const AppRuntimeConfig config = TranslateApplicationLaunchOptions(
@@ -24,7 +24,7 @@ namespace gglab
 			"Windows launch policy translates backend, adapter, demo, and Lab identity explicitly");
 		context.Check(config.m_InitialExtent.m_Width == 1920 &&
 			config.m_InitialExtent.m_Height == 1080 &&
-			config.m_InitialPointerMode == AppRuntimePointerMode::Absolute &&
+			config.m_InitialPointerMode == AppRuntimePointerMode::Relative &&
 			config.m_RequestRuntimeValidation,
 			"Host translation carries extent, pointer mode, and validation request explicitly");
 		context.Check(config.HasCapability(AppRuntimeCapability::DevelopmentTools),
@@ -38,8 +38,9 @@ namespace gglab
 		const AppRuntimeConfig defaultContentConfig = TranslateApplicationLaunchOptions(
 			ApplicationLaunchOptions{}, { 1920, 1080 }, true);
 		context.Check(defaultContentConfig.m_StartupDemoId == "Demo.Start" &&
-			defaultContentConfig.m_StartupLabId == "gglab.lab.culling",
-			"Windows host policy supplies explicit stable default Demo and Lab identities");
+			defaultContentConfig.m_StartupLabId == "gglab.lab.culling" &&
+			defaultContentConfig.m_InitialPointerMode == AppRuntimePointerMode::Absolute,
+			"Windows host policy supplies stable default content and an absolute pointer for UI interaction");
 
 		ApplicationLaunchOptions islandOptions{};
 		islandOptions.m_StartupDemo = ApplicationStartupDemo::Island;
