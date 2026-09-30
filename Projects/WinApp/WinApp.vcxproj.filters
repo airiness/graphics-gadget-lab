@@ -877,6 +877,9 @@
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -970,6 +973,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">

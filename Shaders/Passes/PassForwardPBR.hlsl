@@ -9,7 +9,7 @@
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
-#include <PBR/BRDF.hlsli>
+#include <PBR/DirectLighting.hlsli>
 #include <PBR/SpecularAA.hlsli>
 
 struct ForwardPBRPassParameters
@@ -424,87 +424,6 @@ float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 		GetSamplerState(g_Pass.AtmosphereSamplerIndex), uv, 0).rgb;
 }
 
-float3 WorldSunDiskSpecular(float3 centerDirection, float3 N, float3 V, float3 F0,
-	float physicalRoughness)
-{
-	const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
-	const float sineRadiusSquared = sineRadius * sineRadius;
-	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
-	const float3 bitangent = cross(centerDirection, tangent);
-	const float NoV = saturate(dot(N, V));
-	float3 integrated = 0.0.xxx;
-	[unroll]
-	for (uint sampleIndex = 0; sampleIndex < 32u; ++sampleIndex)
-	{
-		const float radial = sqrt((sampleIndex + 0.5) / 32.0 * sineRadiusSquared);
-		const float phase = sampleIndex * 2.39996322973;
-		const float3 L = centerDirection * sqrt(1.0 - radial * radial) +
-			(tangent * cos(phase) + bitangent * sin(phase)) * radial;
-		const float NoL = saturate(dot(N, L));
-		const float3 H = SafeNormalize(L + V, N);
-		const float NoH = saturate(dot(N, H));
-		const float VoH = saturate(dot(V, H));
-		integrated += D_GGX(NoH, physicalRoughness) *
-			V_SmithGGXCorrelated(NoV, NoL, physicalRoughness) *
-			F_Schlick(F0, 1.0.xxx, VoH) * NoL;
-	}
-	// Solid-angle samples reconstruct the authored perpendicular disk illuminance.
-	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
-}
-
-float3 WorldSunDiskAnisotropicSpecular(float3 centerDirection, float3 N, float3 V,
-	float3 F0, AnisotropyShadingState anisotropy)
-{
-	const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
-	const float sineRadiusSquared = sineRadius * sineRadius;
-	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
-	const float3 bitangent = cross(centerDirection, tangent);
-	float3 integrated = 0.0.xxx;
-	[unroll]
-	for (uint sampleIndex = 0; sampleIndex < 32u; ++sampleIndex)
-	{
-		const float radial = sqrt((sampleIndex + 0.5) / 32.0 * sineRadiusSquared);
-		const float phase = sampleIndex * 2.39996322973;
-		const float3 L = centerDirection * sqrt(1.0 - radial * radial) +
-			(tangent * cos(phase) + bitangent * sin(phase)) * radial;
-		const float NoL = saturate(dot(N, L));
-		const float3 H = SafeNormalize(L + V, N);
-		const float VoH = saturate(dot(V, H));
-		integrated += D_GGXAnisotropic(H, N, anisotropy.TangentWS,
-			anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB) *
-			V_SmithGGXCorrelatedAnisotropic(V, L, N, anisotropy.TangentWS,
-				anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB) *
-			F_Schlick(F0, 1.0.xxx, VoH) * NoL;
-	}
-	// The same 32 solid-angle samples and perpendicular-illuminance normalization
-	// as the isotropic world-sun lobe keep the two paths comparable.
-	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
-}
-
-float3 EvaluateClearcoatDirect(float3 L, float3 V, ClearcoatShadingState coat,
-	bool worldSun)
-{
-	const float NoL = saturate(dot(coat.NormalWS, L));
-	if (NoL <= 0.0) return 0.0.xxx;
-	const float3 F0 = 0.04.xxx;
-	if (worldSun && coat.BRDFAlpha < 0.04)
-	{
-		// Integrate the finite solar disk with the coat's own normal and GGX width.
-		return WorldSunDiskSpecular(L, coat.NormalWS, V, F0, coat.BRDFAlpha) *
-			coat.EnergyCompensation;
-	}
-	const float3 H = SafeNormalize(L + V, coat.NormalWS);
-	const float NoH = saturate(dot(coat.NormalWS, H));
-	const float VoH = saturate(dot(V, H));
-	return D_GGX(NoH, coat.BRDFAlpha) *
-		V_SmithGGXCorrelated(coat.NoV, NoL, coat.BRDFAlpha) *
-		F_Schlick(F0, 1.0.xxx, VoH) * coat.EnergyCompensation * NoL;
-}
-
 float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
 	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
 	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
@@ -519,31 +438,11 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	}
 
 	const float NoL = saturate(dot(N, L));
-	if (NoL <= 0.0 && (coat.Factor <= 0.0 || dot(coat.NormalWS, L) <= 0.0))
+	const float coatNoL = coat.Factor > 0.0 ? saturate(dot(coat.NormalWS, L)) : 0.0;
+	if (NoL <= 0.0 && coatNoL <= 0.0)
 	{
 		return result;
 	}
-
-	const float3 H = SafeNormalize(L + V, N);
-	const float NoH = saturate(dot(N, H));
-	const float VoH = saturate(dot(V, H));
-	float D;
-	float visibility;
-	if (anisotropy.Strength > 0.0)
-	{
-		D = D_GGXAnisotropic(H, N, anisotropy.TangentWS,
-			anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB);
-		visibility = V_SmithGGXCorrelatedAnisotropic(V, L, N,
-			anisotropy.TangentWS, anisotropy.BitangentWS, anisotropy.AlphaT, anisotropy.AlphaB);
-	}
-	else
-	{
-		D = D_GGX(NoH, physicalRoughness);
-		visibility = V_SmithGGXCorrelated(NoV, NoL, physicalRoughness);
-	}
-	const float3 F = F_Schlick(F0, 1.0.xxx, VoH);
-	const float3 specular = D * visibility * F * energyCompensation;
-	const float3 diffuse = diffuseWeight * Fd_Lambert(baseColor);
 
 	float shadowVisibility = 1.0;
 	if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
@@ -558,28 +457,10 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	{
 		illuminance *= WorldSunTransmittance(positionWS, L);
 	}
-	float3 directResponse = (diffuse + specular) * NoL;
-	// The isotropic center approximation stayed within 1% above perceptual
-	// roughness 0.2. The anisotropic lobe uses its narrower width for the disk gate.
-	if (lightIndex == g_Scene.WorldSunLightIndex &&
-		(anisotropy.Strength > 0.0 ? anisotropy.AlphaB : physicalRoughness) < 0.04)
-	{
-		const float3 diskSpecular = anisotropy.Strength > 0.0
-			? WorldSunDiskAnisotropicSpecular(L, N, V, F0, anisotropy)
-			: WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
-		directResponse = diffuse * NoL + diskSpecular * energyCompensation;
-	}
-	if (coat.Factor > 0.0)
-	{
-		const float coatNoL = saturate(dot(coat.NormalWS, L));
-		// Two interface crossings attenuate the base; the reflected coat lobe is
-		// evaluated once. The LUT carries the rough coat's outgoing reflectance.
-		const float incidentReflectance = F_Schlick(0.04.xxx, 1.0.xxx, coatNoL).x;
-		const float transmission = (1.0 - coat.Factor * coat.DirectionalAlbedo) *
-			(1.0 - coat.Factor * incidentReflectance);
-		directResponse = directResponse * transmission + coat.Factor *
-			EvaluateClearcoatDirect(L, V, coat, lightIndex == g_Scene.WorldSunLightIndex);
-	}
+	const float3 diffuse = diffuseWeight * Fd_Lambert(baseColor);
+	const float3 directResponse = EvaluateDirectMaterialResponse(L, V, N, NoV, NoL, coatNoL,
+		F0, physicalRoughness, diffuse, energyCompensation, anisotropy, coat,
+		lightIndex == g_Scene.WorldSunLightIndex, g_Scene.WorldSunAngularRadius);
 	result = directResponse * illuminance * attenuation * shadowVisibility;
 	return result;
 }

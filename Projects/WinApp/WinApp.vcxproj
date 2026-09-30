@@ -444,6 +444,7 @@
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli" />
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
@@ -476,6 +477,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl" />

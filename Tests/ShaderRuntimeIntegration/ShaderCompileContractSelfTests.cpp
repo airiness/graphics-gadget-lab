@@ -2444,6 +2444,28 @@ namespace gglab
 				skyboxPixelArtifact.IsSuccess(),
 				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
 
+			auto forwardDxilDesc = desc;
+			forwardDxilDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";
+			forwardDxilDesc.m_Stage = ShaderStage::Pixel;
+			forwardDxilDesc.m_Entry = L"PSMain";
+			forwardDxilDesc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+			forwardDxilDesc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+			bool forwardDxilVariantsCompile = true;
+			for (uint32_t variant = 0; variant < 8; ++variant)
+			{
+				if ((variant & 4u) != 0u && (variant & 1u) == 0u) continue;
+				forwardDxilDesc.m_Defines.clear();
+				if ((variant & 1u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS", L"1" });
+				if ((variant & 2u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_GTAO_CONTRIBUTION_OUTPUT", L"1" });
+				if ((variant & 4u) != 0u)
+					forwardDxilDesc.m_Defines.push_back({ L"GGLAB_FORWARD_PLUS_VALIDATION", L"1" });
+				forwardDxilVariantsCompile &= compiler.Compile(forwardDxilDesc).IsSuccess();
+			}
+			context.Check(forwardDxilVariantsCompile,
+				"DXIL compiles all six Forward PBR lighting and diagnostic variants with shared sun-disk integration");
+
 			desc.m_SourcePath = L"Tests/SurfaceContractCompile.hlsl";
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
@@ -2553,6 +2575,38 @@ namespace gglab
 			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
 			context.Check(compiler.Compile(desc).IsSuccess(),
 				"Production RGB normal decoding numeric contract also compiles to SPIR-V");
+
+			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
+			desc.m_Entry = L"PSMain";
+			const std::array sunDiskCases{
+				"isotropic base only", "anisotropic base only", "smooth base and independent coat",
+				"anisotropic base and smooth coat", "center base and disk coat", "disk base and center coat",
+				"exact alpha threshold", "base below and coat above threshold", "base above and coat below threshold",
+				"anisotropic minor-axis threshold", "ordinary directional light", "back-facing coat",
+				"back-facing base and visible coat", "larger solar radius", "independent half-vector fallbacks",
+				"rotated mirrored anisotropic frame",
+			};
+			bool sunDiskSpirVContractsCompile = true;
+			for (uint32_t testCase = 0; testCase < sunDiskCases.size(); ++testCase)
+			{
+				desc.m_Defines = { { L"GGLAB_SUN_DISK_TEST_CASE", std::to_wstring(testCase) } };
+				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const auto numericDxil = compiler.Compile(desc);
+				std::string disassembly;
+				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+				for (uint32_t component = 0; component < 4; ++component)
+				{
+					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				}
+				context.Check(matches, std::format("Production sun-disk HLSL preserves the frozen response: {}", sunDiskCases[testCase]));
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				sunDiskSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(sunDiskSpirVContractsCompile,
+				"SPIR-V compiles all sixteen production sun-disk numeric contract cases");
+			desc.m_Defines.clear();
 			desc.m_Target = {};
 
 			desc.m_SourcePath = L"Passes/PassForwardPlusCull.hlsl";
