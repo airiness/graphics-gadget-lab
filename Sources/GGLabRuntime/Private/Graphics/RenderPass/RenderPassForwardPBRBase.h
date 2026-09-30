@@ -45,6 +45,9 @@ namespace gglab
 		~RenderPassForwardPBRBase() override = default;
 
 		void Prepare(const RenderServices& services, const ForwardPBRShaderSet& shaderSet) noexcept;
+		[[nodiscard]] bool PrewarmMaterialDiagnosticVariant(const RenderServices& services,
+			uint64_t variantBits, bool useDepthEqual, ForwardPBRLightingVariant lightingVariant,
+			bool gtaoContributionOutputEnabled) noexcept;
 		void SetHdrDiffValidationAvailable(bool available) noexcept
 		{
 			m_HdrDiffValidationAvailable = available;

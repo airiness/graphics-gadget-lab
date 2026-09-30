@@ -1,6 +1,10 @@
 #pragma once
 #include "Lab/LabSessionBase.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+
+#include <vector>
 
 namespace gglab
 {
@@ -12,10 +16,7 @@ namespace gglab
 
 		void BeginPrepare() noexcept override;
 		void TickPrepare() noexcept override;
-		LoadingProgress GetPreparationProgress() const noexcept override
-		{
-			return m_LoadingProgress;
-		}
+		LoadingProgress GetPreparationProgress() const noexcept override;
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
 		void Update(float deltaTime) noexcept override;
@@ -29,6 +30,8 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 		void RebuildScene() noexcept override;
 		void OnParametersRestoredForPrepare(LabChangeImpact impact) noexcept override;
+		void TickScenePrepare() noexcept;
+		void CollectDiagnosticDrawVariants() noexcept;
 		void BuildProceduralGridRow(uint32_t row) noexcept;
 		bool BuildAssetModel(std::string_view path) noexcept;
 		bool FinalizeAssetModel() noexcept;
@@ -48,5 +51,9 @@ namespace gglab
 		ModelID m_PendingModelId{};
 		std::string m_PendingModelPath;
 		LoadingProgress m_LoadingProgress{};
+		ShaderPreloadRequest m_DiagnosticShaderPreload;
+		std::vector<uint64_t> m_DiagnosticDrawVariants;
+		bool m_DiagnosticVariantsCollected = false;
+		MaterialDiagnosticPrewarmProgress m_DiagnosticPrewarmProgress{};
 	};
 }

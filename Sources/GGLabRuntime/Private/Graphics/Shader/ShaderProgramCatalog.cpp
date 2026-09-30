@@ -4,6 +4,29 @@
 
 namespace gglab::shader_programs
 {
+	std::span<const ShaderProgramRef> GetForwardPBRMaterialDiagnosticsShaderProgramDemand() noexcept
+	{
+		static const std::array Programs{
+			ForwardCoverageVertex,
+			ForwardPBRLegacyPixel,
+			ForwardPBRForwardPlusPixel,
+			ForwardPBRForwardPlusValidationPixel,
+			ForwardPBRLegacyGTAOPixel,
+			ForwardPBRForwardPlusGTAOPixel,
+			ForwardPBRForwardPlusValidationGTAOPixel,
+			DepthPrepassAlphaTestPixel,
+			DepthPrepassVelocityOpaquePixel,
+			DepthPrepassVelocityAlphaTestPixel,
+			ForwardPBRLegacyMaterialDiagnosticsPixel,
+			ForwardPBRLegacyGTAOMaterialDiagnosticsPixel,
+			ForwardPBRForwardPlusMaterialDiagnosticsPixel,
+			ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel,
+			ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+			ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+		};
+		return Programs;
+	}
+
 	std::span<const ShaderProgramRef> GetRendererInitialShaderProgramDemand() noexcept
 	{
 		static const std::array Programs{

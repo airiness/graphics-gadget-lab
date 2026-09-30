@@ -766,6 +766,14 @@ namespace gglab
 		}
 	}
 
+	bool RenderPassForwardPBRBase::PrewarmMaterialDiagnosticVariant(
+		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
+	{
+		return GetOrCreatePSOForVariant(services, variantBits, useDepthEqual,
+			lightingVariant, gtaoContributionOutputEnabled, true).IsValid();
+	}
+
 	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
 		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept

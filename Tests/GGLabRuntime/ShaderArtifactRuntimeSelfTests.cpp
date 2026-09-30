@@ -9,14 +9,17 @@
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <span>
+#include <thread>
 #include <utility>
 
 namespace gglab
@@ -681,11 +684,21 @@ namespace gglab
 				.m_VariantId = "vertex.default",
 				.m_Stage = ShaderStage::Vertex,
 			};
+			const ShaderProgramRef contentProgramRef{
+				.m_ProgramId = "gglab.shader.content-preload-test",
+				.m_VariantId = "vertex.default",
+				.m_Stage = ShaderStage::Vertex,
+			};
 			const ShaderRuntimeArtifact artifact = MakeDxilArtifact();
 			const ShaderArtifactRef artifactRef = MakeRef(artifact);
 			const std::array entries{
 				ShaderProgramRegistryEntry{
 					.m_ProgramRef = programRef,
+					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
+					.m_ArtifactRef = artifactRef,
+				},
+				ShaderProgramRegistryEntry{
+					.m_ProgramRef = contentProgramRef,
 					.m_TargetProfile = ShaderTargetProfile::GGLabDX12,
 					.m_ArtifactRef = artifactRef,
 				},
@@ -711,6 +724,79 @@ namespace gglab
 				WriteBytes(artifactPaths.m_BinaryPath, binaryBytes) &&
 				WriteBytes(artifactPaths.m_ManifestPath, serializedManifest) &&
 				WriteBytes(registryPath.m_Path, serializedRegistry);
+
+			{
+				ShaderManager preloadManager({
+					.m_ActiveBackend = RHIBackendType::DX12,
+					.m_ArtifactRoot = root,
+					.m_ActiveRegistry = registryRef,
+				});
+				TaskSystem tasks({ .m_WorkerCount = 1 });
+				const auto waitFor = [&tasks](const auto& ready) noexcept
+					{
+						const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+						while (!ready() && std::chrono::steady_clock::now() < deadline)
+						{
+							tasks.PumpCompletions();
+							std::this_thread::yield();
+						}
+						return ready();
+					};
+				GGLAB_UNUSED(preloadManager.PreloadAsync(tasks, { programRef }));
+				const bool startupReady = waitFor([&]() noexcept
+					{ return !preloadManager.GetPreloadStatus().IsPreparing(); });
+				context.Check(fixturesWritten && startupReady && preloadManager.GetPreloadStatus().IsReady(),
+					"Startup shader preload publishes its artifact request on the completion owner");
+
+				auto cancelled = preloadManager.RequestPreloadAsync(tasks, { contentProgramRef });
+				const bool activationBlocked =
+					preloadManager.ActivateRegistry(registryRef).m_Status == ShaderRegistryActivationStatus::Busy;
+				// Deliberately let the worker finish without pumping its publication callback.
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+				while (cancelled.GetStatus().m_CompletedCount != 1 &&
+					std::chrono::steady_clock::now() < deadline)
+				{
+					std::this_thread::yield();
+				}
+				const bool workerFinished = cancelled.GetStatus().m_CompletedCount == 1;
+				cancelled.Cancel(tasks);
+				const bool cancellationDrained = waitFor([&]() noexcept
+					{ const auto status = tasks.GetStatistics();
+						return status.m_ActiveTasks.empty() && status.m_PendingCompletionCount == 0; });
+				context.Check(activationBlocked && workerFinished && cancellationDrained &&
+					cancelled.GetStatus().m_Status == TaskStatus::Cancelled &&
+					!preloadManager.GetBytecode(ShaderID{ 1 }).IsValid() &&
+					preloadManager.GetPreloadStatus().IsReady(),
+					"Cancelled content preload never publishes finished worker results or replaces startup readiness");
+
+				auto content = preloadManager.RequestPreloadAsync(
+					tasks, { contentProgramRef, contentProgramRef, programRef });
+				const bool contentReady = waitFor([&]() noexcept
+					{ return !content.GetStatus().IsPreparing(); });
+				context.Check(contentReady && content.GetStatus().IsReady() &&
+					content.GetStatus().m_TotalCount == 1 && content.GetStatus().m_CompletedCount == 1 &&
+					preloadManager.GetBytecode(ShaderID{ 1 }).IsValid() &&
+					preloadManager.GetPreloadStatus().m_TotalCount == 1,
+					"Independent content preload deduplicates demand and skips already published startup programs");
+				const uint64_t submittedBefore = tasks.GetStatistics().m_SubmittedCount;
+				auto cached = preloadManager.RequestPreloadAsync(tasks, { programRef, contentProgramRef });
+				context.Check(cached.GetStatus().IsReady() && cached.GetStatus().m_TotalCount == 0 &&
+					tasks.GetStatistics().m_SubmittedCount == submittedBefore,
+					"Reentering prepared content requires no shader worker or artifact I/O");
+
+				const ShaderProgramRef missingProgram{
+					.m_ProgramId = "gglab.shader.missing-preload-test",
+					.m_VariantId = "vertex.default",
+					.m_Stage = ShaderStage::Vertex,
+				};
+				auto failed = preloadManager.RequestPreloadAsync(tasks, { missingProgram });
+				const bool failureReady = waitFor([&]() noexcept
+					{ return !failed.GetStatus().IsPreparing(); });
+				context.Check(failureReady && failed.GetStatus().HasFailed() &&
+					!failed.GetStatus().m_Error.empty() && preloadManager.GetPreloadStatus().IsReady() &&
+					preloadManager.ActivateRegistry(registryRef).IsSuccess(),
+					"Content preload failure reports its error and releases registry activation without poisoning startup");
+			}
 
 			ShaderManager manager({
 				.m_ActiveBackend = RHIBackendType::DX12,

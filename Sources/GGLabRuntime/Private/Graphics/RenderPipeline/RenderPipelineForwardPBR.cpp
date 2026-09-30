@@ -48,6 +48,67 @@ namespace gglab
 		};
 	}
 
+	MaterialDiagnosticPrewarmProgress RenderPipelineForwardPBR::PrewarmMaterialDiagnostics(
+		const RenderServices& services, std::span<const uint64_t> drawVariants) noexcept
+	{
+		PrepareForwardPasses(services, true);
+		if (!std::ranges::equal(drawVariants, m_DiagnosticPrewarmDrawVariants))
+		{
+			m_DiagnosticPrewarmDrawVariants.assign(drawVariants.begin(), drawVariants.end());
+			m_DiagnosticPrewarmVariants.clear();
+			m_DiagnosticPrewarmProgress = {};
+			for (const uint64_t variantBits : drawVariants)
+			{
+				GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
+				const RenderBucket bucket = RenderQueueBuilder::DecodeVariantBucket(variantBits);
+				GGLAB_ASSERT(bucket < RenderBucket::Count);
+				if (bucket == RenderBucket::Transparent)
+				{
+					m_DiagnosticPrewarmVariants.push_back({ .m_DrawVariantBits = variantBits });
+					continue;
+				}
+				// Cover Lab-accessible lighting, GTAO output and depth-prepass settings.
+				// HDR comparison PSOs exist only when this pipeline owns its readback service.
+				for (uint32_t lighting = 0; lighting < (m_ForwardPlusDebugReadback ? 3u : 2u); ++lighting)
+				{
+					for (const bool contribution : { false, true })
+					{
+						for (const bool depthEqual : { false, true })
+						{
+							m_DiagnosticPrewarmVariants.push_back({
+								.m_DrawVariantBits = variantBits,
+								.m_LightingVariant = static_cast<ForwardPBRLightingVariant>(lighting),
+								.m_UseDepthEqual = depthEqual,
+								.m_GTAOContribution = contribution,
+							});
+						}
+					}
+				}
+			}
+			m_DiagnosticPrewarmProgress.m_TotalCount =
+				static_cast<uint32_t>(m_DiagnosticPrewarmVariants.size());
+		}
+		if (!m_DiagnosticPrewarmProgress.IsReady() && !m_DiagnosticPrewarmProgress.m_Failed)
+		{
+			const auto& variant = m_DiagnosticPrewarmVariants[m_DiagnosticPrewarmProgress.m_CompletedCount];
+			const bool transparent =
+				RenderQueueBuilder::DecodeVariantBucket(variant.m_DrawVariantBits) == RenderBucket::Transparent;
+			RenderPassForwardPBRBase& pass = transparent
+				? static_cast<RenderPassForwardPBRBase&>(m_ForwardTransparentPass)
+				: static_cast<RenderPassForwardPBRBase&>(m_ForwardOpaquePass);
+			if (pass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
+				variant.m_UseDepthEqual, variant.m_LightingVariant, variant.m_GTAOContribution))
+			{
+				++m_DiagnosticPrewarmProgress.m_CompletedCount;
+			}
+			else
+			{
+				m_DiagnosticPrewarmProgress.m_Failed = true;
+			}
+		}
+		return m_DiagnosticPrewarmProgress;
+	}
+
 	void RenderPipelineForwardPBR::PrepareTemporalFramePlanning(
 		const RenderServices& services) noexcept
 	{

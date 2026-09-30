@@ -64,6 +64,22 @@ namespace gglab
 		}
 	};
 
+	struct ShaderPreloadJob;
+
+	// Request state and publication are consumed on the TaskSystem owner thread.
+	// Workers retain only immutable artifact inputs and private load results.
+	class ShaderPreloadRequest
+	{
+	public:
+		[[nodiscard]] ShaderPreloadStatus GetStatus() const;
+		void Cancel(TaskSystem& taskSystem) noexcept;
+
+	private:
+		friend class ShaderManager;
+		std::shared_ptr<ShaderPreloadJob> m_Job;
+		TaskHandle m_Task{};
+	};
+
 	enum class ShaderRegistryActivationStatus : uint8_t
 	{
 		Activated,
@@ -118,6 +134,11 @@ namespace gglab
 			std::vector<ShaderProgramRef> programRefs,
 			TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] ShaderPreloadStatus GetPreloadStatus() const;
+		// Independent content requests do not replace the startup preload status.
+		// The manager must outlive their TaskSystem completion callbacks.
+		[[nodiscard]] ShaderPreloadRequest RequestPreloadAsync(TaskSystem& taskSystem,
+			std::vector<ShaderProgramRef> programRefs,
+			TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] std::optional<ShaderArtifactRef> ResolveArtifact(
 			const ShaderProgramRef& programRef) const noexcept;
 		[[nodiscard]] bool CaptureArtifactRefs(
@@ -136,7 +157,6 @@ namespace gglab
 
 	private:
 		struct RuntimeState;
-		struct ShaderPreloadJob;
 
 		bool PublishPreloadJob(ShaderPreloadJob& job) noexcept;
 
@@ -149,9 +169,7 @@ namespace gglab
 		ShaderProgramRegistryArtifactRef m_ActiveRegistryRef{};
 		ShaderManagerInitializeStatus m_InitializeStatus =
 			ShaderManagerInitializeStatus::InvalidCreateInfo;
-		std::shared_ptr<ShaderPreloadJob> m_PreloadJob;
-		TaskHandle m_PreloadTask{};
-		TaskStatus m_PreloadStatus = TaskStatus::Invalid;
-		std::string m_PreloadError;
+		ShaderPreloadRequest m_StartupPreload;
+		uint32_t m_PreparingPreloadCount = 0;
 	};
 }

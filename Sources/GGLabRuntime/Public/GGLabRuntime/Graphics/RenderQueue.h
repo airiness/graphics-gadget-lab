@@ -103,6 +103,9 @@ namespace gglab
 			return bucketBits | sidednessBits;
 		}
 
+		[[nodiscard]] static uint64_t EncodeMaterialVariantBits(
+			AlphaMode alphaMode, MaterialFlags flags) noexcept;
+
 	private:
 		static constexpr uint8_t BucketSortOrder(RenderBucket bucket) noexcept;
 		static constexpr uint64_t PackSortKey(uint8_t bucketOrder, uint8_t variantBits,

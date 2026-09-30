@@ -7,10 +7,16 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <algorithm>
 #include <cmath>
+#include <format>
 #include <numbers>
+#include <string>
 
 namespace gglab
 {
@@ -306,6 +312,13 @@ namespace gglab
 
 	void MiniPBRGridLabSession::BeginPrepare() noexcept
 	{
+		m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
+		const auto programs = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+		m_DiagnosticShaderPreload = m_Services.m_ShaderManager->RequestPreloadAsync(
+			*m_Services.m_TaskSystem, { programs.begin(), programs.end() });
+		m_DiagnosticDrawVariants.clear();
+		m_DiagnosticVariantsCollected = false;
+		m_DiagnosticPrewarmProgress = {};
 		ResetAssetInterests();
 		m_World.GetRegistry().clear();
 		m_PrepareMode = PrepareMode::None;
@@ -345,6 +358,101 @@ namespace gglab
 	}
 
 	void MiniPBRGridLabSession::TickPrepare() noexcept
+	{
+		if (m_LoadingProgress.HasFailed())
+		{
+			m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
+			return;
+		}
+		TickScenePrepare();
+		const ShaderPreloadStatus shaders = m_DiagnosticShaderPreload.GetStatus();
+		if (!m_LoadingProgress.IsReady() || !shaders.IsReady())
+		{
+			return;
+		}
+		if (!m_DiagnosticVariantsCollected)
+		{
+			CollectDiagnosticDrawVariants();
+			m_DiagnosticVariantsCollected = true;
+		}
+		m_DiagnosticPrewarmProgress = GetRenderPipeline().PrewarmMaterialDiagnostics(
+			m_Services.m_RenderServices, m_DiagnosticDrawVariants);
+	}
+
+	LoadingProgress MiniPBRGridLabSession::GetPreparationProgress() const noexcept
+	{
+		const ShaderPreloadStatus shaders = m_DiagnosticShaderPreload.GetStatus();
+		LoadingProgressBuilder progress;
+		progress.AddStep(0.70f, {
+			.m_Status = m_LoadingProgress.m_Status,
+			.m_Fraction = m_LoadingProgress.m_Fraction,
+			.m_Stage = m_LoadingProgress.m_Stage,
+			.m_Detail = m_LoadingProgress.m_Detail,
+		});
+		const std::string shaderDetail = shaders.HasFailed() ? shaders.m_Error
+			: std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
+		progress.AddStep(0.15f, {
+			.m_Status = shaders.HasFailed() ? LoadingStatus::Failed
+				: shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = shaders.IsReady() ? 1.0f : shaders.m_TotalCount == 0 ? 0.0f
+				: static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
+			.m_Stage = shaders.HasFailed() ? "Diagnostic shader preload failed" : "Preloading diagnostic shaders",
+			.m_Detail = shaderDetail,
+		});
+		const bool pipelinesReady = m_DiagnosticVariantsCollected && m_DiagnosticPrewarmProgress.IsReady();
+		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed
+			? "A material diagnostic pipeline could not be created."
+			: !m_DiagnosticVariantsCollected ? "Waiting for scene and shader artifacts."
+			: std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
+				m_DiagnosticPrewarmProgress.m_TotalCount);
+		progress.AddStep(0.15f, {
+			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ? LoadingStatus::Failed
+				: pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = pipelinesReady ? 1.0f : m_DiagnosticPrewarmProgress.m_TotalCount == 0 ? 0.0f
+				: static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
+					static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
+			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed
+				? "Diagnostic pipeline preparation failed" : "Prewarming diagnostic pipelines",
+			.m_Detail = pipelineDetail,
+		});
+		return progress.Build();
+	}
+
+	void MiniPBRGridLabSession::CollectDiagnosticDrawVariants() noexcept
+	{
+		const auto addMaterial = [this](const MaterialProperties& material) noexcept
+			{
+				const uint64_t variant =
+					RenderQueueBuilder::EncodeMaterialVariantBits(material.m_AlphaMode, material.m_Flags);
+				if (std::ranges::find(m_DiagnosticDrawVariants, variant) == m_DiagnosticDrawVariants.end())
+				{
+					m_DiagnosticDrawVariants.push_back(variant);
+				}
+			};
+		auto& registry = m_World.GetRegistry();
+		const auto models = registry.view<components::ModelComponent>();
+		for (const entt::entity entity : models)
+		{
+			const auto* overrideMaterial = registry.try_get<components::MaterialInstanceComponent>(entity);
+			if (overrideMaterial && overrideMaterial->m_Key.IsValid())
+			{
+				addMaterial(overrideMaterial->m_Properties);
+				continue;
+			}
+			const Model* model = m_Services.m_AssetManager->GetModel(models.get<components::ModelComponent>(entity).m_ModelId);
+			GGLAB_ASSERT_NOT_NULL(model);
+			for (const ModelMesh& mesh : model->m_MeshInstance)
+			{
+				if (const MaterialProperties* material = m_Services.m_AssetManager->GetMaterial(mesh.m_MaterialId))
+				{
+					addMaterial(*material);
+				}
+			}
+		}
+		std::ranges::sort(m_DiagnosticDrawVariants);
+	}
+
+	void MiniPBRGridLabSession::TickScenePrepare() noexcept
 	{
 		if (!m_LoadingProgress.IsPreparing())
 		{
@@ -463,11 +571,12 @@ namespace gglab
 
 	void MiniPBRGridLabSession::CommitPrepare() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "Mini PBR Grid must be ready before commit.");
+		GGLAB_ASSERT_MSG(GetPreparationProgress().IsReady(), "Mini PBR Grid must be ready before commit.");
 	}
 
 	void MiniPBRGridLabSession::CancelPrepare() noexcept
 	{
+		m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
 		ResetAssetInterests();
 		m_PrepareMode = PrepareMode::None;
 		m_PendingModelId.Reset();

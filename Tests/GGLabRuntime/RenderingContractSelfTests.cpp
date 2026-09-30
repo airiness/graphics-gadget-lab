@@ -70,6 +70,8 @@
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12PipelineDescUtils.h"
@@ -92,10 +94,12 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <exception>
 #include <initializer_list>
 #include <limits>
 #include <numbers>
 #include <ranges>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -2882,6 +2886,157 @@ namespace gglab
 			}
 			context.Check(accessChainMatches,
 				"RenderGraph preserves the depth-write to sample to read-only-depth access chain");
+		}
+
+		void RunMaterialDiagnosticPrewarmTests(SelfTestContext& context) noexcept
+		{
+			class ShaderAccess final : public RenderShaderProgramAccess
+			{
+			public:
+				ShaderID LoadProgram(const ShaderProgramRef& program) noexcept override
+				{
+					const auto demand = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+					const auto entry = std::ranges::find(demand, program);
+					return entry == demand.end() ? ShaderID{}
+						: ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
+				}
+				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+			} shaders;
+			class BindingAccess final : public RenderBindingLayoutAccess
+			{
+			public:
+				RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override { return { 1, 1 }; }
+				RHIBindingLayoutDesc GetCommonBindingLayoutDesc() const noexcept override { return {}; }
+			} bindings;
+			class PipelineSystem final : public RHIPipelineSystem
+			{
+			public:
+				RHIBindingLayoutHandle CreateBindingLayout(const RHIBindingLayoutDesc& desc) noexcept override
+				{
+					m_OwnerOnly &= std::this_thread::get_id() == m_Owner;
+					return { std::string_view(desc.m_DebugName).find("ForwardPlus") != std::string_view::npos
+						? 2u : 1u, 1 };
+				}
+				RHIPipelineHandle CreateGraphicsPipeline(const RHIGraphicsPipelineCreateInfo&) noexcept override { return {}; }
+				RHIPipelineHandle CreateComputePipeline(const RHIComputePipelineCreateInfo&) noexcept override { return {}; }
+				bool IsAlive(RHIBindingLayoutHandle handle) const noexcept override { return handle.IsValid(); }
+				bool IsAlive(RHIPipelineHandle handle) const noexcept override { return handle.IsValid(); }
+				uint64_t GetRevision() const noexcept override { return 1; }
+				void Clear() noexcept override {}
+				std::thread::id m_Owner = std::this_thread::get_id();
+				bool m_OwnerOnly = true;
+			} pipelineSystem;
+			class PipelineAccess final : public RenderPipelineResolver
+			{
+			public:
+				RHIPipelineHandle Resolve(GraphicsPipelineSlot&, const GraphicsPhysicalPipelineKey& key,
+					const RenderPassInfo&) noexcept override
+				{
+					++m_ResolveCount;
+					m_OwnerOnly &= std::this_thread::get_id() == m_Owner;
+					if (m_FailResolve) { return {}; }
+					const auto found = std::ranges::find(m_Keys, key);
+					if (found == m_Keys.end()) { m_Keys.push_back(key); }
+					const auto entry = std::ranges::find(m_Keys, key);
+					return RHIPipelineHandle{ static_cast<uint32_t>(entry - m_Keys.begin()) + 1, 1 };
+				}
+				RHIPipelineHandle Resolve(ComputePipelineSlot&, const ComputePipelineRecipe&,
+					const RenderPassInfo&) noexcept override { return {}; }
+				void GetPipelineUsages(RHIPipelineHandle, std::vector<RenderPassInfo>&) const noexcept override {}
+				std::vector<GraphicsPhysicalPipelineKey> m_Keys;
+				std::thread::id m_Owner = std::this_thread::get_id();
+				uint32_t m_ResolveCount = 0;
+				bool m_OwnerOnly = true;
+				bool m_FailResolve = false;
+			} pipelines;
+			class Context final : public RHIContext
+			{
+			public:
+				explicit Context(RHIPipelineSystem& pipelines) noexcept : m_Pipelines(pipelines) {}
+				RHIDevice& GetDevice() noexcept override { std::terminate(); }
+				const RHIDevice& GetDevice() const noexcept override { std::terminate(); }
+				RHISwapChain& GetSwapChain() noexcept override { std::terminate(); }
+				const RHISwapChain& GetSwapChain() const noexcept override { std::terminate(); }
+				TransferManager& GetTransferManager() noexcept override { std::terminate(); }
+				RHIPipelineSystem& GetPipelineSystem() noexcept override { return m_Pipelines; }
+				GpuProfiler* GetGpuProfiler() noexcept override { return nullptr; }
+				RHIFrameBeginResult BeginFrame() noexcept override { return RHIFrameBeginResult::Unavailable(); }
+				RHIFrameEndResult EndFrame(RHIFrameContext&) noexcept override { return RHIFrameEndResult::Fatal(); }
+				RHIFencePoint AbortFrame(RHIFrameContext&) noexcept override { return {}; }
+				void WaitForFence(RHIQueueType, const RHIFencePoint&) noexcept override {}
+				void Resize(uint32_t, uint32_t) noexcept override {}
+				void WaitIdle() noexcept override {}
+				void RetireCompletedWork() noexcept override {}
+				uint32_t GetFrameSlotCount() const noexcept override { return 2; }
+			private:
+				RHIPipelineSystem& m_Pipelines;
+			} rhi(pipelineSystem);
+			class PresentationAccess final : public RenderPresentationAccess
+			{
+			public:
+				explicit PresentationAccess(RHIContext& context) noexcept : m_Context(context) {}
+				RHIContext* GetRHIContext() const noexcept override { return &m_Context; }
+				RHIDevice* GetDevice() const noexcept override { return nullptr; }
+				RHISwapChain* GetSwapChain() const noexcept override { return nullptr; }
+				const std::array<float, 4>& GetBackBufferClearColor() const noexcept override { return m_Clear; }
+				RHIFencePoint GetLastSubmittedFencePoint() const noexcept override { return {}; }
+			private:
+				RHIContext& m_Context;
+				std::array<float, 4> m_Clear{};
+			} presentation(rhi);
+			const RenderServices services{
+				.m_PipelineResolver = &pipelines, .m_ShaderPrograms = &shaders,
+				.m_Presentation = &presentation, .m_BindingLayout = &bindings,
+			};
+			const std::array variants{
+				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Opaque, MaterialFlags::None),
+				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Mask, MaterialFlags::DoubleSided),
+				RenderQueueBuilder::EncodeMaterialVariantBits(AlphaMode::Blend, MaterialFlags::DoubleSided),
+			};
+			context.Check(variants[0] == RenderQueueBuilder::EncodeVariantBits(RenderBucket::Opaque, false) &&
+				variants[1] == RenderQueueBuilder::EncodeVariantBits(RenderBucket::AlphaTest, true) &&
+				variants[2] == RenderQueueBuilder::EncodeVariantBits(RenderBucket::Transparent, true),
+				"Material prewarm demand shares alpha and sidedness encoding with draw queue construction");
+
+			auto pipeline = std::make_unique<RenderPipelineForwardPBR>();
+			MaterialDiagnosticPrewarmProgress progress;
+			bool onePerTick = true;
+			for (uint32_t tick = 0; tick < 17; ++tick)
+			{
+				const uint32_t before = pipelines.m_ResolveCount;
+				progress = pipeline->PrewarmMaterialDiagnostics(services, variants);
+				onePerTick &= pipelines.m_ResolveCount == before + 1 &&
+					progress.m_CompletedCount == tick + 1 && progress.m_TotalCount == 17 &&
+					(progress.IsReady() == (tick == 16));
+			}
+			context.Check(onePerTick && pipelines.m_OwnerOnly && pipelineSystem.m_OwnerOnly,
+				"Diagnostic prewarm advances one owner-thread PSO per tick and waits for every demanded variant");
+
+			bool validAttachments = true;
+			bool validBlend = true;
+			for (const auto& key : pipelines.m_Keys)
+			{
+				const uint32_t count = key.m_Formats.m_RenderTargetCount;
+				validAttachments &= count >= 3 &&
+					key.m_Formats.m_RenderTargetFormats[count - 2] == RHIFormat::R16G16B16A16Float &&
+					key.m_Formats.m_RenderTargetFormats[count - 1] == RHIFormat::R16Float;
+				validBlend &= key.m_DepthPreset == DepthPreset::ReversedZReadOnly
+					? key.m_BlendPreset == BlendPreset::AlphaBlendAllTargets
+					: key.m_BlendPreset == BlendPreset::Default;
+			}
+			context.Check(validAttachments && validBlend && pipelines.m_Keys.size() == 17,
+				"Prewarmed production recipes preserve diagnostic MRT formats, GTAO variants and transparent coverage blending");
+
+			const uint32_t completedCalls = pipelines.m_ResolveCount;
+			context.Check(pipeline->PrewarmMaterialDiagnostics(services, variants).IsReady() &&
+				pipelines.m_ResolveCount == completedCalls,
+				"Completed diagnostic prewarm performs no additional PSO resolutions");
+			pipelines.m_FailResolve = true;
+			const std::array changedDemand{ variants[1] };
+			const auto failed = pipeline->PrewarmMaterialDiagnostics(services, changedDemand);
+			context.Check(failed.m_Failed && !failed.IsReady() && failed.m_CompletedCount == 0 &&
+				failed.m_TotalCount == 8,
+				"Changed draw demand restarts preparation and a failed PSO cannot report ready");
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
@@ -8553,6 +8708,7 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunMaterialDiagnosticPrewarmTests(context);
 		RunMaterialBaselineContractTests(context);
 		RunMaterialFrameCacheContractTests(context);
 		RunGGXEnergyCompensationContractTests(context);
