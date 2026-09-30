@@ -134,12 +134,20 @@ do not hand-edit their generated mappings.
 Use `README.md` for setup and the executable/suite catalog, and
 `.github/workflows/build.yml` for the CI build matrix and command details. Use
 the owner's Visual Studio/MSVC toolchain. Run builds from the repository root
-in a shell with MSBuild available; outputs are under
+in a shell with x64-hosted MSBuild available
+(`MSBuild/Current/Bin/amd64/MSBuild.exe`); outputs are under
 `Build/Output/x64/<Configuration>/`.
 
+Pass `/p:PreferredToolArchitecture=x64` to keep the compiler host consistent
+with Visual Studio. For direct `.vcxproj` builds, also pass
+`"/p:SolutionDir=$gglabSolutionDir"` using the absolute repository root with a
+trailing backslash. Keep these settings consistent between command-line and
+IDE builds so they share the same incremental build state.
+
 ```powershell
-msbuild GraphicsGadgetLab.sln /m /p:Configuration=Debug /p:Platform=x64
-msbuild GraphicsGadgetLab.sln /m /p:Configuration=Release /p:Platform=x64
+$gglabSolutionDir = (Get-Location).Path.TrimEnd('\') + '\'
+msbuild GraphicsGadgetLab.sln /m /p:Configuration=Debug /p:Platform=x64 /p:PreferredToolArchitecture=x64
+msbuild GraphicsGadgetLab.sln /m /p:Configuration=Release /p:Platform=x64 /p:PreferredToolArchitecture=x64
 ```
 
 Select checks according to the change:
@@ -152,7 +160,7 @@ Select checks according to the change:
   implementation or trivial text edit.
 - Dependency-boundary changes: build affected libraries directly, not only
   through the solution. For WinApp include/PCH changes, use the no-PCH gate:
-  `msbuild Projects/WinApp/WinApp.vcxproj /m /p:Configuration=Debug /p:Platform=x64 /p:GGLAB_USE_PCH=0`.
+  `msbuild Projects/WinApp/WinApp.vcxproj /m /p:Configuration=Debug /p:Platform=x64 /p:PreferredToolArchitecture=x64 "/p:SolutionDir=$gglabSolutionDir" /p:GGLAB_USE_PCH=0`.
   When changing ownership or dependency closure of Vulkan qualification or the
   shader test boundaries, build the affected `GGLabVulkanQualification`,
   `ShaderToolchainTests` and/or `ShaderRuntimeIntegrationTests` projects directly
