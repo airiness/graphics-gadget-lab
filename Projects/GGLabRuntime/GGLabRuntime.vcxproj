@@ -580,6 +580,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MaterialStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MeshStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\TextureStore.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureSourceKey.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\ModelStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationServices.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublication.h" />

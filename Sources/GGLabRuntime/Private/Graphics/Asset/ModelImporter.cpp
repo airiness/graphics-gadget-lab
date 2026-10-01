@@ -4,6 +4,7 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
+#include "Graphics/Asset/TextureSourceKey.h"
 
 #include <assimp/GltfMaterial.h>
 #include <assimp/Importer.hpp>
@@ -26,6 +27,7 @@
 #include <stop_token>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -644,28 +646,29 @@ namespace gglab
 			}
 		}
 
+		using TextureSourceIndexMap =
+			std::unordered_map<TextureSourceKey, uint32_t, TextureSourceKeyHash>;
+
 		[[nodiscard]] uint32_t RegisterTextureSource(ImportedModel& model,
+			TextureSourceIndexMap& textureSourceIndices,
 			const std::filesystem::path& path, TextureSemantic semantic) noexcept
 		{
 			const TextureImportSettings importSettings = MakeTextureImportSettings(semantic);
-			const auto existing = std::ranges::find_if(model.m_TextureSources,
-				[&](const ImportedTextureSource& texture) noexcept
-				{
-					return texture.m_CanonicalPath == path &&
-						texture.m_ImportSettings == importSettings;
-				});
-			if (existing != model.m_TextureSources.end())
+			const auto [entry, inserted] = textureSourceIndices.try_emplace(
+				TextureSourceKey{ path, importSettings },
+				static_cast<uint32_t>(model.m_TextureSources.size()));
+			if (!inserted)
 			{
-				return static_cast<uint32_t>(
-					std::distance(model.m_TextureSources.begin(), existing));
+				return entry->second;
 			}
 
+			// Assign indices in first-use order, independent of hash-table iteration order.
 			ImportedTextureSource texture{};
 			texture.m_CanonicalPath = path;
 			texture.m_ImportSettings = importSettings;
 			texture.m_Semantic = semantic;
 			model.m_TextureSources.emplace_back(std::move(texture));
-			return static_cast<uint32_t>(model.m_TextureSources.size() - 1);
+			return entry->second;
 		}
 	}
 
@@ -806,6 +809,7 @@ namespace gglab
 		model.m_Type = ModelType::GlTF;
 		model.m_Materials.resize(scene->mNumMaterials);
 		const auto directory = canonicalPath.parent_path();
+		TextureSourceIndexMap textureSourceIndices;
 
 		for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
 		{
@@ -857,7 +861,7 @@ namespace gglab
 				const auto canonicalTexturePath = utils::Canonical(directory / textureSource.m_Path.C_Str());
 				ImportedMaterialTextureBinding& binding = destination.m_TextureBindings[slotIndex];
 				binding.m_TextureIndex =
-					RegisterTextureSource(model, canonicalTexturePath, semantic);
+					RegisterTextureSource(model, textureSourceIndices, canonicalTexturePath, semantic);
 				binding.m_SamplerKey = MakeSamplerKey(textureSource.m_MapMode,
 					textureSource.m_MagFilter, textureSource.m_MinFilter, settings);
 				if (textureSource.m_UVIndex > 1)

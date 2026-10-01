@@ -13,7 +13,9 @@
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Store/ModelStore.h"
+#include "Graphics/Asset/Store/TextureStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
+#include "Graphics/Asset/TextureSourceKey.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
@@ -32,6 +34,8 @@
 #include <chrono>
 #include <cmath>
 #include <concepts>
+#include <cstddef>
+#include <cstdint>
 #include <cwctype>
 #include <deque>
 #include <fstream>
@@ -42,8 +46,10 @@
 #include <mutex>
 #include <numbers>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 
 namespace gglab
@@ -380,6 +386,51 @@ namespace gglab
 			context.Check(MatchesHex(key.m_Value,
 				"5889e6c301b099379dab9713ef36830489dfba6fee4c20ed6e07e7e4203c7e88"),
 				"Texture derived-data key matches the stable golden vector");
+		}
+
+		void RunTextureSourceKeyTests(SelfTestContext& context) noexcept
+		{
+			const TextureSourceKey base{
+				"Textures/Shared.png", MakeTextureImportSettings(TextureSemantic::BaseColor)
+			};
+			TextureSourceKey normal = base;
+			normal.m_ImportSettings.m_Semantic = TextureSemantic::Normal;
+			TextureSourceKey preserved = base;
+			preserved.m_ImportSettings.m_MipPolicy = TextureMipPolicy::Preserve;
+			TextureSourceKey other = base;
+			other.m_CanonicalPath = "Textures/Other.png";
+
+			struct ConstantHash
+			{
+				size_t operator()(const TextureSourceKey&) const noexcept { return 0; }
+			};
+			std::unordered_map<TextureSourceKey, uint32_t, ConstantHash> indices;
+			indices.emplace(base, 0u);
+			indices.emplace(normal, 1u);
+			indices.emplace(preserved, 2u);
+			indices.emplace(other, 3u);
+			context.Check(indices.size() == 4u && indices.at(base) == 0u &&
+				indices.at(normal) == 1u && indices.at(preserved) == 2u && indices.at(other) == 3u,
+				"Texture source keys distinguish paths, semantics and mip policies under hash collisions");
+
+			TextureStore store;
+			const bool baseBound = store.BindCacheKey(base.m_CanonicalPath, base.m_ImportSettings, TextureID{ 101u });
+			const bool normalBound = store.BindCacheKey(normal.m_CanonicalPath, normal.m_ImportSettings, TextureID{ 102u });
+			const bool preservedBound = store.BindCacheKey(preserved.m_CanonicalPath, preserved.m_ImportSettings, TextureID{ 103u });
+			const bool otherBound = store.BindCacheKey(other.m_CanonicalPath, other.m_ImportSettings, TextureID{ 104u });
+			context.Check(baseBound && normalBound && preservedBound && otherBound &&
+				store.FindCached(base.m_CanonicalPath, base.m_ImportSettings) == TextureID{ 101u } &&
+				store.FindCached(normal.m_CanonicalPath, normal.m_ImportSettings) == TextureID{ 102u } &&
+				store.FindCached(preserved.m_CanonicalPath, preserved.m_ImportSettings) == TextureID{ 103u } &&
+				store.FindCached(other.m_CanonicalPath, other.m_ImportSettings) == TextureID{ 104u } &&
+				!store.BindCacheKey(base.m_CanonicalPath, base.m_ImportSettings, TextureID{ 105u }),
+				"Runtime texture lookup uses the shared source key and preserves existing registrations");
+			const bool removed = store.Remove(TextureID{ 101u });
+			context.Check(removed && !store.FindCached(base.m_CanonicalPath, base.m_ImportSettings).IsValid() &&
+				store.FindCached(normal.m_CanonicalPath, normal.m_ImportSettings) == TextureID{ 102u } &&
+				store.FindCached(preserved.m_CanonicalPath, preserved.m_ImportSettings) == TextureID{ 103u } &&
+				store.FindCached(other.m_CanonicalPath, other.m_ImportSettings) == TextureID{ 104u },
+				"Removing one texture registration preserves other source keys");
 		}
 
 		void RunTextureCodecTests(SelfTestContext& context) noexcept
@@ -1539,6 +1590,124 @@ namespace gglab
 			std::filesystem::remove(root, errorCode);
 		}
 
+		void RunGltfTextureSourceTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const auto root = std::filesystem::temp_directory_path(errorCode) /
+				std::format("gglab-texture-source-import-{}-{}", GetCurrentProcessId(), GetTickCount64());
+			const bool created = !errorCode && std::filesystem::create_directory(root, errorCode);
+			context.Check(created && !errorCode, "Texture source import creates an isolated glTF fixture directory");
+			if (!created || errorCode) return;
+
+			const std::array<float, 24> vertices = {
+				0, 0, 0, 1, 0, 0, 0, 1, 0,
+				0, 0, 1, 0, 0, 1, 0, 0, 1,
+				0, 0, 1, 0, 0, 1,
+			};
+			{
+				std::ofstream buffer(root / "probe.bin", std::ios::binary);
+				buffer.write(reinterpret_cast<const char*>(vertices.data()), sizeof(vertices));
+			}
+			constexpr uint32_t UniqueTextureCount = 32;
+			constexpr uint32_t MaterialCount = UniqueTextureCount * 2;
+			const auto writeSource = [&](std::string_view prefix) noexcept
+			{
+				std::ofstream gltf(root / "probe.gltf");
+				gltf << R"({"asset":{"version":"2.0"},"extensionsUsed":["KHR_materials_clearcoat","KHR_texture_transform"],
+"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+"buffers":[{"uri":"probe.bin","byteLength":96}],
+"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36},{"buffer":0,"byteOffset":72,"byteLength":24}],
+"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},
+{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},{"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"}],
+"samplers":[{"wrapS":10497,"wrapT":10497},{"wrapS":33071,"wrapT":33071}],"images":[)";
+				for (uint32_t index = 0; index < UniqueTextureCount; ++index)
+				{
+					if (index != 0) gltf << ',';
+					gltf << "{\"uri\":\"" << prefix << '-' << index << ".png\"}";
+				}
+				gltf << ",{\"uri\":\"./" << prefix << R"(-0.png"}],"textures":[)";
+				for (uint32_t index = 0; index < UniqueTextureCount; ++index)
+				{
+					if (index != 0) gltf << ',';
+					gltf << "{\"source\":" << index << ",\"sampler\":0}";
+				}
+				gltf << ",{\"source\":" << UniqueTextureCount << R"(,"sampler":1}],"materials":[)";
+				for (uint32_t index = 0; index < MaterialCount; ++index)
+				{
+					if (index != 0) gltf << ',';
+					const uint32_t textureIndex = index == UniqueTextureCount ? UniqueTextureCount : index % UniqueTextureCount;
+					gltf << "{\"name\":\"Material-" << index << R"(","pbrMetallicRoughness":{"baseColorTexture":{"index":)" << textureIndex;
+					if (index == UniqueTextureCount)
+						gltf << R"(,"extensions":{"KHR_texture_transform":{"offset":[0.25,0.5]}})";
+					gltf << R"(}},"normalTexture":{"index":0},"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":0.5,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0}}}})";
+				}
+				gltf << R"(],"meshes":[{"primitives":[)";
+				for (uint32_t index = 0; index < MaterialCount; ++index)
+				{
+					if (index != 0) gltf << ',';
+					gltf << R"({"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2},"material":)" << index << '}';
+				}
+				gltf << R"(]}]})";
+			};
+			const auto hasStableBindings = [](const ImportedModel& model) noexcept
+			{
+				if (model.m_Materials.size() < MaterialCount || model.m_TextureSources.size() != UniqueTextureCount + 2u)
+					return false;
+				// The first material adds base color, normal and coat in slot order.
+				// Later materials add only their previously unseen base-color sources.
+				for (uint32_t index = 0; index < MaterialCount; ++index)
+				{
+					const auto& bindings = model.m_Materials[index].m_TextureBindings;
+					const uint32_t textureIndex = index % UniqueTextureCount;
+					const uint32_t expectedBase = textureIndex == 0 ? 0 : textureIndex + 2u;
+					if (bindings[static_cast<size_t>(MaterialTextureSlot::BaseColor)].m_TextureIndex != expectedBase ||
+						bindings[static_cast<size_t>(MaterialTextureSlot::Normal)].m_TextureIndex != 1u ||
+						bindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_TextureIndex != 2u ||
+						bindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatRoughness)].m_TextureIndex != 2u)
+						return false;
+				}
+				return true;
+			};
+
+			writeSource("map");
+			const ModelImportResult imported = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(imported.Succeeded() && hasStableBindings(imported.m_Model), std::format(
+				"Repeated core and extension textures retain first-use indices across source-table growth: {}", imported.m_Error));
+			if (imported.Succeeded() && hasStableBindings(imported.m_Model))
+			{
+				const auto& model = imported.m_Model;
+				bool sourceOrder = model.m_TextureSources[0].m_Semantic == TextureSemantic::BaseColor &&
+					model.m_TextureSources[1].m_Semantic == TextureSemantic::Normal &&
+					model.m_TextureSources[2].m_Semantic == TextureSemantic::Clearcoat;
+				for (uint32_t index = 0; index < UniqueTextureCount; ++index)
+				{
+					const uint32_t sourceIndex = index == 0 ? 0 : index + 2u;
+					sourceOrder &= model.m_TextureSources[sourceIndex].m_CanonicalPath ==
+						utils::Canonical(root / std::format("map-{}.png", index));
+				}
+				context.Check(sourceOrder, "Texture source vector order follows first use rather than hash-table order");
+				const auto& original = model.m_Materials[0].m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::BaseColor)];
+				const auto& alias = model.m_Materials[UniqueTextureCount].m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::BaseColor)];
+				context.Check(original.m_TextureIndex == alias.m_TextureIndex && original.m_SamplerKey != alias.m_SamplerKey &&
+					alias.m_UVOffset.m_X == 0.25f && alias.m_UVOffset.m_Y == 0.5f,
+					"Canonical URI aliases share a texture source while sampler and UV transform remain per binding");
+			}
+			writeSource("replacement");
+			const ModelImportResult replacement = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(replacement.Succeeded() && hasStableBindings(replacement.m_Model) &&
+				replacement.m_Model.m_TextureSources[0].m_CanonicalPath == utils::Canonical(root / "replacement-0.png"),
+				"A subsequent model import owns a fresh source index with unchanged first-use ordering");
+			writeSource("map");
+			const ModelImportResult repeated = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(repeated.Succeeded() && hasStableBindings(repeated.m_Model) &&
+				repeated.m_Model.m_TextureSources[0].m_CanonicalPath == utils::Canonical(root / "map-0.png"),
+				"Reimporting earlier texture paths rebuilds the model-local source vector");
+
+			std::filesystem::remove(root / "probe.gltf", errorCode);
+			std::filesystem::remove(root / "probe.bin", errorCode);
+			std::filesystem::remove(root, errorCode);
+		}
+
 		void RunMaterialUVTransformTests(SelfTestContext& context) noexcept
 		{
 			context.Check(SanitizeMaterialIor(DefaultDielectricIor) == 1.5f &&
@@ -2137,6 +2306,7 @@ namespace gglab
 	{
 		RunSha256Tests(context);
 		RunDerivedDataKeyTests(context);
+		RunTextureSourceKeyTests(context);
 		RunTextureCodecTests(context);
 		RunTextureStructureValidationTests(context);
 		RunLocalDerivedDataStoreTests(context);
@@ -2144,6 +2314,7 @@ namespace gglab
 		RunModelImportArtifactTests(context);
 		RunGltfTangentImportTests(context);
 		RunGltfMaterialImportTests(context);
+		RunGltfTextureSourceTests(context);
 		RunMaterialUVTransformTests(context);
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
