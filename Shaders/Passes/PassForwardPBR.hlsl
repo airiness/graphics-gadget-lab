@@ -10,8 +10,7 @@
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/DirectLighting.hlsli>
-#include <PBR/AnisotropicIBL.hlsli>
-#include <PBR/SpecularAA.hlsli>
+#include <PBR/IndirectLighting.hlsli>
 #include <PBR/MaterialDiagnostics.hlsli>
 
 struct ForwardPBRPassParameters
@@ -125,86 +124,6 @@ float LoadGTAO(uint2 pixel)
 	return saturate(gtaoTexture.Load(int3(pixel, 0)));
 }
 
-// Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
-	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
-{
-	const float3 normalSampled = DecodeNormalTexture(
-		SampleTextureBinding(binding.TextureSamplerBinding, uv).rgb, normalScale);
-
-	// Authored tangents describe UV0. A different UV set or a transformed normal
-	// map needs a frame derived from the actual sampled coordinates, including
-	// rotations and mirrored scales.
-	const bool transformedFrame = binding.TexCoordIndex != 0u ||
-		any(abs(binding.UVTransformU.xy - float2(1.0, 0.0)) > 1.0e-6) ||
-		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
-	float3x3 TBN = transformedFrame
-		? BuildTBN(normalWS, positionWS, uv)
-		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
-
-	// Transform normal from tangent space to world space
-	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled, TBN), TBN[2]);
-	return perturbedNormalWS;
-}
-
-BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS,
-	bool specularAAEnabled)
-{
-	BaseShadingState state;
-	state.NormalWS = normalWS;
-	state.AuthoredPerceptualRoughness = surface.Roughness;
-	const SpecularAAResult specularAA = EvaluateSpecularAA(surface.Roughness, normalWS,
-		specularAAEnabled);
-	state.EffectivePerceptualRoughness = specularAA.EffectivePerceptualRoughness;
-	state.BRDFAlpha = PerceptualRoughnessToAlpha(state.EffectivePerceptualRoughness);
-	state.NormalVariance = specularAA.NormalVariance;
-	state.SpecularAAKernelAlpha = specularAA.KernelAlpha;
-	// glTF reserves zero for an infinite-IOR Fresnel response (F0 = 1).
-	const float ior = surface.Ior == 0.0 ? 0.0 : max(surface.Ior, 1.0);
-	const float dielectricReflectance = (ior - 1.0) / (ior + 1.0);
-	state.F0 = lerp((dielectricReflectance * dielectricReflectance).xxx,
-		surface.BaseColor, surface.Metallic);
-	state.FeatureFlags = 0u;
-	if (surface.ClearcoatFactor > 0.0)
-	{
-		state.FeatureFlags |= 1u;
-	}
-	if (surface.AnisotropyStrength > 0.0)
-	{
-		state.FeatureFlags |= 2u;
-	}
-	return state;
-}
-
-AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 normalWS,
-	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 normalUV,
-	float authoredBaseAlpha, float kernelAlpha, bool evaluateFrame)
-{
-	AnisotropyShadingState state;
-	state.Strength = surface.AnisotropyStrength;
-	state.TangentWS = 0.0.xxx;
-	state.BitangentWS = 0.0.xxx;
-	state.AlphaB = saturate(authoredBaseAlpha + kernelAlpha);
-	state.AlphaT = state.AlphaB;
-	if (!evaluateFrame) return state;
-	const float2 filteredAlpha = FilterAnisotropicAlpha(authoredBaseAlpha,
-		state.Strength, kernelAlpha);
-	state.AlphaT = filteredAlpha.x;
-	state.AlphaB = filteredAlpha.y;
-
-	// A missing mesh tangent uses the same normal-map coordinates as normal
-	// perturbation, including the selected UV set and texture transform.
-	const float3x3 frame = BuildTBNFromTangent(normalWS, tangentWS, positionWS, normalUV);
-	const float2 direction = surface.AnisotropyDirectionTS;
-	const float3 tangent = frame[0] * direction.x + frame[1] * direction.y;
-	const float3 projected = tangent - shadingNormalWS * dot(shadingNormalWS, tangent);
-	const float3 fallbackTangent = SafeNormalize(cross(frame[1], shadingNormalWS), frame[0]);
-	state.TangentWS = SafeNormalize(projected, fallbackTangent);
-	const float handedness = dot(cross(frame[0], frame[1]), normalWS) < 0.0 ? -1.0 : 1.0;
-	state.BitangentWS = SafeNormalize(cross(shadingNormalWS, state.TangentWS), frame[1]) * handedness;
-	return state;
-}
-
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
 {
 	float4 value =
@@ -234,6 +153,24 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		g_Scene.IBLResource.EnvironmentRotationRadians);
 	return SampleTextureCubeLevel(binding, direction, lod).rgb *
 		   g_Scene.IBLResource.EnvironmentIntensity;
+}
+
+MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material)
+{
+	MaterialIBLSamples environment;
+	environment.Irradiance = SampleIBLIrradiance(material.Base.NormalWS);
+	environment.BaseSpecular = SampleIBLPrefilteredSpecular(
+		GetMaterialIBLReflection(material), material.Base.EffectivePerceptualRoughness);
+	environment.ClearcoatSpecular = 0.0.xxx;
+	MaterialIBLResponse response = EvaluateBaseMaterialIBL(material, environment);
+	if (material.Clearcoat.Factor > 0.0)
+	{
+		const float3 reflection = reflect(-material.ViewDirectionWS, material.Clearcoat.NormalWS);
+		environment.ClearcoatSpecular = SampleIBLPrefilteredSpecular(
+			reflection, material.Clearcoat.PerceptualRoughness);
+		ApplyClearcoatIBL(response, material.Clearcoat, environment.ClearcoatSpecular);
+	}
+	return response;
 }
 
 float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
@@ -401,9 +338,8 @@ float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 		GetSamplerState(g_Pass.AtmosphereSamplerIndex), uv, 0).rgb;
 }
 
-float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
+float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 result = 0.0.xxx;
 	const LightData light = g_Lights[lightIndex];
@@ -414,8 +350,9 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 		return result;
 	}
 
-	const float NoL = saturate(dot(N, L));
-	const float coatNoL = coat.Factor > 0.0 ? saturate(dot(coat.NormalWS, L)) : 0.0;
+	const float NoL = saturate(dot(material.Base.NormalWS, L));
+	const float coatNoL = material.Clearcoat.Factor > 0.0
+		? saturate(dot(material.Clearcoat.NormalWS, L)) : 0.0;
 	if (NoL <= 0.0 && coatNoL <= 0.0)
 	{
 		return result;
@@ -434,25 +371,20 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	{
 		illuminance *= WorldSunTransmittance(positionWS, L);
 	}
-	const float3 diffuse = diffuseWeight * Fd_Lambert(baseColor);
-	const float3 directResponse = EvaluateDirectMaterialResponse(L, V, N, NoV, NoL, coatNoL,
-		F0, physicalRoughness, diffuse, energyCompensation, anisotropy, coat,
+	const float3 directResponse = EvaluateDirectMaterialResponse(L, NoL, coatNoL, material,
 		lightIndex == g_Scene.WorldSunLightIndex, g_Scene.WorldSunAngularRadius);
 	result = directResponse * illuminance * attenuation * shadowVisibility;
 	return result;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float3 diffuseWeight,
-	float3 energyCompensation, AnisotropyShadingState anisotropy, ClearcoatShadingState coat)
+float3 EvaluateLegacyDirectLighting(float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
-		const float3 light = EvaluateDirectLight(lightIndex, positionWS, N,
-			shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
-			energyCompensation, anisotropy, coat);
+		const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
 		lighting += light;
 	}
 	return lighting;
@@ -465,10 +397,8 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
-float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
-	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor,
-	float3 diffuseWeight, float3 energyCompensation, AnisotropyShadingState anisotropy,
-	ClearcoatShadingState coat)
+float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 lighting = 0.0.xxx;
 	const uint globalLightCount = min(
@@ -479,9 +409,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		if (lightIndex >= g_Scene.LightBaseIndex &&
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
-			const float3 light = EvaluateDirectLight(lightIndex, positionWS, N,
-				shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
-				energyCompensation, anisotropy, coat);
+			const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
 			lighting += light;
 		}
 	}
@@ -503,9 +431,7 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		{
 			continue;
 		}
-		const float3 light = EvaluateDirectLight(lightIndex, positionWS, N,
-			shadowReceiver, V, NoV, F0, physicalRoughness, baseColor, diffuseWeight,
-			energyCompensation, anisotropy, coat);
+		const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
 		lighting += light;
 	}
 	return lighting;
@@ -529,134 +455,54 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// plus texture+sampler bindings) feed the existing Forward PBR lighting
 	// below.
 	const SurfaceData surface = EvaluateSurface(matData, IN.UV0, IN.UV1);
-	const float3 baseColor = surface.BaseColor;
 	// Alpha mode / cutoff / discard stays pass-owned: resolve the surface's
 	// raw sampled alpha through the material's alpha policy here.
 	const float alpha = ResolveMaterialAlpha(matData, surface.Opacity);
 
-	// Metallic and Roughness (linear, resolved by the surface seam;
-	// B=metallic, G=roughness)
-	const float metallic = surface.Metallic;
-	const float authoredRoughness = surface.Roughness;
-
-	// Normal (linear)
-	float3 normalWS = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0));
-	float4 tangentWS = IN.TangentWS;
-	if ((matData.Flags & 1u) != 0u && !isFrontFace)
-	{
-		normalWS = -normalWS;
-	}
-	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
-	float3 N = SampleNormalWS(matData.NormalBinding, matData.NormalScale,
-		normalWS, tangentWS, IN.PositionWS, normalUV);
-	float3 clearcoatNormalWS = normalWS;
-	if ((matData.ClearcoatFactor > 0.0 ||
-		(matData.DebugView == MaterialDebugViewClearcoatNormal ||
-			matData.DebugView == MaterialDebugViewEffectiveClearcoatRoughness)) &&
-		matData.ClearcoatNormalBinding.TextureEnabled != 0u)
-	{
-		const float2 clearcoatUV = SelectUV(matData.ClearcoatNormalBinding, IN.UV0, IN.UV1);
-		clearcoatNormalWS = SampleNormalWS(matData.ClearcoatNormalBinding,
-			matData.ClearcoatNormalScale, normalWS, tangentWS, IN.PositionWS, clearcoatUV);
-	}
-	const bool specularAAEnabled = matData.DebugView != MaterialDebugViewUnfilteredLit;
-	const BaseShadingState shading = BuildBaseShadingState(surface, N, specularAAEnabled);
-	// Derivatives are evaluated before feature and debug-view branches.
-	const SpecularAAResult coatSpecularAA = EvaluateSpecularAA(
-		surface.ClearcoatRoughness, clearcoatNormalWS, specularAAEnabled);
-	const AnisotropyShadingState anisotropy = BuildAnisotropyShadingState(surface,
-		normalWS, N, tangentWS, IN.PositionWS, normalUV,
-		PerceptualRoughnessToAlpha(ClampPerceptualRoughnessForBRDF(authoredRoughness)),
-		shading.SpecularAAKernelAlpha,
-		matData.AnisotropyStrength > 0.0 ||
-		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld);
-	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(authoredRoughness);
+	MaterialShadingInput shadingInput;
+	shadingInput.PositionWS = IN.PositionWS;
+	shadingInput.NormalWS = IN.NormalWS;
+	shadingInput.TangentWS = IN.TangentWS;
+	shadingInput.UV0 = IN.UV0;
+	shadingInput.UV1 = IN.UV1;
+	shadingInput.ViewPositionWS = viewData.CameraPos.xyz;
+	shadingInput.IsFrontFace = isFrontFace;
+	const MaterialShadingFrame frame = PrepareMaterialShadingFrame(matData, surface, shadingInput);
 
 #if defined(GGLAB_MATERIAL_DIAGNOSTICS)
 	// Scene extraction requests diagnostic MRTs for every parameter debug view.
 	float3 diagnosticColor;
 	const bool diagnostic = TryEvaluateMaterialDiagnostic(matData.DebugView, surface,
-		shading, coatSpecularAA, clearcoatNormalWS, anisotropy, diagnosticColor);
+		frame.Base, frame.ClearcoatSpecularAA, frame.ClearcoatNormalWS, frame.Anisotropy, diagnosticColor);
 #else
 	const float3 diagnosticColor = 0.0.xxx;
 	const bool diagnostic = false;
 #endif
-	perceptualRoughness = shading.EffectivePerceptualRoughness;
 
-	// Shading
-	float3 V = SafeNormalize(viewData.CameraPos.xyz - IN.PositionWS, N); // View direction
-	float NoV = saturate(dot(N, V));
-
-	// convert artistic roughness to physical roughness
-	float a = shading.BRDFAlpha;
-
-	float3 F0 = shading.F0;
-	// The isotropic split-sum LUT estimates directional energy for the
-	// anisotropic lobe using its unmodified base roughness.
-	const float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
-	const float3 energyCompensation = GGXEnergyCompensation(F0, brdfLUT);
-	const float3 specularDirectionalAlbedo =
-		saturate((F0 * brdfLUT.x + brdfLUT.y) * energyCompensation);
-	// The view-integrated GGX albedo also weights direct diffuse. This is a
-	// directional approximation until incident-angle coupling is modeled.
-	const float3 diffuseWeight = (1.0.xxx - specularDirectionalAlbedo) * (1.0 - metallic);
-	ClearcoatShadingState coat;
-	coat.Factor = surface.ClearcoatFactor;
-	coat.NormalWS = clearcoatNormalWS;
-	coat.DirectionalAlbedo = 0.0;
-	coat.EnergyCompensation = 1.0.xxx;
-	coat.PerceptualRoughness = coatSpecularAA.EffectivePerceptualRoughness;
-	coat.BRDFAlpha = PerceptualRoughnessToAlpha(coat.PerceptualRoughness);
-	coat.NoV = saturate(dot(clearcoatNormalWS, V));
+	// The pass owns texture access. Preparation consumes the actual LUT samples
+	// once, and every light and environment response uses the same derived state.
+	const float2 baseBrdfLUT = SampleIBLBrdfLUT(frame.NoV, frame.Base.EffectivePerceptualRoughness);
+	ClearcoatShadingState coat = BuildClearcoatShadingState(surface, frame);
 	if (coat.Factor > 0.0)
 	{
-		const float2 coatLUT = SampleIBLBrdfLUT(coat.NoV, coat.PerceptualRoughness);
-		coat.EnergyCompensation = GGXEnergyCompensation(0.04.xxx, coatLUT);
-		coat.DirectionalAlbedo = saturate(
-			(0.04 * coatLUT.x + coatLUT.y) * coat.EnergyCompensation.x);
+		const float2 clearcoatBrdfLUT = SampleIBLBrdfLUT(coat.NoV, coat.PerceptualRoughness);
+		ApplyClearcoatDirectionalEnergy(coat, clearcoatBrdfLUT);
 	}
+	const PreparedMaterialShading material = PrepareMaterialShading(surface, frame,
+		baseBrdfLUT, coat);
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, diffuseWeight,
-		energyCompensation, anisotropy, coat);
+		IN.PositionWS, shadowReceiver, material);
 #else
-	const float3 directLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, anisotropy, coat);
+	const float3 directLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	const float3 legacyDirectLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor,
-			diffuseWeight, energyCompensation, anisotropy, coat);
+	const float3 legacyDirectLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
 #endif
 
-	// Emissive (resolved by the surface seam from the emissive texture)
-	// The clearcoat layer sits above emission and attenuates its outgoing light.
-	const float coatFresnel = F_Schlick(0.04.xxx, 1.0.xxx, coat.NoV).x;
-	const float3 emissive = surface.Emissive * (1.0 - coat.Factor * coatFresnel);
-
-	// IBL
-	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseWeight * Fd_Lambert(baseColor);
-
-	// Use one reflection direction: offset environment taps duplicate sharp
-	// landmarks instead of producing a continuous anisotropic reflection.
-	const float3 reflectWS = anisotropy.Strength > 0.0
-		? GetAnisotropicIBLReflection(N, V, anisotropy.BitangentWS,
-			anisotropy.AlphaT, anisotropy.AlphaB)
-		: reflect(-V, N);
-	const float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
-	float3 specularIBL = prefilteredEnv * specularDirectionalAlbedo;
-	if (coat.Factor > 0.0)
-	{
-		const float baseTransmission = 1.0 - coat.Factor * coat.DirectionalAlbedo;
-		diffuseIBL *= baseTransmission * baseTransmission;
-		specularIBL *= baseTransmission * baseTransmission;
-		const float3 coatReflection = reflect(-V, clearcoatNormalWS);
-		const float3 coatEnvironment = SampleIBLPrefilteredSpecular(
-			coatReflection, coat.PerceptualRoughness);
-		specularIBL += coatEnvironment * (coat.Factor * coat.DirectionalAlbedo);
-	}
+	const float3 emissive = EvaluateMaterialEmission(surface.Emissive, material.Clearcoat);
+	MaterialIBLResponse ibl = SampleMaterialEnvironment(material);
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
@@ -666,20 +512,20 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ao = saturate(ao);
 	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
 	const float3 materialOccludedDiffuseIBL =
-		diffuseIBL * ResolveSpecularIBLVisibility(ao);
+		ibl.Diffuse * ResolveSpecularIBLVisibility(ao);
 	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);
-	diffuseIBL *= ResolveDiffuseIBLVisibility(ao, gtao);
-	specularIBL *= ResolveSpecularIBLVisibility(ao);
+	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, gtao);
+	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
-	outputLighting += diffuseIBL + specularIBL;
+	outputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 outputColor = float4(
 		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
-	legacyOutputLighting += diffuseIBL + specularIBL;
+	legacyOutputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 legacyColor = float4(
 		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,

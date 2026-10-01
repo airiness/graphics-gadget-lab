@@ -216,8 +216,20 @@ float4 PSMain() : SV_Target
 	const float3 compensation = float3(1.1, 1.3, 1.8);
 	const float3 reference = ReferenceDirectMaterialResponse(L, V, N, NoV, NoL,
 		coatNoL, F0, brdfAlpha, diffuse, compensation, anisotropy, coat, worldSun, angularRadius);
-	const float3 actual = EvaluateDirectMaterialResponse(L, V, N, NoV, NoL,
-		coatNoL, F0, brdfAlpha, diffuse, compensation, anisotropy, coat, worldSun, angularRadius);
+	PreparedMaterialShading material = (PreparedMaterialShading)0;
+	material.Base.NormalWS = N;
+	material.Base.F0 = F0;
+	material.Base.BRDFAlpha = brdfAlpha;
+	material.ViewDirectionWS = V;
+	material.NoV = NoV;
+	material.Anisotropy = anisotropy;
+	material.Clearcoat = coat;
+	material.EnergyCompensation = compensation;
+	// Convert the frozen diffuse BRDF into the prepared color/weight inputs.
+	material.BaseColor = diffuse * PI;
+	material.DiffuseWeight = 1.0.xxx;
+	const float3 actual = EvaluateDirectMaterialResponse(L, NoL, coatNoL,
+		material, worldSun, angularRadius);
 	// Bit checks constant-fold in DXIL; IsFinite remains a runtime intrinsic
 	// even for literal inputs in the current compiler.
 	const bool finite = all((asuint(actual) & 0x7f800000u) != 0x7f800000u) &&

@@ -1,6 +1,5 @@
 #pragma once
-#include <Common/SurfaceEvaluation.hlsli>
-#include <PBR/BRDF.hlsli>
+#include <PBR/MaterialShading.hlsli>
 
 static const uint WorldSunDiskSampleCount = 32u;
 static const float WorldSunDiskAlphaThreshold = 0.04;
@@ -103,15 +102,18 @@ DirectSpecularLobes IntegrateSunDiskSpecular(SunDiskSampling sampling,
 	return integrated;
 }
 
-float3 EvaluateDirectMaterialResponse(float3 L, float3 V, float3 N,
-	float NoV, float NoL, float coatNoL, float3 F0, float brdfAlpha,
-	float3 diffuse, float3 energyCompensation, AnisotropyShadingState anisotropy,
-	ClearcoatShadingState coat, bool worldSun, float sunAngularRadius)
+float3 EvaluateDirectMaterialResponse(float3 L, float NoL, float coatNoL,
+	PreparedMaterialShading material, bool worldSun, float sunAngularRadius)
 {
+	const BaseShadingState base = material.Base;
+	const AnisotropyShadingState anisotropy = material.Anisotropy;
+	const ClearcoatShadingState coat = material.Clearcoat;
+	const float3 V = material.ViewDirectionWS;
+	const float3 diffuse = material.DiffuseWeight * Fd_Lambert(material.BaseColor);
 	// The center approximation applies at alpha >= 0.04. An anisotropic base
 	// uses its narrower width; the coat keeps its own center-visibility gate.
 	const bool integrateBase = worldSun &&
-		(anisotropy.Strength > 0.0 ? anisotropy.AlphaB : brdfAlpha) < WorldSunDiskAlphaThreshold;
+		(anisotropy.Strength > 0.0 ? anisotropy.AlphaB : base.BRDFAlpha) < WorldSunDiskAlphaThreshold;
 	const bool integrateClearcoat = worldSun && coat.Factor > 0.0 && coatNoL > 0.0 &&
 		coat.BRDFAlpha < WorldSunDiskAlphaThreshold;
 	DirectSpecularLobes disk;
@@ -120,18 +122,19 @@ float3 EvaluateDirectMaterialResponse(float3 L, float3 V, float3 N,
 	if (integrateBase || integrateClearcoat)
 	{
 		disk = IntegrateSunDiskSpecular(BuildSunDiskSampling(L, sunAngularRadius),
-			N, V, NoV, F0, brdfAlpha, anisotropy, coat, integrateBase, integrateClearcoat);
+			base.NormalWS, V, material.NoV, base.F0, base.BRDFAlpha, anisotropy, coat,
+			integrateBase, integrateClearcoat);
 	}
 
 	float3 response;
 	if (integrateBase)
 	{
-		response = diffuse * NoL + disk.Base * energyCompensation;
+		response = diffuse * NoL + disk.Base * material.EnergyCompensation;
 	}
 	else
 	{
-		const float3 specular = EvaluateBaseDirectBRDF(L, V, N, NoV, NoL,
-			F0, brdfAlpha, anisotropy) * energyCompensation;
+		const float3 specular = EvaluateBaseDirectBRDF(L, V, base.NormalWS, material.NoV, NoL,
+			base.F0, base.BRDFAlpha, anisotropy) * material.EnergyCompensation;
 		response = (diffuse + specular) * NoL;
 	}
 	if (coat.Factor > 0.0)

@@ -2927,17 +2927,17 @@ namespace gglab
 			context.Check(anisotropicIBLSpirVContractsCompile,
 				"Production anisotropic IBL reflection numeric contracts also compile to SPIR-V");
 
-			struct IBLNumericContractCase
+			struct ShaderNumericContractCase
 			{
 				const wchar_t* m_Entry;
 				const char* m_Description;
 			};
-			const auto checkIBLNumericContracts = [&compiler, &context, &desc](const wchar_t* sourcePath,
-				std::span<const IBLNumericContractCase> cases)
+			const auto checkShaderNumericContracts = [&compiler, &context, &desc](const wchar_t* sourcePath,
+				std::span<const ShaderNumericContractCase> cases)
 				{
 					desc.m_SourcePath = sourcePath;
 					desc.m_Defines.clear();
-					for (const IBLNumericContractCase& testCase : cases)
+					for (const ShaderNumericContractCase& testCase : cases)
 					{
 						desc.m_Entry = testCase.m_Entry;
 						desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
@@ -2949,38 +2949,51 @@ namespace gglab
 						{
 							matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
 						}
-						context.Check(matches, std::format("Production IBL numeric contract returns zero failure output in DXIL: {}",
+						context.Check(matches, std::format("Production shader numeric contract returns zero failure output in DXIL: {}",
 							testCase.m_Description));
 						desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
 						desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
 						context.Check(compiler.Compile(desc).IsSuccess(),
-							std::format("Production IBL numeric contract compiles to SPIR-V: {}", testCase.m_Description));
+							std::format("Production shader numeric contract compiles to SPIR-V: {}", testCase.m_Description));
 					}
 				};
 
 			const std::array irradianceCases{
-				IBLNumericContractCase{ L"TestIrradianceGridForLowPreset", "irradiance Low preset selects a 4x4 face grid" },
-				IBLNumericContractCase{ L"TestIrradianceGridForMediumPreset", "irradiance Medium preset selects an 8x8 face grid" },
-				IBLNumericContractCase{ L"TestIrradianceGridForHighPreset", "irradiance High preset selects a 16x16 face grid" },
-				IBLNumericContractCase{ L"TestIrradianceGridForOfflinePreset", "irradiance Offline preset selects a 32x32 face grid" },
-				IBLNumericContractCase{ L"TestIrradianceGridWithTruncatedMipChain", "irradiance grid respects the available mip chain" },
-				IBLNumericContractCase{ L"TestIrradianceGridWithInsufficientSourceResolution", "irradiance grid retains mip 0 for an undersized source" },
-				IBLNumericContractCase{ L"TestIrradianceGridWithZeroBudget", "irradiance zero budget retains a one-texel face grid" },
-				IBLNumericContractCase{ L"TestIrradianceNormalizationForConstantEnvironment", "constant-environment irradiance has unit normalization" },
+				ShaderNumericContractCase{ L"TestIrradianceGridForLowPreset", "irradiance Low preset selects a 4x4 face grid" },
+				ShaderNumericContractCase{ L"TestIrradianceGridForMediumPreset", "irradiance Medium preset selects an 8x8 face grid" },
+				ShaderNumericContractCase{ L"TestIrradianceGridForHighPreset", "irradiance High preset selects a 16x16 face grid" },
+				ShaderNumericContractCase{ L"TestIrradianceGridForOfflinePreset", "irradiance Offline preset selects a 32x32 face grid" },
+				ShaderNumericContractCase{ L"TestIrradianceGridWithTruncatedMipChain", "irradiance grid respects the available mip chain" },
+				ShaderNumericContractCase{ L"TestIrradianceGridWithInsufficientSourceResolution", "irradiance grid retains mip 0 for an undersized source" },
+				ShaderNumericContractCase{ L"TestIrradianceGridWithZeroBudget", "irradiance zero budget retains a one-texel face grid" },
+				ShaderNumericContractCase{ L"TestIrradianceNormalizationForConstantEnvironment", "constant-environment irradiance has unit normalization" },
 			};
-			checkIBLNumericContracts(L"Tests/IrradianceIntegrationContractCompile.hlsl", irradianceCases);
+			checkShaderNumericContracts(L"Tests/IrradianceIntegrationContractCompile.hlsl", irradianceCases);
 
 			const std::array specularCases{
-				IBLNumericContractCase{ L"TestCubemapJacobianAtFaceCenter", "cube-face center has Jacobian 4" },
-				IBLNumericContractCase{ L"TestCubemapJacobianAtFaceCorner", "cube-face corner has Jacobian 4 / (3 * sqrt(3))" },
-				IBLNumericContractCase{ L"TestGGXPdfAtUnitAlpha", "unit-alpha GGX has reflected-direction PDF 1 / (4 * pi)" },
-				IBLNumericContractCase{ L"TestGGXPdfAtNormalIncidence", "normal-incidence GGX has PDF 1 / (4 * pi * alpha^2)" },
-				IBLNumericContractCase{ L"TestEnvironmentPdfAtFaceCenter", "environment cell probability converts to a solid-angle PDF" },
-				IBLNumericContractCase{ L"TestMISWeightWithBothProposals", "MIS balances GGX and environment sample counts" },
-				IBLNumericContractCase{ L"TestMISWeightWithGGXOnly", "GGX-only MIS reduces to the cosine weight" },
-				IBLNumericContractCase{ L"TestEnvironmentPdfWithZeroMass", "zero-mass environment cell has zero PDF" },
+				ShaderNumericContractCase{ L"TestCubemapJacobianAtFaceCenter", "cube-face center has Jacobian 4" },
+				ShaderNumericContractCase{ L"TestCubemapJacobianAtFaceCorner", "cube-face corner has Jacobian 4 / (3 * sqrt(3))" },
+				ShaderNumericContractCase{ L"TestGGXPdfAtUnitAlpha", "unit-alpha GGX has reflected-direction PDF 1 / (4 * pi)" },
+				ShaderNumericContractCase{ L"TestGGXPdfAtNormalIncidence", "normal-incidence GGX has PDF 1 / (4 * pi * alpha^2)" },
+				ShaderNumericContractCase{ L"TestEnvironmentPdfAtFaceCenter", "environment cell probability converts to a solid-angle PDF" },
+				ShaderNumericContractCase{ L"TestMISWeightWithBothProposals", "MIS balances GGX and environment sample counts" },
+				ShaderNumericContractCase{ L"TestMISWeightWithGGXOnly", "GGX-only MIS reduces to the cosine weight" },
+				ShaderNumericContractCase{ L"TestEnvironmentPdfWithZeroMass", "zero-mass environment cell has zero PDF" },
 			};
-			checkIBLNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
+			checkShaderNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
+
+			const std::array materialShadingCases{
+				ShaderNumericContractCase{ L"TestMaterialDirectionalEnergy", "prepared base retains GGX energy and diffuse partition" },
+				ShaderNumericContractCase{ L"TestMetalSuppressesDiffuseIBL", "metal endpoint suppresses diffuse IBL" },
+				ShaderNumericContractCase{ L"TestClearcoatIBLTransmission", "reflected IBL crosses the coat twice before adding its reflection" },
+				ShaderNumericContractCase{ L"TestDisabledClearcoatIgnoresSamples", "disabled coat ignores its LUT and environment samples" },
+				ShaderNumericContractCase{ L"TestUnbakedMaterialLUT", "unbaked LUT keeps unit compensation and zero directional albedo" },
+				ShaderNumericContractCase{ L"TestSaturatedMaterialAlbedo", "bounded albedo retains the unit-coat endpoint" },
+				ShaderNumericContractCase{ L"TestPreparedAnisotropicIBLDirection", "prepared anisotropy selects bent or isotropic reflection" },
+				ShaderNumericContractCase{ L"TestIndependentClearcoatFrame", "coat retains its own normal, view angle and filtered roughness" },
+				ShaderNumericContractCase{ L"TestEmissionCrossesClearcoatOnce", "emission uses one outgoing Fresnel crossing" },
+			};
+			checkShaderNumericContracts(L"Tests/MaterialShadingContractCompile.hlsl", materialShadingCases);
 
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";

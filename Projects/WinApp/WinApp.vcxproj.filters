@@ -886,6 +886,9 @@
     <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
@@ -1008,7 +1011,13 @@
     <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
     <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">

@@ -450,7 +450,9 @@
     <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli" />
     <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
     <None Include="..\..\Shaders\PBR\DirectLighting.hlsli" />
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli" />
     <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli" />
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli" />
     <None Include="..\..\Shaders\PBR\SpecularAA.hlsli" />
     <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
@@ -486,6 +488,7 @@
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl" />
+    <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl" />
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl" />
