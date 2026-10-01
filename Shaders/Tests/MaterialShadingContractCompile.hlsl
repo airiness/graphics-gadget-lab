@@ -208,3 +208,103 @@ float4 TestEmissionCrossesClearcoatOnce() : SV_Target0
 		surface.Emissive * emissionTransmission);
 	return matches ? 0.0.xxxx : 1.0.xxxx;
 }
+
+float4 TestDisabledClearcoatSkipsFootprint(float3 normalWS : NORMAL) : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewLit;
+	SurfaceData surface = (SurfaceData)0;
+	surface.ClearcoatRoughness = 0.25;
+	const SpecularAAResult result = PrepareClearcoatSpecularAA(material, surface, normalWS);
+	// A varying normal must not generate a footprint for an unused coat.
+	const bool matches = result.NormalVariance == 0.0 && result.KernelAlpha == 0.0 &&
+		result.EffectivePerceptualRoughness == 0.25;
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestClearcoatNormalDiagnosticSkipsFootprint(float3 normalWS : NORMAL) : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewClearcoatNormal;
+	SurfaceData surface = (SurfaceData)0;
+	surface.ClearcoatRoughness = 0.5;
+	const SpecularAAResult result = PrepareClearcoatSpecularAA(material, surface, normalWS);
+	// Normal color diagnostics need the normal, but do not consume its AA footprint.
+	const bool matches = result.NormalVariance == 0.0 && result.KernelAlpha == 0.0 &&
+		result.EffectivePerceptualRoughness == 0.5;
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestClearcoatFootprintUsesUniformRequirements() : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewNormalVariance;
+	const bool inactiveVariance = !NeedsClearcoatSpecularAA(material);
+	material.DebugView = MaterialDebugViewSpecularAAContribution;
+	const bool inactiveContribution = !NeedsClearcoatSpecularAA(material);
+	material.DebugView = MaterialDebugViewEffectiveClearcoatRoughness;
+	const bool requestedRoughness = NeedsClearcoatSpecularAA(material);
+	material.DebugView = MaterialDebugViewLit;
+	material.ClearcoatFactor = 1.0;
+	// The requirement has no sampled-factor input: a textured zero cannot disable it.
+	const bool activeCoat = NeedsClearcoatSpecularAA(material);
+	material.DebugView = MaterialDebugViewUnfilteredLit;
+	const bool unfilteredCoat = NeedsClearcoatSpecularAA(material);
+	const bool matches = inactiveVariance && inactiveContribution && requestedRoughness && activeCoat && unfilteredCoat;
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestDisabledAnisotropySkipsRotation(float rotation : TEXCOORD0) : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewLit;
+	material.AnisotropyRotation = rotation;
+	// Retained bindings on a disabled layer must not cause sampling or direction work.
+	material.AnisotropyBinding.TextureEnabled = 1u;
+	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
+	const bool matches = surface.AnisotropyStrength == 0.0 &&
+		all(surface.AnisotropyDirectionTS == float2(1.0, 0.0));
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestZeroAnisotropyRetainsTangentDiagnostic() : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewAnisotropyDirectionTangent;
+	material.AnisotropyRotation = PI * 0.5;
+	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
+	// A quarter-turn takes the untextured +T direction to +B even at zero strength.
+	const bool matches = surface.AnisotropyStrength == 0.0 &&
+		all(abs(surface.AnisotropyDirectionTS - float2(0.0, 1.0)) < MaterialContractTolerance);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestZeroAnisotropyRetainsWorldDiagnostic() : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewAnisotropyDirectionWorld;
+	material.AnisotropyRotation = -PI * 0.5;
+	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
+	const AnisotropyShadingState state = BuildAnisotropyShadingState(surface,
+		float3(0.0, 0.0, 1.0), float3(0.0, 0.0, 1.0), float4(1.0, 0.0, 0.0, 1.0),
+		0.0.xxx, 0.0.xx, 0.25, 0.0, true);
+	// The negative quarter-turn maps +T to -B in this right-handed world frame.
+	const bool matches = state.Strength == 0.0 &&
+		MatchesMaterialValue(state.TangentWS, float3(0.0, -1.0, 0.0));
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestActiveAnisotropyUsesBindingFlag() : SV_Target0
+{
+	MaterialData material = (MaterialData)0;
+	material.DebugView = MaterialDebugViewLit;
+	material.AnisotropyStrength = 0.7;
+	material.AnisotropyRotation = PI * 0.25;
+	material.AnisotropyPadding = uint2(1u, 1u);
+	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
+	// Only the binding flag controls sampling. Reserved bytes must be ignored;
+	// the untextured direction rotates by 45 degrees to (1/sqrt(2), 1/sqrt(2)).
+	const bool matches = surface.AnisotropyStrength == 0.7 &&
+		all(abs(surface.AnisotropyDirectionTS - 0.7071067812.xx) < MaterialContractTolerance);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}

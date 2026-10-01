@@ -28,7 +28,7 @@ float4 PSMain() : SV_Target
 		matData.ClearcoatBinding.TextureEnabled +
 		matData.ClearcoatRoughnessBinding.TextureEnabled +
 		matData.ClearcoatNormalBinding.TextureEnabled +
-		matData.AnisotropyTextureEnabled +
+		matData.AnisotropyBinding.TextureEnabled + dot(matData.AnisotropyPadding, uint2(1u, 1u)) +
 		dot(matData.NormalBinding.UVTransformU, 1.0.xxxx) +
 		dot(matData.OcclusionBinding.UVTransformV, 1.0.xxxx);
 

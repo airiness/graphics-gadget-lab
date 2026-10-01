@@ -100,8 +100,7 @@ struct MaterialData
 	MaterialTextureBindingData ClearcoatNormalBinding;
 	float AnisotropyStrength;
 	float AnisotropyRotation;
-	uint AnisotropyTextureEnabled;
-	uint AnisotropyPadding;
+	uint2 AnisotropyPadding; // TextureEnabled belongs to AnisotropyBinding.
 	MaterialTextureBindingData AnisotropyBinding;
 };
 

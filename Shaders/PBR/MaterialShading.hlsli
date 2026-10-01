@@ -38,6 +38,29 @@ struct PreparedMaterialShading
 	float3 DiffuseWeight;
 };
 
+bool NeedsClearcoatSpecularAA(MaterialData material)
+{
+	// Use draw-uniform inputs, never a factor sampled within the pixel quad.
+	return material.ClearcoatFactor > 0.0 ||
+		material.DebugView == MaterialDebugViewEffectiveClearcoatRoughness;
+}
+
+SpecularAAResult PrepareClearcoatSpecularAA(MaterialData material, SurfaceData surface,
+	float3 normalWS)
+{
+	[branch]
+	if (NeedsClearcoatSpecularAA(material))
+	{
+		return EvaluateSpecularAA(surface.ClearcoatRoughness, normalWS,
+			material.DebugView != MaterialDebugViewUnfilteredLit);
+	}
+	SpecularAAResult result;
+	result.NormalVariance = 0.0;
+	result.KernelAlpha = 0.0;
+	result.EffectivePerceptualRoughness = ClampPerceptualRoughnessForBRDF(surface.ClearcoatRoughness);
+	return result;
+}
+
 float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
 	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
 {
@@ -140,9 +163,8 @@ MaterialShadingFrame PrepareMaterialShadingFrame(MaterialData material, SurfaceD
 	}
 	const bool specularAAEnabled = material.DebugView != MaterialDebugViewUnfilteredLit;
 	frame.Base = BuildBaseShadingState(surface, baseNormalWS, specularAAEnabled);
-	// Keep both normal footprints ahead of sampled feature and diagnostic branches.
-	frame.ClearcoatSpecularAA = EvaluateSpecularAA(
-		surface.ClearcoatRoughness, frame.ClearcoatNormalWS, specularAAEnabled);
+	// Evaluate required normal footprints ahead of sampled feature and diagnostic branches.
+	frame.ClearcoatSpecularAA = PrepareClearcoatSpecularAA(material, surface, frame.ClearcoatNormalWS);
 	frame.Anisotropy = BuildAnisotropyShadingState(surface, normalWS, baseNormalWS,
 		input.TangentWS, input.PositionWS, normalUV,
 		PerceptualRoughnessToAlpha(ClampPerceptualRoughnessForBRDF(surface.Roughness)),

@@ -32,6 +32,13 @@ static const uint MaterialDebugViewEffectiveClearcoatRoughness = 21u;
 static const uint MaterialDebugViewAnisotropicAlpha = 22u;
 static const uint MaterialDebugViewUnfilteredLit = 23u;
 
+bool NeedsAnisotropyDirection(MaterialData material)
+{
+	return material.AnisotropyStrength > 0.0 ||
+		material.DebugView == MaterialDebugViewAnisotropyDirectionTangent ||
+		material.DebugView == MaterialDebugViewAnisotropyDirectionWorld;
+}
+
 // Resolves runtime material factors and texture bindings for Forward PBR.
 struct SurfaceData
 {
@@ -123,27 +130,29 @@ SurfaceData EvaluateSurface(MaterialData matData, float2 uv0, float2 uv1)
 			matData.ClearcoatRoughnessBinding.TextureSamplerBinding, roughnessUV).g;
 	}
 	surface.AnisotropyStrength = saturate(matData.AnisotropyStrength);
-	float2 direction = float2(1.0, 0.0);
-	if ((matData.AnisotropyStrength > 0.0 ||
-		matData.DebugView == MaterialDebugViewAnisotropyDirectionTangent ||
-		matData.DebugView == MaterialDebugViewAnisotropyDirectionWorld) &&
-		matData.AnisotropyTextureEnabled != 0u)
+	surface.AnisotropyDirectionTS = float2(1.0, 0.0);
+	[branch]
+	if (NeedsAnisotropyDirection(matData))
 	{
-		const float2 anisotropyUV = SelectUV(matData.AnisotropyBinding, uv0, uv1);
-		const float3 anisotropySample = SampleTextureBinding(
-			matData.AnisotropyBinding.TextureSamplerBinding, anisotropyUV).rgb;
-		surface.AnisotropyStrength *= anisotropySample.b;
-		const float2 sampledDirection = anisotropySample.rg * 2.0 - 1.0;
-		if (dot(sampledDirection, sampledDirection) > 1.0e-8)
+		float2 direction = float2(1.0, 0.0);
+		if (matData.AnisotropyBinding.TextureEnabled != 0u)
 		{
-			direction = normalize(sampledDirection);
+			const float2 anisotropyUV = SelectUV(matData.AnisotropyBinding, uv0, uv1);
+			const float3 anisotropySample = SampleTextureBinding(
+				matData.AnisotropyBinding.TextureSamplerBinding, anisotropyUV).rgb;
+			surface.AnisotropyStrength *= anisotropySample.b;
+			const float2 sampledDirection = anisotropySample.rg * 2.0 - 1.0;
+			if (dot(sampledDirection, sampledDirection) > 1.0e-8)
+			{
+				direction = normalize(sampledDirection);
+			}
 		}
+		const float cosine = cos(matData.AnisotropyRotation);
+		const float sine = sin(matData.AnisotropyRotation);
+		surface.AnisotropyDirectionTS = float2(
+			cosine * direction.x - sine * direction.y,
+			sine * direction.x + cosine * direction.y);
 	}
-	const float cosine = cos(matData.AnisotropyRotation);
-	const float sine = sin(matData.AnisotropyRotation);
-	surface.AnisotropyDirectionTS = float2(
-		cosine * direction.x - sine * direction.y,
-		sine * direction.x + cosine * direction.y);
 
 	// Emissive retains the runtime factor scale.
 	// A scene-referred emissive-unit migration requires a separate contract.

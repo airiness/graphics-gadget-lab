@@ -2837,7 +2837,6 @@ namespace gglab
 				GPUAbiMember{ "ClearcoatNormalBinding", offsetof(MaterialGPU, ClearcoatNormalBinding) },
 				GPUAbiMember{ "AnisotropyStrength", offsetof(MaterialGPU, AnisotropyStrength) },
 				GPUAbiMember{ "AnisotropyRotation", offsetof(MaterialGPU, AnisotropyRotation) },
-				GPUAbiMember{ "AnisotropyTextureEnabled", offsetof(MaterialGPU, AnisotropyTextureEnabled) },
 				GPUAbiMember{ "AnisotropyPadding", offsetof(MaterialGPU, AnisotropyPadding) },
 				GPUAbiMember{ "AnisotropyBinding", offsetof(MaterialGPU, AnisotropyBinding) },
 			};
@@ -2992,6 +2991,13 @@ namespace gglab
 				ShaderNumericContractCase{ L"TestPreparedAnisotropicIBLDirection", "prepared anisotropy selects bent or isotropic reflection" },
 				ShaderNumericContractCase{ L"TestIndependentClearcoatFrame", "coat retains its own normal, view angle and filtered roughness" },
 				ShaderNumericContractCase{ L"TestEmissionCrossesClearcoatOnce", "emission uses one outgoing Fresnel crossing" },
+				ShaderNumericContractCase{ L"TestDisabledClearcoatSkipsFootprint", "disabled coat skips a varying normal footprint" },
+				ShaderNumericContractCase{ L"TestClearcoatNormalDiagnosticSkipsFootprint", "coat normal diagnostic skips unused AA" },
+				ShaderNumericContractCase{ L"TestClearcoatFootprintUsesUniformRequirements", "coat footprint follows authored factors and roughness diagnostics" },
+				ShaderNumericContractCase{ L"TestDisabledAnisotropySkipsRotation", "disabled anisotropy ignores varying rotation and retained bindings" },
+				ShaderNumericContractCase{ L"TestZeroAnisotropyRetainsTangentDiagnostic", "zero-strength tangent diagnostic retains rotation" },
+				ShaderNumericContractCase{ L"TestZeroAnisotropyRetainsWorldDiagnostic", "zero-strength world diagnostic retains its rotated frame" },
+				ShaderNumericContractCase{ L"TestActiveAnisotropyUsesBindingFlag", "active anisotropy uses the binding flag and ignores reserved bytes" },
 			};
 			checkShaderNumericContracts(L"Tests/MaterialShadingContractCompile.hlsl", materialShadingCases);
 

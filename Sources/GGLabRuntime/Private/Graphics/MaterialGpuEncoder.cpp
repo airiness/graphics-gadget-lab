@@ -97,7 +97,6 @@ namespace gglab
 			? std::clamp(material.m_AnisotropyStrength, 0.0f, 1.0f) : 0.0f;
 		gpu.AnisotropyRotation = std::isfinite(material.m_AnisotropyRotation)
 			? material.m_AnisotropyRotation : 0.0f;
-		gpu.AnisotropyTextureEnabled = material.m_AnisotropyBinding.m_TextureId.IsValid() ? 1u : 0u;
 		return gpu;
 	}
 }
