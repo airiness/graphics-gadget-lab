@@ -137,6 +137,8 @@ namespace gglab
 			ShaderProgramBuildRecord{ &IBLIrradiancePixel, L"Passes/PassIBLIrradiance.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &IBLPrefilteredSpecularVertex, L"Passes/PassIBLPrefilteredSpecular.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &IBLPrefilteredSpecularPixel, L"Passes/PassIBLPrefilteredSpecular.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &IBLImportanceVertex, L"Passes/PassIBLImportance.hlsl", L"VSMain" },
+			ShaderProgramBuildRecord{ &IBLImportancePixel, L"Passes/PassIBLImportance.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &IBLBrdfLUTVertex, L"Passes/PassIBLBrdfLUT.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &IBLBrdfLUTPixel, L"Passes/PassIBLBrdfLUT.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &IBLCubemapPreviewVertex, L"Passes/PassIBLCubemapPreview.hlsl", L"VSMain" },

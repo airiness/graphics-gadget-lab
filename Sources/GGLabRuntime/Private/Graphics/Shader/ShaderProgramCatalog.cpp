@@ -63,6 +63,8 @@ namespace gglab::shader_programs
 			IBLIrradiancePixel,
 			IBLPrefilteredSpecularVertex,
 			IBLPrefilteredSpecularPixel,
+			IBLImportanceVertex,
+			IBLImportancePixel,
 			IBLBrdfLUTVertex,
 			IBLBrdfLUTPixel,
 			IBLCubemapPreviewVertex,

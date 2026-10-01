@@ -27,6 +27,8 @@ namespace gglab
 
 	private:
 		void EnsureInitialized(const RenderServices& services) noexcept;
+		RGTextureId AddImportancePasses(RenderGraph& rg, const RenderServices& services,
+			uint32_t physicalSky) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSO(
 			const RenderServices& services, RHIFormat renderTargetFormat) noexcept;
@@ -34,6 +36,8 @@ namespace gglab
 	private:
 		GraphicsPhysicalPipelineKey m_BaseRecipe{};
 		GraphicsPipelineSlot m_PipelineSlot{};
+		GraphicsPhysicalPipelineKey m_ImportanceRecipe{};
+		GraphicsPipelineSlot m_ImportancePipelineSlot{};
 		bool m_IsInitialized = false;
 	};
 }

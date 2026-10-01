@@ -78,6 +78,13 @@ namespace shader_irradiance_math
 #include "../../Shaders/Lighting/IrradianceIntegrationMath.hlsli"
 }
 
+namespace shader_specular_math
+{
+	using uint = uint32_t;
+	using std::sqrt;
+#include "../../Shaders/Lighting/SpecularIntegrationMath.hlsli"
+}
+
 namespace gglab
 {
 	namespace
@@ -1145,6 +1152,16 @@ namespace gglab
 			context.Check(executionModelsRecognized,
 				"SPIR-V reader recognizes both EXT and NV task and mesh execution models");
 
+			ShaderDesc importanceDesc = fullscreenDesc;
+			importanceDesc.m_SourcePath = L"Passes/PassIBLImportance.hlsl";
+			importanceDesc.m_Stage = ShaderStage::Pixel;
+			importanceDesc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+			importanceDesc.m_Entry = L"PSMain";
+			const auto importanceRecipe = compiler.Resolve(importanceDesc);
+			const auto importanceResult = compiler.CompileOrLoad(importanceRecipe);
+			importanceDesc.m_SourcePath = L"Passes/PassIBLPrefilteredSpecular.hlsl";
+			const auto specularRecipe = compiler.Resolve(importanceDesc);
+			const auto specularResult = compiler.CompileOrLoad(specularRecipe);
 			const std::array validationCases{
 				std::pair{ &spirVResult, &spirVRecipe },
 				std::pair{ &forwardPixelResult, &forwardPixelRecipe },
@@ -1153,6 +1170,8 @@ namespace gglab
 				std::pair{ &gtaoDiagnosticsResult, &gtaoDiagnosticsRecipe },
 				std::pair{ &storageResult, &storageRecipe },
 				std::pair{ &fullscreenResult, &fullscreenRecipe },
+				std::pair{ &importanceResult, &importanceRecipe },
+				std::pair{ &specularResult, &specularRecipe },
 			};
 			const bool allValidated = validator.MatchesValidationBaseline() &&
 				std::ranges::all_of(validationCases,
@@ -1165,7 +1184,7 @@ namespace gglab
 								compiler.GetCacheBinaryPath(*recipe));
 					});
 			context.Check(allValidated,
-				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, and storage artifacts");
+				"Baseline spirv-val accepts representative vertex, pixel, compute, GTAO, storage and specular IBL artifacts");
 		}
 
 		[[nodiscard]] bool WriteTextFile(
@@ -2183,9 +2202,93 @@ namespace gglab
 				"A concentrated HDR texel follows its fixed cosine response independently of finite-grid energy calibration");
 		}
 
+		void RunSpecularIntegrationMathTests(SelfTestContext& context) noexcept
+		{
+			constexpr double pi = 3.141592653589793;
+			bool projectionMatches = true;
+			for (uint32_t resolution : { 8u, 32u, 64u })
+			{
+				double sphereArea = 0.0;
+				for (uint32_t y = 0u; y < resolution; ++y)
+				{
+					for (uint32_t x = 0u; x < resolution; ++x)
+					{
+						const float u = (static_cast<float>(x) + 0.5f) / resolution;
+						const float v = (static_cast<float>(y) + 0.5f) / resolution;
+						const double jacobian = shader_specular_math::CubemapUvSolidAngleJacobian(u, v);
+						sphereArea += 6.0 * jacobian / (resolution * resolution);
+						projectionMatches &= jacobian > 0.0 &&
+							std::abs(jacobian - shader_specular_math::CubemapUvSolidAngleJacobian(1.0f - u, 1.0f - v)) < 0.000001;
+					}
+				}
+				projectionMatches &= std::abs(sphereArea - 4.0 * pi) / (4.0 * pi) < 0.004;
+			}
+			context.Check(projectionMatches, "Specular importance UV Jacobian covers the sphere with symmetric positive solid angles");
+
+			bool pdfMatches = true;
+			for (float alpha : { 0.01f, 0.0625f, 0.25f, 1.0f })
+			{
+				// Integrate in the analytic GGX CDF coordinate rather than undersampling its peak.
+				for (int step = 0; step < 1000; ++step)
+				{
+					const double alphaSquared = static_cast<double>(alpha) * alpha;
+					const double xi = (step + 0.5) / 1000.0;
+					const double NoHSquared = (1.0 - xi) / (1.0 + (alphaSquared - 1.0) * xi);
+					const double NoL = 2.0 * NoHSquared - 1.0;
+					const double expected = alphaSquared / (4.0 * pi * std::pow(1.0 + (alphaSquared - 1.0) * NoHSquared, 2.0));
+					const double actual = shader_specular_math::GetSpecularGGXPdf(static_cast<float>(NoL), alpha);
+					pdfMatches &= std::isfinite(actual) && actual > 0.0 && std::abs(actual - expected) / expected < 0.001;
+				}
+			}
+			context.Check(pdfMatches, "Reflected GGX PDF matches the analytic V-equals-N distribution including narrow lobes");
+
+			bool environmentPdfMatches = true;
+			for (uint32_t resolution : { 1u, 8u, 64u })
+			{
+				double probabilityIntegral = 0.0;
+				const double totalMass = 6.0 * resolution * resolution;
+				for (uint32_t y = 0u; y < resolution; ++y)
+				{
+					for (uint32_t x = 0u; x < resolution; ++x)
+					{
+						const float u = (static_cast<float>(x) + 0.5f) / resolution;
+						const float v = (static_cast<float>(y) + 0.5f) / resolution;
+						const float pdf = shader_specular_math::GetSpecularEnvironmentPdf(1.0f, static_cast<float>(totalMass), resolution, u, v);
+						probabilityIntegral += 6.0 * pdf * shader_specular_math::CubemapUvSolidAngleJacobian(u, v) / (resolution * resolution);
+					}
+				}
+				environmentPdfMatches &= std::abs(probabilityIntegral - 1.0) < 0.000001;
+			}
+			context.Check(environmentPdfMatches, "Environment cell probabilities transform to a normalized PDF in solid angle");
+
+			bool misMatches = true;
+			for (uint32_t count : { 1u, 3u, 128u, 512u })
+			{
+				const uint32_t environmentCount = count / 2u;
+				const uint32_t ggxCount = count - environmentCount;
+				double numerator = 0.0;
+				double denominator = 0.0;
+				for (int step = 1; step <= 32; ++step)
+				{
+					const float NoL = step / 32.0f;
+					const float ggxPdf = shader_specular_math::GetSpecularGGXPdf(NoL, 0.25f);
+					const float environmentPdf = step % 2 ? 0.0f : step * 0.2f;
+					const double weight = shader_specular_math::GetSpecularMISWeight(NoL, ggxPdf, environmentPdf, ggxCount, environmentCount);
+					const double density = ggxCount * ggxPdf + environmentCount * environmentPdf;
+					misMatches &= std::isfinite(weight) && weight > 0.0 &&
+						std::abs(weight * density - NoL * ggxPdf) < 0.000001;
+					numerator += 120000.0 * weight;
+					denominator += weight;
+				}
+				misMatches &= std::abs(numerator / denominator - 120000.0) < 0.000001;
+			}
+			context.Check(misMatches, "Balance MIS reconstructs the target kernel and preserves constant physical HDR with odd and single-sample budgets");
+		}
+
 		void RunShaderCompileContractTests(SelfTestContext& context) noexcept
 		{
 			RunIrradianceIntegrationMathTests(context);
+			RunSpecularIntegrationMathTests(context);
 			bool historyRescalingMatches = true;
 			for (const float previous : { 0.00000001f, 0.25f, 1.0f, 1024.0f })
 			{
@@ -2847,6 +2950,26 @@ namespace gglab
 			context.Check(irradianceSpirVContractsCompile,
 				"Production irradiance grid and normalization numeric contracts also compile to SPIR-V");
 
+			desc.m_SourcePath = L"Tests/SpecularIntegrationContractCompile.hlsl";
+			bool specularSpirVContractsCompile = true;
+			for (uint32_t testCase = 0; testCase < 8u; ++testCase)
+			{
+				desc.m_Defines = { { L"GGLAB_SPECULAR_TEST_CASE", std::to_wstring(testCase) } };
+				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+				const auto numericDxil = compiler.Compile(desc);
+				std::string disassembly;
+				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+				for (uint32_t component = 0; component < 4; ++component)
+				{
+					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+				}
+				context.Check(matches, std::format("Production specular importance PDF and MIS contract case {}", testCase));
+				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+				specularSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
+			}
+			context.Check(specularSpirVContractsCompile, "Production specular importance numeric contracts also compile to SPIR-V");
+
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
 			const std::array sunDiskCases{
@@ -3068,6 +3191,10 @@ namespace gglab
 				{ L"Passes/PassIBLEnvironmentMip.hlsl", "type.ConstantBuffer.IBLEnvironmentMipPassParameters", "PhysicalSky", 12 },
 				{ L"Passes/PassIBLIrradiance.hlsl", "type.ConstantBuffer.IBLIrradiancePassParameters", "PhysicalSky", 24 },
 				{ L"Passes/PassIBLPrefilteredSpecular.hlsl", "type.ConstantBuffer.IBLPrefilteredSpecularPassParameters", "PhysicalSky", 36 },
+				{ L"Passes/PassIBLPrefilteredSpecular.hlsl", "type.ConstantBuffer.IBLPrefilteredSpecularPassParameters", "ImportanceTextureIndex", 20 },
+				{ L"Passes/PassIBLPrefilteredSpecular.hlsl", "type.ConstantBuffer.IBLPrefilteredSpecularPassParameters", "ImportanceResolution", 24 },
+				{ L"Passes/PassIBLImportance.hlsl", "type.ConstantBuffer.IBLImportancePassParameters", "EnvironmentSourceMip", 20 },
+				{ L"Passes/PassIBLImportance.hlsl", "type.ConstantBuffer.IBLImportancePassParameters", "PhysicalSky", 24 },
 			};
 			for (const auto& abi : iblCases)
 			{

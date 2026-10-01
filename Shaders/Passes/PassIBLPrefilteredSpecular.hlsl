@@ -5,6 +5,7 @@
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
 #include <PBR/BRDF.hlsli>
+#include <Lighting/EnvironmentImportanceSampling.hlsli>
 
 struct IBLPrefilteredSpecularPassParameters
 {
@@ -13,8 +14,8 @@ struct IBLPrefilteredSpecularPassParameters
 	uint MipLevels;
 	uint EnvironmentTextureIndex;
 	uint EnvironmentSamplerIndex;
-	uint EnvironmentResolution;
-	uint EnvironmentMipLevels;
+	uint ImportanceTextureIndex;
+	uint ImportanceResolution;
 	uint SampleCount;
 	float MaxSampleLuminance;
 	uint PhysicalSky;
@@ -56,44 +57,55 @@ float3 IntegratePrefilteredSpecular(
 	}
 
 	const uint sampleCount = max(g_Pass.SampleCount, 1u);
-	const float environmentResolution = max((float) g_Pass.EnvironmentResolution, 1.0);
-	const float environmentTexelSolidAngle =
-		4.0 * PI / (6.0 * environmentResolution * environmentResolution);
-	const float maxEnvironmentMip = (float) (max(g_Pass.EnvironmentMipLevels, 1u) - 1u);
-	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
-	float3 viewWS = normalWS;
+	Texture2DArray<float> importance = GetTexture2DArrayFloat(g_Pass.ImportanceTextureIndex);
+	const float totalMass = GetEnvironmentImportanceMass(importance, g_Pass.ImportanceResolution);
+	// An empty proposal can also result from mip quantization of a very dim HDR.
+	// Retain GGX support instead of treating that proposal as proof of zero radiance.
+	const uint environmentCount = totalMass > 0.0 ? sampleCount / 2u : 0u;
+	const uint ggxCount = sampleCount - environmentCount;
+	const float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
 	float3 prefilteredColor = 0.0.xxx;
 	float totalWeight = 0.0;
 
 	for (uint i = 0; i < sampleCount; ++i)
 	{
-		float2 Xi = Hammersley(i, sampleCount);
-		float3 halfTS = ImportanceSampleGGX(Xi, alpha);
-		float3 halfWS = TangentToWorld(halfTS, normalWS);
-		float3 lightWS = normalize(2.0 * dot(viewWS, halfWS) * halfWS - viewWS);
+		float3 lightWS;
+		float environmentPdf = 0.0;
+		if (i < ggxCount)
+		{
+			float2 Xi = Hammersley(i, ggxCount);
+			Xi.x += 0.5 / (float)ggxCount;
+			const float3 halfWS = TangentToWorld(ImportanceSampleGGX(Xi, alpha), normalWS);
+			lightWS = normalize(2.0 * dot(normalWS, halfWS) * halfWS - normalWS);
+		}
+		else
+		{
+			float2 Xi = Hammersley(i - ggxCount, environmentCount);
+			Xi.x += 0.5 / (float)environmentCount;
+			Xi.y += 0.5 / (float)environmentCount;
+			lightWS = SampleEnvironmentImportance(importance, g_Pass.ImportanceResolution, totalMass, Xi, environmentPdf);
+		}
 
 		float NoL = saturate(dot(normalWS, lightWS));
 		if (NoL > 0.0)
 		{
-			float NoH = saturate(dot(normalWS, halfWS));
-			float HoV = saturate(dot(halfWS, viewWS));
-			float pdf = D_GGX(NoH, alpha) * NoH / max(4.0 * HoV, 1.0e-6);
-
-			// Match the solid angle represented by one importance sample to the
-			// cubemap texel footprint, reducing high-frequency noise without biasing
-			// every roughness level toward environment mip 0.
-			float sampleSolidAngle = 1.0 / max((float) sampleCount * pdf, 1.0e-6);
-			float sourceMip = 0.5 * log2(sampleSolidAngle / environmentTexelSolidAngle);
-			sourceMip = clamp(sourceMip, 0.0, maxEnvironmentMip);
-
-			float3 sampleRadiance =
-				SampleTextureCubeLevel(environmentBinding, lightWS, sourceMip).rgb;
-			prefilteredColor += ClampSampleLuminance(sampleRadiance) * NoL;
-			totalWeight += NoL;
+			if (i < ggxCount && totalMass > 0.0)
+			{
+				environmentPdf = EvaluateEnvironmentImportancePdf(importance,
+					g_Pass.ImportanceResolution, totalMass, lightWS);
+			}
+			const float ggxPdf = GetSpecularGGXPdf(NoL, alpha);
+			const float weight = GetSpecularMISWeight(NoL, ggxPdf, environmentPdf, ggxCount, environmentCount);
+			// Both proposals integrate the same radiance function. PDF-dependent
+			// source mips followed by a luminance clamp change that target with sample density.
+			const float3 sampleRadiance = SampleTextureCubeLevel(environmentBinding, lightWS, 0.0).rgb;
+			prefilteredColor += ClampSampleLuminance(sampleRadiance) * weight;
+			totalWeight += weight;
 		}
 	}
 
-	float3 result = prefilteredColor / max(totalWeight, 1e-5);
+	// Hammersley includes the normal GGX sample, so totalWeight is positive.
+	float3 result = prefilteredColor / totalWeight;
 	return g_Pass.PhysicalSky ? SanitizeSceneRadiance(result) : SanitizeHDRColor(result);
 }
 

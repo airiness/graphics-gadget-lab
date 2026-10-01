@@ -112,6 +112,10 @@ namespace gglab::shader_programs
 		"gglab.shader.ibl-prefiltered-specular", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLPrefilteredSpecularPixel{
 		"gglab.shader.ibl-prefiltered-specular", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef IBLImportanceVertex{
+		"gglab.shader.ibl-importance", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef IBLImportancePixel{
+		"gglab.shader.ibl-importance", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLBrdfLUTVertex{
 		"gglab.shader.ibl-brdf-lut", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLBrdfLUTPixel{

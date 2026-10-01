@@ -47,7 +47,7 @@ namespace gglab
 				TextureIndex::IBL_BrdfLut,
 			};
 
-		const std::array<ShaderProgramRef, 10> IBLProducerPrograms = {
+		const std::array<ShaderProgramRef, 12> IBLProducerPrograms = {
 			shader_programs::IBLEnvironmentVertex,
 			shader_programs::IBLEnvironmentPixel,
 			shader_programs::IBLEnvironmentMipVertex,
@@ -58,6 +58,8 @@ namespace gglab
 			shader_programs::IBLPrefilteredSpecularPixel,
 			shader_programs::IBLBrdfLUTVertex,
 			shader_programs::IBLBrdfLUTPixel,
+			shader_programs::IBLImportanceVertex,
+			shader_programs::IBLImportancePixel,
 		};
 
 		[[nodiscard]] bool CaptureIBLProducerArtifacts(ShaderManager& shaderManager,
@@ -85,7 +87,7 @@ namespace gglab
 
 			assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
 			assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
-			assignStage(IBLArtifactStage::PrefilteredSpecular, { 6, 7 });
+			assignStage(IBLArtifactStage::PrefilteredSpecular, { 6, 7, 10, 11 });
 			assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
 			return std::ranges::all_of(outIdentities,
 				[](const IBLStageShaderArtifactIdentity& identity) noexcept

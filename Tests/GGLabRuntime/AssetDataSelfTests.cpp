@@ -1972,7 +1972,7 @@ namespace gglab
 
 			IBLShaderArtifactIdentities identities{};
 			const std::array<uint32_t, static_cast<size_t>(IBLArtifactStage::Count)>
-				artifactCounts{ 4, 2, 2, 2 };
+				artifactCounts{ 4, 2, 4, 2 };
 			uint8_t marker = 1;
 			for (size_t stageIndex = 0; stageIndex < identities.size(); ++stageIndex)
 			{
@@ -2005,6 +2005,18 @@ namespace gglab
 				baseline.Get(IBLArtifactStage::BrdfLut).m_Key ==
 					changedIrradiance.Get(IBLArtifactStage::BrdfLut).m_Key,
 				"An IBL stage shader change invalidates only that stage and its data dependencies");
+
+			IBLShaderArtifactIdentities importanceChanged = identities;
+			importanceChanged[static_cast<size_t>(IBLArtifactStage::PrefilteredSpecular)]
+				.m_ArtifactRefs[3].m_ArtifactId.m_DurableDigest.m_Value[1] = std::byte{ 1 };
+			const auto changedImportance = system.Lookup(source,
+				EnvironmentTextureSourceType::Equirectangular, config, importanceChanged, true);
+			context.Check(
+				baseline.Get(IBLArtifactStage::PrefilteredSpecular).m_Key != changedImportance.Get(IBLArtifactStage::PrefilteredSpecular).m_Key &&
+				baseline.Get(IBLArtifactStage::Environment).m_Key == changedImportance.Get(IBLArtifactStage::Environment).m_Key &&
+				baseline.Get(IBLArtifactStage::Irradiance).m_Key == changedImportance.Get(IBLArtifactStage::Irradiance).m_Key &&
+				baseline.Get(IBLArtifactStage::BrdfLut).m_Key == changedImportance.Get(IBLArtifactStage::BrdfLut).m_Key,
+				"Environment importance producer changes invalidate the specular stage without invalidating unrelated producers");
 
 			IBLShaderArtifactIdentities environmentChanged = identities;
 			environmentChanged[static_cast<size_t>(IBLArtifactStage::Environment)]

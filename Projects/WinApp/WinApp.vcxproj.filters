@@ -847,6 +847,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLImportance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -884,6 +887,9 @@
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl">
@@ -972,6 +978,9 @@
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
@@ -985,6 +994,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">

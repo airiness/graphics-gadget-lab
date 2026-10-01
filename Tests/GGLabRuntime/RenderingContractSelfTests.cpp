@@ -48,6 +48,8 @@
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
 #include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "Graphics/RenderPass/RenderPassIBLEnvironment.h"
+#include "Graphics/RenderPass/RenderPassIBLEnvironmentMipChain.h"
+#include "Graphics/RenderPass/RenderPassIBLPrefilteredSpecular.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
@@ -6875,14 +6877,46 @@ namespace gglab
 						registry.GetIBLBakeTextureHandle(RenderTextureIndex::IBL_EnvironmentCubemap),
 						*registry.GetIBLBakeTextureDesc(RenderTextureIndex::IBL_EnvironmentCubemap),
 						UndefinedRHITextureState(), RGContentValidity::Undefined);
+					resources.m_BakePrefilteredSpecularCubemap = builder.ImportTexture("IBL.Bake.Specular",
+						registry.GetIBLBakeTextureHandle(RenderTextureIndex::IBL_PrefilteredSpecularCubemap),
+						*registry.GetIBLBakeTextureDesc(RenderTextureIndex::IBL_PrefilteredSpecularCubemap),
+						UndefinedRHITextureState(), RGContentValidity::Undefined);
 				});
 			pass.AddBakePass(bakeGraph, bakeServices);
 			RenderPassIBLEnvironment environmentPass;
 			environmentPass.AddPass(bakeGraph, disabledContext, bakeServices);
+			RenderPassIBLEnvironmentMipChain environmentMipPass;
+			environmentMipPass.AddPass(bakeGraph, disabledContext, bakeServices);
+			RenderPassIBLPrefilteredSpecular specularPass;
+			specularPass.AddPass(bakeGraph, disabledContext, bakeServices);
 			pass.AddFinishPass(bakeGraph);
 			const bool bakeCompiled = bakeGraph.Compile();
 			RGSnapshot bakeSnapshot;
 			BuildRenderGraphSnapshot(bakeGraph, bakeSnapshot);
+			bool importanceDependenciesMatch = bakeCompiled;
+			for (uint32_t mip = 0u; mip < 7u; ++mip)
+			{
+				const std::string from = mip == 0u ? "IBL.EnvironmentMipChain.9" : std::format("IBL.PrefilteredSpecular.Importance.{}", mip - 1u);
+				const std::string to = std::format("IBL.PrefilteredSpecular.Importance.{}", mip);
+				importanceDependenciesMatch &= std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+					[&from, &to](const RGSnapshotDependencyEdge& edge)
+					{ return edge.m_FromPassName == from && edge.m_ToPassName == to; });
+			}
+			importanceDependenciesMatch &= std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
+				[](const RGSnapshotDependencyEdge& edge)
+				{ return edge.m_FromPassName == "IBL.PrefilteredSpecular.Importance.6" && edge.m_ToPassName == "IBL.PrefilteredSpecular"; });
+			context.Check(importanceDependenciesMatch,
+				"Production specular importance mips depend on the baked environment and preceding mip before convolution");
+			const auto importanceResource = std::ranges::find(bakeSnapshot.m_Resources,
+				"IBL.SpecularImportance", &RGSnapshotResourceInfo::m_Name);
+			const auto specularConsumer = std::ranges::find(bakeSnapshot.m_Passes,
+				"IBL.PrefilteredSpecular", &RGSnapshotPassInfo::m_Name);
+			context.Check(importanceResource != bakeSnapshot.m_Resources.end() &&
+				specularConsumer != bakeSnapshot.m_Passes.end() && !importanceResource->m_Imported &&
+				importanceResource->m_TextureFormat == RHIFormat::R32Float &&
+				importanceResource->m_TextureExtent.m_Width == 64u &&
+				importanceResource->m_LastUserPassIndex == static_cast<int32_t>(specularConsumer->m_Index),
+				"Specular importance remains a RenderGraph transient retained through its last convolution consumer");
 			context.Check(bakeCompiled && std::ranges::any_of(bakeSnapshot.m_DependencyEdges,
 				[](const RGSnapshotDependencyEdge& edge)
 				{
