@@ -19,7 +19,7 @@ namespace gglab
 		constexpr const char* LightingContractModelPath =
 			"Assets/Models/GGLabLightingContract/GGLabLightingContract.gltf";
 		constexpr const char* MaterialReferenceModelPath =
-			"Assets/Models/GGLabLightingContractClearcoat/GGLabLightingContract.gltf";
+			"Assets/Models/GGLabLightingContractMaterialReferences/GGLabLightingContract.gltf";
 
 		enum class SceneSource : int32_t
 		{
@@ -77,7 +77,9 @@ namespace gglab
 			return;
 		}
 		m_PhysicalSun = physicalSun;
-		const auto references = BuildLightingContractReferenceViews(physicalSun);
+		const bool materialReferences = GetParameters().Get(SceneSourceId,
+			int32_t(SceneSource::Original)) == int32_t(SceneSource::MaterialReferences);
+		const auto references = BuildLightingContractReferenceViews(physicalSun, materialReferences);
 		const bool registered = GetCameraRig().SetReferenceViews({ references.begin(), references.end() });
 		GGLAB_ASSERT_MSG(registered, "Lighting contract mode must provide valid reference views.");
 		GetMutableViewRenderProfile().m_EnableScenePreExposure = physicalSun;
@@ -105,6 +107,10 @@ namespace gglab
 		m_World.GetRegistry().clear();
 		const auto sceneSource = static_cast<SceneSource>(
 			GetParameters().Get(SceneSourceId, int32_t(SceneSource::Original)));
+		const auto references = BuildLightingContractReferenceViews(m_PhysicalSun,
+			sceneSource == SceneSource::MaterialReferences);
+		const bool registered = GetCameraRig().SetReferenceViews({ references.begin(), references.end() });
+		GGLAB_ASSERT_MSG(registered, "Lighting contract scene reference views must be valid.");
 		m_PendingModelPath = sceneSource == SceneSource::MaterialReferences
 			? MaterialReferenceModelPath : LightingContractModelPath;
 		m_PendingModelId = GetAssetOwnerScope().LoadModelAsync(m_PendingModelPath).m_ModelId;

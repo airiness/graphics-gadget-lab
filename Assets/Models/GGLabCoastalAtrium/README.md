@@ -5,6 +5,12 @@ The asset contains 86 authored meshes, 1046 triangles and five opaque materials.
 Basic concrete, stone and metal surfaces use nine original procedural PNGs.
 Load the `.gltf` with its adjacent `.bin` and `Textures/` directory.
 
+This bundle retains the earlier content reference. The current `--demo atrium`
+loads [the Research Lounge bundle](../GGLabCoastalAtriumResearchLounge/README.md).
+Existing captures below retain their original export identity. Reproducing this
+older export requires the Content source identified by the hashes below; the
+current saved source includes the coated lounge and brushed frame.
+
 ## Source
 
 - Repository: `GraphicsGadgetLabContent`.

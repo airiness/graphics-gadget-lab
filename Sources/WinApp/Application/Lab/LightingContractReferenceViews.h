@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
 
 #include <array>
+#include <vector>
 
 namespace gglab
 {
@@ -46,9 +47,35 @@ namespace gglab
 			.m_FarPlane = 100.0f,
 		},
 	} };
-	inline auto BuildLightingContractReferenceViews(bool physicalSun)
+	inline const std::array<CameraReferenceView, 2> LightingContractMaterialReferenceViews = { {
+		{
+			.m_Id = "CAM_Clearcoat",
+			.m_Name = "Clearcoat",
+			.m_Purpose = "Off, smooth, rough and independent coat-normal references.",
+			.m_Position = { 67.0f, 3.2f, -10.0f },
+			.m_Target = { 67.0f, 0.8f, 0.0f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6509917105f),
+			.m_FarPlane = 100.0f,
+		},
+		{
+			.m_Id = "CAM_Anisotropy",
+			.m_Name = "Anisotropy",
+			.m_Purpose = "Strength off/on, 0/45/90-degree rotations, mirrored UVs and base-normal interaction.",
+			.m_Position = { 82.2f, 4.4f, -10.0f },
+			.m_Target = { 82.2f, 0.8f, 1.3f },
+			.m_VerticalFovDegrees = math::ToDegrees(0.6509917105f),
+			.m_FarPlane = 100.0f,
+		},
+	} };
+	inline auto BuildLightingContractReferenceViews(bool physicalSun, bool materialReferences = false)
 	{
-		auto views = LightingContractReferenceViews;
+		std::vector<CameraReferenceView> views{
+			LightingContractReferenceViews.begin(), LightingContractReferenceViews.end() };
+		if (materialReferences)
+		{
+			views.insert(views.end(), LightingContractMaterialReferenceViews.begin(),
+				LightingContractMaterialReferenceViews.end());
+		}
 		for (auto& view : views)
 		{
 			view.m_ManualEV100 = physicalSun ? 15.0f : 0.0f;
