@@ -880,6 +880,9 @@
     <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\BrdfLutWhiteFurnace.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
