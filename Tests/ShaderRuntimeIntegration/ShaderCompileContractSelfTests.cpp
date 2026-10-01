@@ -2927,48 +2927,60 @@ namespace gglab
 			context.Check(anisotropicIBLSpirVContractsCompile,
 				"Production anisotropic IBL reflection numeric contracts also compile to SPIR-V");
 
-			desc.m_SourcePath = L"Tests/IrradianceIntegrationContractCompile.hlsl";
-			desc.m_Entry = L"PSMain";
-			bool irradianceSpirVContractsCompile = true;
-			for (uint32_t testCase = 0; testCase < 8u; ++testCase)
+			struct IBLNumericContractCase
 			{
-				desc.m_Defines = { { L"GGLAB_IRRADIANCE_TEST_CASE", std::to_wstring(testCase) } };
-				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
-				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
-				const auto numericDxil = compiler.Compile(desc);
-				std::string disassembly;
-				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
-				for (uint32_t component = 0; component < 4; ++component)
+				const wchar_t* m_Entry;
+				const char* m_Description;
+			};
+			const auto checkIBLNumericContracts = [&compiler, &context, &desc](const wchar_t* sourcePath,
+				std::span<const IBLNumericContractCase> cases)
 				{
-					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
-				}
-				context.Check(matches, std::format("Production irradiance grid and normalization contract case {}", testCase));
-				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
-				irradianceSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
-			}
-			context.Check(irradianceSpirVContractsCompile,
-				"Production irradiance grid and normalization numeric contracts also compile to SPIR-V");
+					desc.m_SourcePath = sourcePath;
+					desc.m_Defines.clear();
+					for (const IBLNumericContractCase& testCase : cases)
+					{
+						desc.m_Entry = testCase.m_Entry;
+						desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
+						desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+						const auto numericDxil = compiler.Compile(desc);
+						std::string disassembly;
+						bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
+						for (uint32_t component = 0; component < 4; ++component)
+						{
+							matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
+						}
+						context.Check(matches, std::format("Production IBL numeric contract returns zero failure output in DXIL: {}",
+							testCase.m_Description));
+						desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
+						desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
+						context.Check(compiler.Compile(desc).IsSuccess(),
+							std::format("Production IBL numeric contract compiles to SPIR-V: {}", testCase.m_Description));
+					}
+				};
 
-			desc.m_SourcePath = L"Tests/SpecularIntegrationContractCompile.hlsl";
-			bool specularSpirVContractsCompile = true;
-			for (uint32_t testCase = 0; testCase < 8u; ++testCase)
-			{
-				desc.m_Defines = { { L"GGLAB_SPECULAR_TEST_CASE", std::to_wstring(testCase) } };
-				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
-				desc.m_Target.m_Flags = ShaderCompileFlags::Optimization;
-				const auto numericDxil = compiler.Compile(desc);
-				std::string disassembly;
-				bool matches = numericDxil.IsSuccess() && DisassembleDxil(numericDxil.m_Artifact.m_Binary, disassembly);
-				for (uint32_t component = 0; component < 4; ++component)
-				{
-					matches &= disassembly.find(std::format("i8 {}, float 0.000000e+00)", component)) != std::string::npos;
-				}
-				context.Check(matches, std::format("Production specular importance PDF and MIS contract case {}", testCase));
-				desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Pixel);
-				specularSpirVContractsCompile &= compiler.Compile(desc).IsSuccess();
-			}
-			context.Check(specularSpirVContractsCompile, "Production specular importance numeric contracts also compile to SPIR-V");
+			const std::array irradianceCases{
+				IBLNumericContractCase{ L"TestIrradianceGridForLowPreset", "irradiance Low preset selects a 4x4 face grid" },
+				IBLNumericContractCase{ L"TestIrradianceGridForMediumPreset", "irradiance Medium preset selects an 8x8 face grid" },
+				IBLNumericContractCase{ L"TestIrradianceGridForHighPreset", "irradiance High preset selects a 16x16 face grid" },
+				IBLNumericContractCase{ L"TestIrradianceGridForOfflinePreset", "irradiance Offline preset selects a 32x32 face grid" },
+				IBLNumericContractCase{ L"TestIrradianceGridWithTruncatedMipChain", "irradiance grid respects the available mip chain" },
+				IBLNumericContractCase{ L"TestIrradianceGridWithInsufficientSourceResolution", "irradiance grid retains mip 0 for an undersized source" },
+				IBLNumericContractCase{ L"TestIrradianceGridWithZeroBudget", "irradiance zero budget retains a one-texel face grid" },
+				IBLNumericContractCase{ L"TestIrradianceNormalizationForConstantEnvironment", "constant-environment irradiance has unit normalization" },
+			};
+			checkIBLNumericContracts(L"Tests/IrradianceIntegrationContractCompile.hlsl", irradianceCases);
+
+			const std::array specularCases{
+				IBLNumericContractCase{ L"TestCubemapJacobianAtFaceCenter", "cube-face center has Jacobian 4" },
+				IBLNumericContractCase{ L"TestCubemapJacobianAtFaceCorner", "cube-face corner has Jacobian 4 / (3 * sqrt(3))" },
+				IBLNumericContractCase{ L"TestGGXPdfAtUnitAlpha", "unit-alpha GGX has reflected-direction PDF 1 / (4 * pi)" },
+				IBLNumericContractCase{ L"TestGGXPdfAtNormalIncidence", "normal-incidence GGX has PDF 1 / (4 * pi * alpha^2)" },
+				IBLNumericContractCase{ L"TestEnvironmentPdfAtFaceCenter", "environment cell probability converts to a solid-angle PDF" },
+				IBLNumericContractCase{ L"TestMISWeightWithBothProposals", "MIS balances GGX and environment sample counts" },
+				IBLNumericContractCase{ L"TestMISWeightWithGGXOnly", "GGX-only MIS reduces to the cosine weight" },
+				IBLNumericContractCase{ L"TestEnvironmentPdfWithZeroMass", "zero-mass environment cell has zero PDF" },
+			};
+			checkIBLNumericContracts(L"Tests/SpecularIntegrationContractCompile.hlsl", specularCases);
 
 			desc.m_SourcePath = L"Tests/SunDiskContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
