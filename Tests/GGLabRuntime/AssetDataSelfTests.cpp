@@ -1169,6 +1169,22 @@ namespace gglab
 				emptyIor.m_Model.m_Materials.front().m_Properties.m_Ior == DefaultDielectricIor,
 				"Empty KHR_materials_ior uses the physical default");
 
+			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy"],)",
+				R"({"extensions":{"KHR_materials_ior":{},"KHR_materials_clearcoat":{},"KHR_materials_anisotropy":{}}})");
+			const ModelImportResult emptyExtensions = ModelImporter::Import(root / "probe.gltf", {});
+			bool extensionDefaults = emptyExtensions.Succeeded();
+			if (extensionDefaults)
+			{
+				const auto& properties = emptyExtensions.m_Model.m_Materials.front().m_Properties;
+				extensionDefaults = properties.m_Ior == DefaultDielectricIor &&
+					properties.m_ClearcoatFactor == 0.0f && properties.m_ClearcoatRoughness == 0.0f &&
+					properties.m_ClearcoatNormalScale == 1.0f &&
+					properties.m_AnisotropyStrength == 0.0f && properties.m_AnisotropyRotation == 0.0f &&
+					emptyExtensions.m_Model.m_TextureSources.empty();
+			}
+			context.Check(extensionDefaults, std::format(
+				"Empty material extensions preserve defaults without texture dependencies: {}", emptyExtensions.m_Error));
+
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":2.4}}})");
 			const ModelImportResult highIor = ModelImporter::Import(root / "probe.gltf", {});
@@ -1328,7 +1344,7 @@ namespace gglab
 			context.Check(defaultCoatSampler.Succeeded() && requiredCoat.Succeeded() &&
 				defaultCoatSampler.m_Model.m_Materials.front().m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_SamplerKey ==
 				requiredCoat.m_Model.m_Materials.front().m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_SamplerKey,
-				"Disabled clearcoat without a sampler uses the same defaults as the enabled Assimp path");
+				"Disabled and enabled clearcoat bindings use the same default sampler");
 			writeSource(R"("extensionsUsed":["KHR_materials_clearcoat"],)",
 				R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatTexture":{"index":0}}}})", 0, -1,
 				R"("images":[{"uri":"map.png"}],"samplers":[{"wrapS":999}],"textures":[{"source":0,"sampler":0}],)");
@@ -1386,12 +1402,73 @@ namespace gglab
 				std::abs(disabledAnisotropy.m_Model.m_Materials.front().m_Properties.m_AnisotropyRotation - 1.2f) < 0.0001f,
 				"Zero anisotropy strength preserves rotation without enabling the lobe");
 
+			// The binding is independent of the lobe factor. Check authored values directly,
+			// including a negative rotation, rather than using Assimp's output as a reference.
+			for (const std::string_view strength : { std::string_view(R"("anisotropyStrength":0,)"), std::string_view{} })
+			{
+				const std::string material = std::string(R"({"extensions":{"KHR_materials_anisotropy":{)") +
+					std::string(strength) + R"("anisotropyRotation":-2.5,"anisotropyTexture":{"index":1,"texCoord":0,
+"extensions":{"KHR_texture_transform":{"texCoord":1,"offset":[0.1,0.2],"scale":[-2,0.5],"rotation":0.25}}}}}})";
+				writeSource(R"("extensionsUsed":["KHR_materials_anisotropy","KHR_texture_transform"],"extensionsRequired":["KHR_materials_anisotropy"],)",
+					material, 0, -1, coatTextureDeclarations);
+				const ModelImportResult texturedAnisotropy = ModelImporter::Import(root / "probe.gltf", {});
+				bool bindingValid = texturedAnisotropy.Succeeded() && texturedAnisotropy.m_Model.m_TextureSources.size() == 1u;
+				if (bindingValid)
+				{
+					const auto& properties = texturedAnisotropy.m_Model.m_Materials.front().m_Properties;
+					const auto& binding = texturedAnisotropy.m_Model.m_Materials.front().m_TextureBindings[
+						static_cast<size_t>(MaterialTextureSlot::Anisotropy)];
+					bindingValid = properties.m_AnisotropyStrength == 0.0f && properties.m_AnisotropyRotation == -2.5f &&
+						binding.m_TextureIndex == 0u && binding.m_TexCoordIndex == 1u &&
+						binding.m_SamplerKey.m_AddressU == RHITextureAddressMode::Clamp &&
+						binding.m_SamplerKey.m_AddressV == RHITextureAddressMode::Mirror &&
+						binding.m_SamplerKey.m_Filter == RHISamplerFilter::MinMagMipPoint &&
+						binding.m_SamplerKey.m_MaxLOD == 0.0f &&
+						binding.m_UVOffset.m_X == 0.1f && binding.m_UVOffset.m_Y == 0.2f &&
+						binding.m_UVScale.m_X == -2.0f && binding.m_UVScale.m_Y == 0.5f && binding.m_UVRotation == 0.25f &&
+						texturedAnisotropy.m_Model.m_TextureSources.front().m_CanonicalPath == utils::Canonical(root / "coat.png") &&
+						texturedAnisotropy.m_Model.m_TextureSources.front().m_Semantic == TextureSemantic::Anisotropy;
+				}
+				context.Check(bindingValid, std::format(
+					"{} zero anisotropy retains its authored texture, sampler, UV transform and negative rotation: {}",
+					strength.empty() ? "Default" : "Explicit", texturedAnisotropy.m_Error));
+			}
+
 			writeSource(R"("extensionsUsed":["KHR_materials_anisotropy"],)",
 				R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyStrength":1.2}}})");
 			const ModelImportResult invalidAnisotropy = ModelImporter::Import(root / "probe.gltf", {});
 			context.Check(!invalidAnisotropy.Succeeded() &&
 				invalidAnisotropy.m_Error.find("KHR_materials_anisotropy") != std::string::npos,
 				"Out-of-range anisotropy strength is rejected visibly");
+
+			struct InvalidExtensionInput
+			{
+				std::string_view m_Material;
+				std::string_view m_Reason;
+			};
+			constexpr InvalidExtensionInput invalidExtensionInputs[] = {
+				{ R"({"extensions":[]})", "Non-object extension container" },
+				{ R"({"extensions":{"KHR_materials_ior":false}})", "Non-object IOR extension" },
+				{ R"({"extensions":{"KHR_materials_clearcoat":false}})", "Non-object clearcoat extension" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":false}})", "Non-object anisotropy extension" },
+				{ R"({"extensions":{"KHR_materials_ior":{"ior":1e100}}})", "IOR exceeding float range" },
+				{ R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatRoughnessFactor":-0.1}}})", "Negative clearcoat roughness" },
+				{ R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatFactor":1e100}}})", "Clearcoat factor exceeding float range" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyRotation":1e100}}})", "Anisotropy rotation exceeding float range" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyRotation":"invalid"}}})", "Non-numeric anisotropy rotation" },
+				{ R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatTexture":false}}})", "Non-object disabled clearcoat texture" },
+				{ R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatNormalTexture":{}}}})", "Missing disabled coat normal texture index" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyTexture":false}}})", "Non-object disabled anisotropy texture" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyTexture":{"index":999}}}})", "Invalid disabled anisotropy texture index" },
+				{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyTexture":{"index":0,"texCoord":2}}}})", "Unsupported disabled anisotropy UV set" },
+			};
+			for (const auto& input : invalidExtensionInputs)
+			{
+				writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy"],)", input.m_Material);
+				const ModelImportResult invalid = ModelImporter::Import(root / "probe.gltf", {});
+				context.Check(!invalid.Succeeded() && !invalid.m_Error.empty(),
+					std::format("{} is rejected visibly: {}", input.m_Reason, invalid.m_Error));
+			}
 
 			writeSource(R"("extensionsUsed":["KHR_materials_sheen"],"extensionsRequired":["KHR_materials_sheen"],)",
 				R"({"extensions":{"KHR_materials_sheen":{"sheenColorFactor":[0.2,0.3,0.4]}}})");
@@ -1412,6 +1489,7 @@ namespace gglab
 			writeSource(R"("extensionsUsed":["KHR_materials_ior","KHR_materials_clearcoat","KHR_materials_anisotropy"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":1.7},"KHR_materials_clearcoat":{"clearcoatFactor":0.6,"clearcoatRoughnessFactor":0.25,"clearcoatTexture":{"index":0},"clearcoatRoughnessTexture":{"index":0},"clearcoatNormalTexture":{"index":0,"scale":0.8}},"KHR_materials_anisotropy":{"anisotropyStrength":0.75,"anisotropyRotation":0.4,"anisotropyTexture":{"index":0}}}})");
 			Assimp::Importer assimp;
+			// Qualify the pinned dependency separately from source-authoritative imports.
 			const aiScene* extensionScene = assimp.ReadFile((root / "probe.gltf").string(), 0);
 			bool extensionFactors = extensionScene && extensionScene->mNumMaterials > 0;
 			bool extensionTextures = extensionFactors;
