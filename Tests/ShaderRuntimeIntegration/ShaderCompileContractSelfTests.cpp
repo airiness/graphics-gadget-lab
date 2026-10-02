@@ -3000,6 +3000,8 @@ namespace gglab
 				ShaderNumericContractCase{ L"TestActiveAnisotropyUsesBindingFlag", "active anisotropy uses the binding flag and ignores reserved bytes" },
 				ShaderNumericContractCase{ L"TestNormalTextureFrameSelection", "UV1, rotation and mirroring share a derived normal frame" },
 				ShaderNumericContractCase{ L"TestAnisotropyUsesNormalTextureFrame", "anisotropy follows the normal frame instead of generated UV0 tangents" },
+				ShaderNumericContractCase{ L"TestDerivedNormalFrameScaleInvariant", "derived normal frames retain UV orientation across pixel footprint scales" },
+				ShaderNumericContractCase{ L"TestDerivedNormalFrameMatchesGltfTangents", "derived normal frames match glTF +Y-up tangents with mirrored UVs and flipped normals" },
 			};
 			checkShaderNumericContracts(L"Tests/MaterialShadingContractCompile.hlsl", materialShadingCases);
 

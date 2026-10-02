@@ -343,3 +343,60 @@ float4 TestAnisotropyUsesNormalTextureFrame() : SV_Target0
 		MatchesMaterialValue(state.BitangentWS, float3(1.0, 0.0, 0.0));
 	return matches ? 0.0.xxxx : 1.0.xxxx;
 }
+
+float4 TestDerivedNormalFrameScaleInvariant() : SV_Target0
+{
+	const float3 N = float3(0.0, 0.0, 1.0);
+	const float3x3 reference = BuildTBNFromDerivatives(N,
+		float3(1.0, 0.0, 0.0), float3(0.0, 1.0, 0.0),
+		float2(0.0, 1.0), float2(-1.0, 0.0));
+	const float scales[3] = { 0.01, 0.0001, 100.0 };
+	bool matches = true;
+	[unroll]
+	for (uint index = 0; index < 3u; ++index)
+	{
+		// Scaling both pixel footprints changes the numerator by scale squared,
+		// but must never replace this rotated UV basis with an arbitrary fallback.
+		const float scale = scales[index];
+		const float3x3 frame = BuildTBNFromDerivatives(N,
+			float3(scale, 0.0, 0.0), float3(0.0, scale, 0.0),
+			float2(0.0, scale), float2(-scale, 0.0));
+		matches = matches && MatchesMaterialValue(frame[0], reference[0]) &&
+			MatchesMaterialValue(frame[1], reference[1]) && MatchesMaterialValue(frame[2], N);
+	}
+	const float3x3 degenerate = BuildTBNFromDerivatives(N, 0.0.xxx, 0.0.xxx, 0.0.xx, 0.0.xx);
+	const float3x3 collapsedUV = BuildTBNFromDerivatives(N,
+		float3(1.0, 0.0, 0.0), float3(0.0, 1.0, 0.0), 1.0.xx, 1.0.xx);
+	matches = matches && MatchesMaterialValue(degenerate[0], float3(1.0, 0.0, 0.0)) &&
+		MatchesMaterialValue(degenerate[1], float3(0.0, 1.0, 0.0)) &&
+		MatchesMaterialValue(degenerate[2], N) && MatchesMaterialValue(collapsedUV[0], degenerate[0]) &&
+		MatchesMaterialValue(collapsedUV[1], degenerate[1]);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestDerivedNormalFrameMatchesGltfTangents() : SV_Target0
+{
+	bool matches = true;
+	[unroll]
+	for (uint index = 0; index < 4u; ++index)
+	{
+		const float uSign = (index & 1u) != 0u ? -1.0 : 1.0;
+		const bool flipNormal = (index & 2u) != 0u;
+		const float normalSign = flipNormal ? 1.0 : -1.0;
+		const float3 N = float3(0.0, 0.0, -1.0);
+		// The import contract's front-facing quad has U along X and V down.
+		// Back faces must apply the same B/N reversal as the vertex-tangent path.
+		const float3x3 frame = OrientNormalTextureFrame(BuildTBNFromDerivatives(N,
+			float3(0.01, 0.0, 0.0), float3(0.0, -0.01, 0.0),
+			float2(0.01 * uSign, 0.0), float2(0.0, 0.01)), flipNormal);
+		matches = matches && MatchesMaterialValue(frame[0], float3(uSign, 0.0, 0.0)) &&
+			MatchesMaterialValue(frame[1], float3(0.0, -normalSign, 0.0)) &&
+			MatchesMaterialValue(frame[2], float3(0.0, 0.0, normalSign));
+	}
+	const float3x3 rotated = BuildTBNFromDerivatives(float3(0.0, 0.0, -1.0),
+		float3(0.01, 0.0, 0.0), float3(0.0, -0.01, 0.0),
+		float2(0.0, -0.01), float2(-0.01, 0.0));
+	matches = matches && MatchesMaterialValue(rotated[0], float3(0.0, 1.0, 0.0)) &&
+		MatchesMaterialValue(rotated[1], float3(1.0, 0.0, 0.0));
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}

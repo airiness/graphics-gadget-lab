@@ -68,14 +68,26 @@ bool RequiresDerivedNormalFrame(MaterialTextureBindingData binding)
 		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
 }
 
+float3x3 OrientNormalTextureFrame(float3x3 frame, bool flipNormal)
+{
+	if (flipNormal)
+	{
+		// Match the vertex-tangent path: back faces retain T and reverse B/N.
+		frame[1] = -frame[1];
+		frame[2] = -frame[2];
+	}
+	return frame;
+}
+
 float3x3 BuildNormalTextureFrame(MaterialTextureBindingData binding,
-	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
+	float3 geometricNormalWS, float4 tangentWS, float3 positionWS, float2 uv, bool flipNormal)
 {
 	// Imported generated tangents use UV0. Normal mapping and anisotropy must
 	// share the frame derived from the actual normal coordinates when these differ.
-	return RequiresDerivedNormalFrame(binding)
-		? BuildTBN(normalWS, positionWS, uv)
-		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
+	const float3x3 frame = RequiresDerivedNormalFrame(binding)
+		? BuildTBN(geometricNormalWS, positionWS, uv)
+		: BuildTBNFromTangent(geometricNormalWS, tangentWS, positionWS, uv);
+	return OrientNormalTextureFrame(frame, flipNormal);
 }
 
 float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale, float3x3 TBN, float2 uv)
@@ -143,14 +155,12 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 MaterialShadingFrame PrepareMaterialShadingFrame(MaterialData material, SurfaceData surface,
 	MaterialShadingInput input)
 {
-	float3 normalWS = SafeNormalize(input.NormalWS, float3(0.0, 1.0, 0.0));
-	if ((material.Flags & 1u) != 0u && !input.IsFrontFace)
-	{
-		normalWS = -normalWS;
-	}
+	const float3 geometricNormalWS = SafeNormalize(input.NormalWS, float3(0.0, 1.0, 0.0));
+	const bool flipNormal = (material.Flags & 1u) != 0u && !input.IsFrontFace;
+	const float3 normalWS = flipNormal ? -geometricNormalWS : geometricNormalWS;
 	const float2 normalUV = SelectUV(material.NormalBinding, input.UV0, input.UV1);
 	const float3x3 normalFrame = BuildNormalTextureFrame(material.NormalBinding,
-		normalWS, input.TangentWS, input.PositionWS, normalUV);
+		geometricNormalWS, input.TangentWS, input.PositionWS, normalUV, flipNormal);
 	const float3 baseNormalWS = SampleNormalWS(material.NormalBinding, material.NormalScale,
 		normalFrame, normalUV);
 	MaterialShadingFrame frame;
@@ -164,7 +174,7 @@ MaterialShadingFrame PrepareMaterialShadingFrame(MaterialData material, SurfaceD
 	{
 		const float2 clearcoatUV = SelectUV(material.ClearcoatNormalBinding, input.UV0, input.UV1);
 		const float3x3 clearcoatFrame = BuildNormalTextureFrame(material.ClearcoatNormalBinding,
-			normalWS, input.TangentWS, input.PositionWS, clearcoatUV);
+			geometricNormalWS, input.TangentWS, input.PositionWS, clearcoatUV, flipNormal);
 		frame.ClearcoatNormalWS = SampleNormalWS(material.ClearcoatNormalBinding,
 			material.ClearcoatNormalScale, clearcoatFrame, clearcoatUV);
 	}
