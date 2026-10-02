@@ -1474,7 +1474,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 62;
+			constexpr size_t ExpectedRuntimeProgramCount = 70;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
@@ -1564,6 +1564,27 @@ namespace gglab
 					shader_programs::AerialPerspectiveProbeCompute,
 					ShaderTargetProfile::GGLabVulkan13).has_value(),
 				"build-runtime activates the complete Vulkan 1.3 registry including the aerial probe");
+
+			const std::array requiredPrograms{
+				shader_programs::ForwardPBRLegacyMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRLegacyGTAOMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+				shader_programs::NapaVoxelVertex,
+				shader_programs::NapaVoxelPixel,
+			};
+			for (const ShaderProgramRef& programRef : requiredPrograms)
+			{
+				context.Check(firstRegistry.IsSuccess() && vulkanRegistry.IsSuccess() &&
+					ResolveShaderProgramRegistryArtifact(firstRegistry.m_Artifact,
+						programRef, ShaderTargetProfile::GGLabDX12).has_value() &&
+					ResolveShaderProgramRegistryArtifact(vulkanRegistry.m_Artifact,
+						programRef, ShaderTargetProfile::GGLabVulkan13).has_value(),
+					std::format("build-runtime activates {}::{} for DX12 and Vulkan 1.3",
+						programRef.m_ProgramId, programRef.m_VariantId).c_str());
+			}
 
 			const CliRunResult second = RunCli(arguments);
 			const ActiveShaderProgramRegistryReadResult secondActive = activeReader.Read();
