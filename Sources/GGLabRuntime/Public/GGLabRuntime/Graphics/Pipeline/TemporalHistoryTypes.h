@@ -90,6 +90,16 @@ namespace gglab
 		}
 	};
 
+	// Constant-size observation without texture-pool scans or retirement vectors.
+	struct TemporalHistorySummary
+	{
+		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
+		uint64_t m_SessionIdentity = 0;
+		TemporalHistoryResetReason m_LastResetReason = TemporalHistoryResetReason::None;
+		bool m_HasActiveHistory = false;
+		bool m_HistoryValid = false;
+	};
+
 	struct TemporalHistoryManagerDiagnostics
 	{
 		TemporalHistoryCompatibilityIdentity m_Compatibility{};

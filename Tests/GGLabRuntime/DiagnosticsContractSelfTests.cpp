@@ -15,6 +15,7 @@
 #include "Diagnostics/Builders/BuiltinSnapshotProviders.h"
 #include "Diagnostics/Builders/LabSnapshotProvider.h"
 #include "Diagnostics/Builders/ShadowDiagnosticsSnapshotBuilder.h"
+#include "Diagnostics/Builders/RenderingSettingsDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "Diagnostics/DiagnosticsRuntime.h"
 #include "Diagnostics/SnapshotProvider.h"
@@ -31,10 +32,19 @@
 #include "GGLabRuntime/Graphics/Profiling/GpuProfilingViewBase.h"
 #include "Graphics/Profiling/GpuProfiler.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
+#include "Graphics/RenderPass/ForwardPlusGraphResources.h"
+#include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
+#include "Graphics/RenderPass/GTAOGraphResources.h"
+#include "Graphics/RenderPass/TemporalAAGraphResources.h"
+#include "GGLabRuntime/Graphics/Camera.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 
 #include <concepts>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -199,6 +209,243 @@ namespace gglab
 		struct ShadowDiagnosticsFixturePassData
 		{
 		};
+
+		void PopulateRenderingSettingsGraph(RenderGraph& graph, bool retained) noexcept
+		{
+			graph.AddPass<ShadowDiagnosticsFixturePassData>("Diagnostics.RenderingSettingsFixture",
+				[retained](RenderGraph::RGBuilder& builder, ShadowDiagnosticsFixturePassData&)
+				{
+					if (retained) builder.SideEffect();
+					const auto texture = [&](const char* name)
+					{
+						auto id = builder.CreateTexture(name, {
+							.m_Format = RHIFormat::R16Float, .m_Extent = { 32, 32, 1 },
+							});
+						builder.WriteInPlace(id, RGTextureAccess::RenderTarget);
+						return id;
+					};
+					const auto buffer = [&](const char* name)
+					{
+						auto id = builder.CreateBuffer(name, { .m_SizeInBytes = 64, .m_StrideInBytes = 16 });
+						builder.WriteInPlace(id, RGBufferAccess::StorageWrite);
+						return id;
+					};
+					auto& blackboard = builder.GetBlackboard();
+					auto& forward = blackboard.Create<RGForwardPlusResources>(ForwardPlusResourcesName);
+					forward.m_Status = ForwardPlusFrameStatus::Active;
+					forward.m_TileLightHeaders = buffer("Settings.TileHeaders");
+					forward.m_TileLightIndices = buffer("Settings.TileIndices");
+					forward.m_HdrDiffStatus = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+					blackboard.Create<RGForwardPlusValidationResources>(ForwardPlusValidationResourcesName)
+						.m_FrameMetrics = buffer("Settings.HdrDiff");
+					auto& gtao = blackboard.Create<RGGTAOResources>(GTAOResourcesName);
+					gtao.m_Status = GTAOFrameStatus::Active;
+					gtao.m_FinalAO = texture("Settings.AO");
+					gtao.m_FinalAOFormat = RHIFormat::R16Float;
+					auto& temporal = blackboard.Create<RGTemporalAAResources>(TemporalAAResourcesName);
+					temporal.m_ResolvedSceneColor = texture("Settings.TAA");
+					auto& aerial = blackboard.Create<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
+					aerial.m_ThroughputAtlas = texture("Settings.Throughput");
+					aerial.m_ProbeBuffer = buffer("Settings.Probe");
+					auto& aerialStatus = blackboard.Create<RGAerialPerspectiveFrameStatus>(AerialPerspectiveFrameStatusName);
+					aerialStatus.m_Status = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+					aerialStatus.m_ProbeStatus = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+					auto& postProcess = blackboard.Create<RGPostProcessResources>(PostProcessResourcesName);
+					postProcess.m_Output.m_Texture = texture("Settings.Output");
+					postProcess.m_Bloom.m_Result.m_Texture = texture("Settings.Bloom");
+					postProcess.m_BloomContributionEnabled = true;
+					blackboard.Create<RGShadowResources>(ShadowResourcesName).m_DirectionalShadowMap = texture("Settings.Shadow");
+				});
+		}
+
+		void RunRenderingSettingsDiagnosticsSelfTests(SelfTestContext& context) noexcept
+		{
+			ViewRenderProfile authoring{};
+			authoring.m_Lighting.m_GTAO.m_Enabled = false;
+			ViewRenderProfile requested = authoring;
+			requested.m_Lighting.m_GTAO.m_Enabled = true;
+			requested.m_Lighting.m_GTAO.m_Radius = 100.0f;
+			requested.m_PostProcess.m_Bloom.m_MaxLevels = 20;
+			requested.m_TemporalAA.m_Enabled = true;
+			requested.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
+			requested.m_Lighting.m_EnableAerialProbe = true;
+			Camera camera(Camera::CreateInfo{});
+			ResolvedViewRenderSettings resolved = ResolveViewRenderSettings(requested, camera);
+			resolved.m_Exposure.m_PreExposure = 1.0f;
+			std::array<RenderView, static_cast<size_t>(RenderViewID::Count)> views{};
+			views[0].m_ViewId = RenderViewID::Main;
+			views[0].m_IsValid = true;
+			views[0].m_Width = 32;
+			views[0].m_Height = 32;
+			auto& displayView = views[static_cast<size_t>(RenderViewID::DebugCamera0)];
+			displayView.m_ViewId = RenderViewID::DebugCamera0;
+			displayView.m_IsValid = true;
+			displayView.m_Width = 128;
+			displayView.m_Height = 64;
+			ResolvedTemporalFramePlan temporalPlan{
+				.m_DisplayViewId = RenderViewID::DebugCamera0,
+				.m_Status = TemporalAAFrameStatus::Active,
+				.m_DisableReason = TemporalAADisableReason::None,
+				.m_SessionIdentity = 41,
+				.m_Requested = true,
+				.m_Active = true,
+				};
+			DirectionalShadowFramePlan shadows{};
+			shadows.m_Settings = DirectionalShadowSettings{};
+			shadows.m_ShadingEnabled = true;
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			PopulateRenderingSettingsGraph(graph, true);
+			DiagnosticsFrameContext frame{
+				.m_RenderGraph = &graph,
+				.m_RenderViews = views,
+				.m_DirectionalShadowFramePlan = &shadows,
+				.m_FrameSerial = 17,
+				.m_MainRenderView = &views[0],
+				.m_AuthoringViewRenderProfile = &authoring,
+				.m_EffectiveViewRenderProfile = &requested,
+				.m_DisplayViewId = RenderViewID::DebugCamera0,
+				.m_DisplayViewSettings = &resolved,
+				.m_TemporalFramePlan = &temporalPlan,
+				};
+			const auto uncompiled = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+			context.Check(uncompiled.m_SettingsAvailable && !uncompiled.m_RuntimeAvailable &&
+				uncompiled.m_GTAO.m_State == ViewRenderFeatureState::Unavailable &&
+				uncompiled.m_GTAO.m_Reason == ViewRenderFeatureReason::FrameUnavailable &&
+				uncompiled.m_DisplayViewId == RenderViewID::DebugCamera0 && uncompiled.m_Width == 128,
+				"Settings diagnostics preserve intent but never claim active work before graph compilation");
+			context.Check(graph.Compile(), "Rendering settings fixture compiles without GPU execution");
+			const TemporalHistorySummary history{
+				.m_DisplayViewId = RenderViewID::DebugCamera0, .m_SessionIdentity = 41,
+				.m_HasActiveHistory = true, .m_HistoryValid = true,
+				};
+			const auto active = BuildRenderingSettingsDiagnosticsSnapshot(frame, &history);
+			context.Check(active.m_SettingsAvailable && active.m_RuntimeAvailable && active.m_FrameSerial == 17 &&
+				active.m_Width == 128 && active.m_Height == 64 && !active.m_AuthoringProfile.m_Lighting.m_GTAO.m_Enabled &&
+				active.m_RequestedProfile.m_Lighting.m_GTAO.m_Radius == 100.0f &&
+				active.m_ResolvedSettings.m_Lighting.m_GTAO.m_Radius == 10.0f &&
+				active.m_RequestedProfile.m_PostProcess.m_Bloom.m_MaxLevels == 20 &&
+				active.m_ResolvedSettings.m_PostProcess.m_Bloom.m_MaxLevels == 8,
+				"Settings snapshots copy authoring, raw requested and resolved inputs for the actual display view");
+			context.Check(active.m_ForwardLighting.m_State == ViewRenderFeatureState::Active &&
+				active.m_ActualLightingMode == ForwardLightingMode::ForwardPlus &&
+				active.m_GTAO.m_State == ViewRenderFeatureState::Active && active.m_GTAOUsesFormatFallback &&
+				active.m_TemporalAA.m_State == ViewRenderFeatureState::Active &&
+				active.m_Bloom.m_State == ViewRenderFeatureState::Active &&
+				active.m_AerialPerspective.m_State == ViewRenderFeatureState::Active &&
+				active.m_AerialProbe.m_State == ViewRenderFeatureState::Active &&
+				active.m_HdrDiffValidation.m_State == ViewRenderFeatureState::Active &&
+				active.m_Shadows.m_State == ViewRenderFeatureState::Active,
+				"Settings activity comes from live compiled resources and existing feature decisions");
+			context.Check(active.m_ScenePreExposure.m_State == ViewRenderFeatureState::Active &&
+				active.m_ResolvedSettings.m_Exposure.m_PreExposure == 1.0f &&
+				active.m_ToneMapping.m_State == ViewRenderFeatureState::Active,
+				"Enabled scene pre-exposure remains enabled when the actual storage scale is one");
+			context.Check(active.m_HistoryAvailable && active.m_History.m_HistoryValid,
+				"Temporal history validity is an independent observation for the selected display view");
+			auto otherHistory = history;
+			otherHistory.m_SessionIdentity++;
+			context.Check(!BuildRenderingSettingsDiagnosticsSnapshot(frame, &otherHistory).m_HistoryAvailable,
+				"History from another session cannot be presented as the current view history");
+
+			auto& forward = graph.GetBlackboard().Get<RGForwardPlusResources>(ForwardPlusResourcesName);
+			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
+			forward.m_Status = ForwardPlusFrameStatus::DepthCoverageUnavailable;
+			forward.m_HdrDiffStatus = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive };
+			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
+			temporalPlan.m_Active = false;
+			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
+			temporalPlan.m_DisableReason = TemporalAADisableReason::DepthVelocityPathUnavailable;
+			const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+			context.Check(unavailable.m_RequestedProfile.m_Lighting.m_ForwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
+				unavailable.m_ActualLightingMode == ForwardLightingMode::Legacy &&
+				unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Fallback &&
+				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::DepthCoverageUnavailable &&
+				unavailable.m_HdrDiffValidation.m_Reason == ViewRenderFeatureReason::RequiredFeatureInactive &&
+				unavailable.m_GTAO.m_Reason == ViewRenderFeatureReason::CoreCapabilityUnavailable &&
+				unavailable.m_TemporalAA.m_Reason == ViewRenderFeatureReason::DepthVelocityPathUnavailable,
+				"Runtime fallbacks and unavailable reasons preserve requested feature intent");
+			auto& postProcess = graph.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
+			postProcess.m_BloomContributionEnabled = false;
+			graph.GetBlackboard().Create<RGViewTargetsTable>(ViewTargetsTableName)
+				.GetViewTargets(RenderViewID::DebugCamera0).m_MaterialDiagnosticColor = postProcess.m_Bloom.m_Result.m_Texture;
+			const auto previewOnly = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+			context.Check(previewOnly.m_Bloom.m_State == ViewRenderFeatureState::Inactive &&
+				previewOnly.m_Bloom.m_Reason == ViewRenderFeatureReason::MaterialDiagnosticsActive,
+				"Live bloom resources retained for previews do not imply bloom contributes to final color");
+			resolved.m_PostProcess.m_Bloom.m_Intensity = 0.0f;
+			context.Check(BuildRenderingSettingsDiagnosticsSnapshot(frame).m_Bloom.m_Reason == ViewRenderFeatureReason::ZeroIntensity,
+				"Requested bloom with zero resolved intensity is inactive rather than active");
+			resolved.m_PostProcess.m_Bloom.m_Enabled = false;
+			requested.m_EnableScenePreExposure = false;
+			shadows.m_ShadingEnabled = false;
+			const auto disabled = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+			context.Check(disabled.m_Bloom.m_State == ViewRenderFeatureState::Disabled &&
+				disabled.m_ScenePreExposure.m_State == ViewRenderFeatureState::Disabled &&
+				disabled.m_Shadows.m_State == ViewRenderFeatureState::Disabled &&
+				active.m_Bloom.m_State == ViewRenderFeatureState::Active && active.m_History.m_HistoryValid,
+				"Disabled intent overrides retained resources while earlier value snapshots remain independent");
+
+			requested.m_EnableScenePreExposure = true;
+			resolved.m_PostProcess.m_Bloom = requested.m_PostProcess.m_Bloom;
+			temporalPlan.m_Active = true;
+			temporalPlan.m_Status = TemporalAAFrameStatus::Active;
+			temporalPlan.m_DisableReason = TemporalAADisableReason::None;
+			RenderGraph culledGraph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			PopulateRenderingSettingsGraph(culledGraph, false);
+			context.Check(culledGraph.Compile(), "Unused settings fixture compiles with resource culling");
+			frame.m_RenderGraph = &culledGraph;
+			const auto culled = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+			context.Check(culled.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				!culled.m_ActualLightingMode && culled.m_GTAO.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_TemporalAA.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_Bloom.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_AerialPerspective.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_AerialProbe.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_HdrDiffValidation.m_Reason == ViewRenderFeatureReason::RenderGraphCulled,
+				"Created feature resources culled from the execution plan never appear active");
+			frame.m_DisplayViewId = RenderViewID::Unknown;
+			context.Check(!BuildRenderingSettingsDiagnosticsSnapshot(frame).m_RuntimeAvailable,
+				"Invalid display-view identity cannot silently select the main camera");
+			frame.m_DisplayViewId = RenderViewID::DebugCamera0;
+			frame.m_RenderGraph = &graph;
+
+			DiagnosticsRuntime diagnostics;
+			RegisterBuiltinSnapshotProviders(diagnostics, nullptr);
+			context.Check(diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>() == nullptr,
+				"Settings diagnostics have no publication before an open frame");
+			diagnostics.BeginFrame(frame);
+			const auto* captured = diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>();
+			const auto* cached = diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>();
+			bool onlySettingsCaptured = true;
+			for (const auto& profile : diagnostics.GetProfiles())
+			{
+				onlySettingsCaptured &= profile.m_Id == SnapshotIdOf<RenderingSettingsDiagnosticsSnapshot>
+					? profile.m_CaptureCount == 1 && profile.m_CacheHitCount == 1
+					: profile.m_CaptureCount == 0;
+			}
+			context.Check(captured && cached == captured && captured->m_RuntimeAvailable && onlySettingsCaptured,
+				"Reading settings captures only its lightweight provider and reuses it within the frame");
+			const auto retained = captured ? *captured : RenderingSettingsDiagnosticsSnapshot{};
+			diagnostics.EndFrame();
+			requested.m_Lighting.m_GTAO.m_Radius = 2.0f;
+			const auto* closed = diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>();
+			context.Check(closed && closed->m_RequestedProfile.m_Lighting.m_GTAO.m_Radius == 100.0f,
+				"Published settings own their values after borrowed source mutation and frame closure");
+			diagnostics.BeginFrame({ .m_FrameSerial = 18 });
+			const auto* missing = diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>();
+			context.Check(missing && !missing->m_SettingsAvailable && !missing->m_RuntimeAvailable &&
+				missing->m_FrameSerial == 18 && !missing->m_ActualLightingMode && !missing->m_HistoryAvailable &&
+				missing->m_GTAO.m_State == ViewRenderFeatureState::Unavailable &&
+				missing->m_GTAO.m_Reason == ViewRenderFeatureReason::FrameUnavailable && retained.m_RuntimeAvailable,
+				"Missing-source recapture clears old settings activity without turning unknown state into OFF");
+			diagnostics.EndFrame();
+		}
 
 		class DiagnosticsViewContractProvider final : public SnapshotProviderBase
 		{
@@ -689,6 +936,7 @@ namespace gglab
 			queueDiagnostics.EndFrame();
 		}
 		RunGpuProfilingContractSelfTests(context);
+		RunRenderingSettingsDiagnosticsSelfTests(context);
 
 		DiagnosticsRuntime runtime;
 		auto provider = std::make_unique<DiagnosticsViewContractProvider>();

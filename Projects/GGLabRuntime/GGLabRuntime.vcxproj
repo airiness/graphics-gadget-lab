@@ -496,6 +496,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessResolution.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ViewRenderFeatureStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Profiling\GpuProfiler.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfileFrameSnapshot.h" />
@@ -668,6 +669,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\WorldTooling.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\RuntimeToolingAdapters.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderingSettingsDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\ShadowTemporalDiagnostics.cpp" />
@@ -705,6 +707,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TemporalAADiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\PersistentSceneBufferSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderGraphSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderingSettingsDiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\RenderingSettingsDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\SamplerRegistrySnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ShadowDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TransientResourcePoolSnapshotBuilder.h" />

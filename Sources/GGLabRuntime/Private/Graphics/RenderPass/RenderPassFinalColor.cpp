@@ -102,6 +102,7 @@ namespace gglab
 				// Bloom from the full lighting image cannot be separated by local coverage.
 				data.m_BloomEnabled = !targets.m_MaterialDiagnosticColor.IsValid() &&
 					postProcess.m_Bloom.m_Result.m_Texture.IsValid();
+				postProcess.m_BloomContributionEnabled = data.m_BloomEnabled;
 				if (data.m_BloomEnabled)
 				{
 					GGLAB_ASSERT_MSG(postProcess.m_Bloom.m_Result.m_State ==

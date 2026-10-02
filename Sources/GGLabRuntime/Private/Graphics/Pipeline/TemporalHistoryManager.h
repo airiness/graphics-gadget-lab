@@ -65,6 +65,7 @@ namespace gglab
 			const RHIFencePoint& retirementFence = {}) noexcept;
 		void Shutdown() noexcept;
 
+		[[nodiscard]] TemporalHistorySummary GetSummary() const noexcept;
 		[[nodiscard]] TemporalHistoryManagerDiagnostics GetDiagnostics() const;
 
 	private:

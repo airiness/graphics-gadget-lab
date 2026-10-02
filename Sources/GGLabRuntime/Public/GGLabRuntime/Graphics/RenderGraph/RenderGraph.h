@@ -505,6 +505,7 @@ namespace gglab
 
 		friend class RGBuilder;
 		friend class RGCompiler;
+		friend class RenderingSettingsDiagnosticsSnapshotBuilder;
 
 		friend void BuildRenderGraphSnapshot(
 			const RenderGraph& rg, RGSnapshot& outSnapshot) noexcept;

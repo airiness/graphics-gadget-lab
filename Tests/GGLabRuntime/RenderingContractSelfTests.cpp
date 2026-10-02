@@ -5123,6 +5123,10 @@ namespace gglab
 			device.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool texturePool(&device);
 			TemporalHistoryManager historyManager(&texturePool);
+			const auto emptyHistorySummary = historyManager.GetSummary();
+			context.Check(!emptyHistorySummary.m_HasActiveHistory && !emptyHistorySummary.m_HistoryValid &&
+				emptyHistorySummary.m_DisplayViewId == RenderViewID::Unknown && device.m_CreateTextureCount == 0,
+				"Lightweight history summary observes an empty manager without allocating GPU history");
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			ResolvedTemporalFramePlan activePlan{
@@ -5255,6 +5259,11 @@ namespace gglab
 			const TemporalHistoryManagerDiagnostics firstCommitted =
 				historyManager.GetDiagnostics();
 			const uint64_t firstGeneration = firstCommitted.m_AllocationGeneration;
+			const auto committedHistorySummary = historyManager.GetSummary();
+			context.Check(committedHistorySummary.m_HasActiveHistory && committedHistorySummary.m_HistoryValid &&
+				committedHistorySummary.m_DisplayViewId == activePlan.m_DisplayViewId &&
+				committedHistorySummary.m_SessionIdentity == activePlan.m_SessionIdentity && device.m_CreateTextureCount == 4,
+				"Lightweight history summary identifies valid committed history without allocating or reading back");
 			context.Check(coldStartGraphValid && !firstView.m_HasPreviousTemporalState &&
 				firstTransaction.GetState() == TemporalFrameTransactionState::Committed &&
 				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
@@ -6997,6 +7006,12 @@ namespace gglab
 				ViewTargetsTableName).GetViewTargets(RenderViewID::Main).m_SceneColor;
 			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = false;
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			const auto* disabledAerialStatus = aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveFrameStatus>(
+				AerialPerspectiveFrameStatusName);
+			context.Check(disabledAerialStatus && disabledAerialStatus->m_Status.m_State == ViewRenderFeatureState::Disabled &&
+				disabledAerialStatus->m_Status.m_Reason == ViewRenderFeatureReason::NotRequested &&
+				disabledAerialStatus->m_ProbeStatus.m_State == ViewRenderFeatureState::Disabled,
+				"Disabled aerial transport publishes CPU-only intent without creating aerial resources");
 			context.Check(!aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName) &&
 				aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).
 				GetViewTargets(RenderViewID::Main).m_SceneColor == baselineColor &&
@@ -7004,6 +7019,11 @@ namespace gglab
 				"Disabling aerial transport preserves surface scene color, active atmosphere and sky settings");
 			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = true;
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
+			const auto* activeAerialStatus = aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveFrameStatus>(
+				AerialPerspectiveFrameStatusName);
+			context.Check(activeAerialStatus && activeAerialStatus->m_Status.m_State == ViewRenderFeatureState::Active &&
+				activeAerialStatus->m_ProbeStatus.m_State == ViewRenderFeatureState::Disabled,
+				"Aerial transport reports active graph work without implicitly enabling the GPU probe");
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
 			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](

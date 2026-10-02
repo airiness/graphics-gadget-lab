@@ -23,6 +23,8 @@ namespace gglab
 		RGPostProcessInputs m_Inputs{};
 		RGBloomResources m_Bloom{};
 		RGPostProcessOutputTarget m_Output{};
+		// FinalColor owns whether bloom contributes, even when previews retain its resources.
+		bool m_BloomContributionEnabled = false;
 	};
 
 	inline constexpr const char* PostProcessResourcesName = "RGPostProcessResources";

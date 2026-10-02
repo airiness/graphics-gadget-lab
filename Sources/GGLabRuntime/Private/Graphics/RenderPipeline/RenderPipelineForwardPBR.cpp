@@ -208,6 +208,13 @@ namespace gglab
 		gtaoResources.m_Capabilities = m_GTAOPass.GetCapabilityStatus();
 		gtaoResources.m_ResolvedSettings = gtaoSettings;
 		forwardPlusResources.m_Status = forwardPlusStatus;
+		forwardPlusResources.m_HdrDiffStatus = !forwardPlusSettings.m_EnableHdrDiffValidation
+			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested }
+			: !forwardPlusActive
+			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
+			: forwardPlusValidationEnabled
+			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None }
+			: ViewRenderFeatureStatus{ ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
 		forwardPlusResources.m_LightTableCapacity = context.m_RenderScene.m_LightCount;
 		forwardPlusResources.m_DirectionalLightCount =
