@@ -3,24 +3,41 @@
 SDR visual checks of the refined coast, rock material, service equipment,
 boulders and architectural/metal edges, saved on October 2, 2026 (UTC).
 The [asset reference](../../../Models/GGLabCoastalAtriumResearchLounge/README.md)
-records the source/export identities and reproduction commands.
+describes the current bundle and reproduction workflow. This record retains
+the earlier capture's source identity below, before concrete material refinement.
 
 ## Inputs
 
-- Code base: `6ee509d8c069f2c5f580ed973e495aa98c45fb9c`, on
-  `199-import-gglab-content`, with this asset replacement and expanded import
+- Recorded code commit at capture: `6ee509d8c069f2c5f580ed973e495aa98c45fb9c`,
+  with this asset replacement and expanded import
   self-tests in the working tree. Renderer, shader and camera sources are
   unchanged from that commit.
 - Shader source tree: `1167f85ebf7fd2441e6e973415ed1dc502befea3`.
-- Content base: `0ded870` on `7-island-plan-procedural`, with the subsequent
-  metal refinement in its working tree. The saved `.blend` hash in the asset
-  reference identifies the exact source; that base commit alone is insufficient.
+- Content source: the saved Coastal Atrium `.blend` with refined metal geometry
+  and the original concrete maps. Source SHA-256:
+  `ef1f456acd4780f356c8f2d30420d8981d9d04798c146b85d5e208eb619979e3`.
 - Blender 5.1.1 glTF Separate export: JSON, adjacent binary and twelve PNGs.
   The installed bundle matches the independently validated Content candidate.
 - WinApp Debug x64 and ShaderCompiler Debug were built with Visual Studio 2022
   Community's x64 MSBuild and `/p:PreferredToolArchitecture=x64`.
 - GPU: NVIDIA GeForce RTX 5080. The Vulkan panel reported driver 617.14,
   adapter API 1.4.351 and application baseline 1.3, with validation requested.
+
+The recorded commit is historical context, not a required checkout target;
+rebase or squash can rewrite it. The shader tree ID identifies content rather
+than commit ancestry. Use the source SHA-256 above and image/binary hashes below
+to identify these capture inputs. File hashes remain valid while their bytes
+are unchanged. Compared with the handoff recorded in
+[Concrete Surface](../ConcreteSurface/CAPTURE.md), JSON, binary and nine other
+PNGs are identical; the original export and concrete map hashes are recorded here.
+
+| Earlier export artifact | SHA-256 |
+| --- | --- |
+| `GGLabCoastalAtrium.gltf` | `18a2ca7bce8a701b7c33e64846f5347c618c83f3be468041120a5ff3d2371e2d` |
+| `GGLabCoastalAtrium.bin` | `5fb21d820258097019dfabdc0b3247de4c98f836f178c08ae452641b95973c1a` |
+| `Concrete_BaseColor.png` | `e818a7ae00626effb5fcc87b52b9e9671cfb60555d5ea6630a2d6ae79e65410d` |
+| `Concrete_Normal.png` | `3cfc07edbd853b63a489d4badb4852891447779c51012bede6362c2db83dcb89` |
+| `Concrete_MetallicRoughness.png` | `4c86c67ae2978d6d92b7b2c5e95f4ac8ba8d70fa9131dd1e8bf1a4095493a2e9` |
 
 ## Settings and capture method
 

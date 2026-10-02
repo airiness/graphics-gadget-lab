@@ -575,7 +575,7 @@ namespace gglab
 					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
 					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
 			if (!atrium.Succeeded()) return;
-			CheckImportedTextures(context, atrium.m_Model);
+			const auto atriumTextures = CheckImportedTextures(context, atrium.m_Model);
 			constexpr std::array<std::pair<std::string_view, size_t>, 11> atriumTriangles = { {
 				{ "MAT_Concrete", 3054 },
 				{ "MAT_Paving", 156 },
@@ -648,6 +648,30 @@ namespace gglab
 				}
 			}
 			context.Check(rockBindingsValid, "Coastal rock retains dedicated UV0 color, normal and metallic-roughness bindings");
+			const auto concrete = std::ranges::find(atrium.m_Model.m_Materials, "MAT_Concrete", &ImportedMaterial::m_Name);
+			bool concreteBindingsValid = concrete != atrium.m_Model.m_Materials.end();
+			if (concreteBindingsValid)
+			{
+				concreteBindingsValid &= concrete->m_Properties.m_MetallicFactor == 0.0f &&
+					concrete->m_Properties.m_RoughnessFactor == 1.0f && concrete->m_Properties.m_NormalScale == 1.0f;
+				for (const auto& [slot, filename] : std::array{
+					std::pair{ MaterialTextureSlot::BaseColor, "Concrete_BaseColor.png" },
+					std::pair{ MaterialTextureSlot::Normal, "Concrete_Normal.png" },
+					std::pair{ MaterialTextureSlot::MetallicRoughness, "Concrete_MetallicRoughness.png" } })
+				{
+					const auto& binding = concrete->m_TextureBindings[static_cast<size_t>(slot)];
+					concreteBindingsValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < atriumTextures.size();
+					if (binding.m_TextureIndex < atriumTextures.size())
+					{
+						const auto& source = atrium.m_Model.m_TextureSources[binding.m_TextureIndex];
+						const auto& texture = atriumTextures[binding.m_TextureIndex];
+						concreteBindingsValid &= source.m_CanonicalPath.filename() == filename &&
+							source.m_Semantic == GetMaterialTextureSlotSemantic(slot) &&
+							texture.m_Extent.m_Width == 1024 && texture.m_Extent.m_Height == 1024 && texture.m_MipLevels == 11;
+					}
+				}
+			}
+			context.Check(concreteBindingsValid, "Refined concrete retains UV0 factors and three 1024-square semantic textures with complete mip chains");
 			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
 				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
 			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
