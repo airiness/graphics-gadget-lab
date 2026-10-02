@@ -1,4 +1,5 @@
 #include "AssetDataSelfTests.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/IO/PathUtils.h"
@@ -10,6 +11,7 @@
 #include "Graphics/Asset/DerivedData/Platform/Win/Win32LocalDerivedDataPlatform.h"
 #include "Graphics/Asset/DerivedData/TextureArtifactCodec.h"
 #include "Graphics/Asset/ModelImportArtifactCache.h"
+#include "Graphics/Asset/Interop/GltfMaterialIdentity.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
 #include "Graphics/Asset/Store/ModelStore.h"
@@ -41,6 +43,7 @@
 #include <fstream>
 #include <filesystem>
 #include <format>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -1099,6 +1102,62 @@ namespace gglab
 			std::filesystem::remove(root, errorCode);
 		}
 
+		void RunGltfMaterialIdentityTests(SelfTestContext& context) noexcept
+		{
+			using namespace asset::interop;
+			aiScene scene;
+			scene.mNumMaterials = 4;
+			scene.mMaterials = new aiMaterial*[scene.mNumMaterials]{};
+			for (uint32_t index = 0; index < scene.mNumMaterials; ++index)
+			{
+				scene.mMaterials[index] = new aiMaterial();
+			}
+			const auto setName = [&](uint32_t index, std::string_view name)
+			{
+				const aiString identity{ std::string(name) };
+				GGLAB_UNUSED(scene.mMaterials[index]->AddProperty(&identity, AI_MATKEY_NAME));
+			};
+			setName(0, MakeGltfMaterialIdentity(2));
+			setName(1, "Unused generated material");
+			setName(2, MakeGltfMaterialIdentity(0));
+			setName(3, MakeGltfMaterialIdentity(1));
+			scene.mNumMeshes = 3;
+			scene.mMeshes = new aiMesh*[scene.mNumMeshes]{};
+			constexpr std::array<uint32_t, 3> meshMaterials{ 3, 0, 2 };
+			for (uint32_t index = 0; index < scene.mNumMeshes; ++index)
+			{
+				scene.mMeshes[index] = new aiMesh();
+				scene.mMeshes[index]->mMaterialIndex = meshMaterials[index];
+			}
+			std::vector<size_t> sources;
+			std::string error;
+			context.Check(ResolveGltfMaterialSources(scene, 3, sources, error) &&
+				sources == std::vector<size_t>{ 2, NoGltfMaterialSource, 0, 1 },
+				"Material identities resolve arbitrary Assimp order with an unused generated material in the middle");
+			std::swap(scene.mMaterials[0], scene.mMaterials[2]);
+			scene.mMeshes[1]->mMaterialIndex = 2;
+			scene.mMeshes[2]->mMaterialIndex = 0;
+			context.Check(ResolveGltfMaterialSources(scene, 3, sources, error) &&
+				sources == std::vector<size_t>{ 0, NoGltfMaterialSource, 2, 1 },
+				"Reordering Assimp materials preserves mesh-to-source identity");
+			context.Check(ResolveGltfMaterialSources(scene, 4, sources, error),
+				"Material identity mapping does not require a fixed source-to-Assimp material count");
+			setName(0, MakeGltfMaterialIdentity(3));
+			error.clear();
+			context.Check(!ResolveGltfMaterialSources(scene, 3, sources, error) && !error.empty(),
+				"Out-of-range source identity fails visibly");
+			setName(0, MakeGltfMaterialIdentity(0) + "suffix");
+			context.Check(!ResolveGltfMaterialSources(scene, 3, sources, error),
+				"Source identity parsing consumes the complete tag");
+			setName(0, "");
+			context.Check(!ResolveGltfMaterialSources(scene, 3, sources, error),
+				"A used material without preserved identity fails instead of using another source's extensions");
+			setName(0, MakeGltfMaterialIdentity(0));
+			scene.mMeshes[0]->mMaterialIndex = scene.mNumMaterials;
+			context.Check(!ResolveGltfMaterialSources(scene, 3, sources, error),
+				"Out-of-range Assimp mesh material index fails before publication");
+		}
+
 		void RunGltfMaterialImportTests(SelfTestContext& context) noexcept
 		{
 			std::error_code errorCode;
@@ -1137,8 +1196,9 @@ namespace gglab
 {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
 {"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
 )" << textureDeclarations << R"("materials":[)" << material << R"(],
-"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
-					<< firstMaterial << '}';
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3})";
+				if (firstMaterial >= 0) gltf << R"(,"material":)" << firstMaterial;
+				gltf << '}';
 				if (secondMaterial >= 0)
 				{
 					gltf << R"(,{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
@@ -1248,6 +1308,8 @@ namespace gglab
 			const ModelImportResult duplicateNames = ModelImporter::Import(root / "probe.gltf", {});
 			context.Check(duplicateNames.Succeeded() &&
 				duplicateNames.m_Model.m_Materials.size() == 3u &&
+				duplicateNames.m_Model.m_Materials[0].m_Name == "Repeated" &&
+				duplicateNames.m_Model.m_Materials[1].m_Name == "Repeated" &&
 				std::abs(duplicateNames.m_Model.m_Materials[0].m_Properties.m_Ior - 2.2f) < 0.0001f &&
 				std::abs(duplicateNames.m_Model.m_Materials[1].m_Properties.m_Ior - 1.2f) < 0.0001f,
 				std::format("Duplicate material names retain their glTF index identities (error='{}', count={})",
@@ -1258,6 +1320,8 @@ namespace gglab
 			const ModelImportResult unnamedMaterials = ModelImporter::Import(root / "probe.gltf", {});
 			context.Check(unnamedMaterials.Succeeded() &&
 				unnamedMaterials.m_Model.m_Materials.size() == 3u &&
+				unnamedMaterials.m_Model.m_Materials[0].m_Name.empty() &&
+				unnamedMaterials.m_Model.m_Materials[1].m_Name.empty() &&
 				std::abs(unnamedMaterials.m_Model.m_Materials[0].m_Properties.m_Ior - 1.25f) < 0.0001f &&
 				std::abs(unnamedMaterials.m_Model.m_Materials[1].m_Properties.m_Ior - 2.25f) < 0.0001f,
 				std::format("Unnamed materials retain their glTF index identities (error='{}', count={})",
@@ -1277,6 +1341,55 @@ namespace gglab
 				laterMaterial.m_Model.m_Materials.size() == 2u &&
 				std::abs(laterMaterial.m_Model.m_Materials[0].m_Properties.m_Ior - 2.3f) < 0.0001f,
 				"A later glTF material can occupy the first dense Assimp index");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"name":"gglab.material.1","extensions":{"KHR_materials_ior":{"ior":1.3}}},{"name":"gglab.material.0","pbrMetallicRoughness":{"metallicFactor":0.7,"roughnessFactor":0.3},"extensions":{"KHR_materials_ior":{"ior":2.3}}})", 1);
+			const auto readSourceText = [&]()
+			{
+				std::ifstream source(root / "probe.gltf", std::ios::binary);
+				return std::string(std::istreambuf_iterator<char>(source), std::istreambuf_iterator<char>());
+			};
+			const std::string authoredSource = readSourceText();
+			const ModelImportResult identityNames = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(identityNames.Succeeded() && identityNames.m_Model.m_Materials[0].m_Name == "gglab.material.0" &&
+				std::abs(identityNames.m_Model.m_Materials[0].m_Properties.m_Ior - 2.3f) < 0.0001f &&
+				std::abs(identityNames.m_Model.m_Materials[0].m_Properties.m_MetallicFactor - 0.7f) < 0.0001f &&
+				std::abs(identityNames.m_Model.m_Materials[0].m_Properties.m_RoughnessFactor - 0.3f) < 0.0001f,
+				"Authored names resembling identity tags are restored and keep core and extension factors together");
+			context.Check(readSourceText() == authoredSource,
+				"Material identity overlay leaves the original glTF bytes unchanged");
+
+			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
+				R"({"name":"Unused","extensions":{"KHR_materials_ior":{"ior":1.3}}},{"name":"Explicit","extensions":{"KHR_materials_ior":{"ior":2.3}}})", -1, 1);
+			const ModelImportResult mixedDefault = ModelImporter::Import(root / "probe.gltf", {});
+			bool mappedDefault = false;
+			bool mappedExplicit = false;
+			for (const ImportedMesh& mesh : mixedDefault.m_Model.m_Meshes)
+			{
+				const ImportedMaterial& material = mixedDefault.m_Model.m_Materials[mesh.m_MaterialIndex];
+				mappedDefault |= material.m_Name.empty() && std::abs(material.m_Properties.m_Ior - 1.5f) < 0.0001f;
+				mappedExplicit |= material.m_Name == "Explicit" && std::abs(material.m_Properties.m_Ior - 2.3f) < 0.0001f;
+			}
+			context.Check(mixedDefault.Succeeded() && mappedDefault && mappedExplicit,
+				std::format("Missing primitive material retains default PBR alongside an explicit source material: {}", mixedDefault.m_Error));
+
+			writeSource("", "", -1);
+			std::string noMaterialSource = readSourceText();
+			constexpr std::string_view EmptyMaterials = "\"materials\":[],";
+			noMaterialSource.erase(noMaterialSource.find(EmptyMaterials), EmptyMaterials.size());
+			{
+				std::ofstream source(root / "probe.gltf");
+				source << noMaterialSource;
+			}
+			const ModelImportResult noMaterials = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(noMaterials.Succeeded() && noMaterials.m_Model.m_Materials.front().m_Name.empty() &&
+				std::abs(noMaterials.m_Model.m_Materials.front().m_Properties.m_Ior - 1.5f) < 0.0001f,
+				std::format("A glTF without a materials array imports its default PBR material: {}", noMaterials.m_Error));
+
+			writeSource("", R"({"name":"Explicit"})", -1, 1);
+			const ModelImportResult invalidDefaultIndex = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!invalidDefaultIndex.Succeeded() && !invalidDefaultIndex.m_Error.empty(),
+				"An invalid explicit material index cannot alias the injected default material");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"extensions":{"KHR_materials_ior":{"ior":0}}})");
@@ -2313,6 +2426,7 @@ namespace gglab
 		RunLocalDerivedDataMaintenanceTests(context);
 		RunModelImportArtifactTests(context);
 		RunGltfTangentImportTests(context);
+		RunGltfMaterialIdentityTests(context);
 		RunGltfMaterialImportTests(context);
 		RunGltfTextureSourceTests(context);
 		RunMaterialUVTransformTests(context);

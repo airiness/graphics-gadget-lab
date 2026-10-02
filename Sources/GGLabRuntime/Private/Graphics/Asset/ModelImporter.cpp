@@ -4,19 +4,24 @@
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
 #include "Graphics/Asset/Interop/AssimpMathInterop.h"
+#include "Graphics/Asset/Interop/GltfMaterialIdentity.h"
 #include "Graphics/Asset/TextureSourceKey.h"
 
+#include <assimp/DefaultIOSystem.h>
 #include <assimp/GltfMaterial.h>
 #include <assimp/Importer.hpp>
+#include <assimp/MemoryIOWrapper.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <format>
@@ -33,6 +38,50 @@
 
 namespace gglab
 {
+	namespace asset::interop
+	{
+		constexpr std::string_view GltfMaterialIdentityPrefix = "gglab.material.";
+
+		std::string MakeGltfMaterialIdentity(size_t sourceIndex)
+		{
+			return std::format("{}{}", GltfMaterialIdentityPrefix, sourceIndex);
+		}
+
+		bool ResolveGltfMaterialSources(const aiScene& scene, size_t sourceMaterialCount,
+			std::vector<size_t>& sourceIndices, std::string& error) noexcept
+		{
+			sourceIndices.assign(scene.mNumMaterials, NoGltfMaterialSource);
+			for (uint32_t index = 0; index < scene.mNumMaterials; ++index)
+			{
+				const aiString name = scene.mMaterials[index]->GetName();
+				const std::string_view identity(name.C_Str(), name.length);
+				// Assimp may synthesize unused materials. Their count and placement
+				// have no bearing on the identities of source-authored materials.
+				if (!identity.starts_with(GltfMaterialIdentityPrefix)) continue;
+				const std::string_view digits = identity.substr(GltfMaterialIdentityPrefix.size());
+				size_t sourceIndex = 0;
+				const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), sourceIndex);
+				if (parsed.ec != std::errc{} || parsed.ptr != digits.data() + digits.size() ||
+					sourceIndex >= sourceMaterialCount)
+				{
+					error = "Assimp returned an invalid glTF material identity.";
+					return false;
+				}
+				sourceIndices[index] = sourceIndex;
+			}
+			for (uint32_t index = 0; index < scene.mNumMeshes; ++index)
+			{
+				const uint32_t materialIndex = scene.mMeshes[index]->mMaterialIndex;
+				if (materialIndex >= sourceIndices.size() || sourceIndices[materialIndex] == NoGltfMaterialSource)
+				{
+					error = "Assimp did not preserve the source identity of a mesh material.";
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+
 	namespace
 	{
 		constexpr float TangentLengthEpsilon = 1.0e-4f;
@@ -108,107 +157,79 @@ namespace gglab
 			return found != parent.end() && found->is_array() ? &*found : nullptr;
 		}
 
-		[[nodiscard]] std::vector<size_t> CollectAssimpMaterialOrder(
-			const Json& gltf, size_t materialCount)
+		class GltfDocumentIOSystem final : public Assimp::DefaultIOSystem
 		{
-			// The pinned glTF2 Asset lazily loads materials on the first mesh
-			// primitive reference. Its dense indices follow that encounter order.
-			const Json* nodes = FindArrayField(gltf, "nodes");
-			const Json* meshes = FindArrayField(gltf, "meshes");
-			std::vector<bool> visitedNodes(nodes ? nodes->size() : 0u, false);
-			std::vector<bool> visitedMeshes(meshes ? meshes->size() : 0u, false);
-			std::vector<bool> visitedMaterials(materialCount, false);
-			std::vector<size_t> order;
-			const auto visitMesh = [&](size_t index)
+		public:
+			GltfDocumentIOSystem(std::string path, std::string document) :
+				m_Path(std::move(path)), m_Document(std::move(document))
 			{
-				if (!meshes || index >= meshes->size() || visitedMeshes[index]) return;
-				visitedMeshes[index] = true;
-				if (const Json* primitives = FindArrayField((*meshes)[index], "primitives"))
+			}
+
+			Assimp::IOStream* Open(const char* path, const char* mode = "rb") override
+			{
+				if (!ComparePaths(path, m_Path.c_str())) return DefaultIOSystem::Open(path, mode);
+				if (std::strchr(mode, 'w') || std::strchr(mode, 'a') || std::strchr(mode, '+')) return nullptr;
+				return new Assimp::MemoryIOStream(
+					reinterpret_cast<const uint8_t*>(m_Document.data()), m_Document.size());
+			}
+
+		private:
+			// Importer owns this handler; its document outlives every borrowed stream.
+			std::string m_Path;
+			std::string m_Document;
+		};
+
+		[[nodiscard]] bool PrepareGltfMaterialIdentities(Json& gltf, std::string& error)
+		{
+			if (!gltf.contains("materials")) gltf["materials"] = Json::array();
+			auto& materials = gltf["materials"];
+			if (!materials.is_array())
+			{
+				error = "glTF materials must be an array.";
+				return false;
+			}
+			for (size_t index = 0; index < materials.size(); ++index)
+			{
+				Json& material = materials[index];
+				if (!material.is_object() ||
+					(material.contains("name") && !material["name"].is_string()))
 				{
-					for (const Json& primitive : *primitives)
+					error = "glTF materials must be objects with optional string names.";
+					return false;
+				}
+				material["name"] = asset::interop::MakeGltfMaterialIdentity(index);
+			}
+			// A missing primitive material denotes glTF's default PBR material.
+			// Give it an explicit identity as well, instead of identifying Assimp's
+			// synthesized default by its name, array position or material count.
+			const size_t defaultIndex = materials.size();
+			if (auto meshes = gltf.find("meshes"); meshes != gltf.end() && meshes->is_array())
+			{
+				for (Json& mesh : *meshes)
+				{
+					auto primitives = mesh.find("primitives");
+					if (primitives == mesh.end() || !primitives->is_array()) continue;
+					for (Json& primitive : *primitives)
 					{
 						if (!primitive.is_object()) continue;
-						const auto material = primitive.find("material");
-						if (material == primitive.end() || !material->is_number_unsigned()) continue;
-						const size_t materialIndex = material->get<size_t>();
-						if (materialIndex >= materialCount || visitedMaterials[materialIndex]) continue;
-						visitedMaterials[materialIndex] = true;
-						order.push_back(materialIndex);
-					}
-				}
-			};
-			const auto visitNode = [&](auto&& self, size_t index) -> void
-			{
-				if (!nodes || index >= nodes->size() || visitedNodes[index]) return;
-				visitedNodes[index] = true;
-				const Json& node = (*nodes)[index];
-				if (const Json* children = FindArrayField(node, "children"))
-				{
-					for (const Json& child : *children)
-					{
-						if (child.is_number_unsigned()) self(self, child.get<size_t>());
-					}
-				}
-				if (!node.is_object()) return;
-				const auto mesh = node.find("mesh");
-				if (mesh != node.end() && mesh->is_number_unsigned())
-				{
-					visitMesh(mesh->get<size_t>());
-				}
-			};
-			if (const Json* scenes = FindArrayField(gltf, "scenes"); scenes && !scenes->empty())
-			{
-				size_t sceneIndex = 0u;
-				const auto scene = gltf.find("scene");
-				if (scene != gltf.end() && scene->is_number_unsigned())
-				{
-					sceneIndex = scene->get<size_t>();
-				}
-				if (sceneIndex < scenes->size())
-				{
-					if (const Json* roots = FindArrayField((*scenes)[sceneIndex], "nodes"))
-					{
-						for (const Json& root : *roots)
+						if (const auto material = primitive.find("material"); material != primitive.end())
 						{
-							if (root.is_number_unsigned()) visitNode(visitNode, root.get<size_t>());
-						}
-					}
-				}
-			}
-			if (const Json* skins = FindArrayField(gltf, "skins"))
-			{
-				for (const Json& skin : *skins)
-				{
-					if (const Json* joints = FindArrayField(skin, "joints"))
-					{
-						for (const Json& joint : *joints)
-						{
-							if (joint.is_number_unsigned()) visitNode(visitNode, joint.get<size_t>());
-						}
-					}
-				}
-			}
-			if (const Json* animations = FindArrayField(gltf, "animations"))
-			{
-				for (const Json& animation : *animations)
-				{
-					if (const Json* channels = FindArrayField(animation, "channels"))
-					{
-						for (const Json& channel : *channels)
-						{
-							if (const Json* target = FindObjectField(channel, "target"))
+							if (!material->is_number_unsigned() || material->get<uint64_t>() >= defaultIndex)
 							{
-								const auto node = target->find("node");
-								if (node != target->end() && node->is_number_unsigned())
-								{
-									visitNode(visitNode, node->get<size_t>());
-								}
+								error = "glTF primitive material index is outside the source material array.";
+								return false;
 							}
+							continue;
 						}
+						if (materials.size() == defaultIndex)
+						{
+							materials.push_back(Json{ { "name", asset::interop::MakeGltfMaterialIdentity(defaultIndex) } });
+						}
+						primitive["material"] = defaultIndex;
 					}
 				}
 			}
-			return order;
+			return true;
 		}
 
 		[[nodiscard]] const Json* FindMaterialTextureInfo(
@@ -736,6 +757,15 @@ namespace gglab
 		}
 
 		Assimp::Importer importer;
+		size_t assimpMaterialSourceCount = 0;
+		{
+			Json assimpGltf = gltf;
+			if (!PrepareGltfMaterialIdentities(assimpGltf, result.m_Error)) return result;
+			assimpMaterialSourceCount = assimpGltf["materials"].size();
+			// Keep ReadFile's real path so external buffers resolve beside the source.
+			// Only the root JSON is overlaid; source files and process CWD are untouched.
+			importer.SetIOHandler(new GltfDocumentIOSystem(canonicalPath.string(), assimpGltf.dump()));
+		}
 		constexpr uint32_t importFlags =
 			aiProcess_ConvertToLeftHanded | aiProcess_Triangulate | aiProcess_GenSmoothNormals |
 			aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices |
@@ -750,6 +780,9 @@ namespace gglab
 				canonicalPath.string(), importer.GetErrorString());
 			return result;
 		}
+		// ReadFile completed synchronously and closed its streams. Release the
+		// serialized overlay before post-processing and building runtime mesh data.
+		importer.SetIOHandler(nullptr);
 		// Assimp's MakeLeftHanded pass reflects authored bitangents and also negates
 		// them. glTF normal maps require only the spatial reflection: preserve their
 		// +Y-up tangent basis by cancelling that extra negation before processing.
@@ -782,23 +815,19 @@ namespace gglab
 				"Model file '{}' does not contain a scene hierarchy.", canonicalPath.string());
 			return result;
 		}
-		const std::vector<size_t> materialOrder = CollectAssimpMaterialOrder(
-			gltf, sourceMaterials ? sourceMaterials->size() : 0u);
-		// The pinned Assimp glTF2 importer lazily loads referenced materials in
-		// first-use order, then appends one default material. Optional names do
-		// not identify a source entry, even when they happen to be unique.
-		if (scene->mNumMaterials != materialOrder.size() + 1u)
-		{
-			result.m_Error = "Assimp material indices do not match referenced glTF materials.";
-			return result;
-		}
+		std::vector<size_t> materialSourceIndices;
+		if (!asset::interop::ResolveGltfMaterialSources(*scene, assimpMaterialSourceCount,
+			materialSourceIndices, result.m_Error)) return result;
 		std::vector<const Json*> materialSources(scene->mNumMaterials, nullptr);
-		if (sourceMaterials)
+		for (uint32_t index = 0; index < scene->mNumMaterials; ++index)
 		{
-			for (size_t index = 0; index < materialOrder.size(); ++index)
-			{
-				materialSources[index] = &(*sourceMaterials)[materialOrder[index]];
-			}
+			const size_t sourceIndex = materialSourceIndices[index];
+			if (sourceIndex == asset::interop::NoGltfMaterialSource) continue;
+			const Json* source = sourceMaterials && sourceIndex < sourceMaterials->size()
+				? &(*sourceMaterials)[sourceIndex] : nullptr;
+			materialSources[index] = source;
+			const aiString name(source && source->contains("name") ? (*source)["name"].get<std::string>() : "");
+			GGLAB_UNUSED(scene->mMaterials[index]->AddProperty(&name, AI_MATKEY_NAME));
 		}
 		progress.Report(0.25f, "Model structure parsed",
 			std::format("{} meshes, {} materials", scene->mNumMeshes, scene->mNumMaterials));

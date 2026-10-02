@@ -588,6 +588,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJournal.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\GltfMaterialIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h" />

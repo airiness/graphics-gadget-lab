@@ -1061,6 +1061,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.h">
       <Filter>Private\Graphics\Asset\Interop</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\GltfMaterialIdentity.h">
+      <Filter>Private\Graphics\Asset\Interop</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Loading\AssetLoadCoordinator.h">
       <Filter>Private\Graphics\Asset\Loading</Filter>
     </ClInclude>
