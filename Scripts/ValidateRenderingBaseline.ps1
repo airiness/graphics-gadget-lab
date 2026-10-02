@@ -1,7 +1,6 @@
 param(
     [string]$RootDir = "",
     [string]$ManifestPath = "Assets/Media/GGLabCoastalAtrium/Baseline1/baseline.json",
-    [string]$ContentRoot = "",
     [string]$ShaderArtifactRoot = "",
     [ValidateSet("dx12", "vulkan")][string]$Rhi = "dx12",
     [switch]$CheckRenderer
@@ -18,7 +17,7 @@ if (-not [System.IO.Path]::IsPathRooted($ManifestPath)) {
     $ManifestPath = Join-Path $RootDir $ManifestPath
 }
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.schemaVersion -ne 1) {
+if ($manifest.schemaVersion -notin @(1, 2)) {
     throw "Unsupported rendering baseline manifest version."
 }
 
@@ -51,12 +50,6 @@ function Test-RecordedFiles {
 
 Test-RecordedFiles $RootDir $manifest.content.runtimeFiles "Runtime content"
 Test-RecordedFiles (Split-Path -Parent $ManifestPath) $manifest.captures "Reference captures"
-
-if (-not [string]::IsNullOrWhiteSpace($ContentRoot)) {
-    Test-RecordedFiles $ContentRoot $manifest.content.authoringFiles "Authoring content"
-} else {
-    Write-Host "Authoring content: skipped (supply -ContentRoot to check)."
-}
 
 if ($CheckRenderer) {
     # Documentation commits may follow the capture without changing the renderer.

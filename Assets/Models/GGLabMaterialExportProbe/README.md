@@ -17,11 +17,9 @@ supports.
 ## Source and identity
 
 All geometry, material values and tiny textures are original project work; no
-third-party assets are included. The saved source and exporter/validator are in
-`GraphicsGadgetLabContent/Scenes/GGLabMaterialExportProbe/` and its `Scripts/`
-directory. The probe was revised on 2026-09-30 to remove the deferred fiber
-response, from Content baseline `df187bb`; the source hash identifies this generation.
-The saved `.blend` SHA-256 is
+third-party assets are included. The probe was revised on 2026-09-30 to remove
+the deferred fiber response. The authoring-source SHA-256 below is provenance
+only; the saved source is not distributed here:
 `a3d08657745f90ff4186c844d1196d32348b78928bd4bceb7f1cdbb09fb44dc7`.
 
 | Installed file | SHA-256 |
@@ -36,11 +34,10 @@ The saved `.blend` SHA-256 is
 | `Textures/Normal.png` | `e80418f9a0d051e6af54e4069fa92520b973fcb88905fc024a95d7f6de16543e` |
 | `Textures/Occlusion.png` | `ee518438a6c5f8d0e8eb9dc25001432ef5d2c14d90a6fe690e6967387471652e` |
 
-## Reproduce
+## Validate installed inputs
 
-From the Content repository root, follow its probe README to export the saved
-source and run `Scripts/validate_material_export_probe.py`. Create the second
-document with `Scripts/make_material_ior_import_fixture.py`, passing the Blender
-export as `--input` and `GGLabMaterialIOROnly.gltf` in the same output directory
-as `--output`. Copy both `.gltf` files, the `.bin` and all exported textures to
-this directory. Compare SHA-256 values before using the fixture in import tests.
+Use both committed glTF documents with their shared buffer and textures.
+Compare SHA-256 values above before using the fixture in import tests, then run
+the production `app-content-registration` suite described in the
+[bundle contract](../README.md). The IOR-only JSON derivation is described above
+so its importer contract can be understood from the installed files.

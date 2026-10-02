@@ -11,18 +11,16 @@ No third-party assets are used.
 
 ## Source and identity
 
-The editable source is
-`GraphicsGadgetLabContent/Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend`.
-The source includes the refined coast, architectural/metal edges and concrete
-material. The file SHA-256 values below identify the exported source and assets
+The bundle includes the refined coast, architectural/metal edges and concrete
+material. The file SHA-256 values below identify the installed assets
 independently of branch names or Git commit history. Rebase can change commit
 identifiers; file hashes remain valid while the file bytes are unchanged.
-Blender 5.1.1 and Content's
-`Scripts/export_gltf.py` exported the saved source without saving changes back.
+Blender 5.1.1 exported the saved authoring source without changing it. Its source
+fingerprint is retained as provenance only; the editable source is not shipped here.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Source `.blend` | `b0dbb35343489dcb04a753e2fd91b3789b4cd704f69e662248debb74be9d4882` |
+| Authoring-source fingerprint (provenance) | `b0dbb35343489dcb04a753e2fd91b3789b4cd704f69e662248debb74be9d4882` |
 | `GGLabCoastalAtrium.gltf` | `18a2ca7bce8a701b7c33e64846f5347c618c83f3be468041120a5ff3d2371e2d` |
 | `GGLabCoastalAtrium.bin` | `5fb21d820258097019dfabdc0b3247de4c98f836f178c08ae452641b95973c1a` |
 | `Textures/Concrete_BaseColor.png` | `a72bce9124eafc7f4f3153afc8284a868f0f3eb1f11f8c6bd1857e588edb9a4c` |
@@ -59,34 +57,19 @@ Compared with the preceding bundle recorded in the coastal detail captures,
 only the three concrete PNGs change. The glTF JSON, binary geometry and nine
 other PNGs are byte-identical.
 JSON and buffer hashes alone therefore cannot identify this material update.
-Detailed procedural recipes, contact checks and pointer-free Blender previews
-live in the Content scene README.
 
-## Reproduce and validate
+## Installed bundle validation
 
-Run from the Content repository root with the saved source identity above:
+Use the committed glTF, buffer and twelve PNGs as the Runtime inputs. Compare
+their file hashes and run `app-content-registration` as shown below. The
+[bundle contract](../README.md) describes the public validation workflow.
 
-```powershell
-$blender = 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe'
-& $blender --background --factory-startup --python-exit-code 1 --python Scripts/export_gltf.py -- `
-  --input Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend `
-  --output ../GraphicsGadgetLab/Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf
-& $blender --background --factory-startup --python-exit-code 1 --python Scripts/validate_concrete_material.py -- `
-  --source Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend `
-  --reference Exports/Checks/ConcreteMaterial/Before/GGLabCoastalAtrium.blend `
-  --gltf ../GraphicsGadgetLab/Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf `
-  --compare Exports/Checks/ConcreteMaterial/ExportB/GGLabCoastalAtrium.gltf `
-  --reference-gltf Exports/Checks/ConcreteMaterial/PriorExport/GGLabCoastalAtrium.gltf
-```
-
-The Content scene README identifies the pre-concrete source by file SHA-256
-and explains how to regenerate the material independently and create comparison
-exports. Validation against this installed bundle covers concrete palette,
+Authoring validation against this installed bundle covered concrete palette,
 roughness, dielectric packing, unit normals, periodic seams, source graph and
 21 glTF tangent frames. It verifies all objects, UVs, corner normals, hierarchy,
 other materials/images and scene settings are preserved. Reimport verifies
 RGB/G/B connections, color spaces and normal scale. All fourteen installed files
-match the independently regenerated Content export byte for byte; only three
+match the independently regenerated export byte for byte; only three
 PNGs differ from the prior export. The saved source hash remained unchanged.
 Earlier lounge, terrain, equipment and 268 concrete / 255 metal contact probes
 remain applicable to the unchanged geometry; those probes were not rerun for

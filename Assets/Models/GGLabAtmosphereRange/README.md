@@ -1,14 +1,13 @@
 # Atmosphere Range
 
-Original C3 fixture exported from `GraphicsGadgetLabContent` using Blender 5.1.1
-(`b70da489d7f4`, glTF exporter 5.1.19) and `Scripts/export_gltf.py`.
-Source: `Scenes/GGLabAtmosphereRange/GGLabAtmosphereRange.blend` plus its README.
-The editable source is in Content commit `3dab662b8a1c55b44cd77d3319d29de7610aca32`.
-SHA-256 identifies the exact source and exported asset pair:
+Original atmosphere-range fixture exported using Blender 5.1.1
+(`b70da489d7f4`, glTF exporter 5.1.19). The [bundle contract](../README.md)
+describes installed-content validation. SHA-256 identifies the exported asset
+pair; the authoring-source fingerprint is retained as provenance only:
 
 | File | SHA-256 |
 | --- | --- |
-| Saved `.blend` | `83c4f0aa846de53645f8031915990dc870f71a0a3bfdff110b2c59cdfb306222` |
+| Authoring-source fingerprint (provenance) | `83c4f0aa846de53645f8031915990dc870f71a0a3bfdff110b2c59cdfb306222` |
 | `GGLabAtmosphereRange.gltf` | `19ef62b3fdb8a8e55978bc257d4cf92e5cb530c087ee52e7cfbce679e633ea96` |
 | `GGLabAtmosphereRange.bin` | `80c279bae9ac1cea83f7515cedb0175a9d25a5885448032c92f47f681cae4c30` |
 

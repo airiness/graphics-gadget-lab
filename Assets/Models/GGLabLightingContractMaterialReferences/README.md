@@ -8,18 +8,15 @@ one binary buffer and two normal PNGs. It contains no lights. Keep the `.gltf`,
 
 ## Source and identity
 
-The editable source is
-`GraphicsGadgetLabContent/Scenes/GGLabLightingContract/GGLabLightingContract.blend`
-at Content revision `63a90291e62df30f96943f3f2d6cd1e11f52d87c`. Blender 5.1.1 and
-`Scripts/export_gltf.py` produced the direct export. The Content script
-`Scripts/derive_lighting_ior_export.py` removed only Blender's specular export
+Blender 5.1.1 produced the direct export. A JSON-only derivative removed
+only Blender's specular export
 trigger from the IOR row, preserving IOR, clearcoat, anisotropy, geometry and
 both normal images. This bundle supersedes the former `GGLabLightingContractClearcoat`
 handoff path; the original Lighting Contract asset remains available.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Source `.blend` | `ce4e1ca18e3718cc3257123500f8d870926027609fe6d61126a80457fb864ce5` |
+| Authoring-source fingerprint (provenance) | `ce4e1ca18e3718cc3257123500f8d870926027609fe6d61126a80457fb864ce5` |
 | `GGLabLightingContract.gltf` | `f4e9dc7a4368c83c6cbcf2f0dd38007cb038e39657785e61c7380a56e90f9d9d` |
 | `GGLabLightingContract.bin` | `78c766e04fe97a16272bb1f66f439f18660abe7336a116ee61edbe4c25209c6e` |
 | `Textures/BrushedNormal.png` | `0f1b57c0e91588d15aa303a679dbbb9ba9ed01a6cfbe58549dd64c0b888a1a5c` |
@@ -35,29 +32,17 @@ handoff path; the original Lighting Contract asset remains available.
 The anisotropy spheres share linear RGB `(0.48, 0.52, 0.56)`, metallic 1 and
 base roughness 0.42. The unmirrored front tangent maps to runtime +X; mirrored
 U maps it to -X while preserving the +Y bitangent. Normal images are linear
-data on UV0. Exact geometry and exported direction contracts are recorded in
-`GraphicsGadgetLabContent/Scenes/GGLabLightingContract/README.md`.
+data on UV0. The installed glTF contains the authoritative geometry and tangent
+streams. The [import self-tests](../../../Sources/WinApp/Application/SelfTest/ApplicationContentRegistrationSelfTests.cpp)
+check these numeric direction contracts.
 
-## Reproduce
+## Installed bundle validation
 
-Run from the Content repository root:
-
-```powershell
-$blender = 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe'
-& $blender --background --factory-startup --python-exit-code 1 --python Scripts/export_gltf.py -- `
-  --input Scenes/GGLabLightingContract/GGLabLightingContract.blend `
-  --output Exports/Checks/LightingContractGGLabHandoff/GGLabLightingContract.gltf
-python Scripts/derive_lighting_ior_export.py `
-  --input Exports/Checks/LightingContractGGLabHandoff/GGLabLightingContract.gltf `
-  --output ../GraphicsGadgetLab/Assets/Models/GGLabLightingContractMaterialReferences/GGLabLightingContract.gltf
-& $blender --background --factory-startup --python-exit-code 1 --python Scripts/validate_lighting_contract.py -- `
-  --gltf Exports/Checks/LightingContractGGLabHandoff/GGLabLightingContract.gltf `
-  --derived ../GraphicsGadgetLab/Assets/Models/GGLabLightingContractMaterialReferences/GGLabLightingContract.gltf
-```
-
-The exporter does not save the source. Content checks cover geometry, materials,
-normal PNGs, tangent handedness, six camera targets and round-trip import. The
-original Content repeated exports produced identical JSON, buffer and images.
+Use the committed bundle and compare its SHA-256 values above. The
+[bundle contract](../README.md) describes the production import self-test.
+Authoring checks covered geometry, materials, normal PNGs, tangent handedness,
+six camera targets and round-trip import. Repeated exports produced identical
+JSON, buffer and images; authoring sources are not distributed here.
 
 ## Runtime entry and camera profiles
 
@@ -88,11 +73,11 @@ the two views for absent stations.
 
 Runtime tests cover IOR/clearcoat preservation, all six anisotropy material
 inputs, imported mirror handedness, normal-image decoding and camera registration.
-These CPU checks and the Content previews do not establish rendered direct/IBL
+These CPU checks and authoring previews do not establish rendered direct/IBL
 quality. GGLab's anisotropic IBL uses a bent reflection into an isotropic
 prefiltered environment; matching DX12/Vulkan visual acceptance remains separate.
 
-The installed derivative passed Content source/export/round-trip checks and the
+The installed derivative passed authoring source/export/round-trip checks and the
 180-check `app-content-registration` suite in both Debug and Release. The new
 Lab selection and reference views have not been exercised through the native UI
 in this handoff; no new Runtime captures were taken.

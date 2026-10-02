@@ -6,15 +6,14 @@ Keep the `.gltf`, adjacent `.bin` and `Textures/` together.
 
 ## Source and export
 
-The editable source is `GraphicsGadgetLabContent/Scenes/GGLabTextureContract/GGLabTextureContract.blend`.
-`Scripts/create_texture_contract.py` generates the scene and exact diagnostic
-pixels; `Scripts/export_gltf.py` exports the saved source with UV0 and tangents.
 All geometry and texture data are original project work, with no third-party assets.
-Exported with Blender 5.1.1 / glTF I/O 5.1.19.
+Exported with Blender 5.1.1 / glTF I/O 5.1.19, with UV0 and tangents. The
+[bundle contract](../README.md) describes installed-content validation;
+the exact diagnostic inputs are documented below.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Saved `.blend` | `78503a8f05bcad67a153777fa13f335993bea1e48e90752e836ae30fd0b594c3` |
+| Authoring-source fingerprint (provenance) | `78503a8f05bcad67a153777fa13f335993bea1e48e90752e836ae30fd0b594c3` |
 | `.gltf` | `d0b64ff5db17eb8231cc7b06c8af4ffb1ab938e911967e9514631a3df0507de6` |
 | `.bin` | `8936806ef89ac8d2c0d3e7e2c90f89b2598e89029d29b3151779a37e84f1f809` |
 

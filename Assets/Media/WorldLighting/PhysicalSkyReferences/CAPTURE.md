@@ -70,24 +70,25 @@ coordinate system. Positions, targets and clipping distances are in meters.
 ## Build and content identity
 
 The code working tree is based on `601ff3888603d7aa14e5790e3f8d753dee8f363d`.
-The Content working tree is based on `9fcc3132834cfd3de3234d89607583ea5ce84a9d`.
-Both contain the uncommitted reference-content extension; the hashes below
-identify the actual saved source, installed exports and camera definitions.
+It contains the reference-asset and camera-profile extension in its working
+tree; the hashes below identify the installed exports and camera definitions.
+Authoring-source fingerprints are provenance only; those files are not
+distributed here and are not needed to reproduce the Runtime checks.
 Runtime and shader sources have no working-tree changes relative to the code
 base. The Git shader-tree identity is `065bc7ca5468dd014c1c7b2854711fd9756aa39d`.
 Both runs used NVIDIA GeForce RTX 5080; Vulkan reported driver 617.14,
 Vulkan API 1.4.351 and application baseline Vulkan 1.3. VSync was disabled;
 Vulkan used Mailbox and DX12 allowed tearing. These captures are not timing data.
 
-Paths in this table are relative to the code repository, except `Content/`, which
-denotes the sibling GraphicsGadgetLabContent repository.
+File paths in this table are relative to the code repository. Provenance rows
+are fingerprints rather than paths to shipped files.
 
 | Artifact | SHA-256 |
 | --- | --- |
 | `Build/Output/x64/Debug/GraphicsGadgetLab.exe` | `c67723c711651bc2f8eba13d2f2d40acf0237c1cda21efe8731ae7c93b0533f8` |
 | `Build/Output/x64/Debug/dxcompiler.dll` | `9a5100511e127c6a2fc78edf984f95074a76d35b90c90c4d342430a5ae160e9b` |
-| `Content/Scenes/GGLabLightingContract/GGLabLightingContract.blend` | `841bdbc7c7b7590d0aae269c61084778a73e6a26404fa32a336b9f913100f498` |
-| `Content/Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend` | `709cf13a6ef7b827736b7978c949608659624b519b882dc2519ae7920a9cbfaf` |
+| Lighting Contract authoring-source fingerprint (provenance) | `841bdbc7c7b7590d0aae269c61084778a73e6a26404fa32a336b9f913100f498` |
+| Coastal Atrium authoring-source fingerprint (provenance) | `709cf13a6ef7b827736b7978c949608659624b519b882dc2519ae7920a9cbfaf` |
 | `Assets/Models/GGLabLightingContract/GGLabLightingContract.gltf` | `602805e187a5197e1878e1403a883afafbc259ddf760166ed7328cfa889643b4` |
 | `Assets/Models/GGLabLightingContract/GGLabLightingContract.bin` | `9ec30b41a3775e8f4f94d465dfe90105b3e0bed227fb423547c1085f774f2ecf` |
 | `Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf` | `7bcfc2ecf7e4f48446128d73af936d5147dafd8756d83ed56ce24ce892c14192` |

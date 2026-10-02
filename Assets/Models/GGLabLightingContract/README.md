@@ -1,36 +1,23 @@
 # GGLab Lighting Contract
 
-C0 reference content for World Lighting, loaded through the production asset and
+Reference content for World Lighting, loaded through the production asset and
 Forward PBR paths. The asset contains 28 meshes, 21 authored materials, 4 exported
 cameras and one orientation Empty. It has no textures or light objects. Keep
 `GGLabLightingContract.gltf` and its adjacent `.bin` together.
 
 ## Source and export
 
-Original project geometry and materials; no third-party content. Editable source:
-`GraphicsGadgetLabContent/Scenes/GGLabLightingContract/GGLabLightingContract.blend`.
-Content working-tree extension based on revision
-`9fcc3132834cfd3de3234d89607583ea5ce84a9d`. The hashes below identify the exact
-uncommitted source and installed export paired with the new Runtime profile.
-Exported with Blender 5.1.1 / glTF I/O 5.1.19 using the Content repository's
-`Scripts/export_gltf.py`. Its scene README records the exact Blender geometry,
-materials, cameras and authoring preview settings. This code change installs the
-matching asset and Runtime reference profiles.
+Original project geometry and materials; no third-party content. Exported with
+Blender 5.1.1 / glTF I/O 5.1.19. The hashes below identify the installed export;
+the authoring-source fingerprint is provenance only. Fixture geometry,
+materials, cameras and Runtime settings are documented in this file. See the
+[bundle contract](../README.md) for installed-content validation.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| `GGLabLightingContract.blend` | `841bdbc7c7b7590d0aae269c61084778a73e6a26404fa32a336b9f913100f498` |
+| Authoring-source fingerprint (provenance) | `841bdbc7c7b7590d0aae269c61084778a73e6a26404fa32a336b9f913100f498` |
 | `GGLabLightingContract.gltf` | `602805e187a5197e1878e1403a883afafbc259ddf760166ed7328cfa889643b4` |
 | `GGLabLightingContract.bin` | `9ec30b41a3775e8f4f94d465dfe90105b3e0bed227fb423547c1085f774f2ecf` |
-
-To re-export, run from the Content repository root:
-
-```powershell
-$blender = 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe'
-& $blender --background --factory-startup --python-exit-code 1 --python Scripts/export_gltf.py -- `
-  --input Scenes/GGLabLightingContract/GGLabLightingContract.blend `
-  --output ../GraphicsGadgetLab/Assets/Models/GGLabLightingContract/GGLabLightingContract.gltf
-```
 
 ## Run and inspect
 
@@ -144,7 +131,7 @@ Blender authoring previews use different light/world/display settings and are no
 Runtime golden images. No GPU presentation or visual-correctness claim is made
 by the CPU checks.
 
-Content validation covers saved-source preservation, material factors, sphere
+Authoring validation covered saved-source preservation, material factors, sphere
 radius/tessellation/normals, camera framing and Blender round-trip. Repeated
 exports are byte-identical; original mesh payloads, material factors and camera
 nodes match the previous installed asset. Runtime import and GPU checks remain

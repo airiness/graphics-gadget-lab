@@ -2,7 +2,7 @@
 
 SDR visual checks of the refined concrete material, saved on October 2, 2026
 (UTC). The [asset reference](../../../Models/GGLabCoastalAtriumResearchLounge/README.md)
-records the source/export identities and reproduction commands.
+records the asset identities and Runtime verification commands.
 
 ## Inputs
 
@@ -11,10 +11,10 @@ records the source/export identities and reproduction commands.
   additional import self-test in the working tree. Renderer, shader and camera
   sources are unchanged from that commit.
 - Shader source tree: `1167f85ebf7fd2441e6e973415ed1dc502befea3`.
-- Content source: the saved Coastal Atrium `.blend`, identified by SHA-256:
+- Authoring-source fingerprint (provenance only; source not distributed here):
   `b0dbb35343489dcb04a753e2fd91b3789b4cd704f69e662248debb74be9d4882`.
 - Blender 5.1.1 glTF Separate export: JSON, adjacent binary and twelve PNGs.
-  All fourteen installed files match the independently regenerated Content
+  All fourteen installed files match the independently regenerated
   export. Only the three concrete PNGs differ from the preceding metal export;
   geometry, UVs, tangents, hierarchy, materials, cameras and other PNGs are retained.
 - WinApp Debug and Release x64 were built with Visual Studio 2022 Community's
@@ -90,7 +90,7 @@ frame timestamps. Desktop HDR/color calibration was not verified.
   metallic/roughness/normal factors, three semantic texture bindings,
   1024-square extent and eleven mip levels. Existing checks retain per-material
   triangles, orthonormal tangent frames, rock bindings and lounge extensions.
-- Content validation passed against the installed bundle: palette, roughness,
+- Authoring validation passed against the installed bundle: palette, roughness,
   dielectric packing, unit normals, seams, packed source graph, preserved scene
   state and normalized orthogonal UV0 tangent frames on 21 concrete primitives.
   Export bytes match independent regeneration; glTF reimport retains color

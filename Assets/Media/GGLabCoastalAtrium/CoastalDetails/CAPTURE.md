@@ -3,7 +3,7 @@
 SDR visual checks of the refined coast, rock material, service equipment,
 boulders and architectural/metal edges, saved on October 2, 2026 (UTC).
 The [asset reference](../../../Models/GGLabCoastalAtriumResearchLounge/README.md)
-describes the current bundle and reproduction workflow. This record retains
+describes the current bundle and Runtime verification workflow. This record retains
 the earlier capture's source identity below, before concrete material refinement.
 
 ## Inputs
@@ -13,11 +13,11 @@ the earlier capture's source identity below, before concrete material refinement
   self-tests in the working tree. Renderer, shader and camera sources are
   unchanged from that commit.
 - Shader source tree: `1167f85ebf7fd2441e6e973415ed1dc502befea3`.
-- Content source: the saved Coastal Atrium `.blend` with refined metal geometry
-  and the original concrete maps. Source SHA-256:
+- Authoring-source fingerprint (provenance only; source not distributed here),
+  with refined metal geometry and the original concrete maps:
   `ef1f456acd4780f356c8f2d30420d8981d9d04798c146b85d5e208eb619979e3`.
 - Blender 5.1.1 glTF Separate export: JSON, adjacent binary and twelve PNGs.
-  The installed bundle matches the independently validated Content candidate.
+  The installed bundle matches the independently validated authoring candidate.
 - WinApp Debug x64 and ShaderCompiler Debug were built with Visual Studio 2022
   Community's x64 MSBuild and `/p:PreferredToolArchitecture=x64`.
 - GPU: NVIDIA GeForce RTX 5080. The Vulkan panel reported driver 617.14,
@@ -97,7 +97,7 @@ frame timestamps. Desktop HDR/color calibration was not verified.
   205 checks in each configuration: texture decoding/semantics, valid geometry,
   orthonormal imported tangent frames, per-material placed triangles, rock UV0
   bindings and retained lounge clearcoat/anisotropy.
-- Content validation passed against the installed bundle: save/source identity,
+- Authoring validation passed against the installed bundle: save/source identity,
   repeated export bytes, reimport, lounge surface separation, terrain support,
   service/boulder clearances, 268 concrete and 255 metal contact/detail probes.
 - Both backends presented the three views with the new coast, rock maps,

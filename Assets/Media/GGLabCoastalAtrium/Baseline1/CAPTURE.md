@@ -10,20 +10,22 @@ The existing PCF self-shadowing waves are part of this baseline.
 | Input | Immutable reference |
 | --- | --- |
 | Runtime, shaders and exported scene | [graphics-gadget-lab at a9a4cb4](https://github.com/airiness/graphics-gadget-lab/tree/a9a4cb4aab5c17fec563b86f4d0ee224cf79d56e) |
-| Blender source, authoring scripts and textures | [graphics-gadget-lab-content at 0fde6e1](https://github.com/airiness/graphics-gadget-lab-content/tree/0fde6e137eb1505715fe41492b70e27d11a4360d) |
 | Shader source tree | `51e0be693dd13de836bdf8dc3b6ef4478155ff7c` |
 | Build | Debug, x64, v143, MSVC 14.44.35207; Vulkan SDK 1.3.296.0 |
 | Exporter | Blender 5.1.1, glTF I/O 5.1.19, separate glTF + binary + PNGs |
 
-The manifest covers the saved `.blend`, four authoring/export scripts, nine
-source textures, exported glTF/binary/textures, and the startup HDR environment.
+The public manifest covers exported glTF/binary/textures, the startup HDR
+environment and archived captures. Its schema version 2 separates Runtime
+inputs from authoring records. The original authoring file records and checks
+are maintained in the authoring workspace; Runtime hash checks remain unchanged.
 The environment is loaded by application startup but contributes no lighting
 or skybox in this Demo. Its FP16 sanitization warning is recorded below.
 The [asset reference](../../../Models/GGLabCoastalAtrium/README.md) contains the
-export command; the manifest records the export options. Reuse the frozen
-export for rendering comparisons. Re-exporting is a separate content check.
+installed asset contract; the manifest records the export options. Reuse the
+frozen export for rendering comparisons. Regeneration is an authoring check.
 
-Obtain these exact commits in separate checkouts to recover historical inputs.
+Obtain the recorded public code revision in a separate checkout to recover
+the historical rendering inputs.
 Keep this capture directory and the validation script available separately:
 they were added after the recorded renderer revision. Do not replace the old
 asset or capture files when preparing a new comparison.
@@ -65,14 +67,14 @@ All cameras are perspective, roll-free, at 16:9 with near/far 0.1/150 m.
 From the restored code checkout, build with the recorded MSVC/SDK toolchain:
 
 ```powershell
-msbuild GraphicsGadgetLab.sln /m /p:Configuration=Debug /p:Platform=x64
+msbuild GraphicsGadgetLab.sln /m /p:Configuration=Debug /p:Platform=x64 /p:PreferredToolArchitecture=x64
 ```
 
 From the checkout containing this baseline, verify the assets and screenshots:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/ValidateRenderingBaseline.ps1 `
-  -RootDir . -ContentRoot ../GraphicsGadgetLabContent -CheckRenderer
+  -RootDir . -CheckRenderer
 ```
 
 For a separate historical checkout, set `-RootDir` to that checkout and
@@ -81,6 +83,8 @@ checks tracked renderer/build inputs against the recorded commit and rejects
 untracked inputs in those directories. Omit it only for an intentional renderer
 A/B change; keep the content hashes fixed and record the new renderer revision.
 The script does not read live camera or rendering settings.
+It validates only files and renderer inputs in the code repository and accepts
+manifest versions 1 and 2. Authoring-source validation is performed separately.
 
 Launch each backend separately with a fresh, absolute state path outside the
 executable directory. This isolates saved DevTools layout and derived caches:

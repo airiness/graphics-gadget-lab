@@ -2,32 +2,20 @@
 
 This first-party primitive fixture validates the Blender-to-GGLab model path.
 It contains seven meshes and four untextured metallic/roughness materials.
-The editable source belongs to the separate `GraphicsGadgetLabContent`
-repository; this directory contains the runtime glTF Separate export and its
-external `.bin` buffer. Load the `.gltf`, keeping both files together.
+This directory contains the Runtime glTF Separate export and its external
+`.bin` buffer. Load the `.gltf`, keeping both files together. See the
+[bundle contract](../README.md) for installed-content validation.
 
 ## Source and export
 
-- Content revision: `cad63a6`.
-- Source: `Scenes/GGLabIslandPrototype/GGLabIslandPrototype.blend`.
-- Source SHA-256: `8f5bd0b5c411d04b058247092823716cafc5e0f849bc5b558297f8d9853ae019`.
+- Authoring-source SHA-256 (provenance): `8f5bd0b5c411d04b058247092823716cafc5e0f849bc5b558297f8d9853ae019`.
 - glTF SHA-256: `b971bb89c2fc23f11156ff4ac67e97688e1c50df19b7cf7864d5c40f6e4c3c59`.
 - Buffer SHA-256: `88bd7f695c7d78fab7972a9e1e02efbe0356efbcdb05ee5bf36697951a12db0e`.
-- Exporter: `Scripts/export_gltf.py`, Blender 5.1.1, glTF I/O 5.1.19.
+- Exporter: Blender 5.1.1, glTF I/O 5.1.19.
 - These are original project primitives, with no third-party model or texture inputs.
 
-Run from the code repository root, adapting the two sibling repository paths
-and Blender installation if needed:
-
-```powershell
-& 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe' --background `
-  --python ../GraphicsGadgetLabContent/Scripts/export_gltf.py -- `
-  --output ./Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf
-```
-
-The exporter reads the saved `.blend`; it does not regenerate or overwrite it.
-Restart the island Demo after re-exporting. This workflow does not provide live
-file watching.
+The exported files are the installed inputs. Restart the island Demo after
+replacing a bundle; this workflow does not provide live file watching.
 
 ## Runtime preset
 
