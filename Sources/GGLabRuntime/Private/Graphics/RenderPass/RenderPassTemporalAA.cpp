@@ -325,7 +325,12 @@ namespace gglab
 					.m_VelocityWeightScale = temporalAASettings.m_VelocityWeightScale,
 					.m_LuminanceWeightScale = temporalAASettings.m_LuminanceWeightScale,
 				};
-				targets.m_SceneColor = resources.m_ResolvedSceneColor;
+				// Still update history, but diagnostic MRTs describe this frame's raw
+				// radiance and coverage, not the temporally reconstructed image.
+				if (!targets.m_MaterialDiagnosticColor.IsValid())
+				{
+					targets.m_SceneColor = resources.m_ResolvedSceneColor;
+				}
 				const bool exported =
 					transaction->ExportHistoryResources(builder, resources.m_History);
 				GGLAB_ASSERT_MSG(exported,

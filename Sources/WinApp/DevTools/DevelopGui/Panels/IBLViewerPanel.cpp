@@ -328,7 +328,7 @@ namespace gglab
 				}
 				const auto& bakeConfig = settings.m_BakeConfig;
 				ImGui::TextDisabled(
-					"Environment %u | Irradiance %u (%u samples) | Specular %u (%u mips)",
+					"Environment %u | Irradiance %u (budget %u) | Specular %u (%u mips)",
 					bakeConfig.m_EnvironmentCubemapSize, bakeConfig.m_IrradianceCubemapSize,
 					bakeConfig.m_IrradianceSampleCount, bakeConfig.m_PrefilteredSpecularCubemapSize,
 					bakeConfig.m_PrefilteredSpecularMipLevels);

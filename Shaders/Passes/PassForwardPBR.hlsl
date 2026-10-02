@@ -9,7 +9,9 @@
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/ShadowSampling.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
-#include <PBR/BRDF.hlsli>
+#include <PBR/DirectLighting.hlsli>
+#include <PBR/IndirectLighting.hlsli>
+#include <PBR/MaterialDiagnostics.hlsli>
 
 struct ForwardPBRPassParameters
 {
@@ -43,68 +45,68 @@ float4 EncodeForwardSceneColor(float4 color)
 	return float4(EncodeSceneColor(color.rgb, preExposure), color.a);
 }
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
-struct ForwardPBRPixelOutput
-{
-	float4 ForwardPlusColor : SV_Target0;
-	float4 LegacyColor : SV_Target1;
-	float4 GTAOContribution : SV_Target2;
-};
-
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
-{
-	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
-	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
-	output.GTAOContribution = gtaoContribution;
-	return output;
-}
-#elif defined(GGLAB_FORWARD_PLUS_VALIDATION)
-struct ForwardPBRPixelOutput
-{
-	float4 ForwardPlusColor : SV_Target0;
-	float4 LegacyColor : SV_Target1;
-};
-
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 forwardPlusColor, float4 legacyColor, float4 gtaoContribution)
-{
-	ForwardPBRPixelOutput output;
-	output.ForwardPlusColor = EncodeForwardSceneColor(forwardPlusColor);
-	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
-	return output;
-}
-#elif defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 struct ForwardPBRPixelOutput
 {
 	float4 Color : SV_Target0;
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	float4 LegacyColor : SV_Target1;
+#endif
+#if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	float4 GTAOContribution : SV_Target2;
+#else
 	float4 GTAOContribution : SV_Target1;
+#endif
+#endif
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+	float4 MaterialDiagnosticColor : SV_Target3;
+	float4 MaterialDiagnosticCoverage : SV_Target4;
+	float4 MaterialDiagnosticLighting : SV_Target5;
+#elif defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+	float4 MaterialDiagnosticColor : SV_Target2;
+	float4 MaterialDiagnosticCoverage : SV_Target3;
+	float4 MaterialDiagnosticLighting : SV_Target4;
+#else
+	float4 MaterialDiagnosticColor : SV_Target1;
+	float4 MaterialDiagnosticCoverage : SV_Target2;
+	float4 MaterialDiagnosticLighting : SV_Target3;
+#endif
+#endif
 };
 
-ForwardPBRPixelOutput MakeForwardPBRPixelOutput(
-	float4 color, float4 legacyColor, float4 gtaoContribution)
+ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 legacyColor,
+	float4 gtaoContribution, float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	ForwardPBRPixelOutput output;
 	output.Color = EncodeForwardSceneColor(color);
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION)
+	output.LegacyColor = EncodeForwardSceneColor(legacyColor);
+#endif
+#if defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	output.GTAOContribution = gtaoContribution;
+#endif
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+	// Preserve full scene radiance for metering while tracking the part that
+	// must be replaced by display-linear diagnostics during final composition.
+	const MaterialDiagnosticOutput diagnostics = MakeMaterialDiagnosticOutput(output.Color, diagnosticColor, diagnostic);
+	output.MaterialDiagnosticColor = diagnostics.Color;
+	output.MaterialDiagnosticCoverage = diagnostics.Coverage;
+	output.MaterialDiagnosticLighting = diagnostics.Lighting;
+#endif
 	return output;
 }
 #else
 #define ForwardPBRPixelOutput float4
 
-float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution)
+float4 MakeForwardPBRPixelOutput(float4 color, float4 legacyColor, float4 gtaoContribution,
+	float3 diagnosticColor = 0.0.xxx, bool diagnostic = false)
 {
 	return EncodeForwardSceneColor(color);
 }
 #endif
 
-// Keep these values synchronized with MaterialDebugView in GraphicsTypes.h.
-static const uint MaterialDebugViewLit = 0u;
-static const uint MaterialDebugViewBaseColor = 1u;
-static const uint MaterialDebugViewMetallic = 2u;
-static const uint MaterialDebugViewRoughness = 3u;
-static const uint MaterialDebugViewNormal = 4u;
 static const uint GTAOEnabledFlag = 1u;
 
 bool IsShadowEnabled()
@@ -125,45 +127,6 @@ float LoadGTAO(uint2 pixel)
 	}
 	Texture2D<float> gtaoTexture = GetTexture2DFloat(g_Pass.GTAOTextureIndex);
 	return saturate(gtaoTexture.Load(int3(pixel, 0)));
-}
-
-// Sample normal map and compute perturbed normal in world space
-float3 SampleNormalWS(
-	MaterialData matData, float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
-{
-	// TODO: flip Y for normal map?
-
-	// Sample normal texture
-	float4 normalSampled = SampleTextureBinding(matData.NormalBinding.TextureSamplerBinding, uv);
-
-	// Remap from [0,1] to [-1,1], xy only
-	normalSampled.xy = normalSampled.xy * 2.0 - 1.0;
-
-	// Apply normal scale xy
-	normalSampled.xy *= matData.NormalScale; // apply normal scale
-
-	// rebuild z, avoid normalization issues
-	normalSampled.z = sqrt(saturate(1.0 - dot(normalSampled.xy, normalSampled.xy)));
-
-	// Build TBN matrix
-	float3x3 TBN = BuildTBNFromTangent(
-		SafeNormalize(normalWS, float3(0.0, 1.0, 0.0)), tangentWS, positionWS, uv);
-
-	// Transform normal from tangent space to world space
-	float3 perturbedNormalWS = SafeNormalize(mul(normalSampled.xyz, TBN), TBN[2]);
-	return perturbedNormalWS;
-}
-
-float FilterPerceptualRoughness(float perceptualRoughness, float3 normalWS)
-{
-	// Normal-map frequencies above the pixel footprint otherwise turn a small,
-	// intense environment light into unstable sub-pixel specular highlights.
-	float3 normalDx = ddx(normalWS);
-	float3 normalDy = ddy(normalWS);
-	float normalVariance = dot(normalDx, normalDx) + dot(normalDy, normalDy);
-	float kernelAlpha = min(2.0 * normalVariance, 0.18);
-	float alpha = PerceptualRoughnessToAlpha(perceptualRoughness);
-	return sqrt(saturate(alpha + kernelAlpha));
 }
 
 float2 SampleIBLBrdfLUT(float NoV, float perceptualRoughness)
@@ -197,6 +160,24 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		   g_Scene.IBLResource.EnvironmentIntensity;
 }
 
+MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material)
+{
+	MaterialIBLSamples environment;
+	environment.Irradiance = SampleIBLIrradiance(material.Base.NormalWS);
+	environment.BaseSpecular = SampleIBLPrefilteredSpecular(
+		GetMaterialIBLReflection(material), material.Base.EffectivePerceptualRoughness);
+	environment.ClearcoatSpecular = 0.0.xxx;
+	MaterialIBLResponse response = EvaluateBaseMaterialIBL(material, environment);
+	if (material.Clearcoat.Factor > 0.0)
+	{
+		const float3 reflection = reflect(-material.ViewDirectionWS, material.Clearcoat.NormalWS);
+		environment.ClearcoatSpecular = SampleIBLPrefilteredSpecular(
+			reflection, material.Clearcoat.PerceptualRoughness);
+		ApplyClearcoatIBL(response, material.Clearcoat, environment.ClearcoatSpecular);
+	}
+	return response;
+}
+
 float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
 	float receiverNoL, uint cascadeIndex)
 {
@@ -207,7 +188,7 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 		return 1.0;
 	}
 	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
-	SamplerComparisonState sampler = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
+	SamplerComparisonState samplerState = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
 	const float2 texelSize = 1.0.xx / max((float) g_Pass.ShadowMapSize, 1.0);
 	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
 	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
@@ -217,9 +198,9 @@ float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane rece
 	const float compareDepth = projection.ReceiverDepth - residualBias - bilinearBias;
 	if (!IsShadowPCFEnabled())
 	{
-		return SampleShadowHard(shadowMap, sampler, projection.UV, cascadeIndex, saturate(compareDepth));
+		return SampleShadowHard(shadowMap, samplerState, projection.UV, cascadeIndex, saturate(compareDepth));
 	}
-	return SampleShadowPCF3x3(shadowMap, sampler, projection.UV, cascadeIndex,
+	return SampleShadowPCF3x3(shadowMap, samplerState, projection.UV, cascadeIndex,
 		compareDepth, texelSize, gradient);
 }
 
@@ -261,7 +242,8 @@ float3 ApplyShadowDiagnosticsOverlay(float3 color, float3 positionWS)
 	{
 		return color;
 	}
-	const float3 cascadeColors[4] = {
+	const float3 cascadeColors[4] =
+	{
 		float3(0.15, 0.65, 1.0), float3(0.35, 1.0, 0.25),
 		float3(1.0, 0.45, 0.15), float3(0.8, 0.3, 1.0)
 	};
@@ -338,7 +320,10 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 
 float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 {
-	if (g_Pass.AtmosphereTransmittanceIndex == 0xffffffffu) return 1.0.xxx;
+	if (g_Pass.AtmosphereTransmittanceIndex == 0xffffffffu)
+	{
+		return 1.0.xxx;
+	}
 	float3 positionKm = positionWS * g_Scene.AtmosphereWorld.w - g_Scene.AtmosphereWorld.xyz;
 	float radiusKm = length(positionKm);
 	float bottomKm = g_Scene.AtmosphereRadii.x;
@@ -358,62 +343,25 @@ float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
 		GetSamplerState(g_Pass.AtmosphereSamplerIndex), uv, 0).rgb;
 }
 
-float3 WorldSunDiskSpecular(float3 centerDirection, float3 N, float3 V, float3 F0,
-	float physicalRoughness)
+float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
-	const float sineRadius = sin(g_Scene.WorldSunAngularRadius);
-	const float sineRadiusSquared = sineRadius * sineRadius;
-	const float3 referenceAxis = abs(centerDirection.y) < 0.99 ?
-		float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
-	const float3 tangent = normalize(cross(referenceAxis, centerDirection));
-	const float3 bitangent = cross(centerDirection, tangent);
-	const float NoV = saturate(dot(N, V));
-	float3 integrated = 0.0.xxx;
-	[unroll]
-	for (uint sampleIndex = 0; sampleIndex < 32u; ++sampleIndex)
-	{
-		const float radial = sqrt((sampleIndex + 0.5) / 32.0 * sineRadiusSquared);
-		const float phase = sampleIndex * 2.39996322973;
-		const float3 L = centerDirection * sqrt(1.0 - radial * radial) +
-			(tangent * cos(phase) + bitangent * sin(phase)) * radial;
-		const float NoL = saturate(dot(N, L));
-		const float3 H = SafeNormalize(L + V, N);
-		const float NoH = saturate(dot(N, H));
-		const float VoH = saturate(dot(V, H));
-		integrated += D_GGX(NoH, physicalRoughness) *
-			V_SmithGGXCorrelated(NoV, NoL, physicalRoughness) *
-			F_Schlick(F0, 1.0.xxx, VoH) * NoL;
-	}
-	// Solid-angle samples reconstruct the authored perpendicular disk illuminance.
-	return integrated * (2.0 / (1.0 + cos(g_Scene.WorldSunAngularRadius))) / 32.0;
-}
-
-float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
-{
+	float3 result = 0.0.xxx;
 	const LightData light = g_Lights[lightIndex];
 	float3 L = 0.0.xxx;
 	float attenuation = 1.0;
 	if (!ResolveLightVector(light, positionWS, L, attenuation))
 	{
-		return 0.0.xxx;
+		return result;
 	}
 
-	const float NoL = saturate(dot(N, L));
-	if (NoL <= 0.0)
+	const float NoL = saturate(dot(material.Base.NormalWS, L));
+	const float coatNoL = material.Clearcoat.Factor > 0.0
+		? saturate(dot(material.Clearcoat.NormalWS, L)) : 0.0;
+	if (NoL <= 0.0 && coatNoL <= 0.0)
 	{
-		return 0.0.xxx;
+		return result;
 	}
-
-	const float3 H = SafeNormalize(L + V, N);
-	const float NoH = saturate(dot(N, H));
-	const float VoH = saturate(dot(V, H));
-	const float D = D_GGX(NoH, physicalRoughness);
-	const float visibility = V_SmithGGXCorrelated(NoV, NoL, physicalRoughness);
-	const float3 F = F_Schlick(F0, 1.0.xxx, VoH);
-	const float3 specular = D * visibility * F;
-	const float3 kd = (1.0.xxx - F) * (1.0 - metallic);
-	const float3 diffuse = kd * Fd_Lambert(baseColor);
 
 	float shadowVisibility = 1.0;
 	if (light.LightType == 0u && lightIndex == g_Scene.DirectionalShadowLightIndex)
@@ -428,26 +376,21 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS, float3 N, ShadowR
 	{
 		illuminance *= WorldSunTransmittance(positionWS, L);
 	}
-	float3 directResponse = (diffuse + specular) * NoL;
-	// Above perceptual roughness 0.2, the center approximation stayed within 1%
-	// over 0-60 degree incidence and offsets up to two solar radii from reflection.
-	if (lightIndex == g_Scene.WorldSunLightIndex && physicalRoughness < 0.04)
-	{
-		directResponse = diffuse * NoL + WorldSunDiskSpecular(L, N, V, F0, physicalRoughness);
-	}
-	return directResponse * illuminance * attenuation *
-		shadowVisibility;
+	const float3 directResponse = EvaluateDirectMaterialResponse(L, NoL, coatNoL, material,
+		lightIndex == g_Scene.WorldSunLightIndex, g_Scene.WorldSunAngularRadius);
+	result = directResponse * illuminance * attenuation * shadowVisibility;
+	return result;
 }
 
-float3 EvaluateLegacyDirectLighting(float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver, float3 V, float NoV,
-	float3 F0, float physicalRoughness, float3 baseColor, float metallic)
+float3 EvaluateLegacyDirectLighting(float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 lighting = 0.0.xxx;
 	for (uint lightOffset = 0; lightOffset < g_Scene.LightCount; ++lightOffset)
 	{
 		const uint lightIndex = g_Scene.LightBaseIndex + lightOffset;
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, metallic);
+		const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
+		lighting += light;
 	}
 	return lighting;
 }
@@ -459,8 +402,8 @@ uint GetForwardPlusGlobalLightIndex(uint listIndex)
 		: g_Pass.ForwardPlusGlobalLightIndices23[listIndex - 2u];
 }
 
-float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS, float3 N, ShadowReceiverPlane shadowReceiver,
-	float3 V, float NoV, float3 F0, float physicalRoughness, float3 baseColor, float metallic)
+float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS,
+	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
 	float3 lighting = 0.0.xxx;
 	const uint globalLightCount = min(
@@ -471,8 +414,8 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		if (lightIndex >= g_Scene.LightBaseIndex &&
 			lightIndex < g_Scene.LightBaseIndex + g_Scene.LightCount)
 		{
-			lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-				physicalRoughness, baseColor, metallic);
+			const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
+			lighting += light;
 		}
 	}
 
@@ -493,14 +436,14 @@ float3 EvaluateForwardPlusDirectLighting(float2 pixelPosition, float3 positionWS
 		{
 			continue;
 		}
-		lighting += EvaluateDirectLight(lightIndex, positionWS, N, shadowReceiver, V, NoV, F0,
-			physicalRoughness, baseColor, metallic);
+		const float3 light = EvaluateDirectLight(lightIndex, positionWS, shadowReceiver, material);
+		lighting += light;
 	}
 	return lighting;
 }
 #endif
 
-#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
+#if defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT) || defined(GGLAB_MATERIAL_DIAGNOSTICS)
 ForwardPBRPixelOutput PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace)
 #else
 float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : SV_Target
@@ -517,84 +460,54 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	// plus texture+sampler bindings) feed the existing Forward PBR lighting
 	// below.
 	const SurfaceData surface = EvaluateSurface(matData, IN.UV0, IN.UV1);
-	const float3 baseColor = surface.BaseColor;
 	// Alpha mode / cutoff / discard stays pass-owned: resolve the surface's
 	// raw sampled alpha through the material's alpha policy here.
 	const float alpha = ResolveMaterialAlpha(matData, surface.Opacity);
 
-	// Metallic and Roughness (linear, resolved by the surface seam;
-	// B=metallic, G=roughness)
-	const float metallic = surface.Metallic;
-	float perceptualRoughness = ClampPerceptualRoughnessForBRDF(surface.Roughness);
+	MaterialShadingInput shadingInput;
+	shadingInput.PositionWS = IN.PositionWS;
+	shadingInput.NormalWS = IN.NormalWS;
+	shadingInput.TangentWS = IN.TangentWS;
+	shadingInput.UV0 = IN.UV0;
+	shadingInput.UV1 = IN.UV1;
+	shadingInput.ViewPositionWS = viewData.CameraPos.xyz;
+	shadingInput.IsFrontFace = isFrontFace;
+	const MaterialShadingFrame frame = PrepareMaterialShadingFrame(matData, surface, shadingInput);
 
-	// Normal (linear)
-	float3 normalWS = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0));
-	float4 tangentWS = IN.TangentWS;
-	if ((matData.Flags & 1u) != 0u && !isFrontFace)
-	{
-		normalWS = -normalWS;
-	}
-	float2 normalUV = SelectUV(matData.NormalBinding, IN.UV0, IN.UV1);
-	float3 N = SampleNormalWS(matData, normalWS, tangentWS, IN.PositionWS, normalUV);
+#if defined(GGLAB_MATERIAL_DIAGNOSTICS)
+	// Scene extraction requests diagnostic MRTs for every parameter debug view.
+	float3 diagnosticColor;
+	const bool diagnostic = TryEvaluateMaterialDiagnostic(matData.DebugView, surface,
+		frame.Base, frame.ClearcoatSpecularAA, frame.ClearcoatNormalWS, frame.Anisotropy, diagnosticColor);
+#else
+	const float3 diagnosticColor = 0.0.xxx;
+	const bool diagnostic = false;
+#endif
 
-	if (matData.DebugView == MaterialDebugViewBaseColor)
+	// The pass owns texture access. Preparation consumes the actual LUT samples
+	// once, and every light and environment response uses the same derived state.
+	const float2 baseBrdfLUT = SampleIBLBrdfLUT(frame.NoV, frame.Base.EffectivePerceptualRoughness);
+	ClearcoatShadingState coat = BuildClearcoatShadingState(surface, frame);
+	if (coat.Factor > 0.0)
 	{
-		return MakeForwardPBRPixelOutput(
-			float4(baseColor, alpha), float4(baseColor, alpha), 0.0.xxxx);
+		const float2 clearcoatBrdfLUT = SampleIBLBrdfLUT(coat.NoV, coat.PerceptualRoughness);
+		ApplyClearcoatDirectionalEnergy(coat, clearcoatBrdfLUT);
 	}
-	if (matData.DebugView == MaterialDebugViewMetallic)
-	{
-		return MakeForwardPBRPixelOutput(float4(metallic.xxx, alpha),
-			float4(metallic.xxx, alpha), 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewRoughness)
-	{
-		return MakeForwardPBRPixelOutput(float4(perceptualRoughness.xxx, alpha),
-			float4(perceptualRoughness.xxx, alpha), 0.0.xxxx);
-	}
-	if (matData.DebugView == MaterialDebugViewNormal)
-	{
-		const float4 normalColor = float4(N * 0.5 + 0.5, alpha);
-		return MakeForwardPBRPixelOutput(normalColor, normalColor, 0.0.xxxx);
-	}
-	perceptualRoughness = FilterPerceptualRoughness(perceptualRoughness, N);
-
-	// Shading
-	float3 V = SafeNormalize(viewData.CameraPos.xyz - IN.PositionWS, N); // View direction
-	float NoV = saturate(dot(N, V));
-
-	// convert artistic roughness to physical roughness
-	float a = PerceptualRoughnessToAlpha(perceptualRoughness);
-
-	float3 F0 = lerp(0.04.xxx, baseColor, metallic); // dielectric F0 is 0.04, metal F0 is baseColor
+	const PreparedMaterialShading material = PrepareMaterialShading(surface, frame,
+		baseBrdfLUT, coat);
 #if defined(GGLAB_FORWARD_PLUS)
 	const float3 directLighting = EvaluateForwardPlusDirectLighting(IN.PositionCS.xy,
-		IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+		IN.PositionWS, shadowReceiver, material);
 #else
-	const float3 directLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+	const float3 directLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
 #endif
 
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
-	const float3 legacyDirectLighting =
-		EvaluateLegacyDirectLighting(IN.PositionWS, N, shadowReceiver, V, NoV, F0, a, baseColor, metallic);
+	const float3 legacyDirectLighting = EvaluateLegacyDirectLighting(IN.PositionWS, shadowReceiver, material);
 #endif
 
-	// Emissive (resolved by the surface seam from the emissive texture)
-	const float3 emissive = surface.Emissive;
-
-	// IBL
-	float3 iblF = F_Schlick(F0, max((1.0 - perceptualRoughness).xxx, F0), NoV);
-
-	float3 diffuseIBLFactor = (1.0.xxx - iblF) * (1.0 - metallic);
-	float3 diffuseIBL = SampleIBLIrradiance(N) * diffuseIBLFactor * Fd_Lambert(baseColor);
-
-	float2 brdfLUT = SampleIBLBrdfLUT(NoV, perceptualRoughness);
-	float3 specularIBLFactor = F0 * brdfLUT.x + brdfLUT.y;
-
-	float3 reflectWS = reflect(-V, N);
-	float3 prefilteredEnv = SampleIBLPrefilteredSpecular(reflectWS, perceptualRoughness);
-	float3 specularIBL = prefilteredEnv * specularIBLFactor;
+	const float3 emissive = EvaluateMaterialEmission(surface.Emissive, material.Clearcoat);
+	MaterialIBLResponse ibl = SampleMaterialEnvironment(material);
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
@@ -604,26 +517,26 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ao = saturate(ao);
 	const float gtao = LoadGTAO(uint2(IN.PositionCS.xy));
 	const float3 materialOccludedDiffuseIBL =
-		diffuseIBL * ResolveSpecularIBLVisibility(ao);
+		ibl.Diffuse * ResolveSpecularIBLVisibility(ao);
 	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);
-	diffuseIBL *= ResolveDiffuseIBLVisibility(ao, gtao);
-	specularIBL *= ResolveSpecularIBLVisibility(ao);
+	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, gtao);
+	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
 	float3 outputLighting = directLighting;
 	outputLighting += emissive;
-	outputLighting += diffuseIBL + specularIBL;
+	outputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 outputColor = float4(
 		ApplyShadowDiagnosticsOverlay(outputLighting, IN.PositionWS), alpha);
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION)
 	float3 legacyOutputLighting = legacyDirectLighting;
 	legacyOutputLighting += emissive;
-	legacyOutputLighting += diffuseIBL + specularIBL;
+	legacyOutputLighting += ibl.Diffuse + ibl.Specular;
 	const float4 legacyColor = float4(
 		ApplyShadowDiagnosticsOverlay(legacyOutputLighting, IN.PositionWS), alpha);
 	return MakeForwardPBRPixelOutput(outputColor, legacyColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0));
+		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
 #else
 	return MakeForwardPBRPixelOutput(outputColor, outputColor,
-		float4(SanitizeHDRColor(gtaoContribution), 1.0));
+		float4(SanitizeHDRColor(gtaoContribution), 1.0), diagnosticColor, diagnostic);
 #endif
 }

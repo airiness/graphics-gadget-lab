@@ -7,6 +7,7 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "Graphics/SamplerRegistry.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 
 #include <cmath>
@@ -27,9 +28,13 @@ namespace gglab
 			uint32_t BloomEnabled = 0;
 			float BloomIntensity = 0.0f;
 			float ScenePreExposure = 1.0f;
+			uint32_t MaterialDiagnosticColorIndex = 0;
+			uint32_t MaterialDiagnosticCoverageIndex = 0;
+			uint32_t MaterialDiagnosticsEnabled = 0;
+			uint32_t MaterialDiagnosticLightingIndex = 0;
 		};
 		static_assert(IsPassRootConstantStruct<FinalColorPassParameters>);
-		static_assert(sizeof(FinalColorPassParameters) == 32);
+		static_assert(sizeof(FinalColorPassParameters) == 48);
 
 		struct PassData
 		{
@@ -39,6 +44,9 @@ namespace gglab
 			RGTextureViewId m_SceneColorSrv{};
 			RGTextureViewId m_BloomSrv{};
 			RGTextureViewId m_OutputRtv{};
+			RGTextureViewId m_MaterialDiagnosticColorSrv{};
+			RGTextureViewId m_MaterialDiagnosticCoverageSrv{};
+			RGTextureViewId m_MaterialDiagnosticLightingSrv{};
 
 			uint32_t m_Width = 0;
 			uint32_t m_Height = 0;
@@ -89,7 +97,11 @@ namespace gglab
 				data.m_Output = postProcess.m_Output.m_Texture;
 				data.m_SceneColorSrv =
 					builder.CreateView<RHITextureViewType::ShaderResource>(data.m_SceneColor);
-				data.m_BloomEnabled = postProcess.m_Bloom.m_Result.m_Texture.IsValid();
+				const auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
+					.GetViewTargets(displayViewId);
+				// Bloom from the full lighting image cannot be separated by local coverage.
+				data.m_BloomEnabled = !targets.m_MaterialDiagnosticColor.IsValid() &&
+					postProcess.m_Bloom.m_Result.m_Texture.IsValid();
 				if (data.m_BloomEnabled)
 				{
 					GGLAB_ASSERT_MSG(postProcess.m_Bloom.m_Result.m_State ==
@@ -107,6 +119,15 @@ namespace gglab
 				{
 					data.m_Bloom = data.m_SceneColor;
 					data.m_BloomSrv = data.m_SceneColorSrv;
+				}
+				if (targets.m_MaterialDiagnosticColor.IsValid())
+				{
+					const auto color = builder.Read(targets.m_MaterialDiagnosticColor, RGTextureAccess::Sample);
+					const auto coverage = builder.Read(targets.m_MaterialDiagnosticCoverage, RGTextureAccess::Sample);
+					const auto lighting = builder.Read(targets.m_MaterialDiagnosticLighting, RGTextureAccess::Sample);
+					data.m_MaterialDiagnosticColorSrv = builder.CreateView<RHITextureViewType::ShaderResource>(color);
+					data.m_MaterialDiagnosticCoverageSrv = builder.CreateView<RHITextureViewType::ShaderResource>(coverage);
+					data.m_MaterialDiagnosticLightingSrv = builder.CreateView<RHITextureViewType::ShaderResource>(lighting);
 				}
 				data.m_OutputRtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_Output);
@@ -131,6 +152,15 @@ namespace gglab
 				GGLAB_ASSERT_MSG(bloomSrv.IsValid(),
 					"FinalColor bloom SRV must expose a descriptor heap index.");
 
+				const bool materialDiagnostics = data.m_MaterialDiagnosticColorSrv.IsValid();
+				const auto diagnosticColorSrv = materialDiagnostics
+					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticColorSrv) : sceneColorSrv;
+				const auto diagnosticCoverageSrv = materialDiagnostics
+					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticCoverageSrv) : sceneColorSrv;
+				const auto diagnosticLightingSrv = materialDiagnostics
+					? executeContext.GetViewDescriptor(data.m_MaterialDiagnosticLightingSrv) : sceneColorSrv;
+				GGLAB_ASSERT_MSG(diagnosticColorSrv.IsValid() && diagnosticCoverageSrv.IsValid() && diagnosticLightingSrv.IsValid(),
+					"Material diagnostic composition requires valid descriptor indices.");
 				const auto outputRtv = executeContext.GetViewHandle(data.m_OutputRtv);
 
 
@@ -166,6 +196,10 @@ namespace gglab
 					.BloomEnabled = data.m_BloomEnabled ? 1u : 0u,
 					.BloomIntensity = data.m_BloomIntensity,
 					.ScenePreExposure = data.m_ScenePreExposure,
+					.MaterialDiagnosticColorIndex = diagnosticColorSrv.m_Index,
+					.MaterialDiagnosticCoverageIndex = diagnosticCoverageSrv.m_Index,
+					.MaterialDiagnosticsEnabled = materialDiagnostics ? 1u : 0u,
+					.MaterialDiagnosticLightingIndex = diagnosticLightingSrv.m_Index,
 				};
 				commandContext->SetPushConstants(
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);

@@ -25,11 +25,13 @@ namespace gglab
 
 		uint32_t m_IrradianceCubemapSize = 32;
 		RHIFormat m_IrradianceCubemapFormat = RHIFormat::R16G16B16A16Float;
+		// Controls the fixed environment grid density; visible texels supply the samples.
 		uint32_t m_IrradianceSampleCount = 256;
 
 		uint32_t m_PrefilteredSpecularCubemapSize = 128;
 		uint32_t m_PrefilteredSpecularMipLevels = 5;
 		RHIFormat m_PrefilteredSpecularCubemapFormat = RHIFormat::R16G16B16A16Float;
+		// Total budget split between GGX and environment importance samples.
 		uint32_t m_PrefilteredSpecularSampleCount = 512;
 		float m_PrefilteredSpecularMaxSampleLuminance = 1000.0f;
 

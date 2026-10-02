@@ -8,6 +8,11 @@ namespace gglab
 	{
 		RGTextureId m_SceneColor{};
 		RGTextureId m_BackBuffer{};
+		// Optional display-linear diagnostic color and alpha-blended coverage.
+		RGTextureId m_MaterialDiagnosticColor{};
+		RGTextureId m_MaterialDiagnosticCoverage{};
+		// Premultiplied scene-linear lighting to remove before diagnostic composition.
+		RGTextureId m_MaterialDiagnosticLighting{};
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

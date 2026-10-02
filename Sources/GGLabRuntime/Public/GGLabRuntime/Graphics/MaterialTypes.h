@@ -2,10 +2,12 @@
 #include "GGLabFoundation/Base/EnumFlags.h"
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Core/Math/Color.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
+#include <cmath>
 #include <compare>
 #include <cstdint>
 #include <functional>
@@ -42,7 +44,38 @@ namespace gglab
 		Metallic,
 		Roughness,
 		Normal,
+		AuthoredRoughness,
+		EffectiveRoughness,
+		F0,
+		FeatureFlags,
+		Ior,
+		ClearcoatFactor,
+		ClearcoatRoughness,
+		ClearcoatNormal,
+		AnisotropyStrength,
+		AnisotropyDirectionTangent,
+		AnisotropyDirectionWorld,
+		NormalVariance = 19,
+		SpecularAAContribution,
+		EffectiveClearcoatRoughness,
+		AnisotropicAlpha,
+		UnfilteredLit,
 	};
+
+	[[nodiscard]] constexpr bool IsMaterialDiagnosticView(MaterialDebugView view) noexcept
+	{
+		// Persisted IDs 16..18 remain reserved; UnfilteredLit is still a lit view.
+		return (view >= MaterialDebugView::BaseColor && view <= MaterialDebugView::AnisotropyDirectionWorld) ||
+			(view >= MaterialDebugView::NormalVariance && view <= MaterialDebugView::AnisotropicAlpha);
+	}
+
+	inline constexpr float DefaultDielectricIor = 1.5f;
+
+	[[nodiscard]] inline float SanitizeMaterialIor(float ior) noexcept
+	{
+		return std::isfinite(ior) && (ior == 0.0f || ior >= 1.0f)
+			? ior : DefaultDielectricIor;
+	}
 
 	enum class MaterialTextureSlot : uint32_t
 	{
@@ -51,6 +84,10 @@ namespace gglab
 		Normal,
 		Occlusion,
 		Emissive,
+		Clearcoat,
+		ClearcoatRoughness,
+		ClearcoatNormal,
+		Anisotropy,
 
 		Count
 	};
@@ -69,6 +106,13 @@ namespace gglab
 			return TextureSemantic::Occlusion;
 		case MaterialTextureSlot::Emissive:
 			return TextureSemantic::Emissive;
+		case MaterialTextureSlot::Clearcoat:
+		case MaterialTextureSlot::ClearcoatRoughness:
+			return TextureSemantic::Clearcoat;
+		case MaterialTextureSlot::ClearcoatNormal:
+			return TextureSemantic::ClearcoatNormal;
+		case MaterialTextureSlot::Anisotropy:
+			return TextureSemantic::Anisotropy;
 		default:
 			return TextureSemantic::Unknown;
 		}
@@ -137,6 +181,10 @@ namespace gglab
 		TextureID m_TextureId{};
 		SamplerID m_SamplerId{};
 		uint32_t m_TexCoordIndex = 0;
+		// glTF KHR_texture_transform: offset + rotation * scale * selected UV.
+		Vector2 m_UVOffset{ 0.0f, 0.0f };
+		Vector2 m_UVScale{ 1.0f, 1.0f };
+		float m_UVRotation = 0.0f;
 	};
 
 	struct MaterialProperties
@@ -146,6 +194,10 @@ namespace gglab
 		MaterialTextureBinding m_MetallicRoughnessBinding{};
 		MaterialTextureBinding m_NormalBinding{};
 		MaterialTextureBinding m_OcclusionBinding{};
+		MaterialTextureBinding m_ClearcoatBinding{};
+		MaterialTextureBinding m_ClearcoatRoughnessBinding{};
+		MaterialTextureBinding m_ClearcoatNormalBinding{};
+		MaterialTextureBinding m_AnisotropyBinding{};
 
 		Color m_BaseColor = Color::White;
 		Color m_EmissiveColor = Color::Black;
@@ -153,6 +205,12 @@ namespace gglab
 		float m_RoughnessFactor = 1.0f;
 		float m_NormalScale = 1.0f;
 		float m_OcclusionStrength = 1.0f;
+		float m_Ior = DefaultDielectricIor;
+		float m_ClearcoatFactor = 0.0f;
+		float m_ClearcoatRoughness = 0.0f;
+		float m_ClearcoatNormalScale = 1.0f;
+		float m_AnisotropyStrength = 0.0f;
+		float m_AnisotropyRotation = 0.0f;
 
 		MaterialFlags m_Flags = MaterialFlags::None;
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;

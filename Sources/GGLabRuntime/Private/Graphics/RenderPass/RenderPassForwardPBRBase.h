@@ -5,6 +5,9 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 
+#include <array>
+#include <memory>
+
 namespace gglab
 {
 	enum class ForwardPBRPassKind : uint8_t
@@ -42,6 +45,9 @@ namespace gglab
 		~RenderPassForwardPBRBase() override = default;
 
 		void Prepare(const RenderServices& services, const ForwardPBRShaderSet& shaderSet) noexcept;
+		[[nodiscard]] bool PrewarmMaterialDiagnosticVariant(const RenderServices& services,
+			uint64_t variantBits, bool useDepthEqual, ForwardPBRLightingVariant lightingVariant,
+			bool gtaoContributionOutputEnabled) noexcept;
 		void SetHdrDiffValidationAvailable(bool available) noexcept
 		{
 			m_HdrDiffValidationAvailable = available;
@@ -69,18 +75,18 @@ namespace gglab
 			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 			const RenderQueue* expectedRenderQueue, bool useDepthEqual,
 			ForwardPBRLightingVariant lightingVariant,
-			bool gtaoContributionOutputEnabled) noexcept;
+			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
 			const RenderQueue& renderQueue, const DrawItemsRange& range, bool useDepthEqual,
 			const RenderQueue* expectedRenderQueue,
 			ForwardPBRLightingVariant lightingVariant,
-			bool gtaoContributionOutputEnabled) noexcept;
+			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
 			const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
 			ForwardPBRLightingVariant lightingVariant,
-			bool gtaoContributionOutputEnabled) noexcept;
+			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset> GetPresetsFromVariantBits(
 			uint64_t variantBits, bool useDepthEqual) const noexcept;
@@ -89,12 +95,15 @@ namespace gglab
 		static constexpr size_t LightingVariantCount =
 			static_cast<size_t>(ForwardPBRLightingVariant::Count);
 		static constexpr size_t GTAOContributionVariantCount = 2;
+		static constexpr size_t OutputVariantCount = 4;
 
 		ForwardPBRPassKind m_PassKind = ForwardPBRPassKind::Opaque;
-		std::array<std::array<GraphicsPhysicalPipelineKey, GTAOContributionVariantCount>,
+		std::array<std::array<GraphicsPhysicalPipelineKey, OutputVariantCount>,
 			LightingVariantCount> m_BasePhysicalKeys{};
-		std::array<std::array<std::array<GraphicsPipelineSlot, RenderQueueBuilder::VariantCount>,
-			GTAOContributionVariantCount>, LightingVariantCount> m_PipelineSlots{};
+		using PipelineSlotTable = std::array<std::array<std::array<GraphicsPipelineSlot,
+			RenderQueueBuilder::VariantCount>, GTAOContributionVariantCount>, LightingVariantCount>;
+		PipelineSlotTable m_PipelineSlots{};
+		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
 		bool m_HdrDiffValidationAvailable = false;
 		bool m_IsInitialized = false;
 	};

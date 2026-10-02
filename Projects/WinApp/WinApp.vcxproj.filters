@@ -847,6 +847,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLImportance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -874,7 +877,28 @@
     <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\BrdfLutWhiteFurnace.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl">
       <Filter>Shaders\Tests</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
@@ -904,6 +928,9 @@
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli">
       <Filter>Shaders\Common</Filter>
     </None>
     <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
@@ -957,10 +984,16 @@
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli">
@@ -969,7 +1002,28 @@
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
     <None Include="..\..\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">
       <Filter>Shaders\PBR</Filter>
     </None>
     <None Include="..\..\Shaders\shadertoolsconfig.json">

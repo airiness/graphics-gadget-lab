@@ -33,6 +33,21 @@ float3 F_Schlick(float3 F0, float3 F90, float cosTheta)
 	return F0 + (F90 - F0) * Pow5(1.0 - cosTheta);
 }
 
+// The split-sum LUT stores A = integral(1 - Fc) and B = integral(Fc).
+// A + B is the single-scattering directional albedo at F0 = 1.
+// Filament's DFG approximation restores the missing energy with
+// 1 + F0 * (1 / directionalAlbedo - 1).
+float3 GGXEnergyCompensation(float3 F0, float2 brdfLUT)
+{
+	const float directionalAlbedo = saturate(brdfLUT.x + brdfLUT.y);
+	if (directionalAlbedo <= 1.0e-4)
+	{
+		// An unbaked LUT cannot provide a trustworthy energy estimate.
+		return 1.0.xxx;
+	}
+	return 1.0.xxx + saturate(F0) * (rcp(directionalAlbedo) - 1.0);
+}
+
 // Height-correlated Smith visibility term for GGX.
 // Approximates the combined masking and shadowing effect for view and light directions.
 float V_SmithGGXCorrelated(float NoV, float NoL, float a)
@@ -46,6 +61,27 @@ float V_SmithGGXCorrelated(float NoV, float NoL, float a)
 	float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
 	float GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
 	return 0.5 / max(GGXV + GGXL, 1e-6);
+}
+
+float D_GGXAnisotropic(float3 H, float3 N, float3 T, float3 B, float alphaT, float alphaB)
+{
+	const float NoH = saturate(dot(N, H));
+	if (NoH <= 0.0) return 0.0;
+	const float ToH = dot(T, H) / alphaT;
+	const float BoH = dot(B, H) / alphaB;
+	const float denominator = ToH * ToH + BoH * BoH + NoH * NoH;
+	return rcp(max(PI * alphaT * alphaB * denominator * denominator, 1.0e-12));
+}
+
+float V_SmithGGXCorrelatedAnisotropic(float3 V, float3 L, float3 N,
+	float3 T, float3 B, float alphaT, float alphaB)
+{
+	const float NoV = saturate(dot(N, V));
+	const float NoL = saturate(dot(N, L));
+	if (NoV <= 0.0 || NoL <= 0.0) return 0.0;
+	const float viewLength = length(float3(alphaT * dot(T, V), alphaB * dot(B, V), NoV));
+	const float lightLength = length(float3(alphaT * dot(T, L), alphaB * dot(B, L), NoL));
+	return 0.5 / max(NoL * viewLength + NoV * lightLength, 1.0e-6);
 }
 
 // Lambertian diffuse BRDF.

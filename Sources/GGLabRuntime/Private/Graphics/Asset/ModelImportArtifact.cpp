@@ -89,6 +89,11 @@ namespace gglab
 			writer.U32(binding.m_TextureId.Value());
 			writer.U32(binding.m_SamplerId.Value());
 			writer.U32(binding.m_TexCoordIndex);
+			writer.Float(binding.m_UVOffset.m_X);
+			writer.Float(binding.m_UVOffset.m_Y);
+			writer.Float(binding.m_UVScale.m_X);
+			writer.Float(binding.m_UVScale.m_Y);
+			writer.Float(binding.m_UVRotation);
 		}
 
 		void AddMaterialProperties(
@@ -99,12 +104,22 @@ namespace gglab
 			AddMaterialBinding(writer, properties.m_MetallicRoughnessBinding);
 			AddMaterialBinding(writer, properties.m_NormalBinding);
 			AddMaterialBinding(writer, properties.m_OcclusionBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatRoughnessBinding);
+			AddMaterialBinding(writer, properties.m_ClearcoatNormalBinding);
+			AddMaterialBinding(writer, properties.m_AnisotropyBinding);
 			AddColor(writer, properties.m_BaseColor);
 			AddColor(writer, properties.m_EmissiveColor);
 			writer.Float(properties.m_MetallicFactor);
 			writer.Float(properties.m_RoughnessFactor);
 			writer.Float(properties.m_NormalScale);
 			writer.Float(properties.m_OcclusionStrength);
+			writer.Float(properties.m_Ior);
+			writer.Float(properties.m_ClearcoatFactor);
+			writer.Float(properties.m_ClearcoatRoughness);
+			writer.Float(properties.m_ClearcoatNormalScale);
+			writer.Float(properties.m_AnisotropyStrength);
+			writer.Float(properties.m_AnisotropyRotation);
 			writer.U32(static_cast<uint32_t>(properties.m_Flags));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaMode));
 			writer.U32(static_cast<uint32_t>(properties.m_AlphaCutoffMode));
@@ -193,6 +208,11 @@ namespace gglab
 				writer.U32(binding.m_TextureIndex);
 				AddSampler(writer, binding.m_SamplerKey);
 				writer.U32(binding.m_TexCoordIndex);
+				writer.Float(binding.m_UVOffset.m_X);
+				writer.Float(binding.m_UVOffset.m_Y);
+				writer.Float(binding.m_UVScale.m_X);
+				writer.Float(binding.m_UVScale.m_Y);
+				writer.Float(binding.m_UVRotation);
 			}
 		}
 

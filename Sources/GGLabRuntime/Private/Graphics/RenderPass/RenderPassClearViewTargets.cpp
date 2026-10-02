@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
+#include <array>
 #include <span>
 
 namespace gglab
@@ -13,6 +14,7 @@ namespace gglab
 		{
 			RGTextureId m_SceneColor{};
 			RGTextureViewId m_Rtv{};
+			std::array<RGTextureViewId, 3> m_DiagnosticRtvs{};
 		};
 	}
 
@@ -36,18 +38,43 @@ namespace gglab
 				data.m_SceneColor = targets.m_SceneColor;
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
+				if (targets.m_MaterialDiagnosticColor.IsValid())
+				{
+					const std::array diagnostics{ &targets.m_MaterialDiagnosticColor,
+						&targets.m_MaterialDiagnosticCoverage, &targets.m_MaterialDiagnosticLighting };
+					for (size_t index = 0; index < diagnostics.size(); ++index)
+					{
+						builder.WriteInPlace(*diagnostics[index], RGTextureAccess::RenderTarget);
+						data.m_DiagnosticRtvs[index] =
+							builder.CreateView<RHITextureViewType::RenderTarget>(*diagnostics[index]);
+					}
+				}
 			},
 			[](RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				const RHIRenderingAttachment colorAttachment{
+				std::array<RHIRenderingAttachment, 4> attachments{};
+				attachments[0] = RHIRenderingAttachment{
 					.m_View = rtv,
 					.m_LoadOp = RHIContentLoadOp::DontCare,
 				};
+				uint32_t targetCount = 1;
+				if (data.m_DiagnosticRtvs[0].IsValid())
+				{
+					for (const auto view : data.m_DiagnosticRtvs)
+					{
+						attachments[targetCount++] = { .m_View = executeContext.GetViewHandle(view),
+							.m_LoadOp = RHIContentLoadOp::DontCare };
+					}
+				}
 				commandContext->BeginRendering({ .m_ColorAttachments =
-					std::span<const RHIRenderingAttachment>(&colorAttachment, 1) });
+					std::span<const RHIRenderingAttachment>(attachments.data(), targetCount) });
 				commandContext->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+				for (uint32_t index = 1; index < targetCount; ++index)
+				{
+					commandContext->ClearColorAttachment(index, {});
+				}
 			});
 	}
 }

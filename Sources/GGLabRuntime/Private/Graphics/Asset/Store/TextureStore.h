@@ -1,35 +1,17 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
-#include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
+#include "Graphics/Asset/TextureSourceKey.h"
 
 #include <cstddef>
 #include <filesystem>
 #include <memory>
-#include <tuple>
 #include <unordered_map>
 
 namespace gglab
 {
 	class TextureStore final
 	{
-		struct CacheKey
-		{
-			std::filesystem::path m_CanonicalPath;
-			TextureImportSettings m_ImportSettings{};
-
-			[[nodiscard]] auto AsTuple() const noexcept
-			{
-				return std::tuple{
-					std::filesystem::hash_value(m_CanonicalPath),
-					m_ImportSettings.m_Semantic,
-					m_ImportSettings.m_MipPolicy,
-				};
-			}
-			bool operator==(const CacheKey&) const noexcept = default;
-		};
-		using CacheKeyHash = KeyHash<CacheKey>;
-
 	public:
 		using EntryMap = std::unordered_map<TextureID, std::unique_ptr<Texture>>;
 
@@ -49,7 +31,7 @@ namespace gglab
 		[[nodiscard]] size_t Size() const noexcept { return m_Entries.size(); }
 
 	private:
-		std::unordered_map<CacheKey, TextureID, CacheKeyHash> m_CacheKeys;
+		std::unordered_map<TextureSourceKey, TextureID, TextureSourceKeyHash> m_CacheKeys;
 		EntryMap m_Entries;
 	};
 }

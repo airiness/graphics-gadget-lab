@@ -17,6 +17,18 @@ namespace gglab::shader_programs
 		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationGTAOPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRLegacyMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.legacy.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRLegacyGTAOMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.legacy-gtao.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRForwardPlusMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.forward-plus.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.forward-plus-validation.material-diagnostics", ShaderStage::Pixel };
+	inline const ShaderProgramRef ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel{
+		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao.material-diagnostics", ShaderStage::Pixel };
 	inline const ShaderProgramRef DepthPrepassAlphaTestPixel{
 		"gglab.shader.depth-prepass", "pixel.alpha-test", ShaderStage::Pixel };
 	inline const ShaderProgramRef DepthPrepassVelocityOpaquePixel{
@@ -100,6 +112,10 @@ namespace gglab::shader_programs
 		"gglab.shader.ibl-prefiltered-specular", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLPrefilteredSpecularPixel{
 		"gglab.shader.ibl-prefiltered-specular", "pixel", ShaderStage::Pixel };
+	inline const ShaderProgramRef IBLImportanceVertex{
+		"gglab.shader.ibl-importance", "vertex", ShaderStage::Vertex };
+	inline const ShaderProgramRef IBLImportancePixel{
+		"gglab.shader.ibl-importance", "pixel", ShaderStage::Pixel };
 	inline const ShaderProgramRef IBLBrdfLUTVertex{
 		"gglab.shader.ibl-brdf-lut", "vertex", ShaderStage::Vertex };
 	inline const ShaderProgramRef IBLBrdfLUTPixel{

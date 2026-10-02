@@ -8,6 +8,7 @@
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <algorithm>
+#include <atomic>
 #include <format>
 #include <limits>
 #include <memory>
@@ -35,7 +36,7 @@ namespace gglab
 		ShaderArtifactStore m_ArtifactStore;
 	};
 
-	struct ShaderManager::ShaderPreloadJob
+	struct ShaderPreloadJob
 	{
 		struct Entry
 		{
@@ -45,6 +46,8 @@ namespace gglab
 			ShaderHash128 m_Hash{};
 		};
 
+		TaskStatus m_Status = TaskStatus::Queued;
+		std::string m_Error;
 		std::vector<ShaderProgramRef> m_Programs;
 		std::vector<Entry> m_Entries;
 		std::vector<std::string> m_Labels;
@@ -224,42 +227,58 @@ namespace gglab
 		TaskSystem& taskSystem, std::vector<ShaderProgramRef> programRefs,
 		TaskPriority priority) noexcept
 	{
-		if (m_PreloadStatus == TaskStatus::Queued || m_PreloadStatus == TaskStatus::Running)
+		if (!m_StartupPreload.GetStatus().IsPreparing())
 		{
-			return m_PreloadTask;
+			m_StartupPreload = RequestPreloadAsync(taskSystem, std::move(programRefs), priority);
 		}
+		return m_StartupPreload.m_Task;
+	}
+
+	ShaderPreloadStatus ShaderManager::GetPreloadStatus() const
+	{
+		return m_StartupPreload.GetStatus();
+	}
+
+	ShaderPreloadRequest ShaderManager::RequestPreloadAsync(
+		TaskSystem& taskSystem, std::vector<ShaderProgramRef> programRefs,
+		TaskPriority priority) noexcept
+	{
+		ShaderPreloadRequest request;
+		auto job = std::make_shared<ShaderPreloadJob>();
+		request.m_Job = job;
 		if (!IsReady())
 		{
-			m_PreloadStatus = TaskStatus::Failed;
-			m_PreloadError = "ShaderManager has no valid active Program Registry Artifact.";
-			return {};
-		}
-		if (programRefs.empty())
-		{
-			m_PreloadStatus = TaskStatus::Succeeded;
-			m_PreloadError.clear();
-			m_PreloadJob.reset();
-			m_PreloadTask = {};
-			return {};
+			job->m_Status = TaskStatus::Failed;
+			job->m_Error = "ShaderManager has no valid active Program Registry Artifact.";
+			return request;
 		}
 
-		auto job = std::make_shared<ShaderPreloadJob>();
-		job->m_Programs = std::move(programRefs);
-		job->m_Entries.reserve(job->m_Programs.size());
-		job->m_Labels.reserve(job->m_Programs.size());
-		for (const ShaderProgramRef& program : job->m_Programs)
+		// Previously published programs need no further artifact I/O.
 		{
-			job->m_Labels.push_back(
-				std::format("{}::{}", program.m_ProgramId, program.m_VariantId));
+			std::shared_lock lock(m_Mutex);
+			for (const ShaderProgramRef& program : programRefs)
+			{
+				if (!m_ProgramIdMap.contains(program) &&
+					std::ranges::find(job->m_Programs, program) == job->m_Programs.end())
+				{
+					job->m_Programs.push_back(program);
+					job->m_Labels.push_back(
+						std::format("{}::{}", program.m_ProgramId, program.m_VariantId));
+				}
+			}
 		}
+		if (job->m_Programs.empty())
+		{
+			job->m_Status = TaskStatus::Succeeded;
+			return request;
+		}
+		job->m_Entries.reserve(job->m_Programs.size());
 
 		const std::filesystem::path artifactRoot = m_RuntimeState->m_ArtifactRoot;
 		const ShaderProgramRegistryArtifact registry = m_RuntimeState->m_Registry;
 		const RHIBackendType activeBackend = m_ActiveBackend;
-		m_PreloadJob = job;
-		m_PreloadStatus = TaskStatus::Queued;
-		m_PreloadError.clear();
-		m_PreloadTask = taskSystem.Submit(
+		++m_PreparingPreloadCount;
+		request.m_Task = taskSystem.Submit(
 			{
 				.m_Name = "Shader.Preload",
 				.m_Priority = priority,
@@ -299,48 +318,62 @@ namespace gglab
 			},
 			[this, job](const TaskCompletionInfo& completion) noexcept
 			{
-				m_PreloadStatus = completion.m_Status;
-				m_PreloadError = completion.m_Error;
+				--m_PreparingPreloadCount;
+				// Cancellation can arrive after the worker finishes but before publication.
+				if (job->m_Status == TaskStatus::Cancelled)
+				{
+					return;
+				}
+				job->m_Status = completion.m_Status;
+				job->m_Error = completion.m_Error;
 				if (completion.m_Status == TaskStatus::Succeeded && !PublishPreloadJob(*job))
 				{
-					m_PreloadStatus = TaskStatus::Failed;
-					m_PreloadError = "Failed to publish preloaded shaders.";
+					job->m_Status = TaskStatus::Failed;
+					job->m_Error = "Failed to publish preloaded shaders.";
 				}
-				if (m_PreloadStatus == TaskStatus::Succeeded)
+				if (job->m_Status == TaskStatus::Succeeded)
 				{
 					GGLAB_LOG_GRAPHICS_INFO(
 						"Async artifact preload published {} shaders (queueMs={:.2f}, cpuMs={:.2f}).",
 						job->m_Entries.size(), completion.m_QueueMilliseconds,
 						completion.m_ExecutionMilliseconds);
 				}
-				m_PreloadTask = {};
 			});
-		if (!m_PreloadTask.IsValid())
+		if (!request.m_Task.IsValid())
 		{
-			m_PreloadStatus = TaskStatus::Failed;
-			m_PreloadError = "TaskSystem rejected the shader artifact preload task.";
+			--m_PreparingPreloadCount;
+			job->m_Status = TaskStatus::Failed;
+			job->m_Error = "TaskSystem rejected the shader artifact preload task.";
 		}
-		return m_PreloadTask;
+		return request;
 	}
 
-	ShaderPreloadStatus ShaderManager::GetPreloadStatus() const
+	ShaderPreloadStatus ShaderPreloadRequest::GetStatus() const
 	{
 		ShaderPreloadStatus result{};
-		result.m_Status = m_PreloadStatus;
-		result.m_Error = m_PreloadError;
-		const auto job = m_PreloadJob;
-		if (!job)
+		if (!m_Job)
 		{
 			return result;
 		}
-		result.m_TotalCount = static_cast<uint32_t>(job->m_Programs.size());
-		result.m_CompletedCount = job->m_CompletedCount.load(std::memory_order_relaxed);
-		const uint32_t currentIndex = job->m_CurrentIndex.load(std::memory_order_relaxed);
-		if (currentIndex < job->m_Labels.size())
+		result.m_Status = m_Job->m_Status;
+		result.m_Error = m_Job->m_Error;
+		result.m_TotalCount = static_cast<uint32_t>(m_Job->m_Programs.size());
+		result.m_CompletedCount = m_Job->m_CompletedCount.load(std::memory_order_relaxed);
+		const uint32_t currentIndex = m_Job->m_CurrentIndex.load(std::memory_order_relaxed);
+		if (currentIndex < m_Job->m_Labels.size())
 		{
-			result.m_CurrentShader = job->m_Labels[currentIndex];
+			result.m_CurrentShader = m_Job->m_Labels[currentIndex];
 		}
 		return result;
+	}
+
+	void ShaderPreloadRequest::Cancel(TaskSystem& taskSystem) noexcept
+	{
+		if (m_Job && GetStatus().IsPreparing())
+		{
+			m_Job->m_Status = TaskStatus::Cancelled;
+			GGLAB_UNUSED(taskSystem.Cancel(m_Task));
+		}
 	}
 
 	bool ShaderManager::PublishPreloadJob(ShaderPreloadJob& job) noexcept
@@ -495,7 +528,7 @@ namespace gglab
 				.m_Error = "Shader registry activation requires a valid RegistryRef.",
 			};
 		}
-		if (m_PreloadStatus == TaskStatus::Queued || m_PreloadStatus == TaskStatus::Running)
+		if (m_PreparingPreloadCount != 0)
 		{
 			return {
 				.m_Status = ShaderRegistryActivationStatus::Busy,

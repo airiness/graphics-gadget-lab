@@ -55,10 +55,8 @@ namespace gglab
 			}
 
 			RenderBucket bucket = DecideRenderBucket(instance.m_AlphaMode);
-			bool doubleSided = IsDoubleSided(instance.m_MaterialFlags);
-
-			uint64_t variantBits = 0;
-			variantBits |= EncodeVariantBits(bucket, doubleSided);
+			const uint64_t variantBits =
+				EncodeMaterialVariantBits(instance.m_AlphaMode, instance.m_MaterialFlags);
 
 			const uint8_t bucketOrder = BucketSortOrder(bucket);
 			const uint8_t variantBits8 = static_cast<uint8_t>(variantBits & VariantMask);
@@ -151,6 +149,12 @@ namespace gglab
 		}
 
 		return renderQueue;
+	}
+
+	uint64_t RenderQueueBuilder::EncodeMaterialVariantBits(
+		AlphaMode alphaMode, MaterialFlags flags) noexcept
+	{
+		return EncodeVariantBits(DecideRenderBucket(alphaMode), IsDoubleSided(flags));
 	}
 
 	constexpr uint8_t RenderQueueBuilder::BucketSortOrder(RenderBucket bucket) noexcept

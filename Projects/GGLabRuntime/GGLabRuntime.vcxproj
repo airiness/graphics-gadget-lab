@@ -38,11 +38,13 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
     <Import Project="..\..\PropertySheets\VulkanImport.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -206,6 +208,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderQueue.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\PersistentTexturePool.cpp" />
@@ -501,6 +504,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderQueue.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderSceneTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderView.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderWorldExtractor.h" />
@@ -576,6 +580,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MaterialStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\MeshStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\TextureStore.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureSourceKey.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Store\ModelStore.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\AssetPublicationServices.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetResourcePublication.h" />
@@ -583,6 +588,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Publication\ModelPublicationJournal.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\BuiltinTextureFactory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\GltfMaterialIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\ReservedTexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureAssetViews.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h" />

@@ -82,6 +82,8 @@ namespace gglab
 			RGTextureViewId m_AtmosphereTransmittanceSrv{};
 			RGTextureViewId m_GTAOContributionRtv{};
 			RGTextureViewId m_LegacyReferenceRtv{};
+			std::array<RGTextureViewId, 3> m_MaterialDiagnosticRtvs{};
+			bool m_MaterialDiagnostics = false;
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
@@ -180,6 +182,18 @@ namespace gglab
 				builder.ReadWriteInPlace(
 					displayTargets.m_SceneColor, RGTextureAccess::RenderTarget);
 				data.m_SceneColor = displayTargets.m_SceneColor;
+				data.m_MaterialDiagnostics = displayTargets.m_MaterialDiagnosticColor.IsValid();
+				if (data.m_MaterialDiagnostics)
+				{
+					const std::array diagnostics{ &displayTargets.m_MaterialDiagnosticColor,
+						&displayTargets.m_MaterialDiagnosticCoverage, &displayTargets.m_MaterialDiagnosticLighting };
+					for (size_t index = 0; index < diagnostics.size(); ++index)
+					{
+						builder.ReadWriteInPlace(*diagnostics[index], RGTextureAccess::RenderTarget);
+						data.m_MaterialDiagnosticRtvs[index] =
+							builder.CreateView<RHITextureViewType::RenderTarget>(*diagnostics[index]);
+					}
+				}
 				data.m_IrradianceCubemap =
 					builder.Read(iblRes.m_IrradianceCubemap, RGTextureAccess::Sample);
 				data.m_PrefilteredSpecularCubemap =
@@ -343,9 +357,8 @@ namespace gglab
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				std::array<RHIRenderingAttachment, 3> renderTargets{
-					RHIRenderingAttachment{ .m_View = rtv }, {}, {}
-				};
+				std::array<RHIRenderingAttachment, 6> renderTargets{};
+				renderTargets[0] = RHIRenderingAttachment{ .m_View = rtv };
 				uint32_t renderTargetCount = 1;
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
@@ -367,6 +380,13 @@ namespace gglab
 						"GTAO contribution preview requires a render-target view.");
 					++renderTargetCount;
 				}
+				if (data.m_MaterialDiagnostics)
+				{
+					for (const auto view : data.m_MaterialDiagnosticRtvs)
+					{
+						renderTargets[renderTargetCount++] = { .m_View = executeContext.GetViewHandle(view) };
+					}
+				}
 				graphicsContext->BeginRendering({
 					.m_ColorAttachments =
 						std::span<const RHIRenderingAttachment>(renderTargets.data(), renderTargetCount),
@@ -379,7 +399,8 @@ namespace gglab
 				if (data.m_GTAOContributionOutputEnabled)
 				{
 					graphicsContext->ClearColorAttachment(
-						renderTargetCount - 1, { 0.0f, 0.0f, 0.0f, 1.0f });
+						(data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation ? 2u : 1u),
+						{ 0.0f, 0.0f, 0.0f, 1.0f });
 				}
 				if (data.m_ClearDepth)
 				{
@@ -458,7 +479,7 @@ namespace gglab
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
 					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
 					data.m_UseDepthEqual, data.m_LightingVariant,
-					data.m_GTAOContributionOutputEnabled));
+					data.m_GTAOContributionOutputEnabled, data.m_MaterialDiagnostics));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
 				GGLAB_ASSERT_MSG(
@@ -543,7 +564,7 @@ namespace gglab
 
 				DrawRenderQueue(graphicsContext, *contextPtr, services, displayViewId,
 					data.m_ExpectedRenderQueue, data.m_UseDepthEqual, data.m_LightingVariant,
-					data.m_GTAOContributionOutputEnabled);
+					data.m_GTAOContributionOutputEnabled, data.m_MaterialDiagnostics);
 			});
 	}
 
@@ -625,12 +646,36 @@ namespace gglab
 
 			m_IsInitialized = true;
 		}
+		if (!m_MaterialDiagnosticPipelineSlots && shaderSet.AreMaterialDiagnosticsValid())
+		{
+			const size_t lightingCount =
+				m_PassKind == ForwardPBRPassKind::Opaque ? LightingVariantCount : 1;
+			const size_t contributionCount =
+				m_PassKind == ForwardPBRPassKind::Opaque ? GTAOContributionVariantCount : 1;
+			for (size_t lighting = 0; lighting < lightingCount; ++lighting)
+			{
+				for (size_t contribution = 0; contribution < contributionCount; ++contribution)
+				{
+					auto& key = m_BasePhysicalKeys[lighting][contribution + GTAOContributionVariantCount];
+					key = m_BasePhysicalKeys[lighting][contribution];
+					key.m_PSId = shaderSet.m_MaterialDiagnosticPixelShaders[
+						lighting * GTAOContributionVariantCount + contribution];
+					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] =
+						RHIFormat::R16G16B16A16Float;
+					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] = RHIFormat::R16Float;
+					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] =
+						RHIFormat::R16G16B16A16Float;
+				}
+			}
+			// Optional shader variants must not double the pass object's inline cache.
+			m_MaterialDiagnosticPipelineSlots = std::make_unique<PipelineSlotTable>();
+		}
 	}
 
 	void RenderPassForwardPBRBase::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
 		const RenderQueue* expectedRenderQueue, bool useDepthEqual,
-		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(viewId);
@@ -646,7 +691,7 @@ namespace gglab
 		{
 			DrawRange(graphicsContext, services, renderQueue,
 				ranges[utils::ToIndex(RenderBucket::Transparent)], false, expectedRenderQueue,
-				lightingVariant, gtaoContributionOutputEnabled);
+				lightingVariant, gtaoContributionOutputEnabled, materialDiagnostics);
 			return;
 		}
 
@@ -659,14 +704,14 @@ namespace gglab
 			}
 			DrawRange(
 				graphicsContext, services, renderQueue, range, useDepthEqual, expectedRenderQueue,
-				lightingVariant, gtaoContributionOutputEnabled);
+				lightingVariant, gtaoContributionOutputEnabled, materialDiagnostics);
 		}
 	}
 
 	void RenderPassForwardPBRBase::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services, const RenderQueue& renderQueue, const DrawItemsRange& range,
 		bool useDepthEqual, const RenderQueue* expectedRenderQueue,
-		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		if (range.m_Count == 0)
 		{
@@ -698,7 +743,7 @@ namespace gglab
 			{
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
 					services, drawItem.m_VariantBits, useDepthEqual, lightingVariant,
-					gtaoContributionOutputEnabled));
+					gtaoContributionOutputEnabled, materialDiagnostics));
 
 				lastVariantBits = drawItem.m_VariantBits;
 			}
@@ -723,9 +768,17 @@ namespace gglab
 		}
 	}
 
-	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
+	bool RenderPassForwardPBRBase::PrewarmMaterialDiagnosticVariant(
 		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
+	{
+		return GetOrCreatePSOForVariant(services, variantBits, useDepthEqual,
+			lightingVariant, gtaoContributionOutputEnabled, true).IsValid();
+	}
+
+	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
+		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
+		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 		auto* pipelineCache = services.m_PipelineResolver;
@@ -734,20 +787,25 @@ namespace gglab
 		const size_t lightingVariantIndex = static_cast<size_t>(lightingVariant);
 		GGLAB_ASSERT(lightingVariantIndex < LightingVariantCount);
 		const size_t contributionVariantIndex = gtaoContributionOutputEnabled ? 1u : 0u;
+		const size_t outputVariantIndex = contributionVariantIndex +
+			(materialDiagnostics ? GTAOContributionVariantCount : 0u);
+		GGLAB_ASSERT_MSG(!materialDiagnostics || m_MaterialDiagnosticPipelineSlots,
+			"Diagnostic MRT pipelines must be prepared before graph execution.");
 		GraphicsPipelineDescription description{
-			.m_PhysicalKey = m_BasePhysicalKeys[lightingVariantIndex][contributionVariantIndex],
+			.m_PhysicalKey = m_BasePhysicalKeys[lightingVariantIndex][outputVariantIndex],
 			.m_LogicalMetadata = BuildLogicalPipelineMetadataForVariant(
-				m_BasePhysicalKeys[lightingVariantIndex][contributionVariantIndex], variantBits),
+				m_BasePhysicalKeys[lightingVariantIndex][outputVariantIndex], variantBits),
 		};
 		auto [rasterizerPreset, depthPreset, blendPreset] =
 			GetPresetsFromVariantBits(variantBits, useDepthEqual);
 		description.m_PhysicalKey.m_RasterizerPreset = rasterizerPreset;
 		description.m_PhysicalKey.m_DepthPreset = depthPreset;
-		description.m_PhysicalKey.m_BlendPreset = blendPreset;
+		description.m_PhysicalKey.m_BlendPreset = materialDiagnostics && blendPreset == BlendPreset::AlphaBlend
+			? BlendPreset::AlphaBlendAllTargets : blendPreset;
 
 		const size_t slotIndex = static_cast<size_t>(variantBits & RenderQueueBuilder::VariantMask);
-		auto& slot =
-			m_PipelineSlots[lightingVariantIndex][contributionVariantIndex][slotIndex];
+		auto& slots = materialDiagnostics ? *m_MaterialDiagnosticPipelineSlots : m_PipelineSlots;
+		auto& slot = slots[lightingVariantIndex][contributionVariantIndex][slotIndex];
 		return pipelineCache->Resolve(slot, description.m_PhysicalKey, GetInfo());
 	}
 

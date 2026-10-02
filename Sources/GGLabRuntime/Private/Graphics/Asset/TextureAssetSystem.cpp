@@ -50,6 +50,12 @@ namespace gglab
 				return "Occlusion";
 			case TextureSemantic::Emissive:
 				return "Emissive";
+			case TextureSemantic::Clearcoat:
+				return "Clearcoat";
+			case TextureSemantic::ClearcoatNormal:
+				return "ClearcoatNormal";
+			case TextureSemantic::Anisotropy:
+				return "Anisotropy";
 			case TextureSemantic::Environment:
 				return "Environment";
 			case TextureSemantic::UVTest:

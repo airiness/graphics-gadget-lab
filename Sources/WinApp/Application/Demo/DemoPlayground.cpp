@@ -86,7 +86,7 @@ namespace gglab
 		if (m_Content == PlaygroundContent::CoastalAtrium)
 		{
 			m_PendingModels = {
-				{ .m_Path = "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf" },
+				{ .m_Path = "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf" },
 			};
 		}
 		else if (m_Content == PlaygroundContent::Island)

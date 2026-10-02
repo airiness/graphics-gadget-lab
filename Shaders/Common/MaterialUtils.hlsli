@@ -7,7 +7,9 @@ static const int MaterialAlphaModeBlend = 2;
 
 float2 SelectUV(MaterialTextureBindingData bindingData, float2 uv0, float2 uv1)
 {
-	return (bindingData.TexCoordIndex == 1u) ? uv1 : uv0;
+	const float2 uv = (bindingData.TexCoordIndex == 1u) ? uv1 : uv0;
+	return float2(dot(bindingData.UVTransformU.xy, uv) + bindingData.UVTransformU.z,
+		dot(bindingData.UVTransformV.xy, uv) + bindingData.UVTransformV.z);
 }
 
 float4 SampleMaterialBaseColor(MaterialData matData, float2 uv0, float2 uv1)

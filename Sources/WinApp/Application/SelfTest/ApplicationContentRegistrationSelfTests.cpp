@@ -28,6 +28,7 @@
 #include <numbers>
 #include <string_view>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -382,8 +383,294 @@ namespace gglab
 			}
 			context.Check(physicalRestored && LightingContractReferenceViews.front().m_ManualEV100 == 0.0f,
 				"Physical sun reference views restore daylight exposure without mutating the default zero-EV reference");
+			for (const bool physicalSun : { false, true })
+			{
+				const auto extended = BuildLightingContractReferenceViews(physicalSun, true);
+				bool restored = extended.size() == 6 &&
+					rig.SetReferenceViews({ extended.begin(), extended.end() });
+				for (const auto& reference : LightingContractMaterialReferenceViews)
+				{
+					restored &= rig.RestoreReferenceView(reference.m_Id) &&
+						(camera.GetPosition() - reference.m_Position).Length() < 0.0001f &&
+						camera.GetFov() == reference.m_VerticalFovDegrees &&
+						camera.GetManualEV100() == (physicalSun ? 15.0f : 0.0f);
+				}
+				context.Check(restored, std::format(
+					"Extended material views restore clearcoat and anisotropy with physical sun {}", physicalSun));
+			}
+			const auto original = BuildLightingContractReferenceViews(false);
+			context.Check(original.size() == 4 && rig.SetReferenceViews({ original.begin(), original.end() }) &&
+				!rig.RestoreReferenceView("CAM_Clearcoat") && !rig.RestoreReferenceView("CAM_Anisotropy"),
+				"Returning to the original contract removes views for absent material stations");
 
 		}
+
+		void CheckMaterialReferenceImports(SelfTestContext& context) noexcept
+		{
+			const auto assetRoot = GetApplicationSelfTestAssetRoot();
+			for (const auto path : {
+				"Models/GGLabMaterialExportProbe/GGLabMaterialExportProbe.gltf",
+				"Models/GGLabMaterialExportProbe/GGLabMaterialIOROnly.gltf" })
+			{
+				const auto imported = ModelImporter::Import(ResolveAssetPath(assetRoot, path), {});
+				context.Check(imported.Succeeded(),
+					std::format("Installed Blender material probe imports through Assimp ({}): {}",
+						path, imported.m_Error));
+				if (!imported.Succeeded()) continue;
+				const auto& model = imported.m_Model;
+				const bool hasIor = std::ranges::any_of(model.m_Materials,
+					[](const ImportedMaterial& material) noexcept
+					{ return std::abs(material.m_Properties.m_Ior - 1.33f) < 0.0001f; });
+				const bool hasCoreInputs = std::ranges::any_of(model.m_Materials,
+					[](const ImportedMaterial& material) noexcept
+					{
+						return std::abs(material.m_Properties.m_NormalScale - 0.35f) < 0.0001f &&
+							std::abs(material.m_Properties.m_OcclusionStrength - 0.6f) < 0.0001f;
+					});
+				context.Check(hasIor && hasCoreInputs && !model.m_MeshInstances.empty() &&
+					!model.m_TextureSources.empty(),
+					"Blender IOR, core texture scalars, geometry and external images reach one imported model");
+				const auto coat = std::ranges::find(model.m_Materials,
+					"MAT_ClearcoatTexture", &ImportedMaterial::m_Name);
+				const bool coatBindings = coat != model.m_Materials.end() &&
+					coat->m_Properties.m_ClearcoatFactor == 1.0f &&
+					coat->m_Properties.m_ClearcoatRoughness == 1.0f &&
+					std::abs(coat->m_Properties.m_ClearcoatNormalScale - 0.42f) < 0.0001f &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Clearcoat)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatRoughness)].m_TexCoordIndex == 1 &&
+					coat->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TexCoordIndex == 1;
+				context.Check(coatBindings,
+					"Blender clearcoat channels, independent UV sets and normal scale survive Assimp import");
+				const auto factor = std::ranges::find(model.m_Materials,
+					"MAT_AnisotropyFactor", &ImportedMaterial::m_Name);
+				const auto textured = std::ranges::find(model.m_Materials,
+					"MAT_AnisotropyTexture", &ImportedMaterial::m_Name);
+				context.Check(factor != model.m_Materials.end() &&
+					textured != model.m_Materials.end() &&
+					std::abs(factor->m_Properties.m_AnisotropyStrength - 0.7f) < 0.0001f &&
+					std::abs(factor->m_Properties.m_AnisotropyRotation - 0.785398f) < 0.0001f &&
+					textured->m_Properties.m_AnisotropyStrength == 1.0f &&
+					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TexCoordIndex == 1 &&
+					textured->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					"Blender anisotropy factors and textured UV1 direction survive Assimp import");
+			}
+
+			const auto lighting = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/GGLabLightingContractMaterialReferences/GGLabLightingContract.gltf"), {});
+			context.Check(lighting.Succeeded(),
+				std::format("Extended lighting contract imports: {}", lighting.m_Error));
+			if (lighting.Succeeded())
+			{
+				const auto& model = lighting.m_Model;
+				bool iorRow = true;
+				std::string iorDetail;
+				for (const float ior : { 1.0f, 1.33f, 1.5f, 1.7f, 2.0f })
+				{
+					const bool found = std::ranges::any_of(model.m_Materials,
+						[ior](const ImportedMaterial& material) noexcept
+						{
+							const auto& properties = material.m_Properties;
+							return std::abs(properties.m_Ior - ior) < 0.0001f &&
+								std::abs(properties.m_RoughnessFactor - 0.25f) < 0.0001f &&
+								properties.m_MetallicFactor == 0.0f;
+						});
+					iorRow &= found;
+					iorDetail += std::format(" {}:{}", ior, found);
+				}
+				context.Check(iorRow, std::format(
+					"Extended lighting contract retains five matched opaque dielectric IOR references "
+					"(instances={}, materials={}, found={})",
+					model.m_MeshInstances.size(), model.m_Materials.size(), iorDetail));
+				const auto findCoat = [&](std::string_view name) -> const ImportedMaterial*
+				{
+					const auto found = std::ranges::find(model.m_Materials, name, &ImportedMaterial::m_Name);
+					return found == model.m_Materials.end() ? nullptr : &*found;
+				};
+				const auto* off = findCoat("MAT_Clearcoat_Off");
+				const auto* smooth = findCoat("MAT_Clearcoat_Smooth");
+				const auto* rough = findCoat("MAT_Clearcoat_Rough");
+				const auto* normal = findCoat("MAT_Clearcoat_NormalScale");
+				context.Check(off && smooth && rough && normal &&
+					off->m_Properties.m_ClearcoatFactor == 0.0f &&
+					std::abs(smooth->m_Properties.m_ClearcoatFactor - 0.8f) < 0.0001f &&
+					std::abs(smooth->m_Properties.m_ClearcoatRoughness - 0.08f) < 0.0001f &&
+					std::abs(rough->m_Properties.m_ClearcoatRoughness - 0.32f) < 0.0001f &&
+					std::abs(normal->m_Properties.m_ClearcoatNormalScale - 0.45f) < 0.0001f &&
+					normal->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::ClearcoatNormal)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex,
+					"Extended lighting contract preserves off, smooth, rough and coat-normal references");
+				struct AnisotropyReference
+				{
+					const char* m_Name;
+					float m_Strength;
+					float m_Rotation;
+					bool m_Mirrored;
+					bool m_NormalMapped;
+				};
+				const std::array<AnisotropyReference, 6> references = { {
+					{ "MAT_Anisotropy_Off", 0.0f, 0.0f, false, false },
+					{ "MAT_Anisotropy_Along", 0.85f, 0.0f, false, false },
+					{ "MAT_Anisotropy_Across", 0.85f, std::numbers::pi_v<float> * 0.5f, false, false },
+					{ "MAT_Anisotropy_Diagonal", 0.85f, std::numbers::pi_v<float> * 0.25f, false, false },
+					{ "MAT_Anisotropy_Mirrored", 0.85f, std::numbers::pi_v<float> * 0.25f, true, false },
+					{ "MAT_Anisotropy_Normal", 0.85f, std::numbers::pi_v<float> * 0.25f, false, true },
+				} };
+				for (size_t index = 0; index < references.size(); ++index)
+				{
+					const auto& reference = references[index];
+					const auto material = std::ranges::find(model.m_Materials, reference.m_Name, &ImportedMaterial::m_Name);
+					bool valuesValid = material != model.m_Materials.end();
+					if (valuesValid)
+					{
+						const auto& properties = material->m_Properties;
+						const auto& normalBinding = material->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Normal)];
+						valuesValid = std::abs(properties.m_AnisotropyStrength - reference.m_Strength) < 0.0001f &&
+							std::abs(properties.m_AnisotropyRotation - reference.m_Rotation) < 0.0001f &&
+							properties.m_MetallicFactor == 1.0f && std::abs(properties.m_RoughnessFactor - 0.42f) < 0.0001f &&
+							properties.m_ClearcoatFactor == 0.0f &&
+							(normalBinding.m_TextureIndex != ImportedMaterialTextureBinding::InvalidTextureIndex) ==
+								reference.m_NormalMapped;
+						if (reference.m_NormalMapped)
+							valuesValid &= std::abs(properties.m_NormalScale - 0.4f) < 0.0001f && normalBinding.m_TexCoordIndex == 0;
+					}
+					context.Check(valuesValid, std::format("{} retains factors, rotation and base-normal binding", reference.m_Name));
+					const Vector3 front(80.0f + 2.2f * static_cast<float>(index % 3),
+						0.8f, 2.6f * static_cast<float>(index / 3) - 0.8f);
+					bool frontFound = false;
+					bool basisValid = true;
+					for (const auto& instance : model.m_MeshInstances)
+					{
+						if (model.m_Materials[instance.m_MaterialIndex].m_Name != reference.m_Name) continue;
+						const auto normalMatrix = math::CreateNormalMatrix(instance.m_LocalTransform);
+						for (const auto& vertex : model.m_Meshes[instance.m_MeshIndex].m_Vertices)
+						{
+							const auto position = math::TransformPoint(vertex.m_Position, instance.m_LocalTransform);
+							if ((position - front).Length() > 0.0001f) continue;
+							frontFound = true;
+							const auto n = math::TransformDirection(vertex.m_Normal, normalMatrix);
+							const auto t = math::TransformDirection(
+								{ vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z }, instance.m_LocalTransform);
+							const auto b = n.Cross(t) * vertex.m_Tangent.m_W;
+							basisValid &= (n + Vector3::UnitZ).Length() < 0.0001f &&
+								(t - (reference.m_Mirrored ? -Vector3::UnitX : Vector3::UnitX)).Length() < 0.0001f &&
+								(b - Vector3::UnitY).Length() < 0.0001f &&
+								std::abs(vertex.m_TexCoord0.m_X - (reference.m_Mirrored ? 0.75f : 0.25f)) < 0.0001f &&
+								std::abs(vertex.m_TexCoord0.m_Y - 0.5f) < 0.0001f;
+						}
+					}
+					context.Check(frontFound && basisValid,
+						std::format("{} preserves the authored front tangent, mirror handedness and UV after left-handed import", reference.m_Name));
+				}
+				context.Check(model.m_TextureSources.size() == 2, "Extended material references retain both normal images");
+				CheckImportedTextures(context, model);
+			}
+
+			const auto atrium = ModelImporter::Import(ResolveAssetPath(assetRoot,
+				"Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf"), {});
+			context.Check(atrium.Succeeded() && !atrium.m_Model.m_MeshInstances.empty() &&
+				atrium.m_Model.m_TextureSources.size() == 9,
+				std::format("Research lounge geometry and core textures import "
+					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
+					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
+			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
+				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
+			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
+				std::abs(coatedShell->m_Properties.m_ClearcoatFactor - 0.82f) < 0.0001f &&
+				std::abs(coatedShell->m_Properties.m_ClearcoatRoughness - 0.11f) < 0.0001f,
+				"Research lounge coated shell retains its authored clearcoat layer");
+			const auto frame = std::ranges::find(atrium.m_Model.m_Materials,
+				"MAT_LoungeBrushedAluminum", &ImportedMaterial::m_Name);
+			context.Check(frame != atrium.m_Model.m_Materials.end() &&
+				frame->m_Properties.m_MetallicFactor == 1.0f &&
+				std::abs(frame->m_Properties.m_RoughnessFactor - 0.28f) < 0.0001f &&
+				std::abs(frame->m_Properties.m_AnisotropyStrength - 0.78f) < 0.0001f &&
+				frame->m_Properties.m_AnisotropyRotation == 0.0f,
+				"Research lounge frame retains its brushed-metal anisotropy");
+		}
+
+		void CheckAnisotropyReferenceImports(SelfTestContext& context) noexcept
+		{
+			const auto assetRoot = GetApplicationSelfTestAssetRoot();
+			const auto import = [&](const char* path)
+			{
+				return ModelImporter::Import(ResolveAssetPath(assetRoot, path), {});
+			};
+			const auto checkDirectionTextures = [&](const ImportedModel& model, std::string_view name)
+			{
+				bool found = false;
+				bool valid = true;
+				for (const auto& source : model.m_TextureSources)
+				{
+					if (source.m_Semantic != TextureSemantic::Anisotropy) continue;
+					found = true;
+					const auto texture = TextureLoader::LoadTextureData(
+						source.m_CanonicalPath, source.m_ImportSettings);
+					valid &= texture.IsValid() && texture.m_ColorSpace == TextureColorSpace::Linear &&
+						texture.m_ViewFormat == RHIFormat::R8G8B8A8Unorm;
+				}
+				context.Check(found && valid,
+					std::format("{} direction textures decode as linear data", name));
+			};
+			const auto strength = import("Models/AnisotropyStrengthTest/AnisotropyStrengthTest.gltf");
+			context.Check(strength.Succeeded() && strength.m_Model.m_MeshInstances.size() >= 49,
+				std::format("Anisotropy strength grid imports with its geometry: {}", strength.m_Error));
+			if (strength.Succeeded())
+			{
+				const auto hasEndpoint = [&](float roughness, float anisotropy)
+				{
+					return std::ranges::any_of(strength.m_Model.m_Materials,
+						[&](const ImportedMaterial& material) noexcept
+						{
+							return std::abs(material.m_Properties.m_RoughnessFactor - roughness) < 0.0001f &&
+								std::abs(material.m_Properties.m_AnisotropyStrength - anisotropy) < 0.0001f;
+						});
+				};
+				context.Check(hasEndpoint(0.0f, 0.0f) && hasEndpoint(0.0f, 1.0f) &&
+					hasEndpoint(1.0f, 0.0f) && hasEndpoint(1.0f, 1.0f),
+					"Anisotropy strength grid retains the roughness and strength endpoints");
+			}
+
+			const auto rotation = import("Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf");
+			context.Check(rotation.Succeeded() && rotation.m_Model.m_MeshInstances.size() >= 6,
+				std::format("Anisotropy rotation reference imports with its geometry: {}", rotation.m_Error));
+			if (rotation.Succeeded())
+			{
+				const auto rotated = std::ranges::find(rotation.m_Model.m_Materials,
+					"Aniso Tan + Rotation", &ImportedMaterial::m_Name);
+				const auto combined = std::ranges::find(rotation.m_Model.m_Materials,
+					"Aniso Tan + Rotation + Texture", &ImportedMaterial::m_Name);
+				const bool hasDirectionTexture = combined != rotation.m_Model.m_Materials.end() &&
+					combined->m_TextureBindings[static_cast<size_t>(MaterialTextureSlot::Anisotropy)].m_TextureIndex !=
+						ImportedMaterialTextureBinding::InvalidTextureIndex;
+				context.Check(rotated != rotation.m_Model.m_Materials.end() &&
+					std::abs(rotated->m_Properties.m_AnisotropyRotation - 0.523599f) < 0.0001f &&
+					combined != rotation.m_Model.m_Materials.end() &&
+					std::abs(combined->m_Properties.m_AnisotropyRotation - 0.349066f) < 0.0001f &&
+					hasDirectionTexture,
+					"Anisotropy rotation reference retains factor and texture direction paths");
+				checkDirectionTextures(rotation.m_Model, "Anisotropy rotation reference");
+			}
+
+			const auto disc = import("Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf");
+			context.Check(disc.Succeeded() && disc.m_Model.m_MeshInstances.size() >= 12,
+				std::format("Anisotropy disc reference imports with its geometry: {}", disc.m_Error));
+			if (disc.Succeeded())
+			{
+				const bool anisotropyTexture = std::ranges::any_of(disc.m_Model.m_TextureSources,
+					[](const ImportedTextureSource& source) noexcept
+					{
+						std::error_code error;
+						return source.m_Semantic == TextureSemantic::Anisotropy &&
+							std::filesystem::exists(source.m_CanonicalPath, error) && !error;
+					});
+				context.Check(anisotropyTexture,
+					"Anisotropy disc reference resolves its direction and strength texture");
+				checkDirectionTextures(disc.m_Model, "Anisotropy disc reference");
+			}
+		}
+
 
 		void CheckTextureContractContent(SelfTestContext& context) noexcept
 		{
@@ -851,6 +1138,10 @@ namespace gglab
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
 			"Renderer startup artifacts include both aerial transport programs before any Lab enables atmosphere");
+		context.Check(rendererDemands.size() == 39 &&
+			std::ranges::find(rendererDemands, shader_programs::IBLImportanceVertex) != rendererDemands.end() &&
+			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
+			"Renderer startup demand includes both IBL importance programs in its 39-program contract");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -863,18 +1154,18 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 41,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 43,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 41,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 43,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 39,
+		checkSelectedDemand("gglab.lab.napa_voxel", 41,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 37,
+		checkSelectedDemand("gglab.lab.texture_contract", 39,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 37,
+		checkSelectedDemand("gglab.lab.lighting_contract", 39,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 38,
+		checkSelectedDemand("gglab.lab.atmosphere_range", 40,
 			"Atmosphere range includes the aerial measurement probe shader demand");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
@@ -883,6 +1174,8 @@ namespace gglab
 		std::thread textureWorker([&]
 			{
 				const auto workerContext = win32::Win32TaskWorkerLifecycle{}.CreateContext(0);
+				CheckMaterialReferenceImports(context);
+				CheckAnisotropyReferenceImports(context);
 				CheckCoastalAtriumContent(context);
 				CheckTextureContractContent(context);
 			});

@@ -76,14 +76,14 @@ float3 SafeNormalize(float3 v, float3 fallback)
 	return (len2 > 1.0e-8) ? v * rsqrt(len2) : fallback;
 }
 
-// BuildTBN()
+// BuildTBNFromDerivatives()
 // Reconstruct a tangent basis (T, B, N) per-pixel using screen-space derivatives.
 // This is a common fallback when the mesh does NOT provide vertex tangents.
 //
 // Inputs:
 //   N          : geometric normal in world space (should be normalized).
-//   positionWS : world-space position at current pixel (interpolated).
-//   uv         : texture coordinates at current pixel (interpolated).
+//   deltaPosX/Y : screen-space derivatives of world position.
+//   deltaUVX/Y  : screen-space derivatives of the sampled texture coordinates.
 //
 // Output:
 //   float3x3(T, B, N)  (rows are T, B, N; so mul(n_ts, tbn) works for row-vector convention)
@@ -93,45 +93,31 @@ float3 SafeNormalize(float3 v, float3 fallback)
 //   control-flow paths (dynamic branching, discard, etc.), derivatives can become unstable.
 // - If UV mapping is degenerate (uv does not vary), the reconstructed basis is unreliable.
 // - For mirrored UV islands, we need to handle handedness (sign) to keep normal maps consistent.
-float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
+float3x3 BuildTBNFromDerivatives(float3 N, float3 deltaPosX, float3 deltaPosY,
+	float2 deltaUVX, float2 deltaUVY)
 {
 	N = SafeNormalize(N, float3(0.0, 1.0, 0.0));
 
-	// Screen-space partial derivatives of world position:
-	//   deltaPosX ≈ ∂positionWS / ∂screenX   (difference to the right neighbor pixel)
-	//   deltaPosY ≈ ∂positionWS / ∂screenY   (difference to the bottom neighbor pixel)
-	float3 deltaPosX = ddx(positionWS);
-	float3 deltaPosY = ddy(positionWS);
-
-	// Screen-space partial derivatives of UV:
-	//   deltaUVX ≈ ∂uv / ∂screenX
-	//   deltaUVY ≈ ∂uv / ∂screenY
-	float2 deltaUVX = ddx(uv);
-	float2 deltaUVY = ddy(uv);
-
-	// The goal is to estimate Tangent (T = ∂p/∂u) and Bitangent (B = ∂p/∂v).
+	// The goal is to estimate Tangent (T = ∂p/∂u) and Bitangent (B = -∂p/∂v).
 	// Using the chain rule (locally, inside a triangle):
-	//   ∂p/∂x = T * ∂u/∂x + B * ∂v/∂x
-	//   ∂p/∂y = T * ∂u/∂y + B * ∂v/∂y
+	//   ∂p/∂x = T * ∂u/∂x - B * ∂v/∂x
+	//   ∂p/∂y = T * ∂u/∂y - B * ∂v/∂y
 	//
-	// One can solve this 2x2 linear system for T and B. The following cross-product form
-	// is a numerically stable rearrangement that also tends to keep vectors in the tangent plane.
+	// Solve the UV Jacobian without dividing by its magnitude. Its sign preserves
+	// mirrored UV orientation independently of screen winding or a flipped normal.
+	const float uvDeterminant = deltaUVX.x * deltaUVY.y - deltaUVX.y * deltaUVY.x;
+	const float orientation = uvDeterminant < 0.0 ? -1.0 : 1.0;
+	float3 T = (deltaPosX * deltaUVY.y - deltaPosY * deltaUVX.y) * orientation;
+	// glTF normal maps are +Y-up, opposite increasing V. Match imported tangents.
+	float3 B = (deltaPosX * deltaUVY.x - deltaPosY * deltaUVX.x) * orientation;
 
-	// Build two vectors guaranteed to be perpendicular to N (i.e., lie in the tangent plane).
-	// cross(deltaPosY, N) and cross(N, deltaPosX) are both orthogonal to N.
-	float3 deltaPosYPerp = cross(deltaPosY, N);
-	float3 deltaPosXPerp = cross(N, deltaPosX);
-
-	// Combine them with UV derivatives to produce unnormalized T and B.
-	// Intuition: these terms implement the "adjugate" of the 2x2 UV derivative matrix,
-	// avoiding an explicit inverse, while staying in the tangent plane.
-	float3 T = deltaPosYPerp * deltaUVX.x + deltaPosXPerp * deltaUVY.x;
-	float3 B = deltaPosYPerp * deltaUVX.y + deltaPosXPerp * deltaUVY.y;
-
-	// If the triangle/UV mapping is degenerate, T/B may become very small.
+	// A valid frame can be arbitrarily small as resolution or world units change.
+	// Reject zero/non-finite frames, not a fixed world-space magnitude.
 	float tLen2 = dot(T, T);
 	float bLen2 = dot(B, B);
-	if (max(tLen2, bLen2) <= 1.0e-8)
+	const float frameLen2 = max(tLen2, bLen2);
+	if (uvDeterminant == 0.0 || frameLen2 <= 0.0 ||
+		(asuint(frameLen2) & 0x7f800000u) == 0x7f800000u)
 	{
 		float3 up = (abs(N.y) < 0.999) ? float3(0.0, 1.0, 0.0) : float3(0.0, 0.0, 1.0);
 		T = SafeNormalize(cross(up, N), float3(1.0, 0.0, 0.0));
@@ -140,7 +126,7 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 	}
 
 	// We compute a safe scale to avoid division by zero.
-	float invMax = rsqrt(max(tLen2, bLen2) + 1e-8);
+	float invMax = rsqrt(frameLen2);
 
 	T *= invMax;
 	B *= invMax;
@@ -162,6 +148,11 @@ float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
 	// IMPORTANT: This uses row-vector convention:
 	//   n_ws = normalize(mul(n_ts, float3x3(T,B,N)));
 	return float3x3(T, B, N);
+}
+
+float3x3 BuildTBN(float3 N, float3 positionWS, float2 uv)
+{
+	return BuildTBNFromDerivatives(N, ddx(positionWS), ddy(positionWS), ddx(uv), ddy(uv));
 }
 
 float3x3 BuildTBNFromTangent(float3 N, float4 tangentWS, float3 positionWS, float2 uv)

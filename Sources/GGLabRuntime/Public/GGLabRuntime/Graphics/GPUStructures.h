@@ -116,8 +116,13 @@ namespace gglab
 	{
 		TextureSamplerBindingGPU TextureSamplerBinding;
 		uint32_t TexCoordIndex;
-		uint32_t Padding;
+		uint32_t TextureEnabled;
+		Vector4 UVTransformU;
+		Vector4 UVTransformV;
 	};
+	static_assert(sizeof(MaterialTextureBindingGPU) == 48);
+	static_assert(offsetof(MaterialTextureBindingGPU, UVTransformU) == 16);
+	static_assert(offsetof(MaterialTextureBindingGPU, UVTransformV) == 32);
 
 	struct MaterialGPU
 	{
@@ -139,8 +144,32 @@ namespace gglab
 		float AlphaCutoff;
 		uint32_t Flags; // bit 0: doubleSided
 		uint32_t DebugView;
+		float Ior;
+		float ClearcoatFactor;
+		float ClearcoatRoughness;
+		float ClearcoatNormalScale;
+		MaterialTextureBindingGPU ClearcoatBinding;
+		MaterialTextureBindingGPU ClearcoatRoughnessBinding;
+		MaterialTextureBindingGPU ClearcoatNormalBinding;
+		float AnisotropyStrength;
+		float AnisotropyRotation;
+		uint32_t AnisotropyPadding[2]; // TextureEnabled belongs to AnisotropyBinding.
+		MaterialTextureBindingGPU AnisotropyBinding;
 	};
-	static_assert(sizeof(MaterialGPU) == 144);
+	static_assert(sizeof(MaterialGPU) == 528);
+	static_assert(offsetof(MaterialGPU, BaseColorFactor) == 240);
+	static_assert(offsetof(MaterialGPU, NormalScale) == 280);
+	static_assert(offsetof(MaterialGPU, Ior) == 304);
+	static_assert(offsetof(MaterialGPU, ClearcoatFactor) == 308);
+	static_assert(offsetof(MaterialGPU, ClearcoatRoughness) == 312);
+	static_assert(offsetof(MaterialGPU, ClearcoatNormalScale) == 316);
+	static_assert(offsetof(MaterialGPU, ClearcoatBinding) == 320);
+	static_assert(offsetof(MaterialGPU, ClearcoatRoughnessBinding) == 368);
+	static_assert(offsetof(MaterialGPU, ClearcoatNormalBinding) == 416);
+	static_assert(offsetof(MaterialGPU, AnisotropyStrength) == 464);
+	static_assert(offsetof(MaterialGPU, AnisotropyRotation) == 468);
+	static_assert(offsetof(MaterialGPU, AnisotropyPadding) == 472);
+	static_assert(offsetof(MaterialGPU, AnisotropyBinding) == 480);
 	static constexpr uint32_t MaxMaterialCapacity = 256;
 	static constexpr uint32_t MaxLightCapacity = 64;
 

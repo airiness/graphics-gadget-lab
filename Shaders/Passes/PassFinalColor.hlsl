@@ -1,4 +1,5 @@
 #include <Common/Common.hlsli>
+#include <Common/DisplayColor.hlsli>
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
@@ -13,6 +14,10 @@ struct FinalColorPassParameters
 	uint BloomEnabled;
 	float BloomIntensity;
 	float ScenePreExposure;
+	uint MaterialDiagnosticColorIndex;
+	uint MaterialDiagnosticCoverageIndex;
+	uint MaterialDiagnosticsEnabled;
+	uint MaterialDiagnosticLightingIndex;
 };
 
 ConstantBuffer<FinalColorPassParameters> g_Pass : register(b2);
@@ -39,8 +44,18 @@ float4 PSMain(FullscreenTriangleVSOutput IN) : SV_Target
 
 	const float exposureScaleOverPreExposure =
 		ExposureScaleOverPreExposure(viewData.ExposureMultiplier, g_Pass.ScenePreExposure);
-	float3 color = ACESFitted(storedColor * exposureScaleOverPreExposure);
-	color = LinearToSRGB(color);
+	float3 diagnosticColor = 0.0.xxx;
+	float diagnosticCoverage = 0.0;
+	float3 diagnosticLighting = 0.0.xxx;
+	if (g_Pass.MaterialDiagnosticsEnabled != 0u)
+	{
+		const int3 pixel = int3(uint2(IN.PositionCS.xy), 0);
+		diagnosticColor = GetTexture2DFloat4(g_Pass.MaterialDiagnosticColorIndex).Load(pixel).rgb;
+		diagnosticCoverage = GetTexture2DFloat(g_Pass.MaterialDiagnosticCoverageIndex).Load(pixel);
+		diagnosticLighting = GetTexture2DFloat4(g_Pass.MaterialDiagnosticLightingIndex).Load(pixel).rgb;
+	}
+	const float3 color = ResolveDisplayColor(storedColor, exposureScaleOverPreExposure,
+		diagnosticColor, diagnosticCoverage, diagnosticLighting);
 
 	return float4(color, 1.0);
 }

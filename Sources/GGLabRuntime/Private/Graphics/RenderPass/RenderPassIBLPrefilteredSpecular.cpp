@@ -9,15 +9,21 @@
 #include "Graphics/SamplerRegistry.h"
 
 #include <algorithm>
+#include <array>
+#include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstddef>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace gglab
 {
 	namespace
 	{
+		constexpr uint32_t SpecularImportanceMaxResolution = 64u;
+
 		struct IBLPrefilteredSpecularPassParameters
 		{
 			uint32_t CubemapFaceIndex = 0;
@@ -25,8 +31,8 @@ namespace gglab
 			uint32_t MipLevels = 0;
 			uint32_t EnvironmentTextureIndex = 0;
 			uint32_t EnvironmentSamplerIndex = 0;
-			uint32_t EnvironmentResolution = 0;
-			uint32_t EnvironmentMipLevels = 0;
+			uint32_t ImportanceTextureIndex = 0;
+			uint32_t ImportanceResolution = 0;
 			uint32_t SampleCount = 0;
 			float MaxSampleLuminance = 0.0f;
 			uint32_t PhysicalSky = 0;
@@ -35,11 +41,37 @@ namespace gglab
 		static_assert(IsPassRootConstantStruct<IBLPrefilteredSpecularPassParameters>);
 		static_assert(sizeof(IBLPrefilteredSpecularPassParameters) == 48);
 		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, PhysicalSky) == 36);
+		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, ImportanceTextureIndex) == 20);
+		static_assert(offsetof(IBLPrefilteredSpecularPassParameters, ImportanceResolution) == 24);
+
+		struct IBLImportancePassParameters
+		{
+			uint32_t CubemapFaceIndex = 0;
+			uint32_t MipLevel = 0;
+			uint32_t SourceTextureIndex = 0;
+			uint32_t EnvironmentSamplerIndex = 0;
+			uint32_t ImportanceResolution = 0;
+			float EnvironmentSourceMip = 0.0f;
+			uint32_t PhysicalSky = 0;
+			uint32_t Padding = 0;
+		};
+		static_assert(IsPassRootConstantStruct<IBLImportancePassParameters>);
+		static_assert(sizeof(IBLImportancePassParameters) == 32);
+		static_assert(offsetof(IBLImportancePassParameters, EnvironmentSourceMip) == 20);
+		static_assert(offsetof(IBLImportancePassParameters, PhysicalSky) == 24);
+
+		struct ImportancePassData
+		{
+			RGTextureViewId m_SourceSrv{};
+			std::array<RGTextureViewId, CubemapFaceCount> m_Rtvs{};
+		};
 
 		struct PassData
 		{
 			RGTextureId m_EnvironmentCubemap{};
 			RGTextureId m_PrefilteredSpecularCubemap{};
+			RGTextureViewId m_ImportanceSrv{};
+			uint32_t m_ImportanceResolution = 0;
 			std::vector<RGTextureViewId> m_Rtvs;
 
 			uint32_t m_Width = 0;
@@ -47,8 +79,6 @@ namespace gglab
 			uint32_t m_MipLevels = 0;
 			uint32_t m_EnvironmentTextureIndex = 0;
 			uint32_t m_EnvironmentSamplerIndex = 0;
-			uint32_t m_EnvironmentResolution = 0;
-			uint32_t m_EnvironmentMipLevels = 0;
 			uint32_t m_SampleCount = 0;
 			float m_MaxSampleLuminance = 0.0f;
 			RHIFormat m_RenderTargetFormat = RHIFormat::Unknown;
@@ -68,13 +98,15 @@ namespace gglab
 		const uint64_t bakeGeneration = bakeScheduler->GetBakingGeneration();
 
 		EnsureInitialized(services);
+		const auto importanceTexture = AddImportancePasses(rg, services,
+			bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u);
 
 		const auto& config = bakeScheduler->GetBakingConfig();
 		const uint32_t sampleCount = config.m_PrefilteredSpecularSampleCount;
 		const float maxSampleLuminance = config.m_PrefilteredSpecularMaxSampleLuminance;
 		rg.AddPass<PassData>(
 			GetRenderGraphPassName(),
-			[services, renderResRegistry, sampleCount, maxSampleLuminance](
+			[services, renderResRegistry, sampleCount, maxSampleLuminance, importanceTexture](
 				RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				builder.SideEffect();
@@ -84,6 +116,14 @@ namespace gglab
 
 				data.m_EnvironmentCubemap =
 					builder.Read(iblRes.m_BakeEnvironmentCubemap, RGTextureAccess::Sample);
+				const auto importance = builder.Read(importanceTexture, RGTextureAccess::Sample);
+				const auto& importanceDesc = builder.GetTextureDesc(importance);
+				auto importanceSrvDesc = MakeRHITexture2DArrayViewDesc(
+					importanceDesc.m_Format, 0u, 0u, CubemapFaceCount);
+				importanceSrvDesc.m_Subresources.m_MipCount = importanceDesc.m_MipLevels;
+				data.m_ImportanceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(
+					importance, importanceSrvDesc);
+				data.m_ImportanceResolution = importanceDesc.m_Extent.m_Width;
 				builder.WriteInPlace(
 					iblRes.m_BakePrefilteredSpecularCubemap, RGTextureAccess::RenderTarget);
 				data.m_PrefilteredSpecularCubemap = iblRes.m_BakePrefilteredSpecularCubemap;
@@ -115,12 +155,6 @@ namespace gglab
 				data.m_EnvironmentSamplerIndex =
 					services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 
-				const auto* environmentDesc = renderResRegistry->GetIBLBakeTextureDesc(
-					RenderTextureIndex::IBL_EnvironmentCubemap);
-				GGLAB_ASSERT_NOT_NULL(environmentDesc);
-				data.m_EnvironmentResolution =
-					static_cast<uint32_t>(environmentDesc->m_Extent.m_Width);
-				data.m_EnvironmentMipLevels = environmentDesc->m_MipLevels;
 				data.m_SampleCount = sampleCount;
 				data.m_MaxSampleLuminance = maxSampleLuminance;
 				data.m_RenderTargetFormat = textureDesc->m_Format;
@@ -129,6 +163,8 @@ namespace gglab
 				RGExecuteContext& executeContext, PassData& data)
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
+				const auto importanceSrv = executeContext.GetViewDescriptor(data.m_ImportanceSrv);
+				GGLAB_ASSERT_MSG(importanceSrv.IsValid(), "IBL importance SRV must be shader visible.");
 				commandContext->SetPipeline(GetOrCreatePSO(services, data.m_RenderTargetFormat));
 
 				for (uint32_t mip = 0; mip < data.m_MipLevels; ++mip)
@@ -159,8 +195,8 @@ namespace gglab
 							.MipLevels = data.m_MipLevels,
 							.EnvironmentTextureIndex = data.m_EnvironmentTextureIndex,
 							.EnvironmentSamplerIndex = data.m_EnvironmentSamplerIndex,
-							.EnvironmentResolution = data.m_EnvironmentResolution,
-							.EnvironmentMipLevels = data.m_EnvironmentMipLevels,
+							.ImportanceTextureIndex = importanceSrv.m_Index,
+							.ImportanceResolution = data.m_ImportanceResolution,
 							.SampleCount = data.m_SampleCount,
 							.MaxSampleLuminance = data.m_MaxSampleLuminance,
 							.PhysicalSky = bakeScheduler->GetBakingAtmosphereParameters() ? 1u : 0u,
@@ -177,6 +213,96 @@ namespace gglab
 				bakeScheduler->NotifyStageExecuted(
 					IBLBakeStage::PrefilteredSpecular, bakeGeneration);
 			});
+	}
+
+	RGTextureId RenderPassIBLPrefilteredSpecular::AddImportancePasses(RenderGraph& rg,
+		const RenderServices& services, uint32_t physicalSky) noexcept
+	{
+		auto* registry = services.m_Resources;
+		const auto* environmentDesc = registry->GetIBLBakeTextureDesc(RenderTextureIndex::IBL_EnvironmentCubemap);
+		GGLAB_ASSERT_NOT_NULL(environmentDesc);
+		// A power-of-two proposal grid also supports custom non-power-of-two environments.
+		const uint32_t resolution = std::bit_floor(std::min(environmentDesc->m_Extent.m_Width,
+			SpecularImportanceMaxResolution));
+		const uint32_t mipLevels = std::bit_width(resolution);
+		const float sourceMip = std::min(std::log2(static_cast<float>(environmentDesc->m_Extent.m_Width) /
+			static_cast<float>(resolution)), static_cast<float>(environmentDesc->m_MipLevels - 1u));
+		const uint32_t samplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
+		RGTextureId importanceTexture{};
+		for (uint32_t mip = 0; mip < mipLevels; ++mip)
+		{
+			const std::string name = MakeRenderGraphPassName("Importance." + std::to_string(mip));
+			rg.AddPass<ImportancePassData>(name.c_str(),
+				[&importanceTexture, mip, resolution, mipLevels](RenderGraph::RGBuilder& builder, ImportancePassData& data)
+				{
+					if (mip == 0u)
+					{
+						RHITextureDesc desc{};
+						desc.m_Format = RHIFormat::R32Float;
+						desc.m_Extent = { resolution, resolution, 1u };
+						desc.m_ArraySize = CubemapFaceCount;
+						desc.m_MipLevels = static_cast<uint16_t>(mipLevels);
+						importanceTexture = builder.CreateTexture("IBL.SpecularImportance", desc);
+						const auto& ibl = builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName);
+						builder.Read(ibl.m_BakeEnvironmentCubemap, RGTextureAccess::Sample);
+					}
+					else
+					{
+						const auto sourceDesc = MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float,
+							mip - 1u, 0u, CubemapFaceCount);
+						const auto source = builder.Read(importanceTexture, RGTextureAccess::Sample, sourceDesc.m_Subresources);
+						data.m_SourceSrv = builder.CreateView<RHITextureViewType::ShaderResource>(source, sourceDesc);
+					}
+					const auto targetDesc = MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, mip, 0u, CubemapFaceCount);
+					builder.WriteInPlace(importanceTexture, RGTextureAccess::RenderTarget, targetDesc.m_Subresources);
+					for (uint32_t face = 0u; face < CubemapFaceCount; ++face)
+					{
+						data.m_Rtvs[face] = builder.CreateView<RHITextureViewType::RenderTarget>(importanceTexture,
+							MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, mip, face, 1u));
+					}
+				},
+				[this, services, registry, mip, resolution, sourceMip, samplerIndex, physicalSky](
+					RGExecuteContext& executeContext, ImportancePassData& data)
+				{
+					auto* commandContext = executeContext.GetGraphicsCommandContext();
+					commandContext->SetPipeline(services.m_PipelineResolver->Resolve(
+						m_ImportancePipelineSlot, m_ImportanceRecipe, GetInfo()));
+					const uint32_t size = resolution >> mip;
+					commandContext->SetViewport({ 0.0f, 0.0f, static_cast<float>(size), static_cast<float>(size) });
+					commandContext->SetScissorRect({ 0, 0, static_cast<int32_t>(size), static_cast<int32_t>(size) });
+					uint32_t sourceIndex;
+					if (mip == 0u)
+						sourceIndex = registry->GetIBLBakeShaderVisibleSrvIndex(RenderTextureIndex::IBL_EnvironmentCubemap);
+					else
+					{
+						const auto sourceSrv = executeContext.GetViewDescriptor(data.m_SourceSrv);
+						GGLAB_ASSERT_MSG(sourceSrv.IsValid(), "IBL importance reduction SRV must be shader visible.");
+						sourceIndex = sourceSrv.m_Index;
+					}
+					for (uint32_t face = 0u; face < CubemapFaceCount; ++face)
+					{
+						const RHIRenderingAttachment attachment{
+							.m_View = executeContext.GetViewHandle(data.m_Rtvs[face]),
+							.m_LoadOp = RHIContentLoadOp::DontCare,
+						};
+						commandContext->BeginRendering({ .m_ColorAttachments =
+							std::span<const RHIRenderingAttachment>(&attachment, 1) });
+						commandContext->SetPushConstants(static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants),
+							IBLImportancePassParameters{
+								.CubemapFaceIndex = face,
+								.MipLevel = mip,
+								.SourceTextureIndex = sourceIndex,
+								.EnvironmentSamplerIndex = samplerIndex,
+								.ImportanceResolution = resolution,
+								.EnvironmentSourceMip = sourceMip,
+								.PhysicalSky = physicalSky,
+							});
+						commandContext->DrawFullscreenTriangle();
+						commandContext->EndRendering();
+					}
+				});
+		}
+		return importanceTexture;
 	}
 
 	void RenderPassIBLPrefilteredSpecular::EnsureInitialized(
@@ -209,6 +335,10 @@ namespace gglab
 			m_BaseRecipe.m_RasterizerPreset = RasterizerPreset::Default;
 			m_BaseRecipe.m_BlendPreset = BlendPreset::Default;
 			m_BaseRecipe.m_DepthPreset = DepthPreset::DepthDisabled;
+			m_ImportanceRecipe = m_BaseRecipe;
+			m_ImportanceRecipe.m_VSId = shaderManager->LoadProgram(shader_programs::IBLImportanceVertex);
+			m_ImportanceRecipe.m_PSId = shaderManager->LoadProgram(shader_programs::IBLImportancePixel);
+			m_ImportanceRecipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R32Float;
 
 			m_IsInitialized = true;
 		}

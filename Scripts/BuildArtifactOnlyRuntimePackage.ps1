@@ -133,7 +133,6 @@ function Invoke-PackageSmoke {
     $stderrPath = Join-Path $PackageRoot "artifact-only-smoke.stderr.log"
     $arguments = @(
         "--lab", "gglab.lab.culling",
-        "--absolute-mouse",
         "--no-devtools"
     )
     $process = Start-Process -FilePath $executable -WorkingDirectory $PackageRoot `

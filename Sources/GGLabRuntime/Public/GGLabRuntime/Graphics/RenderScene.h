@@ -37,6 +37,7 @@ namespace gglab
 
 		uint32_t m_MaterialBaseIndex = 0;
 		uint32_t m_MaterialCount = 0;
+		bool m_HasMaterialDiagnostics = false;
 
 		uint32_t m_ViewBaseIndex = 0;
 		uint32_t m_ViewCount = 0;

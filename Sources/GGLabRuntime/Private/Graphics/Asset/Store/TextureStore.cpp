@@ -21,7 +21,7 @@ namespace gglab
 	TextureID TextureStore::FindCached(const std::filesystem::path& canonicalPath,
 		const TextureImportSettings& importSettings) const noexcept
 	{
-		const auto iterator = m_CacheKeys.find(CacheKey{ canonicalPath, importSettings });
+		const auto iterator = m_CacheKeys.find(TextureSourceKey{ canonicalPath, importSettings });
 		return iterator != m_CacheKeys.end() ? iterator->second : TextureID{};
 	}
 
@@ -29,7 +29,7 @@ namespace gglab
 		const TextureImportSettings& importSettings, TextureID textureId) noexcept
 	{
 		return textureId.IsValid() &&
-			m_CacheKeys.emplace(CacheKey{ canonicalPath, importSettings }, textureId).second;
+			m_CacheKeys.emplace(TextureSourceKey{ canonicalPath, importSettings }, textureId).second;
 	}
 
 	bool TextureStore::Insert(TextureID textureId, std::unique_ptr<Texture>&& texture) noexcept

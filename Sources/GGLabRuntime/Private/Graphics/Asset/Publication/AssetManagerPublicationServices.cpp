@@ -192,6 +192,9 @@ namespace gglab
 					binding.m_SamplerId = m_AssetManager->m_SamplerRegistry->GetOrCreateSampler(
 						importedBinding.m_SamplerKey);
 					binding.m_TexCoordIndex = importedBinding.m_TexCoordIndex;
+					binding.m_UVOffset = importedBinding.m_UVOffset;
+					binding.m_UVScale = importedBinding.m_UVScale;
+					binding.m_UVRotation = importedBinding.m_UVRotation;
 					AssetManager::SetMaterialTexture(
 						*material, static_cast<MaterialTextureSlot>(slotIndex), binding);
 				}

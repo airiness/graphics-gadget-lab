@@ -54,9 +54,9 @@ namespace gglab
 				result.m_ShowHelp = true;
 				continue;
 			}
-			if (argument == "--absolute-mouse")
+			if (argument == "--relative-mouse")
 			{
-				result.m_Options.m_StartWithAbsoluteMouse = true;
+				result.m_Options.m_StartWithRelativeMouse = true;
 				continue;
 			}
 			if (argument == "--state-root")
@@ -216,7 +216,7 @@ namespace gglab
 		}
 		if (result.m_Options.m_SelfTestSelection &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
-				result.m_Options.m_StartWithAbsoluteMouse ||
+				result.m_Options.m_StartWithRelativeMouse ||
 				result.m_Options.m_DisableDevelopmentTools ||
 				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
 				result.m_Options.m_AdapterSelector))
@@ -255,7 +255,8 @@ namespace gglab
 			"Options:\n"
 			"  --demo <start|playground|island|atrium|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
-			"  --absolute-mouse                Start with a visible, uncaptured cursor.\n"
+			"  --relative-mouse                Start with a captured cursor for camera control.\n"
+			"                                  Default: visible, uncaptured cursor (Absolute).\n"
 			"  --state-root <absolute-path>    Store artifacts, caches and settings outside deployed inputs.\n"
 			"  --no-devtools                   Disable optional desktop development tooling.\n"
 			"  --rhi <dx12|vulkan>             Select the RHI backend (default: dx12).\n"

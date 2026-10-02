@@ -66,7 +66,9 @@ struct MaterialTextureBindingData
 {
 	TextureSamplerBindingData TextureSamplerBinding;
 	uint TexCoordIndex;
-	uint Padding;
+	uint TextureEnabled;
+	float4 UVTransformU;
+	float4 UVTransformV;
 };
 
 struct MaterialData
@@ -88,7 +90,18 @@ struct MaterialData
 	int AlphaMode; // 0: OPAQUE, 1: MASK, 2: BLEND. Defined in MaterialUtils.hlsli
 	float AlphaCutoff;
 	uint Flags;		// bit 0: doubleSided
-	uint DebugView; // 0: lit, 1: base color, 2: metallic, 3: roughness, 4: normal
+	uint DebugView; // Matches MaterialDebugView in MaterialTypes.h.
+	float Ior;
+	float ClearcoatFactor;
+	float ClearcoatRoughness;
+	float ClearcoatNormalScale;
+	MaterialTextureBindingData ClearcoatBinding;
+	MaterialTextureBindingData ClearcoatRoughnessBinding;
+	MaterialTextureBindingData ClearcoatNormalBinding;
+	float AnisotropyStrength;
+	float AnisotropyRotation;
+	uint2 AnisotropyPadding; // TextureEnabled belongs to AnisotropyBinding.
+	MaterialTextureBindingData AnisotropyBinding;
 };
 
 struct ViewData

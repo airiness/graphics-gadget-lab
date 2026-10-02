@@ -27,12 +27,12 @@ namespace gglab
 			};
 			for (const auto& alias : aliases)
 			{
-				const std::vector<std::string_view> args = { "--demo", alias.m_Alias, "--absolute-mouse" };
+				const std::vector<std::string_view> args = { "--demo", alias.m_Alias };
 				const auto result = ParseApplicationLaunchOptions(args);
 				context.Check(result.IsValid() &&
 					result.m_Options.m_StartupDemo == alias.m_Demo &&
-					result.m_Options.m_StartWithAbsoluteMouse,
-					"Playground alias selects its content preset with absolute mouse input");
+					!result.m_Options.m_StartWithRelativeMouse,
+					"Playground alias selects its content preset with default absolute mouse input");
 				const std::vector<std::string_view> conflict = {
 					"--demo", alias.m_Alias, "--lab", "gglab.lab.culling" };
 				context.Check(!ParseApplicationLaunchOptions(conflict).IsValid(),
@@ -45,15 +45,15 @@ namespace gglab
 			for (const auto backend : { "dx12", "vulkan" })
 			{
 				const std::vector<std::string_view> args = {
-					"--lab", "gglab.lab.texture_contract", "--rhi", backend, "--absolute-mouse" };
+					"--lab", "gglab.lab.texture_contract", "--rhi", backend, "--relative-mouse" };
 				const auto result = ParseApplicationLaunchOptions(args);
 				context.Check(result.IsValid() &&
 					result.m_Options.m_StartupDemo == ApplicationStartupDemo::LabHost &&
 					result.m_Options.m_StartupLabId == "gglab.lab.texture_contract" &&
-					result.m_Options.m_StartWithAbsoluteMouse &&
+					result.m_Options.m_StartWithRelativeMouse &&
 					result.m_Options.m_RhiBackend == (std::string_view(backend) == "dx12" ?
 						RHIBackendType::DX12 : RHIBackendType::Vulkan),
-					"Texture contract starts through LabHost on the requested backend");
+					"Texture contract starts through LabHost on the requested backend with relative mouse input");
 			}
 		}
 
@@ -126,11 +126,14 @@ namespace gglab
 			{
 				const auto unknownSuite = parse({ "--self-test", "unknown-suite" });
 				const auto interactiveConflict = parse({ "--self-test", "all", "--lab", "gglab.lab.culling" });
+				const auto relativeMouseConflict = parse({ "--self-test", "all", "--relative-mouse" });
 				context.Check(!unknownSuite.IsValid() &&
 					unknownSuite.m_Error.find("Unknown self-test selection") != std::string::npos,
 					"Self-test selection rejects unknown suites");
 				context.Check(!interactiveConflict.IsValid() &&
-					interactiveConflict.m_Error.find("cannot be combined") != std::string::npos,
+					interactiveConflict.m_Error.find("cannot be combined") != std::string::npos &&
+					!relativeMouseConflict.IsValid() &&
+					relativeMouseConflict.m_Error.find("cannot be combined") != std::string::npos,
 					"Self-test selection rejects interactive startup options");
 			}
 			{
@@ -146,10 +149,13 @@ namespace gglab
 			}
 			{
 				const auto unknownOption = parse({ "--unknown-option" });
+				const auto removedMouseOption = parse({ "--absolute-mouse" });
 				const auto unknownDemo = parse({ "--demo", "unknown" });
 				context.Check(!unknownOption.IsValid() &&
-					unknownOption.m_Error.find("Unknown option") != std::string::npos,
-					"Launch options reject unknown flags");
+					unknownOption.m_Error.find("Unknown option") != std::string::npos &&
+					!removedMouseOption.IsValid() &&
+					removedMouseOption.m_Error.find("Unknown option") != std::string::npos,
+					"Launch options reject unknown flags, including the removed absolute mouse flag");
 				context.Check(!unknownDemo.IsValid() &&
 					unknownDemo.m_Error.find("Unknown demo") != std::string::npos,
 					"Launch options reject unknown demo names");

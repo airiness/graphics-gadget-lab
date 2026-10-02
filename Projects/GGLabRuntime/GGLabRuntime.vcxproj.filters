@@ -552,6 +552,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderHostFactory.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveProbeReadback.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
@@ -1058,6 +1061,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\AssimpMathInterop.h">
       <Filter>Private\Graphics\Asset\Interop</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Interop\GltfMaterialIdentity.h">
+      <Filter>Private\Graphics\Asset\Interop</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Loading\AssetLoadCoordinator.h">
       <Filter>Private\Graphics\Asset\Loading</Filter>
     </ClInclude>
@@ -1104,6 +1110,9 @@
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h">
+      <Filter>Private\Graphics\Asset</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureSourceKey.h">
       <Filter>Private\Graphics\Asset</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.h">
@@ -1174,6 +1183,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.h">
       <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.h">
+      <Filter>Private\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\AerialPerspectiveGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>

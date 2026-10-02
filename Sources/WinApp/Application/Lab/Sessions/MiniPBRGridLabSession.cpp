@@ -7,7 +7,16 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderQueue.h"
+#include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
+#include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabRuntime/Scene/Components.h"
+
+#include <algorithm>
+#include <cmath>
+#include <format>
+#include <numbers>
+#include <string>
 
 namespace gglab
 {
@@ -21,13 +30,40 @@ namespace gglab
 			"Assets/Models/MetalRoughSpheres/MetalRoughSpheres.gltf";
 		constexpr std::string_view MetalRoughSpheresNoTexturesPath =
 			"Assets/Models/MetalRoughSpheresNoTextures/MetalRoughSpheresNoTextures.gltf";
+		constexpr std::string_view AnisotropyStrengthTestPath =
+			"Assets/Models/AnisotropyStrengthTest/AnisotropyStrengthTest.gltf";
+		constexpr std::string_view AnisotropyRotationTestPath =
+			"Assets/Models/AnisotropyRotationTest/AnisotropyRotationTest.gltf";
+		constexpr std::string_view AnisotropyDiscTestPath =
+			"Assets/Models/AnisotropyDiscTest/AnisotropyDiscTest.gltf";
+		constexpr std::string_view NormalTangentTestPath =
+			"Assets/Models/NormalTangentTest/NormalTangentTest.gltf";
 
 		enum class SceneSource : int32_t
 		{
 			ProceduralGrid,
 			MetalRoughSpheres,
 			MetalRoughSpheresNoTextures,
+			AnisotropyStrengthTest,
+			AnisotropyRotationTest,
+			AnisotropyDiscTest,
+			NormalTangentTest = 8,
 		};
+
+		[[nodiscard]] std::string_view AssetModelPath(SceneSource source) noexcept
+		{
+			switch (source)
+			{
+			case SceneSource::MetalRoughSpheres: return MetalRoughSpheresPath;
+			case SceneSource::MetalRoughSpheresNoTextures: return MetalRoughSpheresNoTexturesPath;
+			case SceneSource::AnisotropyStrengthTest: return AnisotropyStrengthTestPath;
+			case SceneSource::AnisotropyRotationTest: return AnisotropyRotationTestPath;
+			case SceneSource::AnisotropyDiscTest: return AnisotropyDiscTestPath;
+			case SceneSource::NormalTangentTest: return NormalTangentTestPath;
+			case SceneSource::ProceduralGrid: return {};
+			}
+			return {};
+		}
 
 		const LabParameterId SceneSourceId("mini_pbr.scene.source");
 		const LabParameterId EnableCameraInputId("mini_pbr.camera.enable_input");
@@ -37,6 +73,11 @@ namespace gglab
 		const LabParameterId MetallicMaxId("mini_pbr.material.metallic_max");
 		const LabParameterId RoughnessMinId("mini_pbr.material.roughness_min");
 		const LabParameterId RoughnessMaxId("mini_pbr.material.roughness_max");
+		const LabParameterId IorId("mini_pbr.material.ior");
+		const LabParameterId ClearcoatFactorId("mini_pbr.material.clearcoat_factor");
+		const LabParameterId ClearcoatRoughnessId("mini_pbr.material.clearcoat_roughness");
+		const LabParameterId AnisotropyStrengthId("mini_pbr.material.anisotropy_strength");
+		const LabParameterId AnisotropyRotationId("mini_pbr.material.anisotropy_rotation");
 		const LabParameterId DebugViewId("mini_pbr.material.debug_view");
 		const LabParameterId LightIntensityId("mini_pbr.lighting.intensity");
 
@@ -97,6 +138,14 @@ namespace gglab
 						.m_Name = "MetalRoughSpheres"},
 					{.m_Value = int32_t(SceneSource::MetalRoughSpheresNoTextures),
 						.m_Name = "MetalRoughSpheresNoTextures"},
+					{.m_Value = int32_t(SceneSource::AnisotropyStrengthTest),
+						.m_Name = "AnisotropyStrengthTest"},
+					{.m_Value = int32_t(SceneSource::AnisotropyRotationTest),
+						.m_Name = "AnisotropyRotationTest"},
+					{.m_Value = int32_t(SceneSource::AnisotropyDiscTest),
+						.m_Name = "AnisotropyDiscTest"},
+					{.m_Value = int32_t(SceneSource::NormalTangentTest),
+						.m_Name = "NormalTangentTest"},
 				},
 			}));
 		GGLAB_UNUSED(parameters.Add({
@@ -166,6 +215,16 @@ namespace gglab
 			.m_MaxValue = LabValue(1.0f),
 			}));
 		GGLAB_UNUSED(parameters.Add({
+			.m_Id = IorId,
+			.m_Name = "Dielectric IOR",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = DefaultDielectricIor,
+			.m_MinValue = LabValue(1.0f),
+			.m_MaxValue = LabValue(10.0f),
+			}));
+		GGLAB_UNUSED(parameters.Add({
 			.m_Id = DebugViewId,
 			.m_Name = "Debug View",
 			.m_Group = "Procedural Material",
@@ -175,12 +234,68 @@ namespace gglab
 			.m_EnumItems =
 				{
 					{.m_Value = int32_t(MaterialDebugView::Lit), .m_Name = "Lit"},
+					{.m_Value = int32_t(MaterialDebugView::UnfilteredLit), .m_Name = "Lit (Specular AA Off)"},
 					{.m_Value = int32_t(MaterialDebugView::BaseColor), .m_Name = "Base Color"},
 					{.m_Value = int32_t(MaterialDebugView::Metallic), .m_Name = "Metallic"},
 					{.m_Value = int32_t(MaterialDebugView::Roughness), .m_Name = "Roughness"},
 					{.m_Value = int32_t(MaterialDebugView::Normal), .m_Name = "Normal"},
+					{.m_Value = int32_t(MaterialDebugView::AuthoredRoughness), .m_Name = "Authored Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::EffectiveRoughness), .m_Name = "Effective Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::NormalVariance), .m_Name = "Normal Variance (Base R, Coat G)"},
+					{.m_Value = int32_t(MaterialDebugView::SpecularAAContribution), .m_Name = "Specular AA (Base R, Coat G, Delta B)"},
+					{.m_Value = int32_t(MaterialDebugView::F0), .m_Name = "F0"},
+					{.m_Value = int32_t(MaterialDebugView::FeatureFlags), .m_Name = "Feature Flags"},
+					{.m_Value = int32_t(MaterialDebugView::Ior), .m_Name = "IOR"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatFactor), .m_Name = "Clearcoat Factor"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatRoughness), .m_Name = "Clearcoat Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::EffectiveClearcoatRoughness), .m_Name = "Effective Clearcoat Roughness"},
+					{.m_Value = int32_t(MaterialDebugView::ClearcoatNormal), .m_Name = "Clearcoat Normal"},
+					{.m_Value = int32_t(MaterialDebugView::AnisotropyStrength), .m_Name = "Anisotropy Strength"},
+					{.m_Value = int32_t(MaterialDebugView::AnisotropicAlpha), .m_Name = "Anisotropic Alpha (T R, B G)"},
+					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionTangent), .m_Name = "Anisotropy Direction (Tangent)"},
+					{.m_Value = int32_t(MaterialDebugView::AnisotropyDirectionWorld), .m_Name = "Anisotropy Direction (World)"},
 				},
 			}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ClearcoatFactorId,
+			.m_Name = "Clearcoat Factor",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.0f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = ClearcoatRoughnessId,
+			.m_Name = "Clearcoat Roughness",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.1f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = AnisotropyStrengthId,
+			.m_Name = "Anisotropy Strength",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.0f,
+			.m_MinValue = LabValue(0.0f),
+			.m_MaxValue = LabValue(1.0f),
+		}));
+		GGLAB_UNUSED(parameters.Add({
+			.m_Id = AnisotropyRotationId,
+			.m_Name = "Anisotropy Rotation (Degrees)",
+			.m_Group = "Procedural Material",
+			.m_Type = LabParameterType::Float,
+			.m_Impact = LabChangeImpact::Immediate,
+			.m_DefaultValue = 0.0f,
+			.m_MinValue = LabValue(-180.0f),
+			.m_MaxValue = LabValue(180.0f),
+		}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = LightIntensityId,
 			.m_Name = "Intensity",
@@ -197,6 +312,13 @@ namespace gglab
 
 	void MiniPBRGridLabSession::BeginPrepare() noexcept
 	{
+		m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
+		const auto programs = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+		m_DiagnosticShaderPreload = m_Services.m_ShaderManager->RequestPreloadAsync(
+			*m_Services.m_TaskSystem, { programs.begin(), programs.end() });
+		m_DiagnosticDrawVariants.clear();
+		m_DiagnosticVariantsCollected = false;
+		m_DiagnosticPrewarmProgress = {};
 		ResetAssetInterests();
 		m_World.GetRegistry().clear();
 		m_PrepareMode = PrepareMode::None;
@@ -219,9 +341,7 @@ namespace gglab
 			return;
 		}
 
-		const std::string_view modelPath = sceneSource == SceneSource::MetalRoughSpheres
-			? MetalRoughSpheresPath
-			: MetalRoughSpheresNoTexturesPath;
+		const std::string_view modelPath = AssetModelPath(sceneSource);
 		m_PrepareMode = PrepareMode::AssetModel;
 		m_LoadingProgress = {
 			.m_Status = LoadingStatus::Preparing,
@@ -238,6 +358,101 @@ namespace gglab
 	}
 
 	void MiniPBRGridLabSession::TickPrepare() noexcept
+	{
+		if (m_LoadingProgress.HasFailed())
+		{
+			m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
+			return;
+		}
+		TickScenePrepare();
+		const ShaderPreloadStatus shaders = m_DiagnosticShaderPreload.GetStatus();
+		if (!m_LoadingProgress.IsReady() || !shaders.IsReady())
+		{
+			return;
+		}
+		if (!m_DiagnosticVariantsCollected)
+		{
+			CollectDiagnosticDrawVariants();
+			m_DiagnosticVariantsCollected = true;
+		}
+		m_DiagnosticPrewarmProgress = GetRenderPipeline().PrewarmMaterialDiagnostics(
+			m_Services.m_RenderServices, m_DiagnosticDrawVariants);
+	}
+
+	LoadingProgress MiniPBRGridLabSession::GetPreparationProgress() const noexcept
+	{
+		const ShaderPreloadStatus shaders = m_DiagnosticShaderPreload.GetStatus();
+		LoadingProgressBuilder progress;
+		progress.AddStep(0.70f, {
+			.m_Status = m_LoadingProgress.m_Status,
+			.m_Fraction = m_LoadingProgress.m_Fraction,
+			.m_Stage = m_LoadingProgress.m_Stage,
+			.m_Detail = m_LoadingProgress.m_Detail,
+		});
+		const std::string shaderDetail = shaders.HasFailed() ? shaders.m_Error
+			: std::format("{} / {} shader artifacts ready.", shaders.m_CompletedCount, shaders.m_TotalCount);
+		progress.AddStep(0.15f, {
+			.m_Status = shaders.HasFailed() ? LoadingStatus::Failed
+				: shaders.IsReady() ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = shaders.IsReady() ? 1.0f : shaders.m_TotalCount == 0 ? 0.0f
+				: static_cast<float>(shaders.m_CompletedCount) / static_cast<float>(shaders.m_TotalCount),
+			.m_Stage = shaders.HasFailed() ? "Diagnostic shader preload failed" : "Preloading diagnostic shaders",
+			.m_Detail = shaderDetail,
+		});
+		const bool pipelinesReady = m_DiagnosticVariantsCollected && m_DiagnosticPrewarmProgress.IsReady();
+		const std::string pipelineDetail = m_DiagnosticPrewarmProgress.m_Failed
+			? "A material diagnostic pipeline could not be created."
+			: !m_DiagnosticVariantsCollected ? "Waiting for scene and shader artifacts."
+			: std::format("{} / {} diagnostic pipelines ready.", m_DiagnosticPrewarmProgress.m_CompletedCount,
+				m_DiagnosticPrewarmProgress.m_TotalCount);
+		progress.AddStep(0.15f, {
+			.m_Status = m_DiagnosticPrewarmProgress.m_Failed ? LoadingStatus::Failed
+				: pipelinesReady ? LoadingStatus::Ready : LoadingStatus::Preparing,
+			.m_Fraction = pipelinesReady ? 1.0f : m_DiagnosticPrewarmProgress.m_TotalCount == 0 ? 0.0f
+				: static_cast<float>(m_DiagnosticPrewarmProgress.m_CompletedCount) /
+					static_cast<float>(m_DiagnosticPrewarmProgress.m_TotalCount),
+			.m_Stage = m_DiagnosticPrewarmProgress.m_Failed
+				? "Diagnostic pipeline preparation failed" : "Prewarming diagnostic pipelines",
+			.m_Detail = pipelineDetail,
+		});
+		return progress.Build();
+	}
+
+	void MiniPBRGridLabSession::CollectDiagnosticDrawVariants() noexcept
+	{
+		const auto addMaterial = [this](const MaterialProperties& material) noexcept
+			{
+				const uint64_t variant =
+					RenderQueueBuilder::EncodeMaterialVariantBits(material.m_AlphaMode, material.m_Flags);
+				if (std::ranges::find(m_DiagnosticDrawVariants, variant) == m_DiagnosticDrawVariants.end())
+				{
+					m_DiagnosticDrawVariants.push_back(variant);
+				}
+			};
+		auto& registry = m_World.GetRegistry();
+		const auto models = registry.view<components::ModelComponent>();
+		for (const entt::entity entity : models)
+		{
+			const auto* overrideMaterial = registry.try_get<components::MaterialInstanceComponent>(entity);
+			if (overrideMaterial && overrideMaterial->m_Key.IsValid())
+			{
+				addMaterial(overrideMaterial->m_Properties);
+				continue;
+			}
+			const Model* model = m_Services.m_AssetManager->GetModel(models.get<components::ModelComponent>(entity).m_ModelId);
+			GGLAB_ASSERT_NOT_NULL(model);
+			for (const ModelMesh& mesh : model->m_MeshInstance)
+			{
+				if (const MaterialProperties* material = m_Services.m_AssetManager->GetMaterial(mesh.m_MaterialId))
+				{
+					addMaterial(*material);
+				}
+			}
+		}
+		std::ranges::sort(m_DiagnosticDrawVariants);
+	}
+
+	void MiniPBRGridLabSession::TickScenePrepare() noexcept
 	{
 		if (!m_LoadingProgress.IsPreparing())
 		{
@@ -345,7 +560,7 @@ namespace gglab
 		if (!FinalizeAssetModel())
 		{
 			m_LoadingProgress.m_Status = LoadingStatus::Failed;
-			m_LoadingProgress.m_Detail = "The model has no usable bounds.";
+			m_LoadingProgress.m_Detail = "The model instance could not be created.";
 			return;
 		}
 		BuildLighting();
@@ -356,11 +571,12 @@ namespace gglab
 
 	void MiniPBRGridLabSession::CommitPrepare() noexcept
 	{
-		GGLAB_ASSERT_MSG(m_LoadingProgress.IsReady(), "Mini PBR Grid must be ready before commit.");
+		GGLAB_ASSERT_MSG(GetPreparationProgress().IsReady(), "Mini PBR Grid must be ready before commit.");
 	}
 
 	void MiniPBRGridLabSession::CancelPrepare() noexcept
 	{
+		m_DiagnosticShaderPreload.Cancel(*m_Services.m_TaskSystem);
 		ResetAssetInterests();
 		m_PrepareMode = PrepareMode::None;
 		m_PendingModelId.Reset();
@@ -409,7 +625,20 @@ namespace gglab
 				std::lerp(metallicMin, metallicMax, GridFactor(cell.m_Column));
 			material.m_Properties.m_RoughnessFactor =
 				std::lerp(roughnessMin, roughnessMax, GridFactor(cell.m_Row));
+			material.m_Properties.m_Ior = parameters.Get(IorId, DefaultDielectricIor);
+			material.m_Properties.m_ClearcoatFactor = parameters.Get(ClearcoatFactorId, 0.0f);
+			material.m_Properties.m_ClearcoatRoughness = parameters.Get(ClearcoatRoughnessId, 0.1f);
+			material.m_Properties.m_AnisotropyStrength = parameters.Get(AnisotropyStrengthId, 0.0f);
+			material.m_Properties.m_AnisotropyRotation =
+				parameters.Get(AnisotropyRotationId, 0.0f) * std::numbers::pi_v<float> / 180.0f;
 			material.m_Properties.m_DebugView = debugView;
+		}
+		auto modelMaterialView = m_World.GetRegistry().view<components::ModelComponent,
+			components::MaterialInstanceComponent>();
+		for (const entt::entity entity : modelMaterialView)
+		{
+			modelMaterialView.get<components::MaterialInstanceComponent>(entity)
+				.m_Properties.m_DebugView = debugView;
 		}
 
 		auto lightView = m_World.GetRegistry().view<components::LightComponent>();
@@ -533,6 +762,21 @@ namespace gglab
 		const float scale = TargetAssetModelExtent / maxExtent;
 		transform.m_Scale = Vector3::One * scale;
 		transform.m_Position = Vector3(0.0f, 0.0f, GridDepth) - boundsCenter * scale;
+		const MaterialProperties* diagnosticMaterial = nullptr;
+		if (m_PendingModelPath == NormalTangentTestPath)
+		{
+			if (model->m_MeshInstance.size() == 1)
+			{
+				diagnosticMaterial =
+					assetManager.GetMaterial(model->m_MeshInstance.front().m_MaterialId);
+			}
+			if (!diagnosticMaterial)
+			{
+				GGLAB_LOG_ERROR("Mini PBR Grid diagnostic model '{}' needs one material.",
+					m_PendingModelPath);
+				return false;
+			}
+		}
 
 		auto& registry = m_World.GetRegistry();
 		const entt::entity entity = registry.create();
@@ -540,6 +784,14 @@ namespace gglab
 		registry.emplace<components::ModelComponent>(entity, components::ModelComponent{
 																 .m_ModelId = m_PendingModelId,
 			});
+		if (diagnosticMaterial)
+		{
+			registry.emplace<components::MaterialInstanceComponent>(entity,
+				components::MaterialInstanceComponent{
+					.m_Key = RuntimeMaterialKey("gglab.lab.mini_pbr_grid.normal_tangent"),
+					.m_Properties = *diagnosticMaterial,
+				});
+		}
 		m_PendingModelId.Reset();
 		m_PendingModelPath.clear();
 		return true;
@@ -564,7 +816,12 @@ namespace gglab
 
 	void MiniPBRGridLabSession::ApplyCameraPreset() noexcept
 	{
-		GetCamera().LookAt(Vector3(0.0f, 1.8f, -20.0f), Vector3(0.0f, 0.0f, GridDepth));
+		const auto sceneSource = static_cast<SceneSource>(
+			GetParameters().Get(SceneSourceId, int32_t(SceneSource::ProceduralGrid)));
+		// Ground-oriented references need an elevated view to show their surface detail.
+		const Vector3 position = sceneSource == SceneSource::AnisotropyDiscTest
+			? Vector3(0.0f, 16.0f, -20.0f) : Vector3(0.0f, 1.8f, -20.0f);
+		GetCamera().LookAt(position, Vector3(0.0f, 0.0f, GridDepth));
 		GetCamera().Update();
 	}
 
@@ -580,7 +837,7 @@ namespace gglab
 			.m_DisplayName = "Mini PBR Grid",
 			.m_Category = "Materials",
 			.m_Description =
-				"Compares runtime, textured and factor-only metallic-roughness sphere grids.",
+				"Compares procedural PBR, metallic-roughness and anisotropy references.",
 			.m_Kind = LabKind::Scene,
 			.m_SchemaVersion = 1,
 		};
