@@ -10,21 +10,29 @@ cameras, one Sun reference, one binary buffer and nine PNG textures. Keep the
 
 The editable source is
 `GraphicsGadgetLabContent/Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend`
-at Content revision `63a90291e62df30f96943f3f2d6cd1e11f52d87c`. Blender 5.1.1 and
-`GraphicsGadgetLabContent/Scripts/export_gltf.py` produced this bundle.
+with the source identity recorded below. Blender 5.1.1 and
+`GraphicsGadgetLabContent/Scripts/export_gltf.py` produced this bundle, including
+the lounge-side and courtyard-support surface correction.
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Source `.blend` | `664e0e36d301a3f653051c3ce17d837a8eb89e94ad85fbc671d29362a16325aa` |
-| `GGLabCoastalAtrium.gltf` | `09bd2dda39f8b17fc2ea7243d5c7ef6a6e642da687cfd936bedb53941fff4685` |
-| `GGLabCoastalAtrium.bin` | `02c353a5f124389adf047e40966d572bac32a395489c491e26a89b19a9c8454c` |
+| Source `.blend` | `8e59998427ff09c0cf34df1209e6787304163cd96b41ba627987790c58aa9dc1` |
+| `GGLabCoastalAtrium.gltf` | `c6e32f9f86e9c77981d2a77382391fc391df41eee013db283f4ed080c020f8a5` |
+| `GGLabCoastalAtrium.bin` | `e925e714da8dca494aa9c82a76ddaf6479a10bfe797f866ef41bcedea14e5c29` |
 
 The shell retains clearcoat factor 0.82 and roughness 0.11. Its eight frame
 parts use `MAT_LoungeBrushedAluminum`: linear RGB `(0.52, 0.56, 0.59)`, metallic
 1, base roughness 0.28, anisotropy strength 0.78 and rotation 0. UV0 U follows
 the length of each rail or leg. End bevels turn with the surface; the frame has
-no normal map or mirrored UV. Cushions use opaque base materials. Existing
-architecture and all nine PNGs are unchanged.
+no normal map or mirrored UV. Cushions use opaque base materials. All nine PNGs,
+material factors, transforms and reference cameras are unchanged.
+
+Each arm shell is trimmed by its back wing to remove duplicate visible side
+patches. The upper terrain shelf is trimmed around the courtyard slab; the slab
+owns the exposed front surface above Z = 1.90 m in Blender coordinates. Only
+these three meshes change, with closed source solids and retained outside
+normals/UVs. Stairs and both platform heights remain unchanged. The bundle has
+5530 triangles, including 4468 in the 23-part lounge.
 
 ## Reproduce and validate
 
@@ -40,8 +48,10 @@ $blender = 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe'
 ```
 
 The exporter does not save the source. Content checks cover factors, frame
-UV/tangent direction, geometry, cameras and round-trip import. The original
-Content repeated exports also produced identical JSON, buffer and image bytes.
+UV/tangent direction, geometry, cameras, closed source solids and round-trip
+import. Source and imported meshes are checked for duplicate visible surfaces
+on both lounge sides and the courtyard support. Repeated exports produced
+identical JSON, buffer and image bytes.
 
 ## Runtime entry
 
