@@ -147,7 +147,9 @@ namespace gglab
 	void RenderPassAerialPerspective::AddPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		if (!context.IsRenderSceneReady() ||
+		// Parameter diagnostics and their lighting-removal MRT must stay in the
+		// same unmodified scene-linear domain through final composition.
+		if (!context.IsRenderSceneReady() || context.m_RenderScene.m_HasMaterialDiagnostics ||
 			!context.GetDisplayViewRenderSettings().m_Lighting.m_EnableAerialPerspective ||
 			!context.m_RenderScene.m_Atmosphere ||
 			!context.m_RenderScene.m_WorldSun || !services.m_Atmosphere ||

@@ -82,7 +82,7 @@ namespace gglab
 			RGTextureViewId m_AtmosphereTransmittanceSrv{};
 			RGTextureViewId m_GTAOContributionRtv{};
 			RGTextureViewId m_LegacyReferenceRtv{};
-			std::array<RGTextureViewId, 2> m_MaterialDiagnosticRtvs{};
+			std::array<RGTextureViewId, 3> m_MaterialDiagnosticRtvs{};
 			bool m_MaterialDiagnostics = false;
 
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
@@ -186,7 +186,7 @@ namespace gglab
 				if (data.m_MaterialDiagnostics)
 				{
 					const std::array diagnostics{ &displayTargets.m_MaterialDiagnosticColor,
-						&displayTargets.m_MaterialDiagnosticCoverage };
+						&displayTargets.m_MaterialDiagnosticCoverage, &displayTargets.m_MaterialDiagnosticLighting };
 					for (size_t index = 0; index < diagnostics.size(); ++index)
 					{
 						builder.ReadWriteInPlace(*diagnostics[index], RGTextureAccess::RenderTarget);
@@ -357,7 +357,7 @@ namespace gglab
 
 				const RHITextureViewHandle rtv = executeContext.GetViewHandle(data.m_Rtv);
 				const auto dsv = executeContext.GetViewHandle(data.m_Dsv);
-				std::array<RHIRenderingAttachment, 5> renderTargets{};
+				std::array<RHIRenderingAttachment, 6> renderTargets{};
 				renderTargets[0] = RHIRenderingAttachment{ .m_View = rtv };
 				uint32_t renderTargetCount = 1;
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
@@ -663,6 +663,8 @@ namespace gglab
 					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] =
 						RHIFormat::R16G16B16A16Float;
 					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] = RHIFormat::R16Float;
+					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] =
+						RHIFormat::R16G16B16A16Float;
 				}
 			}
 			// Optional shader variants must not double the pass object's inline cache.

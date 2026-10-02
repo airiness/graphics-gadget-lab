@@ -61,21 +61,27 @@ SpecularAAResult PrepareClearcoatSpecularAA(MaterialData material, SurfaceData s
 	return result;
 }
 
-float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale,
+bool RequiresDerivedNormalFrame(MaterialTextureBindingData binding)
+{
+	return binding.TexCoordIndex != 0u ||
+		any(abs(binding.UVTransformU.xy - float2(1.0, 0.0)) > 1.0e-6) ||
+		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
+}
+
+float3x3 BuildNormalTextureFrame(MaterialTextureBindingData binding,
 	float3 normalWS, float4 tangentWS, float3 positionWS, float2 uv)
+{
+	// Imported generated tangents use UV0. Normal mapping and anisotropy must
+	// share the frame derived from the actual normal coordinates when these differ.
+	return RequiresDerivedNormalFrame(binding)
+		? BuildTBN(normalWS, positionWS, uv)
+		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
+}
+
+float3 SampleNormalWS(MaterialTextureBindingData binding, float normalScale, float3x3 TBN, float2 uv)
 {
 	const float3 normalSampled = DecodeNormalTexture(
 		SampleTextureBinding(binding.TextureSamplerBinding, uv).rgb, normalScale);
-
-	// Authored tangents describe UV0. A different UV set or a transformed normal
-	// map needs a frame derived from the actual sampled coordinates, including
-	// rotations and mirrored scales.
-	const bool transformedFrame = binding.TexCoordIndex != 0u ||
-		any(abs(binding.UVTransformU.xy - float2(1.0, 0.0)) > 1.0e-6) ||
-		any(abs(binding.UVTransformV.xy - float2(0.0, 1.0)) > 1.0e-6);
-	float3x3 TBN = transformedFrame
-		? BuildTBN(normalWS, positionWS, uv)
-		: BuildTBNFromTangent(normalWS, tangentWS, positionWS, uv);
 	return SafeNormalize(mul(normalSampled, TBN), TBN[2]);
 }
 
@@ -109,7 +115,7 @@ BaseShadingState BuildBaseShadingState(SurfaceData surface, float3 normalWS,
 }
 
 AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 normalWS,
-	float3 shadingNormalWS, float4 tangentWS, float3 positionWS, float2 normalUV,
+	float3 shadingNormalWS, float3x3 frame,
 	float authoredBaseAlpha, float kernelAlpha, bool evaluateFrame)
 {
 	AnisotropyShadingState state;
@@ -124,9 +130,6 @@ AnisotropyShadingState BuildAnisotropyShadingState(SurfaceData surface, float3 n
 	state.AlphaT = filteredAlpha.x;
 	state.AlphaB = filteredAlpha.y;
 
-	// A missing mesh tangent uses the same normal-map coordinates as normal
-	// perturbation, including the selected UV set and texture transform.
-	const float3x3 frame = BuildTBNFromTangent(normalWS, tangentWS, positionWS, normalUV);
 	const float2 direction = surface.AnisotropyDirectionTS;
 	const float3 tangent = frame[0] * direction.x + frame[1] * direction.y;
 	const float3 projected = tangent - shadingNormalWS * dot(shadingNormalWS, tangent);
@@ -146,8 +149,10 @@ MaterialShadingFrame PrepareMaterialShadingFrame(MaterialData material, SurfaceD
 		normalWS = -normalWS;
 	}
 	const float2 normalUV = SelectUV(material.NormalBinding, input.UV0, input.UV1);
-	const float3 baseNormalWS = SampleNormalWS(material.NormalBinding, material.NormalScale,
+	const float3x3 normalFrame = BuildNormalTextureFrame(material.NormalBinding,
 		normalWS, input.TangentWS, input.PositionWS, normalUV);
+	const float3 baseNormalWS = SampleNormalWS(material.NormalBinding, material.NormalScale,
+		normalFrame, normalUV);
 	MaterialShadingFrame frame;
 	frame.ClearcoatNormalWS = normalWS;
 	// Material factors and debug selection are uniform within a draw. The
@@ -158,15 +163,17 @@ MaterialShadingFrame PrepareMaterialShadingFrame(MaterialData material, SurfaceD
 		material.ClearcoatNormalBinding.TextureEnabled != 0u)
 	{
 		const float2 clearcoatUV = SelectUV(material.ClearcoatNormalBinding, input.UV0, input.UV1);
+		const float3x3 clearcoatFrame = BuildNormalTextureFrame(material.ClearcoatNormalBinding,
+			normalWS, input.TangentWS, input.PositionWS, clearcoatUV);
 		frame.ClearcoatNormalWS = SampleNormalWS(material.ClearcoatNormalBinding,
-			material.ClearcoatNormalScale, normalWS, input.TangentWS, input.PositionWS, clearcoatUV);
+			material.ClearcoatNormalScale, clearcoatFrame, clearcoatUV);
 	}
 	const bool specularAAEnabled = material.DebugView != MaterialDebugViewUnfilteredLit;
 	frame.Base = BuildBaseShadingState(surface, baseNormalWS, specularAAEnabled);
 	// Evaluate required normal footprints ahead of sampled feature and diagnostic branches.
 	frame.ClearcoatSpecularAA = PrepareClearcoatSpecularAA(material, surface, frame.ClearcoatNormalWS);
 	frame.Anisotropy = BuildAnisotropyShadingState(surface, normalWS, baseNormalWS,
-		input.TangentWS, input.PositionWS, normalUV,
+		normalFrame,
 		PerceptualRoughnessToAlpha(ClampPerceptualRoughnessForBRDF(surface.Roughness)),
 		frame.Base.SpecularAAKernelAlpha,
 		material.AnisotropyStrength > 0.0 ||

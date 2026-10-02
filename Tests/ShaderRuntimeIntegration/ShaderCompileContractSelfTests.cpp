@@ -2735,7 +2735,7 @@ namespace gglab
 			desc.m_SourcePath = L"Tests/MaterialDiagnosticContractCompile.hlsl";
 			desc.m_Entry = L"PSMain";
 			bool materialDiagnosticSpirVCompiles = true;
-			for (uint32_t testCase = 0; testCase < 25u; ++testCase)
+			for (uint32_t testCase = 0; testCase < 29u; ++testCase)
 			{
 				desc.m_Defines = { { L"GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE", std::to_wstring(testCase) } };
 				desc.m_Target = MakeDX12CompileTarget(ShaderStage::Pixel);
@@ -2998,6 +2998,8 @@ namespace gglab
 				ShaderNumericContractCase{ L"TestZeroAnisotropyRetainsTangentDiagnostic", "zero-strength tangent diagnostic retains rotation" },
 				ShaderNumericContractCase{ L"TestZeroAnisotropyRetainsWorldDiagnostic", "zero-strength world diagnostic retains its rotated frame" },
 				ShaderNumericContractCase{ L"TestActiveAnisotropyUsesBindingFlag", "active anisotropy uses the binding flag and ignores reserved bytes" },
+				ShaderNumericContractCase{ L"TestNormalTextureFrameSelection", "UV1, rotation and mirroring share a derived normal frame" },
+				ShaderNumericContractCase{ L"TestAnisotropyUsesNormalTextureFrame", "anisotropy follows the normal frame instead of generated UV0 tangents" },
 			};
 			checkShaderNumericContracts(L"Tests/MaterialShadingContractCompile.hlsl", materialShadingCases);
 

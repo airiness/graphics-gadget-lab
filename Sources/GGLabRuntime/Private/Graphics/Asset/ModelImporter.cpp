@@ -283,6 +283,22 @@ namespace gglab
 		[[nodiscard]] bool ReadTextureTransform(const Json& textureInfo,
 			ImportedMaterialTextureBinding& binding, std::string& error) noexcept
 		{
+			uint64_t texCoordIndex = binding.m_TexCoordIndex;
+			const char* texCoordSource = "glTF texture";
+			auto readTexCoord = [&](const Json& source, const char* name) noexcept
+			{
+				const auto found = source.find("texCoord");
+				if (found == source.end()) return true;
+				if (!found->is_number_unsigned())
+				{
+					error = std::format("Invalid {} texCoord.", name);
+					return false;
+				}
+				texCoordIndex = found->get<uint64_t>();
+				texCoordSource = name;
+				return true;
+			};
+			if (!readTexCoord(textureInfo, "glTF texture")) return false;
 			const Json* extensions = FindObjectField(textureInfo, "extensions");
 			if (extensions)
 			{
@@ -294,40 +310,41 @@ namespace gglab
 				}
 			}
 			const Json* transform = extensions ? FindObjectField(*extensions, "KHR_texture_transform") : nullptr;
-			if (!transform) return true;
-
-			auto readPair = [&](const char* name, Vector2& destination) noexcept
+			if (transform)
 			{
-				const auto found = transform->find(name);
-				if (found == transform->end()) return true;
-				if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
-					!(*found)[1].is_number()) return false;
-				destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
-				return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
-			};
-			if (!readPair("offset", binding.m_UVOffset) || !readPair("scale", binding.m_UVScale))
+				auto readPair = [&](const char* name, Vector2& destination) noexcept
+				{
+					const auto found = transform->find(name);
+					if (found == transform->end()) return true;
+					if (!found->is_array() || found->size() != 2 || !(*found)[0].is_number() ||
+						!(*found)[1].is_number()) return false;
+					destination = Vector2((*found)[0].get<float>(), (*found)[1].get<float>());
+					return std::isfinite(destination.m_X) && std::isfinite(destination.m_Y);
+				};
+				if (!readPair("offset", binding.m_UVOffset) || !readPair("scale", binding.m_UVScale))
+				{
+					error = "Invalid KHR_texture_transform offset or scale.";
+					return false;
+				}
+				if (const auto rotation = transform->find("rotation"); rotation != transform->end())
+				{
+					if (!rotation->is_number() || !std::isfinite(rotation->get<float>()))
+					{
+						error = "Invalid KHR_texture_transform rotation.";
+						return false;
+					}
+					binding.m_UVRotation = rotation->get<float>();
+				}
+				if (!readTexCoord(*transform, "KHR_texture_transform")) return false;
+			}
+			// The extension can replace an unsupported fallback UV set with UV0/UV1.
+			// Validate the effective index before narrowing, not either source independently.
+			if (texCoordIndex > 1u)
 			{
-				error = "Invalid KHR_texture_transform offset or scale.";
+				error = std::format("{} requires unsupported TEXCOORD{}.", texCoordSource, texCoordIndex);
 				return false;
 			}
-			if (const auto rotation = transform->find("rotation"); rotation != transform->end())
-			{
-				if (!rotation->is_number() || !std::isfinite(rotation->get<float>()))
-				{
-					error = "Invalid KHR_texture_transform rotation.";
-					return false;
-				}
-				binding.m_UVRotation = rotation->get<float>();
-			}
-			if (const auto texCoord = transform->find("texCoord"); texCoord != transform->end())
-			{
-				if (!texCoord->is_number_unsigned() || texCoord->get<uint64_t>() > 1u)
-				{
-					error = "KHR_texture_transform requires unsupported TEXCOORD set.";
-					return false;
-				}
-				binding.m_TexCoordIndex = texCoord->get<uint32_t>();
-			}
+			binding.m_TexCoordIndex = static_cast<uint32_t>(texCoordIndex);
 			return true;
 		}
 
@@ -572,15 +589,6 @@ namespace gglab
 				return false;
 			}
 			destination.m_Path = aiString(uri->get_ref<const std::string&>());
-			if (const auto texCoord = textureInfo.find("texCoord"); texCoord != textureInfo.end())
-			{
-				if (!texCoord->is_number_unsigned() || texCoord->get<uint64_t>() > 1u)
-				{
-					error = "glTF texture binding requires unsupported TEXCOORD set.";
-					return false;
-				}
-				destination.m_UVIndex = texCoord->get<unsigned int>();
-			}
 			if (!texture->contains("sampler")) return true;
 			const Json* sampler = ReadIndexedObject(gltf, "samplers", *texture, "sampler", error);
 			if (!sampler) return false;
@@ -893,20 +901,14 @@ namespace gglab
 					RegisterTextureSource(model, textureSourceIndices, canonicalTexturePath, semantic);
 				binding.m_SamplerKey = MakeSamplerKey(textureSource.m_MapMode,
 					textureSource.m_MagFilter, textureSource.m_MinFilter, settings);
-				if (textureSource.m_UVIndex > 1)
+				binding.m_TexCoordIndex = textureSource.m_UVIndex;
+				if (textureInfo && !ReadTextureTransform(*textureInfo, binding, result.m_Error)) return result;
+				if (binding.m_TexCoordIndex > 1)
 				{
 					result.m_Error = std::format(
 						"Texture '{}' requests unsupported TEXCOORD{}.",
-						canonicalTexturePath.string(), textureSource.m_UVIndex);
+						canonicalTexturePath.string(), binding.m_TexCoordIndex);
 					return result;
-				}
-				binding.m_TexCoordIndex = textureSource.m_UVIndex;
-				if (textureInfo)
-				{
-					if (!ReadTextureTransform(*textureInfo, binding, result.m_Error))
-					{
-						return result;
-					}
 				}
 			}
 

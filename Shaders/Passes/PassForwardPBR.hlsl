@@ -63,12 +63,15 @@ struct ForwardPBRPixelOutput
 #if defined(GGLAB_FORWARD_PLUS_VALIDATION) && defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	float4 MaterialDiagnosticColor : SV_Target3;
 	float4 MaterialDiagnosticCoverage : SV_Target4;
+	float4 MaterialDiagnosticLighting : SV_Target5;
 #elif defined(GGLAB_FORWARD_PLUS_VALIDATION) || defined(GGLAB_GTAO_CONTRIBUTION_OUTPUT)
 	float4 MaterialDiagnosticColor : SV_Target2;
 	float4 MaterialDiagnosticCoverage : SV_Target3;
+	float4 MaterialDiagnosticLighting : SV_Target4;
 #else
 	float4 MaterialDiagnosticColor : SV_Target1;
 	float4 MaterialDiagnosticCoverage : SV_Target2;
+	float4 MaterialDiagnosticLighting : SV_Target3;
 #endif
 #endif
 };
@@ -85,10 +88,12 @@ ForwardPBRPixelOutput MakeForwardPBRPixelOutput(float4 color, float4 legacyColor
 	output.GTAOContribution = gtaoContribution;
 #endif
 #if defined(GGLAB_MATERIAL_DIAGNOSTICS)
-	// Actual surface opacity blends both targets. Lit transparent surfaces
-	// contribute zero diagnostics while attenuating diagnostics behind them.
-	output.MaterialDiagnosticColor = float4(diagnosticColor, color.a);
-	output.MaterialDiagnosticCoverage = float4(diagnostic ? 1.0 : 0.0, 0.0, 0.0, color.a);
+	// Preserve full scene radiance for metering while tracking the part that
+	// must be replaced by display-linear diagnostics during final composition.
+	const MaterialDiagnosticOutput diagnostics = MakeMaterialDiagnosticOutput(output.Color, diagnosticColor, diagnostic);
+	output.MaterialDiagnosticColor = diagnostics.Color;
+	output.MaterialDiagnosticCoverage = diagnostics.Coverage;
+	output.MaterialDiagnosticLighting = diagnostics.Lighting;
 #endif
 	return output;
 }

@@ -1196,12 +1196,12 @@ namespace gglab
 {"bufferView":2,"componentType":5126,"count":3,"type":"VEC2"},
 {"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"}],
 )" << textureDeclarations << R"("materials":[)" << material << R"(],
-"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3})";
+"meshes":[{"primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3,"TEXCOORD_2":2})";
 				if (firstMaterial >= 0) gltf << R"(,"material":)" << firstMaterial;
 				gltf << '}';
 				if (secondMaterial >= 0)
 				{
-					gltf << R"(,{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3},"material":)"
+					gltf << R"(,{"attributes":{"POSITION":0,"NORMAL":1,"TEXCOORD_0":2,"TEXCOORD_1":3,"TEXCOORD_2":2},"material":)"
 						<< secondMaterial << '}';
 				}
 				gltf << R"(]}]})";
@@ -1257,6 +1257,40 @@ namespace gglab
 			context.Check(!largeTexCoord.Succeeded() &&
 				largeTexCoord.m_Error.find("TEXCOORD") != std::string::npos,
 				"Out-of-range UV override cannot wrap into a supported TEXCOORD set");
+			struct UVOverrideCase
+			{
+				std::string_view m_Material;
+				MaterialTextureSlot m_Slot;
+				uint32_t m_EffectiveTexCoord;
+			};
+			const std::array uvOverrides{
+				UVOverrideCase{ R"({"pbrMetallicRoughness":{"baseColorTexture":{"index":0,"texCoord":2,"extensions":{"KHR_texture_transform":{"texCoord":0}}}}})",
+					MaterialTextureSlot::BaseColor, 0 },
+				UVOverrideCase{ R"({"normalTexture":{"index":0,"texCoord":2,"extensions":{"KHR_texture_transform":{"texCoord":1}}}})",
+					MaterialTextureSlot::Normal, 1 },
+				UVOverrideCase{ R"({"extensions":{"KHR_materials_clearcoat":{"clearcoatTexture":{"index":0,"texCoord":2,"extensions":{"KHR_texture_transform":{"texCoord":0}}}}}})",
+					MaterialTextureSlot::Clearcoat, 0 },
+				UVOverrideCase{ R"({"extensions":{"KHR_materials_anisotropy":{"anisotropyTexture":{"index":0,"texCoord":2,"extensions":{"KHR_texture_transform":{"texCoord":1}}}}}})",
+					MaterialTextureSlot::Anisotropy, 1 },
+			};
+			for (const auto& input : uvOverrides)
+			{
+				writeSource(R"("extensionsUsed":["KHR_texture_transform","KHR_materials_clearcoat","KHR_materials_anisotropy"],)", input.m_Material);
+				const auto overridden = ModelImporter::Import(root / "probe.gltf", {});
+				context.Check(overridden.Succeeded() &&
+					overridden.m_Model.m_Materials.front().m_TextureBindings[static_cast<size_t>(input.m_Slot)].m_TexCoordIndex == input.m_EffectiveTexCoord,
+					std::format("Texture slot {} accepts UV{} overriding fallback UV2: {}",
+						static_cast<uint32_t>(input.m_Slot), input.m_EffectiveTexCoord, overridden.m_Error));
+			}
+			writeSource("", R"({"pbrMetallicRoughness":{"baseColorTexture":{"index":0,"texCoord":2}}})");
+			const auto unsupportedBaseUV = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!unsupportedBaseUV.Succeeded() && unsupportedBaseUV.m_Error.find("TEXCOORD2") != std::string::npos,
+				"Unsupported core UV set without an override is still rejected");
+			writeSource(R"("extensionsUsed":["KHR_texture_transform"],)",
+				R"({"pbrMetallicRoughness":{"baseColorTexture":{"index":0,"texCoord":2,"extensions":{"KHR_texture_transform":{"texCoord":2}}}}})");
+			const auto unsupportedEffectiveUV = ModelImporter::Import(root / "probe.gltf", {});
+			context.Check(!unsupportedEffectiveUV.Succeeded() && unsupportedEffectiveUV.m_Error.find("KHR_texture_transform") != std::string::npos,
+				"Unsupported effective UV set is rejected after applying the override");
 
 			writeSource(R"("extensionsUsed":["KHR_materials_ior"],)",
 				R"({"pbrMetallicRoughness":{"baseColorFactor":[0.2,0.3,0.4,1]},"extensions":{"KHR_materials_ior":{"ior":1.7}}})");

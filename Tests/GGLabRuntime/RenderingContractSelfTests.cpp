@@ -3019,9 +3019,10 @@ namespace gglab
 			for (const auto& key : pipelines.m_Keys)
 			{
 				const uint32_t count = key.m_Formats.m_RenderTargetCount;
-				validAttachments &= count >= 3 &&
-					key.m_Formats.m_RenderTargetFormats[count - 2] == RHIFormat::R16G16B16A16Float &&
-					key.m_Formats.m_RenderTargetFormats[count - 1] == RHIFormat::R16Float;
+				validAttachments &= count >= 4 && count <= 6 &&
+					key.m_Formats.m_RenderTargetFormats[count - 3] == RHIFormat::R16G16B16A16Float &&
+					key.m_Formats.m_RenderTargetFormats[count - 2] == RHIFormat::R16Float &&
+					key.m_Formats.m_RenderTargetFormats[count - 1] == RHIFormat::R16G16B16A16Float;
 				validBlend &= key.m_DepthPreset == DepthPreset::ReversedZReadOnly
 					? key.m_BlendPreset == BlendPreset::AlphaBlendAllTargets
 					: key.m_BlendPreset == BlendPreset::Default;
@@ -8529,10 +8530,12 @@ namespace gglab
 					if (diagnostics)
 					{
 						targets.m_MaterialDiagnosticColor = builder.CreateTexture("MaterialDiagnostics.Color", desc);
+						targets.m_MaterialDiagnosticLighting = builder.CreateTexture("MaterialDiagnostics.Lighting", desc);
 						desc.m_Format = RHIFormat::R16Float;
 						targets.m_MaterialDiagnosticCoverage = builder.CreateTexture("MaterialDiagnostics.Coverage", desc);
 						builder.WriteInPlace(targets.m_MaterialDiagnosticColor, RGTextureAccess::RenderTarget);
 						builder.WriteInPlace(targets.m_MaterialDiagnosticCoverage, RGTextureAccess::RenderTarget);
+						builder.WriteInPlace(targets.m_MaterialDiagnosticLighting, RGTextureAccess::RenderTarget);
 					}
 					// Seed a prior writer so the production clear must publish a new version.
 					builder.WriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
@@ -8554,14 +8557,16 @@ namespace gglab
 					{
 						builder.Read(targets.m_MaterialDiagnosticColor, RGTextureAccess::Sample);
 						builder.Read(targets.m_MaterialDiagnosticCoverage, RGTextureAccess::Sample);
+						builder.Read(targets.m_MaterialDiagnosticLighting, RGTextureAccess::Sample);
 					}
 					builder.SideEffect();
 				});
 			const bool versionsPublished = cleared.m_SceneColor.GetVersion() > original.m_SceneColor.GetVersion() &&
 				(!diagnostics || (cleared.m_MaterialDiagnosticColor.GetVersion() > original.m_MaterialDiagnosticColor.GetVersion() &&
-					cleared.m_MaterialDiagnosticCoverage.GetVersion() > original.m_MaterialDiagnosticCoverage.GetVersion()));
+					cleared.m_MaterialDiagnosticCoverage.GetVersion() > original.m_MaterialDiagnosticCoverage.GetVersion() &&
+					cleared.m_MaterialDiagnosticLighting.GetVersion() > original.m_MaterialDiagnosticLighting.GetVersion()));
 			context.Check(versionsPublished && graph.Compile(), diagnostics
-				? "Production clear publishes defined diagnostic color and coverage versions to display consumers"
+				? "Production clear publishes defined diagnostic color, coverage and lighting versions to display consumers"
 				: "Production clear preserves the original scene-only graph when diagnostics are absent");
 		}
 	}

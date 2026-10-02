@@ -14,7 +14,7 @@ namespace gglab
 		{
 			RGTextureId m_SceneColor{};
 			RGTextureViewId m_Rtv{};
-			std::array<RGTextureViewId, 2> m_DiagnosticRtvs{};
+			std::array<RGTextureViewId, 3> m_DiagnosticRtvs{};
 		};
 	}
 
@@ -41,7 +41,7 @@ namespace gglab
 				if (targets.m_MaterialDiagnosticColor.IsValid())
 				{
 					const std::array diagnostics{ &targets.m_MaterialDiagnosticColor,
-						&targets.m_MaterialDiagnosticCoverage };
+						&targets.m_MaterialDiagnosticCoverage, &targets.m_MaterialDiagnosticLighting };
 					for (size_t index = 0; index < diagnostics.size(); ++index)
 					{
 						builder.WriteInPlace(*diagnostics[index], RGTextureAccess::RenderTarget);
@@ -54,7 +54,7 @@ namespace gglab
 			{
 				auto* commandContext = executeContext.GetGraphicsCommandContext();
 				const auto rtv = executeContext.GetViewHandle(data.m_Rtv);
-				std::array<RHIRenderingAttachment, 3> attachments{};
+				std::array<RHIRenderingAttachment, 4> attachments{};
 				attachments[0] = RHIRenderingAttachment{
 					.m_View = rtv,
 					.m_LoadOp = RHIContentLoadOp::DontCare,

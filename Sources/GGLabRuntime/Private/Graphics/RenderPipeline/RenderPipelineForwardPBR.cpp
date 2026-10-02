@@ -286,6 +286,8 @@ namespace gglab
 					};
 					targets.m_MaterialDiagnosticColor =
 						builder.CreateTexture("DisplayView.MaterialDiagnosticColor", diagnosticColorDesc);
+					targets.m_MaterialDiagnosticLighting =
+						builder.CreateTexture("DisplayView.MaterialDiagnosticLighting", diagnosticColorDesc);
 					RHITextureDesc coverageDesc = diagnosticColorDesc;
 					coverageDesc.m_Format = RHIFormat::R16Float;
 					coverageDesc.m_ClearValue->m_Format = coverageDesc.m_Format;

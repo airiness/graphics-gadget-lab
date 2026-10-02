@@ -286,8 +286,8 @@ float4 TestZeroAnisotropyRetainsWorldDiagnostic() : SV_Target0
 	material.AnisotropyRotation = -PI * 0.5;
 	const SurfaceData surface = EvaluateSurface(material, 0.0.xx, 0.0.xx);
 	const AnisotropyShadingState state = BuildAnisotropyShadingState(surface,
-		float3(0.0, 0.0, 1.0), float3(0.0, 0.0, 1.0), float4(1.0, 0.0, 0.0, 1.0),
-		0.0.xxx, 0.0.xx, 0.25, 0.0, true);
+		float3(0.0, 0.0, 1.0), float3(0.0, 0.0, 1.0),
+		float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0), 0.25, 0.0, true);
 	// The negative quarter-turn maps +T to -B in this right-handed world frame.
 	const bool matches = state.Strength == 0.0 &&
 		MatchesMaterialValue(state.TangentWS, float3(0.0, -1.0, 0.0));
@@ -306,5 +306,40 @@ float4 TestActiveAnisotropyUsesBindingFlag() : SV_Target0
 	// the untextured direction rotates by 45 degrees to (1/sqrt(2), 1/sqrt(2)).
 	const bool matches = surface.AnisotropyStrength == 0.7 &&
 		all(abs(surface.AnisotropyDirectionTS - 0.7071067812.xx) < MaterialContractTolerance);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestNormalTextureFrameSelection() : SV_Target0
+{
+	MaterialTextureBindingData binding = (MaterialTextureBindingData)0;
+	binding.UVTransformU = float4(1.0, 0.0, 0.25, 0.0);
+	binding.UVTransformV = float4(0.0, 1.0, -0.5, 0.0);
+	bool matches = !RequiresDerivedNormalFrame(binding); // Translation alone keeps UV0's basis.
+	binding.TexCoordIndex = 1u;
+	matches = matches && RequiresDerivedNormalFrame(binding);
+	binding.TexCoordIndex = 0u;
+	binding.UVTransformU.xy = float2(0.0, -1.0);
+	binding.UVTransformV.xy = float2(1.0, 0.0);
+	matches = matches && RequiresDerivedNormalFrame(binding);
+	binding.UVTransformU.xy = float2(-1.0, 0.0);
+	binding.UVTransformV.xy = float2(0.0, 1.0);
+	matches = matches && RequiresDerivedNormalFrame(binding);
+	return matches ? 0.0.xxxx : 1.0.xxxx;
+}
+
+float4 TestAnisotropyUsesNormalTextureFrame() : SV_Target0
+{
+	SurfaceData surface = (SurfaceData)0;
+	surface.AnisotropyStrength = 0.8;
+	surface.AnisotropyDirectionTS = float2(1.0, 0.0);
+	// UV1 rotated relative to UV0 yields -Y as the normal-map tangent, not +X.
+	float3x3 normalFrame;
+	normalFrame[0] = float3(0.0, -1.0, 0.0);
+	normalFrame[1] = float3(1.0, 0.0, 0.0);
+	normalFrame[2] = float3(0.0, 0.0, 1.0);
+	const AnisotropyShadingState state = BuildAnisotropyShadingState(surface,
+		normalFrame[2], normalFrame[2], normalFrame, 0.25, 0.0, true);
+	const bool matches = MatchesMaterialValue(state.TangentWS, float3(0.0, -1.0, 0.0)) &&
+		MatchesMaterialValue(state.BitangentWS, float3(1.0, 0.0, 0.0));
 	return matches ? 0.0.xxxx : 1.0.xxxx;
 }

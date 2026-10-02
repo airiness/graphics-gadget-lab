@@ -2,12 +2,23 @@
 #include <Common/Common.hlsli>
 
 float3 ResolveDisplayColor(float3 storedSceneColor, float exposureScaleOverPreExposure,
-	float3 materialDiagnosticColor, float materialDiagnosticCoverage)
+	float3 materialDiagnosticColor, float materialDiagnosticCoverage,
+	float3 storedDiagnosticLighting = 0.0.xxx)
 {
-	const float3 litDisplayColor = ACESFitted(storedSceneColor * exposureScaleOverPreExposure);
-	// Forward alpha blending has already premultiplied the diagnostic color and
-	// its separate coverage in [0, 1]. The overlay never receives exposure or tone mapping.
-	const float3 displayColor = litDisplayColor * (1.0 - materialDiagnosticCoverage) +
-		materialDiagnosticColor;
-	return LinearToSRGB(displayColor);
+	if (materialDiagnosticCoverage <= 0.0)
+	{
+		return LinearToSRGB(ACESFitted(storedSceneColor * exposureScaleOverPreExposure));
+	}
+	const float litCoverage = 1.0 - saturate(materialDiagnosticCoverage);
+	float3 litDisplayColor = 0.0.xxx;
+	if (litCoverage > 0.0)
+	{
+		// Remove diagnostic surfaces' lighting, then undo its coverage before
+		// tone mapping. Otherwise transparency retains that lighting or weights
+		// the residual background twice. All three diagnostic MRTs are premultiplied.
+		const float3 residualLighting = max(storedSceneColor - storedDiagnosticLighting, 0.0.xxx);
+		litDisplayColor = ACESFitted(residualLighting *
+			(exposureScaleOverPreExposure / litCoverage)) * litCoverage;
+	}
+	return LinearToSRGB(litDisplayColor + materialDiagnosticColor);
 }

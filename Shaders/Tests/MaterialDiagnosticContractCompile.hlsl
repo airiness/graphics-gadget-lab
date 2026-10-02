@@ -18,6 +18,11 @@ bool CloseDisplayColor(float3 actual, float3 expected)
 	return all(abs(actual - expected) <= 2.0e-6.xxx);
 }
 
+float3 BlendDiagnosticTarget(float4 source, float3 destination)
+{
+	return source.rgb * source.a + destination * (1.0 - source.a);
+}
+
 float4 PSMain() : SV_Target0
 {
 	SurfaceData surface = (SurfaceData)0;
@@ -83,20 +88,86 @@ float4 PSMain() : SV_Target0
 	}
 #endif
 #elif GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE == 23
-	// Two diagnostic layers followed by a lit transparent occluder. Both MRTs
-	// use actual surface opacity, including when diagnostic coverage is zero.
+	// Two diagnostic layers followed by a lit transparent occluder. Simulate
+	// alpha blending the production MRT payloads together with scene lighting.
 	const float3 background = float3(0.25, 0.5, 0.75);
 	const float3 foreground = float3(0.75, 0.25, 0.5);
-	const float3 color = (foreground * 0.5 + background * 0.5) * 0.75;
-	const float coverage = (1.0 * 0.5 + 1.0 * 0.5) * 0.75;
-	const float3 stored = float3(1.0, 2.0, 3.0);
-	matches = CloseDisplayColor(ResolveDisplayColor(stored, 0.01, color, coverage),
-		LinearToSRGB(ACESFitted(stored * 0.01) * 0.25 + float3(0.375, 0.28125, 0.46875)));
-#else
+	const float4 first = float4(4.0, 8.0, 16.0, 1.0);
+	const float4 second = float4(8.0, 16.0, 32.0, 0.5);
+	const float4 lit = float4(1.0, 2.0, 3.0, 0.25);
+	const MaterialDiagnosticOutput firstOutput = MakeMaterialDiagnosticOutput(first, background, true);
+	const MaterialDiagnosticOutput secondOutput = MakeMaterialDiagnosticOutput(second, foreground, true);
+	const MaterialDiagnosticOutput litOutput = MakeMaterialDiagnosticOutput(lit, 0.0.xxx, false);
+	const float3 color = BlendDiagnosticTarget(litOutput.Color,
+		BlendDiagnosticTarget(secondOutput.Color, firstOutput.Color.rgb));
+	const float coverage = BlendDiagnosticTarget(litOutput.Coverage,
+		BlendDiagnosticTarget(secondOutput.Coverage, firstOutput.Coverage.rgb)).r;
+	const float3 lighting = BlendDiagnosticTarget(litOutput.Lighting,
+		BlendDiagnosticTarget(secondOutput.Lighting, firstOutput.Lighting.rgb));
+	const float3 stored = BlendDiagnosticTarget(lit, BlendDiagnosticTarget(second, first.rgb));
+	matches = CloseDisplayColor(ResolveDisplayColor(stored, 0.01, color, coverage, lighting),
+		LinearToSRGB(ACESFitted(lit.rgb * 0.01) * 0.25 + float3(0.375, 0.28125, 0.46875)));
+#elif GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE == 24
 	surface.BaseColor = float3(2.0, -1.0, 0.5);
 	float3 color;
 	matches = TryEvaluateMaterialDiagnostic(MaterialDebugViewBaseColor, surface,
 		shading, coatAA, coatNormal, anisotropy, color) && CloseColor(color, float3(1.0, 0.0, 0.5));
+#elif GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE == 25
+	// A half-transparent diagnostic over black contains no ordinary lighting,
+	// regardless of exposure or the storage pre-exposure used by Forward.
+	const float exposures[3] = { 0.01, 1.0, 100.0 };
+	[unroll]
+	for (uint index = 0; index < 3u; ++index)
+	{
+		[unroll]
+		for (uint mode = 0; mode < 2u; ++mode)
+		{
+			const float preExposure = mode == 0u ? 1.0 : exposures[index];
+			const float4 stored = float4(EncodeSceneColor(float3(4.0, 8.0, 16.0), preExposure), 0.5);
+			const MaterialDiagnosticOutput output = MakeMaterialDiagnosticOutput(stored, surface.BaseColor, true);
+			matches = matches && CloseDisplayColor(ResolveDisplayColor(stored.rgb * 0.5,
+				exposures[index] / preExposure, output.Color.rgb * 0.5,
+				output.Coverage.r * 0.5, output.Lighting.rgb * 0.5),
+				LinearToSRGB(float3(0.1, 0.2, 0.4)));
+		}
+	}
+#elif GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE == 26
+	// Preserve exactly one coverage factor on a lit background; removing
+	// diagnostic lighting must not also dim the background a second time.
+	const float3 background = float3(2.0, 4.0, 8.0);
+	const float4 stored = float4(4.0, 8.0, 16.0, 0.5);
+	const MaterialDiagnosticOutput output = MakeMaterialDiagnosticOutput(stored, surface.BaseColor, true);
+	matches = CloseDisplayColor(ResolveDisplayColor(BlendDiagnosticTarget(stored, background), 0.01,
+		output.Color.rgb * 0.5, output.Coverage.r * 0.5, output.Lighting.rgb * 0.5),
+		LinearToSRGB(ACESFitted(background * 0.01) * 0.5 + float3(0.1, 0.2, 0.4)));
+#elif GGLAB_MATERIAL_DIAGNOSTIC_TEST_CASE == 27
+	// Zero opacity leaves ordinary lighting unchanged; unit opacity removes it completely.
+	const float3 background = float3(2.0, 4.0, 8.0);
+	const float4 invisible = float4(4.0, 8.0, 16.0, 0.0);
+	const float4 opaque = float4(invisible.rgb, 1.0);
+	const MaterialDiagnosticOutput zero = MakeMaterialDiagnosticOutput(invisible, surface.BaseColor, true);
+	const MaterialDiagnosticOutput one = MakeMaterialDiagnosticOutput(opaque, surface.BaseColor, true);
+	matches = CloseDisplayColor(ResolveDisplayColor(BlendDiagnosticTarget(invisible, background), 0.01,
+		BlendDiagnosticTarget(zero.Color, 0.0.xxx), BlendDiagnosticTarget(zero.Coverage, 0.0.xxx).r,
+		BlendDiagnosticTarget(zero.Lighting, 0.0.xxx)), LinearToSRGB(ACESFitted(background * 0.01))) &&
+		CloseDisplayColor(ResolveDisplayColor(opaque.rgb, 100.0, one.Color.rgb, one.Coverage.r,
+			one.Lighting.rgb), LinearToSRGB(surface.BaseColor));
+#else
+	// Multiple transparent diagnostics over lighting retain the background's
+	// remaining 0.375 coverage and replace both diagnostic surfaces' lighting.
+	const float3 background = float3(2.0, 4.0, 8.0);
+	const float4 first = float4(4.0, 8.0, 16.0, 0.5);
+	const float4 second = float4(8.0, 16.0, 32.0, 0.25);
+	// Binary-exact colors let DXC eliminate the comparison through its ACES
+	// IsFinite intrinsic instead of retaining a one-ULP sRGB comparison at runtime.
+	const MaterialDiagnosticOutput a = MakeMaterialDiagnosticOutput(first, float3(0.25, 0.5, 1.0), true);
+	const MaterialDiagnosticOutput b = MakeMaterialDiagnosticOutput(second, float3(1.0, 0.5, 0.25), true);
+	const float3 stored = BlendDiagnosticTarget(second, BlendDiagnosticTarget(first, background));
+	const float3 color = BlendDiagnosticTarget(b.Color, BlendDiagnosticTarget(a.Color, 0.0.xxx));
+	const float coverage = BlendDiagnosticTarget(b.Coverage, BlendDiagnosticTarget(a.Coverage, 0.0.xxx)).r;
+	const float3 lighting = BlendDiagnosticTarget(b.Lighting, BlendDiagnosticTarget(a.Lighting, 0.0.xxx));
+	matches = CloseDisplayColor(ResolveDisplayColor(stored, 0.01, color, coverage, lighting),
+		LinearToSRGB(ACESFitted(background * 0.01) * 0.375 + float3(0.34375, 0.3125, 0.4375)));
 #endif
 	return matches ? 0.0.xxxx : 1.0.xxxx;
 }

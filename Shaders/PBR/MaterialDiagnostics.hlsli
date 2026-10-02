@@ -2,6 +2,25 @@
 #include <Common/SurfaceEvaluation.hlsli>
 #include <PBR/SpecularAA.hlsli>
 
+struct MaterialDiagnosticOutput
+{
+	float4 Color;
+	float4 Coverage;
+	float4 Lighting;
+};
+
+MaterialDiagnosticOutput MakeMaterialDiagnosticOutput(float4 storedSceneColor,
+	float3 diagnosticColor, bool diagnostic)
+{
+	MaterialDiagnosticOutput output;
+	// Every MRT uses surface opacity, including lit surfaces that attenuate
+	// diagnostics behind them. Lighting uses the same storage scale as scene color.
+	output.Color = float4(diagnosticColor, storedSceneColor.a);
+	output.Coverage = float4(diagnostic ? 1.0 : 0.0, 0.0, 0.0, storedSceneColor.a);
+	output.Lighting = float4(diagnostic ? storedSceneColor.rgb : 0.0.xxx, storedSceneColor.a);
+	return output;
+}
+
 // Parameter diagnostics are bounded linear Rec.709 colors, not scene radiance.
 // Lit and UnfilteredLit deliberately fall through to ordinary lighting.
 bool TryEvaluateMaterialDiagnostic(uint debugView, SurfaceData surface,
