@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
+#include <cstdint>
 #include <optional>
 
 namespace gglab
@@ -15,23 +16,36 @@ namespace gglab
 		ShadowVisualizationSettings m_Shadow;
 	};
 
-	struct GTAOSettingsOverride
+	template <typename T> struct SettingsOverride
 	{
-		GTAOSettings m_Settings{};
+		T m_Settings{};
 		bool m_IsActive = false;
+
+		void Activate(const T& settings) noexcept
+		{
+			m_Settings = settings;
+			m_IsActive = true;
+		}
+		void Reset() noexcept { *this = {}; }
 	};
 
-	struct TemporalAASettingsOverride
-	{
-		TemporalAASettings m_Settings{};
-		bool m_IsActive = false;
-	};
-
+	// DevTools-session state: overrides survive Demo/Lab switches, but are never
+	// persisted. Active blocks replace all parameters; absent scalars inherit.
 	struct ViewRenderSettingsOverrides
 	{
-		TemporalAASettingsOverride m_TemporalAA{};
-		GTAOSettingsOverride m_GTAO{};
+		SettingsOverride<TemporalAASettings> m_TemporalAA{};
+		SettingsOverride<GTAOSettings> m_GTAO{};
+		SettingsOverride<BloomSettings> m_Bloom{};
+		std::optional<ForwardLightingMode> m_ForwardLightingMode;
+		std::optional<bool> m_AerialPerspective;
 		std::optional<bool> m_ScenePreExposure;
+		// Diagnostic intent is independent of the lighting path and transport toggle.
+		std::optional<bool> m_HdrDiffValidation;
+		std::optional<bool> m_AerialProbe;
+
+		// Counts active blocks/scalars, including values equal to authoring settings.
+		[[nodiscard]] uint32_t GetActiveCount() const noexcept;
+		void ClearAll() noexcept { *this = {}; }
 	};
 
 	class DevToolsRuntime

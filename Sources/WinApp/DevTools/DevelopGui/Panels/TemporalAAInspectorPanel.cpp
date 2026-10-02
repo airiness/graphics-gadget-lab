@@ -226,18 +226,21 @@ namespace gglab
 				bool active = overrides->m_TemporalAA.m_IsActive;
 				if (ImGui::Checkbox("Override Active Profile##TemporalAA", &active))
 				{
-					if (active && !overrides->m_TemporalAA.m_IsActive)
+					if (active)
 					{
-						overrides->m_TemporalAA.m_Settings = snapshot->m_AuthoringSettings;
+						overrides->m_TemporalAA.Activate(snapshot->m_AuthoringSettings);
 					}
-					overrides->m_TemporalAA.m_IsActive = active;
+					else
+					{
+						overrides->m_TemporalAA.Reset();
+					}
 				}
 				if (active)
 				{
 					DrawSettings(overrides->m_TemporalAA.m_Settings);
 					if (ImGui::Button("Reset Override to Active Profile"))
 					{
-						overrides->m_TemporalAA.m_Settings = snapshot->m_AuthoringSettings;
+						overrides->m_TemporalAA.Activate(snapshot->m_AuthoringSettings);
 					}
 				}
 				else

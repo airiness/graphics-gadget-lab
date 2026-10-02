@@ -383,11 +383,14 @@ namespace gglab
 				bool overrideActive = overrides->m_GTAO.m_IsActive;
 				if (ImGui::Checkbox("Override Active Profile##GTAO", &overrideActive))
 				{
-					if (overrideActive && !overrides->m_GTAO.m_IsActive)
+					if (overrideActive)
 					{
-						overrides->m_GTAO.m_Settings = snapshot->m_AuthoringSettings;
+						overrides->m_GTAO.Activate(snapshot->m_AuthoringSettings);
 					}
-					overrides->m_GTAO.m_IsActive = overrideActive;
+					else
+					{
+						overrides->m_GTAO.Reset();
+					}
 				}
 				if (!overrides->m_GTAO.m_IsActive)
 				{
@@ -401,7 +404,7 @@ namespace gglab
 					DrawSettingsControls(overrides->m_GTAO.m_Settings);
 					if (ImGui::Button("Reset Override to Active Profile"))
 					{
-						overrides->m_GTAO.m_Settings = snapshot->m_AuthoringSettings;
+						overrides->m_GTAO.Activate(snapshot->m_AuthoringSettings);
 					}
 				}
 			}
