@@ -39,3 +39,15 @@ Images are compressed SDR references with window chrome and pointer excluded.
 | Shadow Stairs | `(5.5, 3.4, -14)` | `(0, 2.8, 1)` | 39.7607002 |
 | Interior / Exterior | `(-12, 4, -2.9)` | `(2, 2.5, -5)` | 45.7473259 |
 | Sky / Horizon | `(20, 5.5, -26)` | `(0, 3, 0)` | 45.7473259 |
+
+Machine-readable [capture evidence](capture-evidence.json) retains file identities,
+method/crop metadata and recorded diagnostics.
+
+## Observations
+
+- Concrete shows warm variation and shallow relief in both backends.
+
+## Known limitations
+
+- Existing PCF bands and the finite-ocean horizon gap remain visible.
+- Static frames do not establish temporal stability.

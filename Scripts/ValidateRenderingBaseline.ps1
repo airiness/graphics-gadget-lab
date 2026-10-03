@@ -17,8 +17,8 @@ if (-not [System.IO.Path]::IsPathRooted($ManifestPath)) {
     $ManifestPath = Join-Path $RootDir $ManifestPath
 }
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
-if ($manifest.schemaVersion -notin @(1, 2)) {
-    throw "Unsupported rendering baseline manifest version."
+if ($manifest.schemaVersion -ne 2) {
+    throw "Unsupported rendering baseline manifest version. Use schema version 2 for Runtime-only validation; legacy authoring records require separate authoring validation."
 }
 
 function Test-RecordedFiles {

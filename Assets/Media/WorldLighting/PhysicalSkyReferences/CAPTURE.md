@@ -31,3 +31,16 @@ travel. Images are compressed SDR references.
 | --- | --- | --- | --- | --- | --- |
 | `CAM_RoughnessSweep` | `(48, 3.5, -13)` / `(48, 2, 0)` | 0.6509917105 | 0.1 / 100 | `normalize(0, -1, 1)` | Disabled |
 | `CAM_SkyHorizon` | `(20, 5.5, -26)` / `(0, 3, 0)` | 0.7984415392 | 0.1 / 150 | `normalize(-1, -0.85, 0.35)` | Enabled; PCF |
+
+Machine-readable [capture evidence](capture-evidence.json) retains file identities,
+method/crop metadata and recorded diagnostics.
+
+## Observations
+
+- The sweep shows six roughness levels in metallic and dielectric rows.
+- Sky and shoreline composition are visually consistent between DX12 and Vulkan.
+
+## Known limitations
+
+- The finite ocean leaves a black gap below the physical horizon.
+- SDR screenshots do not establish quantitative BRDF or atmosphere accuracy.

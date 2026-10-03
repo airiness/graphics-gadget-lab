@@ -37,3 +37,15 @@ Images are compressed SDR references with window chrome and pointer excluded.
 | Courtyard | `(23, 19, -28)` | `(-1, 1.8, -2)` | 37.2990761 |
 | Shadow Stairs | `(5.5, 3.4, -14)` | `(0, 2.8, 1)` | 39.7607002 |
 | Sky / Horizon | `(20, 5.5, -26)` | `(0, 3, 0)` | 45.7473259 |
+
+Machine-readable [capture evidence](capture-evidence.json) retains file identities,
+method/crop metadata and recorded diagnostics.
+
+## Observations
+
+- Both backends show the refined shoreline, boulders, service equipment and fittings.
+
+## Known limitations
+
+- Existing PCF bands and the finite-ocean horizon gap remain visible.
+- Changed content prevents a renderer-only A/B comparison.

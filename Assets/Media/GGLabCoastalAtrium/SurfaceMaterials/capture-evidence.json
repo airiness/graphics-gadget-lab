@@ -1,0 +1,526 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.capture.surfacematerials",
+  "captureDate": "2026-10-03",
+  "timeZone": "UTC",
+  "provenance": {
+    "recoveredRecord": {
+      "path": "Assets/Media/GGLabCoastalAtrium/SurfaceMaterials/CAPTURE.md",
+      "gitBlob": "5adc985d5ace829186fb3ecca9c16f444dbb8aa2"
+    },
+    "unknownValues": "null means not recorded; no replacement capture or rebuilt-binary identity is inferred.",
+    "rawAvailability": "Unarchived raw identities are fingerprints only; no local workspace path is required."
+  },
+  "captures": [
+    {
+      "path": "courtyard-dx12.png",
+      "sha256": "7992ce3aecf6122f32b9a6358e8eb91d2faae6eadab890a93e8da6e52d621484",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "courtyard-dx12-window.jpg",
+        "sha256": "4d885ef20855de6c7b90f7dcdda079b0a87e3e8102527c1d234808075ccf6b26",
+        "availability": "notArchived"
+      }
+    },
+    {
+      "path": "shadow-stairs-dx12.png",
+      "sha256": "282a3c6bc03f90ff5d20bfe9c167090e26ceb82acd867abb99bb7b50c04a5d42",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_ShadowStairs",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "shadow-stairs-dx12-window.jpg",
+        "sha256": "9361df77dc86e145d53fd746b5621a90f7fe95a23ceb19f3dc759d300ec2e314",
+        "availability": "notArchived"
+      }
+    },
+    {
+      "path": "paving-surface-dx12.png",
+      "sha256": "a463517d690d8537df66d232f7f5ee6146c0aea53cec03f6d1fd07acd0d826b5",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_PavingSurface",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "paving-surface-dx12-window.jpg",
+        "sha256": "6c463e7ad755d5a13835dd1538c229c1beab4e89203b53ddbcca3aa93f7f63e1",
+        "availability": "notArchived"
+      }
+    },
+    {
+      "path": "railing-detail-dx12.png",
+      "sha256": "780c30148d29d964138df4508729206f6869de618bca15921f467b7bf2396b1f",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_RailingDetail",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "railing-detail-dx12-window.jpg",
+        "sha256": "6b0872730b646284c1c23405077e8eb99df23ed241f8147bb2bd27f951a62d9e",
+        "availability": "notArchived"
+      }
+    },
+    {
+      "path": "upholstery-surface-dx12.png",
+      "sha256": "33d537d0a4d317e3cbae12ba42d8aabf45351fdd3098fc9430c594099e0632be",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_UpholsterySurface",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "upholstery-surface-dx12-window.jpg",
+        "sha256": "b56fa69c911e831e6ac7ade7176936fc75cae72b37ecbeafd72f0e3c16532d14",
+        "availability": "notArchived"
+      }
+    },
+    {
+      "path": "upholstery-weave-dx12.png",
+      "sha256": "d248176c2358775bfe75580208e77a76b099569c566eee6653681f1715cfcef5",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_UpholsteryWeave",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": "upholstery-weave-dx12-window.jpg",
+        "sha256": "015894d85cb61ec9685d41904493ae29b2fa69faf6f482597ccb8dc0e1b2083a",
+        "availability": "notArchived"
+      }
+    }
+  ],
+  "inputIdentity": {
+    "configuration": "Debug",
+    "platform": "x64",
+    "recordedFiles": [
+      {
+        "label": "Debug WinApp executable",
+        "sha256": "fc9abbead8ad6f8e96eb288ab7d2261e3272c66fa822d63d001d903dbe2a5417",
+        "kind": "binary",
+        "availability": "notArchived",
+        "fileName": "GraphicsGadgetLab.exe"
+      },
+      {
+        "label": "Debug development shader compiler",
+        "sha256": "d53ca7f3ed52bf1a940a1f999b6d42b45df6b2b51110659f45faa80be13f4256",
+        "kind": "binary",
+        "availability": "notArchived",
+        "fileName": "gglab-shaderc.exe"
+      },
+      {
+        "label": "Runtime reference view header",
+        "sha256": "3d52c70cd8b22b9b773288f4763e492336388c3324ea93ce1dfa1bc614f5283b",
+        "kind": "cameraSource",
+        "repository": "runtime",
+        "path": "Sources/WinApp/Application/Demo/CoastalAtriumReferenceViews.h"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf",
+        "sha256": "2bddb863ef030d7bf56822b301eb8d0dc584167260ad1208ebeef4b7a4a29863"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.bin",
+        "sha256": "741fc6668d7ee5bbc55a1cc80dc61dd3b90de8b316bde5e0e88604dbd89f0f1b"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_BaseColor.png",
+        "sha256": "a72bce9124eafc7f4f3153afc8284a868f0f3eb1f11f8c6bd1857e588edb9a4c"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_Normal.png",
+        "sha256": "6b9f1617caac4ef09e2e3a26ce585afe8e3d22e23e193efd750ce4e5de9ed0c1"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_MetallicRoughness.png",
+        "sha256": "9ac7b9afe3777e152a2b97839924f3431fc9309089be82fad04dd55529a4bb18"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_BaseColor.png",
+        "sha256": "9ba6d6555520f77bb07fcb519730eb6363fc18b5e2553a2b9d69679dbd2c2fb8"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_Normal.png",
+        "sha256": "b517b49532f0da891df1da937adaa76028f02835c14ea19a568601b5d739d962"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_MetallicRoughness.png",
+        "sha256": "3f4bad3b871c0390c15893af2596a7e95f934817bb2ec048905d47a1241f33f0"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_BaseColor.png",
+        "sha256": "cc09b179567bac43a80d988a64d9089b7c00ea6aea5da00db1ac38b337936064"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_Normal.png",
+        "sha256": "b027121d763390e6687f134c74b7ceaac0da4ab92a750536e582e841d15bb476"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_MetallicRoughness.png",
+        "sha256": "fc86a16fe6f9bf0613593de00471673d0c625514934cea89a4d4c52f42024a1f"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Upholstery_BaseColor.png",
+        "sha256": "8b609f23151ddc922cd926183f7aeb1b3e099ac0b8177d7553a6de943fa54f08"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Upholstery_Normal.png",
+        "sha256": "5f433933356f2de09dcf550a2cc1e1267ce74287d5b7a89795b08a73dcf4b3d6"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Upholstery_MetallicRoughness.png",
+        "sha256": "15ea1ce5c4fc92f21e5588929b044b903ec137fbf15e44abcdb995a571ff1964"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_Normal.png",
+        "sha256": "d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_BaseColor.png",
+        "sha256": "56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_MetallicRoughness.png",
+        "sha256": "4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      }
+    ],
+    "authoringSourceFingerprints": [
+      {
+        "label": "Authoring-source fingerprint",
+        "sha256": "bd2f21b56a43075a5ac4a5c1902b3bccc48dbd3d7dc01bd561b75c8c4ee00678",
+        "availability": "fingerprintOnly"
+      }
+    ],
+    "shaderSourceTree": "1167f85ebf7fd2441e6e973415ed1dc502befea3",
+    "historicalCodeRevision": null,
+    "assetContractBlob": "5f6260d7bdb494ac6893ae64844614150f47050d",
+    "buildToolchain": {
+      "visualStudio": "2022 Community",
+      "msbuildHost": "x64",
+      "preferredToolArchitecture": "x64"
+    },
+    "captureWorkingTreeChanges": "Imported surface bundle, four supplemental camera definitions and expanded import checks; renderer and shader sources unchanged"
+  },
+  "recordedRenderSettings": [
+    {
+      "setting": "Scene / model transform",
+      "value": "Demo.Playground.CoastalAtrium / identity"
+    },
+    {
+      "setting": "Swapchain and internal extent",
+      "value": "1920 x 1080"
+    },
+    {
+      "setting": "Pipeline / lighting",
+      "value": "Forward PBR / Forward+"
+    },
+    {
+      "setting": "Material view / Specular AA",
+      "value": "Lit / retained code defaults"
+    },
+    {
+      "setting": "World Sun ray direction",
+      "value": "Normalized (-1, -0.85, 0.35)"
+    },
+    {
+      "setting": "Physical Sun illuminance / angular radius",
+      "value": "120000 lux / 0.2666 degrees"
+    },
+    {
+      "setting": "Atmosphere",
+      "value": "Enabled; Earth defaults"
+    },
+    {
+      "setting": "Environment source / skybox",
+      "value": "Physical Sky / enabled"
+    },
+    {
+      "setting": "Published World Lighting",
+      "value": "Active/requested generation 3; zero retiring persistent textures"
+    },
+    {
+      "setting": "IBL intensity / yaw",
+      "value": "Calibrated 1 / 0 degrees; world aligned"
+    },
+    {
+      "setting": "IBL environment",
+      "value": "512 x 512 x 6 FP32; ten mips"
+    },
+    {
+      "setting": "Exposure",
+      "value": "Manual EV100 15; compensation 0, reapplied after each reference restoration"
+    },
+    {
+      "setting": "TAA / GTAO / bloom",
+      "value": "Disabled by the Atrium Demo profile"
+    },
+    {
+      "setting": "Shadows and other rendering settings",
+      "value": "Retained code defaults"
+    }
+  ],
+  "cameras": [
+    {
+      "id": "CAM_Courtyard",
+      "profileVersion": 1,
+      "position": [
+        23,
+        19,
+        -28
+      ],
+      "target": [
+        -1,
+        1.8,
+        -2
+      ],
+      "verticalFovRadians": 0.6509917105,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_ShadowStairs",
+      "profileVersion": 1,
+      "position": [
+        5.5,
+        3.4,
+        -14
+      ],
+      "target": [
+        0,
+        2.8,
+        1
+      ],
+      "verticalFovRadians": 0.6939552104,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_PavingSurface",
+      "profileVersion": 1,
+      "position": [
+        1.8,
+        3.65,
+        -4.5
+      ],
+      "target": [
+        -0.2,
+        2.4,
+        -1.5
+      ],
+      "verticalFovRadians": 0.4426288847,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_RailingDetail",
+      "profileVersion": 1,
+      "position": [
+        5.1,
+        2.15,
+        -12.1
+      ],
+      "target": [
+        3.58,
+        1.55,
+        -10.325
+      ],
+      "verticalFovRadians": 0.5631968436,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_UpholsterySurface",
+      "profileVersion": 1,
+      "position": [
+        7.5,
+        3.95,
+        -3.35
+      ],
+      "target": [
+        6.35,
+        3.1,
+        -1.1
+      ],
+      "verticalFovRadians": 0.3641052332,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_UpholsteryWeave",
+      "profileVersion": 1,
+      "position": [
+        5.85,
+        3.5,
+        -1.85
+      ],
+      "target": [
+        5.75,
+        3.065,
+        -1.22
+      ],
+      "verticalFovRadians": 0.237118016,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    }
+  ],
+  "method": {
+    "acquisition": "Desktop window capture after final-color tone mapping and DevTools composition",
+    "sourceEncoding": "jpeg",
+    "rawExtent": [
+      1922,
+      1112
+    ],
+    "renderExtent": [
+      1920,
+      1080
+    ],
+    "cropRectangle": {
+      "x": 1,
+      "y": 100,
+      "width": 1920,
+      "height": 1010,
+      "coordinateSpace": "decoded raw image pixels",
+      "bounds": "x/y inclusive; x+width/y+height exclusive"
+    },
+    "resampled": false,
+    "retouched": false,
+    "pointerPlacement": "Excluded title bar",
+    "overlays": "Panels closed",
+    "quantitativeHDR": false,
+    "encodingNote": "PNG archive encoding does not recover detail lost by JPEG acquisition.",
+    "launch": "Desktop helper, default writable application state, then Demo selector from Start to Coastal Atrium",
+    "readiness": "Model/texture upload and requested Physical Sky publication completed before accepting the image",
+    "cameraRestoration": "Named reference views; reapply Manual EV100 15 after Atrium profile 1 restores legacy EV0"
+  },
+  "backends": [
+    {
+      "backend": "dx12",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": "32.0.16.1714",
+      "validation": {
+        "requested": null,
+        "messengerEnabled": null,
+        "errors": null,
+        "warnings": null
+      },
+      "runtimeHealth": "healthy",
+      "exitCode": null,
+      "featureLevel": "12_2",
+      "resourceManagerFailures": {
+        "creation": 0,
+        "import": 0,
+        "invalidUse": 0,
+        "destroy": 0,
+        "staleHandle": 0,
+        "doubleDestroy": 0
+      }
+    },
+    {
+      "backend": "vulkan",
+      "captureState": "pending",
+      "validation": null,
+      "reason": "Screenshot tool could not target the command-line window; alternative Visual Studio application-access request timed out."
+    }
+  ],
+  "quantitativeMeasurements": [],
+  "observations": [
+    "Paving joints and mineral variation remain readable.",
+    "Railings show a dark satin finish; cushions show neutral woven fabric."
+  ],
+  "knownLimitations": [
+    "Vulkan captures and camera-motion checks remain pending.",
+    "Existing PCF bands and the finite-ocean horizon gap remain visible."
+  ]
+}

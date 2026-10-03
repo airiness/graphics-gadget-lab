@@ -34,3 +34,16 @@ Matching Vulkan images remain pending.
 | Shadows | Default directional PCF |
 
 Images are compressed SDR references with window chrome and pointer excluded.
+
+Machine-readable [capture evidence](capture-evidence.json) retains file identities,
+method/crop metadata and recorded diagnostics.
+
+## Observations
+
+- Paving joints and mineral variation remain readable.
+- Railings show a dark satin finish; cushions show neutral woven fabric.
+
+## Known limitations
+
+- Vulkan captures and camera-motion checks remain pending.
+- Existing PCF bands and the finite-ocean horizon gap remain visible.

@@ -32,3 +32,15 @@ camera poses and full render settings for historical comparisons.
 | Receiver / rasterizer / slope-scaled bias | 0 / 360 / 0.6 |
 
 Images are compressed SDR references with window chrome; cursor highlights may remain.
+
+Machine-readable [capture evidence](capture-evidence.json) retains file identities,
+method/crop metadata and recorded diagnostics.
+
+## Observations
+
+- The original PCF self-shadowing waves are retained.
+
+## Known limitations
+
+- Environment lighting is disabled in this historical preset.
+- Static SDR frames and isolated Debug timings are not pixel goldens or performance benchmarks.

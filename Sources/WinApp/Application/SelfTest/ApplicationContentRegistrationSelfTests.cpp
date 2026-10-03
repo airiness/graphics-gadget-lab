@@ -574,7 +574,10 @@ namespace gglab
 				std::format("Coastal atrium geometry and all surface textures import "
 					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
 					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
-			if (!atrium.Succeeded()) return;
+			if (!atrium.Succeeded() || atrium.m_Model.m_TextureSources.size() != 15)
+			{
+				return;
+			}
 			const auto atriumTextures = CheckImportedTextures(context, atrium.m_Model);
 			constexpr std::array<std::pair<std::string_view, size_t>, 11> atriumTriangles = { {
 				{ "MAT_Concrete", 3054 },

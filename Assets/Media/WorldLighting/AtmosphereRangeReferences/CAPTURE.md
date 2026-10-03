@@ -25,3 +25,15 @@ The paired 1 km images differ only in the Aerial Perspective setting.
 | TAA | Disabled for the 1 km pair; enabled for the 25 m image |
 
 Lab controls remain visible in these compressed SDR images.
+
+Machine-readable [capture evidence](capture-evidence.json) retains image identities,
+method/crop metadata and the six-distance quantitative GPU readback.
+
+## Observations
+
+- Enabling aerial perspective visibly lightens the dark 1 km patch while preserving the sky control.
+
+## Known limitations
+
+- The six readback samples do not bound transport integration or atlas interpolation error.
+- Altitude changes and moving TAA sequences remain untested.

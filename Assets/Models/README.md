@@ -29,6 +29,8 @@ and visual checks. CPU import tests do not establish GPU rendering correctness.
 
 For a frozen rendering comparison, use that capture record's manifest,
 exported assets and rendering settings. The [Coastal Atrium baseline](../Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
-documents `Scripts/ValidateRenderingBaseline.ps1`, which checks Runtime asset
-and screenshot hashes within this repository. Authoring preservation checks
-belong to the authoring workspace.
+links the frozen manifest. `Scripts/ValidateRenderingBaseline.ps1` accepts
+baseline schema version 2 and checks Runtime asset and screenshot hashes within
+this repository. The [capture evidence format](../Media/CAPTURE_EVIDENCE.md)
+describes investigation records. Authoring preservation checks belong to the
+authoring workspace.
