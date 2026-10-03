@@ -570,7 +570,7 @@ namespace gglab
 			const auto atrium = ModelImporter::Import(ResolveAssetPath(assetRoot,
 				"Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf"), {});
 			context.Check(atrium.Succeeded() && !atrium.m_Model.m_MeshInstances.empty() &&
-				atrium.m_Model.m_TextureSources.size() == 12,
+				atrium.m_Model.m_TextureSources.size() == 15,
 				std::format("Coastal atrium geometry and all surface textures import "
 					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
 					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
@@ -672,6 +672,57 @@ namespace gglab
 				}
 			}
 			context.Check(concreteBindingsValid, "Refined concrete retains UV0 factors and three 1024-square semantic textures with complete mip chains");
+			struct SurfaceReference
+			{
+				std::string_view m_Name;
+				std::string_view m_Prefix;
+				float m_Metallic;
+			};
+			constexpr std::array<SurfaceReference, 3> surfaces = { {
+				{ "MAT_Paving", "Stone", 0.0f },
+				{ "MAT_Structure", "Metal", 1.0f },
+				{ "MAT_LoungeUpholstery", "Upholstery", 0.0f },
+			} };
+			for (const auto& surface : surfaces)
+			{
+				const auto material = std::ranges::find(atrium.m_Model.m_Materials,
+					surface.m_Name, &ImportedMaterial::m_Name);
+				bool valid = material != atrium.m_Model.m_Materials.end();
+				if (valid)
+				{
+					const auto& properties = material->m_Properties;
+					valid &= properties.m_MetallicFactor == surface.m_Metallic &&
+						properties.m_RoughnessFactor == 1.0f && properties.m_NormalScale == 1.0f &&
+						properties.m_ClearcoatFactor == 0.0f && properties.m_AnisotropyStrength == 0.0f;
+					for (size_t channel = 0; channel < 4; ++channel)
+						valid &= properties.m_BaseColor[channel] == 1.0f;
+					for (const auto& [slot, suffix] : std::array{
+						std::pair{ MaterialTextureSlot::BaseColor, "BaseColor" },
+						std::pair{ MaterialTextureSlot::Normal, "Normal" },
+						std::pair{ MaterialTextureSlot::MetallicRoughness, "MetallicRoughness" } })
+					{
+						const auto& binding = material->m_TextureBindings[static_cast<size_t>(slot)];
+						valid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < atriumTextures.size() &&
+							binding.m_SamplerKey.m_AddressU == RHITextureAddressMode::Wrap &&
+							binding.m_SamplerKey.m_AddressV == RHITextureAddressMode::Wrap;
+						if (binding.m_TextureIndex < atriumTextures.size())
+						{
+							const auto& source = atrium.m_Model.m_TextureSources[binding.m_TextureIndex];
+							const auto& texture = atriumTextures[binding.m_TextureIndex];
+							valid &= source.m_CanonicalPath.filename() == std::format("{}_{}.png", surface.m_Prefix, suffix) &&
+								source.m_Semantic == GetMaterialTextureSlotSemantic(slot) &&
+								texture.m_Extent.m_Width == 1024 && texture.m_Extent.m_Height == 1024 && texture.m_MipLevels == 11;
+						}
+					}
+					for (const auto slot : { MaterialTextureSlot::Occlusion, MaterialTextureSlot::Emissive,
+						MaterialTextureSlot::Clearcoat, MaterialTextureSlot::ClearcoatRoughness,
+						MaterialTextureSlot::ClearcoatNormal, MaterialTextureSlot::Anisotropy })
+						valid &= material->m_TextureBindings[static_cast<size_t>(slot)].m_TextureIndex ==
+							ImportedMaterialTextureBinding::InvalidTextureIndex;
+				}
+				context.Check(valid, std::format("{} retains opaque isotropic UV0 factors, repeating semantic textures and complete 1024-square mip chains",
+					surface.m_Name));
+			}
 			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
 				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
 			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
@@ -898,7 +949,8 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			context.Check(registered, "Three coastal atrium reference cameras register in runtime coordinates");
+			context.Check(registered && CoastalAtriumReferenceViews.size() == 8,
+				"Four established and four surface-detail coastal atrium views register in runtime coordinates");
 			if (!registered) return;
 			for (const auto& reference : CoastalAtriumReferenceViews)
 			{
