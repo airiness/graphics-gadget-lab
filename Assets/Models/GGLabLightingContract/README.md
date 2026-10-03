@@ -151,7 +151,7 @@ pixel golden tests or quantitative BRDF/IBL accuracy measurements.
 
 ## Physical Sky screenshots
 
-[Capture settings and identities](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
+[Capture settings](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
 record the paired, cursor-free SDR captures of `CAM_RoughnessSweep`:
 [DirectX 12](../../Media/GGLabLightingContract/PhysicalSky/roughness-sweep-dx12.png)
 and [Vulkan](../../Media/GGLabLightingContract/PhysicalSky/roughness-sweep-vulkan.png).

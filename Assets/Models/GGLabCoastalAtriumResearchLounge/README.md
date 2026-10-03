@@ -107,9 +107,8 @@ Runtime camera views pass target/projection and repeat-restoration checks.
 Debug DX12 production startup resolved fifteen textures, completed their GPU
 uploads and activated the Atrium with fourteen imported meshes and nineteen
 instances. Six [DX12 surface captures](../../Media/GGLabCoastalAtrium/SurfaceMaterials/CAPTURE.md)
-record Physical Sun/Sky at EV100 15 and a healthy Runtime summary with zero
-resource-manager failures. Matching Vulkan presentation and camera-motion
-checks remain pending; the capture record explains the tool launch limitation.
+record Physical Sun/Sky at EV100 15. Matching Vulkan presentation and camera-motion
+checks remain pending.
 
 ## Runtime entry
 

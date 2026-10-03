@@ -158,7 +158,7 @@ does not change sky/ground rendering or supply distant atmospheric geometry.
 
 ## Screenshots
 
-[Physical Sky capture settings and identities](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
+[Physical Sky capture settings](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
 record `CAM_SkyHorizon` at EV100 15:
 [DirectX 12](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-dx12.png)
 and [Vulkan](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-vulkan.png).
@@ -167,7 +167,7 @@ exclude window chrome and the top menu without resampling.
 
 [Rendering Baseline 1](../../Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
 provides frozen asset and renderer references, capture settings, three paired
-DX12/Vulkan views, and GPU timing observations.
+DX12/Vulkan views, and archived diagnostic panels.
 
 ### Basic materials
 
