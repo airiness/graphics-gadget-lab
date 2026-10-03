@@ -7,40 +7,26 @@ Load the `.gltf` with its adjacent `.bin` and `Textures/` directory.
 
 This bundle retains the earlier content reference. The current `--demo atrium`
 loads [the Research Lounge bundle](../GGLabCoastalAtriumResearchLounge/README.md).
-Existing captures below retain their original export identity. Reproducing this
-older export requires the Content source identified by the hashes below; the
-current saved source includes the coated lounge and brushed frame.
+Existing captures below retain their original export identity. Use the recorded
+exported files for those comparisons; the current Demo bundle also includes
+the coated lounge, brushed frame and subsequent coastal/material refinements.
 
 ## Source
 
-- Repository: `GraphicsGadgetLabContent`.
-- Saved source: `Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend`.
-- Generator: `Scripts/create_coastal_atrium.py`.
-- Material authoring: `Scripts/apply_coastal_atrium_materials.py`.
-- Exporter: `Scripts/export_gltf.py`, Blender 5.1.1 / glTF I/O 5.1.19.
-- Source SHA-256: `709cf13a6ef7b827736b7978c949608659624b519b882dc2519ae7920a9cbfaf`.
+- Exporter: Blender 5.1.1 / glTF I/O 5.1.19.
+- Authoring-source SHA-256 (provenance): `709cf13a6ef7b827736b7978c949608659624b519b882dc2519ae7920a9cbfaf`.
 - glTF SHA-256: `7bcfc2ecf7e4f48446128d73af936d5147dafd8756d83ed56ce24ce892c14192`.
 - Buffer SHA-256: `b31b36f65c0eb2aaca8ca280aa50ebe2446138bcf0ef4c957c4e4bcffbe52e7e`.
 
 No third-party assets are used. The island import fixture is a separate asset.
 
-This export matches the Content working-tree camera extension based on revision
-`9fcc3132834cfd3de3234d89607583ea5ce84a9d`, identified by the hashes above.
-`Scripts/extend_lighting_references.py --scene atrium` adds `CAM_SkyHorizon`
-without regenerating the saved source. Geometry buffer, nine image files,
+This export adds the `CAM_SkyHorizon` reference to the earlier scene.
+Geometry buffer, nine image files,
 materials, transforms, original cameras and the reference Sun are preserved.
 
-From the code repository root:
-
-```powershell
-& 'C:/Program Files/Blender Foundation/Blender 5.1/blender.exe' --background `
-  --python-exit-code 1 --python ../GraphicsGadgetLabContent/Scripts/export_gltf.py -- `
-  --input ../GraphicsGadgetLabContent/Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend `
-  --output Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.gltf
-```
-
-Export reads the saved `.blend` without replacing it. Runtime content is loaded
-when entering the Demo; automatic file watching is not provided.
+The [bundle contract](../README.md) describes installed-content validation.
+Runtime content is loaded when entering the Demo; automatic file watching is
+not provided. Historical comparisons use their frozen bundle, not a re-export.
 
 ## Basic materials
 
@@ -172,7 +158,7 @@ does not change sky/ground rendering or supply distant atmospheric geometry.
 
 ## Screenshots
 
-[Physical Sky capture settings and identities](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
+[Physical Sky capture settings](../../Media/WorldLighting/PhysicalSkyReferences/CAPTURE.md)
 record `CAM_SkyHorizon` at EV100 15:
 [DirectX 12](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-dx12.png)
 and [Vulkan](../../Media/GGLabCoastalAtrium/PhysicalSky/sky-horizon-vulkan.png).
@@ -181,7 +167,7 @@ exclude window chrome and the top menu without resampling.
 
 [Rendering Baseline 1](../../Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md)
 provides frozen asset and renderer references, capture settings, three paired
-DX12/Vulkan views, and GPU timing observations.
+DX12/Vulkan views, and archived diagnostic panels.
 
 ### Basic materials
 

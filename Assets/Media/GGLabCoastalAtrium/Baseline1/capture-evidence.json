@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.capture.baseline1",
+  "captureDate": "2026-09-20",
+  "timeZone": "Asia/Tokyo",
+  "provenance": {
+    "recoveredRecord": {
+      "path": "Assets/Media/GGLabCoastalAtrium/Baseline1/CAPTURE.md",
+      "gitBlob": "1427b676b06c59cb0b4c946a516dfa0fbf38484f"
+    },
+    "unknownValues": "null means not recorded; no replacement capture or rebuilt-binary identity is inferred.",
+    "rawAvailability": "Unarchived raw identities are fingerprints only; no local workspace path is required."
+  },
+  "captures": [
+    {
+      "path": "dx12-courtyard.png",
+      "sha256": "147b11ef0568166e3960bc3dff0097812e50a97e9f26102fbac2ab50956f7f25",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "dx12-courtyard.png",
+        "sha256": "147b11ef0568166e3960bc3dff0097812e50a97e9f26102fbac2ab50956f7f25",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:27:36.8042866Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "vulkan-courtyard.png",
+      "sha256": "71b39c5080e37b7126b4bfd204f5c113a0438a437e267e96ebaecffd5aa1fe7b",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-courtyard.png",
+        "sha256": "71b39c5080e37b7126b4bfd204f5c113a0438a437e267e96ebaecffd5aa1fe7b",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:32:15.0380249Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "dx12-shadow-stairs.png",
+      "sha256": "f8375f1b717143f5d8430c2659077a1d6832c03446712ee736a9261cd35dcfe7",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_ShadowStairs",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "dx12-shadow-stairs.png",
+        "sha256": "f8375f1b717143f5d8430c2659077a1d6832c03446712ee736a9261cd35dcfe7",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:28:49.1606902Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "vulkan-shadow-stairs.png",
+      "sha256": "7e5cd91db02d8ec7ddf7158da0fe290eb022707ca28b83a6b1f364264a117c0d",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_ShadowStairs",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-shadow-stairs.png",
+        "sha256": "7e5cd91db02d8ec7ddf7158da0fe290eb022707ca28b83a6b1f364264a117c0d",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:35:05.3838963Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "dx12-interior-exterior.png",
+      "sha256": "ffc3251282ced4b4b69499e8a311f294e58fa9064d8487f49ce8661e4b2b033b",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_InteriorExterior",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "dx12-interior-exterior.png",
+        "sha256": "ffc3251282ced4b4b69499e8a311f294e58fa9064d8487f49ce8661e4b2b033b",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:30:14.3896744Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "vulkan-interior-exterior.png",
+      "sha256": "f248bc9b3e905398b245f0596f5ea32fbf04c0b586d186e1e1f2212fd7794765",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-interior-exterior.png",
+        "sha256": "f248bc9b3e905398b245f0596f5ea32fbf04c0b586d186e1e1f2212fd7794765",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:39:25.7295199Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "reference"
+    },
+    {
+      "path": "vulkan-courtyard-repeat.png",
+      "sha256": "547a2fc428ca10418d644f1c4280e44a680696a13a6c885769192babf2be822a",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-courtyard-repeat.png",
+        "sha256": "547a2fc428ca10418d644f1c4280e44a680696a13a6c885769192babf2be822a",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-20T03:46:13.0173508Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "repeatability"
+    },
+    {
+      "path": "vulkan-interior-exterior-repeat.png",
+      "sha256": "46590a0db6ada4284f0f18278f47c6fed86837a9a47c0d2461b2c4c42cf31c10",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-interior-exterior-repeat.png",
+        "sha256": "46590a0db6ada4284f0f18278f47c6fed86837a9a47c0d2461b2c4c42cf31c10",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-20T03:47:12.8423050Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "repeatability"
+    },
+    {
+      "path": "dx12-backend.png",
+      "sha256": "9b99dccfb86a0f621029eebd3af68d76a3546a163fe6e0c4048f3f8fde22f615",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "dx12-backend.png",
+        "sha256": "9b99dccfb86a0f621029eebd3af68d76a3546a163fe6e0c4048f3f8fde22f615",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:27:24.2179740Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "backend-evidence"
+    },
+    {
+      "path": "vulkan-backend.png",
+      "sha256": "d32465ee941299fdc99938c6ca1275e631a88b7ea124b38274b96fd92f1c60f4",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-backend.png",
+        "sha256": "d32465ee941299fdc99938c6ca1275e631a88b7ea124b38274b96fd92f1c60f4",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:31:57.6292779Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "backend-evidence"
+    },
+    {
+      "path": "dx12-interior-timing.png",
+      "sha256": "4e3620ef56e2c367fd99bd7d8c09eff50352329b34eb7eaa9693ff96b43f763c",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_InteriorExterior",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "dx12-interior-timing.png",
+        "sha256": "4e3620ef56e2c367fd99bd7d8c09eff50352329b34eb7eaa9693ff96b43f763c",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-19T15:30:35.3687709Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "timing-evidence"
+    },
+    {
+      "path": "vulkan-interior-timing.png",
+      "sha256": "5c800cb1ea8952852da720de37fb49a72da56955c5addfa0809fcc07b4622443",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_InteriorExterior",
+      "imageExtent": [
+        1922,
+        1112
+      ],
+      "encoding": "jpeg",
+      "rawImage": {
+        "fileName": "vulkan-interior-timing.png",
+        "sha256": "5c800cb1ea8952852da720de37fb49a72da56955c5addfa0809fcc07b4622443",
+        "availability": "archivedOriginal"
+      },
+      "recordedTimeUtc": "2026-09-20T03:47:38.8245526Z",
+      "timeMeaning": "Archival time; not a GPU timestamp",
+      "role": "timing-evidence"
+    }
+  ],
+  "inputIdentity": {
+    "manifestPath": "baseline.json",
+    "contentPointer": "/content",
+    "rendererPointer": "/renderer"
+  },
+  "recordedRenderSettings": {
+    "manifestPath": "baseline.json",
+    "pointer": "/captureProfile"
+  },
+  "cameras": [
+    {
+      "id": "CAM_Courtyard",
+      "profileVersion": 1,
+      "position": [
+        23.0,
+        19.0,
+        -28.0
+      ],
+      "target": [
+        -1.0,
+        1.8,
+        -2.0
+      ],
+      "verticalFovRadians": 0.6509917105
+    },
+    {
+      "id": "CAM_ShadowStairs",
+      "profileVersion": 1,
+      "position": [
+        5.5,
+        3.4,
+        -14.0
+      ],
+      "target": [
+        0.0,
+        2.8,
+        1.0
+      ],
+      "verticalFovRadians": 0.6939552104
+    },
+    {
+      "id": "CAM_InteriorExterior",
+      "profileVersion": 1,
+      "position": [
+        -12.0,
+        4.0,
+        -2.9
+      ],
+      "target": [
+        2.0,
+        2.5,
+        -5.0
+      ],
+      "verticalFovRadians": 0.7984415392
+    }
+  ],
+  "method": {
+    "acquisition": "Desktop window capture after final-color tone mapping and DevTools composition",
+    "sourceEncoding": "jpeg",
+    "rawExtent": [
+      1922,
+      1112
+    ],
+    "renderExtent": [
+      1920,
+      1080
+    ],
+    "cropRectangle": null,
+    "resampled": false,
+    "retouched": false,
+    "pointerPlacement": "May be visible",
+    "overlays": "Window chrome and menu retained; scene panels closed",
+    "quantitativeHDR": false,
+    "archivedEncoding": "jpeg",
+    "encodingNote": "Archived files have .png names but JPEG signatures. The historical manifest method calls them PNG; actual bytes are preserved."
+  },
+  "backends": [
+    {
+      "backend": "dx12",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": "32.0.16.1088",
+      "validation": {
+        "requested": true,
+        "messengerEnabled": null,
+        "errors": null,
+        "warnings": null
+      },
+      "runtimeHealth": "healthy",
+      "exitCode": null,
+      "hardwareManifest": {
+        "path": "baseline.json",
+        "pointer": "/hardware"
+      }
+    },
+    {
+      "backend": "vulkan",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": "610.88",
+      "validation": {
+        "requested": true,
+        "messengerEnabled": true,
+        "errors": 0,
+        "warnings": 0
+      },
+      "runtimeHealth": "healthy",
+      "exitCode": null,
+      "hardwareManifest": {
+        "path": "baseline.json",
+        "pointer": "/hardware"
+      }
+    }
+  ],
+  "quantitativeMeasurements": [
+    {
+      "kind": "gpuTimingSamples",
+      "manifestPath": "baseline.json",
+      "pointer": "/timingSamples"
+    },
+    {
+      "kind": "staticRepeatability",
+      "manifestPath": "baseline.json",
+      "pointer": "/repeatability"
+    }
+  ],
+  "observations": [
+    "The original PCF self-shadowing waves are retained."
+  ],
+  "knownLimitations": [
+    "Environment lighting is disabled in this historical preset.",
+    "Static SDR frames and isolated Debug timings are not pixel goldens or performance benchmarks."
+  ],
+  "baselineManifest": {
+    "path": "baseline.json",
+    "sha256": "acd49fdc055dbf2cbd795cd6d8c49fb51b1e41d0f8a2e7aaef99b89cc73ab299",
+    "schemaVersion": 2
+  }
+}

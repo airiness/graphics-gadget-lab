@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "gglab.coastal-atrium.rendering-baseline.1",
   "captureDate": "2026-09-20",
   "timeZone": "Asia/Tokyo",
@@ -7,8 +7,6 @@
   "content": {
     "runtimeRepository": "https://github.com/airiness/graphics-gadget-lab.git",
     "runtimeCommit": "a9a4cb4aab5c17fec563b86f4d0ee224cf79d56e",
-    "authoringRepository": "https://github.com/airiness/graphics-gadget-lab-content.git",
-    "authoringCommit": "0fde6e137eb1505715fe41492b70e27d11a4360d",
     "runtimeFiles": [
       {
         "path": "Assets/Models/GGLabCoastalAtrium/GGLabCoastalAtrium.bin",
@@ -57,64 +55,6 @@
       {
         "path": "Assets/Textures/Skybox/golden_gate_hills_2k.hdr",
         "sha256": "dfe7389710b1d911c213068d4358a142902307ed7d498185b447d92565fc308f"
-      }
-    ],
-    "authoringFiles": [
-      {
-        "path": "Scenes/GGLabCoastalAtrium/GGLabCoastalAtrium.blend",
-        "sha256": "b9db2295a3e0376265f60d031ab83851ccdf539afcb8396d122996f93439c677"
-      },
-      {
-        "path": "Scripts/create_coastal_atrium.py",
-        "sha256": "462d0b8db32f44e91dbf67895df6477bfae9f387760504fd8bc49a8a1d038649"
-      },
-      {
-        "path": "Scripts/apply_coastal_atrium_materials.py",
-        "sha256": "a389988a88353eb0d28df8d46c5beb01208d002916f052cb0a6becf8644cf628"
-      },
-      {
-        "path": "Scripts/material_authoring.py",
-        "sha256": "793e4a6b2b5d61fbbf195fa69eec030755d27fb1b1fe9735703bab9b997e225c"
-      },
-      {
-        "path": "Scripts/export_gltf.py",
-        "sha256": "f3801568f6e89f4b771c938210ce1de269dcbb736347c781960268b251878f2b"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_BaseColor.png",
-        "sha256": "e818a7ae00626effb5fcc87b52b9e9671cfb60555d5ea6630a2d6ae79e65410d"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_MetallicRoughness.png",
-        "sha256": "4c86c67ae2978d6d92b7b2c5e95f4ac8ba8d70fa9131dd1e8bf1a4095493a2e9"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Concrete_Normal.png",
-        "sha256": "3cfc07edbd853b63a489d4badb4852891447779c51012bede6362c2db83dcb89"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_BaseColor.png",
-        "sha256": "d8a5bf06a09c0056ec7e9eac0adf71e513d5658b00627acf2902634e87faf73a"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_MetallicRoughness.png",
-        "sha256": "931c557ce52a15ee6c0f581fe4aee34bff96e3dcc00b6254af6d1f42e337962a"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Metal_Normal.png",
-        "sha256": "d1e7cc1c0be239458ab8bcda525c08b05da90cd4ff0d540ad5a89b925b24811d"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_BaseColor.png",
-        "sha256": "430e72861fc0aac6d2f28da426c505fce244cc4e629c0e71ab5c858d51acd86b"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_MetallicRoughness.png",
-        "sha256": "5d8f81d00944a33837b4e88e312ba9bbf18b7e679fbea6c8b0707acb06530c72"
-      },
-      {
-        "path": "Scenes/GGLabCoastalAtrium/Textures/Stone_Normal.png",
-        "sha256": "b1d701b9a1c5482e887ac25f6a9d7969ee10ca8a8ff036b2bc7442665e909bac"
       }
     ],
     "environmentContribution": "Disabled: intensity 0, skybox disabled",

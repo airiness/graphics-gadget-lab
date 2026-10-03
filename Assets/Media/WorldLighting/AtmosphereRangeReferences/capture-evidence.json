@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.capture.atmosphererangereferences",
+  "captureDate": null,
+  "timeZone": null,
+  "provenance": {
+    "recoveredRecord": {
+      "path": "Assets/Media/WorldLighting/AtmosphereRangeReferences/CAPTURE.md",
+      "gitBlob": "5615a58450e93190a9f840dfc44c44055ada846c"
+    },
+    "unknownValues": "null means not recorded; no replacement capture or rebuilt-binary identity is inferred.",
+    "rawAvailability": "Unarchived raw identities are fingerprints only; no local workspace path is required."
+  },
+  "captures": [
+    {
+      "path": "dx12-1000m-aerial-on.png",
+      "sha256": "f2277598edf33ca57b092bb1217a0b34ded25992ceb1f3eb47a4ea019a291a30",
+      "sha256Basis": "archivedFileAtEvidenceRecovery",
+      "backend": "dx12",
+      "cameraId": "CAM_Range_01000m",
+      "imageExtent": [
+        1920,
+        1060
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "aerialPerspective": true,
+      "taa": false
+    },
+    {
+      "path": "dx12-1000m-aerial-off.png",
+      "sha256": "b3d89dbe7da749a661fbe587a32778b2bcb8ecfb66498341c5e006fe96721ecd",
+      "sha256Basis": "archivedFileAtEvidenceRecovery",
+      "backend": "dx12",
+      "cameraId": "CAM_Range_01000m",
+      "imageExtent": [
+        1920,
+        1060
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "aerialPerspective": false,
+      "taa": false
+    },
+    {
+      "path": "vulkan-1000m-aerial-on.png",
+      "sha256": "2afcc2d996a71190fafe93d3c51ded319b2ca3510cc114f862aa728bcd3e4754",
+      "sha256Basis": "archivedFileAtEvidenceRecovery",
+      "backend": "vulkan",
+      "cameraId": "CAM_Range_01000m",
+      "imageExtent": [
+        1920,
+        1060
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "aerialPerspective": true,
+      "taa": false
+    },
+    {
+      "path": "vulkan-1000m-aerial-off.png",
+      "sha256": "abb1f347f0f0559b97f27a05bb11a91ce5feca43b61f4c4215af3ef415c010dc",
+      "sha256Basis": "archivedFileAtEvidenceRecovery",
+      "backend": "vulkan",
+      "cameraId": "CAM_Range_01000m",
+      "imageExtent": [
+        1920,
+        1060
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "aerialPerspective": false,
+      "taa": false
+    },
+    {
+      "path": "vulkan-25m-taa-on.png",
+      "sha256": "f7e7b6b325ac59f6b77c0bd6f4da136b38e1cdb1257fb0048d45b9a6ef322e07",
+      "sha256Basis": "archivedFileAtEvidenceRecovery",
+      "backend": "vulkan",
+      "cameraId": "CAM_Range_00025m",
+      "imageExtent": [
+        1920,
+        1060
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "aerialPerspective": true,
+      "taa": true
+    }
+  ],
+  "inputIdentity": {
+    "configuration": "Debug",
+    "platform": "x64",
+    "recordedFiles": [
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabAtmosphereRange/GGLabAtmosphereRange.gltf",
+        "sha256": "19ef62b3fdb8a8e55978bc257d4cf92e5cb530c087ee52e7cfbce679e633ea96",
+        "identityBasis": "Tracked fixture contract; executable identity was not recorded in the capture notes"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabAtmosphereRange/GGLabAtmosphereRange.bin",
+        "sha256": "80c279bae9ac1cea83f7515cedb0175a9d25a5885448032c92f47f681cae4c30",
+        "identityBasis": "Tracked fixture contract; executable identity was not recorded in the capture notes"
+      }
+    ],
+    "authoringSourceFingerprints": [],
+    "shaderSourceTree": null,
+    "historicalCodeRevision": null,
+    "executableSha256": null
+  },
+  "recordedRenderSettings": [],
+  "cameras": [],
+  "method": {
+    "acquisition": "Desktop window capture after final-color tone mapping and DevTools composition",
+    "sourceEncoding": "jpeg",
+    "rawExtent": [
+      1922,
+      1112
+    ],
+    "renderExtent": [
+      1920,
+      1080
+    ],
+    "cropRectangle": {
+      "x": 1,
+      "y": 50,
+      "width": 1920,
+      "height": 1060,
+      "coordinateSpace": "decoded raw image pixels",
+      "bounds": "x/y inclusive; x+width/y+height exclusive"
+    },
+    "resampled": false,
+    "retouched": false,
+    "pointerPlacement": "Excluded title bar",
+    "overlays": "Lab controls retained to show the mode and camera",
+    "quantitativeHDR": false,
+    "encodingNote": "PNG archive encoding does not recover detail lost by JPEG acquisition."
+  },
+  "backends": [
+    {
+      "backend": "dx12",
+      "gpu": null,
+      "driver": null,
+      "validation": {
+        "requested": null,
+        "messengerEnabled": null,
+        "errors": null,
+        "warnings": null
+      },
+      "runtimeHealth": null,
+      "exitCode": null
+    },
+    {
+      "backend": "vulkan",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": null,
+      "validation": {
+        "requested": null,
+        "messengerEnabled": null,
+        "errors": 0,
+        "warnings": 1,
+        "warningMessages": [
+          "WARNING-Shader-OutputNotConsumed after enabling TAA"
+        ]
+      },
+      "runtimeHealth": null,
+      "exitCode": null
+    }
+  ],
+  "quantitativeMeasurements": [
+    {
+      "kind": "displayRGBSpotChecks",
+      "backends": [
+        "dx12",
+        "vulkan"
+      ],
+      "encoding": "8-bit SDR display RGB",
+      "surfacePixel": [
+        870,
+        510
+      ],
+      "surfaceOffRGB": [
+        28,
+        27,
+        25
+      ],
+      "surfaceOnRGB": [
+        32,
+        33,
+        38
+      ],
+      "skyControlPixel": [
+        1300,
+        510
+      ],
+      "skyOffRGB": [
+        88,
+        133,
+        174
+      ],
+      "skyOnRGB": [
+        88,
+        133,
+        174
+      ]
+    },
+    {
+      "kind": "sceneLinearGPUReadback",
+      "backends": [
+        "dx12",
+        "vulkan"
+      ],
+      "surfacePixel": [
+        960,
+        540
+      ],
+      "skyControlPixel": [
+        960,
+        135
+      ],
+      "sampleStage": "Surface color before and after aerial composite; corresponding atlas transmittance and in-scattering",
+      "renderExtent": [
+        1920,
+        1080
+      ],
+      "exposureEV100": 15,
+      "taa": false,
+      "scenePreExposure": 2.5431314e-05,
+      "activeWorldGeneration": {
+        "dx12": 3,
+        "vulkan": 2
+      },
+      "centerRayDistanceErrorMaxMeters": 0.008,
+      "compositionResidualDefinition": "max(abs(L_composite - (L_surface * T + L_in-scattering))) after dividing sampled FP16 scene colors by scene pre-exposure",
+      "samples": [
+        {
+          "fixtureDistanceMeters": 25.0,
+          "transmittanceRGBBothBackends": [
+            0.999512,
+            0.999432,
+            0.998944
+          ],
+          "inScatteringBlueSceneLinearDX12": 12.127,
+          "largestRGBCompositionResidualBothBackends": 0.388
+        },
+        {
+          "fixtureDistanceMeters": 50.0,
+          "transmittanceRGBBothBackends": [
+            0.999376,
+            0.998888,
+            0.997911
+          ],
+          "inScatteringBlueSceneLinearDX12": 24.634,
+          "largestRGBCompositionResidualBothBackends": 2.321
+        },
+        {
+          "fixtureDistanceMeters": 100.0,
+          "transmittanceRGBBothBackends": [
+            0.998544,
+            0.998047,
+            0.996102
+          ],
+          "inScatteringBlueSceneLinearDX12": 49.585,
+          "largestRGBCompositionResidualBothBackends": 1.725
+        },
+        {
+          "fixtureDistanceMeters": 250.0,
+          "transmittanceRGBBothBackends": [
+            0.997329,
+            0.995376,
+            0.990523
+          ],
+          "inScatteringBlueSceneLinearDX12": 123.697,
+          "largestRGBCompositionResidualBothBackends": 1.938
+        },
+        {
+          "fixtureDistanceMeters": 500.0,
+          "transmittanceRGBBothBackends": [
+            0.994745,
+            0.990897,
+            0.981306
+          ],
+          "inScatteringBlueSceneLinearDX12": 242.356,
+          "largestRGBCompositionResidualBothBackends": 1.828
+        },
+        {
+          "fixtureDistanceMeters": 1000.0,
+          "transmittanceRGBBothBackends": [
+            0.990123,
+            0.9824,
+            0.963623
+          ],
+          "inScatteringBlueSceneLinearDX12": 470.775,
+          "largestRGBCompositionResidualBothBackends": 1.451
+        }
+      ],
+      "surfaceBlueSceneLinear": [
+        {
+          "distanceMeters": 25,
+          "before": 4298.4,
+          "after": 4305.6
+        },
+        {
+          "distanceMeters": 1000,
+          "before": 4324.8,
+          "after": 4636.8
+        }
+      ],
+      "skyControlChangeAllSamples": 0,
+      "crossBackendAgreement": {
+        "surfaceAndCompositeMatchAtPrintedPrecision": true,
+        "inScatteringDifferenceStrictUpperBoundSceneLinear": 0.0005
+      },
+      "probeValidation": {
+        "validationErrors": 0,
+        "synchronizationErrors": 0,
+        "deviceLossErrors": 0
+      },
+      "repeat": "25 m repeated on both backends with identical values after adding the per-sample frame-serial guard against unsubmitted-frame readback",
+      "limitations": [
+        "Not an independent reference for transport integration",
+        "No bound on 32-slice atlas interpolation error",
+        "Altitude changes and moving TAA sequences remain unchecked"
+      ]
+    }
+  ],
+  "observations": [
+    "Enabling aerial perspective visibly lightens the dark 1 km patch while preserving the sky control."
+  ],
+  "knownLimitations": [
+    "The six readback samples do not bound transport integration or atlas interpolation error.",
+    "Altitude changes and moving TAA sequences remain untested."
+  ]
+}

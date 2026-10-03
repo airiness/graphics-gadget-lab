@@ -1,0 +1,461 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.capture.coastaldetails",
+  "captureDate": "2026-10-02",
+  "timeZone": "UTC",
+  "provenance": {
+    "recoveredRecord": {
+      "path": "Assets/Media/GGLabCoastalAtrium/CoastalDetails/CAPTURE.md",
+      "gitBlob": "540776e91339f4c01c5989ce7833d07645c341fc"
+    },
+    "unknownValues": "null means not recorded; no replacement capture or rebuilt-binary identity is inferred.",
+    "rawAvailability": "Unarchived raw identities are fingerprints only; no local workspace path is required."
+  },
+  "captures": [
+    {
+      "path": "courtyard-dx12.png",
+      "sha256": "e9475ff274ab7f7aa5748f3ab0de9b79a5f8f19b8f49b2e21236afc4c560713d",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:22:28.852Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    },
+    {
+      "path": "courtyard-vulkan.png",
+      "sha256": "ee909b43b48cae187367308b4e14d4afce29f30ad08e878c1604d647e54dee82",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_Courtyard",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:40:06.828Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    },
+    {
+      "path": "shadow-stairs-dx12.png",
+      "sha256": "8477456d84e7d15694834559d9491402e21db138f0259c2f1c0939d8a8a9675c",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_ShadowStairs",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:25:56.147Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    },
+    {
+      "path": "shadow-stairs-vulkan.png",
+      "sha256": "83cdcf11480a2eb711113f69f6bfa590b93b93199f49463bfab4ae57cafd5116",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_ShadowStairs",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:43:02.751Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    },
+    {
+      "path": "sky-horizon-dx12.png",
+      "sha256": "b51702740ea7d19ffd39bcd889989f37e039792638bfa46203c1b02746c96c1e",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "dx12",
+      "cameraId": "CAM_SkyHorizon",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:33:00.088Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    },
+    {
+      "path": "sky-horizon-vulkan.png",
+      "sha256": "a83875bf48be9e2bb9e78d69c24442c8e7fa218c0076d37566269d505e19ecf4",
+      "sha256Basis": "recoveredCaptureRecord",
+      "backend": "vulkan",
+      "cameraId": "CAM_SkyHorizon",
+      "imageExtent": [
+        1920,
+        1010
+      ],
+      "encoding": "png",
+      "rawImage": {
+        "fileName": null,
+        "sha256": null,
+        "availability": "notRecorded"
+      },
+      "recordedTimeUtc": "2026-10-02T12:46:17.323Z",
+      "timeMeaning": "Archival/file capture time; not a GPU timestamp"
+    }
+  ],
+  "inputIdentity": {
+    "configuration": "Debug",
+    "platform": "x64",
+    "recordedFiles": [
+      {
+        "label": "GGLabCoastalAtrium.gltf",
+        "sha256": "18a2ca7bce8a701b7c33e64846f5347c618c83f3be468041120a5ff3d2371e2d",
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf"
+      },
+      {
+        "label": "GGLabCoastalAtrium.bin",
+        "sha256": "5fb21d820258097019dfabdc0b3247de4c98f836f178c08ae452641b95973c1a",
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.bin"
+      },
+      {
+        "label": "Concrete_BaseColor.png",
+        "sha256": "e818a7ae00626effb5fcc87b52b9e9671cfb60555d5ea6630a2d6ae79e65410d",
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_BaseColor.png"
+      },
+      {
+        "label": "Concrete_Normal.png",
+        "sha256": "3cfc07edbd853b63a489d4badb4852891447779c51012bede6362c2db83dcb89",
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_Normal.png"
+      },
+      {
+        "label": "Concrete_MetallicRoughness.png",
+        "sha256": "4c86c67ae2978d6d92b7b2c5e95f4ac8ba8d70fa9131dd1e8bf1a4095493a2e9",
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Concrete_MetallicRoughness.png"
+      },
+      {
+        "label": "Debug GraphicsGadgetLab.exe",
+        "sha256": "a9e320f2b51071ca8519d55db1b25d5a24c8fd18c0e332b0d3a8a0d08fba9f68",
+        "kind": "binary",
+        "availability": "notArchived",
+        "fileName": "GraphicsGadgetLab.exe"
+      },
+      {
+        "label": "Debug gglab-shaderc.exe",
+        "sha256": "d53ca7f3ed52bf1a940a1f999b6d42b45df6b2b51110659f45faa80be13f4256",
+        "kind": "binary",
+        "availability": "notArchived",
+        "fileName": "gglab-shaderc.exe"
+      },
+      {
+        "label": "Debug dxcompiler.dll",
+        "sha256": "9a5100511e127c6a2fc78edf984f95074a76d35b90c90c4d342430a5ae160e9b",
+        "kind": "binary",
+        "availability": "notArchived",
+        "fileName": "dxcompiler.dll"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_Normal.png",
+        "sha256": "b1d701b9a1c5482e887ac25f6a9d7969ee10ca8a8ff036b2bc7442665e909bac",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_BaseColor.png",
+        "sha256": "430e72861fc0aac6d2f28da426c505fce244cc4e629c0e71ab5c858d51acd86b",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Stone_MetallicRoughness.png",
+        "sha256": "5d8f81d00944a33837b4e88e312ba9bbf18b7e679fbea6c8b0707acb06530c72",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_Normal.png",
+        "sha256": "d1e7cc1c0be239458ab8bcda525c08b05da90cd4ff0d540ad5a89b925b24811d",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_BaseColor.png",
+        "sha256": "d8a5bf06a09c0056ec7e9eac0adf71e513d5658b00627acf2902634e87faf73a",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/Metal_MetallicRoughness.png",
+        "sha256": "931c557ce52a15ee6c0f581fe4aee34bff96e3dcc00b6254af6d1f42e337962a",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_Normal.png",
+        "sha256": "d2e0a7a84ca0761d316acb0a5297a9412d857a76907e69963fb38302f887d9f8",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_BaseColor.png",
+        "sha256": "56c9d606ac6fa3bf7bcbf50a159660d93b349bc435a454bf811f6cc83cab62f9",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      },
+      {
+        "kind": "asset",
+        "repository": "runtime",
+        "path": "Assets/Models/GGLabCoastalAtriumResearchLounge/Textures/CoastalRock_MetallicRoughness.png",
+        "sha256": "4d9a8ab323d8cd305186df980a96471eb04eb482858bf43d79b8c4c580804342",
+        "identityBasis": "Tracked bundle matching the capture asset contract"
+      }
+    ],
+    "authoringSourceFingerprints": [
+      {
+        "label": "Authoring-source fingerprint",
+        "sha256": "ef1f456acd4780f356c8f2d30420d8981d9d04798c146b85d5e208eb619979e3",
+        "availability": "fingerprintOnly"
+      }
+    ],
+    "shaderSourceTree": "1167f85ebf7fd2441e6e973415ed1dc502befea3",
+    "historicalCodeRevision": "6ee509d8c069f2c5f580ed973e495aa98c45fb9c",
+    "revisionIsExactCaptureCheckout": false,
+    "assetContractBlob": "e0750c0d1c37c39087784822d0f4c65390e9a5af",
+    "buildToolchain": {
+      "visualStudio": "2022 Community",
+      "msbuildHost": "x64",
+      "preferredToolArchitecture": "x64"
+    },
+    "captureWorkingTreeChanges": "Refined asset bundle and expanded import checks; renderer, shader and camera sources unchanged"
+  },
+  "recordedRenderSettings": [
+    {
+      "setting": "Scene / transform",
+      "value": "Demo.Playground.CoastalAtrium / identity"
+    },
+    {
+      "setting": "Output and internal resolution",
+      "value": "1920 x 1080"
+    },
+    {
+      "setting": "Pipeline / lighting",
+      "value": "Forward PBR / Forward+"
+    },
+    {
+      "setting": "World Sun ray direction",
+      "value": "Normalized (-1, -0.85, 0.35)"
+    },
+    {
+      "setting": "Sun TOA illuminance / angular radius",
+      "value": "120000 lux / 0.2666 degrees"
+    },
+    {
+      "setting": "Atmosphere",
+      "value": "Enabled; Earth defaults"
+    },
+    {
+      "setting": "Sky source / skybox",
+      "value": "Physical Sky / enabled"
+    },
+    {
+      "setting": "Published World Lighting",
+      "value": "Active and requested generation 3; no retiring persistent textures"
+    },
+    {
+      "setting": "IBL",
+      "value": "Calibrated intensity 1, world aligned; 512 x 512 x 6 FP32, ten mips"
+    },
+    {
+      "setting": "Exposure",
+      "value": "Manual EV100 15, compensation 0"
+    },
+    {
+      "setting": "TAA / GTAO / bloom",
+      "value": "Disabled by the Atrium Demo profile"
+    },
+    {
+      "setting": "Other rendering settings",
+      "value": "Current code defaults, including directional PCF shadows"
+    }
+  ],
+  "cameras": [
+    {
+      "id": "CAM_Courtyard",
+      "profileVersion": 1,
+      "position": [
+        23,
+        19,
+        -28
+      ],
+      "target": [
+        -1,
+        1.8,
+        -2
+      ],
+      "verticalFovRadians": 0.6509917105,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_ShadowStairs",
+      "profileVersion": 1,
+      "position": [
+        5.5,
+        3.4,
+        -14
+      ],
+      "target": [
+        0,
+        2.8,
+        1
+      ],
+      "verticalFovRadians": 0.6939552104,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    },
+    {
+      "id": "CAM_SkyHorizon",
+      "profileVersion": 1,
+      "position": [
+        20,
+        5.5,
+        -26
+      ],
+      "target": [
+        0,
+        3,
+        0
+      ],
+      "verticalFovRadians": 0.7984415392,
+      "nearMeters": 0.1,
+      "farMeters": 150,
+      "coordinates": "Left-handed Y-up meters",
+      "aspect": [
+        16,
+        9
+      ]
+    }
+  ],
+  "method": {
+    "acquisition": "Desktop window capture after final-color tone mapping and DevTools composition",
+    "sourceEncoding": "jpeg",
+    "rawExtent": [
+      1922,
+      1112
+    ],
+    "renderExtent": [
+      1920,
+      1080
+    ],
+    "cropRectangle": {
+      "x": 1,
+      "y": 100,
+      "width": 1920,
+      "height": 1010,
+      "coordinateSpace": "decoded raw image pixels",
+      "bounds": "x/y inclusive; x+width/y+height exclusive"
+    },
+    "resampled": false,
+    "retouched": false,
+    "pointerPlacement": "Excluded title bar",
+    "overlays": "Panels closed",
+    "quantitativeHDR": false,
+    "encodingNote": "PNG archive encoding does not recover detail lost by JPEG acquisition.",
+    "launch": {
+      "dx12": "Desktop helper then Demo selector from Start to Coastal Atrium",
+      "vulkan": "Command line with a fresh state root"
+    },
+    "readiness": "Model/texture upload and requested Physical Sky publication completed before accepting the image",
+    "cameraRestoration": "Named reference views; reapply Manual EV100 15 after Atrium profile 1 restores legacy EV0"
+  },
+  "backends": [
+    {
+      "backend": "dx12",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": null,
+      "validation": {
+        "requested": null,
+        "messengerEnabled": null,
+        "errors": null,
+        "warnings": null
+      },
+      "runtimeHealth": null,
+      "exitCode": null
+    },
+    {
+      "backend": "vulkan",
+      "gpu": "NVIDIA GeForce RTX 5080",
+      "driver": "617.14",
+      "validation": {
+        "requested": true,
+        "messengerEnabled": null,
+        "errors": 0,
+        "warnings": 0,
+        "basis": "Capture-session log; no validation warning/error messages recorded"
+      },
+      "runtimeHealth": null,
+      "exitCode": 0,
+      "adapterApi": "1.4.351",
+      "applicationBaseline": "1.3"
+    }
+  ],
+  "quantitativeMeasurements": [],
+  "observations": [
+    "Both backends show the refined shoreline, boulders, service equipment and fittings."
+  ],
+  "knownLimitations": [
+    "Existing PCF bands and the finite-ocean horizon gap remain visible.",
+    "Changed content prevents a renderer-only A/B comparison."
+  ]
+}

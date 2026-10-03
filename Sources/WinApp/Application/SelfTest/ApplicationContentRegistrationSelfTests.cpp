@@ -570,10 +570,162 @@ namespace gglab
 			const auto atrium = ModelImporter::Import(ResolveAssetPath(assetRoot,
 				"Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf"), {});
 			context.Check(atrium.Succeeded() && !atrium.m_Model.m_MeshInstances.empty() &&
-				atrium.m_Model.m_TextureSources.size() == 9,
-				std::format("Research lounge geometry and core textures import "
+				atrium.m_Model.m_TextureSources.size() == 15,
+				std::format("Coastal atrium geometry and all surface textures import "
 					"(instances={}, textures={}): {}", atrium.m_Model.m_MeshInstances.size(),
 					atrium.m_Model.m_TextureSources.size(), atrium.m_Error));
+			if (!atrium.Succeeded() || atrium.m_Model.m_TextureSources.size() != 15)
+			{
+				return;
+			}
+			const auto atriumTextures = CheckImportedTextures(context, atrium.m_Model);
+			constexpr std::array<std::pair<std::string_view, size_t>, 11> atriumTriangles = { {
+				{ "MAT_Concrete", 3054 },
+				{ "MAT_Paving", 156 },
+				{ "MAT_Structure", 10812 },
+				{ "MAT_CoastalRock", 3902 },
+				{ "MAT_OceanPlaceholder", 2 },
+				{ "MAT_LoungeCoatedShell", 1460 },
+				{ "MAT_LoungeBrushedAluminum", 1504 },
+				{ "MAT_LoungeUpholstery", 752 },
+				{ "MAT_LoungeJoints", 752 },
+				{ "MAT_ServicePaint", 1296 },
+				{ "MAT_ServiceSeal", 968 },
+			} };
+			std::array<size_t, atriumTriangles.size()> importedTriangles{};
+			bool geometryValid = true;
+			for (const auto& mesh : atrium.m_Model.m_Meshes)
+			{
+				geometryValid &= mesh.m_HasBounds && !mesh.m_Vertices.empty() && mesh.m_Indices.size() % 3 == 0;
+				for (const auto index : mesh.m_Indices)
+					geometryValid &= index < mesh.m_Vertices.size();
+				for (const auto& vertex : mesh.m_Vertices)
+				{
+					const Vector3 tangent(vertex.m_Tangent.m_X, vertex.m_Tangent.m_Y, vertex.m_Tangent.m_Z);
+					geometryValid &= std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+						std::isfinite(vertex.m_Position.m_Z) && std::isfinite(vertex.m_TexCoord0.m_X) &&
+						std::isfinite(vertex.m_TexCoord0.m_Y) && std::abs(vertex.m_Normal.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(tangent.LengthSquared() - 1.0f) < 0.0002f &&
+						std::abs(vertex.m_Normal.Dot(tangent)) < 0.0002f && std::abs(std::abs(vertex.m_Tangent.m_W) - 1.0f) < 0.0002f;
+				}
+			}
+			// Assimp merges compatible meshes; count placed triangles through material bindings.
+			for (const auto& instance : atrium.m_Model.m_MeshInstances)
+			{
+				if (instance.m_MeshIndex >= atrium.m_Model.m_Meshes.size() ||
+					instance.m_MaterialIndex >= atrium.m_Model.m_Materials.size())
+				{
+					geometryValid = false;
+					continue;
+				}
+				const auto& material = atrium.m_Model.m_Materials[instance.m_MaterialIndex];
+				geometryValid &= material.m_Properties.m_AlphaMode == AlphaMode::Opaque;
+				const auto match = std::ranges::find(atriumTriangles, material.m_Name,
+					&std::pair<std::string_view, size_t>::first);
+				if (match == atriumTriangles.end()) { geometryValid = false; continue; }
+				importedTriangles[static_cast<size_t>(match - atriumTriangles.begin())] +=
+					atrium.m_Model.m_Meshes[instance.m_MeshIndex].m_Indices.size() / 3;
+			}
+			context.Check(geometryValid, "Coastal atrium retains valid geometry, opaque bindings and orthonormal imported tangent frames");
+			for (size_t index = 0; index < atriumTriangles.size(); ++index)
+				context.Check(importedTriangles[index] == atriumTriangles[index].second,
+					std::format("Coastal atrium {} retains {} placed triangles (imported={})",
+						atriumTriangles[index].first, atriumTriangles[index].second, importedTriangles[index]));
+			const auto rock = std::ranges::find(atrium.m_Model.m_Materials, "MAT_CoastalRock", &ImportedMaterial::m_Name);
+			bool rockBindingsValid = rock != atrium.m_Model.m_Materials.end();
+			if (rockBindingsValid)
+			{
+				rockBindingsValid &= rock->m_Properties.m_MetallicFactor == 0.0f && rock->m_Properties.m_NormalScale == 1.0f;
+				for (const auto& [slot, filename] : std::array{
+					std::pair{ MaterialTextureSlot::BaseColor, "CoastalRock_BaseColor.png" },
+					std::pair{ MaterialTextureSlot::Normal, "CoastalRock_Normal.png" },
+					std::pair{ MaterialTextureSlot::MetallicRoughness, "CoastalRock_MetallicRoughness.png" } })
+				{
+					const auto& binding = rock->m_TextureBindings[static_cast<size_t>(slot)];
+					rockBindingsValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < atrium.m_Model.m_TextureSources.size();
+					if (binding.m_TextureIndex < atrium.m_Model.m_TextureSources.size())
+					{
+						const auto& source = atrium.m_Model.m_TextureSources[binding.m_TextureIndex];
+						rockBindingsValid &= source.m_CanonicalPath.filename() == filename && source.m_Semantic == GetMaterialTextureSlotSemantic(slot);
+					}
+				}
+			}
+			context.Check(rockBindingsValid, "Coastal rock retains dedicated UV0 color, normal and metallic-roughness bindings");
+			const auto concrete = std::ranges::find(atrium.m_Model.m_Materials, "MAT_Concrete", &ImportedMaterial::m_Name);
+			bool concreteBindingsValid = concrete != atrium.m_Model.m_Materials.end();
+			if (concreteBindingsValid)
+			{
+				concreteBindingsValid &= concrete->m_Properties.m_MetallicFactor == 0.0f &&
+					concrete->m_Properties.m_RoughnessFactor == 1.0f && concrete->m_Properties.m_NormalScale == 1.0f;
+				for (const auto& [slot, filename] : std::array{
+					std::pair{ MaterialTextureSlot::BaseColor, "Concrete_BaseColor.png" },
+					std::pair{ MaterialTextureSlot::Normal, "Concrete_Normal.png" },
+					std::pair{ MaterialTextureSlot::MetallicRoughness, "Concrete_MetallicRoughness.png" } })
+				{
+					const auto& binding = concrete->m_TextureBindings[static_cast<size_t>(slot)];
+					concreteBindingsValid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < atriumTextures.size();
+					if (binding.m_TextureIndex < atriumTextures.size())
+					{
+						const auto& source = atrium.m_Model.m_TextureSources[binding.m_TextureIndex];
+						const auto& texture = atriumTextures[binding.m_TextureIndex];
+						concreteBindingsValid &= source.m_CanonicalPath.filename() == filename &&
+							source.m_Semantic == GetMaterialTextureSlotSemantic(slot) &&
+							texture.m_Extent.m_Width == 1024 && texture.m_Extent.m_Height == 1024 && texture.m_MipLevels == 11;
+					}
+				}
+			}
+			context.Check(concreteBindingsValid, "Refined concrete retains UV0 factors and three 1024-square semantic textures with complete mip chains");
+			struct SurfaceReference
+			{
+				std::string_view m_Name;
+				std::string_view m_Prefix;
+				float m_Metallic;
+			};
+			constexpr std::array<SurfaceReference, 3> surfaces = { {
+				{ "MAT_Paving", "Stone", 0.0f },
+				{ "MAT_Structure", "Metal", 1.0f },
+				{ "MAT_LoungeUpholstery", "Upholstery", 0.0f },
+			} };
+			for (const auto& surface : surfaces)
+			{
+				const auto material = std::ranges::find(atrium.m_Model.m_Materials,
+					surface.m_Name, &ImportedMaterial::m_Name);
+				bool valid = material != atrium.m_Model.m_Materials.end();
+				if (valid)
+				{
+					const auto& properties = material->m_Properties;
+					valid &= properties.m_MetallicFactor == surface.m_Metallic &&
+						properties.m_RoughnessFactor == 1.0f && properties.m_NormalScale == 1.0f &&
+						properties.m_ClearcoatFactor == 0.0f && properties.m_AnisotropyStrength == 0.0f;
+					for (size_t channel = 0; channel < 4; ++channel)
+						valid &= properties.m_BaseColor[channel] == 1.0f;
+					for (const auto& [slot, suffix] : std::array{
+						std::pair{ MaterialTextureSlot::BaseColor, "BaseColor" },
+						std::pair{ MaterialTextureSlot::Normal, "Normal" },
+						std::pair{ MaterialTextureSlot::MetallicRoughness, "MetallicRoughness" } })
+					{
+						const auto& binding = material->m_TextureBindings[static_cast<size_t>(slot)];
+						valid &= binding.m_TexCoordIndex == 0 && binding.m_TextureIndex < atriumTextures.size() &&
+							binding.m_SamplerKey.m_AddressU == RHITextureAddressMode::Wrap &&
+							binding.m_SamplerKey.m_AddressV == RHITextureAddressMode::Wrap;
+						if (binding.m_TextureIndex < atriumTextures.size())
+						{
+							const auto& source = atrium.m_Model.m_TextureSources[binding.m_TextureIndex];
+							const auto& texture = atriumTextures[binding.m_TextureIndex];
+							valid &= source.m_CanonicalPath.filename() == std::format("{}_{}.png", surface.m_Prefix, suffix) &&
+								source.m_Semantic == GetMaterialTextureSlotSemantic(slot) &&
+								texture.m_Extent.m_Width == 1024 && texture.m_Extent.m_Height == 1024 && texture.m_MipLevels == 11;
+						}
+					}
+					for (const auto slot : { MaterialTextureSlot::Occlusion, MaterialTextureSlot::Emissive,
+						MaterialTextureSlot::Clearcoat, MaterialTextureSlot::ClearcoatRoughness,
+						MaterialTextureSlot::ClearcoatNormal, MaterialTextureSlot::Anisotropy })
+						valid &= material->m_TextureBindings[static_cast<size_t>(slot)].m_TextureIndex ==
+							ImportedMaterialTextureBinding::InvalidTextureIndex;
+				}
+				context.Check(valid, std::format("{} retains opaque isotropic UV0 factors, repeating semantic textures and complete 1024-square mip chains",
+					surface.m_Name));
+			}
 			const auto coatedShell = std::ranges::find(atrium.m_Model.m_Materials,
 				"MAT_LoungeCoatedShell", &ImportedMaterial::m_Name);
 			context.Check(coatedShell != atrium.m_Model.m_Materials.end() &&
@@ -800,7 +952,8 @@ namespace gglab
 			rig.AttachMainCamera(camera, controller);
 			const bool registered = rig.SetReferenceViews(
 				{ CoastalAtriumReferenceViews.begin(), CoastalAtriumReferenceViews.end() });
-			context.Check(registered, "Three coastal atrium reference cameras register in runtime coordinates");
+			context.Check(registered && CoastalAtriumReferenceViews.size() == 8,
+				"Four established and four surface-detail coastal atrium views register in runtime coordinates");
 			if (!registered) return;
 			for (const auto& reference : CoastalAtriumReferenceViews)
 			{

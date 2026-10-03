@@ -14,8 +14,8 @@ It also checks the current BRDF LUT interpretation (`F0 * A + B`),
 roughness-to-alpha conversion, and the IOR 1.5 default (`F0 = 0.04`).
 
 The [Physical Sky references](PhysicalSkyReferences/CAPTURE.md) provide manual
-SDR appearance examples for DX12 and Vulkan. Their capture manifest records
-the exact source and export identities. These images do not measure
+SDR appearance examples for DX12 and Vulkan. The capture record lists
+lighting settings and camera poses. These images do not measure
 linear-light BRDF energy.
 
 Material emissive factors retain the pre-World-Lighting legacy scale.
