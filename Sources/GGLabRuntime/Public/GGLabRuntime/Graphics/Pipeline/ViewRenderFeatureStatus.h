@@ -1,9 +1,6 @@
 #pragma once
 
-#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
-
 #include <cstdint>
-#include <optional>
 
 namespace gglab
 {
@@ -32,10 +29,6 @@ namespace gglab
 		DepthVelocityPathUnavailable,
 		SceneExtensionUnsupported,
 		MaterialDiagnosticsActive,
-		AtmosphereUnavailable,
-		PhysicalSunUnavailable,
-		EnvironmentUnavailable,
-		PhysicalSkyInactive,
 		RequiredFeatureInactive,
 		ZeroIntensity,
 		ResourcesUnavailable,
@@ -48,17 +41,5 @@ namespace gglab
 		ViewRenderFeatureReason m_Reason = ViewRenderFeatureReason::FrameUnavailable;
 
 		bool operator==(const ViewRenderFeatureStatus&) const noexcept = default;
-	};
-
-	// Copied from the inputs and resources considered by the aerial pass,
-	// including frames where aerial transport itself was not requested.
-	struct AerialPerspectiveDependencies
-	{
-		bool m_SceneAvailable = false;
-		bool m_AtmosphereEnabled = false;
-		bool m_AtmosphereReady = false;
-		bool m_PhysicalSunEnabled = false;
-		std::optional<EnvironmentBackgroundMode> m_SkySource;
-		bool m_SkyboxEnabled = false;
 	};
 }

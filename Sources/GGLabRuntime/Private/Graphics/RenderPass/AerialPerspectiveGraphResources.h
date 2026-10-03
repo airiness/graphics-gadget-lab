@@ -1,19 +1,10 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
-#include "GGLabRuntime/Graphics/Pipeline/ViewRenderFeatureStatus.h"
 
 namespace gglab
 {
 	inline constexpr const char* AerialPerspectiveResourcesName = "Atmosphere.AerialPerspective.Resources";
-	inline constexpr const char* AerialPerspectiveFrameStatusName = "Atmosphere.AerialPerspective.FrameStatus";
-	struct RGAerialPerspectiveFrameStatus
-	{
-		ViewRenderFeatureStatus m_Status{};
-		ViewRenderFeatureStatus m_ProbeStatus{};
-		AerialPerspectiveDependencies m_Dependencies{};
-	};
-
 	struct RGAerialPerspectiveResources
 	{
 		RGTextureId m_RadianceAtlas{};

@@ -37,11 +37,9 @@ namespace gglab
 		SettingsOverride<GTAOSettings> m_GTAO{};
 		SettingsOverride<BloomSettings> m_Bloom{};
 		std::optional<ForwardLightingMode> m_ForwardLightingMode;
-		std::optional<bool> m_AerialPerspective;
 		std::optional<bool> m_ScenePreExposure;
-		// Diagnostic intent is independent of the lighting path and transport toggle.
+		// Diagnostic intent is independent of the lighting path.
 		std::optional<bool> m_HdrDiffValidation;
-		std::optional<bool> m_AerialProbe;
 
 		// Counts active blocks/scalars, including values equal to authoring settings.
 		[[nodiscard]] uint32_t GetActiveCount() const noexcept;

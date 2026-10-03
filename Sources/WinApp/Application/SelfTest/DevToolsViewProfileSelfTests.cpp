@@ -3,7 +3,6 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
-#include "DevTools/DevelopGui/Panels/WorldLightingPanel.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
@@ -134,7 +133,6 @@ namespace gglab
 			{
 				registry.RegisterPanel(std::make_unique<SettingsNavigationProbe>(paths[index], draws[index], windowNames[index]));
 			}
-			registry.RegisterPanel(std::make_unique<WorldLightingPanel>());
 			DevelopGuiContext gui{
 				.m_Diagnostics = &diagnostics,
 				.m_ViewRenderSettingsOverrides = &overrides,
@@ -205,13 +203,12 @@ namespace gglab
 			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "##Enabled")));
 			GGLAB_UNUSED(draw(ImHashStr("Advanced / Diagnostics", 0, windowId)));
 			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "HDR Diff Validation", "##Enabled")));
-			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "Aerial Probe", "##Enabled")));
-			context.Check(overrides.GetActiveCount() == 6 &&
-				overrides.m_ScenePreExposure == false && overrides.m_HdrDiffValidation == true && overrides.m_AerialProbe == true,
+			context.Check(overrides.GetActiveCount() == 5 &&
+				overrides.m_ScenePreExposure == false && overrides.m_HdrDiffValidation == true,
 				"Cockpit scalar controls keep explicit false intent and independent diagnostic requests");
 			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "Reset")));
-			context.Check(!overrides.m_ScenePreExposure && overrides.GetActiveCount() == 5 && overrides.m_AerialProbe == true,
-				"A scalar row reset restores inheritance without clearing the independently requested probe");
+			context.Check(!overrides.m_ScenePreExposure && overrides.GetActiveCount() == 4 && overrides.m_HdrDiffValidation == true,
+				"A scalar row reset restores inheritance without clearing independently requested diagnostics");
 			GGLAB_UNUSED(draw(ImHashStr("Clear All Overrides", 0, windowId)));
 			context.Check(overrides.GetActiveCount() == 0 &&
 				ProfilesMatch(devTools.ResolveViewRenderProfile(snapshot.m_AuthoringProfile), snapshot.m_AuthoringProfile),
@@ -239,39 +236,6 @@ namespace gglab
 			ImGui::EndFrame();
 			context.Check(draws[4] == 2 && !ImGui::FindWindowByName(windowNames[4].c_str())->Collapsed,
 				"Inspect reopens an already open collapsed Inspector without creating another window");
-			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "Aerial Probe", "Inspect")));
-			DevelopGuiContext navigationGui{};
-			const auto drawRegistry = [&]()
-			{
-				ImGui::NewFrame();
-				registry.DrawPanels(navigationGui);
-				ImGui::EndFrame();
-			};
-			drawRegistry();
-			drawRegistry();
-			ImGuiWindow* lightingWindow = nullptr;
-			for (auto* window : ImGui::GetCurrentContext()->Windows)
-			{
-				if (std::string_view(window->Name).starts_with("World Lighting##")) lightingWindow = window;
-			}
-			const ImGuiID tabsId = lightingWindow ? ImHashStr("WorldLightingTabs", 0, lightingWindow->ID) : 0;
-			auto* tabs = ImGui::GetCurrentContext()->TabBars.GetByKey(tabsId);
-			const ImGuiID atmosphereId = ImHashStr("Atmosphere", 0, tabsId);
-			context.Check(registry.IsPanelOpen(WorldLightingPanel::Path) && tabs && tabs->SelectedTabId == atmosphereId &&
-				ImGui::GetCurrentContext()->NavWindow == lightingWindow && overrides.GetActiveCount() == 0,
-				"Aerial Probe Inspect opens and focuses World Lighting on its actual Atmosphere tab without changing overrides");
-			ImGui::ActivateItemByID(ImHashStr("Sun", 0, tabsId));
-			drawRegistry();
-			drawRegistry();
-			context.Check(tabs && tabs->SelectedTabId == ImHashStr("Sun", 0, tabsId),
-				"Normal World Lighting navigation remains usable after a targeted cockpit link");
-			if (lightingWindow) ImGui::SetWindowCollapsed(lightingWindow->Name, true);
-			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "Aerial Probe", "Inspect")));
-			drawRegistry();
-			drawRegistry();
-			context.Check(tabs && tabs->SelectedTabId == atmosphereId && lightingWindow && !lightingWindow->Collapsed &&
-				!registry.IsPanelOpen("Missing"),
-				"Aerial Probe Inspect reuses World Lighting and restores its Atmosphere tab from another collapsed section");
 			registry.Reset();
 			context.Check(!registry.OpenPanel(paths[4]) && !registry.IsPanelOpen(paths[4]) && !registry.OpenPanel("Missing"),
 				"Navigation rejects missing and reset registrations rather than creating phantom panels");
@@ -297,7 +261,6 @@ namespace gglab
 		authoringProfile.m_TemporalAA.m_Enabled = false;
 		authoringProfile.m_PostProcess.m_Bloom.m_Enabled = false;
 		authoringProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
-		authoringProfile.m_Lighting.m_EnableAerialProbe = true;
 		const ViewRenderProfile originalAuthoringProfile = authoringProfile;
 		DevToolsRuntime devTools;
 		auto& overrides = devTools.GetViewRenderSettingsOverrides();
@@ -377,22 +340,6 @@ namespace gglab
 			"Explicitly disabling HDR diff counts as an override without changing the lighting path");
 
 		overrides.ClearAll();
-		overrides.m_AerialPerspective = false;
-		expectedProfile = originalAuthoringProfile;
-		expectedProfile.m_Lighting.m_EnableAerialPerspective = false;
-		context.Check(overrides.GetActiveCount() == 1 &&
-			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile),
-			"Aerial-perspective override preserves independently authored probe intent");
-
-		overrides.ClearAll();
-		overrides.m_AerialProbe = false;
-		expectedProfile = originalAuthoringProfile;
-		expectedProfile.m_Lighting.m_EnableAerialProbe = false;
-		context.Check(overrides.GetActiveCount() == 1 &&
-			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile),
-			"Aerial-probe override does not change surface transport or other features");
-
-		overrides.ClearAll();
 		overrides.m_ScenePreExposure = false;
 		expectedProfile = originalAuthoringProfile;
 		expectedProfile.m_EnableScenePreExposure = false;
@@ -408,20 +355,17 @@ namespace gglab
 		overrides.m_TemporalAA.Activate(temporalSettings);
 		overrides.m_Bloom.Activate(bloomSettings);
 		overrides.m_ForwardLightingMode = ForwardLightingMode::Legacy;
-		overrides.m_AerialPerspective = true;
 		overrides.m_HdrDiffValidation = false;
-		overrides.m_AerialProbe = false;
 		expectedProfile = originalAuthoringProfile;
 		expectedProfile.m_Lighting.m_GTAO = gtaoSettings;
 		expectedProfile.m_TemporalAA = temporalSettings;
 		expectedProfile.m_PostProcess.m_Bloom = bloomSettings;
 		expectedProfile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
 		expectedProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = false;
-		expectedProfile.m_Lighting.m_EnableAerialProbe = false;
-		context.Check(overrides.GetActiveCount() == 8 &&
+		context.Check(overrides.GetActiveCount() == 6 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile) &&
 			ProfilesMatch(authoringProfile, originalAuthoringProfile),
-			"All eight overrides compose, counting blocks once and explicit false values as active");
+			"All six overrides compose, counting blocks once and explicit false values as active");
 
 		// A different authoring source must not silently clear session overrides or
 		// re-seed the parameters of an already active settings block.
@@ -429,22 +373,21 @@ namespace gglab
 		nextAuthoringProfile.m_Lighting.m_GTAO.m_Radius = 7.0f;
 		nextAuthoringProfile.m_TemporalAA.m_MaxHistoryFeedback = 0.9f;
 		nextAuthoringProfile.m_PostProcess.m_Bloom.m_Intensity = 0.4f;
-		nextAuthoringProfile.m_Lighting.m_EnableAerialPerspective = false;
 		nextAuthoringProfile.m_EnableScenePreExposure = false;
 		const ViewRenderProfile originalNextAuthoringProfile = nextAuthoringProfile;
-		context.Check(overrides.GetActiveCount() == 8 &&
+		context.Check(overrides.GetActiveCount() == 6 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile) &&
 			ProfilesMatch(nextAuthoringProfile, originalNextAuthoringProfile),
 			"DevTools session overrides survive authoring-profile switches without mutating either source");
 
 		overrides.m_GTAO.Reset();
 		expectedProfile.m_Lighting.m_GTAO = nextAuthoringProfile.m_Lighting.m_GTAO;
-		context.Check(overrides.GetActiveCount() == 7 &&
+		context.Check(overrides.GetActiveCount() == 5 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
 			"Resetting one block restores the current authoring source and preserves sibling overrides");
-		overrides.m_AerialPerspective.reset();
-		expectedProfile.m_Lighting.m_EnableAerialPerspective = false;
-		context.Check(overrides.GetActiveCount() == 6 &&
+		overrides.m_ScenePreExposure.reset();
+		expectedProfile.m_EnableScenePreExposure = false;
+		context.Check(overrides.GetActiveCount() == 4 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
 			"Resetting one scalar restores inheritance without clearing diagnostic or other overrides");
 
@@ -454,16 +397,15 @@ namespace gglab
 			"Clear All restores every current authoring setting, including diagnostic intent");
 		nextAuthoringProfile.m_Lighting.m_GTAO.m_Radius = 3.0f;
 		nextAuthoringProfile.m_PostProcess.m_Bloom.m_Intensity = 0.6f;
-		nextAuthoringProfile.m_Lighting.m_EnableAerialPerspective = true;
+		nextAuthoringProfile.m_EnableScenePreExposure = true;
 		context.Check(ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), nextAuthoringProfile),
 			"Cleared overrides keep following subsequent authoring edits rather than a captured profile");
 
 		overrides.m_Bloom.Activate(bloomSettings);
 		overrides.m_ScenePreExposure = false;
 		overrides.m_HdrDiffValidation = false;
-		overrides.m_AerialProbe = false;
 		DevToolsRuntime nextDevToolsSession;
-		context.Check(overrides.GetActiveCount() == 4 &&
+		context.Check(overrides.GetActiveCount() == 3 &&
 			nextDevToolsSession.GetViewRenderSettingsOverrides().GetActiveCount() == 0 &&
 			ProfilesMatch(nextDevToolsSession.ResolveViewRenderProfile(nextAuthoringProfile), nextAuthoringProfile),
 			"Session overrides are instance-owned and never inherited by a new DevTools session");

@@ -8,7 +8,6 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
-#include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
@@ -114,27 +113,6 @@ namespace gglab
 				{
 					snapshot.m_History = *history;
 					snapshot.m_HistoryAvailable = true;
-				}
-			}
-
-			const auto* aerialStatus = blackboard.TryGet<RGAerialPerspectiveFrameStatus>(AerialPerspectiveFrameStatusName);
-			if (aerialStatus)
-			{
-				snapshot.m_AerialPerspective = aerialStatus->m_Status;
-				snapshot.m_AerialDependencies = aerialStatus->m_Dependencies;
-				snapshot.m_AerialProbe = aerialStatus->m_ProbeStatus;
-				const auto* aerial = blackboard.TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
-				if (snapshot.m_AerialPerspective.m_State == ViewRenderFeatureState::Active)
-				{
-					snapshot.m_AerialPerspective = aerial
-						? CheckResourceActivity(graph, aerial->m_ThroughputAtlas)
-						: ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
-				}
-				if (snapshot.m_AerialProbe.m_State == ViewRenderFeatureState::Active)
-				{
-					snapshot.m_AerialProbe = aerial
-						? CheckResourceActivity(graph, aerial->m_ProbeBuffer)
-						: ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
 				}
 			}
 

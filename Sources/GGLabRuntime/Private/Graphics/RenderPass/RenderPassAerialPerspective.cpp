@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -153,73 +154,44 @@ namespace gglab
 	void RenderPassAerialPerspective::AddPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
-		auto& frameStatus = rg.GetBlackboard().GetOrCreate<RGAerialPerspectiveFrameStatus>(
-			AerialPerspectiveFrameStatusName);
-		frameStatus = {};
-		auto& dependencies = frameStatus.m_Dependencies;
-		dependencies.m_SceneAvailable = context.IsRenderSceneReady();
-		if (dependencies.m_SceneAvailable)
-		{
-			dependencies.m_AtmosphereEnabled = context.m_RenderScene.m_Atmosphere.has_value();
-			dependencies.m_PhysicalSunEnabled = context.m_RenderScene.m_WorldSun.has_value();
-		}
-		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
-			AtmosphereResourcesName);
-		dependencies.m_AtmosphereReady = dependencies.m_AtmosphereEnabled && services.m_Atmosphere &&
-			services.m_Atmosphere->GetConstants().IsValid() && atmosphereResources;
-		if (services.m_Environment)
-		{
-			const auto& environment = services.m_Environment->GetEnvironmentLightingSettings();
-			dependencies.m_SkySource = environment.m_BackgroundMode;
-			dependencies.m_SkyboxEnabled = environment.m_EnableSkybox;
-		}
 		const auto& lighting = context.GetDisplayViewRenderSettings().m_Lighting;
-		frameStatus.m_ProbeStatus = lighting.m_EnableAerialProbe
-			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
-			: ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested };
 		// Parameter diagnostics and their lighting-removal MRT must stay in the
 		// same unmodified scene-linear domain through final composition.
 		if (!lighting.m_EnableAerialPerspective)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested };
 			return;
 		}
 		if (!context.IsRenderSceneReady())
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RenderSceneUnavailable };
 			return;
 		}
 		if (context.m_RenderScene.m_HasMaterialDiagnostics)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::MaterialDiagnosticsActive };
 			return;
 		}
 		if (!context.m_RenderScene.m_Atmosphere || !services.m_Atmosphere ||
 			!services.m_Atmosphere->GetConstants().IsValid())
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::AtmosphereUnavailable };
 			return;
 		}
 		if (!context.m_RenderScene.m_WorldSun)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PhysicalSunUnavailable };
 			return;
 		}
 		if (!services.m_Environment)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::EnvironmentUnavailable };
 			return;
 		}
 		const auto& environment = services.m_Environment->GetEnvironmentLightingSettings();
 		if (!environment.m_EnableSkybox ||
 			environment.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::PhysicalSkyInactive };
 			return;
 		}
+		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
+			AtmosphereResourcesName);
 		if (!atmosphereResources)
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::AtmosphereUnavailable };
 			return;
 		}
 		if (!m_BuildRecipe.m_CSId.IsValid())
@@ -237,10 +209,8 @@ namespace gglab
 			m_CompositeSlot, m_CompositeRecipe, GetInfo());
 		if (!buildPipeline.IsValid() || !compositePipeline.IsValid())
 		{
-			frameStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
 			return;
 		}
-		frameStatus.m_Status = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 		RHIPipelineHandle probePipeline{};
 		if (context.GetDisplayViewRenderSettings().m_Lighting.m_EnableAerialProbe)
 		{
@@ -259,9 +229,6 @@ namespace gglab
 			}
 			probePipeline = services.m_PipelineResolver->Resolve(
 				m_ProbeSlot, m_ProbeRecipe, GetInfo());
-			frameStatus.m_ProbeStatus = probePipeline.IsValid()
-				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None }
-				: ViewRenderFeatureStatus{ ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
 		}
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();

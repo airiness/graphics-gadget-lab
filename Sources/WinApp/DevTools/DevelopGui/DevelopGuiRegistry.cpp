@@ -76,7 +76,7 @@ namespace gglab
 		m_IsBuilt = false;
 	}
 
-	bool DevelopGuiRegistry::OpenPanel(std::string_view fullPath, std::string_view section) noexcept
+	bool DevelopGuiRegistry::OpenPanel(std::string_view fullPath) noexcept
 	{
 		for (auto& panel : m_Panels)
 		{
@@ -84,7 +84,6 @@ namespace gglab
 			{
 				panel.m_Open = true;
 				panel.m_FocusRequested = true;
-				if (!section.empty()) panel.m_Panel->RequestSection(section);
 				return true;
 			}
 		}

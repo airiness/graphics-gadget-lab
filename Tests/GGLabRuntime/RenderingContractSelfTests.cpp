@@ -7006,51 +7006,13 @@ namespace gglab
 				ViewTargetsTableName).GetViewTargets(RenderViewID::Main).m_SceneColor;
 			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = false;
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
-			const auto* disabledAerialStatus = aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveFrameStatus>(
-				AerialPerspectiveFrameStatusName);
-			context.Check(disabledAerialStatus && disabledAerialStatus->m_Status.m_State == ViewRenderFeatureState::Disabled &&
-				disabledAerialStatus->m_Status.m_Reason == ViewRenderFeatureReason::NotRequested &&
-				disabledAerialStatus->m_ProbeStatus.m_State == ViewRenderFeatureState::Disabled,
-				"Disabled aerial transport publishes CPU-only intent without creating aerial resources");
-			context.Check(disabledAerialStatus && disabledAerialStatus->m_Dependencies.m_SceneAvailable &&
-				disabledAerialStatus->m_Dependencies.m_AtmosphereEnabled &&
-				disabledAerialStatus->m_Dependencies.m_AtmosphereReady &&
-				disabledAerialStatus->m_Dependencies.m_PhysicalSunEnabled &&
-				disabledAerialStatus->m_Dependencies.m_SkyboxEnabled &&
-				disabledAerialStatus->m_Dependencies.m_SkySource == EnvironmentBackgroundMode::PhysicalAtmospherePreview,
-				"Aerial dependency observations remain available while transport is disabled and recognize sky preview");
 			context.Check(!aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName) &&
 				aerialGraph.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName).
 				GetViewTargets(RenderViewID::Main).m_SceneColor == baselineColor &&
 				activeAtmosphere.GetTexture(0) == newTexture && bakeEnvironment.m_Settings.m_EnableSkybox,
 				"Disabling aerial transport preserves surface scene color, active atmosphere and sky settings");
-			RenderGraph dependencyGraph({ .m_Device = &device, .m_TransientResourcePool = &previewPool });
-			aerialPass.AddPass(dependencyGraph, aerialContext, aerialServices);
-			const auto& missingResources = dependencyGraph.GetBlackboard().Get<RGAerialPerspectiveFrameStatus>(
-				AerialPerspectiveFrameStatusName).m_Dependencies;
-			context.Check(missingResources.m_AtmosphereEnabled && !missingResources.m_AtmosphereReady,
-				"Enabled atmosphere inputs do not imply aerial resources are available in this graph");
-			frame.m_RenderScene.m_Atmosphere.reset();
-			bakeEnvironment.m_Settings.m_EnableSkybox = false;
-			bakeEnvironment.m_Settings.m_BackgroundMode = EnvironmentBackgroundMode::TextureEnvironment;
-			aerialPass.AddPass(dependencyGraph, aerialContext, aerialServices);
-			const auto& disabledDependencies = dependencyGraph.GetBlackboard().Get<RGAerialPerspectiveFrameStatus>(
-				AerialPerspectiveFrameStatusName).m_Dependencies;
-			context.Check(!disabledDependencies.m_AtmosphereEnabled && !disabledDependencies.m_AtmosphereReady &&
-				disabledDependencies.m_PhysicalSunEnabled && !disabledDependencies.m_SkyboxEnabled &&
-				disabledDependencies.m_SkySource == EnvironmentBackgroundMode::TextureEnvironment &&
-				!dependencyGraph.GetBlackboard().TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName),
-				"Dependency observations refresh disabled atmosphere and HDR sky state without adding aerial work");
-			frame.m_RenderScene.m_Atmosphere = AtmosphereSettings{};
-			bakeEnvironment.m_Settings.m_EnableSkybox = true;
-			bakeEnvironment.m_Settings.m_BackgroundMode = EnvironmentBackgroundMode::PhysicalAtmospherePreview;
 			frame.m_ViewRenderSettings[0].m_Lighting.m_EnableAerialPerspective = true;
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
-			const auto* activeAerialStatus = aerialGraph.GetBlackboard().TryGet<RGAerialPerspectiveFrameStatus>(
-				AerialPerspectiveFrameStatusName);
-			context.Check(activeAerialStatus && activeAerialStatus->m_Status.m_State == ViewRenderFeatureState::Active &&
-				activeAerialStatus->m_ProbeStatus.m_State == ViewRenderFeatureState::Disabled,
-				"Aerial transport reports active graph work without implicitly enabling the GPU probe");
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
 			aerialGraph.AddPass<AerialTargetData>("AerialTest.TransparentLoad", [](

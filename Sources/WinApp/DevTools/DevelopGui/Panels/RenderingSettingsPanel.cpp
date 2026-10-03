@@ -3,7 +3,6 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
-#include "DevTools/DevelopGui/Panels/WorldLightingPanel.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 
@@ -42,10 +41,6 @@ namespace gglab
 			case ViewRenderFeatureReason::DepthVelocityPathUnavailable: return "Depth / velocity path unavailable";
 			case ViewRenderFeatureReason::SceneExtensionUnsupported: return "Scene extension unsupported";
 			case ViewRenderFeatureReason::MaterialDiagnosticsActive: return "Material diagnostics active";
-			case ViewRenderFeatureReason::AtmosphereUnavailable: return "Atmosphere unavailable";
-			case ViewRenderFeatureReason::PhysicalSunUnavailable: return "Physical sun unavailable";
-			case ViewRenderFeatureReason::EnvironmentUnavailable: return "Environment unavailable";
-			case ViewRenderFeatureReason::PhysicalSkyInactive: return "Physical sky inactive";
 			case ViewRenderFeatureReason::RequiredFeatureInactive: return "Required feature inactive";
 			case ViewRenderFeatureReason::ZeroIntensity: return "Intensity is zero";
 			case ViewRenderFeatureReason::ResourcesUnavailable: return "Resources unavailable";
@@ -111,8 +106,7 @@ namespace gglab
 			ImGui::TableSetColumnIndex(1);
 		}
 
-		void DrawInspect(DevelopGuiContext& context, std::string_view path,
-			std::string_view section = {}) noexcept
+		void DrawInspect(DevelopGuiContext& context, std::string_view path) noexcept
 		{
 			ImGui::TableSetColumnIndex(4);
 			if (!path.empty())
@@ -120,7 +114,7 @@ namespace gglab
 				ImGui::BeginDisabled(!context.m_PanelRegistry);
 				if (ImGui::SmallButton("Inspect"))
 				{
-					GGLAB_UNUSED(context.m_PanelRegistry->OpenPanel(path, section));
+					GGLAB_UNUSED(context.m_PanelRegistry->OpenPanel(path));
 				}
 				ImGui::EndDisabled();
 			}
@@ -177,8 +171,7 @@ namespace gglab
 
 		void DrawScalar(const char* label, std::optional<bool>* override,
 			bool authoring, bool published, bool resolved, ViewRenderFeatureStatus status,
-			DevelopGuiContext& context, std::string_view inspector,
-			std::string_view section = {}) noexcept
+			DevelopGuiContext& context, std::string_view inspector) noexcept
 		{
 			BeginRow(label);
 			bool enabled = override ? override->value_or(authoring) : published;
@@ -188,7 +181,7 @@ namespace gglab
 			ImGui::EndDisabled();
 			DrawOverride(override && override->has_value(), [&]() { override->reset(); });
 			DrawRuntime(status, (override ? override->value_or(authoring) : published) != published);
-			DrawInspect(context, inspector, section);
+			DrawInspect(context, inspector);
 		}
 
 		void DrawLightingMode(const RenderingSettingsDiagnosticsSnapshot& snapshot,
@@ -303,10 +296,6 @@ namespace gglab
 			DrawScalar("HDR Diff Validation", overrides ? &overrides->m_HdrDiffValidation : nullptr,
 				authoring.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, requested.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation,
 				resolved.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, snapshot->m_HdrDiffValidation, context, ForwardInspector);
-			DrawScalar("Aerial Probe", overrides ? &overrides->m_AerialProbe : nullptr,
-				authoring.m_Lighting.m_EnableAerialProbe, requested.m_Lighting.m_EnableAerialProbe,
-				resolved.m_Lighting.m_EnableAerialProbe, snapshot->m_AerialProbe, context,
-				WorldLightingPanel::Path, WorldLightingPanel::AtmosphereSection);
 			ImGui::EndTable();
 			ImGui::TextDisabled("Diagnostic readbacks add GPU work when enabled.");
 		}
