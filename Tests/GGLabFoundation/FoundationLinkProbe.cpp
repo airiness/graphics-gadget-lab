@@ -339,6 +339,218 @@ namespace gglab::foundation::tests
 		std::shared_ptr<RecordingLifecycleState> m_State;
 	};
 
+	[[nodiscard]] bool RunTaskFailureTests() noexcept
+	{
+		std::vector<TaskCompletionInfo> completions;
+		const std::thread::id ownerThread = std::this_thread::get_id();
+		bool ownerThreadCallbacks = true;
+		TaskSystem taskSystem({ .m_WorkerCount = 1 });
+		std::array<TaskWork, 4> work{
+			[](std::stop_token) { return TaskResult::Failure("Explicit task failure."); },
+			[](std::stop_token) -> TaskResult { throw std::runtime_error("Task exception."); },
+			[](std::stop_token) -> TaskResult { throw 42; },
+			[](std::stop_token) { return TaskResult::Success(); },
+		};
+		for (TaskWork& taskWork : work)
+		{
+			if (!taskSystem.Submit({ .m_Name = "Foundation/failure recovery" },
+				std::move(taskWork), [&](const TaskCompletionInfo& info)
+				{
+					ownerThreadCallbacks &= std::this_thread::get_id() == ownerThread;
+					completions.push_back(info);
+				}))
+			{
+				return false;
+			}
+		}
+		if (!WaitUntil([&] { return taskSystem.GetStatistics().m_PendingCompletionCount == 4; }) ||
+			taskSystem.PumpCompletions() != 4 || completions.size() != 4)
+		{
+			return false;
+		}
+		const TaskSystemStatistics statistics = taskSystem.GetStatistics();
+		return ownerThreadCallbacks && completions[0].m_Status == TaskStatus::Failed &&
+			completions[0].m_Error == "Explicit task failure." &&
+			completions[1].m_Status == TaskStatus::Failed &&
+			completions[1].m_Error == "Task exception." &&
+			completions[2].m_Status == TaskStatus::Failed &&
+			completions[2].m_Error == "Unknown task exception." &&
+			completions[3].m_Status == TaskStatus::Succeeded && completions[3].m_Error.empty() &&
+			statistics.m_FailedCount == 3 && statistics.m_SucceededCount == 1 &&
+			statistics.m_CompletionCallbackCount == 4 && statistics.m_ActiveTasks.empty();
+	}
+
+	[[nodiscard]] bool RunTaskRunningCancellationTests() noexcept
+	{
+		std::atomic_bool started = false;
+		std::atomic_bool observedStop = false;
+		TaskCompletionInfo completion;
+		TaskSystem taskSystem({ .m_WorkerCount = 1 });
+		const TaskHandle handle = taskSystem.Submit({ .m_Name = "Foundation/cancel running" },
+			[&](std::stop_token stopToken)
+			{
+				started = true;
+				while (!stopToken.stop_requested())
+				{
+					std::this_thread::yield();
+				}
+				observedStop = true;
+				return TaskResult::Failure("Cancellation takes precedence over failure.");
+			},
+			[&](const TaskCompletionInfo& info) { completion = info; });
+		if (!handle || !WaitUntil([&] { return started.load(); }) || !taskSystem.Cancel(handle) ||
+			!WaitUntil([&] { return taskSystem.GetStatistics().m_PendingCompletionCount == 1; }) ||
+			taskSystem.PumpCompletions() != 1)
+		{
+			return false;
+		}
+		const TaskSystemStatistics statistics = taskSystem.GetStatistics();
+		return observedStop.load() && completion.m_Handle == handle &&
+			completion.m_Status == TaskStatus::Cancelled && completion.m_Error.empty() &&
+			statistics.m_CancelledCount == 1 && statistics.m_FailedCount == 0 &&
+			statistics.m_RunningCount == 0 && statistics.m_AcceptingTasks &&
+			!taskSystem.Cancel(handle);
+	}
+
+	[[nodiscard]] bool RunTaskCompletionBacklogTests() noexcept
+	{
+		constexpr uint32_t TaskCount = 256;
+		std::atomic_uint32_t executed = 0;
+		std::array<TaskHandle, TaskCount> handles{};
+		std::array<bool, TaskCount> completed{};
+		uint32_t callbacks = 0;
+		bool validCallbacks = true;
+		const std::thread::id ownerThread = std::this_thread::get_id();
+		TaskSystem taskSystem({ .m_WorkerCount = 2 });
+		for (uint32_t index = 0; index < TaskCount; ++index)
+		{
+			handles[index] = taskSystem.Submit({ .m_Name = "Foundation/completion backlog" },
+				[&](std::stop_token)
+				{
+					++executed;
+					return TaskResult::Success();
+				},
+				[&, index](const TaskCompletionInfo& info)
+				{
+					validCallbacks &= !completed[index] && info.m_Handle == handles[index] &&
+						info.m_Status == TaskStatus::Succeeded &&
+						std::this_thread::get_id() == ownerThread;
+					completed[index] = true;
+					++callbacks;
+				});
+			if (!handles[index])
+			{
+				return false;
+			}
+		}
+		if (!WaitUntil([&]
+			{ return taskSystem.GetStatistics().m_PendingCompletionCount == TaskCount; }) ||
+			executed.load() != TaskCount || callbacks != 0 ||
+			taskSystem.PumpCompletions({ .m_MaxCallbacks = 0 }) != 0 ||
+			taskSystem.GetStatistics().m_PendingCompletionCount != TaskCount)
+		{
+			return false;
+		}
+		// A time budget is checked after dispatch, so even a zero budget permits one callback.
+		if (taskSystem.PumpCompletions({ .m_MaxMilliseconds = 0.0 }) != 1 || callbacks != 1)
+		{
+			return false;
+		}
+		while (callbacks < TaskCount)
+		{
+			const uint32_t expected = (TaskCount - callbacks) < 7 ? TaskCount - callbacks : 7;
+			const uint32_t before = callbacks;
+			if (taskSystem.PumpCompletions({ .m_MaxCallbacks = 7 }) != expected ||
+				callbacks != before + expected ||
+				taskSystem.GetStatistics().m_PendingCompletionCount != TaskCount - callbacks)
+			{
+				return false;
+			}
+		}
+		const TaskSystemStatistics statistics = taskSystem.GetStatistics();
+		return validCallbacks && statistics.m_SubmittedCount == TaskCount &&
+			statistics.m_SucceededCount == TaskCount && statistics.m_CompletionCallbackCount == TaskCount &&
+			statistics.m_CompletionCallbackFailureCount == 0 && statistics.m_ActiveTasks.empty() &&
+			taskSystem.PumpCompletions() == 0;
+	}
+
+	[[nodiscard]] bool RunTaskCompletionLifetimeTests() noexcept
+	{
+		auto owner = std::make_shared<uint32_t>(0);
+		const std::weak_ptr<uint32_t> weakOwner = owner;
+		std::atomic_bool started = false;
+		uint32_t expiredOwnerCallbacks = 0;
+		TaskSystem taskSystem({ .m_WorkerCount = 1 });
+		const TaskHandle handle = taskSystem.Submit({ .m_Name = "Foundation/expired owner" },
+			[state = owner, &started](std::stop_token stopToken)
+			{
+				*state = 1;
+				started = true;
+				while (!stopToken.stop_requested())
+				{
+					std::this_thread::yield();
+				}
+				return TaskResult::Success();
+			},
+			[weakOwner, &expiredOwnerCallbacks](const TaskCompletionInfo&)
+			{
+				if (const auto state = weakOwner.lock())
+				{
+					++*state;
+				}
+				else
+				{
+					++expiredOwnerCallbacks;
+				}
+			});
+		if (!handle || !WaitUntil([&] { return started.load(); }))
+		{
+			return false;
+		}
+		owner.reset();
+		// Work retains its backing state until it finishes; a weak callback must not retain it.
+		if (weakOwner.expired() || !taskSystem.Cancel(handle) || !WaitUntil([&]
+			{ return taskSystem.GetStatistics().m_PendingCompletionCount == 1; }) ||
+			!weakOwner.expired())
+		{
+			return false;
+		}
+		auto nextOwner = std::make_shared<uint32_t>(0);
+		if (!taskSystem.Submit({ .m_Name = "Foundation/replacement owner" },
+			[](std::stop_token) { return TaskResult::Success(); },
+			[state = nextOwner](const TaskCompletionInfo&) { ++*state; }) ||
+			!WaitUntil([&] { return taskSystem.GetStatistics().m_PendingCompletionCount == 2; }) ||
+			taskSystem.PumpCompletions() != 2 || expiredOwnerCallbacks != 1 || *nextOwner != 1)
+		{
+			return false;
+		}
+
+		bool discardedCallbackRan = false;
+		std::weak_ptr<uint32_t> pendingOwner;
+		{
+			TaskSystem pendingSystem({ .m_WorkerCount = 1 });
+			auto state = std::make_shared<uint32_t>(0);
+			pendingOwner = state;
+			if (!pendingSystem.Submit({ .m_Name = "Foundation/discard pending completion" },
+				[](std::stop_token) { return TaskResult::Success(); },
+				[state, &discardedCallbackRan](const TaskCompletionInfo&)
+				{
+					++*state;
+					discardedCallbackRan = true;
+				}) || !WaitUntil([&]
+				{ return pendingSystem.GetStatistics().m_PendingCompletionCount == 1; }))
+			{
+				return false;
+			}
+			state.reset();
+			if (pendingOwner.expired())
+			{
+				return false;
+			}
+		}
+		return pendingOwner.expired() && !discardedCallbackRan;
+	}
+
 	[[nodiscard]] bool RunTaskTests() noexcept
 	{
 		const std::thread::id ownerThread = std::this_thread::get_id();
@@ -374,7 +586,7 @@ namespace gglab::foundation::tests
 		std::atomic_bool blockerStarted = false;
 		std::atomic_bool releaseBlocker = false;
 		std::atomic_bool backgroundExecuted = false;
-		std::vector<std::string> executionOrder;
+		std::vector<uint32_t> executionOrder;
 		std::mutex executionMutex;
 		TaskStatus cancelledStatus = TaskStatus::Invalid;
 		{
@@ -410,36 +622,52 @@ namespace gglab::foundation::tests
 					return TaskResult::Success();
 				},
 				[&](const TaskCompletionInfo& info) { cancelledStatus = info.m_Status; });
-			const TaskHandle critical = taskSystem.Submit(
-				{ .m_Name = "Foundation/critical", .m_Priority = TaskPriority::Critical },
-				[&](std::stop_token)
+			constexpr std::array Priorities{
+				TaskPriority::Background, TaskPriority::High, TaskPriority::Normal, TaskPriority::Critical,
+			};
+			// Queue every priority twice behind one running worker to verify priority and FIFO order.
+			for (uint32_t index = 0; index < 8; ++index)
+			{
+				if (!taskSystem.Submit(
+					{ .m_Name = "Foundation/priority order", .m_Priority = Priorities[index % Priorities.size()] },
+					[&, index](std::stop_token)
+					{
+						std::scoped_lock lock(executionMutex);
+						executionOrder.push_back(index);
+						return TaskResult::Success();
+					}))
 				{
-					std::scoped_lock lock(executionMutex);
-					executionOrder.emplace_back("critical");
-					return TaskResult::Success();
-				});
-			if (!critical || !taskSystem.Cancel(background))
+					return false;
+				}
+			}
+			if (!background || !taskSystem.Cancel(background))
 			{
 				return false;
 			}
 			releaseBlocker = true;
 			if (!WaitUntil([&]
-				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 3; }))
+				{ return taskSystem.GetStatistics().m_PendingCompletionCount == 10; }))
 			{
 				return false;
 			}
-			taskSystem.PumpCompletions();
+			if (taskSystem.PumpCompletions() != 10)
+			{
+				return false;
+			}
 			taskSystem.Shutdown();
 		}
 		if (lifecycleState->m_Destroyed.load() != 1 ||
 			!lifecycleState->m_DestroyedOnCreatingThread.load() || backgroundExecuted.load() ||
-			cancelledStatus != TaskStatus::Cancelled || executionOrder != std::vector<std::string>{ "critical" })
+			cancelledStatus != TaskStatus::Cancelled ||
+			executionOrder != std::vector<uint32_t>{ 3, 7, 1, 5, 2, 6, 0, 4 })
 		{
 			return false;
 		}
 
 		std::atomic_bool shutdownTaskStarted = false;
+		std::atomic_bool shutdownQueuedExecuted = false;
 		TaskStatus shutdownStatus = TaskStatus::Invalid;
+		TaskStatus shutdownQueuedStatus = TaskStatus::Invalid;
 		TaskSystem shutdownSystem({ .m_WorkerCount = 1 });
 		const TaskHandle shutdownTask = shutdownSystem.Submit(
 			{ .m_Name = "Foundation/shutdown" },
@@ -457,9 +685,32 @@ namespace gglab::foundation::tests
 		{
 			return false;
 		}
+		const TaskHandle shutdownQueued = shutdownSystem.Submit(
+			{ .m_Name = "Foundation/shutdown queued" },
+			[&](std::stop_token)
+			{
+				shutdownQueuedExecuted = true;
+				return TaskResult::Success();
+			},
+			[&](const TaskCompletionInfo& info) { shutdownQueuedStatus = info.m_Status; });
+		if (!shutdownQueued)
+		{
+			return false;
+		}
 		shutdownSystem.Shutdown();
-		return shutdownSystem.PumpCompletions() == 1 &&
-			shutdownStatus == TaskStatus::Cancelled && !shutdownSystem.IsAcceptingTasks();
+		shutdownSystem.Shutdown();
+		const TaskSystemStatistics shutdownStatistics = shutdownSystem.GetStatistics();
+		if (shutdownSystem.PumpCompletions() != 2 || shutdownStatus != TaskStatus::Cancelled ||
+			shutdownQueuedStatus != TaskStatus::Cancelled || shutdownQueuedExecuted.load() ||
+			shutdownSystem.IsAcceptingTasks() || shutdownStatistics.m_WorkerCount != 0 ||
+			shutdownStatistics.m_RunningCount != 0 || shutdownStatistics.m_CancelledCount != 2 ||
+			shutdownSystem.Submit({ .m_Name = "Foundation/rejected after shutdown" },
+				[](std::stop_token) { return TaskResult::Success(); }))
+		{
+			return false;
+		}
+		return RunTaskFailureTests() && RunTaskRunningCancellationTests() &&
+			RunTaskCompletionBacklogTests() && RunTaskCompletionLifetimeTests();
 	}
 
 	class ScopedTestDirectory final

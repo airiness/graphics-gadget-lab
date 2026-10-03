@@ -1265,10 +1265,14 @@ namespace gglab
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
-			desktop.m_Labs.size() == 20 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
-			"Windows desktop composition includes four Demo entries and twenty Labs");
+			"Windows desktop composition includes four Demo entries and nineteen Labs");
+		context.Check(ResolveApplicationContentSelection(
+			desktop, DesktopLabHostDemoId, "gglab.lab.task_system").m_Status ==
+			ApplicationContentSelectionStatus::StartupLabUnavailable,
+			"The retired Task System Lab identity is unavailable");
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
 		context.Check(islandSelection.Succeeded(),

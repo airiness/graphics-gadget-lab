@@ -19,7 +19,6 @@
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
-#include "Application/Lab/Sessions/TaskSystemLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
 #include "Application/Lab/Sessions/TextureContractLabSession.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
@@ -113,7 +112,6 @@ namespace gglab
 			{ TemporalAALabSession::GetDescriptor(), &TemporalAALabSession::Create },
 			{ AlphaTestLabSession::GetDescriptor(), &AlphaTestLabSession::Create },
 			{ MathFoundationLabSession::GetDescriptor(), &MathFoundationLabSession::Create },
-			{ TaskSystemLabSession::GetDescriptor(), &TaskSystemLabSession::Create },
 			{ AssetPublicationLabSession::GetDescriptor(), &AssetPublicationLabSession::Create },
 			{ AssetResidencyLabSession::GetDescriptor(), &AssetResidencyLabSession::Create },
 			{ EnvironmentAssetLabSession::GetDescriptor(), &EnvironmentAssetLabSession::Create },
