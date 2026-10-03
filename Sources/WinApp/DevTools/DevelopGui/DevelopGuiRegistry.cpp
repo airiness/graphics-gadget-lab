@@ -76,6 +76,27 @@ namespace gglab
 		m_IsBuilt = false;
 	}
 
+	bool DevelopGuiRegistry::OpenPanel(std::string_view fullPath, std::string_view section) noexcept
+	{
+		for (auto& panel : m_Panels)
+		{
+			if (panel.m_FullPath == fullPath)
+			{
+				panel.m_Open = true;
+				panel.m_FocusRequested = true;
+				if (!section.empty()) panel.m_Panel->RequestSection(section);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool DevelopGuiRegistry::IsPanelOpen(std::string_view fullPath) const noexcept
+	{
+		return std::ranges::any_of(m_Panels, [fullPath](const PanelRuntime& panel)
+			{ return panel.m_FullPath == fullPath && panel.m_Open; });
+	}
+
 	void DevelopGuiRegistry::BuildMenuTree() noexcept
 	{
 		m_Root = MenuNode{};
@@ -163,10 +184,16 @@ namespace gglab
 
 	void DevelopGuiRegistry::DrawPanels(DevelopGuiContext& context) noexcept
 	{
+		if (!m_IsBuilt)
+		{
+			BuildMenuTree();
+		}
 		auto* prevStore = context.m_StateStore;
+		auto* prevRegistry = context.m_PanelRegistry;
 		const uint64_t prevKey = context.m_CurrentPanelKey;
 
 		context.m_StateStore = &m_StateStore;
+		context.m_PanelRegistry = this;
 
 		for (auto& panel : m_Panels)
 		{
@@ -176,6 +203,12 @@ namespace gglab
 			}
 
 			context.m_CurrentPanelKey = panel.m_Key;
+			if (panel.m_FocusRequested)
+			{
+				ImGui::SetNextWindowCollapsed(false);
+				ImGui::SetNextWindowFocus();
+				panel.m_FocusRequested = false;
+			}
 
 			if (ImGui::Begin(panel.m_ImGuiWindowTitle.c_str(), &panel.m_Open))
 			{
@@ -193,6 +226,7 @@ namespace gglab
 
 		context.m_CurrentPanelKey = prevKey;
 		context.m_StateStore = prevStore;
+		context.m_PanelRegistry = prevRegistry;
 	}
 
 	void DevelopGuiRegistry::ClearPanels() noexcept

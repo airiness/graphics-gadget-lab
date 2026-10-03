@@ -1,5 +1,8 @@
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
+
+#include <format>
 
 #include <imgui.h>
 
@@ -72,6 +75,18 @@ namespace gglab
 		}
 
 		m_Registry.DrawMenuBar();
+		const uint32_t activeOverrides = m_ViewRenderSettingsOverrides.GetActiveCount();
+		if (activeOverrides > 0 && ImGui::BeginMainMenuBar())
+		{
+			const auto label = std::format("{} DevTools Overrides Active", activeOverrides);
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.75f, 0.3f, 1.0f));
+			if (ImGui::MenuItem(label.c_str()))
+			{
+				GGLAB_UNUSED(m_Registry.OpenPanel(RenderingSettingsPanel::Path));
+			}
+			ImGui::PopStyleColor();
+			ImGui::EndMainMenuBar();
+		}
 		m_Registry.DrawPanels(context);
 	}
 }

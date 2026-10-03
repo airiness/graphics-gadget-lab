@@ -150,6 +150,23 @@ namespace gglab
 		auto& frameStatus = rg.GetBlackboard().GetOrCreate<RGAerialPerspectiveFrameStatus>(
 			AerialPerspectiveFrameStatusName);
 		frameStatus = {};
+		auto& dependencies = frameStatus.m_Dependencies;
+		dependencies.m_SceneAvailable = context.IsRenderSceneReady();
+		if (dependencies.m_SceneAvailable)
+		{
+			dependencies.m_AtmosphereEnabled = context.m_RenderScene.m_Atmosphere.has_value();
+			dependencies.m_PhysicalSunEnabled = context.m_RenderScene.m_WorldSun.has_value();
+		}
+		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
+			AtmosphereResourcesName);
+		dependencies.m_AtmosphereReady = dependencies.m_AtmosphereEnabled && services.m_Atmosphere &&
+			services.m_Atmosphere->GetConstants().IsValid() && atmosphereResources;
+		if (services.m_Environment)
+		{
+			const auto& environment = services.m_Environment->GetEnvironmentLightingSettings();
+			dependencies.m_SkySource = environment.m_BackgroundMode;
+			dependencies.m_SkyboxEnabled = environment.m_EnableSkybox;
+		}
 		const auto& lighting = context.GetDisplayViewRenderSettings().m_Lighting;
 		frameStatus.m_ProbeStatus = lighting.m_EnableAerialProbe
 			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
@@ -188,8 +205,6 @@ namespace gglab
 			return;
 		}
 		const auto& environment = services.m_Environment->GetEnvironmentLightingSettings();
-		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
-			AtmosphereResourcesName);
 		if (!environment.m_EnableSkybox ||
 			environment.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment)
 		{

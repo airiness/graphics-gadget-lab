@@ -283,7 +283,8 @@ namespace gglab
 			DrawSun(context);
 			ImGui::EndTabItem();
 		}
-		if (ImGui::BeginTabItem("Atmosphere"))
+		if (ImGui::BeginTabItem("Atmosphere", nullptr,
+			m_AtmosphereRequested ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None))
 		{
 			DrawAtmosphere(context);
 			ImGui::EndTabItem();
@@ -294,5 +295,6 @@ namespace gglab
 			ImGui::EndTabItem();
 		}
 		ImGui::EndTabBar();
+		m_AtmosphereRequested = false;
 	}
 }

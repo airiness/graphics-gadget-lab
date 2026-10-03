@@ -11,6 +11,7 @@ namespace gglab
 	{
 		ViewRenderFeatureStatus m_Status{};
 		ViewRenderFeatureStatus m_ProbeStatus{};
+		AerialPerspectiveDependencies m_Dependencies{};
 	};
 
 	struct RGAerialPerspectiveResources

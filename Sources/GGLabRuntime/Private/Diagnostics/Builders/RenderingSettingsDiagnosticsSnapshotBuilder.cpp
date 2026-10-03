@@ -121,6 +121,7 @@ namespace gglab
 			if (aerialStatus)
 			{
 				snapshot.m_AerialPerspective = aerialStatus->m_Status;
+				snapshot.m_AerialDependencies = aerialStatus->m_Dependencies;
 				snapshot.m_AerialProbe = aerialStatus->m_ProbeStatus;
 				const auto* aerial = blackboard.TryGet<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
 				if (snapshot.m_AerialPerspective.m_State == ViewRenderFeatureState::Active)

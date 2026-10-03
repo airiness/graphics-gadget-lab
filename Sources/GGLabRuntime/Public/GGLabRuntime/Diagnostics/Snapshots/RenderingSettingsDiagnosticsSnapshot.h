@@ -35,6 +35,7 @@ namespace gglab
 		bool m_HistoryAvailable = false;
 		ViewRenderFeatureStatus m_Bloom{};
 		ViewRenderFeatureStatus m_AerialPerspective{};
+		AerialPerspectiveDependencies m_AerialDependencies{};
 		ViewRenderFeatureStatus m_ScenePreExposure{};
 		ViewRenderFeatureStatus m_HdrDiffValidation{};
 		ViewRenderFeatureStatus m_AerialProbe{};

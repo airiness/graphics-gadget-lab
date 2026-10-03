@@ -250,6 +250,11 @@ namespace gglab
 					auto& aerialStatus = blackboard.Create<RGAerialPerspectiveFrameStatus>(AerialPerspectiveFrameStatusName);
 					aerialStatus.m_Status = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 					aerialStatus.m_ProbeStatus = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+					aerialStatus.m_Dependencies = {
+						.m_SceneAvailable = true, .m_AtmosphereEnabled = true, .m_AtmosphereReady = true,
+						.m_PhysicalSunEnabled = true, .m_SkySource = EnvironmentBackgroundMode::PhysicalSky,
+						.m_SkyboxEnabled = true,
+						};
 					auto& postProcess = blackboard.Create<RGPostProcessResources>(PostProcessResourcesName);
 					postProcess.m_Output.m_Texture = texture("Settings.Output");
 					postProcess.m_Bloom.m_Result.m_Texture = texture("Settings.Bloom");
@@ -339,6 +344,11 @@ namespace gglab
 				active.m_HdrDiffValidation.m_State == ViewRenderFeatureState::Active &&
 				active.m_Shadows.m_State == ViewRenderFeatureState::Active,
 				"Settings activity comes from live compiled resources and existing feature decisions");
+			context.Check(active.m_AerialDependencies.m_SceneAvailable && active.m_AerialDependencies.m_AtmosphereEnabled &&
+				active.m_AerialDependencies.m_AtmosphereReady && active.m_AerialDependencies.m_PhysicalSunEnabled &&
+				active.m_AerialDependencies.m_SkySource == EnvironmentBackgroundMode::PhysicalSky &&
+				active.m_AerialDependencies.m_SkyboxEnabled,
+				"Aerial dependency observations are copied from the same frame as feature activity");
 			context.Check(active.m_ScenePreExposure.m_State == ViewRenderFeatureState::Active &&
 				active.m_ResolvedSettings.m_Exposure.m_PreExposure == 1.0f &&
 				active.m_ToneMapping.m_State == ViewRenderFeatureState::Active,
@@ -355,6 +365,9 @@ namespace gglab
 			forward.m_Status = ForwardPlusFrameStatus::DepthCoverageUnavailable;
 			forward.m_HdrDiffStatus = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive };
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
+			auto& aerialStatus = graph.GetBlackboard().Get<RGAerialPerspectiveFrameStatus>(AerialPerspectiveFrameStatusName);
+			aerialStatus.m_Status = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::AtmosphereUnavailable };
+			aerialStatus.m_Dependencies.m_AtmosphereReady = false;
 			temporalPlan.m_Active = false;
 			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
 			temporalPlan.m_DisableReason = TemporalAADisableReason::DepthVelocityPathUnavailable;
@@ -367,6 +380,11 @@ namespace gglab
 				unavailable.m_GTAO.m_Reason == ViewRenderFeatureReason::CoreCapabilityUnavailable &&
 				unavailable.m_TemporalAA.m_Reason == ViewRenderFeatureReason::DepthVelocityPathUnavailable,
 				"Runtime fallbacks and unavailable reasons preserve requested feature intent");
+			context.Check(unavailable.m_AerialDependencies.m_AtmosphereEnabled &&
+				!unavailable.m_AerialDependencies.m_AtmosphereReady &&
+				unavailable.m_AerialPerspective.m_Reason == ViewRenderFeatureReason::AtmosphereUnavailable &&
+				active.m_AerialDependencies.m_AtmosphereReady,
+				"An enabled but unavailable atmosphere stays distinct from disabled intent and retained snapshots");
 			auto& postProcess = graph.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 			postProcess.m_BloomContributionEnabled = false;
 			graph.GetBlackboard().Create<RGViewTargetsTable>(ViewTargetsTableName)

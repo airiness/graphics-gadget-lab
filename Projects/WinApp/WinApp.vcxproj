@@ -192,6 +192,7 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderingSettingsPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp" />
@@ -310,6 +311,7 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderingSettingsPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\SceneDepthPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\WorldLightingPanel.h" />
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h" />
