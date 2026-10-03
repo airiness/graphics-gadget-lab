@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
+#include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
@@ -48,8 +49,9 @@ namespace gglab
 				snapshot.m_Height = view->m_Height;
 			}
 			snapshot.m_RuntimeAvailable = snapshot.m_SettingsAvailable &&
-				IsTemporalAADisplayViewEligible(context.m_DisplayViewId,
-					snapshot.m_Width, snapshot.m_Height) && context.m_RenderGraph &&
+				(context.m_DisplayViewId == RenderViewID::Main ||
+					IsDebugCameraRenderViewID(context.m_DisplayViewId)) &&
+				snapshot.m_Width > 0 && snapshot.m_Height > 0 && context.m_RenderGraph &&
 				context.m_RenderGraph->GetExecutionPlan();
 			if (!snapshot.m_RuntimeAvailable)
 			{

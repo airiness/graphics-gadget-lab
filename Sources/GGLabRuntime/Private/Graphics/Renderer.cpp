@@ -213,7 +213,7 @@ namespace gglab
 		}
 
 		GGLAB_ASSERT_MSG(!m_HasActiveFrame,
-			"Renderer::Finalize called while a Renderer::Frame is still active.");
+			"Renderer::Finalize called while a render frame is still active.");
 
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
@@ -290,7 +290,7 @@ namespace gglab
 			m_ActiveFrame.m_BackBufferIndex);
 	}
 
-	TemporalFrameTransaction& Renderer::BeginTemporalFrame(Frame& frame,
+	TemporalFrameTransaction& Renderer::BeginTemporalFrame(RenderFrame& frame,
 		const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
 		float scenePreExposure) noexcept
 	{
@@ -354,7 +354,7 @@ namespace gglab
 		return result;
 	}
 
-	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept
+	void Renderer::InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial &&
 			m_ActiveFrame.m_Phase == FramePhase::Begun,
@@ -381,7 +381,7 @@ namespace gglab
 	}
 
 	void Renderer::Render(
-		Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
+		RenderFrame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::Render called before initialization.");
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,
@@ -423,7 +423,7 @@ namespace gglab
 		m_ActiveFrame.m_Phase = FramePhase::Recorded;
 	}
 
-	RHIFrameEndResult Renderer::EndFrame(Frame& frame) noexcept
+	RHIFrameEndResult Renderer::EndFrame(RenderFrame& frame) noexcept
 	{
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::EndFrame called before initialization.");
 		GGLAB_ASSERT_MSG(m_HasActiveFrame && frame.GetSerial() == m_ActiveFrame.m_Serial,

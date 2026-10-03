@@ -330,6 +330,45 @@ namespace gglab
 				active.m_Shadows.m_State == ViewRenderFeatureState::Active,
 				"Settings activity comes from live compiled resources and existing feature decisions");
 			{
+				auto withoutTemporal = frame;
+				withoutTemporal.m_TemporalFramePlan = nullptr;
+				const auto nonTemporal = BuildRenderingSettingsDiagnosticsSnapshot(withoutTemporal);
+				context.Check(nonTemporal.m_RuntimeAvailable &&
+					nonTemporal.m_ForwardLighting.m_State == ViewRenderFeatureState::Active &&
+					nonTemporal.m_GTAO.m_State == ViewRenderFeatureState::Active &&
+					nonTemporal.m_ToneMapping.m_State == ViewRenderFeatureState::Active &&
+					!nonTemporal.m_HistoryAvailable,
+					"Settings runtime availability does not require a temporal frame plan");
+				const auto validView = displayView;
+				std::array invalidViews{ validView, validView, validView, validView };
+				invalidViews[0].m_IsValid = false;
+				invalidViews[1].m_ViewId = RenderViewID::Main;
+				invalidViews[2].m_Width = 0;
+				invalidViews[3].m_Height = 0;
+				bool unavailableViewsRejected = true;
+				for (const auto& invalidView : invalidViews)
+				{
+					displayView = invalidView;
+					const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+					unavailableViewsRejected &= unavailable.m_SettingsAvailable && !unavailable.m_RuntimeAvailable &&
+						unavailable.m_GTAO.m_Reason == ViewRenderFeatureReason::FrameUnavailable;
+				}
+				displayView = validView;
+				context.Check(unavailableViewsRejected,
+					"Settings reject invalid, mismatched and zero-extent display views while preserving intent");
+				auto shadowViews = views;
+				auto& shadowView = shadowViews[static_cast<size_t>(RenderViewID::DirectionalShadow)];
+				shadowView = validView;
+				shadowView.m_ViewId = RenderViewID::DirectionalShadow;
+				auto shadowFrame = frame;
+				shadowFrame.m_RenderViews = shadowViews;
+				shadowFrame.m_DisplayViewId = RenderViewID::DirectionalShadow;
+				const auto shadow = BuildRenderingSettingsDiagnosticsSnapshot(shadowFrame);
+				context.Check(shadow.m_SettingsAvailable && !shadow.m_RuntimeAvailable &&
+					shadow.m_Width == 128 && shadow.m_Height == 64,
+					"A valid shadow view cannot be reported as the display camera's rendering settings");
+			}
+			{
 				auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 				const auto finalAO = gtao.m_FinalAO;
 				gtao.m_FinalAO = {};

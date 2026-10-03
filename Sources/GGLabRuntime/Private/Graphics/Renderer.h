@@ -59,10 +59,6 @@ namespace gglab
 		public RenderCompositionAccess
 	{
 	public:
-		// Transitional alias for the Public RAII frame handle. The nested frame
-		// type was replaced by RenderFrame when the render host contract landed.
-		using Frame = RenderFrame;
-
 		struct CreateInfo
 		{
 			const RHIContextFactoryBase* m_RHIContextFactory = nullptr;
@@ -89,16 +85,16 @@ namespace gglab
 		void Finalize() noexcept override;
 		bool IsInitialized() const noexcept override { return m_IsInitialized; }
 
-		[[nodiscard]] Frame BeginFrame() noexcept override;
+		[[nodiscard]] RenderFrame BeginFrame() noexcept override;
 		[[nodiscard]] RenderFrameBuildResult BuildFrame(
 			const RenderFrameBuildRequest& request) noexcept override;
-		TemporalFrameTransaction& BeginTemporalFrame(Frame& frame,
+		TemporalFrameTransaction& BeginTemporalFrame(RenderFrame& frame,
 			const ResolvedTemporalFramePlan& plan, uint32_t width, uint32_t height,
 			float scenePreExposure) noexcept override;
-		void InvalidateTemporalFrameAfterLateContractFailure(Frame& frame) noexcept override;
+		void InvalidateTemporalFrameAfterLateContractFailure(RenderFrame& frame) noexcept override;
 		void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept override;
-		void Render(Frame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
-		[[nodiscard]] RHIFrameEndResult EndFrame(Frame& frame) noexcept override;
+		void Render(RenderFrame& frame, RenderGraph& rg, const RenderFrameContext& renderContext) noexcept override;
+		[[nodiscard]] RHIFrameEndResult EndFrame(RenderFrame& frame) noexcept override;
 
 		RHIContext* GetRHIContext() const noexcept override { return m_RHIContext.get(); }
 		RHIDevice* GetDevice() const noexcept override
