@@ -1318,8 +1318,8 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.lighting_contract", 39,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 40,
-			"Atmosphere range includes the aerial measurement probe shader demand");
+		checkSelectedDemand("gglab.lab.atmosphere_range", 39,
+			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
 		CheckCoastalAtriumReferenceViews(context);

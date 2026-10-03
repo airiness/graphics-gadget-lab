@@ -30,7 +30,6 @@ namespace gglab
 				left.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation ==
 					right.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation &&
 				left.m_Lighting.m_EnableAerialPerspective == right.m_Lighting.m_EnableAerialPerspective &&
-				left.m_Lighting.m_EnableAerialProbe == right.m_Lighting.m_EnableAerialProbe &&
 				leftGTAO.m_Enabled == rightGTAO.m_Enabled &&
 				leftGTAO.m_Radius == rightGTAO.m_Radius &&
 				leftGTAO.m_FalloffStart == rightGTAO.m_FalloffStart &&

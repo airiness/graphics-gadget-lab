@@ -106,7 +106,6 @@ namespace gglab
 			ShaderProgramBuildRecord{ &AtmosphereLutCompute, L"Passes/PassAtmosphere.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &AerialPerspectiveBuildCompute, L"Passes/PassAerialPerspective.hlsl", L"CSBuild", AerialBuildDefines },
 			ShaderProgramBuildRecord{ &AerialPerspectiveCompositeCompute, L"Passes/PassAerialPerspective.hlsl", L"CSComposite" },
-			ShaderProgramBuildRecord{ &AerialPerspectiveProbeCompute, L"Passes/PassAerialProbe.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateCompute, L"Passes/PassGTAO.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GTAOEvaluateDiagnosticsCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODiagnosticsDefines },
 			ShaderProgramBuildRecord{ &GTAODenoiseXCompute, L"Passes/PassGTAO.hlsl", L"CSMain", GTAODenoiseXDefines },

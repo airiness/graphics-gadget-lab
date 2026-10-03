@@ -460,7 +460,6 @@
   </ItemGroup>
   <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
     <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl" />
-    <FxCompile Include="..\..\Shaders\Passes\PassAerialProbe.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />

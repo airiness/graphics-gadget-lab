@@ -72,8 +72,6 @@ namespace gglab
 		GTAOSettings m_GTAO{};
 		// Surface transport only; disabling this preserves physical sun, sky and IBL.
 		bool m_EnableAerialPerspective = true;
-		// Diagnostic GPU readback is opt-in so ordinary rendering has no probe cost.
-		bool m_EnableAerialProbe = false;
 	};
 
 	// Authoring settings owned above the renderer by the active Demo or Lab.
@@ -110,7 +108,6 @@ namespace gglab
 		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
 		bool m_EnableAerialPerspective = true;
-		bool m_EnableAerialProbe = false;
 	};
 
 	// Immutable settings resolved for one RenderView and one frame.
