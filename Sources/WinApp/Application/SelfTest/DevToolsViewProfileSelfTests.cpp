@@ -123,11 +123,6 @@ namespace gglab
 			snapshot.m_TemporalAA = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			snapshot.m_HistoryAvailable = true;
 			snapshot.m_History.m_HasActiveHistory = snapshot.m_History.m_HistoryValid = true;
-			snapshot.m_AerialDependencies = {
-				.m_SceneAvailable = true, .m_AtmosphereEnabled = false, .m_AtmosphereReady = false,
-				.m_PhysicalSunEnabled = true, .m_SkySource = EnvironmentBackgroundMode::TextureEnvironment,
-				.m_SkyboxEnabled = false,
-				};
 			DevToolsRuntime devTools;
 			auto& overrides = devTools.GetViewRenderSettingsOverrides();
 			auto& registry = devTools.GetRegistry();
@@ -177,21 +172,6 @@ namespace gglab
 				const ImGuiID rowId = ImHashStr(row, 0, tableId);
 				return ImHashStr(label, 0, rowId);
 			};
-			context.Check(text.find("Atmosphere: Disabled") != std::string::npos &&
-				text.find("Physical Sun: Enabled") != std::string::npos && text.find("Skybox: Disabled") != std::string::npos &&
-				text.find("HDR Texture (ineligible)") != std::string::npos,
-				"The cockpit exposes the individual world lighting dependencies instead of a single atmosphere error");
-			snapshot.m_AerialDependencies.m_AtmosphereEnabled = true;
-			const auto notReady = draw();
-			context.Check(notReady.find("Atmosphere: Enabled but unavailable") != std::string::npos,
-				"The cockpit distinguishes enabled but unavailable atmosphere resources from disabled atmosphere intent");
-			snapshot.m_AerialDependencies.m_SceneAvailable = false;
-			snapshot.m_AerialDependencies.m_SkySource.reset();
-			const auto dependenciesUnknown = draw();
-			context.Check(dependenciesUnknown.find("Atmosphere / Physical Sun: Unavailable") != std::string::npos &&
-				dependenciesUnknown.find("Skybox / Sky Source: Unavailable") != std::string::npos &&
-				dependenciesUnknown.find("Atmosphere: Disabled") == std::string::npos,
-				"Missing dependency observations are unavailable rather than inferred as disabled");
 			const ViewRenderProfile original = snapshot.m_AuthoringProfile;
 			GGLAB_UNUSED(draw(widget("LightingSettings", "GTAO", "##Enabled")));
 			GGLAB_UNUSED(draw(widget("TemporalSettings", "TAA", "##Enabled")));
@@ -222,16 +202,15 @@ namespace gglab
 			GGLAB_UNUSED(draw(widget("LightingSettings", "GTAO", "##Enabled")));
 			context.Check(overrides.m_GTAO.m_Settings.m_Radius == 6.5f,
 				"A later edit seeds the new authoring profile rather than an old Inspector or frame block");
-			GGLAB_UNUSED(draw(widget("LightingSettings", "Aerial Perspective", "##Enabled")));
 			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "##Enabled")));
 			GGLAB_UNUSED(draw(ImHashStr("Advanced / Diagnostics", 0, windowId)));
 			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "HDR Diff Validation", "##Enabled")));
 			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "Aerial Probe", "##Enabled")));
-			context.Check(overrides.GetActiveCount() == 7 && overrides.m_AerialPerspective == false &&
+			context.Check(overrides.GetActiveCount() == 6 &&
 				overrides.m_ScenePreExposure == false && overrides.m_HdrDiffValidation == true && overrides.m_AerialProbe == true,
 				"Cockpit scalar controls keep explicit false intent and independent diagnostic requests");
-			GGLAB_UNUSED(draw(widget("LightingSettings", "Aerial Perspective", "Reset")));
-			context.Check(!overrides.m_AerialPerspective && overrides.GetActiveCount() == 6 && overrides.m_AerialProbe == true,
+			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "Reset")));
+			context.Check(!overrides.m_ScenePreExposure && overrides.GetActiveCount() == 5 && overrides.m_AerialProbe == true,
 				"A scalar row reset restores inheritance without clearing the independently requested probe");
 			GGLAB_UNUSED(draw(ImHashStr("Clear All Overrides", 0, windowId)));
 			context.Check(overrides.GetActiveCount() == 0 &&
@@ -260,7 +239,7 @@ namespace gglab
 			ImGui::EndFrame();
 			context.Check(draws[4] == 2 && !ImGui::FindWindowByName(windowNames[4].c_str())->Collapsed,
 				"Inspect reopens an already open collapsed Inspector without creating another window");
-			GGLAB_UNUSED(draw(widget("LightingSettings", "Aerial Perspective", "Configure")));
+			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "Aerial Probe", "Inspect")));
 			DevelopGuiContext navigationGui{};
 			const auto drawRegistry = [&]()
 			{
@@ -280,7 +259,7 @@ namespace gglab
 			const ImGuiID atmosphereId = ImHashStr("Atmosphere", 0, tabsId);
 			context.Check(registry.IsPanelOpen(WorldLightingPanel::Path) && tabs && tabs->SelectedTabId == atmosphereId &&
 				ImGui::GetCurrentContext()->NavWindow == lightingWindow && overrides.GetActiveCount() == 0,
-				"Aerial Configure opens and focuses World Lighting on its actual Atmosphere tab without changing overrides");
+				"Aerial Probe Inspect opens and focuses World Lighting on its actual Atmosphere tab without changing overrides");
 			ImGui::ActivateItemByID(ImHashStr("Sun", 0, tabsId));
 			drawRegistry();
 			drawRegistry();

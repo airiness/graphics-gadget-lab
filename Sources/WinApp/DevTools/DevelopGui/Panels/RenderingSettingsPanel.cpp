@@ -112,13 +112,13 @@ namespace gglab
 		}
 
 		void DrawInspect(DevelopGuiContext& context, std::string_view path,
-			std::string_view section = {}, const char* label = "Inspect") noexcept
+			std::string_view section = {}) noexcept
 		{
 			ImGui::TableSetColumnIndex(4);
 			if (!path.empty())
 			{
 				ImGui::BeginDisabled(!context.m_PanelRegistry);
-				if (ImGui::SmallButton(label))
+				if (ImGui::SmallButton("Inspect"))
 				{
 					GGLAB_UNUSED(context.m_PanelRegistry->OpenPanel(path, section));
 				}
@@ -175,40 +175,10 @@ namespace gglab
 			DrawInspect(context, inspector);
 		}
 
-		void DrawAerialDependencies(const AerialPerspectiveDependencies& dependencies) noexcept
-		{
-			ImGui::TextDisabled("Dependencies for this frame:");
-			if (!dependencies.m_SceneAvailable)
-			{
-				ImGui::TextWrapped("Atmosphere / Physical Sun: Unavailable");
-			}
-			else
-			{
-				ImGui::TextWrapped("Atmosphere: %s", !dependencies.m_AtmosphereEnabled ? "Disabled"
-					: dependencies.m_AtmosphereReady ? "Enabled (resources available)" : "Enabled but unavailable");
-				ImGui::TextWrapped("Physical Sun: %s", dependencies.m_PhysicalSunEnabled ? "Enabled" : "Disabled");
-			}
-			if (!dependencies.m_SkySource)
-			{
-				ImGui::TextWrapped("Skybox / Sky Source: Unavailable");
-				return;
-			}
-			ImGui::TextWrapped("Skybox: %s", dependencies.m_SkyboxEnabled ? "Enabled" : "Disabled");
-			const char* skySource = "HDR Texture (ineligible)";
-			switch (*dependencies.m_SkySource)
-			{
-			case EnvironmentBackgroundMode::TextureEnvironment: break;
-			case EnvironmentBackgroundMode::PhysicalAtmospherePreview: skySource = "Physical Sky Preview"; break;
-			case EnvironmentBackgroundMode::PhysicalSky: skySource = "Physical Sky"; break;
-			}
-			ImGui::TextWrapped("Sky Source: %s", skySource);
-		}
-
 		void DrawScalar(const char* label, std::optional<bool>* override,
 			bool authoring, bool published, bool resolved, ViewRenderFeatureStatus status,
 			DevelopGuiContext& context, std::string_view inspector,
-			std::string_view section = {}, const char* buttonLabel = "Inspect",
-			const AerialPerspectiveDependencies* dependencies = nullptr) noexcept
+			std::string_view section = {}) noexcept
 		{
 			BeginRow(label);
 			bool enabled = override ? override->value_or(authoring) : published;
@@ -218,8 +188,7 @@ namespace gglab
 			ImGui::EndDisabled();
 			DrawOverride(override && override->has_value(), [&]() { override->reset(); });
 			DrawRuntime(status, (override ? override->value_or(authoring) : published) != published);
-			if (dependencies) DrawAerialDependencies(*dependencies);
-			DrawInspect(context, inspector, section, buttonLabel);
+			DrawInspect(context, inspector, section);
 		}
 
 		void DrawLightingMode(const RenderingSettingsDiagnosticsSnapshot& snapshot,
@@ -293,10 +262,6 @@ namespace gglab
 				authoring.m_Lighting.m_GTAO, requested.m_Lighting.m_GTAO, resolved.m_Lighting.m_GTAO.m_Enabled,
 				snapshot->m_GTAO, context, GTAOInspector,
 				snapshot->m_GTAOUsesFormatFallback ? "R16 format fallback" : nullptr);
-			DrawScalar("Aerial Perspective", overrides ? &overrides->m_AerialPerspective : nullptr,
-				authoring.m_Lighting.m_EnableAerialPerspective, requested.m_Lighting.m_EnableAerialPerspective,
-				resolved.m_Lighting.m_EnableAerialPerspective, snapshot->m_AerialPerspective, context,
-				WorldLightingPanel::Path, WorldLightingPanel::AtmosphereSection, "Configure", &snapshot->m_AerialDependencies);
 			ImGui::EndTable();
 		}
 		if (ImGui::CollapsingHeader("Shadows", ImGuiTreeNodeFlags_DefaultOpen) && BeginSettingsTable("ShadowSettings"))
