@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace gglab
 {
@@ -85,6 +86,11 @@ namespace gglab
 			RGTextureViewId m_Throughput{};
 			RGTextureViewId m_ColorOutput{};
 			RGTextureViewId m_DiagnosticOutput{};
+		};
+
+		struct SceneColorInitializePassData
+		{
+			RGTextureViewId m_Rtv{};
 		};
 
 		struct ProbeParameters
@@ -336,6 +342,39 @@ namespace gglab
 
 		const RGTextureId surfaceColor = rg.GetBlackboard().Get<RGViewTargetsTable>(
 			ViewTargetsTableName).GetViewTargets(displayViewId).m_SceneColor;
+		rg.AddPass<SceneColorInitializePassData>("Atmosphere.AerialPerspective.InitializeSceneColor",
+			[displayViewId](RenderGraph::RGBuilder& builder, SceneColorInitializePassData& data)
+			{
+				// A full compute write does not initialize CREATE_NOT_ZEROED RTV/UAV
+				// allocations for later rendering. Retain the physical clear even though
+				// the composite overwrites its logical contents, as in temporal resolve.
+				builder.SideEffect();
+				auto& blackboard = builder.GetBlackboard();
+				const auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
+					.GetViewTargets(displayViewId);
+				const auto& colorDesc = builder.GetTextureDesc(targets.m_SceneColor);
+				RHITextureDesc outputDesc{};
+				outputDesc.m_Format = colorDesc.m_Format;
+				outputDesc.m_Extent = colorDesc.m_Extent;
+				auto& resources = blackboard.Get<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
+				resources.m_SceneColor = builder.CreateTexture("Atmosphere.AerialSceneColor", outputDesc);
+				builder.WriteInPlace(resources.m_SceneColor, RGTextureAccess::RenderTarget);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(resources.m_SceneColor);
+			},
+			[](RGExecuteContext& execute, SceneColorInitializePassData& data)
+			{
+				auto* command = execute.GetGraphicsCommandContext();
+				const auto rtv = execute.GetViewHandle(data.m_Rtv);
+				GGLAB_ASSERT_NOT_NULL(command);
+				GGLAB_ASSERT_MSG(rtv.IsValid(), "Aerial scene color must have a live initialization RTV.");
+				const RHIRenderingAttachment attachment{
+					.m_View = rtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				command->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&attachment, 1) });
+				command->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+			});
 		rg.AddPass<CompositePassData>("Atmosphere.AerialPerspective.Composite",
 			RGPassEncoderType::Compute,
 			[displayViewId, diagnosticMode, selectedTap](RenderGraph::RGBuilder& builder,
@@ -363,10 +402,9 @@ namespace gglab
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = colorDesc.m_Format;
 				outputDesc.m_Extent = colorDesc.m_Extent;
-				auto output = builder.CreateTexture("Atmosphere.AerialSceneColor", outputDesc);
-				builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-				data.m_ColorOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
-				targets.m_SceneColor = output;
+				builder.WriteInPlace(resources.m_SceneColor, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_ColorOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(resources.m_SceneColor);
+				targets.m_SceneColor = resources.m_SceneColor;
 				if (diagnosticMode)
 				{
 					resources.m_DiagnosticTap = selectedTap;

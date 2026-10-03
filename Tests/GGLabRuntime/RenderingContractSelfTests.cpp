@@ -7053,6 +7053,14 @@ namespace gglab
 				"Aerial transport reports active graph work without implicitly enabling the GPU probe");
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.TransparentLoad", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				});
 			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](
 				RenderGraph::RGBuilder& builder, AerialTargetData&)
 				{
@@ -7092,10 +7100,60 @@ namespace gglab
 					}), "Aerial froxel build samples both active atmosphere transport LUTs");
 			context.Check(aerialEdge("Atmosphere.AerialPerspective.Build", "Atmosphere.AerialPerspective.Composite"),
 				"Aerial composite reads the froxel output");
-			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.Consumer"),
-				"Downstream scene color reads the aerial composite output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.TransparentLoad") &&
+				aerialEdge("AerialTest.TransparentLoad", "AerialTest.Consumer"),
+				"Downstream rendering loads aerial scene color before final sampled consumption");
 			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "Atmosphere.Preview"),
 				"Aerial diagnostic preview reads the current composite result");
+			const auto aerialInitialize = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.InitializeSceneColor", &RGSnapshotPassInfo::m_Name);
+			const auto aerialComposite = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.Composite", &RGSnapshotPassInfo::m_Name);
+			const auto aerialTransparent = std::ranges::find(aerialSnapshot.m_Passes,
+				"AerialTest.TransparentLoad", &RGSnapshotPassInfo::m_Name);
+			const auto aerialColor = std::ranges::find(aerialSnapshot.m_Resources,
+				"Atmosphere.AerialSceneColor", &RGSnapshotResourceInfo::m_Name);
+			context.Check(aerialInitialize != aerialSnapshot.m_Passes.end() &&
+				aerialComposite != aerialSnapshot.m_Passes.end() &&
+				aerialTransparent != aerialSnapshot.m_Passes.end() &&
+				!aerialInitialize->m_Culled && aerialInitialize->m_SideEffect &&
+				aerialInitialize->m_EncoderType == RGPassEncoderType::Graphics &&
+				aerialInitialize->m_ExecutionOrder >= 0 &&
+				aerialInitialize->m_ExecutionOrder < aerialComposite->m_ExecutionOrder &&
+				aerialComposite->m_ExecutionOrder < aerialTransparent->m_ExecutionOrder &&
+				aerialEdge("Atmosphere.AerialPerspective.InitializeSceneColor",
+					"Atmosphere.AerialPerspective.Composite"),
+				"Physical aerial color initialization survives full-write culling and precedes compute and rendering");
+			const auto aerialColorUsage = RHITextureUsage::RenderTarget |
+				RHITextureUsage::UnorderedAccess | RHITextureUsage::Sampled;
+			context.Check(aerialColor != aerialSnapshot.m_Resources.end() &&
+				aerialInitialize != aerialSnapshot.m_Passes.end() &&
+				aerialColor->m_FirstUserPassIndex == static_cast<int32_t>(aerialInitialize->m_Index) &&
+				aerialColor->m_UsageBits == static_cast<uint64_t>(aerialColorUsage),
+				"Aerial scene color is allocated at its clear pass with combined RTV, UAV and SRV usage");
+			const auto aerialColorTransition = [&aerialSnapshot](std::string_view passName,
+				const RHIResourceState& before, const RHIResourceState& after) noexcept
+				{
+					const auto passInfo = std::ranges::find(aerialSnapshot.m_Passes,
+						passName, &RGSnapshotPassInfo::m_Name);
+					return passInfo != aerialSnapshot.m_Passes.end() &&
+						std::ranges::any_of(passInfo->m_PreBarriers,
+							[&](const RGSnapshotBarrierInfo& barrier)
+							{
+								return barrier.m_ResourceName == "Atmosphere.AerialSceneColor" &&
+									barrier.m_Kind == RGBarrierKind::Transition &&
+									barrier.m_Before == before && barrier.m_After == after;
+							});
+				};
+			const auto aerialRenderTargetState = ToRHIResourceState(RGTextureAccess::RenderTarget);
+			const auto aerialStorageState =
+				ToRHIResourceState(RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+			context.Check(aerialColorTransition("Atmosphere.AerialPerspective.InitializeSceneColor",
+				UndefinedRHITextureState(), aerialRenderTargetState) &&
+				aerialColorTransition("Atmosphere.AerialPerspective.Composite",
+					aerialRenderTargetState, aerialStorageState) &&
+				aerialColorTransition("AerialTest.TransparentLoad", aerialStorageState, aerialRenderTargetState),
+				"RenderGraph orders aerial initialization, compute writes and render target loads with exact transitions");
 			activeAtmosphere.EndFrame(false, {});
 			device.m_CompletedFenceValue = 200;
 			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
