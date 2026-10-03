@@ -329,6 +329,19 @@ namespace gglab
 				active.m_HdrDiffValidation.m_State == ViewRenderFeatureState::Active &&
 				active.m_Shadows.m_State == ViewRenderFeatureState::Active,
 				"Settings activity comes from live compiled resources and existing feature decisions");
+			{
+				auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
+				const auto finalAO = gtao.m_FinalAO;
+				gtao.m_FinalAO = {};
+				const auto missingResource = BuildRenderingSettingsDiagnosticsSnapshot(frame);
+				context.Check(missingResource.m_RuntimeAvailable &&
+					missingResource.m_RequestedProfile.m_Lighting.m_GTAO.m_Enabled &&
+					missingResource.m_GTAO.m_State == ViewRenderFeatureState::Inactive &&
+					missingResource.m_GTAO.m_Reason == ViewRenderFeatureReason::ResourcesUnavailable &&
+					missingResource.m_ForwardLighting.m_State == ViewRenderFeatureState::Active,
+					"Unavailable resource queries preserve requested intent without reporting the feature as active or culled");
+				gtao.m_FinalAO = finalAO;
+			}
 			context.Check(active.m_ScenePreExposure.m_State == ViewRenderFeatureState::Active &&
 				active.m_ResolvedSettings.m_Exposure.m_PreExposure == 1.0f &&
 				active.m_ToneMapping.m_State == ViewRenderFeatureState::Active,

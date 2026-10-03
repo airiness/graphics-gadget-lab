@@ -10,6 +10,14 @@ namespace gglab
 		RGBuffer,
 	};
 
+	// Underlying-resource usage in a compiled plan, independent of GPU completion.
+	enum class RGCompiledResourceStatus : uint8_t
+	{
+		Unavailable,
+		Culled,
+		Referenced,
+	};
+
 	// Describes dependency semantics in the render graph.
 	// Read      : the pass depends on previous contents.
 	// Write     : the pass produces new contents and does not depend on previous contents.

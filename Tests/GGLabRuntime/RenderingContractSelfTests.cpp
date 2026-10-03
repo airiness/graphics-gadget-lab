@@ -4084,6 +4084,101 @@ namespace gglab
 				"GTAO FinalAO transitions exactly from compute UAV-write to opaque pixel SRV-read");
 		}
 
+		void RunCompiledResourceStatusTests(SelfTestContext& context) noexcept
+		{
+			struct FixturePassData {};
+			struct ResourceHandleFixture : RGResourceHandle
+			{
+				ResourceHandleFixture(Handle handle, Version version) noexcept :
+					RGResourceHandle(handle, version) {}
+			};
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			const RHITextureDesc textureDesc{
+				.m_Format = RHIFormat::R16Float, .m_Extent = { 8, 8, 1 },
+				};
+			const RHIBufferDesc bufferDesc{ .m_SizeInBytes = 64, .m_StrideInBytes = 16 };
+			RGTextureId earlierTexture;
+			RGBufferId earlierBuffer;
+			RGTextureId retainedTexture;
+			RGBufferId retainedBuffer;
+			RGTextureId culledTexture;
+			RGBufferId culledBuffer;
+			graph.AddPass<FixturePassData>("ResourceStatus.EarlierWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					earlierTexture = builder.Write(builder.CreateTexture("Status.RetainedTexture", textureDesc),
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					earlierBuffer = builder.Write(builder.CreateBuffer("Status.RetainedBuffer", bufferDesc),
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+				});
+			graph.AddPass<FixturePassData>("ResourceStatus.RetainedWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					retainedTexture = builder.Write(earlierTexture,
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					retainedBuffer = builder.Write(earlierBuffer,
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			graph.AddPass<FixturePassData>("ResourceStatus.CulledWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					culledTexture = builder.Write(builder.CreateTexture("Status.CulledTexture", textureDesc),
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					culledBuffer = builder.Write(builder.CreateBuffer("Status.CulledBuffer", bufferDesc),
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+				});
+			const RenderGraph& query = graph;
+			context.Check(query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Unavailable,
+				"Resource usage is unavailable before compilation even when retained writes are declared");
+			context.Check(graph.Compile(), "Compiled resource status fixture compiles without GPU execution");
+			context.Check(query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(culledTexture) == RGCompiledResourceStatus::Culled &&
+				query.GetCompiledResourceStatus(culledBuffer) == RGCompiledResourceStatus::Culled,
+				"Texture and buffer queries distinguish retained accesses from culled declarations");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			context.Check(snapshot.m_Passes.size() == 3 && snapshot.m_Passes[0].m_Culled &&
+				!snapshot.m_Passes[1].m_Culled && snapshot.m_Passes[2].m_Culled &&
+				earlierTexture.GetVersion() < retainedTexture.GetVersion() &&
+				earlierBuffer.GetVersion() < retainedBuffer.GetVersion() &&
+				query.GetCompiledResourceStatus(earlierTexture) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(earlierBuffer) == RGCompiledResourceStatus::Referenced,
+				"Valid logical versions share underlying-resource usage even when their earlier writers are culled");
+			const ResourceHandleFixture outOfRange(RGResourceHandle::Handle{ uint16_t{ 65534 } }, 1);
+			const ResourceHandleFixture uninitializedVersion(retainedTexture.GetHandle(),
+				RGResourceHandle::UnintializedVersion);
+			const ResourceHandleFixture futureVersion(retainedBuffer.GetHandle(),
+				static_cast<RGResourceHandle::Version>(retainedBuffer.GetVersion() + 1));
+			context.Check(query.GetCompiledResourceStatus(RGTextureId{}) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(RGBufferId{}) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(outOfRange) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(uninitializedVersion) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(futureVersion) == RGCompiledResourceStatus::Unavailable,
+				"Resource queries reject invalid slots, uninitialized versions and versions beyond this graph");
+			RGTextureId undefinedTexture;
+			graph.AddPass<FixturePassData>("ResourceStatus.UndefinedRead", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					undefinedTexture = builder.CreateTexture("Status.UndefinedTexture", textureDesc);
+					builder.Read(undefinedTexture, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			context.Check(query.GetCompiledResourceStatus(undefinedTexture) == RGCompiledResourceStatus::Unavailable,
+				"Resources absent from the current compiled plan cannot acquire another resource's usage status");
+			context.Check(!graph.Compile() && !graph.GetExecutionPlan() &&
+				query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(culledTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(culledBuffer) == RGCompiledResourceStatus::Unavailable,
+				"Failed recompilation clears previously compiled usage instead of retaining stale resource activity");
+		}
+
 		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext& context) noexcept
 		{
 			struct TextureCompatibilityRow
@@ -8853,6 +8948,7 @@ namespace gglab
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
+		RunCompiledResourceStatusTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);
 	}

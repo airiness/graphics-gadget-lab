@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RenderGraph/RGCompiler.h"
+#include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderGraph/RGExecutor.h"
 #include "Graphics/RHI/RHISubresourceUtils.h"
 
@@ -44,6 +45,26 @@ namespace gglab
 
 		m_ExecutionPlan = std::move(result.m_Plan);
 		return true;
+	}
+
+	RGCompiledResourceStatus RenderGraph::GetCompiledResourceStatus(
+		RGResourceHandle handle) const noexcept
+	{
+		if (!m_ExecutionPlan || !handle.IsValid() ||
+			handle.GetHandle().Value() >= m_ResourceSlots.size())
+		{
+			return RGCompiledResourceStatus::Unavailable;
+		}
+		const auto& slot = m_ResourceSlots[handle.GetHandle().Value()];
+		const auto& resources = m_ExecutionPlan->GetResources();
+		if (handle.GetVersion() == RGResourceHandle::UnintializedVersion ||
+			handle.GetVersion() > slot.m_Version ||
+			slot.m_VirtualResourceIndex.Value() >= resources.size())
+		{
+			return RGCompiledResourceStatus::Unavailable;
+		}
+		return resources[slot.m_VirtualResourceIndex.Value()].m_RefCount > 0
+			? RGCompiledResourceStatus::Referenced : RGCompiledResourceStatus::Culled;
 	}
 
 	void RenderGraph::Execute(RGExecuteContext& executeContext) noexcept

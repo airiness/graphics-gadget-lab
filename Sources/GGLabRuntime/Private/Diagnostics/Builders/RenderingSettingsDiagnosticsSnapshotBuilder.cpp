@@ -7,7 +7,6 @@
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
-#include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
@@ -169,21 +168,16 @@ namespace gglab
 		static ViewRenderFeatureStatus CheckResourceActivity(
 			const RenderGraph& graph, RGResourceHandle handle) noexcept
 		{
-			if (!handle.IsValid() || handle.GetHandle().Value() >= graph.m_ResourceSlots.size())
+			switch (graph.GetCompiledResourceStatus(handle))
 			{
+			case RGCompiledResourceStatus::Unavailable:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
+			case RGCompiledResourceStatus::Culled:
+				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RenderGraphCulled };
+			case RGCompiledResourceStatus::Referenced:
+				return { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			}
-			const auto& slot = graph.m_ResourceSlots[handle.GetHandle().Value()];
-			const auto* plan = graph.GetExecutionPlan();
-			if (!plan || handle.GetVersion() == RGResourceHandle::UnintializedVersion ||
-				handle.GetVersion() > slot.m_Version ||
-				slot.m_VirtualResourceIndex.Value() >= plan->GetResources().size())
-			{
-				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
-			}
-			return plan->GetResources()[slot.m_VirtualResourceIndex.Value()].m_RefCount > 0
-				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None }
-				: ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RenderGraphCulled };
+			GGLAB_UNREACHABLE("Unhandled compiled resource status.");
 		}
 
 		static ViewRenderFeatureStatus ResolveForwardLightingStatus(ForwardPlusFrameStatus status) noexcept
