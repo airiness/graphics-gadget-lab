@@ -273,6 +273,9 @@ namespace gglab
 					&frame.m_RenderViews[utils::ToIndex(RenderViewID::Main)],
 				.m_AuthoringViewRenderProfile = &authoringViewRenderProfile,
 				.m_EffectiveViewRenderProfile = &effectiveViewRenderProfile,
+				.m_DisplayViewId = frame.m_DisplayViewId,
+				.m_DisplayViewSettings =
+					&frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 				.m_TemporalFramePlan = &frame.m_TemporalFramePlan,
 				.m_GTAOOverrideActive = toolingSettingsResolution.m_GTAOOverrideActive,
 			};

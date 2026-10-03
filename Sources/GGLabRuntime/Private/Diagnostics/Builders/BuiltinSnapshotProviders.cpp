@@ -7,6 +7,7 @@
 #include "Diagnostics/Builders/PersistentSceneBufferSnapshotBuilder.h"
 #include "Diagnostics/Builders/PostProcessDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderGraphSnapshotBuilder.h"
+#include "Diagnostics/Builders/RenderingSettingsDiagnosticsSnapshotBuilder.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
 #include "Diagnostics/Builders/SceneDepthDiagnosticsSnapshotBuilder.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
@@ -34,6 +35,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/TemporalAADiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Pipeline/TemporalHistoryManager.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 
 #include <memory>
@@ -43,6 +45,30 @@ namespace gglab
 {
 	namespace
 	{
+		class RenderingSettingsDiagnosticsSnapshotProvider final
+			: public TypedSnapshotProviderBase<RenderingSettingsDiagnosticsSnapshot>
+		{
+		public:
+			explicit RenderingSettingsDiagnosticsSnapshotProvider(Renderer* renderer) noexcept :
+				m_Renderer(renderer)
+			{
+			}
+			[[nodiscard]] std::string_view GetName() const noexcept override
+			{
+				return "Rendering Settings";
+			}
+			void Capture(const DiagnosticsFrameContext& context, SnapshotStore& store) noexcept override
+			{
+				const auto* manager = m_Renderer ? m_Renderer->GetTemporalHistoryManager() : nullptr;
+				const TemporalHistorySummary history = manager ? manager->GetSummary() : TemporalHistorySummary{};
+				store.GetOrCreate<RenderingSettingsDiagnosticsSnapshot>() =
+					BuildRenderingSettingsDiagnosticsSnapshot(context, manager ? &history : nullptr);
+			}
+
+		private:
+			Renderer* m_Renderer;
+		};
+
 		class RenderViewSnapshotProvider final : public TypedSnapshotProviderBase<RenderViewSnapshot>
 		{
 		public:
@@ -445,6 +471,8 @@ namespace gglab
 	void RegisterBuiltinSnapshotProviders(
 		DiagnosticsRuntime& runtime, Renderer* renderer) noexcept
 	{
+		runtime.RegisterProvider(std::make_unique<RenderingSettingsDiagnosticsSnapshotProvider>(renderer),
+			SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(
 			std::make_unique<RenderViewSnapshotProvider>(), SnapshotUpdatePolicy::EveryFrame);
 		runtime.RegisterProvider(

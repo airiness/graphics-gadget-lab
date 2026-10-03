@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Buffer/DynamicConstantBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/DynamicStructuredBufferAllocator.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -11,16 +12,13 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
-#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
-#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
-#include "GGLabRuntime/Graphics/RHI/RHIPipelineSystem.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace gglab
 {
@@ -87,82 +85,52 @@ namespace gglab
 			RGTextureViewId m_DiagnosticOutput{};
 		};
 
-		struct ProbeParameters
+		struct SceneColorInitializePassData
 		{
-			uint32_t m_SurfaceIndex = 0;
-			uint32_t m_CompositeIndex = 0;
-			uint32_t m_DepthIndex = 0;
-			uint32_t m_RadianceIndex = 0;
-			uint32_t m_ThroughputIndex = 0;
-			uint32_t m_SamplerIndex = 0;
-			uint32_t m_ViewIndex = 0;
-			uint32_t m_GridWidth = 0;
-			uint32_t m_GridHeight = 0;
-			uint32_t m_SliceCount = AerialSliceCount;
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			float m_MaxDistanceKm = 0.0f;
-			float m_WorldScaleKm = 0.0f;
-			uint32_t m_FrameSerialLow = 0;
-			uint32_t m_FrameSerialHigh = 0;
+			RGTextureViewId m_Rtv{};
 		};
-		static_assert(sizeof(ProbeParameters) == 64 && IsPassRootConstantStruct<ProbeParameters>);
-		static_assert(offsetof(ProbeParameters, m_FrameSerialLow) == 56);
-		static_assert(offsetof(ProbeParameters, m_FrameSerialHigh) == 60);
-
-		struct ProbePassData
-		{
-			RGTextureViewId m_Surface{};
-			RGTextureViewId m_Composite{};
-			RGTextureViewId m_Depth{};
-			RGTextureViewId m_Radiance{};
-			RGTextureViewId m_Throughput{};
-			RGBufferId m_Output{};
-		};
-
-		struct ProbeReadbackPassData
-		{
-			RGBufferId m_Source{};
-			RGBufferId m_Destination{};
-		};
-
-		RHIBindingLayoutDesc BuildProbeBindingLayout() noexcept
-		{
-			RHIBindingLayoutDesc desc{};
-			desc.m_DebugName = "Atmosphere.AerialProbeBindingLayout";
-			desc.m_Slots[desc.m_SlotCount++] = { RHIBindingType::PushConstants,
-				RHIShaderStage::Compute, 0, 0, 1, sizeof(ProbeParameters), "ProbeConstants" };
-			desc.m_Slots[desc.m_SlotCount++] = { RHIBindingType::ReadWriteStorageBuffer,
-				RHIShaderStage::Compute, 0, 0, 1, 0, "ProbeOutput" };
-			desc.m_Slots[desc.m_SlotCount++] = { RHIBindingType::ReadOnlyStorageBuffer,
-				RHIShaderStage::Compute, 3, 0, 1, 0, "ViewSB" };
-			desc.m_Slots[desc.m_SlotCount++] = { RHIBindingType::BindlessResourceTable,
-				RHIShaderStage::Compute, 0, 0, 0, 0, "BindlessResources" };
-			desc.m_Slots[desc.m_SlotCount++] = { RHIBindingType::BindlessSamplerTable,
-				RHIShaderStage::Compute, 0, 0, 0, 0, "BindlessSamplers" };
-			return desc;
-		}
 	}
 
 	void RenderPassAerialPerspective::AddPass(RenderGraph& rg, const RenderFrameContext& context,
 		const RenderServices& services) noexcept
 	{
+		const auto& lighting = context.GetDisplayViewRenderSettings().m_Lighting;
 		// Parameter diagnostics and their lighting-removal MRT must stay in the
 		// same unmodified scene-linear domain through final composition.
-		if (!context.IsRenderSceneReady() || context.m_RenderScene.m_HasMaterialDiagnostics ||
-			!context.GetDisplayViewRenderSettings().m_Lighting.m_EnableAerialPerspective ||
-			!context.m_RenderScene.m_Atmosphere ||
-			!context.m_RenderScene.m_WorldSun || !services.m_Atmosphere ||
-			!services.m_Atmosphere->GetConstants().IsValid() || !services.m_Environment)
+		if (!lighting.m_EnableAerialPerspective)
+		{
+			return;
+		}
+		if (!context.IsRenderSceneReady())
+		{
+			return;
+		}
+		if (context.m_RenderScene.m_HasMaterialDiagnostics)
+		{
+			return;
+		}
+		if (!context.m_RenderScene.m_Atmosphere || !services.m_Atmosphere ||
+			!services.m_Atmosphere->GetConstants().IsValid())
+		{
+			return;
+		}
+		if (!context.m_RenderScene.m_WorldSun)
+		{
+			return;
+		}
+		if (!services.m_Environment)
 		{
 			return;
 		}
 		const auto& environment = services.m_Environment->GetEnvironmentLightingSettings();
+		if (!environment.m_EnableSkybox ||
+			environment.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment)
+		{
+			return;
+		}
 		const auto* atmosphereResources = rg.GetBlackboard().TryGet<RGAtmosphereResources>(
 			AtmosphereResourcesName);
-		if (!environment.m_EnableSkybox ||
-			environment.m_BackgroundMode == EnvironmentBackgroundMode::TextureEnvironment ||
-			!atmosphereResources)
+		if (!atmosphereResources)
 		{
 			return;
 		}
@@ -179,25 +147,9 @@ namespace gglab
 			m_BuildSlot, m_BuildRecipe, GetInfo());
 		const RHIPipelineHandle compositePipeline = services.m_PipelineResolver->Resolve(
 			m_CompositeSlot, m_CompositeRecipe, GetInfo());
-		if (!buildPipeline.IsValid() || !compositePipeline.IsValid()) return;
-		RHIPipelineHandle probePipeline{};
-		if (context.GetDisplayViewRenderSettings().m_Lighting.m_EnableAerialProbe)
+		if (!buildPipeline.IsValid() || !compositePipeline.IsValid())
 		{
-			auto* rhiContext = services.m_Presentation->GetRHIContext();
-			auto* device = services.m_Presentation->GetDevice();
-			GGLAB_ASSERT_NOT_NULL(rhiContext);
-			GGLAB_ASSERT_NOT_NULL(device);
-			m_ProbeReadback.Initialize(*device, rhiContext->GetFrameSlotCount());
-			m_ProbeReadback.ConsumeCompletedSlot(context.m_FrameSlotIndex);
-			if (!m_ProbeRecipe.m_CSId.IsValid())
-			{
-				m_ProbeRecipe.m_CSId = services.m_ShaderPrograms->LoadProgram(
-					shader_programs::AerialPerspectiveProbeCompute);
-				m_ProbeRecipe.m_BindingLayout = rhiContext->GetPipelineSystem().CreateBindingLayout(
-					BuildProbeBindingLayout());
-			}
-			probePipeline = services.m_PipelineResolver->Resolve(
-				m_ProbeSlot, m_ProbeRecipe, GetInfo());
+			return;
 		}
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
@@ -276,8 +228,39 @@ namespace gglab
 					(gridHeight + AerialThreadGroupSize - 1) / AerialThreadGroupSize, 1);
 			});
 
-		const RGTextureId surfaceColor = rg.GetBlackboard().Get<RGViewTargetsTable>(
-			ViewTargetsTableName).GetViewTargets(displayViewId).m_SceneColor;
+		rg.AddPass<SceneColorInitializePassData>("Atmosphere.AerialPerspective.InitializeSceneColor",
+			[displayViewId](RenderGraph::RGBuilder& builder, SceneColorInitializePassData& data)
+			{
+				// A full compute write does not initialize CREATE_NOT_ZEROED RTV/UAV
+				// allocations for later rendering. Retain the physical clear even though
+				// the composite overwrites its logical contents, as in temporal resolve.
+				builder.SideEffect();
+				auto& blackboard = builder.GetBlackboard();
+				const auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
+					.GetViewTargets(displayViewId);
+				const auto& colorDesc = builder.GetTextureDesc(targets.m_SceneColor);
+				RHITextureDesc outputDesc{};
+				outputDesc.m_Format = colorDesc.m_Format;
+				outputDesc.m_Extent = colorDesc.m_Extent;
+				auto& resources = blackboard.Get<RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
+				resources.m_SceneColor = builder.CreateTexture("Atmosphere.AerialSceneColor", outputDesc);
+				builder.WriteInPlace(resources.m_SceneColor, RGTextureAccess::RenderTarget);
+				data.m_Rtv = builder.CreateView<RHITextureViewType::RenderTarget>(resources.m_SceneColor);
+			},
+			[](RGExecuteContext& execute, SceneColorInitializePassData& data)
+			{
+				auto* command = execute.GetGraphicsCommandContext();
+				const auto rtv = execute.GetViewHandle(data.m_Rtv);
+				GGLAB_ASSERT_NOT_NULL(command);
+				GGLAB_ASSERT_MSG(rtv.IsValid(), "Aerial scene color must have a live initialization RTV.");
+				const RHIRenderingAttachment attachment{
+					.m_View = rtv,
+					.m_LoadOp = RHIContentLoadOp::DontCare,
+				};
+				command->BeginRendering({ .m_ColorAttachments =
+					std::span<const RHIRenderingAttachment>(&attachment, 1) });
+				command->ClearColorAttachment(0, { 0.0f, 0.0f, 0.0f, 1.0f });
+			});
 		rg.AddPass<CompositePassData>("Atmosphere.AerialPerspective.Composite",
 			RGPassEncoderType::Compute,
 			[displayViewId, diagnosticMode, selectedTap](RenderGraph::RGBuilder& builder,
@@ -305,10 +288,9 @@ namespace gglab
 				RHITextureDesc outputDesc{};
 				outputDesc.m_Format = colorDesc.m_Format;
 				outputDesc.m_Extent = colorDesc.m_Extent;
-				auto output = builder.CreateTexture("Atmosphere.AerialSceneColor", outputDesc);
-				builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-				data.m_ColorOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
-				targets.m_SceneColor = output;
+				builder.WriteInPlace(resources.m_SceneColor, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_ColorOutput = builder.CreateView<RHITextureViewType::UnorderedAccess>(resources.m_SceneColor);
+				targets.m_SceneColor = resources.m_SceneColor;
 				if (diagnosticMode)
 				{
 					resources.m_DiagnosticTap = selectedTap;
@@ -352,105 +334,6 @@ namespace gglab
 				command->Dispatch((parameters.m_Width + AerialThreadGroupSize - 1) /
 					AerialThreadGroupSize, (parameters.m_Height + AerialThreadGroupSize - 1) /
 					AerialThreadGroupSize, 1);
-			});
-		if (!probePipeline.IsValid()) return;
-
-		const uint32_t width = view.m_Width;
-		const uint32_t height = view.m_Height;
-		const uint64_t frameSerial = context.m_FrameSerial;
-		const float worldScaleKm = atmosphereResources->m_Diagnostics.m_Parameters.m_World.m_W;
-		rg.AddPass<ProbePassData>("Atmosphere.AerialProbe.Sample", RGPassEncoderType::Compute,
-			[displayViewId, surfaceColor](RenderGraph::RGBuilder& builder, ProbePassData& data)
-			{
-				auto& blackboard = builder.GetBlackboard();
-				auto& aerialResources = blackboard.Get<RGAerialPerspectiveResources>(
-					AerialPerspectiveResourcesName);
-				const auto& sceneDepth = blackboard.Get<RGSceneDepthResources>(
-					SceneDepthResourcesName);
-				const auto& targets = blackboard.Get<RGViewTargetsTable>(ViewTargetsTableName)
-					.GetViewTargets(displayViewId);
-				data.m_Surface = builder.CreateView<RHITextureViewType::ShaderResource>(
-					builder.Read(surfaceColor, RGTextureAccess::Sample, RHIStage::ComputeShader));
-				data.m_Composite = builder.CreateView<RHITextureViewType::ShaderResource>(
-					builder.Read(targets.m_SceneColor, RGTextureAccess::Sample, RHIStage::ComputeShader));
-				data.m_Depth = builder.CreateView<RHITextureViewType::ShaderResource>(
-					builder.Read(sceneDepth.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader),
-					sceneDepth.m_SrvDesc);
-				data.m_Radiance = builder.CreateView<RHITextureViewType::ShaderResource>(
-					builder.Read(aerialResources.m_RadianceAtlas,
-						RGTextureAccess::Sample, RHIStage::ComputeShader));
-				data.m_Throughput = builder.CreateView<RHITextureViewType::ShaderResource>(
-					builder.Read(aerialResources.m_ThroughputAtlas,
-						RGTextureAccess::Sample, RHIStage::ComputeShader));
-				RHIBufferDesc outputDesc{};
-				outputDesc.m_SizeInBytes = AerialPerspectiveProbeReadback::ReadbackSizeInBytes;
-				outputDesc.m_StrideInBytes = sizeof(AerialPerspectiveProbeSample);
-				aerialResources.m_ProbeBuffer = builder.CreateBuffer("Atmosphere.AerialProbeSamples", outputDesc);
-				builder.WriteInPlace(aerialResources.m_ProbeBuffer,
-					RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
-				data.m_Output = aerialResources.m_ProbeBuffer;
-			},
-			[services, probePipeline, samplerIndex, viewIndex, gridWidth, gridHeight,
-				maxDistanceKm, worldScaleKm, width, height, frameSerial](RGExecuteContext& execute,
-				ProbePassData& data)
-			{
-				ProbeParameters parameters{};
-				parameters.m_SurfaceIndex = execute.GetViewDescriptor(data.m_Surface).m_Index;
-				parameters.m_CompositeIndex = execute.GetViewDescriptor(data.m_Composite).m_Index;
-				parameters.m_DepthIndex = execute.GetViewDescriptor(data.m_Depth).m_Index;
-				parameters.m_RadianceIndex = execute.GetViewDescriptor(data.m_Radiance).m_Index;
-				parameters.m_ThroughputIndex = execute.GetViewDescriptor(data.m_Throughput).m_Index;
-				parameters.m_SamplerIndex = samplerIndex;
-				parameters.m_ViewIndex = viewIndex;
-				parameters.m_GridWidth = gridWidth;
-				parameters.m_GridHeight = gridHeight;
-				parameters.m_Width = width;
-				parameters.m_Height = height;
-				parameters.m_MaxDistanceKm = maxDistanceKm;
-				parameters.m_WorldScaleKm = worldScaleKm;
-				parameters.m_FrameSerialLow = static_cast<uint32_t>(frameSerial);
-				parameters.m_FrameSerialHigh = static_cast<uint32_t>(frameSerial >> 32);
-				auto* command = execute.GetDirectComputeCommandContext();
-				command->SetPipeline(probePipeline);
-				command->SetReadWriteBuffer(1, execute.GetBufferHandle(data.m_Output));
-				command->SetReadOnlyBuffer(2,
-					services.m_FrameBuffers->GetViewStructuredBuffer()->GetBufferHandle());
-				command->SetPushConstants(0, parameters);
-				command->Dispatch(1, 1, 1);
-			});
-
-		const uint32_t frameSlot = context.m_FrameSlotIndex;
-		const uint64_t worldGeneration = services.m_Environment->GetBakingStatus().m_ActiveGeneration;
-		const float fovRadians = view.m_FovRadians;
-		const float manualEV100 = context.GetDisplayViewRenderSettings().m_Exposure.m_ManualEV100;
-		auto* probeReadback = &m_ProbeReadback;
-		rg.AddPass<ProbeReadbackPassData>("Atmosphere.AerialProbe.Readback", RGPassEncoderType::Copy,
-			[probeReadback, frameSlot](RenderGraph::RGBuilder& builder, ProbeReadbackPassData& data)
-			{
-				builder.SideEffect();
-				const auto& aerialResources = builder.GetBlackboard().Get<
-					RGAerialPerspectiveResources>(AerialPerspectiveResourcesName);
-				data.m_Source = builder.Read(aerialResources.m_ProbeBuffer,
-					RGBufferAccess::CopySource, RHIStage::Copy);
-				RHIBufferDesc readbackDesc{};
-				readbackDesc.m_SizeInBytes = AerialPerspectiveProbeReadback::ReadbackSizeInBytes;
-				readbackDesc.m_Usage = RHIBufferUsage::CopyDest;
-				readbackDesc.m_MemoryUsage = RHIMemoryUsage::GpuToCpu;
-				readbackDesc.m_DebugName = "Atmosphere.AerialProbeReadback";
-				data.m_Destination = builder.ImportBuffer("Atmosphere.AerialProbeReadback",
-					probeReadback->GetBuffer(frameSlot), readbackDesc,
-					RGBufferAccess::CopyDest, RGContentValidity::Undefined);
-				builder.WriteInPlace(data.m_Destination, RGBufferAccess::CopyDest, RHIStage::Copy);
-			},
-			[probeReadback, frameSlot, frameSerial, worldGeneration, fovRadians, manualEV100](
-				RGExecuteContext& execute, ProbeReadbackPassData& data)
-			{
-				auto* command = execute.GetCopyCommandContext();
-				command->CopyBuffer(execute.GetBufferHandle(data.m_Destination), 0,
-					execute.GetBufferHandle(data.m_Source), 0,
-					AerialPerspectiveProbeReadback::ReadbackSizeInBytes);
-				probeReadback->MarkScheduled(frameSlot, frameSerial, worldGeneration,
-					fovRadians, manualEV100);
 			});
 	}
 }

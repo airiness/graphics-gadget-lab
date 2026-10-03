@@ -1,4 +1,5 @@
 #include "Application/Tooling/ApplicationToolingComposition.h"
+#include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Demo/DemoLabRuntimeLocator.h"
 #include "Demo/DemoManager.h"
 #include "Lab/LabRuntime.h"
@@ -48,6 +49,8 @@ namespace gglab
 				}
 
 				m_ResourceLifecycleTools = CreateDX12ResourceLifecycleTools(*createInfo.m_RHIContext);
+				m_DemoManager = createInfo.m_DemoManager;
+				m_LabRuntimeLocator = createInfo.m_LabRuntimeLocator;
 				auto& runtime = m_System.GetDevToolsRuntime();
 				runtime.GetRegistry().RegisterPanel(
 					std::make_unique<DemoPanel>(createInfo.m_DemoManager));
@@ -88,6 +91,16 @@ namespace gglab
 			void Draw(const ApplicationToolingFrameContext& context) noexcept override
 			{
 				DevelopGuiContext guiContext{};
+				const auto* activeDemo = m_DemoManager->GetActiveDemo();
+				guiContext.m_ActiveProfileName = activeDemo ? activeDemo->GetName() : std::string_view{};
+				if (guiContext.m_ActiveProfileName == DesktopLabHostDemoId && m_LabRuntimeLocator)
+				{
+					const auto* lab = m_LabRuntimeLocator->GetLabRuntimeIfCreated();
+					if (const auto* session = lab ? lab->GetActiveSession() : nullptr)
+					{
+						guiContext.m_ActiveProfileName = session->GetDescriptor().m_DisplayName;
+					}
+				}
 				guiContext.m_Cameras = context.m_Cameras;
 				guiContext.m_CameraControl = context.m_CameraControl;
 				guiContext.m_CameraRenderViewQuery = context.m_CameraRenderViewQuery;
@@ -136,6 +149,8 @@ namespace gglab
 			}
 
 		private:
+			DemoManager* m_DemoManager = nullptr;
+			LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
 			std::unique_ptr<DX12ResourceLifecycleToolsBase> m_ResourceLifecycleTools;
 			DevelopGuiSystem m_System;
 		};

@@ -1474,7 +1474,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 70;
+			constexpr size_t ExpectedRuntimeProgramCount = 69;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
@@ -1530,11 +1530,8 @@ namespace gglab
 					Sha256DigestToHex(
 						firstActive.m_RegistryRef.m_RegistryId.m_DurableDigest) ==
 							firstRegistryId && firstRegistry.IsSuccess() &&
-					firstRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount &&
-					ResolveShaderProgramRegistryArtifact(firstRegistry.m_Artifact,
-						shader_programs::AerialPerspectiveProbeCompute,
-						ShaderTargetProfile::GGLabDX12).has_value(),
-				"build-runtime activates the complete DX12 registry including the aerial probe");
+					firstRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount,
+				"build-runtime activates the complete DX12 registry");
 
 			std::vector<std::wstring> vulkanArguments = arguments;
 			const auto targetArgument = std::ranges::find(vulkanArguments, L"gglab-dx12");
@@ -1559,13 +1556,12 @@ namespace gglab
 				vulkanBuild.m_StdOut.find(expectedProgramCountField) != std::string::npos,
 				"build-runtime reports the complete Vulkan 1.3 catalog in JSON");
 			context.Check(vulkanActive.IsSuccess() && vulkanRegistry.IsSuccess() &&
-				vulkanRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount &&
-				ResolveShaderProgramRegistryArtifact(vulkanRegistry.m_Artifact,
-					shader_programs::AerialPerspectiveProbeCompute,
-					ShaderTargetProfile::GGLabVulkan13).has_value(),
-				"build-runtime activates the complete Vulkan 1.3 registry including the aerial probe");
+				vulkanRegistry.m_Artifact.m_Entries.size() == ExpectedRuntimeProgramCount,
+				"build-runtime activates the complete Vulkan 1.3 registry");
 
 			const std::array requiredPrograms{
+				shader_programs::AerialPerspectiveBuildCompute,
+				shader_programs::AerialPerspectiveCompositeCompute,
 				shader_programs::ForwardPBRLegacyMaterialDiagnosticsPixel,
 				shader_programs::ForwardPBRLegacyGTAOMaterialDiagnosticsPixel,
 				shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel,

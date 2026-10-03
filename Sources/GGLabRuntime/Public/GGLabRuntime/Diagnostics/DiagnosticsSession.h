@@ -20,6 +20,7 @@ namespace gglab
 	struct DirectionalShadowFramePlan;
 	struct ResolvedTemporalFramePlan;
 	struct ViewRenderProfile;
+	struct ResolvedViewRenderSettings;
 
 	// Borrowed live frame inputs for one Runtime-owned diagnostics capture
 	// interval. The session captures requested providers while these inputs
@@ -40,6 +41,8 @@ namespace gglab
 		RenderView* m_MainRenderView = nullptr;
 		const ViewRenderProfile* m_AuthoringViewRenderProfile = nullptr;
 		const ViewRenderProfile* m_EffectiveViewRenderProfile = nullptr;
+		RenderViewID m_DisplayViewId = RenderViewID::Unknown;
+		const ResolvedViewRenderSettings* m_DisplayViewSettings = nullptr;
 		const ResolvedTemporalFramePlan* m_TemporalFramePlan = nullptr;
 		bool m_GTAOOverrideActive = false;
 	};

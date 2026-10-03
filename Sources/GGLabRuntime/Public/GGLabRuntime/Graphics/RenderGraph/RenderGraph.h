@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGCompileDiagnostic.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <memory>
@@ -411,6 +412,11 @@ namespace gglab
 		{
 			return m_ExecutionPlan.get();
 		}
+		// The handle belongs to this graph. Valid logical versions share the
+		// underlying resource's usage status in the current compiled plan;
+		// Referenced does not imply version-writer liveness or GPU completion.
+		[[nodiscard]] RGCompiledResourceStatus GetCompiledResourceStatus(
+			RGResourceHandle handle) const noexcept;
 		[[nodiscard]] const std::vector<RGCompileDiagnostic>& GetCompileDiagnostics() const noexcept
 		{
 			return m_CompileDiagnostics;

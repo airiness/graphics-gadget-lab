@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
+#include <string_view>
+
 namespace gglab
 {
 	class WorldToolingViewBase;
@@ -31,6 +33,7 @@ namespace gglab
 	class DiagnosticsControl;
 	class DiagnosticsView;
 	class DevelopGuiSystem;
+	class DevelopGuiRegistry;
 	class DebugDrawChannelControlBase;
 	class DebugDrawChannelViewBase;
 	struct ViewRenderSettingsOverrides;
@@ -71,6 +74,9 @@ namespace gglab
 		ShadowVisualizationSettings* m_ShadowVisualizationSettings = nullptr;
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
+		DevelopGuiRegistry* m_PanelRegistry = nullptr;
+		// Borrowed from the active authoring owner for this draw.
+		std::string_view m_ActiveProfileName;
 
 		DevelopGuiStateStore* m_StateStore = nullptr;
 		uint64_t m_CurrentPanelKey = 0;

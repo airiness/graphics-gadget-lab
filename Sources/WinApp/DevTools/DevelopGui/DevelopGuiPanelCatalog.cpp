@@ -11,6 +11,7 @@
 #include "DevTools/DevelopGui/Panels/ImGuiToolsPanel.h"
 #include "DevTools/DevelopGui/Panels/RenderGraphInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/RenderViewPanel.h"
+#include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
 #include "DevTools/DevelopGui/Panels/ResourceManagementPanel.h"
 #include "DevTools/DevelopGui/Panels/SceneDepthPanel.h"
 #include "DevTools/DevelopGui/Panels/ShadowInspectorPanel.h"
@@ -33,6 +34,7 @@ namespace gglab::devtools
 	void RegisterDefaultDevelopGuiPanels(
 		DevelopGuiRegistry& registry, RHIContext& rhiContext) noexcept
 	{
+		registry.RegisterPanel(std::make_unique<RenderingSettingsPanel>());
 		registry.RegisterPanel(std::make_unique<AssetManagerPanel>());
 		registry.RegisterPanel(std::make_unique<CameraInspectorPanel>());
 		registry.RegisterPanel(std::make_unique<DebugDrawPanel>());

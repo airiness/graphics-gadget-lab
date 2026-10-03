@@ -22,6 +22,7 @@ namespace gglab
 
 			int32_t m_Order = 0;
 			bool m_Open = false;
+			bool m_FocusRequested = false;
 
 			std::unique_ptr<DevelopGuiPanelBase> m_Panel;
 
@@ -57,6 +58,8 @@ namespace gglab
 
 		void RegisterPanel(std::unique_ptr<DevelopGuiPanelBase> panel) noexcept;
 		void BuildMenuTree() noexcept;
+		[[nodiscard]] bool OpenPanel(std::string_view fullPath) noexcept;
+		[[nodiscard]] bool IsPanelOpen(std::string_view fullPath) const noexcept;
 
 		void DrawMenuBar() noexcept;
 		void DrawPanels(DevelopGuiContext& context) noexcept;

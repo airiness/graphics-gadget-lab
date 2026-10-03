@@ -3188,29 +3188,6 @@ namespace gglab
 				aerialCompositeLayout && aerialCompositeLayout->m_Members.size() == 16 &&
 				aerialCompositeLayout->m_Members[15].m_Offset == 60,
 				"Aerial pass root constants retain the 64-byte CPU and SPIR-V layout");
-			desc.m_SourcePath = L"Passes/PassAerialProbe.hlsl";
-			desc.m_Entry = L"CSMain";
-			desc.m_Target = {};
-			const auto aerialProbeDxil = compiler.Compile(desc);
-			desc.m_Target = MakeVulkan13CompileTarget(ShaderStage::Compute);
-			const auto aerialProbeSpirV = compiler.Compile(desc);
-			context.Check(aerialProbeDxil.IsSuccess() && aerialProbeSpirV.IsSuccess(),
-				"Aerial linear GPU probe compiles for DX12 and Vulkan");
-			SpirVDecorationReflection aerialProbeReflection;
-			const bool aerialProbeReflected = aerialProbeSpirV.IsSuccess() &&
-				ReadSpirVDecorations(aerialProbeSpirV.m_Artifact.m_Binary, aerialProbeReflection);
-			const auto* aerialProbeParameters = aerialProbeReflected
-				? aerialProbeReflection.FindStructLayout("type.ConstantBuffer.AerialProbeParameters") : nullptr;
-			const auto* aerialProbeSample = aerialProbeReflected
-				? aerialProbeReflection.FindStructLayout("AerialProbeSample") : nullptr;
-			context.Check(aerialProbeParameters && aerialProbeParameters->m_Members.size() == 16 &&
-				aerialProbeParameters->m_Members[14].m_Offset == 56 &&
-				aerialProbeParameters->m_Members[15].m_Offset == 60 &&
-				aerialProbeSample && aerialProbeSample->m_Members.size() == 7 &&
-				aerialProbeSample->m_Members[1].m_Offset == 12 &&
-				aerialProbeSample->m_Members[3].m_Offset == 28 &&
-				aerialProbeSample->m_Members[6].m_Offset == 64,
-				"Aerial probe frame serial and sample layout match the CPU ABI");
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
 

@@ -298,6 +298,19 @@ namespace gglab
 		m_Shutdown = true;
 	}
 
+	TemporalHistorySummary TemporalHistoryManager::GetSummary() const noexcept
+	{
+		TemporalHistorySummary summary{ .m_LastResetReason = m_LastResetReason };
+		if (m_ActiveHistory)
+		{
+			summary.m_DisplayViewId = m_ActiveHistory->m_Compatibility.m_DisplayViewId;
+			summary.m_SessionIdentity = m_ActiveHistory->m_Compatibility.m_SessionIdentity;
+			summary.m_HasActiveHistory = true;
+			summary.m_HistoryValid = m_ActiveHistory->m_Valid;
+		}
+		return summary;
+	}
+
 	TemporalHistoryManagerDiagnostics TemporalHistoryManager::GetDiagnostics() const
 	{
 		TemporalHistoryManagerDiagnostics diagnostics{

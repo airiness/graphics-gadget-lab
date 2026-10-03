@@ -387,6 +387,9 @@
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderingSettingsPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
@@ -737,6 +740,9 @@
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderingSettingsPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\DevelopGui\Panels\RenderViewPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
@@ -794,9 +800,6 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl">
-      <Filter>Shaders\Passes</Filter>
-    </FxCompile>
-    <FxCompile Include="..\..\Shaders\Passes\PassAerialProbe.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">

@@ -4084,6 +4084,101 @@ namespace gglab
 				"GTAO FinalAO transitions exactly from compute UAV-write to opaque pixel SRV-read");
 		}
 
+		void RunCompiledResourceStatusTests(SelfTestContext& context) noexcept
+		{
+			struct FixturePassData {};
+			struct ResourceHandleFixture : RGResourceHandle
+			{
+				ResourceHandleFixture(Handle handle, Version version) noexcept :
+					RGResourceHandle(handle, version) {}
+			};
+			RenderGraph graph({
+				.m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+				});
+			const RHITextureDesc textureDesc{
+				.m_Format = RHIFormat::R16Float, .m_Extent = { 8, 8, 1 },
+				};
+			const RHIBufferDesc bufferDesc{ .m_SizeInBytes = 64, .m_StrideInBytes = 16 };
+			RGTextureId earlierTexture;
+			RGBufferId earlierBuffer;
+			RGTextureId retainedTexture;
+			RGBufferId retainedBuffer;
+			RGTextureId culledTexture;
+			RGBufferId culledBuffer;
+			graph.AddPass<FixturePassData>("ResourceStatus.EarlierWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					earlierTexture = builder.Write(builder.CreateTexture("Status.RetainedTexture", textureDesc),
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					earlierBuffer = builder.Write(builder.CreateBuffer("Status.RetainedBuffer", bufferDesc),
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+				});
+			graph.AddPass<FixturePassData>("ResourceStatus.RetainedWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					retainedTexture = builder.Write(earlierTexture,
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					retainedBuffer = builder.Write(earlierBuffer,
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			graph.AddPass<FixturePassData>("ResourceStatus.CulledWriters", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					culledTexture = builder.Write(builder.CreateTexture("Status.CulledTexture", textureDesc),
+						RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					culledBuffer = builder.Write(builder.CreateBuffer("Status.CulledBuffer", bufferDesc),
+						RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+				});
+			const RenderGraph& query = graph;
+			context.Check(query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Unavailable,
+				"Resource usage is unavailable before compilation even when retained writes are declared");
+			context.Check(graph.Compile(), "Compiled resource status fixture compiles without GPU execution");
+			context.Check(query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(culledTexture) == RGCompiledResourceStatus::Culled &&
+				query.GetCompiledResourceStatus(culledBuffer) == RGCompiledResourceStatus::Culled,
+				"Texture and buffer queries distinguish retained accesses from culled declarations");
+			RGSnapshot snapshot;
+			BuildRenderGraphSnapshot(graph, snapshot);
+			context.Check(snapshot.m_Passes.size() == 3 && snapshot.m_Passes[0].m_Culled &&
+				!snapshot.m_Passes[1].m_Culled && snapshot.m_Passes[2].m_Culled &&
+				earlierTexture.GetVersion() < retainedTexture.GetVersion() &&
+				earlierBuffer.GetVersion() < retainedBuffer.GetVersion() &&
+				query.GetCompiledResourceStatus(earlierTexture) == RGCompiledResourceStatus::Referenced &&
+				query.GetCompiledResourceStatus(earlierBuffer) == RGCompiledResourceStatus::Referenced,
+				"Valid logical versions share underlying-resource usage even when their earlier writers are culled");
+			const ResourceHandleFixture outOfRange(RGResourceHandle::Handle{ uint16_t{ 65534 } }, 1);
+			const ResourceHandleFixture uninitializedVersion(retainedTexture.GetHandle(),
+				RGResourceHandle::UnintializedVersion);
+			const ResourceHandleFixture futureVersion(retainedBuffer.GetHandle(),
+				static_cast<RGResourceHandle::Version>(retainedBuffer.GetVersion() + 1));
+			context.Check(query.GetCompiledResourceStatus(RGTextureId{}) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(RGBufferId{}) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(outOfRange) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(uninitializedVersion) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(futureVersion) == RGCompiledResourceStatus::Unavailable,
+				"Resource queries reject invalid slots, uninitialized versions and versions beyond this graph");
+			RGTextureId undefinedTexture;
+			graph.AddPass<FixturePassData>("ResourceStatus.UndefinedRead", RGPassEncoderType::Compute,
+				[&](RenderGraph::RGBuilder& builder, FixturePassData&)
+				{
+					undefinedTexture = builder.CreateTexture("Status.UndefinedTexture", textureDesc);
+					builder.Read(undefinedTexture, RGTextureAccess::Sample, RHIStage::ComputeShader);
+					builder.SideEffect();
+				});
+			context.Check(query.GetCompiledResourceStatus(undefinedTexture) == RGCompiledResourceStatus::Unavailable,
+				"Resources absent from the current compiled plan cannot acquire another resource's usage status");
+			context.Check(!graph.Compile() && !graph.GetExecutionPlan() &&
+				query.GetCompiledResourceStatus(retainedTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(retainedBuffer) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(culledTexture) == RGCompiledResourceStatus::Unavailable &&
+				query.GetCompiledResourceStatus(culledBuffer) == RGCompiledResourceStatus::Unavailable,
+				"Failed recompilation clears previously compiled usage instead of retaining stale resource activity");
+		}
+
 		void RunRenderGraphAccessAndBarrierContractTests(SelfTestContext& context) noexcept
 		{
 			struct TextureCompatibilityRow
@@ -5123,6 +5218,10 @@ namespace gglab
 			device.m_UseControlledFenceCompletion = true;
 			PersistentTexturePool texturePool(&device);
 			TemporalHistoryManager historyManager(&texturePool);
+			const auto emptyHistorySummary = historyManager.GetSummary();
+			context.Check(!emptyHistorySummary.m_HasActiveHistory && !emptyHistorySummary.m_HistoryValid &&
+				emptyHistorySummary.m_DisplayViewId == RenderViewID::Unknown && device.m_CreateTextureCount == 0,
+				"Lightweight history summary observes an empty manager without allocating GPU history");
 			TemporalViewHistory viewHistory;
 			TemporalObjectHistory objectHistory;
 			ResolvedTemporalFramePlan activePlan{
@@ -5255,6 +5354,11 @@ namespace gglab
 			const TemporalHistoryManagerDiagnostics firstCommitted =
 				historyManager.GetDiagnostics();
 			const uint64_t firstGeneration = firstCommitted.m_AllocationGeneration;
+			const auto committedHistorySummary = historyManager.GetSummary();
+			context.Check(committedHistorySummary.m_HasActiveHistory && committedHistorySummary.m_HistoryValid &&
+				committedHistorySummary.m_DisplayViewId == activePlan.m_DisplayViewId &&
+				committedHistorySummary.m_SessionIdentity == activePlan.m_SessionIdentity && device.m_CreateTextureCount == 4,
+				"Lightweight history summary identifies valid committed history without allocating or reading back");
 			context.Check(coldStartGraphValid && !firstView.m_HasPreviousTemporalState &&
 				firstTransaction.GetState() == TemporalFrameTransactionState::Committed &&
 				firstCommitted.m_HasActiveHistory && firstCommitted.m_HistoryValid &&
@@ -7006,6 +7110,14 @@ namespace gglab
 			aerialPass.AddPass(aerialGraph, aerialContext, aerialServices);
 			RenderPassPostProcessPreview aerialPreview;
 			aerialPreview.AddPass(aerialGraph, aerialContext, aerialServices);
+			aerialGraph.AddPass<AerialTargetData>("AerialTest.TransparentLoad", [](
+				RenderGraph::RGBuilder& builder, AerialTargetData&)
+				{
+				builder.SideEffect();
+				auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(
+					ViewTargetsTableName).GetViewTargets(RenderViewID::Main);
+				builder.ReadWriteInPlace(targets.m_SceneColor, RGTextureAccess::RenderTarget);
+				});
 			aerialGraph.AddPass<AerialTargetData>("AerialTest.Consumer", [](
 				RenderGraph::RGBuilder& builder, AerialTargetData&)
 				{
@@ -7045,10 +7157,60 @@ namespace gglab
 					}), "Aerial froxel build samples both active atmosphere transport LUTs");
 			context.Check(aerialEdge("Atmosphere.AerialPerspective.Build", "Atmosphere.AerialPerspective.Composite"),
 				"Aerial composite reads the froxel output");
-			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.Consumer"),
-				"Downstream scene color reads the aerial composite output");
+			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "AerialTest.TransparentLoad") &&
+				aerialEdge("AerialTest.TransparentLoad", "AerialTest.Consumer"),
+				"Downstream rendering loads aerial scene color before final sampled consumption");
 			context.Check(aerialEdge("Atmosphere.AerialPerspective.Composite", "Atmosphere.Preview"),
 				"Aerial diagnostic preview reads the current composite result");
+			const auto aerialInitialize = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.InitializeSceneColor", &RGSnapshotPassInfo::m_Name);
+			const auto aerialComposite = std::ranges::find(aerialSnapshot.m_Passes,
+				"Atmosphere.AerialPerspective.Composite", &RGSnapshotPassInfo::m_Name);
+			const auto aerialTransparent = std::ranges::find(aerialSnapshot.m_Passes,
+				"AerialTest.TransparentLoad", &RGSnapshotPassInfo::m_Name);
+			const auto aerialColor = std::ranges::find(aerialSnapshot.m_Resources,
+				"Atmosphere.AerialSceneColor", &RGSnapshotResourceInfo::m_Name);
+			context.Check(aerialInitialize != aerialSnapshot.m_Passes.end() &&
+				aerialComposite != aerialSnapshot.m_Passes.end() &&
+				aerialTransparent != aerialSnapshot.m_Passes.end() &&
+				!aerialInitialize->m_Culled && aerialInitialize->m_SideEffect &&
+				aerialInitialize->m_EncoderType == RGPassEncoderType::Graphics &&
+				aerialInitialize->m_ExecutionOrder >= 0 &&
+				aerialInitialize->m_ExecutionOrder < aerialComposite->m_ExecutionOrder &&
+				aerialComposite->m_ExecutionOrder < aerialTransparent->m_ExecutionOrder &&
+				aerialEdge("Atmosphere.AerialPerspective.InitializeSceneColor",
+					"Atmosphere.AerialPerspective.Composite"),
+				"Physical aerial color initialization survives full-write culling and precedes compute and rendering");
+			const auto aerialColorUsage = RHITextureUsage::RenderTarget |
+				RHITextureUsage::UnorderedAccess | RHITextureUsage::Sampled;
+			context.Check(aerialColor != aerialSnapshot.m_Resources.end() &&
+				aerialInitialize != aerialSnapshot.m_Passes.end() &&
+				aerialColor->m_FirstUserPassIndex == static_cast<int32_t>(aerialInitialize->m_Index) &&
+				aerialColor->m_UsageBits == static_cast<uint64_t>(aerialColorUsage),
+				"Aerial scene color is allocated at its clear pass with combined RTV, UAV and SRV usage");
+			const auto aerialColorTransition = [&aerialSnapshot](std::string_view passName,
+				const RHIResourceState& before, const RHIResourceState& after) noexcept
+				{
+					const auto passInfo = std::ranges::find(aerialSnapshot.m_Passes,
+						passName, &RGSnapshotPassInfo::m_Name);
+					return passInfo != aerialSnapshot.m_Passes.end() &&
+						std::ranges::any_of(passInfo->m_PreBarriers,
+							[&](const RGSnapshotBarrierInfo& barrier)
+							{
+								return barrier.m_ResourceName == "Atmosphere.AerialSceneColor" &&
+									barrier.m_Kind == RGBarrierKind::Transition &&
+									barrier.m_Before == before && barrier.m_After == after;
+							});
+				};
+			const auto aerialRenderTargetState = ToRHIResourceState(RGTextureAccess::RenderTarget);
+			const auto aerialStorageState =
+				ToRHIResourceState(RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+			context.Check(aerialColorTransition("Atmosphere.AerialPerspective.InitializeSceneColor",
+				UndefinedRHITextureState(), aerialRenderTargetState) &&
+				aerialColorTransition("Atmosphere.AerialPerspective.Composite",
+					aerialRenderTargetState, aerialStorageState) &&
+				aerialColorTransition("AerialTest.TransparentLoad", aerialStorageState, aerialRenderTargetState),
+				"RenderGraph orders aerial initialization, compute writes and render target loads with exact transitions");
 			activeAtmosphere.EndFrame(false, {});
 			device.m_CompletedFenceValue = 200;
 			activeAtmosphere.Shutdown(); bakeAtmosphere.Shutdown();
@@ -7724,12 +7886,9 @@ namespace gglab
 			const ResolvedViewRenderSettings defaultSettings =
 				ResolveViewRenderSettings(profile, camera);
 			profile.m_Lighting.m_EnableAerialPerspective = false;
-			profile.m_Lighting.m_EnableAerialProbe = true;
 			const auto baselineSettings = ResolveViewRenderSettings(profile, camera);
 			context.Check(defaultSettings.m_Lighting.m_EnableAerialPerspective &&
 				!baselineSettings.m_Lighting.m_EnableAerialPerspective &&
-				!defaultSettings.m_Lighting.m_EnableAerialProbe &&
-				baselineSettings.m_Lighting.m_EnableAerialProbe &&
 				baselineSettings.m_Exposure.m_PreExposure == defaultSettings.m_Exposure.m_PreExposure &&
 				baselineSettings.m_Lighting.m_GTAO.m_Enabled == defaultSettings.m_Lighting.m_GTAO.m_Enabled &&
 				baselineSettings.m_TemporalAA.m_Enabled == defaultSettings.m_TemporalAA.m_Enabled,
@@ -8789,6 +8948,7 @@ namespace gglab
 		RunExposureContractTests(context);
 		RunResourceStateAndPortabilityContractTests(context);
 		RunGTAORenderGraphDataflowTests(context);
+		RunCompiledResourceStatusTests(context);
 		RunRenderGraphAccessAndBarrierContractTests(context);
 		RunTemporalCompatibilityAndHistoryContractTests(context);
 	}
