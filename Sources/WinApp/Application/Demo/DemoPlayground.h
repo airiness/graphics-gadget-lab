@@ -19,7 +19,6 @@ namespace gglab
 
 	enum class PlaygroundContent : uint8_t
 	{
-		Sponza,
 		Island,
 		CoastalAtrium,
 	};
@@ -28,7 +27,7 @@ namespace gglab
 	{
 	public:
 		explicit DemoPlayground(const DemoCreateInfo& createInfo,
-			PlaygroundContent content = PlaygroundContent::Sponza) noexcept;
+			PlaygroundContent content) noexcept;
 		~DemoPlayground() override = default;
 
 		std::string_view GetName() const noexcept override;
@@ -74,7 +73,7 @@ namespace gglab
 
 	private:
 		DemoServices m_Services{};
-		PlaygroundContent m_Content = PlaygroundContent::Sponza;
+		PlaygroundContent m_Content;
 		float m_PreviousEnvironmentIntensity = 1.0f;
 		bool m_PreviousSkyboxEnabled = true;
 		bool m_HasEnvironmentOverride = false;

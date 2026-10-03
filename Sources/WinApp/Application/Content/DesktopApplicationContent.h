@@ -6,7 +6,6 @@
 namespace gglab
 {
 	inline constexpr std::string_view DesktopStartDemoId = "Demo.Start";
-	inline constexpr std::string_view DesktopPlaygroundDemoId = "Demo.Playground";
 	inline constexpr std::string_view DesktopIslandDemoId = "Demo.Playground.Island";
 	inline constexpr std::string_view DesktopCoastalAtriumDemoId = "Demo.Playground.CoastalAtrium";
 	inline constexpr std::string_view DesktopLabHostDemoId = "Demo.LabHost";
