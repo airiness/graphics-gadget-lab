@@ -2567,7 +2567,7 @@ namespace gglab
 			desc.m_Stage = ShaderStage::Pixel;
 			desc.m_Entry = L"PSMain";
 			desc.m_Defines.clear();
-			const ShaderCompileResult legacyForwardPixelArtifact =
+			const ShaderCompileResult allLightsForwardPixelArtifact =
 				compiler.Compile(desc);
 			auto shadowDesc = desc;
 			shadowDesc.m_Target = {};
@@ -2591,8 +2591,8 @@ namespace gglab
 				FindDxilMemberOffset(shadowDisassembly, "ShadowMetadataPadding") == offsetof(DirectionalShadowGPU, ShadowMetadataPadding),
 				"DXIL cascaded shadow metadata matches every CPU member offset");
 			SpirVDecorationReflection shadowReflection;
-			const bool shadowSpirVReflected = legacyForwardPixelArtifact.IsSuccess() &&
-				ReadSpirVDecorations(legacyForwardPixelArtifact.m_Artifact.m_Binary, shadowReflection);
+			const bool shadowSpirVReflected = allLightsForwardPixelArtifact.IsSuccess() &&
+				ReadSpirVDecorations(allLightsForwardPixelArtifact.m_Artifact.m_Binary, shadowReflection);
 			const auto* shadowLayout = shadowSpirVReflected
 				? shadowReflection.FindStructLayout("type.ConstantBuffer.DirectionalShadowData") : nullptr;
 			context.Check(shadowLayout && shadowLayout->m_Size == sizeof(DirectionalShadowGPU) &&
@@ -2639,7 +2639,7 @@ namespace gglab
 					.m_Value = L"1",
 				},
 			};
-			const ShaderCompileResult legacyGTAOContributionPixelArtifact =
+			const ShaderCompileResult allLightsGTAOContributionPixelArtifact =
 				compiler.Compile(desc);
 			desc.m_Defines = {
 				{
@@ -2678,15 +2678,15 @@ namespace gglab
 			desc.m_Entry = L"PSMain";
 			const ShaderCompileResult skyboxPixelArtifact =
 				compiler.Compile(desc);
-			context.Check(legacyForwardPixelArtifact.IsSuccess() &&
-				legacyGTAOContributionPixelArtifact.IsSuccess() &&
+			context.Check(allLightsForwardPixelArtifact.IsSuccess() &&
+				allLightsGTAOContributionPixelArtifact.IsSuccess() &&
 				forwardPlusPixelArtifact.IsSuccess() &&
 				forwardPlusGTAOContributionPixelArtifact.IsSuccess() &&
 				forwardPlusValidationPixelArtifact.IsSuccess() &&
 				forwardPlusValidationGTAOContributionPixelArtifact.IsSuccess() &&
 				skyboxVertexArtifact.IsSuccess() &&
 				skyboxPixelArtifact.IsSuccess(),
-				"Production DXC compiles Legacy, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
+				"Production DXC compiles all-lights, Forward+, HDR-diff, GTAO-contribution MRT, and background Skybox variants");
 
 			auto forwardDxilDesc = desc;
 			forwardDxilDesc.m_SourcePath = L"Passes/PassForwardPBR.hlsl";

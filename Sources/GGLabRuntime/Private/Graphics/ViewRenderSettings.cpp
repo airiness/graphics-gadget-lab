@@ -1,4 +1,4 @@
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
 
@@ -57,7 +57,6 @@ namespace gglab
 				profile.m_EnableScenePreExposure),
 			.m_Lighting =
 				{
-					.m_ForwardPlus = profile.m_Lighting.m_ForwardPlus,
 					.m_GTAO = gtao,
 					.m_EnableAerialPerspective = profile.m_Lighting.m_EnableAerialPerspective,
 				},

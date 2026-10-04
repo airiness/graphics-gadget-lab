@@ -16,11 +16,6 @@ namespace gglab
 			{
 				return ApplicationStartupDemo::Start;
 			}
-			if (utils::EqualsAsciiIgnoreCase(value, "playground") ||
-				utils::EqualsAsciiIgnoreCase(value, "demo.playground"))
-			{
-				return ApplicationStartupDemo::Playground;
-			}
 			if (utils::EqualsAsciiIgnoreCase(value, "island") ||
 				utils::EqualsAsciiIgnoreCase(value, "demo.playground.island"))
 			{
@@ -156,7 +151,7 @@ namespace gglab
 				if (!demo)
 				{
 					result.m_Error =
-						std::format("Unknown demo '{}'. Expected 'start', 'playground', 'island', 'atrium', or 'lab'.",
+						std::format("Unknown demo '{}'. Expected 'start', 'island', 'atrium', or 'lab'.",
 							arguments[index]);
 					return result;
 				}
@@ -253,7 +248,7 @@ namespace gglab
 		return "Usage: GraphicsGadgetLab.exe [options]\n"
 			"\n"
 			"Options:\n"
-			"  --demo <start|playground|island|atrium|lab> Select the startup demo.\n"
+			"  --demo <start|island|atrium|lab> Select the startup demo.\n"
 			"  --lab <stable-lab-id>           Start LabHost with the requested Lab.\n"
 			"  --relative-mouse                Start with a captured cursor for camera control.\n"
 			"                                  Default: visible, uncaptured cursor (Absolute).\n"

@@ -5,7 +5,7 @@
 #include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
 #include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
 #include "Application/SelfTest/LaunchOptionsSelfTests.h"
-#include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
+#include "Application/SelfTest/NapaVoxelSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
 #endif
@@ -64,7 +64,7 @@ namespace gglab
 #endif
 			SelfTestSuiteDesc{
 				.m_Id = "napa-voxel",
-				.m_Run = &RunNapaVoxelCoreSelfTests,
+				.m_Run = &RunNapaVoxelSelfTests,
 			},
 #if GGLAB_ENABLE_VULKAN
 			SelfTestSuiteDesc{

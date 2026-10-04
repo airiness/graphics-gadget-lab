@@ -137,6 +137,90 @@ namespace gglab
 
 		static_assert(ValidateShaderRegistryChangeDetection(),
 			"IBL bake provenance must restart when the active shader registry changes.");
+
+		[[nodiscard]] float GetIBLBakeStageProgress(IBLBakeStage stage) noexcept
+		{
+			switch (stage)
+			{
+			case IBLBakeStage::Environment: return 0.1f;
+			case IBLBakeStage::Irradiance: return 0.4f;
+			case IBLBakeStage::PrefilteredSpecular: return 0.6f;
+			case IBLBakeStage::BrdfLut: return 0.8f;
+			default: return 0.0f;
+			}
+		}
+	}
+
+	void detail::ApplyIBLCacheLookupResult(
+		const IBLDerivedDataLookupResult& result, IBLBakeStatus& status) noexcept
+	{
+		uint32_t cacheHitStageCount = 0;
+		for (IBLArtifactStage stage : ArtifactStages)
+		{
+			const auto& stageResult = result.Get(stage);
+			auto& stageStatus = status.m_Artifacts[static_cast<size_t>(stage)];
+			stageStatus.m_DerivedDataKey = stageResult.m_Key;
+			stageStatus.m_ContentDigest = stageResult.m_Artifact
+				? stageResult.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+			switch (stageResult.m_Source)
+			{
+			case IBLDerivedDataSource::CpuCache:
+				stageStatus.m_Resolution = IBLArtifactResolution::CpuCache;
+				status.m_CpuCacheHit = true;
+				++cacheHitStageCount;
+				break;
+			case IBLDerivedDataSource::LocalDdc:
+				stageStatus.m_Resolution = IBLArtifactResolution::LocalDdc;
+				status.m_DerivedDataCacheHit = true;
+				++cacheHitStageCount;
+				break;
+			case IBLDerivedDataSource::Miss:
+				stageStatus.m_Resolution = IBLArtifactResolution::Miss;
+				break;
+			}
+		}
+		status.m_CacheHitStageCount = cacheHitStageCount;
+		status.m_CacheHit = cacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count);
+		status.m_PartialCacheHit = cacheHitStageCount > 0 && !status.m_CacheHit;
+	}
+
+	IBLBakeStage detail::SelectNextMissingIBLBakeStage(const IBLBakeStatus& status) noexcept
+	{
+		constexpr std::array<std::pair<IBLArtifactStage, IBLBakeStage>,
+			static_cast<size_t>(IBLArtifactStage::Count)> ProducerOrder = { {
+				{ IBLArtifactStage::Environment, IBLBakeStage::Environment },
+				{ IBLArtifactStage::Irradiance, IBLBakeStage::Irradiance },
+				{ IBLArtifactStage::PrefilteredSpecular, IBLBakeStage::PrefilteredSpecular },
+				{ IBLArtifactStage::BrdfLut, IBLBakeStage::BrdfLut },
+			} };
+		for (const auto& [artifactStage, bakeStage] : ProducerOrder)
+		{
+			if (status.m_Artifacts[static_cast<size_t>(artifactStage)].m_Resolution ==
+				IBLArtifactResolution::Miss)
+			{
+				return bakeStage;
+			}
+		}
+		return IBLBakeStage::Idle;
+	}
+
+	void detail::MarkIBLStageGpuBuilt(IBLBakeStatus& status, IBLArtifactStage stage) noexcept
+	{
+		auto& stageStatus = status.m_Artifacts[static_cast<size_t>(stage)];
+		GGLAB_ASSERT(stageStatus.m_Resolution == IBLArtifactResolution::Miss);
+		stageStatus.m_Resolution = IBLArtifactResolution::GpuBuild;
+		++status.m_GpuBuildStageCount;
+	}
+
+	bool detail::ShouldSaveIBLBakeToCache(const IBLBakeStatus& status, bool physicalSky) noexcept
+	{
+		return status.m_GpuBuildStageCount > 0 && !physicalSky;
+	}
+
+	bool detail::ShouldWriteIBLStageToCache(const IBLStageArtifactStatus& status) noexcept
+	{
+		return status.m_Resolution == IBLArtifactResolution::GpuBuild &&
+			status.m_DerivedDataKey.IsValid();
 	}
 
 	IBLBakeScheduler::IBLBakeScheduler(const CreateInfo& createInfo) noexcept :
@@ -459,33 +543,7 @@ namespace gglab
 			return;
 		}
 
-		for (IBLArtifactStage stage : ArtifactStages)
-		{
-			const auto& result = work->m_Result.Get(stage);
-			auto& status = m_Status.m_Artifacts[static_cast<size_t>(stage)];
-			status.m_DerivedDataKey = result.m_Key;
-			status.m_ContentDigest =
-				result.m_Artifact ? result.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
-			switch (result.m_Source)
-			{
-			case IBLDerivedDataSource::CpuCache:
-				status.m_Resolution = IBLArtifactResolution::CpuCache;
-				m_Status.m_CpuCacheHit = true;
-				++m_Status.m_CacheHitStageCount;
-				break;
-			case IBLDerivedDataSource::LocalDdc:
-				status.m_Resolution = IBLArtifactResolution::LocalDdc;
-				m_Status.m_DerivedDataCacheHit = true;
-				++m_Status.m_CacheHitStageCount;
-				break;
-			case IBLDerivedDataSource::Miss:
-				status.m_Resolution = IBLArtifactResolution::Miss;
-				break;
-			}
-		}
-		m_Status.m_CacheHit =
-			m_Status.m_CacheHitStageCount == static_cast<uint32_t>(IBLArtifactStage::Count);
-		m_Status.m_PartialCacheHit = m_Status.m_CacheHitStageCount > 0 && !m_Status.m_CacheHit;
+		detail::ApplyIBLCacheLookupResult(work->m_Result, m_Status);
 
 		m_CurrentCacheLoad = work;
 		const RHIFencePoint* retireFencePtr = retireFence.IsValid() ? &retireFence : nullptr;
@@ -682,40 +740,22 @@ namespace gglab
 
 	void IBLBakeScheduler::AdvanceToNextMissingStage() noexcept
 	{
-		const auto isMissing = [this](IBLArtifactStage stage) noexcept
-			{
-				return m_Status.m_Artifacts[static_cast<size_t>(stage)].m_Resolution ==
-					IBLArtifactResolution::Miss;
-			};
-		if (isMissing(IBLArtifactStage::Environment))
+		const IBLBakeStage nextStage = detail::SelectNextMissingIBLBakeStage(m_Status);
+		if (nextStage == IBLBakeStage::Environment &&
+			!m_BakingRequest.m_Source.IsValid() && !m_BakingRequest.m_PhysicalSky)
 		{
-			if (!m_BakingRequest.m_Source.IsValid() && !m_BakingRequest.m_PhysicalSky)
-			{
-				ReleaseBakingSourceLease();
-				SetStage(IBLBakeStage::Failed, 0.0f);
-				return;
-			}
-			SetStage(IBLBakeStage::Environment, 0.1f);
+			ReleaseBakingSourceLease();
+			SetStage(IBLBakeStage::Failed, 0.0f);
 			return;
 		}
-		if (isMissing(IBLArtifactStage::Irradiance))
+		if (nextStage != IBLBakeStage::Idle)
 		{
-			SetStage(IBLBakeStage::Irradiance, 0.4f);
-			return;
-		}
-		if (isMissing(IBLArtifactStage::PrefilteredSpecular))
-		{
-			SetStage(IBLBakeStage::PrefilteredSpecular, 0.6f);
-			return;
-		}
-		if (isMissing(IBLArtifactStage::BrdfLut))
-		{
-			SetStage(IBLBakeStage::BrdfLut, 0.8f);
+			SetStage(nextStage, GetIBLBakeStageProgress(nextStage));
 			return;
 		}
 
 		ReleaseBakingSourceLease();
-		if (m_Status.m_GpuBuildStageCount > 0 && !m_BakingRequest.m_PhysicalSky)
+		if (detail::ShouldSaveIBLBakeToCache(m_Status, m_BakingRequest.m_PhysicalSky.has_value()))
 		{
 			SetStage(IBLBakeStage::SavingCache, 0.95f);
 			GGLAB_UNUSED(StartCacheReadback());
@@ -725,10 +765,7 @@ namespace gglab
 
 	void IBLBakeScheduler::MarkGpuStageBuilt(IBLArtifactStage stage) noexcept
 	{
-		auto& status = m_Status.m_Artifacts[static_cast<size_t>(stage)];
-		GGLAB_ASSERT(status.m_Resolution == IBLArtifactResolution::Miss);
-		status.m_Resolution = IBLArtifactResolution::GpuBuild;
-		++m_Status.m_GpuBuildStageCount;
+		detail::MarkIBLStageGpuBuilt(m_Status, stage);
 	}
 
 	void IBLBakeScheduler::ReleaseBakingSourceLease() noexcept
@@ -753,7 +790,7 @@ namespace gglab
 			work->m_Keys[index] = stageStatus.m_DerivedDataKey;
 			work->m_BuiltStages[index] =
 				stageStatus.m_Resolution == IBLArtifactResolution::GpuBuild;
-			if (!work->m_BuiltStages[index] || !work->m_Keys[index].IsValid())
+			if (!detail::ShouldWriteIBLStageToCache(stageStatus))
 			{
 				continue;
 			}

@@ -11,14 +11,12 @@ namespace gglab
 	inline constexpr uint32_t ForwardPlusCullThreadCount =
 		ForwardPlusTileSize * ForwardPlusTileSize;
 
+	// Forward+ is the only opaque lighting path; a validated frame either culls its
+	// opaque draws or has none to shade.
 	enum class ForwardPlusFrameStatus : uint8_t
 	{
-		Disabled,
-		Active,
-		GlobalLightCapacityExceeded,
-		DepthCoverageUnavailable,
-		RenderSceneUnavailable,
 		NoOpaqueDraws,
+		Active,
 	};
 
 	struct ForwardPlusTileGrid

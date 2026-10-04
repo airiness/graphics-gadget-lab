@@ -6,8 +6,8 @@ namespace gglab
 	// Explicit developer/acceptance control contract for the asset upload
 	// scheduler. It is a sibling of the production AssetUploadScheduling
 	// contract: production code receives only the scheduling and submission
-	// view, while acceptance Labs and host tooling receive this budget, fault
-	// injection and GPU completion hold view.
+	// view, while runtime tests and hardware qualification receive this budget,
+	// fault injection and GPU completion hold view from the scheduler factory.
 	class AssetUploadControl
 	{
 	public:

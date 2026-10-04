@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "Application/SelfTest/NapaVoxelSelfTestCases.h"
 
 #include "Application/Lab/NapaVoxel/NapaVoxelCommands.h"
 #include "Application/Lab/NapaVoxel/NapaVoxelRaycast.h"

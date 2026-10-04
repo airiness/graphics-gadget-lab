@@ -3,12 +3,11 @@
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/ViewRenderFeatureStatus.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
-#include <optional>
 
 namespace gglab
 {
@@ -27,7 +26,6 @@ namespace gglab
 		bool m_RuntimeAvailable = false;
 
 		ViewRenderFeatureStatus m_ForwardLighting{};
-		std::optional<ForwardLightingMode> m_ActualLightingMode;
 		ViewRenderFeatureStatus m_GTAO{};
 		bool m_GTAOUsesFormatFallback = false;
 		ViewRenderFeatureStatus m_TemporalAA{};
@@ -35,7 +33,6 @@ namespace gglab
 		bool m_HistoryAvailable = false;
 		ViewRenderFeatureStatus m_Bloom{};
 		ViewRenderFeatureStatus m_ScenePreExposure{};
-		ViewRenderFeatureStatus m_HdrDiffValidation{};
 		ViewRenderFeatureStatus m_ToneMapping{};
 		ViewRenderFeatureStatus m_Shadows{};
 		DirectionalShadowSettings m_ShadowSettings = DisabledDirectionalShadowSettings();

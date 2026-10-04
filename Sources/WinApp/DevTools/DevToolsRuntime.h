@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
@@ -36,10 +36,7 @@ namespace gglab
 		SettingsOverride<TemporalAASettings> m_TemporalAA{};
 		SettingsOverride<GTAOSettings> m_GTAO{};
 		SettingsOverride<BloomSettings> m_Bloom{};
-		std::optional<ForwardLightingMode> m_ForwardLightingMode;
 		std::optional<bool> m_ScenePreExposure;
-		// Diagnostic intent is independent of the lighting path.
-		std::optional<bool> m_HdrDiffValidation;
 
 		// Counts active blocks/scalars, including values equal to authoring settings.
 		[[nodiscard]] uint32_t GetActiveCount() const noexcept;

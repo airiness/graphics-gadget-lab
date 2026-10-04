@@ -97,6 +97,24 @@ namespace gglab
 			bool m_Executed = false;
 			bool m_InFlight = false;
 		};
+
+		// Stage resolution of one requested bake. A cache lookup resolves each stage from
+		// the CPU cache, the Local DDC or a miss; hit stages upload their cached artifacts,
+		// missing stages are rebuilt on the GPU in producer dependency order, and only
+		// GPU-built stages are written back to the cache.
+
+		// Records the lookup's per-stage key, digest and resolution and the aggregate hit
+		// state in a status reset for the requested bake.
+		void ApplyIBLCacheLookupResult(
+			const IBLDerivedDataLookupResult& result, IBLBakeStatus& status) noexcept;
+		// The next GPU stage that rebuilds a missing artifact, or Idle once every stage is resolved.
+		[[nodiscard]] IBLBakeStage SelectNextMissingIBLBakeStage(const IBLBakeStatus& status) noexcept;
+		void MarkIBLStageGpuBuilt(IBLBakeStatus& status, IBLArtifactStage stage) noexcept;
+		// Physical-sky bakes are not cached; other bakes save only when a stage was rebuilt.
+		[[nodiscard]] bool ShouldSaveIBLBakeToCache(
+			const IBLBakeStatus& status, bool physicalSky) noexcept;
+		// Cache hits are never rewritten; a rebuilt stage is written under its lookup key.
+		[[nodiscard]] bool ShouldWriteIBLStageToCache(const IBLStageArtifactStatus& status) noexcept;
 	}
 
 	class AssetManager;

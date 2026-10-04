@@ -62,6 +62,7 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -84,7 +85,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
@@ -1225,9 +1226,9 @@ namespace gglab
 		{
 			static_assert(std::is_abstract_v<RenderPipelineSceneExtensionBase>);
 			static_assert(std::has_virtual_destructor_v<RenderPipelineSceneExtensionBase>);
-			static_assert(!std::is_copy_constructible_v<RenderPipelineForwardPBR::CreateInfo>);
+			static_assert(!std::is_copy_constructible_v<RenderPipelineForwardPlus::CreateInfo>);
 			static_assert(std::is_nothrow_move_constructible_v<
-				RenderPipelineForwardPBR::CreateInfo>);
+				RenderPipelineForwardPlus::CreateInfo>);
 
 			uint32_t addPassCount = 0;
 			uint32_t destructionCount = 0;
@@ -1318,21 +1319,21 @@ namespace gglab
 			auto debugReadback = std::make_shared<ForwardPlusDebugReadback>();
 			const long debugReadbackOwnerCount = debugReadback.use_count();
 			{
-				RenderPipelineForwardPBR pipeline(RenderPipelineForwardPBR::CreateInfo{
+				RenderPipelineForwardPlus pipeline(RenderPipelineForwardPlus::CreateInfo{
 					.m_ForwardPlusDebugReadback = debugReadback,
 					.m_SceneExtension = std::move(extension),
 					});
 				context.Check(extension == nullptr && destructionCount == 0 &&
 					debugReadback.use_count() > debugReadbackOwnerCount,
-					"ForwardPBR owns the optional extension alongside Forward+ diagnostics");
+					"The Forward+ pipeline owns the optional extension alongside Forward+ diagnostics");
 			}
 			context.Check(destructionCount == 1 &&
 				debugReadback.use_count() == debugReadbackOwnerCount,
-				"ForwardPBR retires optional extension and debug ownership with the pipeline");
+				"The Forward+ pipeline retires optional extension and debug ownership with the pipeline");
 
-			RenderPipelineForwardPBR defaultPipeline;
-			context.Check(defaultPipeline.GetName() == "ForwardPBR",
-				"ForwardPBR remains source-compatible without an optional extension");
+			RenderPipelineForwardPlus defaultPipeline;
+			context.Check(defaultPipeline.GetName() == "ForwardPlus",
+				"The Forward+ pipeline remains source-compatible without an optional extension");
 		}
 
 		void RunOverlayExtensionContractTests(SelfTestContext& context) noexcept
@@ -2898,11 +2899,23 @@ namespace gglab
 				ShaderID LoadProgram(const ShaderProgramRef& program) noexcept override
 				{
 					const auto demand = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
-					const auto entry = std::ranges::find(demand, program);
-					return entry == demand.end() ? ShaderID{}
-						: ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
+					if (const auto entry = std::ranges::find(demand, program); entry != demand.end())
+					{
+						return ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
+					}
+					// Only the Lab-composed validation recipe may resolve HDR-diff programs.
+					const std::array validation{
+						shader_programs::ForwardPBRForwardPlusValidationPixel,
+						shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+						shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+						shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+					};
+					const auto entry = std::ranges::find(validation, program);
+					return !m_AllowValidationPrograms || entry == validation.end() ? ShaderID{}
+						: ShaderID{ static_cast<uint32_t>(demand.size() + (entry - validation.begin())) };
 				}
 				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+				bool m_AllowValidationPrograms = false;
 			} shaders;
 			class BindingAccess final : public RenderBindingLayoutAccess
 			{
@@ -3000,24 +3013,29 @@ namespace gglab
 				variants[2] == RenderQueueBuilder::EncodeVariantBits(RenderBucket::Transparent, true),
 				"Material prewarm demand shares alpha and sidedness encoding with draw queue construction");
 
-			auto pipeline = std::make_unique<RenderPipelineForwardPBR>();
+			auto pipeline = std::make_unique<RenderPipelineForwardPlus>();
 			MaterialDiagnosticPrewarmProgress progress;
 			bool onePerTick = true;
-			for (uint32_t tick = 0; tick < 17; ++tick)
+			for (uint32_t tick = 0; tick < 5; ++tick)
 			{
 				const uint32_t before = pipelines.m_ResolveCount;
 				progress = pipeline->PrewarmMaterialDiagnostics(services, variants);
 				onePerTick &= pipelines.m_ResolveCount == before + 1 &&
-					progress.m_CompletedCount == tick + 1 && progress.m_TotalCount == 17 &&
-					(progress.IsReady() == (tick == 16));
+					progress.m_CompletedCount == tick + 1 && progress.m_TotalCount == 5 &&
+					(progress.IsReady() == (tick == 4));
 			}
 			context.Check(onePerTick && pipelines.m_OwnerOnly && pipelineSystem.m_OwnerOnly,
 				"Diagnostic prewarm advances one owner-thread PSO per tick and waits for every demanded variant");
 
 			bool validAttachments = true;
 			bool validBlend = true;
+			bool separateLighting = true;
+			constexpr RHIBindingLayoutHandle forwardPlusLayout{ 2, 1 };
 			for (const auto& key : pipelines.m_Keys)
 			{
+				// Transparent recipes read depth without EQUAL and never bind Forward+ light lists.
+				separateLighting &= (key.m_DepthPreset == DepthPreset::ReversedZReadOnly) ==
+					(key.m_BindingLayout != forwardPlusLayout);
 				const uint32_t count = key.m_Formats.m_RenderTargetCount;
 				validAttachments &= count >= 4 && count <= 6 &&
 					key.m_Formats.m_RenderTargetFormats[count - 3] == RHIFormat::R16G16B16A16Float &&
@@ -3025,47 +3043,181 @@ namespace gglab
 					key.m_Formats.m_RenderTargetFormats[count - 1] == RHIFormat::R16G16B16A16Float;
 				validBlend &= key.m_DepthPreset == DepthPreset::ReversedZReadOnly
 					? key.m_BlendPreset == BlendPreset::AlphaBlendAllTargets
-					: key.m_BlendPreset == BlendPreset::Default;
+					: key.m_BlendPreset == BlendPreset::Default &&
+						key.m_DepthPreset == DepthPreset::ReversedZEqualReadOnly;
 			}
-			context.Check(validAttachments && validBlend && pipelines.m_Keys.size() == 17,
-				"Prewarmed production recipes preserve diagnostic MRT formats, GTAO variants and transparent coverage blending");
+			context.Check(validAttachments && validBlend && pipelines.m_Keys.size() == 5,
+				"Prewarmed production recipes preserve diagnostic MRT formats, GTAO variants, depth-equal opaque shading and transparent coverage blending");
+			context.Check(separateLighting,
+				"Opaque recipes consume Forward+ light lists while transparent recipes keep an independent all-lights layout");
 
 			const uint32_t completedCalls = pipelines.m_ResolveCount;
 			context.Check(pipeline->PrewarmMaterialDiagnostics(services, variants).IsReady() &&
 				pipelines.m_ResolveCount == completedCalls,
 				"Completed diagnostic prewarm performs no additional PSO resolutions");
+
+			shaders.m_AllowValidationPrograms = true;
+			RenderPipelineForwardPlus validationPipeline(RenderPipelineForwardPlus::CreateInfo{
+				.m_ForwardPlusDebugReadback = std::make_shared<ForwardPlusDebugReadback>(),
+				});
+			MaterialDiagnosticPrewarmProgress validationProgress;
+			for (uint32_t tick = 0; tick < 9; ++tick)
+			{
+				validationProgress = validationPipeline.PrewarmMaterialDiagnostics(services, variants);
+			}
+			context.Check(validationProgress.IsReady() && validationProgress.m_TotalCount == 9 &&
+				std::ranges::any_of(pipelines.m_Keys, [](const GraphicsPhysicalPipelineKey& key)
+					{
+						return key.m_Formats.m_RenderTargetCount == 6;
+					}),
+				"The Lab-composed validation recipe prewarms HDR-diff variants beside the production variants");
+			shaders.m_AllowValidationPrograms = false;
+
 			pipelines.m_FailResolve = true;
 			const std::array changedDemand{ variants[1] };
 			const auto failed = pipeline->PrewarmMaterialDiagnostics(services, changedDemand);
 			context.Check(failed.m_Failed && !failed.IsReady() && failed.m_CompletedCount == 0 &&
-				failed.m_TotalCount == 8,
+				failed.m_TotalCount == 2,
 				"Changed draw demand restarts preparation and a failed PSO cannot report ready");
 		}
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
-			ForwardPlusSettings legacySettings{};
-			legacySettings.m_Mode = ForwardLightingMode::Legacy;
-			ForwardPlusSettings forwardPlusSettings{};
-			ForwardPlusSettings validationSettings{};
-			validationSettings.m_EnableHdrDiffValidation = true;
-			context.Check(
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, legacySettings, false) ==
-				ForwardPBRLightingVariant::Legacy &&
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, forwardPlusSettings, false) ==
-				ForwardPBRLightingVariant::ForwardPlus &&
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, validationSettings, true) ==
-				ForwardPBRLightingVariant::ForwardPlusValidation &&
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, validationSettings, false) ==
-				ForwardPBRLightingVariant::ForwardPlus &&
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Transparent, validationSettings, true) ==
-				ForwardPBRLightingVariant::Legacy,
-				"Opaque shading selects Legacy, Forward+, or HDR-diff variants while transparent shading remains Legacy");
+			const ForwardPlusFrameValidationInputs ready{
+				.m_PresentationAvailable = true,
+				.m_DisplayExtentMatchesPresentation = true,
+				.m_RenderSceneReady = true,
+				.m_HasOpaqueDraws = true,
+				.m_GlobalLightCount = ForwardPlusGlobalLightCapacity,
+				.m_DepthCoverageValid = true,
+			};
+			const auto classify = [](ForwardPlusFrameValidationInputs inputs)
+				{
+					return ClassifyForwardPlusFrame(inputs).m_Status;
+				};
+			ForwardPlusFrameValidationInputs readyTemporal = ready;
+			readyTemporal.m_TemporalActive = true;
+			readyTemporal.m_TemporalResolveClosureValid = true;
+			ForwardPlusFrameValidationInputs missingPresentation = ready;
+			missingPresentation.m_PresentationAvailable = false;
+			ForwardPlusFrameValidationInputs resizing = ready;
+			resizing.m_DisplayExtentMatchesPresentation = false;
+			resizing.m_DepthCoverageValid = false;
+			ForwardPlusFrameValidationInputs sceneUnavailable = ready;
+			sceneUnavailable.m_RenderSceneReady = false;
+			ForwardPlusFrameValidationInputs closureLost = readyTemporal;
+			closureLost.m_TemporalResolveClosureValid = false;
+			ForwardPlusFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
+			closureUnusedWithoutTemporal.m_TemporalActive = false;
+			ForwardPlusFrameValidationInputs gtaoReady = ready;
+			gtaoReady.m_GTAOEnabledAndSupported = true;
+			gtaoReady.m_GTAOPipelineAvailable = true;
+			ForwardPlusFrameValidationInputs gtaoRecipesMissing = gtaoReady;
+			gtaoRecipesMissing.m_GTAOPipelineAvailable = false;
+			ForwardPlusFrameValidationInputs gtaoUnsupported = gtaoRecipesMissing;
+			gtaoUnsupported.m_GTAOEnabledAndSupported = false;
+			ForwardPlusFrameValidationInputs lightOverflow = ready;
+			lightOverflow.m_GlobalLightCount = ForwardPlusGlobalLightCapacity + 1;
+			const RenderFrameValidationResult lightFailure = ClassifyForwardPlusFrame(lightOverflow);
+			// Transparent-only frames record no Forward+ opaque shading or GTAO.
+			ForwardPlusFrameValidationInputs transparentOnly = lightOverflow;
+			transparentOnly.m_HasOpaqueDraws = false;
+			transparentOnly.m_GTAOEnabledAndSupported = true;
+			transparentOnly.m_GTAOPipelineAvailable = false;
+			ForwardPlusFrameValidationInputs coverageMismatch = ready;
+			coverageMismatch.m_DepthCoverageValid = false;
+			coverageMismatch.m_DepthCoverageDiagnostic = "Coverage variant 1 mismatch";
+			const RenderFrameValidationResult coverageFailure =
+				ClassifyForwardPlusFrame(coverageMismatch);
+			context.Check(classify(ready) == RenderFrameValidationStatus::Ready &&
+				classify(readyTemporal) == RenderFrameValidationStatus::Ready &&
+				classify(closureUnusedWithoutTemporal) == RenderFrameValidationStatus::Ready &&
+				classify(resizing) == RenderFrameValidationStatus::Skipped &&
+				classify(missingPresentation) == RenderFrameValidationStatus::ContractFailure &&
+				classify(sceneUnavailable) == RenderFrameValidationStatus::ContractFailure &&
+				classify(closureLost) == RenderFrameValidationStatus::ContractFailure &&
+				classify(gtaoReady) == RenderFrameValidationStatus::Ready &&
+				classify(gtaoUnsupported) == RenderFrameValidationStatus::Ready &&
+				classify(gtaoRecipesMissing) == RenderFrameValidationStatus::ContractFailure &&
+				classify(transparentOnly) == RenderFrameValidationStatus::Ready &&
+				lightFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				lightFailure.m_Detail == std::format("requested {}, limit {}",
+					ForwardPlusGlobalLightCapacity + 1, ForwardPlusGlobalLightCapacity) &&
+				coverageFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				coverageFailure.m_Detail == "Coverage variant 1 mismatch" &&
+				!coverageFailure.m_Reason.empty(),
+				"Frame validation skips only resize mismatches, limits only opaque work by Forward+ capacity and GTAO readiness, and fails with evidence instead of selecting another lighting path, topology or silently dropping enabled GTAO");
+
+			// Production composition must not depend on Lab-owned validation programs.
+			const auto productionDemand =
+				shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+			const std::array validationPrograms{
+				shader_programs::ForwardPBRForwardPlusValidationPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+				shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+			};
+			context.Check(std::ranges::none_of(validationPrograms, [&](const ShaderProgramRef& program)
+				{
+					return std::ranges::find(productionDemand, program) != productionDemand.end();
+				}),
+				"Production Forward shader demand excludes HDR-diff validation programs");
+
+			// Startup preload is the production readiness closure: a missing production
+			// artifact must fail the preload, not the first frame that needs it.
+			const auto initialDemand = shader_programs::GetRendererInitialShaderProgramDemand();
+			const auto inInitialDemand = [&initialDemand](const ShaderProgramRef& program) noexcept
+				{
+					return std::ranges::find(initialDemand, program) != initialDemand.end();
+				};
+			const std::array productionPrograms{
+				shader_programs::ForwardPBRAllLightsPixel,
+				shader_programs::ForwardPBRForwardPlusPixel,
+				shader_programs::ForwardPBRForwardPlusGTAOPixel,
+				shader_programs::ForwardPlusCullCompute,
+				shader_programs::GTAOEvaluateCompute,
+				shader_programs::GTAODenoiseXCompute,
+				shader_programs::GTAODenoiseYCompute,
+				shader_programs::GTAOUpsampleCompute,
+				shader_programs::AtmosphereLutCompute,
+			};
+			const std::array labOwnedPrograms{
+				shader_programs::ForwardPBRForwardPlusValidationPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+				shader_programs::ForwardPlusCullDiagnosticsCompute,
+				shader_programs::ForwardPlusValidationTilesCompute,
+				shader_programs::ForwardPlusValidationFrameCompute,
+				shader_programs::GTAOEvaluateDiagnosticsCompute,
+			};
+			context.Check(std::ranges::all_of(productionPrograms, inInitialDemand) &&
+				std::ranges::none_of(labOwnedPrograms, inInitialDemand),
+				"Renderer startup demand preloads production Forward+, GTAO and atmosphere programs and excludes Lab-owned validation and diagnostics programs");
+
+			ForwardPBRShaderSet shaderSet{};
+			shaderSet.m_CoverageVertexShader = ShaderID{ 1 };
+			shaderSet.m_AllLightsShadingPixelShader = ShaderID{ 2 };
+			shaderSet.m_ForwardPlus.m_Shading = ShaderID{ 3 };
+			shaderSet.m_ForwardPlus.m_GTAOContribution = ShaderID{ 5 };
+			shaderSet.m_AlphaTestPixelShader = ShaderID{ 6 };
+			shaderSet.m_VelocityOpaquePixelShader = ShaderID{ 7 };
+			shaderSet.m_VelocityAlphaTestPixelShader = ShaderID{ 8 };
+			shaderSet.m_AllLightsMaterialDiagnosticsPixelShader = ShaderID{ 10 };
+			shaderSet.m_ForwardPlus.m_MaterialDiagnostics = ShaderID{ 11 };
+			shaderSet.m_ForwardPlus.m_GTAOContributionMaterialDiagnostics = ShaderID{ 12 };
+			const bool productionValid =
+				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid();
+			shaderSet.m_IncludesHdrDiffValidation = true;
+			const bool validationRequiresPrograms =
+				!shaderSet.IsValid() && !shaderSet.AreMaterialDiagnosticsValid();
+			shaderSet.m_ForwardPlusValidation = {
+				.m_Shading = ShaderID{ 20 },
+				.m_GTAOContribution = ShaderID{ 21 },
+				.m_MaterialDiagnostics = ShaderID{ 22 },
+				.m_GTAOContributionMaterialDiagnostics = ShaderID{ 23 },
+			};
+			context.Check(productionValid && validationRequiresPrograms &&
+				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid(),
+				"Forward shader validity requires HDR-diff programs only for the Lab-composed validation recipe");
 
 			const ForwardPlusHdrDiffReadback withinTolerance{
 				.m_MaxAbsoluteError = ForwardPlusHdrDiffAbsoluteTolerance,
@@ -3092,7 +3244,7 @@ namespace gglab
 			context.Check(IsForwardPlusGlobalLightCountSupported(0) &&
 				IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity) &&
 				!IsForwardPlusGlobalLightCountSupported(ForwardPlusGlobalLightCapacity + 1),
-				"Forward+ uses a bounded global-light loop and fails closed when it overflows");
+				"Forward+ uses a bounded global-light loop whose capacity frame validation enforces");
 			std::array<uint32_t, 4> unsortedGlobalLightIndices{ 31, 4, 19, 7 };
 			SortForwardPlusGlobalLightIndices(unsortedGlobalLightIndices);
 			context.Check(unsortedGlobalLightIndices == std::array<uint32_t, 4>{ 4, 7, 19, 31 },
@@ -3591,8 +3743,13 @@ namespace gglab
 			DepthCoverageFramePlanBuildInfo mismatchedShaderBuildInfo = framePlanBuildInfo;
 			mismatchedShaderBuildInfo.m_ForwardPipelineSignatures[opaqueVariant]
 				->m_CoverageVertexShader = ShaderID{ 18 };
-			const DepthCoverageFramePlan fallbackPlan =
+			const DepthCoverageFramePlan mismatchedPlan =
 				BuildDepthCoverageFramePlan(mismatchedShaderBuildInfo);
+
+			DepthCoverageFramePlanBuildInfo missingSignatureBuildInfo = framePlanBuildInfo;
+			missingSignatureBuildInfo.m_ForwardPipelineSignatures[opaqueVariant].reset();
+			const DepthCoverageFramePlan missingSignaturePlan =
+				BuildDepthCoverageFramePlan(missingSignatureBuildInfo);
 
 			RenderQueue invalidPacketQueue = queue;
 			invalidPacketQueue.m_DrawItems.front().m_CoverageDrawPacket = {};
@@ -3615,18 +3772,19 @@ namespace gglab
 			const DepthCoverageFramePlan emptyQueuePlan =
 				BuildDepthCoverageFramePlan(emptyQueueBuildInfo);
 			context.Check(
-				equalPlan.UsesDepthPrepassEqual() && equalPlan.RendersGeometry() &&
+				equalPlan.IsValid() && equalPlan.m_Diagnostic.empty() &&
 				equalPlan.AddsForwardOpaquePass() && !equalPlan.AddsForwardTransparentPass() &&
-				fallbackPlan.UsesForwardDepthWrite() && fallbackPlan.RendersGeometry() &&
-				fallbackPlan.m_Diagnostic.find("CoverageVertexShader") != std::string::npos &&
-				!rejectedPlan.RendersGeometry() &&
-				rejectedPlan.m_ExecutionMode == DepthCoverageExecutionMode::SkipGeometry &&
-				!standardDepthPlan.RendersGeometry() &&
+				!mismatchedPlan.IsValid() && !mismatchedPlan.AddsForwardOpaquePass() &&
+				mismatchedPlan.m_Diagnostic.find("CoverageVertexShader") != std::string::npos &&
+				!missingSignaturePlan.IsValid() &&
+				missingSignaturePlan.m_Diagnostic.find("pipeline signatures") != std::string::npos &&
+				!rejectedPlan.IsValid() && !rejectedPlan.m_Diagnostic.empty() &&
+				!standardDepthPlan.IsValid() &&
 				standardDepthPlan.m_Diagnostic.find("Reversed-Z") != std::string::npos &&
-				emptyQueuePlan.UsesDepthPrepassEqual() &&
+				emptyQueuePlan.IsValid() &&
 				!emptyQueuePlan.AddsForwardOpaquePass() &&
 				!emptyQueuePlan.AddsForwardTransparentPass(),
-				"Frame-level coverage planning selects one consistent EQUAL, Forward-write, or reject path and omits empty Forward buckets");
+				"Frame-level coverage planning validates the single EQUAL topology, reports the first violation and omits empty Forward buckets");
 		}
 
 		// CPU reference rules for the GTAO shaders tested below.
@@ -3814,21 +3972,15 @@ namespace gglab
 				"GTAO modulates material-occluded diffuse IBL without changing specular IBL visibility");
 
 			context.Check(
-				ResolveGTAOFrameStatus(false, false, false, false, false, false) ==
+				ResolveGTAOFrameStatus(false, false, false) ==
 				GTAOFrameStatus::Disabled &&
-				ResolveGTAOFrameStatus(true, false, false, false, false, false) ==
+				ResolveGTAOFrameStatus(true, false, false) ==
 				GTAOFrameStatus::CoreCapabilityUnavailable &&
-				ResolveGTAOFrameStatus(true, true, false, false, false, false) ==
-				GTAOFrameStatus::PipelineUnavailable &&
-				ResolveGTAOFrameStatus(true, true, true, false, false, false) ==
-				GTAOFrameStatus::RenderSceneUnavailable &&
-				ResolveGTAOFrameStatus(true, true, true, true, false, false) ==
-				GTAOFrameStatus::DepthCoverageUnavailable &&
-				ResolveGTAOFrameStatus(true, true, true, true, true, false) ==
+				ResolveGTAOFrameStatus(true, true, false) ==
 				GTAOFrameStatus::NoOpaqueDraws &&
-				ResolveGTAOFrameStatus(true, true, true, true, true, true) ==
+				ResolveGTAOFrameStatus(true, true, true) ==
 				GTAOFrameStatus::Active,
-				"GTAO frame status preserves deterministic disabled, fallback, idle, and active causes");
+				"GTAO frame status preserves deterministic disabled, unsupported, idle, and active causes");
 
 			ViewRenderProfile gtaoProfile{};
 			context.Check(gtaoProfile.m_Lighting.m_GTAO.m_Enabled,
@@ -7941,13 +8093,10 @@ namespace gglab
 				.m_HistoryColorTypedUavStore = true,
 				.m_HistoryDepthShaderResource = true,
 				.m_HistoryDepthTypedUavStore = true,
-				.m_VelocityProgramsAvailable = true,
-				.m_ResolveProgramAvailable = true,
-				.m_BindingLayoutAvailable = true,
 			};
 			context.Check(fullCapabilities.IsCoreAvailable() &&
 				!TemporalAACapabilityStatus{}.IsCoreAvailable(),
-				"Temporal AA core capability requires the complete texture, program, and binding closure");
+				"Temporal AA core capability requires the complete device texture support");
 
 			TemporalFramePlanResolveInfo resolveInfo{
 				.m_Settings = {.m_Enabled = true},
@@ -8003,28 +8152,33 @@ namespace gglab
 				!IsTemporalAADisplayViewEligible(RenderViewID::Main, 0, 1080),
 				"Temporal AA eligibility is restricted to non-empty perspective display views");
 
-			RenderPipelineForwardPBR forwardPipeline;
+			RenderPipelineForwardPlus forwardPipeline;
 			const ResolvedTemporalFramePlan forwardPlan =
 				forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
-			RenderPipelineForwardPBR integratedExtensionPipeline({
+			RenderPipelineForwardPlus integratedExtensionPipeline({
 				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
 			});
+			TemporalFramePlanResolveInfo noDepthVelocityClaimInfo = resolveInfo;
+			noDepthVelocityClaimInfo.m_DepthVelocityPathAvailable = false;
+			const ResolvedTemporalFramePlan forwardWithoutClaimPlan =
+				forwardPipeline.ResolveTemporalFramePlan(noDepthVelocityClaimInfo);
 			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
 			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
 			const ResolvedTemporalFramePlan integratedExtensionPlan =
 				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
 			context.Check(forwardPlan.m_Active && forwardPlan.m_DepthVelocityPathAvailable &&
+				forwardWithoutClaimPlan.m_Active &&
 				forwardPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::PostTAA &&
 				forwardPlan.m_DisableReason == TemporalAADisableReason::None &&
 				!integratedExtensionPlan.m_Active &&
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
-				"ForwardPBR exposes its velocity path and rejects unsupported integrated extensions");
+				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),
-				"Renderer publishes temporal core capability as unavailable before pipeline closure");
+				"Renderer publishes temporal core capability as unavailable before initialization");
 
 			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
 				.m_Settings = enabledSettings.m_TemporalAA,

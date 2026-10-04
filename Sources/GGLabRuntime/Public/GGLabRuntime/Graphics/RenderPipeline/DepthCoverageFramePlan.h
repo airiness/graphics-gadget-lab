@@ -7,45 +7,31 @@
 
 namespace gglab
 {
-	enum class DepthCoverageExecutionMode : uint8_t
-	{
-		DepthPrepassEqual,
-		ForwardDepthWrite,
-		SkipGeometry,
-	};
-
+	// The Forward pipeline draws every coverage item with a depth prepass followed by a
+	// depth-equal Forward pass. A plan that cannot satisfy that contract is invalid and
+	// carries the first violation in m_Diagnostic; it never selects another topology.
 	struct DepthCoverageFramePlan
 	{
-		DepthCoverageExecutionMode m_ExecutionMode = DepthCoverageExecutionMode::SkipGeometry;
 		const RenderQueue* m_SourceRenderQueue = nullptr;
 		const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 		std::string m_Diagnostic;
+		bool m_IsValid = false;
 		bool m_HasDepthCoverageDraws = false;
 		bool m_HasTransparentDraws = false;
 
-		[[nodiscard]] bool UsesDepthPrepassEqual() const noexcept
+		[[nodiscard]] bool IsValid() const noexcept
 		{
-			return m_ExecutionMode == DepthCoverageExecutionMode::DepthPrepassEqual;
-		}
-
-		[[nodiscard]] bool UsesForwardDepthWrite() const noexcept
-		{
-			return m_ExecutionMode == DepthCoverageExecutionMode::ForwardDepthWrite;
-		}
-
-		[[nodiscard]] bool RendersGeometry() const noexcept
-		{
-			return m_ExecutionMode != DepthCoverageExecutionMode::SkipGeometry;
+			return m_IsValid;
 		}
 
 		[[nodiscard]] bool AddsForwardOpaquePass() const noexcept
 		{
-			return RendersGeometry() && m_HasDepthCoverageDraws;
+			return m_IsValid && m_HasDepthCoverageDraws;
 		}
 
 		[[nodiscard]] bool AddsForwardTransparentPass() const noexcept
 		{
-			return RendersGeometry() && m_HasTransparentDraws;
+			return m_IsValid && m_HasTransparentDraws;
 		}
 	};
 

@@ -4,7 +4,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 namespace gglab
@@ -31,11 +31,10 @@ namespace gglab
 
 	SampleableDepthLabSession::SampleableDepthLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR()),
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPlus()),
 		m_ViewportWidth(createInfo.m_WindowWidth), m_ViewportHeight(createInfo.m_WindowHeight)
 	{
 		auto& profile = GetMutableViewRenderProfile();
-		profile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;
 

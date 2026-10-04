@@ -13,7 +13,6 @@ namespace gglab
 	enum class ApplicationStartupDemo : uint8_t
 	{
 		Start,
-		Playground,
 		Island,
 		CoastalAtrium,
 		LabHost,

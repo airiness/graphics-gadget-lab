@@ -19,54 +19,98 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
+#include <cstdint>
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace gglab
 {
-	class RenderPipelineForwardPBR : public RenderPipelineBase
+	// Frame facts that decide whether the Forward+ recipe can record this frame.
+	struct ForwardPlusFrameValidationInputs
+	{
+		bool m_PresentationAvailable = false;
+		bool m_DisplayExtentMatchesPresentation = false;
+		bool m_RenderSceneReady = false;
+		// Opaque or alpha-test draws record Forward+ cull, opaque shading and GTAO.
+		bool m_HasOpaqueDraws = false;
+		uint32_t m_GlobalLightCount = 0;
+		bool m_DepthCoverageValid = false;
+		std::string_view m_DepthCoverageDiagnostic;
+		bool m_GTAOEnabledAndSupported = false;
+		bool m_GTAOPipelineAvailable = false;
+		bool m_TemporalActive = false;
+		bool m_TemporalResolveClosureValid = false;
+	};
+
+	// The recipe always shades opaque draws with Forward+ after an EQUAL depth prepass.
+	// A display view built for another swap-chain extent is an expected resize state and
+	// skips the frame. Missing scene data, invalid depth coverage and a lost temporal resolve
+	// closure are contract failures. Frames that record opaque work additionally fail when
+	// global lights exceed the Forward+ capacity or an enabled, supported GTAO has unprepared
+	// recipes; transparent-only frames record neither and are not limited by them. No failure
+	// selects another lighting path or frame topology or silently drops a requested feature.
+	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPlusFrame(
+		const ForwardPlusFrameValidationInputs& inputs) noexcept;
+
+	class RenderPipelineForwardPlus : public RenderPipelineBase
 	{
 	public:
 		struct CreateInfo
 		{
+			// Lab-owned Forward+ instrumentation. When present, the pipeline composes
+			// tile readback and the HDR-diff validation recipe.
 			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
 		};
 
-		explicit RenderPipelineForwardPBR(
+		explicit RenderPipelineForwardPlus(
 			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
-			RenderPipelineForwardPBR(CreateInfo{
+			RenderPipelineForwardPlus(CreateInfo{
 				.m_ForwardPlusDebugReadback = std::move(forwardPlusDebugReadback),
 				})
 		{
 		}
-		explicit RenderPipelineForwardPBR(CreateInfo createInfo) noexcept :
+		explicit RenderPipelineForwardPlus(CreateInfo createInfo) noexcept :
 			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
 			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
-			m_ForwardOpaquePass.SetHdrDiffValidationAvailable(
-				m_ForwardPlusDebugReadback != nullptr);
+			m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation =
+				m_ForwardPlusValidationPass.IsAvailable();
 		}
-		~RenderPipelineForwardPBR() override = default;
+		~RenderPipelineForwardPlus() override = default;
 
-		std::string_view GetName() const noexcept override { return "ForwardPBR"; }
-		void PrepareTemporalFramePlanning(const RenderServices& services) noexcept override;
+		std::string_view GetName() const noexcept override { return "ForwardPlus"; }
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 
 		[[nodiscard]] MaterialDiagnosticPrewarmProgress PrewarmMaterialDiagnostics(
 			const RenderServices& services, std::span<const uint64_t> drawVariants) noexcept override;
 
+		[[nodiscard]] RenderFrameValidationResult ValidateRenderFrame(
+			const RenderFrameContext& context, const RenderServices& services) noexcept override;
 		void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
-			const RenderServices& services) noexcept override;
-		[[nodiscard]] bool ValidateRenderFrame(const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
+		// Decisions resolved once by ValidateRenderFrame and consumed by graph
+		// construction of the same frame. The depth coverage plan references
+		// that frame's RenderQueue and must not outlive it.
+		struct FramePlan
+		{
+			uint64_t m_FrameSerial = 0;
+			DepthCoverageFramePlan m_DepthCoverage{};
+			ForwardPlusFrameStatus m_ForwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
+			GTAOFrameStatus m_GTAOStatus = GTAOFrameStatus::Disabled;
+		};
+
 		void PrepareForwardPasses(const RenderServices& services, bool materialDiagnostics) noexcept;
 		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
 			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
@@ -92,12 +136,13 @@ namespace gglab
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
+		std::optional<FramePlan> m_FramePlan;
 
 		struct MaterialDiagnosticPrewarmVariant
 		{
 			uint64_t m_DrawVariantBits = 0;
-			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::Legacy;
-			bool m_UseDepthEqual = false;
+			// Opaque draws only; transparent prewarm has a single all-lights recipe.
+			bool m_HdrDiffValidation = false;
 			bool m_GTAOContribution = false;
 		};
 		std::vector<uint64_t> m_DiagnosticPrewarmDrawVariants;

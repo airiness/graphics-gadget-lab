@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
 #include <cstdint>
@@ -30,7 +30,7 @@ namespace gglab
 
 	LightingContractLabSession::LightingContractLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPlus())
 	{
 		GGLAB_UNUSED(GetMutableParameters().Add({
 			.m_Id = SceneSourceId,

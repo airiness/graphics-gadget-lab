@@ -1,7 +1,6 @@
 #pragma once
 
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
-#include "GGLabRuntime/Graphics/Pipeline/ViewRenderFeatureStatus.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <array>
@@ -17,8 +16,7 @@ namespace gglab
 		RGBufferId m_TileLightIndices{};
 		RGBufferId m_TileDepthRanges{};
 		ForwardPlusTileGrid m_TileGrid{};
-		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::Disabled;
-		ViewRenderFeatureStatus m_HdrDiffStatus{};
+		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightTableCapacity = 0;
 		uint32_t m_DirectionalLightCount = 0;

@@ -52,12 +52,9 @@ namespace gglab
 
 	struct ForwardPlusPerformanceReadback
 	{
-		uint64_t m_LegacyFrameSerial = 0;
 		uint64_t m_ForwardPlusFrameSerial = 0;
-		double m_LegacyOpaqueMilliseconds = 0.0;
 		double m_ForwardPlusCullMilliseconds = 0.0;
 		double m_ForwardPlusOpaqueMilliseconds = 0.0;
-		bool m_HasLegacySample = false;
 		bool m_HasForwardPlusSample = false;
 	};
 
@@ -104,6 +101,13 @@ namespace gglab
 		void InvalidateResults() noexcept;
 		void ResetPerformance() noexcept;
 		void SetSelectedTile(uint32_t tileX, uint32_t tileY) noexcept;
+		// Lab-owned control for the HDR-diff validation recipe. A pipeline composes
+		// that recipe only when created with this readback service; the request
+		// selects whether an active Forward+ frame records the comparison.
+		void SetHdrDiffRequested(bool requested) noexcept
+		{
+			m_HdrDiffRequested.store(requested, std::memory_order_release);
+		}
 		void ConsumeCompletedSlot(uint32_t bufferIndex) noexcept;
 		void MarkScheduled(uint32_t bufferIndex, uint64_t frameSerial,
 			const ForwardPlusTileGrid& tileGrid, uint32_t tileX, uint32_t tileY) noexcept;
@@ -111,7 +115,6 @@ namespace gglab
 			uint32_t height) noexcept;
 		void MarkGridScheduled(uint32_t bufferIndex, uint64_t frameSerial,
 			const ForwardPlusTileGrid& tileGrid) noexcept;
-		void RecordLegacyGpuTiming(uint64_t frameSerial, double opaqueMilliseconds) noexcept;
 		void RecordForwardPlusGpuTiming(uint64_t frameSerial, double cullMilliseconds,
 			double opaqueMilliseconds) noexcept;
 
@@ -131,6 +134,10 @@ namespace gglab
 		[[nodiscard]] uint64_t GetScheduledCount() const noexcept
 		{
 			return m_ScheduledCount.load(std::memory_order_relaxed);
+		}
+		[[nodiscard]] bool IsHdrDiffRequested() const noexcept
+		{
+			return m_HdrDiffRequested.load(std::memory_order_acquire);
 		}
 
 		static constexpr uint64_t HeaderReadbackOffset = 0;
@@ -197,6 +204,7 @@ namespace gglab
 		std::atomic<uint32_t> m_SelectedTileY = 0;
 		std::atomic<uint64_t> m_ScheduledCount = 0;
 		std::atomic<uint64_t> m_RequestGeneration = 1;
+		std::atomic<bool> m_HdrDiffRequested = false;
 		mutable std::mutex m_ResultMutex;
 		ForwardPlusTileReadback m_Latest{};
 		ForwardPlusHdrDiffReadback m_LatestHdrDiff{};

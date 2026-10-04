@@ -14,6 +14,14 @@ namespace gglab
 	{
 		void RunPlaygroundContentCliContractTests(SelfTestContext& context) noexcept
 		{
+			for (const auto alias : { "playground", "Demo.Playground", "PLAYGROUND", "dEmO.pLaYgRoUnD" })
+			{
+				const std::vector<std::string_view> args = { "--demo", alias };
+				const auto result = ParseApplicationLaunchOptions(args);
+				context.Check(!result.IsValid() && result.m_Error.find("Unknown demo") != std::string::npos,
+					"The retired original Playground aliases are rejected without selecting another Demo");
+			}
+
 			struct ContentAlias
 			{
 				std::string_view m_Alias;

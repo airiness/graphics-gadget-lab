@@ -603,6 +603,13 @@ namespace gglab
 				AppRuntimeInitializeResult::InvalidConfig &&
 				invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
 				"Invalid shared config fails atomically");
+			context.Check(invalidConfigRuntime.Tick() == AppRuntimeTickResult::Fatal &&
+				invalidConfigRuntime.Tick() == AppRuntimeTickResult::Fatal &&
+				invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
+				"A failed runtime stays terminal and reports Fatal instead of a normal Exit");
+			invalidConfigRuntime.Shutdown();
+			context.Check(invalidConfigRuntime.GetLifecycleState() == AppRuntimeLifecycleState::Failed,
+				"Shutdown preserves a fatal runtime failure for the host");
 
 			GGLabAppRuntimeCreateInfo missingStartupDemo = MakeCreateInfo();
 			missingStartupDemo.m_Config.m_StartupDemoId.clear();

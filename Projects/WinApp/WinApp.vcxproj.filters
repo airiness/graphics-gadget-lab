@@ -162,12 +162,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -175,9 +169,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
@@ -208,9 +199,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp">
@@ -276,9 +264,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -286,6 +271,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
@@ -497,12 +485,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -510,9 +492,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h">
@@ -543,9 +522,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h">
@@ -614,10 +590,10 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.h">
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">

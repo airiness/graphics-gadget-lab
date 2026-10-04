@@ -28,7 +28,6 @@
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "Graphics/SamplerRegistry.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderManager.h"
-#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 #include "GGLabRuntime/Graphics/TransferManager.h"
 
 #include <atomic>
@@ -74,11 +73,6 @@ namespace gglab
 		return m_EnvironmentLightingSystem.get();
 	}
 
-	AssetUploadControl* Renderer::GetAssetUploadControl() const noexcept
-	{
-		return m_AssetUploadControl;
-	}
-
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (createInfo.m_RHIContextFactory == nullptr)
@@ -114,7 +108,6 @@ namespace gglab
 				.m_TransferManager = GetTransferManager(),
 				});
 		m_AssetUploadScheduler = std::move(uploadSchedulerInstance.m_Scheduling);
-		m_AssetUploadControl = uploadSchedulerInstance.m_Control;
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
@@ -186,19 +179,6 @@ namespace gglab
 			historySupport.m_Depth.m_ShaderResource.IsSupported();
 		m_TemporalAACapabilityStatus.m_HistoryDepthTypedUavStore =
 			historySupport.m_Depth.m_TypedUavStore.IsSupported();
-		m_TemporalAACapabilityStatus.m_BindingLayoutAvailable =
-			m_CommonBindingLayout.IsValid();
-		if (createInfo.m_ShaderManager)
-		{
-			const ShaderID coverageVertex =
-				createInfo.m_ShaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
-			const ShaderID velocityOpaque = createInfo.m_ShaderManager->LoadProgram(
-				shader_programs::DepthPrepassVelocityOpaquePixel);
-			const ShaderID velocityAlphaTest = createInfo.m_ShaderManager->LoadProgram(
-				shader_programs::DepthPrepassVelocityAlphaTestPixel);
-			m_TemporalAACapabilityStatus.m_VelocityProgramsAvailable =
-				coverageVertex.IsValid() && velocityOpaque.IsValid() && velocityAlphaTest.IsValid();
-		}
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
 		m_IsInitialized = true;
@@ -234,7 +214,6 @@ namespace gglab
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
-		m_AssetUploadControl = nullptr;
 
 		m_SceneCB.reset();
 		m_FrameBuilder.reset();

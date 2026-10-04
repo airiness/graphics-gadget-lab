@@ -13,7 +13,6 @@
 namespace gglab
 {
 	class AssetManager;
-	class AssetUploadControl;
 	class DebugDrawContext;
 	class EnvironmentAssetController;
 	class ApplicationInput;
@@ -32,7 +31,6 @@ namespace gglab
 		IBLCacheControlBase* m_IBLCacheControl = nullptr;
 		GpuProfilingViewBase* m_GpuProfiling = nullptr;
 		GpuProfilingControlBase* m_GpuProfilingControl = nullptr;
-		AssetUploadControl* m_AssetUploadControl = nullptr;
 		RHIContext* m_RHIContext = nullptr;
 		AssetManager* m_AssetManager = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
@@ -47,8 +45,7 @@ namespace gglab
 			// Required: the explicit render service bundle plus every content
 			// service below. The renderer always provides the RHI context,
 			// environment lighting and IBL cache when composition succeeds.
-			// Optional: GPU profiling depends on backend profiler availability;
-			// the asset upload control is a developer/acceptance capability.
+			// Optional: GPU profiling depends on backend profiler availability.
 			return m_RenderServices.IsValid() && m_RHIContext && m_EnvironmentLighting &&
 				m_EnvironmentLightingControl && m_IBLCacheControl && m_AssetManager &&
 				m_ShaderManager && m_TaskSystem && m_Input && m_Time && m_DebugDraw &&

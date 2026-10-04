@@ -10,7 +10,7 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
@@ -23,29 +23,24 @@ namespace gglab
 		m_AssetOwnerScope(createInfo.m_Services.m_AssetManager->CreateOwnerScope())
 	{
 		GGLAB_ASSERT_MSG(createInfo.IsValid(), "DemoPlayground requires valid create info.");
+		GGLAB_ASSERT_MSG(m_Content == PlaygroundContent::Island ||
+			m_Content == PlaygroundContent::CoastalAtrium, "DemoPlayground requires a supported content preset.");
 
 		// Camera
 		Camera::CreateInfo camCreateInfo{};
-		camCreateInfo.m_Forward = -Vector3::UnitX;
-		camCreateInfo.m_Position = Vector3(8.0f, 2.0f, 0.0f);
 		camCreateInfo.m_Width = createInfo.m_WindowWidth;
 		camCreateInfo.m_Height = createInfo.m_WindowHeight;
 		camCreateInfo.m_Near = 0.1f;
-		camCreateInfo.m_Far = 1000.0f;
-		camCreateInfo.m_Fov = 60.0f;
-		if (m_Content != PlaygroundContent::Sponza)
-		{
-			// Blender (X, Y, Z) maps to runtime (X, Z, Y); preserve authored meters.
-			camCreateInfo.m_Position = Vector3(17.0f, 16.0f, -23.0f);
-			camCreateInfo.m_Forward = Vector3(0.0f, 0.8f, 0.0f) - camCreateInfo.m_Position;
-			camCreateInfo.m_Forward.Normalize();
-			camCreateInfo.m_Far = 100.0f;
-			camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
-			camCreateInfo.m_ExposureCompensationEV = 0.0f;
-			m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
-			m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
-			m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
-		}
+		// Blender (X, Y, Z) maps to runtime (X, Z, Y); preserve authored meters.
+		camCreateInfo.m_Position = Vector3(17.0f, 16.0f, -23.0f);
+		camCreateInfo.m_Forward = Vector3(0.0f, 0.8f, 0.0f) - camCreateInfo.m_Position;
+		camCreateInfo.m_Forward.Normalize();
+		camCreateInfo.m_Far = 100.0f;
+		camCreateInfo.m_Fov = math::ToDegrees(0.4426289085f);
+		camCreateInfo.m_ExposureCompensationEV = 0.0f;
+		m_ViewRenderProfile.m_TemporalAA.m_Enabled = false;
+		m_ViewRenderProfile.m_Lighting.m_GTAO.m_Enabled = false;
+		m_ViewRenderProfile.m_PostProcess.m_Bloom.m_Enabled = false;
 		m_Camera = std::make_unique<Camera>(camCreateInfo);
 
 		// CameraController
@@ -66,7 +61,7 @@ namespace gglab
 		}
 
 		// RenderPipeline
-		m_RenderPipeline = CreateRenderPipelineForwardPBR();
+		m_RenderPipeline = CreateRenderPipelineForwardPlus();
 	}
 
 	std::string_view DemoPlayground::GetName() const noexcept
@@ -75,8 +70,7 @@ namespace gglab
 		{
 			return DesktopCoastalAtriumDemoId;
 		}
-		return m_Content == PlaygroundContent::Island ?
-			DesktopIslandDemoId : DesktopPlaygroundDemoId;
+		return DesktopIslandDemoId;
 	}
 
 	void DemoPlayground::BeginPrepare() noexcept
@@ -89,27 +83,10 @@ namespace gglab
 				{ .m_Path = "Assets/Models/GGLabCoastalAtriumResearchLounge/GGLabCoastalAtrium.gltf" },
 			};
 		}
-		else if (m_Content == PlaygroundContent::Island)
-		{
-			m_PendingModels = {
-				{ .m_Path = "Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf" },
-			};
-		}
 		else
 		{
 			m_PendingModels = {
-				{
-					.m_Path = "Assets/Models/Sponza/Sponza.gltf",
-					.m_Position = Vector3::Zero,
-					.m_Rotation = Vector3::Zero,
-					.m_Scale = Vector3::One,
-				},
-				{
-					.m_Path = "Assets/Models/FlightHelmet/FlightHelmet.gltf",
-					.m_Position = Vector3::Zero,
-					.m_Rotation = Vector3::Zero,
-					.m_Scale = Vector3::One,
-				},
+				{ .m_Path = "Assets/Models/GGLabIslandPrototype/GGLabIslandPrototype.gltf" },
 			};
 		}
 
@@ -200,19 +177,16 @@ namespace gglab
 
 	void DemoPlayground::OnEnter() noexcept
 	{
-		if (m_Content != PlaygroundContent::Sponza)
-		{
-			auto* environmentView = m_Services.m_EnvironmentLighting;
-			auto* environmentControl = m_Services.m_EnvironmentLightingControl;
-			GGLAB_ASSERT_NOT_NULL(environmentView);
-			GGLAB_ASSERT_NOT_NULL(environmentControl);
-			const auto previous = environmentView->GetEnvironmentLightingSettings();
-			m_PreviousEnvironmentIntensity = previous.m_Intensity;
-			m_PreviousSkyboxEnabled = previous.m_EnableSkybox;
-			m_HasEnvironmentOverride = true;
-			environmentControl->SetIntensity(0.0f);
-			environmentControl->SetSkyboxEnabled(false);
-		}
+		auto* environmentView = m_Services.m_EnvironmentLighting;
+		auto* environmentControl = m_Services.m_EnvironmentLightingControl;
+		GGLAB_ASSERT_NOT_NULL(environmentView);
+		GGLAB_ASSERT_NOT_NULL(environmentControl);
+		const auto previous = environmentView->GetEnvironmentLightingSettings();
+		m_PreviousEnvironmentIntensity = previous.m_Intensity;
+		m_PreviousSkyboxEnabled = previous.m_EnableSkybox;
+		m_HasEnvironmentOverride = true;
+		environmentControl->SetIntensity(0.0f);
+		environmentControl->SetSkyboxEnabled(false);
 	}
 
 	void DemoPlayground::OnResize(uint32_t width, uint32_t height) noexcept
@@ -271,15 +245,8 @@ namespace gglab
 			auto mainLightEntity = registry.create();
 
 			components::TransformComponent transComp{};
-			Vector3 direction = Vector3(-0.406f, -0.906f, -0.123f);
-			if (m_Content == PlaygroundContent::Island)
-			{
-				direction = Vector3(-0.6f, -1.6f, 0.4f);
-			}
-			else if (m_Content == PlaygroundContent::CoastalAtrium)
-			{
-				direction = Vector3(-1.0f, -0.85f, 0.35f);
-			}
+			Vector3 direction = m_Content == PlaygroundContent::CoastalAtrium ?
+				Vector3(-1.0f, -0.85f, 0.35f) : Vector3(-0.6f, -1.6f, 0.4f);
 			direction.Normalize();
 			transComp.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(mainLightEntity, transComp);

@@ -31,11 +31,7 @@ namespace gglab
 			case ViewRenderFeatureReason::None: return "";
 			case ViewRenderFeatureReason::NotRequested: return "Not requested";
 			case ViewRenderFeatureReason::FrameUnavailable: return "Current frame unavailable";
-			case ViewRenderFeatureReason::PipelineUnavailable: return "Pipeline unavailable";
 			case ViewRenderFeatureReason::CoreCapabilityUnavailable: return "Required capabilities unavailable";
-			case ViewRenderFeatureReason::GlobalLightCapacityExceeded: return "Global light capacity exceeded";
-			case ViewRenderFeatureReason::DepthCoverageUnavailable: return "Depth coverage unavailable";
-			case ViewRenderFeatureReason::RenderSceneUnavailable: return "Render scene unavailable";
 			case ViewRenderFeatureReason::NoOpaqueDraws: return "No opaque draws";
 			case ViewRenderFeatureReason::DisplayViewIneligible: return "Display view ineligible";
 			case ViewRenderFeatureReason::DepthVelocityPathUnavailable: return "Depth / velocity path unavailable";
@@ -59,7 +55,6 @@ namespace gglab
 			{
 			case ViewRenderFeatureState::Active: label = "Active"; color = ActiveColor; break;
 			case ViewRenderFeatureState::Disabled: label = "Disabled"; color = MutedColor; break;
-			case ViewRenderFeatureState::Fallback: label = "Legacy Fallback"; break;
 			case ViewRenderFeatureState::Inactive: label = "Inactive"; break;
 			case ViewRenderFeatureState::Unavailable: break;
 			}
@@ -184,32 +179,6 @@ namespace gglab
 			DrawInspect(context, inspector);
 		}
 
-		void DrawLightingMode(const RenderingSettingsDiagnosticsSnapshot& snapshot,
-			DevelopGuiContext& context, ViewRenderSettingsOverrides* overrides) noexcept
-		{
-			const auto authoring = snapshot.m_AuthoringProfile.m_Lighting.m_ForwardPlus.m_Mode;
-			const auto published = snapshot.m_RequestedProfile.m_Lighting.m_ForwardPlus.m_Mode;
-			auto mode = overrides ? overrides->m_ForwardLightingMode.value_or(authoring) : published;
-			BeginRow("Lighting Path");
-			ImGui::SetNextItemWidth(-1.0f);
-			ImGui::BeginDisabled(!overrides);
-			constexpr const char* modes[] = { "Legacy", "Forward+" };
-			int selected = mode == ForwardLightingMode::ForwardPlus ? 1 : 0;
-			if (ImGui::Combo("##Mode", &selected, modes, 2))
-			{
-				overrides->m_ForwardLightingMode = selected == 1
-					? ForwardLightingMode::ForwardPlus : ForwardLightingMode::Legacy;
-			}
-			ImGui::EndDisabled();
-			DrawOverride(overrides && overrides->m_ForwardLightingMode.has_value(),
-				[&]() { overrides->m_ForwardLightingMode.reset(); });
-			mode = overrides ? overrides->m_ForwardLightingMode.value_or(authoring) : published;
-			const char* actual = snapshot.m_ActualLightingMode ?
-				(*snapshot.m_ActualLightingMode == ForwardLightingMode::ForwardPlus ? "Forward+" : "Legacy") : nullptr;
-			DrawRuntime(snapshot.m_ForwardLighting, mode != published, actual);
-			DrawInspect(context, ForwardInspector);
-		}
-
 		void DrawReadOnly(const char* label, const char* requested, ViewRenderFeatureStatus status,
 			DevelopGuiContext& context, std::string_view inspector) noexcept
 		{
@@ -250,7 +219,7 @@ namespace gglab
 		const auto& resolved = snapshot->m_ResolvedSettings;
 		if (ImGui::CollapsingHeader("Lighting", ImGuiTreeNodeFlags_DefaultOpen) && BeginSettingsTable("LightingSettings"))
 		{
-			DrawLightingMode(*snapshot, context, overrides);
+			DrawReadOnly("Lighting Path", "Forward+", snapshot->m_ForwardLighting, context, ForwardInspector);
 			DrawBlock("GTAO", overrides ? &overrides->m_GTAO : nullptr,
 				authoring.m_Lighting.m_GTAO, requested.m_Lighting.m_GTAO, resolved.m_Lighting.m_GTAO.m_Enabled,
 				snapshot->m_GTAO, context, GTAOInspector,
@@ -290,14 +259,6 @@ namespace gglab
 				requested.m_EnableScenePreExposure, snapshot->m_ScenePreExposure, context, PostProcessInspector);
 			ImGui::EndTable();
 			ImGui::TextDisabled("Scene storage scale: %.6g", resolved.m_Exposure.m_PreExposure);
-		}
-		if (ImGui::CollapsingHeader("Advanced / Diagnostics") && BeginSettingsTable("DiagnosticSettings"))
-		{
-			DrawScalar("HDR Diff Validation", overrides ? &overrides->m_HdrDiffValidation : nullptr,
-				authoring.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, requested.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation,
-				resolved.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, snapshot->m_HdrDiffValidation, context, ForwardInspector);
-			ImGui::EndTable();
-			ImGui::TextDisabled("Diagnostic readbacks add GPU work when enabled.");
 		}
 	}
 }

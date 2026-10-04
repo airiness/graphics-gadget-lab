@@ -160,18 +160,16 @@ namespace gglab
 		bool m_HistoryColorTypedUavStore = false;
 		bool m_HistoryDepthShaderResource = false;
 		bool m_HistoryDepthTypedUavStore = false;
-		bool m_VelocityProgramsAvailable = false;
-		bool m_ResolveProgramAvailable = false;
-		bool m_BindingLayoutAvailable = false;
 
+		// Device format support only. Required programs and pipeline closures are frame
+		// contracts of the selected pipeline, never a reason to disable a requested TAA.
 		[[nodiscard]] constexpr bool IsCoreAvailable() const noexcept
 		{
 			return m_MotionRenderTarget && m_MotionShaderResource &&
 				m_ResolvedColorRenderTarget && m_ResolvedColorShaderResource &&
 				m_ResolvedColorTypedUavStore && m_HistoryColorShaderResource &&
 				m_HistoryColorTypedUavStore && m_HistoryDepthShaderResource &&
-				m_HistoryDepthTypedUavStore && m_VelocityProgramsAvailable &&
-				m_ResolveProgramAvailable && m_BindingLayoutAvailable;
+				m_HistoryDepthTypedUavStore;
 		}
 
 		bool operator==(const TemporalAACapabilityStatus&) const noexcept = default;

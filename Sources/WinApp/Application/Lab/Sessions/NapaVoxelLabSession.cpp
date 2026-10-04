@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/DebugDraw/DebugDraw.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 
 #include "NapaVoxelCore/Field/Primitive.h"
 #include "NapaVoxelCore/Hash/VoxelWorldHash.h"
@@ -289,7 +289,7 @@ namespace gglab
 	NapaVoxelLabSession::NapaVoxelLabSession(const LabSessionCreateInfo& createInfo,
 		std::shared_ptr<NapaVoxelRenderFrameSource> frameSource) noexcept :
 		LabSessionBase(GetDescriptor(), createInfo,
-			CreateRenderPipelineForwardPBR(RenderPipelineForwardPBRCreateInfo{
+			CreateRenderPipelineForwardPlus(RenderPipelineForwardPlusCreateInfo{
 				.m_SceneExtension = std::make_unique<NapaVoxelRenderExtension>(frameSource),
 				})),
 				m_FrameSource(std::move(frameSource))
@@ -430,7 +430,6 @@ namespace gglab
 			}));
 
 		auto& profile = GetMutableViewRenderProfile();
-		profile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;
 		ApplyImmediateParameters();

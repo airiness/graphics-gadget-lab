@@ -177,7 +177,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.cpp" />
@@ -193,11 +195,11 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PipelineDesc.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PSOCreator.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBR.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPlus.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBRFactory.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPlusFactory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\WorldSun.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Atmosphere.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.cpp" />
@@ -449,7 +451,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPBRShaderSet.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.h" />
@@ -481,8 +483,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\PSOKey.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\DepthCoverageFramePlan.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPBR.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineForwardPlus.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPlus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderPipeline\RenderPipelineSceneExtensionBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessColor.h" />
@@ -494,7 +496,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessResolution.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ViewRenderSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ViewRenderFeatureStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Profiling\GpuProfiler.h" />
@@ -568,7 +570,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataAcceptance.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetStateEventQueue.h" />

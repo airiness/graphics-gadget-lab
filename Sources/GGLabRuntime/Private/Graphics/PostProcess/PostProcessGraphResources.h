@@ -2,7 +2,7 @@
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "Graphics/PostProcess/PostProcessOutput.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 
 #include <array>
 

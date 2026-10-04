@@ -286,6 +286,18 @@ namespace gglab
 			m_PlatformHost->WaitForEvents();
 			return true;
 		}
+		if (tickResult == AppRuntimeTickResult::Fatal)
+		{
+			// Host fatal policy: record the failure and exit without resuming the
+			// failed runtime. Shutdown still runs the GPU-quiescent ordering point.
+			GGLAB_LOG_CRITICAL_ALWAYS("Application is exiting after a fatal runtime failure.");
+			if (m_ExitCode == 0)
+			{
+				m_ExitCode = 1;
+			}
+			m_LifecycleState = LifecycleState::Failed;
+			return false;
+		}
 		return tickResult == AppRuntimeTickResult::Continue;
 	}
 

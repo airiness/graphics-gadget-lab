@@ -1264,17 +1264,29 @@ namespace gglab
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(
 			desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
-		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 5 &&
-			desktop.m_Labs.size() == 20 && desktopSelection.Succeeded() &&
+		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
+			desktop.m_Labs.size() == 16 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{ return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa"); }),
-			"Windows desktop composition includes five Demo entries and twenty Labs");
+			"Windows desktop composition includes four Demo entries and sixteen Labs");
+		for (const std::string_view retiredLabId : {
+			"gglab.lab.task_system",
+			"gglab.lab.asset_publication",
+			"gglab.lab.asset_residency",
+			"gglab.lab.environment_assets" })
+		{
+			context.Check(ResolveApplicationContentSelection(
+				desktop, DesktopLabHostDemoId, retiredLabId).m_Status ==
+				ApplicationContentSelectionStatus::StartupLabUnavailable,
+				"Retired Lab identities are unavailable");
+		}
 		const ApplicationContentSelection islandSelection = ResolveApplicationContentSelection(
 			desktop, DesktopIslandDemoId, DesktopDefaultLabId);
-		context.Check(islandSelection.Succeeded() &&
-			std::ranges::any_of(desktop.m_Demos, [](const ApplicationDemoRegistration& demo) noexcept
-				{ return demo.m_Id == DesktopPlaygroundDemoId; }),
-			"Island is selectable alongside the original Playground content");
+		context.Check(islandSelection.Succeeded(),
+			"Island remains selectable through its stable Demo identity");
+		context.Check(!ResolveApplicationContentSelection(
+			desktop, "Demo.Playground", DesktopDefaultLabId).Succeeded(),
+			"The retired original Playground Demo identity is unavailable");
 		context.Check(ResolveApplicationContentSelection(
 			desktop, DesktopCoastalAtriumDemoId, DesktopDefaultLabId).Succeeded(),
 			"Coastal atrium is selectable alongside the import prototype");
@@ -1291,10 +1303,10 @@ namespace gglab
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
 			"Renderer startup artifacts include both aerial transport programs before any Lab enables atmosphere");
-		context.Check(rendererDemands.size() == 39 &&
+		context.Check(rendererDemands.size() == 46 &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportanceVertex) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
-			"Renderer startup demand includes both IBL importance programs in its 39-program contract");
+			"Renderer startup demand includes both IBL importance programs in its 46-program contract");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -1307,18 +1319,18 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 43,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 50,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 43,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 50,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 41,
+		checkSelectedDemand("gglab.lab.napa_voxel", 48,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 39,
+		checkSelectedDemand("gglab.lab.texture_contract", 46,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 39,
+		checkSelectedDemand("gglab.lab.lighting_contract", 46,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 39,
+		checkSelectedDemand("gglab.lab.atmosphere_range", 46,
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);

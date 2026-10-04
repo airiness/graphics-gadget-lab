@@ -37,9 +37,6 @@ namespace gglab
 
 		switch (options.m_StartupDemo)
 		{
-		case ApplicationStartupDemo::Playground:
-			config.m_StartupDemoId = DesktopPlaygroundDemoId;
-			break;
 		case ApplicationStartupDemo::LabHost:
 			config.m_StartupDemoId = DesktopLabHostDemoId;
 			break;

@@ -10,7 +10,6 @@ namespace gglab
 		Unavailable,
 		Disabled,
 		Active,
-		Fallback,
 		Inactive,
 	};
 
@@ -19,11 +18,7 @@ namespace gglab
 		None,
 		NotRequested,
 		FrameUnavailable,
-		PipelineUnavailable,
 		CoreCapabilityUnavailable,
-		GlobalLightCapacityExceeded,
-		DepthCoverageUnavailable,
-		RenderSceneUnavailable,
 		NoOpaqueDraws,
 		DisplayViewIneligible,
 		DepthVelocityPathUnavailable,

@@ -176,7 +176,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
@@ -232,9 +232,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
@@ -247,7 +244,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\LightingContractLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp" />
@@ -287,8 +283,8 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h" />
@@ -361,9 +357,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\NapaVoxel\NapaVoxelRenderState.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\MathFoundationLabSession.h" />
@@ -376,7 +369,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\GTAOLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TaskSystemLabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\TemporalAALabSession.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\LightingContractReferenceViews.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\AtmosphereRangeReferenceViews.h" />

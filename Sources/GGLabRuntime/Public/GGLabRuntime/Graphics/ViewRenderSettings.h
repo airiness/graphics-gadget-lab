@@ -33,18 +33,6 @@ namespace gglab
 		ToneMappingSettings m_ToneMapping{};
 	};
 
-	enum class ForwardLightingMode : uint8_t
-	{
-		Legacy,
-		ForwardPlus,
-	};
-
-	struct ForwardPlusSettings
-	{
-		ForwardLightingMode m_Mode = ForwardLightingMode::ForwardPlus;
-		bool m_EnableHdrDiffValidation = false;
-	};
-
 	enum class GTAOFinalAOFormatPreference : uint8_t
 	{
 		PreferR8Unorm,
@@ -68,7 +56,6 @@ namespace gglab
 
 	struct LightingProfile
 	{
-		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
 		// Surface transport only; disabling this preserves physical sun, sky and IBL.
 		bool m_EnableAerialPerspective = true;
@@ -105,7 +92,6 @@ namespace gglab
 
 	struct ResolvedLightingSettings
 	{
-		ForwardPlusSettings m_ForwardPlus{};
 		GTAOSettings m_GTAO{};
 		bool m_EnableAerialPerspective = true;
 	};
