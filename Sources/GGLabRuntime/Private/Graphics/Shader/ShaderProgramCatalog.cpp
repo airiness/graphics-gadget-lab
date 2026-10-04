@@ -23,16 +23,25 @@ namespace gglab::shader_programs
 
 	std::span<const ShaderProgramRef> GetRendererInitialShaderProgramDemand() noexcept
 	{
+		// Every program the production recipe can require. Lab-composed validation and
+		// readback programs and optional diagnostic taps are loaded by their owners.
 		static const std::array Programs{
 			ForwardCoverageVertex,
 			ForwardPBRAllLightsPixel,
+			ForwardPBRForwardPlusPixel,
+			ForwardPBRForwardPlusGTAOPixel,
 			DepthPrepassAlphaTestPixel,
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,
 			TemporalAAReprojectionCompute,
+			AtmosphereLutCompute,
 			AerialPerspectiveBuildCompute,
 			AerialPerspectiveCompositeCompute,
 			ForwardPlusCullCompute,
+			GTAOEvaluateCompute,
+			GTAODenoiseXCompute,
+			GTAODenoiseYCompute,
+			GTAOUpsampleCompute,
 			DirectionalShadowMapVertex,
 			DirectionalShadowMapPixel,
 			ShadowMapPreviewVertex,

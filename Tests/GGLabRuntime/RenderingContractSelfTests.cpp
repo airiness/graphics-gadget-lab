@@ -3087,6 +3087,7 @@ namespace gglab
 				.m_PresentationAvailable = true,
 				.m_DisplayExtentMatchesPresentation = true,
 				.m_RenderSceneReady = true,
+				.m_HasOpaqueDraws = true,
 				.m_GlobalLightCount = ForwardPlusGlobalLightCapacity,
 				.m_DepthCoverageValid = true,
 			};
@@ -3109,15 +3110,20 @@ namespace gglab
 			ForwardPlusFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
 			closureUnusedWithoutTemporal.m_TemporalActive = false;
 			ForwardPlusFrameValidationInputs gtaoReady = ready;
-			gtaoReady.m_GTAOPipelineRequired = true;
+			gtaoReady.m_GTAOEnabledAndSupported = true;
 			gtaoReady.m_GTAOPipelineAvailable = true;
 			ForwardPlusFrameValidationInputs gtaoRecipesMissing = gtaoReady;
 			gtaoRecipesMissing.m_GTAOPipelineAvailable = false;
 			ForwardPlusFrameValidationInputs gtaoUnsupported = gtaoRecipesMissing;
-			gtaoUnsupported.m_GTAOPipelineRequired = false;
+			gtaoUnsupported.m_GTAOEnabledAndSupported = false;
 			ForwardPlusFrameValidationInputs lightOverflow = ready;
 			lightOverflow.m_GlobalLightCount = ForwardPlusGlobalLightCapacity + 1;
 			const RenderFrameValidationResult lightFailure = ClassifyForwardPlusFrame(lightOverflow);
+			// Transparent-only frames record no Forward+ opaque shading or GTAO.
+			ForwardPlusFrameValidationInputs transparentOnly = lightOverflow;
+			transparentOnly.m_HasOpaqueDraws = false;
+			transparentOnly.m_GTAOEnabledAndSupported = true;
+			transparentOnly.m_GTAOPipelineAvailable = false;
 			ForwardPlusFrameValidationInputs coverageMismatch = ready;
 			coverageMismatch.m_DepthCoverageValid = false;
 			coverageMismatch.m_DepthCoverageDiagnostic = "Coverage variant 1 mismatch";
@@ -3133,13 +3139,14 @@ namespace gglab
 				classify(gtaoReady) == RenderFrameValidationStatus::Ready &&
 				classify(gtaoUnsupported) == RenderFrameValidationStatus::Ready &&
 				classify(gtaoRecipesMissing) == RenderFrameValidationStatus::ContractFailure &&
+				classify(transparentOnly) == RenderFrameValidationStatus::Ready &&
 				lightFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				lightFailure.m_Detail == std::format("requested {}, limit {}",
 					ForwardPlusGlobalLightCapacity + 1, ForwardPlusGlobalLightCapacity) &&
 				coverageFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				coverageFailure.m_Detail == "Coverage variant 1 mismatch" &&
 				!coverageFailure.m_Reason.empty(),
-				"Frame validation skips only resize mismatches and fails with evidence instead of selecting another lighting path, topology or silently dropping enabled GTAO");
+				"Frame validation skips only resize mismatches, limits only opaque work by Forward+ capacity and GTAO readiness, and fails with evidence instead of selecting another lighting path, topology or silently dropping enabled GTAO");
 
 			// Production composition must not depend on Lab-owned validation programs.
 			const auto productionDemand =
@@ -3155,6 +3162,36 @@ namespace gglab
 					return std::ranges::find(productionDemand, program) != productionDemand.end();
 				}),
 				"Production Forward shader demand excludes HDR-diff validation programs");
+
+			// Startup preload is the production readiness closure: a missing production
+			// artifact must fail the preload, not the first frame that needs it.
+			const auto initialDemand = shader_programs::GetRendererInitialShaderProgramDemand();
+			const auto inInitialDemand = [&initialDemand](const ShaderProgramRef& program) noexcept
+				{
+					return std::ranges::find(initialDemand, program) != initialDemand.end();
+				};
+			const std::array productionPrograms{
+				shader_programs::ForwardPBRAllLightsPixel,
+				shader_programs::ForwardPBRForwardPlusPixel,
+				shader_programs::ForwardPBRForwardPlusGTAOPixel,
+				shader_programs::ForwardPlusCullCompute,
+				shader_programs::GTAOEvaluateCompute,
+				shader_programs::GTAODenoiseXCompute,
+				shader_programs::GTAODenoiseYCompute,
+				shader_programs::GTAOUpsampleCompute,
+				shader_programs::AtmosphereLutCompute,
+			};
+			const std::array labOwnedPrograms{
+				shader_programs::ForwardPBRForwardPlusValidationPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+				shader_programs::ForwardPlusCullDiagnosticsCompute,
+				shader_programs::ForwardPlusValidationTilesCompute,
+				shader_programs::ForwardPlusValidationFrameCompute,
+				shader_programs::GTAOEvaluateDiagnosticsCompute,
+			};
+			context.Check(std::ranges::all_of(productionPrograms, inInitialDemand) &&
+				std::ranges::none_of(labOwnedPrograms, inInitialDemand),
+				"Renderer startup demand preloads production Forward+, GTAO and atmosphere programs and excludes Lab-owned validation and diagnostics programs");
 
 			ForwardPBRShaderSet shaderSet{};
 			shaderSet.m_CoverageVertexShader = ShaderID{ 1 };

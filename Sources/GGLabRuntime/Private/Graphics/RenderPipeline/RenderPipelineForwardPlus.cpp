@@ -549,7 +549,8 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure(
 				"The frame requires prepared scene GPU data.");
 		}
-		if (!IsForwardPlusGlobalLightCountSupported(inputs.m_GlobalLightCount))
+		if (inputs.m_HasOpaqueDraws &&
+			!IsForwardPlusGlobalLightCountSupported(inputs.m_GlobalLightCount))
 		{
 			return RenderFrameValidationResult::ContractFailure(
 				"The scene exceeds the Forward+ global-light capacity.",
@@ -562,7 +563,8 @@ namespace gglab
 				"The frame requires depth-prepass EQUAL coverage for every opaque draw.",
 				std::string(inputs.m_DepthCoverageDiagnostic));
 		}
-		if (inputs.m_GTAOPipelineRequired && !inputs.m_GTAOPipelineAvailable)
+		if (inputs.m_HasOpaqueDraws && inputs.m_GTAOEnabledAndSupported &&
+			!inputs.m_GTAOPipelineAvailable)
 		{
 			return RenderFrameValidationResult::ContractFailure(
 				"GTAO is enabled but its compute pipeline recipes failed to prepare.");
@@ -618,11 +620,12 @@ namespace gglab
 			.m_PresentationAvailable = true,
 			.m_DisplayExtentMatchesPresentation = true,
 			.m_RenderSceneReady = context.IsRenderSceneReady(),
+			.m_HasOpaqueDraws = depthCoverage.m_HasDepthCoverageDraws,
 			.m_GlobalLightCount =
 				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()),
 			.m_DepthCoverageValid = depthCoverage.IsValid(),
 			.m_DepthCoverageDiagnostic = depthCoverage.m_Diagnostic,
-			.m_GTAOPipelineRequired = gtaoEnabled && gtaoCoreAvailable,
+			.m_GTAOEnabledAndSupported = gtaoEnabled && gtaoCoreAvailable,
 			.m_GTAOPipelineAvailable = m_GTAOPass.IsAvailable(),
 			.m_TemporalActive = temporalActive,
 			.m_TemporalResolveClosureValid = temporalResolveClosureValid,

@@ -37,11 +37,12 @@ namespace gglab
 		bool m_PresentationAvailable = false;
 		bool m_DisplayExtentMatchesPresentation = false;
 		bool m_RenderSceneReady = false;
+		// Opaque or alpha-test draws record Forward+ cull, opaque shading and GTAO.
+		bool m_HasOpaqueDraws = false;
 		uint32_t m_GlobalLightCount = 0;
 		bool m_DepthCoverageValid = false;
 		std::string_view m_DepthCoverageDiagnostic;
-		// GTAO is enabled and the device supports it, so its compute recipes must be prepared.
-		bool m_GTAOPipelineRequired = false;
+		bool m_GTAOEnabledAndSupported = false;
 		bool m_GTAOPipelineAvailable = false;
 		bool m_TemporalActive = false;
 		bool m_TemporalResolveClosureValid = false;
@@ -49,10 +50,11 @@ namespace gglab
 
 	// The recipe always shades opaque draws with Forward+ after an EQUAL depth prepass.
 	// A display view built for another swap-chain extent is an expected resize state and
-	// skips the frame. Missing scene data, global lights beyond the Forward+ capacity,
-	// invalid depth coverage, unprepared GTAO recipes for an enabled and supported GTAO,
-	// and a lost temporal resolve closure are contract failures; none of them selects
-	// another lighting path or frame topology or silently drops a requested feature.
+	// skips the frame. Missing scene data, invalid depth coverage and a lost temporal resolve
+	// closure are contract failures. Frames that record opaque work additionally fail when
+	// global lights exceed the Forward+ capacity or an enabled, supported GTAO has unprepared
+	// recipes; transparent-only frames record neither and are not limited by them. No failure
+	// selects another lighting path or frame topology or silently drops a requested feature.
 	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPlusFrame(
 		const ForwardPlusFrameValidationInputs& inputs) noexcept;
 

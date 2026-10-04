@@ -128,12 +128,18 @@ namespace gglab
 
 		m_PipelineRecipes[0].m_CSId =
 			shaderManager->LoadProgram(shader_programs::ForwardPlusCullCompute);
-		m_PipelineRecipes[1].m_CSId =
-			shaderManager->LoadProgram(shader_programs::ForwardPlusCullDiagnosticsCompute);
+		// The diagnostics variant belongs to the Lab-owned readback composition; production
+		// readiness never depends on its program or binding layout.
+		const size_t variantCount = m_DebugReadback ? m_PipelineRecipes.size() : 1u;
+		if (m_DebugReadback)
+		{
+			m_PipelineRecipes[1].m_CSId =
+				shaderManager->LoadProgram(shader_programs::ForwardPlusCullDiagnosticsCompute);
+		}
 
 		auto* rhiContext = services.m_Presentation->GetRHIContext();
 		GGLAB_ASSERT_NOT_NULL(rhiContext);
-		for (size_t variantIndex = 0; variantIndex < m_PipelineRecipes.size(); ++variantIndex)
+		for (size_t variantIndex = 0; variantIndex < variantCount; ++variantIndex)
 		{
 			auto& recipe = m_PipelineRecipes[variantIndex];
 			recipe.m_BindingLayout = rhiContext->GetPipelineSystem().CreateBindingLayout(
@@ -392,6 +398,8 @@ namespace gglab
 	{
 		auto* pipelineCache = services.m_PipelineResolver;
 		GGLAB_ASSERT_NOT_NULL(pipelineCache);
+		GGLAB_ASSERT_MSG(!diagnosticsEnabled || m_DebugReadback,
+			"The Forward+ diagnostics variant is prepared only for readback composition.");
 		const size_t variantIndex = diagnosticsEnabled ? 1u : 0u;
 		const RHIPipelineHandle pipeline =
 			pipelineCache->Resolve(

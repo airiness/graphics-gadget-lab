@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
 #include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureImportTypes.h"
 #include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
@@ -25,8 +26,10 @@
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12ViewDescUtils.h"
+#include "GGLabRuntime/Graphics/RHI/RHIFormat.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "Graphics/Utility/DXGIFormatUtils.h"
+#include "Graphics/Utility/TextureUtils.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/GltfMaterial.h>
@@ -2359,15 +2362,8 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
-		void RunIBLDerivedDataShaderIdentityTests(SelfTestContext& context) noexcept
+		[[nodiscard]] IBLShaderArtifactIdentities MakeIBLShaderArtifactIdentitiesFixture() noexcept
 		{
-			const std::filesystem::path cacheDirectory =
-				std::filesystem::temp_directory_path() / "gglab-ibl-key-self-test";
-			IBLDerivedDataSystem system({
-				.m_CacheDirectory = cacheDirectory,
-				.m_Compatibility = IBLArtifactCompatibility::Portable,
-			});
-
 			IBLShaderArtifactIdentities identities{};
 			const std::array<uint32_t, static_cast<size_t>(IBLArtifactStage::Count)>
 				artifactCounts{ 4, 2, 4, 2 };
@@ -2382,7 +2378,19 @@ namespace gglab
 						.m_ArtifactId.m_DurableDigest.m_Value[0] = static_cast<std::byte>(marker++);
 				}
 			}
+			return identities;
+		}
 
+		void RunIBLDerivedDataShaderIdentityTests(SelfTestContext& context) noexcept
+		{
+			const std::filesystem::path cacheDirectory =
+				std::filesystem::temp_directory_path() / "gglab-ibl-key-self-test";
+			IBLDerivedDataSystem system({
+				.m_CacheDirectory = cacheDirectory,
+				.m_Compatibility = IBLArtifactCompatibility::Portable,
+			});
+
+			const IBLShaderArtifactIdentities identities = MakeIBLShaderArtifactIdentitiesFixture();
 			const AssetContentFingerprint source{ 1, 2, 3 };
 			const IBLBakeConfig config{};
 			const IBLDerivedDataLookupResult baseline = system.Lookup(source,
@@ -2431,6 +2439,201 @@ namespace gglab
 				baseline.Get(IBLArtifactStage::BrdfLut).m_Key ==
 					changedEnvironment.Get(IBLArtifactStage::BrdfLut).m_Key,
 				"Environment shader identity propagates only through dependent IBL stage keys");
+		}
+
+		// Builds one tightly packed stage texture that satisfies IBLStageArtifact::MatchesConfig.
+		[[nodiscard]] TextureAssetData MakeIBLStageTextureFixture(uint32_t size, uint32_t arraySize,
+			uint32_t mipLevels, RHIFormat format, std::byte seed)
+		{
+			TextureAssetData texture{};
+			texture.m_ResourceFormat = format;
+			texture.m_ViewFormat = format;
+			texture.m_SrvDimension = arraySize == CubemapFaceCount
+				? RHITextureViewDimension::TextureCube : RHITextureViewDimension::Texture2D;
+			texture.m_Extent = { size, size, 1 };
+			texture.m_ArraySize = static_cast<uint16_t>(arraySize);
+			texture.m_MipLevels = static_cast<uint16_t>(mipLevels);
+			texture.m_ColorSpace = TextureColorSpace::Linear;
+			const uint64_t bytesPerTexel = GetRHIFormatInfo(format).m_BytesPerBlock;
+			for (uint32_t slice = 0; slice < arraySize; ++slice)
+			{
+				for (uint32_t mip = 0; mip < mipLevels; ++mip)
+				{
+					const uint32_t extent = std::max(1u, size >> mip);
+					const uint64_t rowPitch = extent * bytesPerTexel;
+					const uint64_t slicePitch = rowPitch * extent;
+					texture.m_Subresources.push_back({
+						.m_DataOffset = static_cast<uint64_t>(texture.m_Pixels.size()),
+						.m_DataSize = slicePitch,
+						.m_RowPitch = rowPitch,
+						.m_SlicePitch = slicePitch,
+						.m_Width = extent,
+						.m_Height = extent,
+						.m_MipLevel = mip,
+						.m_ArraySlice = slice,
+						});
+					texture.m_Pixels.resize(texture.m_Pixels.size() + slicePitch, seed);
+				}
+			}
+			return texture;
+		}
+
+		void RunIBLDerivedDataLookupResolutionTests(SelfTestContext& context) noexcept
+		{
+			std::error_code errorCode;
+			const auto temporaryRoot = std::filesystem::temp_directory_path(errorCode);
+			if (errorCode)
+			{
+				context.Check(false, "IBL lookup resolution tests resolve a temporary directory");
+				return;
+			}
+			const auto root = temporaryRoot / std::format("gglab.ibl-lookup-resolution.{}.{}",
+				GetCurrentProcessId(), std::chrono::steady_clock::now().time_since_epoch().count());
+			{
+				IBLDerivedDataSystem system({
+					.m_CacheDirectory = root / "cache",
+					.m_Compatibility = IBLArtifactCompatibility::Portable,
+				});
+				const IBLBakeConfig config{
+					.m_EnvironmentCubemapSize = 2,
+					.m_IrradianceCubemapSize = 1,
+					.m_PrefilteredSpecularCubemapSize = 2,
+					.m_PrefilteredSpecularMipLevels = 2,
+					.m_BrdfLutSize = 2,
+				};
+				const IBLShaderArtifactIdentities identities = MakeIBLShaderArtifactIdentitiesFixture();
+				const AssetContentFingerprint source{ 7, 8, 9 };
+				const auto lookup = [&](bool ignoreCache)
+					{
+						return system.Lookup(source, EnvironmentTextureSourceType::Equirectangular,
+							config, identities, ignoreCache);
+					};
+
+				constexpr size_t StageCount = static_cast<size_t>(IBLArtifactStage::Count);
+				const std::array<IBLStageArtifactHandle, StageCount> artifacts{
+					CreateIBLStageArtifact(IBLArtifactStage::Environment, MakeIBLStageTextureFixture(
+						2, CubemapFaceCount, CalculateMipLevelCount(2),
+						config.m_EnvironmentCubemapFormat, std::byte{ 0x21 })),
+					CreateIBLStageArtifact(IBLArtifactStage::Irradiance, MakeIBLStageTextureFixture(
+						1, CubemapFaceCount, 1, config.m_IrradianceCubemapFormat, std::byte{ 0x22 })),
+					CreateIBLStageArtifact(IBLArtifactStage::PrefilteredSpecular,
+						MakeIBLStageTextureFixture(2, CubemapFaceCount, 2,
+							config.m_PrefilteredSpecularCubemapFormat, std::byte{ 0x23 })),
+					CreateIBLStageArtifact(IBLArtifactStage::BrdfLut, MakeIBLStageTextureFixture(
+						2, 1, 1, config.m_BrdfLutFormat, std::byte{ 0x24 })),
+				};
+				const bool fixturesValid = std::ranges::all_of(artifacts,
+					[&config](const IBLStageArtifactHandle& artifact)
+					{
+						return artifact && artifact->IsValid() && artifact->MatchesConfig(config);
+					});
+
+				const IBLDerivedDataLookupResult empty = lookup(false);
+				// Every stage reports its source under the stable key, and a resolved stage
+				// returns the artifact whose content digest was published for that key.
+				const auto matches = [&artifacts, &empty](const IBLDerivedDataLookupResult& result,
+					const std::array<IBLDerivedDataSource, StageCount>& expectedSources) noexcept
+					{
+						for (size_t index = 0; index < StageCount; ++index)
+						{
+							const auto& stage = result.m_Stages[index];
+							const bool resolved = expectedSources[index] != IBLDerivedDataSource::Miss;
+							if (stage.m_Source != expectedSources[index] ||
+								stage.m_Key != empty.m_Stages[index].m_Key || !stage.m_Error.empty() ||
+								static_cast<bool>(stage.m_Artifact) != resolved ||
+								(resolved && stage.m_Artifact->m_ContentDigest !=
+									artifacts[index]->m_ContentDigest))
+							{
+								return false;
+							}
+						}
+						return true;
+					};
+				const auto publish = [&](IBLArtifactStage stage) noexcept
+					{
+						const size_t index = static_cast<size_t>(stage);
+						const DerivedDataKey& key = empty.m_Stages[index].m_Key;
+						return static_cast<bool>(system.Admit(key, artifacts[index])) &&
+							system.Store(key, artifacts[index]);
+					};
+				using enum IBLDerivedDataSource;
+
+				const bool keysValid = std::ranges::all_of(empty.m_Stages,
+					[](const IBLStageDerivedDataLookupResult& stage) { return stage.m_Key.IsValid(); });
+				context.Check(fixturesValid && keysValid && matches(empty, { Miss, Miss, Miss, Miss }),
+					"An empty IBL derived-data system misses every stage with a valid key");
+
+				const auto cpuBefore = system.GetArtifactCacheStatistics();
+				const bool partialPublished = publish(IBLArtifactStage::Environment) &&
+					publish(IBLArtifactStage::Irradiance);
+				const IBLDerivedDataLookupResult partialCpu = lookup(false);
+				const auto cpuAfterPartial = system.GetArtifactCacheStatistics();
+				context.Check(partialPublished &&
+					matches(partialCpu, { CpuCache, CpuCache, Miss, Miss }) &&
+					cpuAfterPartial.m_HitCount - cpuBefore.m_HitCount == 2,
+					"A partial IBL CPU-cache hit resolves only the published stages by key and digest");
+
+				const bool remainingPublished = publish(IBLArtifactStage::PrefilteredSpecular) &&
+					publish(IBLArtifactStage::BrdfLut);
+				const IBLDerivedDataLookupResult fullCpu = lookup(false);
+				const auto cpuAfterFull = system.GetArtifactCacheStatistics();
+				context.Check(remainingPublished &&
+					matches(fullCpu, { CpuCache, CpuCache, CpuCache, CpuCache }) &&
+					cpuAfterFull.m_HitCount - cpuAfterPartial.m_HitCount == StageCount &&
+					system.GetStoreStatistics().m_StoredEntryCount == StageCount,
+					"A full IBL CPU-cache hit resolves every stage from the CPU cache");
+
+				system.ClearArtifactCache();
+				const auto ddcBefore = system.GetStoreStatistics();
+				const IBLDerivedDataLookupResult fullDdc = lookup(false);
+				const auto ddcAfterFull = system.GetStoreStatistics();
+				const IBLDerivedDataLookupResult readmitted = lookup(false);
+				context.Check(matches(fullDdc, { LocalDdc, LocalDdc, LocalDdc, LocalDdc }) &&
+					ddcAfterFull.m_HitCount - ddcBefore.m_HitCount == StageCount &&
+					system.GetArtifactCacheStatistics().m_CachedEntryCount == StageCount &&
+					matches(readmitted, { CpuCache, CpuCache, CpuCache, CpuCache }) &&
+					system.GetStoreStatistics().m_HitCount == ddcAfterFull.m_HitCount,
+					"A full IBL Local DDC hit decodes every stage digest and readmits it to the CPU cache");
+
+				system.ClearArtifactCache();
+				const bool storeCleared = system.ClearDerivedDataStore();
+				const auto storeAt = [&](IBLArtifactStage stage) noexcept
+					{
+						const size_t index = static_cast<size_t>(stage);
+						return system.Store(empty.m_Stages[index].m_Key, artifacts[index]);
+					};
+				const bool partialStored = storeAt(IBLArtifactStage::PrefilteredSpecular) &&
+					storeAt(IBLArtifactStage::BrdfLut);
+				const auto ddcBeforePartial = system.GetStoreStatistics();
+				const IBLDerivedDataLookupResult partialDdc = lookup(false);
+				const auto ddcAfterPartial = system.GetStoreStatistics();
+				context.Check(storeCleared && partialStored &&
+					matches(partialDdc, { Miss, Miss, LocalDdc, LocalDdc }) &&
+					ddcAfterPartial.m_HitCount - ddcBeforePartial.m_HitCount == 2 &&
+					ddcAfterPartial.m_MissCount - ddcBeforePartial.m_MissCount == 2,
+					"A partial IBL Local DDC hit resolves only the stored stages and misses the rest");
+
+				// The DDC hits above were readmitted; drop them so the stored stages resolve from
+				// the DDC again while only the environment is CPU-resident.
+				system.ClearArtifactCache();
+				const size_t environmentIndex = static_cast<size_t>(IBLArtifactStage::Environment);
+				const bool environmentAdmitted = static_cast<bool>(system.Admit(
+					empty.m_Stages[environmentIndex].m_Key, artifacts[environmentIndex]));
+				const IBLDerivedDataLookupResult mixed = lookup(false);
+				context.Check(environmentAdmitted &&
+					matches(mixed, { CpuCache, Miss, LocalDdc, LocalDdc }),
+					"IBL lookup resolves each stage independently across the CPU cache, DDC and misses");
+
+				const auto cpuBeforeIgnore = system.GetArtifactCacheStatistics();
+				const auto ddcBeforeIgnore = system.GetStoreStatistics();
+				const IBLDerivedDataLookupResult ignored = lookup(true);
+				context.Check(matches(ignored, { Miss, Miss, Miss, Miss }) &&
+					system.GetArtifactCacheStatistics().m_HitCount == cpuBeforeIgnore.m_HitCount &&
+					system.GetStoreStatistics().m_HitCount == ddcBeforeIgnore.m_HitCount &&
+					system.GetStoreStatistics().m_MissCount == ddcBeforeIgnore.m_MissCount,
+					"An IBL rebake that ignores the cache keeps stage keys without consulting either cache");
+			}
+			std::filesystem::remove_all(root, errorCode);
 		}
 
 		void RunAssetPathTests(SelfTestContext& context) noexcept
@@ -2541,6 +2744,7 @@ namespace gglab
 		RunMaterialUVTransformTests(context);
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
+		RunIBLDerivedDataLookupResolutionTests(context);
 		RunIBLCacheControlTests(context);
 		RunAssetPathTests(context);
 		RunTextureDerivedDataCoordinatorTests(context);

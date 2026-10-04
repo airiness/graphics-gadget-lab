@@ -1303,10 +1303,10 @@ namespace gglab
 		context.Check(std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveBuildCompute) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::AerialPerspectiveCompositeCompute) != rendererDemands.end(),
 			"Renderer startup artifacts include both aerial transport programs before any Lab enables atmosphere");
-		context.Check(rendererDemands.size() == 39 &&
+		context.Check(rendererDemands.size() == 46 &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportanceVertex) != rendererDemands.end() &&
 			std::ranges::find(rendererDemands, shader_programs::IBLImportancePixel) != rendererDemands.end(),
-			"Renderer startup demand includes both IBL importance programs in its 39-program contract");
+			"Renderer startup demand includes both IBL importance programs in its 46-program contract");
 
 		const auto checkSelectedDemand = [&context, &desktop](
 			std::string_view labId, size_t expectedCount, std::string_view message) noexcept
@@ -1319,18 +1319,18 @@ namespace gglab
 					AppendSelectedContentShaderProgramDemand(selection, demands);
 				context.Check(succeeded && demands.GetPrograms().size() == expectedCount, message);
 			};
-		checkSelectedDemand("gglab.lab.render_graph_compute", 43,
+		checkSelectedDemand("gglab.lab.render_graph_compute", 50,
 			"Render-graph compute selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 43,
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 50,
 			"Coordinate conformance selection contributes four stable shader demands");
-		checkSelectedDemand("gglab.lab.napa_voxel", 41,
+		checkSelectedDemand("gglab.lab.napa_voxel", 48,
 			"Napa voxel selection contributes two stable shader demands");
-		checkSelectedDemand("gglab.lab.texture_contract", 39,
+		checkSelectedDemand("gglab.lab.texture_contract", 46,
 			"Texture contract uses the production renderer's shader demands");
-		checkSelectedDemand("gglab.lab.lighting_contract", 39,
+		checkSelectedDemand("gglab.lab.lighting_contract", 46,
 			"Lighting contract is selectable through LabHost with production shader demands");
 		CheckLightingContractContent(context);
-		checkSelectedDemand("gglab.lab.atmosphere_range", 39,
+		checkSelectedDemand("gglab.lab.atmosphere_range", 46,
 			"Atmosphere range uses the production renderer's shader demands");
 		CheckAtmosphereRangeContent(context);
 		CheckIslandContent(context);
