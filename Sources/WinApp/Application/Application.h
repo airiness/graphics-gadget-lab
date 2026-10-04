@@ -59,7 +59,7 @@ namespace gglab
 		LifecycleState GetLifecycleState() const noexcept { return m_LifecycleState; }
 
 		// Process exit code. Non-zero when startup validation, backend bootstrap,
-		// or qualification fails.
+		// qualification or a running frame fails fatally.
 		int GetExitCode() const noexcept { return m_ExitCode; }
 
 		uint32_t GetWindowWidth() const noexcept { return m_WindowWidth; }

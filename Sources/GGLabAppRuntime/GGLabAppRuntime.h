@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string_view>
 
 namespace gglab
 {
@@ -51,7 +52,11 @@ namespace gglab
 	{
 		Continue,
 		Suspended,
+		// The runtime stopped normally, for example after an explicit exit request.
 		Exit,
+		// The runtime recorded a fatal failure. The host applies its fatal process
+		// policy and must not resume the failed rendering path.
+		Fatal,
 	};
 
 	enum class AppHostEventType : uint8_t
@@ -213,6 +218,8 @@ namespace gglab
 		[[nodiscard]] bool BeginInitialShaderPreload(
 			const ApplicationContentSelection& contentSelection) noexcept;
 		void Resize(uint32_t width, uint32_t height) noexcept;
+		// Records failure evidence that survives Release builds and makes Failed terminal.
+		[[nodiscard]] AppRuntimeTickResult FailRuntime(std::string_view failure) noexcept;
 
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};

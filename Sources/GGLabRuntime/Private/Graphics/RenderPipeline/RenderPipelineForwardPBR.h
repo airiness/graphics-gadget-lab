@@ -19,13 +19,34 @@
 #include "Graphics/RenderPass/RenderPassTemporalAA.h"
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
 #include <memory>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace gglab
 {
+	// Frame facts that decide whether the ForwardPBR recipe can record this frame.
+	struct ForwardPBRFrameValidationInputs
+	{
+		bool m_PresentationAvailable = false;
+		bool m_TemporalActive = false;
+		bool m_RenderSceneReady = false;
+		bool m_TemporalResolveClosureValid = false;
+		bool m_DepthPrepassEqual = false;
+		std::string_view m_DepthCoverageDiagnostic;
+	};
+
+	// An active temporal frame requires prepared scene data, its resolve closure and
+	// depth-prepass velocity coverage; violating any of them is a contract failure,
+	// never a skipped frame that is retried indefinitely.
+	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPBRFrame(
+		const ForwardPBRFrameValidationInputs& inputs) noexcept;
+
 	class RenderPipelineForwardPBR : public RenderPipelineBase
 	{
 	public:
@@ -63,12 +84,23 @@ namespace gglab
 		[[nodiscard]] MaterialDiagnosticPrewarmProgress PrewarmMaterialDiagnostics(
 			const RenderServices& services, std::span<const uint64_t> drawVariants) noexcept override;
 
+		[[nodiscard]] RenderFrameValidationResult ValidateRenderFrame(
+			const RenderFrameContext& context, const RenderServices& services) noexcept override;
 		void BuildRenderGraph(RenderGraph& rg, const RenderFrameContext& context,
-			const RenderServices& services) noexcept override;
-		[[nodiscard]] bool ValidateRenderFrame(const RenderFrameContext& context,
 			const RenderServices& services) noexcept override;
 
 	private:
+		// Decisions resolved once by ValidateRenderFrame and consumed by graph
+		// construction of the same frame. The depth coverage plan references
+		// that frame's RenderQueue and must not outlive it.
+		struct FramePlan
+		{
+			uint64_t m_FrameSerial = 0;
+			DepthCoverageFramePlan m_DepthCoverage{};
+			ForwardPlusFrameStatus m_ForwardPlusStatus = ForwardPlusFrameStatus::Disabled;
+			GTAOFrameStatus m_GTAOStatus = GTAOFrameStatus::Disabled;
+		};
+
 		void PrepareForwardPasses(const RenderServices& services, bool materialDiagnostics) noexcept;
 		[[nodiscard]] DepthCoverageFramePlan BuildDepthCoverageFramePlanForFrame(
 			const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const;
@@ -94,6 +126,7 @@ namespace gglab
 		RenderPassIBLPreview m_IBLPreviewPass;
 		RenderPassDebugDraw m_DebugDrawOverlayPass{ DebugDrawPassMode::Overlay };
 		ForwardPBRShaderSet m_ForwardPBRShaderSet{};
+		std::optional<FramePlan> m_FramePlan;
 
 		struct MaterialDiagnosticPrewarmVariant
 		{

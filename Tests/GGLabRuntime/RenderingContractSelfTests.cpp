@@ -3093,6 +3093,39 @@ namespace gglab
 				ForwardPBRLightingVariant::AllLights,
 				"Opaque shading selects all-lights, Forward+, or an active HDR-diff record while transparent shading remains all-lights");
 
+			const ForwardPBRFrameValidationInputs readyTemporal{
+				.m_PresentationAvailable = true,
+				.m_TemporalActive = true,
+				.m_RenderSceneReady = true,
+				.m_TemporalResolveClosureValid = true,
+				.m_DepthPrepassEqual = true,
+			};
+			const auto classify = [](ForwardPBRFrameValidationInputs inputs)
+				{
+					return ClassifyForwardPBRFrame(inputs).m_Status;
+				};
+			ForwardPBRFrameValidationInputs missingPresentation = readyTemporal;
+			missingPresentation.m_PresentationAvailable = false;
+			ForwardPBRFrameValidationInputs nonTemporal{ .m_PresentationAvailable = true };
+			ForwardPBRFrameValidationInputs sceneUnavailable = readyTemporal;
+			sceneUnavailable.m_RenderSceneReady = false;
+			ForwardPBRFrameValidationInputs closureLost = readyTemporal;
+			closureLost.m_TemporalResolveClosureValid = false;
+			ForwardPBRFrameValidationInputs coverageMismatch = readyTemporal;
+			coverageMismatch.m_DepthPrepassEqual = false;
+			coverageMismatch.m_DepthCoverageDiagnostic = "Coverage variant 1 mismatch";
+			const RenderFrameValidationResult coverageFailure =
+				ClassifyForwardPBRFrame(coverageMismatch);
+			context.Check(classify(readyTemporal) == RenderFrameValidationStatus::Ready &&
+				classify(nonTemporal) == RenderFrameValidationStatus::Ready &&
+				classify(missingPresentation) == RenderFrameValidationStatus::ContractFailure &&
+				classify(sceneUnavailable) == RenderFrameValidationStatus::ContractFailure &&
+				classify(closureLost) == RenderFrameValidationStatus::ContractFailure &&
+				coverageFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
+				coverageFailure.m_Detail == "Coverage variant 1 mismatch" &&
+				!coverageFailure.m_Reason.empty(),
+				"Active temporal contract violations are fatal failures with evidence, never retried skips");
+
 			// Production composition must not depend on Lab-owned validation programs.
 			const auto productionDemand =
 				shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();

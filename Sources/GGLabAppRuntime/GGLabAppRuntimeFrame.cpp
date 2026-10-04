@@ -25,8 +25,10 @@
 #include "Lab/LabRuntime.h"
 #include "LoadingProgress.h"
 
+#include <format>
 #include <optional>
 #include <span>
+#include <string_view>
 
 namespace gglab
 {
@@ -66,6 +68,27 @@ namespace gglab
 		private:
 			DiagnosticsSession* m_Session = nullptr;
 		};
+
+		[[nodiscard]] std::string_view GetBackendName(AppRuntimeRHIBackend backend) noexcept
+		{
+			switch (backend)
+			{
+			case AppRuntimeRHIBackend::DX12:
+				return "dx12";
+			case AppRuntimeRHIBackend::Vulkan:
+				return "vulkan";
+			case AppRuntimeRHIBackend::Unknown:
+				break;
+			}
+			return "unknown";
+		}
+	}
+
+	AppRuntimeTickResult GGLabAppRuntime::FailRuntime(std::string_view failure) noexcept
+	{
+		GGLAB_LOG_CRITICAL_ALWAYS("Fatal runtime failure: {}", failure);
+		m_LifecycleState = AppRuntimeLifecycleState::Failed;
+		return AppRuntimeTickResult::Fatal;
 	}
 
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
@@ -76,6 +99,8 @@ namespace gglab
 			return AppRuntimeTickResult::Suspended;
 		case AppRuntimeLifecycleState::Running:
 			break;
+		case AppRuntimeLifecycleState::Failed:
+			return AppRuntimeTickResult::Fatal;
 		default:
 			return AppRuntimeTickResult::Exit;
 		}
@@ -118,15 +143,13 @@ namespace gglab
 		}
 		if (!tickInfo.m_PreContentUpdate.Run())
 		{
-			GGLAB_LOG_ERROR("Host pre-content update failed.");
-			return AppRuntimeTickResult::Exit;
+			return FailRuntime("Host pre-content update failed.");
 		}
 		if (shaderPreload.IsReady())
 		{
 			if (!m_DemoManager->CompleteTransitionTick())
 			{
-				GGLAB_LOG_ERROR("No active demo is available for rendering.");
-				return AppRuntimeTickResult::Exit;
+				return FailRuntime("No active demo is available for rendering.");
 			}
 		}
 
@@ -153,7 +176,7 @@ namespace gglab
 		{
 			return rendererFrame.IsUnavailable()
 				? AppRuntimeTickResult::Continue
-				: AppRuntimeTickResult::Exit;
+				: FailRuntime("The render host failed to begin a frame.");
 		}
 		ApplicationToolingFrame toolingFrame(applicationTooling);
 		RenderServices services = m_RenderServices;
@@ -225,11 +248,24 @@ namespace gglab
 			frame = m_RenderHost->BuildFrame(frameBuildRequest);
 		}
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
-		if (!renderPipeline.ValidateRenderFrame(validationContext, services))
+		const RenderFrameValidationResult validation =
+			renderPipeline.ValidateRenderFrame(validationContext, services);
+		if (!validation.IsReady())
 		{
+			// Nothing has been recorded. The temporal transaction is aborted and the
+			// RenderFrame handle retires the begun frame on return.
 			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
-			toolingFrame.Complete();
-			return AppRuntimeTickResult::Continue;
+			if (validation.m_Status == RenderFrameValidationStatus::Skipped)
+			{
+				toolingFrame.Complete();
+				return AppRuntimeTickResult::Continue;
+			}
+			toolingFrame.Abort();
+			return FailRuntime(std::format(
+				"Rendering contract failure: pipeline='{}', frame={}, backend={}, reason='{}'{}{}",
+				renderPipeline.GetName(), frame.m_FrameSerial, GetBackendName(m_Config.m_RhiBackend),
+				validation.m_Reason, validation.m_Detail.empty() ? "" : ", detail=",
+				validation.m_Detail));
 		}
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawService->GetContext());
 		frame.m_DebugDrawFrame = m_DebugDrawService->SealFrame(frameSlotIndex,
@@ -248,7 +284,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
-			return AppRuntimeTickResult::Exit;
+			return FailRuntime("RenderGraph compilation failed.");
 		}
 
 		if (toolingFrame.IsOpen())
@@ -336,7 +372,7 @@ namespace gglab
 		if (!frameEndResult.IsCompleted())
 		{
 			toolingFrame.Abort();
-			return AppRuntimeTickResult::Exit;
+			return FailRuntime("The render host failed to complete frame submission.");
 		}
 
 		m_DemoManager->OnFrameSubmitted({

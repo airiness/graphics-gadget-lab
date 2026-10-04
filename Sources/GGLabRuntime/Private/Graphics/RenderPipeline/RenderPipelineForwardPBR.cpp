@@ -141,6 +141,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 
+		GGLAB_ASSERT_MSG(m_FramePlan && m_FramePlan->m_FrameSerial == context.m_FrameSerial,
+			"ForwardPBR graph construction requires a Ready validation of the same frame.");
+		if (!m_FramePlan || m_FramePlan->m_FrameSerial != context.m_FrameSerial)
+		{
+			GGLAB_UNREACHABLE("ForwardPBR graph construction has no validated frame plan.");
+		}
+		const FramePlan framePlan = std::move(*m_FramePlan);
+		m_FramePlan.reset();
+
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
@@ -148,50 +157,12 @@ namespace gglab
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const DepthConvention displayDepthConvention =
 			context.GetDisplayRenderView().m_DepthConvention;
-		const uint32_t targetWidth = swapChain->GetBufferWidth();
-		const uint32_t targetHeight = swapChain->GetBufferHeight();
-		const ForwardPlusSettings& forwardPlusSettings =
-			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus;
-		const bool forwardPlusEnabled =
-			forwardPlusSettings.m_Mode == ForwardLightingMode::ForwardPlus;
-		const bool forwardPlusAvailable = forwardPlusEnabled &&
-			IsForwardPlusGlobalLightCountSupported(
-				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()));
-		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
-		const DepthCoverageFramePlan depthCoverageFramePlan =
-			BuildDepthCoverageFramePlanForFrame(context, targetWidth, targetHeight);
-		ForwardPlusFrameStatus forwardPlusStatus = ForwardPlusFrameStatus::Disabled;
-		if (forwardPlusEnabled)
-		{
-			if (!forwardPlusAvailable)
-			{
-				forwardPlusStatus = ForwardPlusFrameStatus::GlobalLightCapacityExceeded;
-			}
-			else if (!context.IsRenderSceneReady())
-			{
-				forwardPlusStatus = ForwardPlusFrameStatus::RenderSceneUnavailable;
-			}
-			else if (!depthCoverageFramePlan.UsesDepthPrepassEqual())
-			{
-				forwardPlusStatus = ForwardPlusFrameStatus::DepthCoverageUnavailable;
-			}
-			else if (!depthCoverageFramePlan.m_HasDepthCoverageDraws)
-			{
-				forwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
-			}
-			else
-			{
-				forwardPlusStatus = ForwardPlusFrameStatus::Active;
-			}
-		}
+		const DepthCoverageFramePlan& depthCoverageFramePlan = framePlan.m_DepthCoverage;
+		const ForwardPlusFrameStatus forwardPlusStatus = framePlan.m_ForwardPlusStatus;
 		const bool forwardPlusActive = forwardPlusStatus == ForwardPlusFrameStatus::Active;
 		const GTAOSettings& gtaoSettings =
 			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO;
-		m_GTAOPass.Prepare(services);
-		const GTAOFrameStatus gtaoStatus = ResolveGTAOFrameStatus(gtaoSettings.m_Enabled,
-			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
-			context.IsRenderSceneReady(), depthCoverageFramePlan.UsesDepthPrepassEqual(),
-			depthCoverageFramePlan.m_HasDepthCoverageDraws);
+		const GTAOFrameStatus gtaoStatus = framePlan.m_GTAOStatus;
 		const bool gtaoActive = gtaoStatus == GTAOFrameStatus::Active;
 
 		auto& forwardPlusResources =
@@ -592,45 +563,109 @@ namespace gglab
 			});
 	}
 
-	bool RenderPipelineForwardPBR::ValidateRenderFrame(
+	RenderFrameValidationResult ClassifyForwardPBRFrame(
+		const ForwardPBRFrameValidationInputs& inputs) noexcept
+	{
+		if (!inputs.m_PresentationAvailable)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"The presentation swap chain is unavailable after the frame began.");
+		}
+		if (!inputs.m_TemporalActive)
+		{
+			return RenderFrameValidationResult::Ready();
+		}
+		if (!inputs.m_RenderSceneReady)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"An active temporal frame requires prepared scene GPU data.");
+		}
+		if (!inputs.m_TemporalResolveClosureValid)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"An active temporal frame requires its resolve pipeline closure.");
+		}
+		if (!inputs.m_DepthPrepassEqual)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"An active temporal frame requires depth-prepass velocity coverage.",
+				std::string(inputs.m_DepthCoverageDiagnostic));
+		}
+		return RenderFrameValidationResult::Ready();
+	}
+
+	RenderFrameValidationResult RenderPipelineForwardPBR::ValidateRenderFrame(
 		const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
-		if (!context.GetTemporalFramePlan().m_Active)
-		{
-			return true;
-		}
-		if (!context.IsRenderSceneReady())
-		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Active temporal frame rejected after scene GPU preparation failed.");
-			return false;
-		}
-
+		m_FramePlan.reset();
 		const auto* swapChain = services.m_Presentation->GetSwapChain();
 		if (!swapChain || !swapChain->IsValid())
 		{
-			return false;
-		}
-		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
-		m_TemporalAAPass.Prepare(services);
-		if (!m_TemporalAAPass.ValidatePipelineClosure(services))
-		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Active temporal frame lost its required resolve pipeline closure.");
-			return false;
+			return ClassifyForwardPBRFrame({ .m_PresentationAvailable = false });
 		}
 
-		const DepthCoverageFramePlan depthCoverageFramePlan =
-			BuildDepthCoverageFramePlanForFrame(
-				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight());
-		if (!depthCoverageFramePlan.UsesDepthPrepassEqual())
+		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
+		m_GTAOPass.Prepare(services);
+		const bool temporalActive = context.GetTemporalFramePlan().m_Active;
+		bool temporalResolveClosureValid = false;
+		if (temporalActive)
 		{
-			GGLAB_LOG_GRAPHICS_ERROR(
-				"Active temporal frame rejected its velocity depth-coverage contract: {}",
-				depthCoverageFramePlan.m_Diagnostic);
-			return false;
+			m_TemporalAAPass.Prepare(services);
+			temporalResolveClosureValid = m_TemporalAAPass.ValidatePipelineClosure(services);
 		}
-		return true;
+
+		FramePlan plan{
+			.m_FrameSerial = context.m_FrameSerial,
+			.m_DepthCoverage = BuildDepthCoverageFramePlanForFrame(
+				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight()),
+		};
+		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
+		const bool sceneReady = context.IsRenderSceneReady();
+		const ForwardLightingMode lightingMode =
+			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Mode;
+		if (lightingMode == ForwardLightingMode::ForwardPlus)
+		{
+			if (!IsForwardPlusGlobalLightCountSupported(
+				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size())))
+			{
+				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::GlobalLightCapacityExceeded;
+			}
+			else if (!sceneReady)
+			{
+				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::RenderSceneUnavailable;
+			}
+			else if (!depthCoverage.UsesDepthPrepassEqual())
+			{
+				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::DepthCoverageUnavailable;
+			}
+			else if (!depthCoverage.m_HasDepthCoverageDraws)
+			{
+				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
+			}
+			else
+			{
+				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::Active;
+			}
+		}
+		plan.m_GTAOStatus = ResolveGTAOFrameStatus(
+			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled,
+			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
+			sceneReady, depthCoverage.UsesDepthPrepassEqual(),
+			depthCoverage.m_HasDepthCoverageDraws);
+
+		RenderFrameValidationResult result = ClassifyForwardPBRFrame({
+			.m_PresentationAvailable = true,
+			.m_TemporalActive = temporalActive,
+			.m_RenderSceneReady = sceneReady,
+			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
+			.m_DepthPrepassEqual = depthCoverage.UsesDepthPrepassEqual(),
+			.m_DepthCoverageDiagnostic = depthCoverage.m_Diagnostic,
+			});
+		if (result.IsReady())
+		{
+			m_FramePlan = std::move(plan);
+		}
+		return result;
 	}
 
 	void RenderPipelineForwardPBR::PrepareForwardPasses(
