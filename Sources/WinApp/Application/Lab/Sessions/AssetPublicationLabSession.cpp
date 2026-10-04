@@ -149,68 +149,6 @@ namespace gglab
 				[identity](const AssetUploadActivity& upload) noexcept
 				{ return upload.m_Identity == identity; });
 		}
-
-		struct SyntheticPublicationState
-		{
-			uint32_t m_TargetSteps = 1;
-			uint32_t m_Steps = 0;
-			uint64_t m_ProgressToken = 0;
-			uint32_t m_AbortCount = 0;
-			AssetResourcePublicationAbortReason m_AbortReason =
-				AssetResourcePublicationAbortReason::Shutdown;
-			bool m_Completed = false;
-		};
-
-		class SyntheticPublicationJob final : public IResourcePublicationJob
-		{
-		public:
-			explicit SyntheticPublicationJob(
-				std::shared_ptr<SyntheticPublicationState> state) noexcept :
-				m_State(std::move(state))
-			{
-			}
-
-			[[nodiscard]] AssetResourcePublicationStepResult Step(
-				AssetResourcePublicationContext& context) noexcept override
-			{
-				GGLAB_UNUSED(context);
-				++m_State->m_Steps;
-				++m_State->m_ProgressToken;
-				if (m_State->m_Steps >= m_State->m_TargetSteps)
-				{
-					m_State->m_Completed = true;
-					return {
-						.m_Status = AssetResourcePublicationStepStatus::Completed,
-						.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
-					};
-				}
-				return {
-					.m_Status = AssetResourcePublicationStepStatus::Continue,
-					.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
-				};
-			}
-
-			void Abort(AssetResourcePublicationContext& context,
-				AssetResourcePublicationAbortReason reason) noexcept override
-			{
-				GGLAB_UNUSED(context);
-				++m_State->m_AbortCount;
-				m_State->m_AbortReason = reason;
-			}
-
-			[[nodiscard]] uint64_t GetProgressToken() const noexcept override
-			{
-				return m_State->m_ProgressToken;
-			}
-
-			[[nodiscard]] AssetResourcePublicationStage GetCurrentStage() const noexcept override
-			{
-				return AssetResourcePublicationStage::Textures;
-			}
-
-		private:
-			std::shared_ptr<SyntheticPublicationState> m_State;
-		};
 	}
 
 	struct AssetPublicationLabSession::ScenarioState
@@ -254,11 +192,9 @@ namespace gglab
 			CancelDependencies,
 			CancelBeforeCommit,
 			FailMaterials,
-			StaleGeneration,
 			SharedTextureRollback,
 			OwnershipPriorityMerge,
 			GpuSubmittedCancellation,
-			ShutdownDrain,
 			Count,
 		};
 
@@ -266,8 +202,6 @@ namespace gglab
 		{
 			Starting,
 			RunningModel,
-			WaitingOldYield,
-			WaitingNewGeneration,
 			WaitingSharedTexture,
 			WaitingSharedRollback,
 			WaitingGpuSubmission,
@@ -294,14 +228,7 @@ namespace gglab
 		AssetManager::ModelLoadRequest m_ModelRequest{};
 		AssetStreamingIdentity m_TextureIdentity{};
 		AssetStreamingIdentity m_ModelIdentity{};
-		std::shared_ptr<SyntheticPublicationState> m_OldGeneration;
-		std::shared_ptr<SyntheticPublicationState> m_NewGeneration;
-		std::shared_ptr<SyntheticPublicationState> m_DrainJob;
-		AssetStreamingIdentity m_OldIdentity{};
-		AssetStreamingIdentity m_NewIdentity{};
-		uint32_t m_OldStepsAtCancellation = 0;
 		uint64_t m_StartGpuDeferredCancellations = 0;
-		uint64_t m_StartNoProgressContinues = 0;
 		float m_CaseElapsedSeconds = 0.0f;
 		float m_TotalElapsedSeconds = 0.0f;
 		uint32_t m_SettleFrames = 0;
@@ -807,35 +734,6 @@ namespace gglab
 		case AcceptanceSuiteState::Case::FailMaterials:
 			startModel(Scenario::FailMaterials, 3);
 			break;
-		case AcceptanceSuiteState::Case::StaleGeneration:
-		{
-			constexpr uint64_t StableId = std::numeric_limits<uint64_t>::max() - 1024;
-			m_Suite->m_OldIdentity = {
-				.m_Kind = AssetStreamingWorkKind::Model,
-				.m_StableId = StableId,
-				.m_Generation = 1,
-			};
-			m_Suite->m_NewIdentity = {
-				.m_Kind = AssetStreamingWorkKind::Model,
-				.m_StableId = StableId,
-				.m_Generation = 2,
-			};
-			m_Suite->m_OldGeneration = std::make_shared<SyntheticPublicationState>();
-			m_Suite->m_OldGeneration->m_TargetSteps = 8;
-			m_Suite->m_NewGeneration = std::make_shared<SyntheticPublicationState>();
-			m_Suite->m_NewGeneration->m_TargetSteps = 3;
-			m_Suite->m_StartNoProgressContinues =
-				m_Suite->m_CaseBaselineUpload.m_ResourcePublicationQueue.m_NoProgressContinueCount;
-			scheduler->EnqueueResourcePublication(
-				{
-					.m_Name = "Acceptance stale generation 1",
-					.m_Identity = m_Suite->m_OldIdentity,
-					.m_Priority = TaskPriority::Normal,
-				},
-				std::make_unique<SyntheticPublicationJob>(m_Suite->m_OldGeneration));
-			m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingOldYield;
-			break;
-		}
 		case AcceptanceSuiteState::Case::SharedTextureRollback:
 		{
 			m_Suite->m_PrimaryOwner = assetManager->CreateOwnerScope();
@@ -944,48 +842,6 @@ namespace gglab
 			m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingGpuSubmission;
 			break;
 		}
-		case AcceptanceSuiteState::Case::ShutdownDrain:
-		{
-			m_Suite->m_DrainJob = std::make_shared<SyntheticPublicationState>();
-			m_Suite->m_DrainJob->m_TargetSteps = 64;
-			const AssetStreamingIdentity identity{
-				.m_Kind = AssetStreamingWorkKind::Model,
-				.m_StableId = std::numeric_limits<uint64_t>::max() - 2048,
-				.m_Generation = 1,
-			};
-			m_Suite->m_StartNoProgressContinues =
-				m_Suite->m_CaseBaselineUpload.m_ResourcePublicationQueue.m_NoProgressContinueCount;
-			scheduler->EnqueueResourcePublication(
-				{
-					.m_Name = "Acceptance shutdown drain",
-					.m_Identity = identity,
-					.m_Priority = TaskPriority::Normal,
-				},
-				std::make_unique<SyntheticPublicationJob>(m_Suite->m_DrainJob));
-			scheduler->DrainReadyWork();
-			const AssetUploadStatistics after = scheduler->GetStatistics();
-			std::vector<std::string> errors;
-			if (!m_Suite->m_DrainJob->m_Completed ||
-				m_Suite->m_DrainJob->m_Steps != m_Suite->m_DrainJob->m_TargetSteps)
-			{
-				errors.push_back("DrainReadyWork did not complete every yielded synthetic step.");
-			}
-			if (m_Suite->m_DrainJob->m_AbortCount != 0)
-			{
-				errors.push_back("DrainReadyWork aborted a finite-progress publication job.");
-			}
-			if (HasPendingIdentity(after.m_ResourcePublicationQueue, identity))
-			{
-				errors.push_back("The drained publication job remains queued.");
-			}
-			if (after.m_ResourcePublicationQueue.m_NoProgressContinueCount !=
-				m_Suite->m_StartNoProgressContinues)
-			{
-				errors.push_back("DrainReadyWork observed a no-progress Continue.");
-			}
-			CompleteAcceptanceCase("Shutdown drain", std::move(errors));
-			return;
-		}
 		case AcceptanceSuiteState::Case::Count:
 			CompleteAcceptanceSuite();
 			break;
@@ -1023,61 +879,6 @@ namespace gglab
 			if (m_State && m_State->m_Finished)
 			{
 				CompleteAcceptanceCase(ScenarioText(m_State->m_Scenario), m_State->m_Errors);
-			}
-			break;
-
-		case AcceptanceSuiteState::Phase::WaitingOldYield:
-			if (m_Suite->m_OldGeneration->m_Steps > 0)
-			{
-				scheduler->EnqueueResourcePublication(
-					{
-						.m_Name = "Acceptance current generation 2",
-						.m_Identity = m_Suite->m_NewIdentity,
-						.m_Priority = TaskPriority::Normal,
-					},
-					std::make_unique<SyntheticPublicationJob>(m_Suite->m_NewGeneration));
-				const uint32_t cancelled = scheduler->CancelReadyWork(m_Suite->m_OldIdentity);
-				m_Suite->m_OldStepsAtCancellation = m_Suite->m_OldGeneration->m_Steps;
-				if (cancelled != 1)
-				{
-					CompleteAcceptanceCase("Stale generation rejection",
-						{ std::format(
-							"Expected one stale job cancellation, observed {}.", cancelled) });
-					return;
-				}
-				m_Suite->m_Phase = AcceptanceSuiteState::Phase::WaitingNewGeneration;
-			}
-			break;
-
-		case AcceptanceSuiteState::Phase::WaitingNewGeneration:
-			if (m_Suite->m_NewGeneration->m_Completed &&
-				!HasPendingIdentity(
-					statistics.m_ResourcePublicationQueue, m_Suite->m_NewIdentity) &&
-				!HasPendingIdentity(statistics.m_ResourcePublicationQueue, m_Suite->m_OldIdentity))
-			{
-				std::vector<std::string> errors;
-				if (m_Suite->m_OldGeneration->m_AbortCount != 1 ||
-					m_Suite->m_OldGeneration->m_AbortReason !=
-					AssetResourcePublicationAbortReason::Cancelled)
-				{
-					errors.push_back(
-						"The stale generation was not aborted exactly once as Cancelled.");
-				}
-				if (m_Suite->m_OldGeneration->m_Steps != m_Suite->m_OldStepsAtCancellation)
-				{
-					errors.push_back("The stale generation executed again after cancellation.");
-				}
-				if (m_Suite->m_NewGeneration->m_AbortCount != 0 ||
-					m_Suite->m_NewGeneration->m_Steps != m_Suite->m_NewGeneration->m_TargetSteps)
-				{
-					errors.push_back("The current generation did not complete independently.");
-				}
-				if (statistics.m_ResourcePublicationQueue.m_NoProgressContinueCount !=
-					m_Suite->m_StartNoProgressContinues)
-				{
-					errors.push_back("The generation test produced a no-progress Continue.");
-				}
-				CompleteAcceptanceCase("Stale generation rejection", std::move(errors));
 			}
 			break;
 

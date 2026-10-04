@@ -6,6 +6,9 @@
 #include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "GGLabRuntime/Graphics/Asset/ModelImporter.h"
 #include "GGLabRuntime/Graphics/Asset/DerivedDataKey.h"
+#include "GGLabRuntime/Graphics/Asset/TextureArtifact.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAsset.h"
+#include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
 #include "Graphics/Asset/DerivedData/IBLDerivedDataSystem.h"
 #include "Graphics/Asset/DerivedData/LocalDerivedDataStore.h"
 #include "Graphics/Asset/DerivedData/Platform/Win/Win32LocalDerivedDataPlatform.h"
@@ -17,6 +20,7 @@
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/Store/TextureStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
+#include "Graphics/Asset/TextureDerivedDataCoordinator.h"
 #include "Graphics/Asset/TextureSourceKey.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetValidation.h"
 #include "Graphics/RHI/DX12/Utility/DX12ResourceDescUtils.h"
@@ -2447,6 +2451,77 @@ namespace gglab
 			context.Check(ResolveAssetPath(assetRoot, "../outside.png").empty(),
 				"Relative asset paths cannot escape the injected root");
 		}
+
+		void RunTextureDerivedDataCoordinatorTests(SelfTestContext& context) noexcept
+		{
+			// An empty cache directory keeps the coordinator in memory.
+			TextureDerivedDataSystem system(std::filesystem::path{});
+			SourceDigest sourceDigest{};
+			sourceDigest.m_Value.front() = std::byte{ 0x5a };
+			TextureImportSettings importSettings{};
+			importSettings.m_Semantic = TextureSemantic::GenericColor;
+			const DerivedDataKey key =
+				BuildTextureDerivedDataKey(sourceDigest, "shared-request.png", importSettings);
+			TextureDerivedDataRequestResult producer = system.Request(key);
+			TextureDerivedDataRequestResult waiting = system.Request(key);
+			context.Check(producer.m_Disposition == ArtifactRequestDisposition::BuildRequired &&
+				producer.m_BuildClaim.IsValid() && producer.m_Waiter.IsValid() &&
+				waiting.m_Disposition == ArtifactRequestDisposition::Waiting &&
+				waiting.m_Waiter.IsValid() && !waiting.m_BuildClaim.IsValid(),
+				"Concurrent texture requests for one key create one build claim and one waiter");
+			context.Check(producer.m_Waiter.Cancel(),
+				"The producer may cancel its own waiter while keeping the build claim");
+
+			constexpr std::array<uint8_t, 4> pixels{ 64, 128, 192, 255 };
+			TextureAssetData textureData =
+				TextureLoader::MakeTexture2DRgba8(1, 1, pixels, TextureColorSpace::SRGB);
+			const AssetContentFingerprint contentFingerprint =
+				ComputeTextureContentFingerprint(textureData, importSettings);
+			TextureArtifactBuildResult built = CreateTextureArtifact(std::move(textureData));
+			const TextureArtifactHandle artifact = built.Succeeded()
+				? std::make_shared<const TextureArtifact>(std::move(built.m_Artifact))
+				: TextureArtifactHandle{};
+			const TextureDerivedDataArtifact published{
+				.m_Artifact = artifact,
+				.m_ContentFingerprint = contentFingerprint,
+			};
+			context.Check(published.IsValid() &&
+				system.Publish(std::move(producer.m_BuildClaim), published),
+				"The build claim publishes the shared texture artifact");
+
+			TextureDerivedDataRequestResult immediate = system.Request(key);
+			TextureArtifactWaitResult waited = system.Wait(std::move(waiting.m_Waiter), {});
+			const TextureDerivedDataCoordinatorStatistics statistics = system.GetCoordinatorStatistics();
+			context.Check(immediate.m_Disposition == ArtifactRequestDisposition::Hit &&
+				immediate.m_Artifact.m_Artifact == artifact &&
+				waited.m_Disposition == ArtifactWaitDisposition::Succeeded &&
+				waited.m_Artifact.m_Artifact == artifact,
+				"Published texture artifacts fan out to waiters and serve later requests as hits");
+			context.Check(statistics.m_RequestCount == 3 && statistics.m_BuildRequiredCount == 1 &&
+				statistics.m_WaitCount == 1 && statistics.m_ImmediateHitCount == 1 &&
+				statistics.m_PublishCount == 1 && statistics.m_CancelledWaiterCount == 1 &&
+				statistics.m_FanoutDeliveryCount == 1 && statistics.m_ActiveBuildCount == 0 &&
+				statistics.m_ActiveWaiterCount == 0,
+				"Texture coordinator diagnostics count every request, fan-out and cancellation exactly once");
+
+			sourceDigest.m_Value.back() = std::byte{ 0xa5 };
+			const DerivedDataKey cancellationKey = BuildTextureDerivedDataKey(
+				sourceDigest, "cancelled-shared-request.png", importSettings);
+			TextureDerivedDataRequestResult cancelledProducer = system.Request(cancellationKey);
+			const bool producerCancelled =
+				cancelledProducer.m_Disposition == ArtifactRequestDisposition::BuildRequired &&
+				cancelledProducer.m_Waiter.Cancel();
+			TextureDerivedDataRequestResult replacement = system.Request(cancellationKey);
+			context.Check(producerCancelled &&
+				replacement.m_Disposition == ArtifactRequestDisposition::Waiting &&
+				!replacement.m_BuildClaim.IsValid(),
+				"Cancelling the producer's waiter never admits a second producer for an active key");
+			GGLAB_UNUSED(system.Fail(std::move(cancelledProducer.m_BuildClaim),
+				"Expected cancellation-boundary validation failure."));
+			context.Check(system.Wait(std::move(replacement.m_Waiter), {}).m_Disposition ==
+				ArtifactWaitDisposition::Failed,
+				"Waiters behind a cancelled producer observe the producer's terminal failure");
+		}
 	}
 
 	void RunAssetDataSelfTests(SelfTestContext& context) noexcept
@@ -2468,5 +2543,6 @@ namespace gglab
 		RunIBLDerivedDataShaderIdentityTests(context);
 		RunIBLCacheControlTests(context);
 		RunAssetPathTests(context);
+		RunTextureDerivedDataCoordinatorTests(context);
 	}
 }

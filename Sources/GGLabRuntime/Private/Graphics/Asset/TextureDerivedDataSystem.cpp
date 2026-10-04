@@ -379,10 +379,4 @@ namespace gglab
 	{
 		return m_Store->m_Store.Clear();
 	}
-
-	std::unique_ptr<TextureDerivedDataAcceptance>
-		CreateTextureDerivedDataAcceptance(std::filesystem::path cacheDirectory) noexcept
-	{
-		return std::make_unique<TextureDerivedDataSystem>(std::move(cacheDirectory));
-	}
 }

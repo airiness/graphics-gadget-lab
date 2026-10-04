@@ -570,7 +570,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\Platform\Win\Win32LocalDerivedDataPlatform.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\SourceSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\DerivedData\TextureArtifactCodec.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataAcceptance.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\TextureDerivedDataTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetDependencyGraph.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\Dependency\AssetStateEventQueue.h" />

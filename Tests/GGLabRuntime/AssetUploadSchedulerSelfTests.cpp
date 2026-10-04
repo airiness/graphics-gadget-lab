@@ -1,5 +1,6 @@
 #include "AssetUploadSchedulerSelfTests.h"
 
+#include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
@@ -14,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string_view>
@@ -268,6 +270,174 @@ namespace gglab
 			bool m_FailUploads = false;
 		};
 
+		struct SyntheticPublicationState
+		{
+			uint32_t m_TargetSteps = 1;
+			uint32_t m_Steps = 0;
+			uint64_t m_ProgressToken = 0;
+			uint32_t m_AbortCount = 0;
+			AssetResourcePublicationAbortReason m_AbortReason =
+				AssetResourcePublicationAbortReason::Shutdown;
+			bool m_Completed = false;
+		};
+
+		// Finite-progress job that yields once per step until its target is reached.
+		class SyntheticPublicationJob final : public IResourcePublicationJob
+		{
+		public:
+			explicit SyntheticPublicationJob(
+				std::shared_ptr<SyntheticPublicationState> state) noexcept :
+				m_State(std::move(state))
+			{
+			}
+
+			[[nodiscard]] AssetResourcePublicationStepResult Step(
+				AssetResourcePublicationContext&) noexcept override
+			{
+				++m_State->m_Steps;
+				++m_State->m_ProgressToken;
+				m_State->m_Completed = m_State->m_Steps >= m_State->m_TargetSteps;
+				return {
+					.m_Status = m_State->m_Completed ? AssetResourcePublicationStepStatus::Completed
+						: AssetResourcePublicationStepStatus::Continue,
+					.m_Usage = {.m_Stage = AssetResourcePublicationStage::Textures},
+				};
+			}
+
+			void Abort(AssetResourcePublicationContext&,
+				AssetResourcePublicationAbortReason reason) noexcept override
+			{
+				++m_State->m_AbortCount;
+				m_State->m_AbortReason = reason;
+			}
+
+			[[nodiscard]] uint64_t GetProgressToken() const noexcept override
+			{
+				return m_State->m_ProgressToken;
+			}
+
+			[[nodiscard]] AssetResourcePublicationStage GetCurrentStage() const noexcept override
+			{
+				return AssetResourcePublicationStage::Textures;
+			}
+
+		private:
+			std::shared_ptr<SyntheticPublicationState> m_State;
+		};
+
+		// Scheduler over fake RHI services. One publication step per Tick reproduces
+		// frame-by-frame interleaving without depending on wall-clock budgets.
+		struct PublicationSchedulerFixture
+		{
+			PublicationSchedulerFixture() noexcept :
+				m_TransferManager(std::make_unique<NapaVoxelPublicationTestTransferContext>()),
+				m_Scheduler(CreateAssetUploadScheduler({
+					.m_Device = &m_Device,
+					.m_TransferManager = &m_TransferManager,
+					.m_FrameBudget = {
+						.m_MaxResourcePublicationSteps = 1,
+						.m_MaxResourcePublicationCreations = 1,
+						.m_MaxResourcePublicationMilliseconds = 1000.0,
+					},
+					}))
+			{
+			}
+
+			~PublicationSchedulerFixture()
+			{
+				m_Scheduler.m_Scheduling->Finalize();
+			}
+
+			[[nodiscard]] AssetUploadScheduling& Scheduling() const noexcept
+			{
+				return *m_Scheduler.m_Scheduling;
+			}
+
+			void Enqueue(const char* name, const AssetStreamingIdentity& identity,
+				std::shared_ptr<SyntheticPublicationState> state) const noexcept
+			{
+				Scheduling().EnqueueResourcePublication(
+					{ .m_Name = name, .m_Identity = identity, .m_Priority = TaskPriority::Normal },
+					std::make_unique<SyntheticPublicationJob>(std::move(state)));
+			}
+
+			NapaVoxelPublicationTestDevice m_Device;
+			TransferManager m_TransferManager;
+			AssetUploadSchedulerInstance m_Scheduler;
+		};
+
+		[[nodiscard]] bool HasPendingPublication(
+			const AssetUploadStatistics& statistics, const AssetStreamingIdentity& identity) noexcept
+		{
+			return std::ranges::any_of(statistics.m_ResourcePublicationQueue.m_PendingWork,
+				[&identity](const AssetStreamingWorkActivity& work) noexcept
+				{ return work.m_Identity == identity; });
+		}
+
+		void RunResourcePublicationGenerationTest(SelfTestContext& context) noexcept
+		{
+			PublicationSchedulerFixture fixture;
+			constexpr uint64_t StableId = std::numeric_limits<uint64_t>::max() - 1024;
+			const AssetStreamingIdentity oldIdentity{
+				.m_Kind = AssetStreamingWorkKind::Model, .m_StableId = StableId, .m_Generation = 1 };
+			const AssetStreamingIdentity newIdentity{
+				.m_Kind = AssetStreamingWorkKind::Model, .m_StableId = StableId, .m_Generation = 2 };
+			auto oldGeneration = std::make_shared<SyntheticPublicationState>();
+			oldGeneration->m_TargetSteps = 8;
+			auto newGeneration = std::make_shared<SyntheticPublicationState>();
+			newGeneration->m_TargetSteps = 3;
+
+			fixture.Enqueue("Stale generation 1", oldIdentity, oldGeneration);
+			GGLAB_UNUSED(fixture.Scheduling().Tick());
+			context.Check(oldGeneration->m_Steps == 1 && !oldGeneration->m_Completed,
+				"A one-step publication budget yields the older generation after one step");
+
+			fixture.Enqueue("Current generation 2", newIdentity, newGeneration);
+			const uint32_t cancelled = fixture.Scheduling().CancelReadyWork(oldIdentity);
+			const uint32_t oldStepsAtCancellation = oldGeneration->m_Steps;
+			for (uint32_t tick = 0; tick < 16 && !newGeneration->m_Completed; ++tick)
+			{
+				GGLAB_UNUSED(fixture.Scheduling().Tick());
+			}
+
+			const AssetUploadStatistics statistics = fixture.Scheduling().GetStatistics();
+			const auto& publication = statistics.m_ResourcePublicationQueue;
+			context.Check(cancelled == 1 && oldGeneration->m_AbortCount == 1 &&
+				oldGeneration->m_AbortReason == AssetResourcePublicationAbortReason::Cancelled &&
+				oldGeneration->m_Steps == oldStepsAtCancellation,
+				"Cancelling a stale generation aborts it once as Cancelled and never steps it again");
+			context.Check(newGeneration->m_Completed && newGeneration->m_AbortCount == 0 &&
+				newGeneration->m_Steps == newGeneration->m_TargetSteps &&
+				!HasPendingPublication(statistics, oldIdentity) &&
+				!HasPendingPublication(statistics, newIdentity),
+				"The current generation of the same asset completes independently of the cancelled one");
+			context.Check(publication.m_NoProgressContinueCount == 0 &&
+				publication.m_EnqueuedCount == publication.m_CompletedCount + publication.m_FailedCount +
+					publication.m_CancelledCount + publication.m_PendingCount &&
+				publication.m_QueueSampleCount == publication.m_EnqueuedCount,
+				"Yielded publication jobs keep queue conservation and their first-queued timestamp");
+		}
+
+		void RunResourcePublicationDrainTest(SelfTestContext& context) noexcept
+		{
+			PublicationSchedulerFixture fixture;
+			const AssetStreamingIdentity identity{
+				.m_Kind = AssetStreamingWorkKind::Model,
+				.m_StableId = std::numeric_limits<uint64_t>::max() - 2048,
+				.m_Generation = 1,
+			};
+			auto drainJob = std::make_shared<SyntheticPublicationState>();
+			drainJob->m_TargetSteps = 64;
+			fixture.Enqueue("Shutdown drain", identity, drainJob);
+			fixture.Scheduling().DrainReadyWork();
+
+			const AssetUploadStatistics statistics = fixture.Scheduling().GetStatistics();
+			context.Check(drainJob->m_Completed && drainJob->m_Steps == drainJob->m_TargetSteps &&
+				drainJob->m_AbortCount == 0 && !HasPendingPublication(statistics, identity) &&
+				statistics.m_ResourcePublicationQueue.m_NoProgressContinueCount == 0,
+				"DrainReadyWork completes every yielded step of a finite-progress job without aborting it");
+		}
+
 		void RunAssetUploadSchedulerWorkerHandoffTest(SelfTestContext& context) noexcept
 		{
 			auto transferContext = std::make_unique<NapaVoxelPublicationTestTransferContext>();
@@ -336,5 +506,7 @@ namespace gglab
 	void RunAssetUploadSchedulerSelfTests(SelfTestContext& context) noexcept
 	{
 		RunAssetUploadSchedulerWorkerHandoffTest(context);
+		RunResourcePublicationGenerationTest(context);
+		RunResourcePublicationDrainTest(context);
 	}
 }
