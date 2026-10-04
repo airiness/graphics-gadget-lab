@@ -18,6 +18,7 @@
 #include "Graphics/Asset/Interop/GltfMaterialIdentity.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/Asset/IBLStageArtifact.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Asset/Store/ModelStore.h"
 #include "Graphics/Asset/Store/TextureStore.h"
 #include "Graphics/Asset/TextureArtifactCache.h"
@@ -2636,6 +2637,127 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
+		void RunIBLBakeStageResolutionTests(SelfTestContext& context) noexcept
+		{
+			using enum IBLDerivedDataSource;
+			constexpr size_t StageCount = static_cast<size_t>(IBLArtifactStage::Count);
+			// Builds the lookup a requested bake receives; each stage has a distinct valid key.
+			const auto makeLookup = [](const std::array<IBLDerivedDataSource, StageCount>& sources)
+				{
+					IBLDerivedDataLookupResult result{};
+					for (size_t index = 0; index < StageCount; ++index)
+					{
+						auto& stage = result.m_Stages[index];
+						stage.m_Key.m_Value[0] = static_cast<std::byte>(index + 1);
+						stage.m_Source = sources[index];
+						if (sources[index] != Miss)
+						{
+							stage.m_Artifact = CreateIBLStageArtifact(static_cast<IBLArtifactStage>(index),
+								MakeIBLStageTextureFixture(1, 1, 1, RHIFormat::R16G16Float,
+									static_cast<std::byte>(0x30 + index)));
+						}
+					}
+					return result;
+				};
+			// Rebuilds missing stages in producer order exactly as the scheduler records them.
+			const auto rebuildMissing = [](IBLBakeStatus& status)
+				{
+					std::vector<IBLBakeStage> order;
+					for (IBLBakeStage stage = detail::SelectNextMissingIBLBakeStage(status);
+						stage != IBLBakeStage::Idle && order.size() < StageCount;
+						stage = detail::SelectNextMissingIBLBakeStage(status))
+					{
+						order.push_back(stage);
+						const IBLArtifactStage artifactStage =
+							stage == IBLBakeStage::Environment ? IBLArtifactStage::Environment
+							: stage == IBLBakeStage::Irradiance ? IBLArtifactStage::Irradiance
+							: stage == IBLBakeStage::PrefilteredSpecular
+							? IBLArtifactStage::PrefilteredSpecular : IBLArtifactStage::BrdfLut;
+						detail::MarkIBLStageGpuBuilt(status, artifactStage);
+					}
+					return order;
+				};
+			const auto written = [](const IBLBakeStatus& status)
+				{
+					std::array<bool, StageCount> stages{};
+					for (size_t index = 0; index < StageCount; ++index)
+					{
+						stages[index] = detail::ShouldWriteIBLStageToCache(status.m_Artifacts[index]);
+					}
+					return stages;
+				};
+			const auto recordsLookup = [](const IBLBakeStatus& status,
+				const IBLDerivedDataLookupResult& lookup) noexcept
+				{
+					for (size_t index = 0; index < StageCount; ++index)
+					{
+						const auto& stage = lookup.m_Stages[index];
+						const auto& artifact = status.m_Artifacts[index];
+						const ArtifactContentDigest expectedDigest =
+							stage.m_Artifact ? stage.m_Artifact->m_ContentDigest : ArtifactContentDigest{};
+						if (artifact.m_DerivedDataKey != stage.m_Key ||
+							artifact.m_ContentDigest != expectedDigest)
+						{
+							return false;
+						}
+					}
+					return true;
+				};
+
+			const IBLDerivedDataLookupResult missLookup = makeLookup({ Miss, Miss, Miss, Miss });
+			IBLBakeStatus miss{};
+			detail::ApplyIBLCacheLookupResult(missLookup, miss);
+			const bool missResolved = recordsLookup(miss, missLookup) && !miss.m_CacheHit &&
+				!miss.m_PartialCacheHit && !miss.m_CpuCacheHit && !miss.m_DerivedDataCacheHit &&
+				miss.m_CacheHitStageCount == 0;
+			const std::vector<IBLBakeStage> missOrder = rebuildMissing(miss);
+			context.Check(missResolved && missOrder == std::vector{ IBLBakeStage::Environment,
+				IBLBakeStage::Irradiance, IBLBakeStage::PrefilteredSpecular, IBLBakeStage::BrdfLut } &&
+				miss.m_GpuBuildStageCount == StageCount &&
+				detail::ShouldSaveIBLBakeToCache(miss, false) &&
+				!detail::ShouldSaveIBLBakeToCache(miss, true) &&
+				written(miss) == std::array{ true, true, true, true },
+				"A cache-miss IBL bake rebuilds every stage in producer order and saves all of them unless it bakes a physical sky");
+
+			const IBLDerivedDataLookupResult partialLookup =
+				makeLookup({ CpuCache, Miss, LocalDdc, Miss });
+			IBLBakeStatus partial{};
+			detail::ApplyIBLCacheLookupResult(partialLookup, partial);
+			const bool partialResolved = recordsLookup(partial, partialLookup) &&
+				partial.m_Artifacts[0].m_Resolution == IBLArtifactResolution::CpuCache &&
+				partial.m_Artifacts[1].m_Resolution == IBLArtifactResolution::Miss &&
+				partial.m_Artifacts[2].m_Resolution == IBLArtifactResolution::LocalDdc &&
+				partial.m_Artifacts[3].m_Resolution == IBLArtifactResolution::Miss &&
+				!partial.m_CacheHit && partial.m_PartialCacheHit && partial.m_CpuCacheHit &&
+				partial.m_DerivedDataCacheHit && partial.m_CacheHitStageCount == 2;
+			const std::vector<IBLBakeStage> partialOrder = rebuildMissing(partial);
+			context.Check(partialResolved &&
+				partialOrder == std::vector{ IBLBakeStage::Irradiance, IBLBakeStage::BrdfLut } &&
+				partial.m_GpuBuildStageCount == 2 &&
+				partial.m_Artifacts[0].m_Resolution == IBLArtifactResolution::CpuCache &&
+				partial.m_Artifacts[2].m_Resolution == IBLArtifactResolution::LocalDdc &&
+				detail::ShouldSaveIBLBakeToCache(partial, false) &&
+				written(partial) == std::array{ false, true, false, true },
+				"A partial IBL cache hit keeps hit stages, rebuilds only the missing stages and writes back only the rebuilt ones");
+
+			const IBLDerivedDataLookupResult hitLookup =
+				makeLookup({ LocalDdc, CpuCache, CpuCache, LocalDdc });
+			IBLBakeStatus hit{};
+			detail::ApplyIBLCacheLookupResult(hitLookup, hit);
+			context.Check(recordsLookup(hit, hitLookup) && hit.m_CacheHit && !hit.m_PartialCacheHit &&
+				hit.m_CpuCacheHit && hit.m_DerivedDataCacheHit &&
+				hit.m_CacheHitStageCount == StageCount &&
+				detail::SelectNextMissingIBLBakeStage(hit) == IBLBakeStage::Idle &&
+				!detail::ShouldSaveIBLBakeToCache(hit, false) &&
+				written(hit) == std::array{ false, false, false, false },
+				"A full IBL cache hit schedules no GPU stage and writes nothing back");
+
+			IBLStageArtifactStatus rebuiltWithoutKey{};
+			rebuiltWithoutKey.m_Resolution = IBLArtifactResolution::GpuBuild;
+			context.Check(!detail::ShouldWriteIBLStageToCache(rebuiltWithoutKey),
+				"A rebuilt IBL stage without a derived-data key is not written to the cache");
+		}
+
 		void RunAssetPathTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path assetRoot =
@@ -2745,6 +2867,7 @@ namespace gglab
 		RunRHITextureValidationTests(context);
 		RunIBLDerivedDataShaderIdentityTests(context);
 		RunIBLDerivedDataLookupResolutionTests(context);
+		RunIBLBakeStageResolutionTests(context);
 		RunIBLCacheControlTests(context);
 		RunAssetPathTests(context);
 		RunTextureDerivedDataCoordinatorTests(context);
