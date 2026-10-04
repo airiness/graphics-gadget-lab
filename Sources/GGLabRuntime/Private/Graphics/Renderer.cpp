@@ -1,5 +1,6 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/AtmosphereSystem.h"
+#include "Graphics/Capture/FrameCaptureService.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
@@ -181,6 +182,7 @@ namespace gglab
 			historySupport.m_Depth.m_TypedUavStore.IsSupported();
 
 		m_FrameBuilder = std::make_unique<RenderFrameBuilder>();
+		m_FrameCapture = std::make_unique<FrameCaptureService>(m_RHIContext->GetDevice());
 		m_IsInitialized = true;
 		return true;
 	}
@@ -198,6 +200,8 @@ namespace gglab
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 
 		m_RHIContext->WaitIdle();
+		// The device is idle, so every submitted capture can publish its rows.
+		m_FrameCapture->Shutdown();
 		m_AssetUploadScheduler->Finalize();
 
 		m_IBLBakeScheduler.reset();
@@ -239,6 +243,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
 		GGLAB_ASSERT_NOT_NULL(m_RHIContext.get());
+		m_FrameCapture->CollectCompleted();
 		const RHIFrameBeginResult beginResult = m_RHIContext->BeginFrame();
 		if (!beginResult.IsReady())
 		{
@@ -418,6 +423,14 @@ namespace gglab
 
 		const RHIFrameEndResult result = m_RHIContext->EndFrame(*m_ActiveFrame.m_RHIFrame);
 		const RHIFencePoint submittedFence = result.GetSubmittedFence();
+		if (result.IsCompleted() && submittedFence.IsValid())
+		{
+			m_FrameCapture->OnFrameSubmitted(m_ActiveFrame.m_Serial, submittedFence);
+		}
+		else
+		{
+			m_FrameCapture->OnFrameSubmissionFailed(m_ActiveFrame.m_Serial);
+		}
 		m_Atmosphere->EndFrame(result.IsCompleted(), submittedFence);
 		m_BakeAtmosphere->EndFrame(result.IsCompleted(), submittedFence);
 		if (result.IsCompleted() && submittedFence.IsValid())
@@ -502,6 +515,8 @@ namespace gglab
 					m_ActiveFrame.m_RenderGraph->Retire(retirementFence);
 				}
 			}
+			// Release capture readbacks only after the RHI abort recorded their uses.
+			m_FrameCapture->OnFrameAborted(frameSerial);
 			EndFrameLifetime();
 			return submittedFence;
 		}
@@ -510,6 +525,7 @@ namespace gglab
 		m_BakeAtmosphere->EndFrame(false, {});
 		m_IBLBakeScheduler->OnFrameAborted();
 		m_ActiveFrame.m_TemporalTransaction.Abort();
+		m_FrameCapture->OnFrameAborted(frameSerial);
 		EndFrameLifetime();
 		return {};
 	}
@@ -852,6 +868,16 @@ namespace gglab
 	{
 		GpuProfiler* profiler = m_RHIContext ? m_RHIContext->GetGpuProfiler() : nullptr;
 		return profiler;
+	}
+
+	FrameCaptureControlBase* Renderer::GetFrameCaptureControl() const noexcept
+	{
+		return m_FrameCapture.get();
+	}
+
+	RenderFrameCaptureAccess* Renderer::GetFrameCaptureAccess() const noexcept
+	{
+		return m_FrameCapture.get();
 	}
 
 	void Renderer::AttachAssetManager(AssetManager& assetManager) noexcept

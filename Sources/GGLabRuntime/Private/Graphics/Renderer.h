@@ -25,6 +25,7 @@ namespace gglab
 	class AssetManager;
 	class AssetUploadScheduling;
 	class EnvironmentLightingSystem;
+	class FrameCaptureService;
 	class IBLBakeScheduler;
 	class AtmosphereSystem;
 	class RenderResourceRegistry;
@@ -163,6 +164,8 @@ namespace gglab
 		[[nodiscard]] ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept override;
 		[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override;
 		[[nodiscard]] GpuProfilingControlBase* GetGpuProfilingControl() const noexcept override;
+		[[nodiscard]] FrameCaptureControlBase* GetFrameCaptureControl() const noexcept override;
+		[[nodiscard]] RenderFrameCaptureAccess* GetFrameCaptureAccess() const noexcept;
 		// Composition-time asset lease wiring for the IBL bake scheduler. The
 		// scheduler and its derived-data ownership remain Runtime-internal.
 		void AttachAssetManager(AssetManager& assetManager) noexcept override;
@@ -325,6 +328,8 @@ namespace gglab
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<RenderFrameGpuResources> m_FrameGpuResources;
 		std::unique_ptr<RenderFrameBuilder> m_FrameBuilder;
+		// Outlives Finalize so the application can drain the final capture results.
+		std::unique_ptr<FrameCaptureService> m_FrameCapture;
 		std::unique_ptr<PipelineCache> m_PipelineCache;
 		std::unique_ptr<EnvironmentLightingSystem> m_EnvironmentLightingSystem;
 		std::unique_ptr<IBLBakeScheduler> m_IBLBakeScheduler;

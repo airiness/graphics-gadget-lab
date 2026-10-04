@@ -255,6 +255,88 @@ namespace gglab
 		TrackBufferUse(source);
 	}
 
+	void DX12CommandContext::CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept
+	{
+		GGLAB_ASSERT_MSG(!m_IsRendering,
+			"Texture copies cannot be encoded inside an active rendering scope.");
+		if (m_IsRendering)
+		{
+			return;
+		}
+		ID3D12GraphicsCommandList* commandList = Get();
+		if (!m_Device || !commandList ||
+			!EncodeDX12TextureToBufferCopy(*m_Device, *commandList, copy))
+		{
+			return;
+		}
+		TrackTextureUse(copy.m_Source);
+		TrackBufferUse(copy.m_Destination);
+	}
+
+	bool EncodeDX12TextureToBufferCopy(DX12Device& device, ID3D12GraphicsCommandList& commandList,
+		const RHITextureToBufferCopy& copy) noexcept
+	{
+		static_assert(RHITextureCopyRowPitchAlignment == D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+		static_assert(
+			RHITextureCopyPlacementAlignment == D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+		DX12Texture* sourceTexture = device.ResolveTexture(copy.m_Source);
+		DX12Buffer* destinationBuffer = device.ResolveBuffer(copy.m_Destination);
+		const RHITextureCopyFootprint& footprint = copy.m_Footprint;
+		if (!sourceTexture || !sourceTexture->IsValid() || !destinationBuffer ||
+			!footprint.IsValid() ||
+			copy.m_DestinationOffset % RHITextureCopyPlacementAlignment != 0 ||
+			footprint.m_SizeInBytes > destinationBuffer->SizeInBytes() ||
+			copy.m_DestinationOffset > destinationBuffer->SizeInBytes() - footprint.m_SizeInBytes)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12 texture-to-buffer copy received an invalid texture, "
+				"buffer or footprint.");
+			return false;
+		}
+
+		const D3D12_RESOURCE_DESC sourceDesc = sourceTexture->Get()->GetDesc();
+		const uint64_t mipWidth = std::max<uint64_t>(sourceDesc.Width >> copy.m_SourceMipLevel, 1);
+		const uint64_t mipHeight = std::max<uint64_t>(
+			static_cast<uint64_t>(sourceDesc.Height) >> copy.m_SourceMipLevel, 1);
+		if (sourceDesc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE2D ||
+			sourceDesc.SampleDesc.Count != 1 || copy.m_SourceMipLevel >= sourceDesc.MipLevels ||
+			copy.m_SourceArraySlice >= sourceDesc.DepthOrArraySize ||
+			sourceDesc.Format != ToDXGIFormat(footprint.m_Format) ||
+			footprint.m_Width > mipWidth || footprint.m_Height > mipHeight)
+		{
+			GGLAB_LOG_GRAPHICS_WARN("DX12 texture-to-buffer copy footprint does not match the "
+				"source subresource.");
+			return false;
+		}
+
+		D3D12_TEXTURE_COPY_LOCATION destination{};
+		destination.pResource = destinationBuffer->Get();
+		destination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		destination.PlacedFootprint.Offset = copy.m_DestinationOffset;
+		destination.PlacedFootprint.Footprint = {
+			.Format = sourceDesc.Format,
+			.Width = footprint.m_Width,
+			.Height = footprint.m_Height,
+			.Depth = 1,
+			.RowPitch = static_cast<UINT>(footprint.m_RowPitch),
+		};
+
+		D3D12_TEXTURE_COPY_LOCATION source{};
+		source.pResource = sourceTexture->Get();
+		source.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		source.SubresourceIndex =
+			copy.m_SourceMipLevel + copy.m_SourceArraySlice * sourceDesc.MipLevels;
+		const D3D12_BOX sourceBox{
+			.left = 0,
+			.top = 0,
+			.front = 0,
+			.right = footprint.m_Width,
+			.bottom = footprint.m_Height,
+			.back = 1,
+		};
+		commandList.CopyTextureRegion(&destination, 0, 0, 0, &source, &sourceBox);
+		return true;
+	}
+
 	void DX12CommandContext::TrackBufferUse(RHIBufferHandle buffer) noexcept
 	{
 		if (std::ranges::find(m_UsedBuffers, buffer) == m_UsedBuffers.end())

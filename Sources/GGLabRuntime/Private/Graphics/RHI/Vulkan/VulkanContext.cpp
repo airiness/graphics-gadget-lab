@@ -40,7 +40,7 @@ namespace gglab
 				importDesc.m_RHI.m_Desc = {
 					.m_Dimension = RHITextureDimension::Texture2D,
 					.m_Format = nativeSwapChain.GetFormat(),
-					.m_Usage = RHITextureUsage::RenderTarget | RHITextureUsage::Present,
+					.m_Usage = GetBackBufferUsage(nativeSwapChain),
 					.m_Extent = { nativeSwapChain.GetWidth(), nativeSwapChain.GetHeight(), 1 },
 					.m_ArraySize = 1,
 					.m_MipLevels = 1,
@@ -110,6 +110,12 @@ namespace gglab
 				? m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain().GetFormat()
 				: RHIFormat::Unknown;
 		}
+		RHITextureUsage GetBackBufferUsage() const noexcept override
+		{
+			return IsValid()
+				? GetBackBufferUsage(m_Context->m_Bootstrap->m_FrameRuntime->GetSwapChain())
+				: RHITextureUsage::None;
+		}
 		RHITextureHandle GetBackBufferHandle(uint32_t bufferIndex) const noexcept override
 		{
 			return bufferIndex < m_BackBuffers.size() ? m_BackBuffers[bufferIndex]
@@ -125,6 +131,14 @@ namespace gglab
 				m_Context->m_Bootstrap->m_FrameRuntime->GetLayoutTracker().Get(bufferIndex));
 		}
 	private:
+		[[nodiscard]] static RHITextureUsage GetBackBufferUsage(
+			const VulkanSwapChain& swapChain) noexcept
+		{
+			return RHITextureUsage::RenderTarget | RHITextureUsage::Present |
+				(swapChain.SupportsCopySource() ? RHITextureUsage::CopySource
+					: RHITextureUsage::None);
+		}
+
 		VulkanContext* m_Context = nullptr;
 		std::vector<RHITextureHandle> m_BackBuffers;
 		bool m_Valid = false;

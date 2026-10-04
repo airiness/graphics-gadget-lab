@@ -64,6 +64,9 @@
     <Filter Include="Private\Graphics\Buffer">
       <UniqueIdentifier>{2AF2C9C1-5356-2606-7F42-2544F45EC7AC}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Private\Graphics\Capture">
+      <UniqueIdentifier>{C8CC56C4-38D9-CCEC-34BC-7C79F45AA079}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Private\Graphics\DebugDraw">
       <UniqueIdentifier>{7E20274A-3511-61E4-415C-FFAC5887E34A}</UniqueIdentifier>
     </Filter>
@@ -153,6 +156,9 @@
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\Buffer">
       <UniqueIdentifier>{0822B0ED-08EC-82F2-3348-0858ACF7E5ED}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Public\GGLabRuntime\Graphics\Capture">
+      <UniqueIdentifier>{847CAED3-56ED-CABB-BD08-E3211386394E}</UniqueIdentifier>
     </Filter>
     <Filter Include="Public\GGLabRuntime\Graphics\DebugDraw">
       <UniqueIdentifier>{1E5001CD-6CB1-FEB4-2389-2767B2919582}</UniqueIdentifier>
@@ -480,6 +486,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureTypes.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp">
       <Filter>Private\Graphics\DebugDraw</Filter>
     </ClCompile>
@@ -592,6 +604,9 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.cpp">
@@ -1130,6 +1145,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Buffer\PersistentStructuredBufferTable.h">
       <Filter>Private\Graphics\Buffer</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.h">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.h">
       <Filter>Private\Graphics\DebugDraw</Filter>
     </ClInclude>
@@ -1251,6 +1269,9 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.h">
@@ -1837,6 +1858,15 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraTooling.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureAccess.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureControlBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\DebugDraw\DebugDraw.h">
       <Filter>Public\GGLabRuntime\Graphics\DebugDraw</Filter>

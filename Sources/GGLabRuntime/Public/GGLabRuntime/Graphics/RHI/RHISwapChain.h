@@ -14,6 +14,9 @@ namespace gglab
 		[[nodiscard]] virtual uint32_t GetBufferWidth() const noexcept = 0;
 		[[nodiscard]] virtual uint32_t GetBufferHeight() const noexcept = 0;
 		[[nodiscard]] virtual RHIFormat GetFormat() const noexcept = 0;
+		// Capabilities every back buffer was created and imported with. CopySource
+		// is optional on presentation surfaces that do not support transfer reads.
+		[[nodiscard]] virtual RHITextureUsage GetBackBufferUsage() const noexcept = 0;
 		[[nodiscard]] virtual RHITextureHandle GetBackBufferHandle(
 			uint32_t bufferIndex) const noexcept = 0;
 		[[nodiscard]] virtual RHIResourceState GetBackBufferInitialState(

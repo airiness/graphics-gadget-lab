@@ -22,6 +22,11 @@ namespace gglab
 	class DX12RootSignature;
 	class DX12GpuProfiler;
 
+	// Validates and encodes one RHI texture-to-buffer copy. Resource state and use
+	// tracking remain the caller's responsibility.
+	[[nodiscard]] bool EncodeDX12TextureToBufferCopy(DX12Device& device,
+		ID3D12GraphicsCommandList& commandList, const RHITextureToBufferCopy& copy) noexcept;
+
 	class DX12CommandContext
 	{
 	public:
@@ -55,6 +60,7 @@ namespace gglab
 		void FlushBarriers() noexcept;
 		void CopyBuffer(RHIBufferHandle destination, uint64_t destinationOffset,
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept;
+		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept;
 
 	protected:
 		[[nodiscard]] DX12Device* GetDevice() const noexcept { return m_Device; }
@@ -122,6 +128,10 @@ namespace gglab
 			RHIBufferHandle source, uint64_t sourceOffset, uint64_t sizeInBytes) noexcept override
 		{
 			m_Backend.CopyBuffer(destination, destinationOffset, source, sourceOffset, sizeInBytes);
+		}
+		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
+		{
+			m_Backend.CopyTextureToBuffer(copy);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;
@@ -220,6 +230,10 @@ namespace gglab
 		{
 			m_Backend->CopyBuffer(
 				destination, destinationOffset, source, sourceOffset, sizeInBytes);
+		}
+		void CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept override
+		{
+			m_Backend->CopyTextureToBuffer(copy);
 		}
 		void SetPipeline(RHIPipelineHandle pipeline) noexcept override;
 		void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept override;

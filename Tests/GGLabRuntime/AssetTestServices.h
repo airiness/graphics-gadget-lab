@@ -118,6 +118,7 @@ namespace gglab::asset_test
 		void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
 		void FlushBarriers() noexcept override {}
 		void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override {}
+		void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 		void Begin() noexcept override { m_IsRecording = true; }
 		RHIFencePoint Submit(bool) noexcept override
 		{

@@ -111,6 +111,10 @@ namespace gglab
 			{
 				return nullptr;
 			}
+			[[nodiscard]] FrameCaptureControlBase* GetFrameCaptureControl() const noexcept override
+			{
+				return nullptr;
+			}
 
 		private:
 			void AbortFrame(uint64_t) noexcept override {}
@@ -342,6 +346,7 @@ namespace gglab
 				uint64_t) noexcept override
 			{
 			}
+			void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
 			void Begin() noexcept override { m_IsRecording = true; }
 			RHIFencePoint Submit(bool) noexcept override
 			{

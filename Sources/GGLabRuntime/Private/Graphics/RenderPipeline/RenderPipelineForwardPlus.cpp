@@ -488,6 +488,10 @@ namespace gglab
 
 		m_PostProcessPipeline.AddPasses(rg, context, services);
 
+		// The scene capture tap reads the post-processed display target before any
+		// back-buffer preview or overlay composes into it.
+		m_SceneCapturePass.AddPass(rg, context, services);
+
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);
 
@@ -512,6 +516,10 @@ namespace gglab
 
 		// Atmosphere LUT previews must declare their reads before the persistent cache is exported.
 		m_AtmospherePass.AddFinishPass(rg);
+
+		// The composited capture tap reads the final display target after every
+		// writer and before the present export.
+		m_CompositedCapturePass.AddPass(rg, context, services);
 
 		// Finish backbuffer
 		rg.AddPass<FinishBackBufferPassData>("SwapChain.FinishBackBuffer",

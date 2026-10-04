@@ -298,6 +298,20 @@ namespace gglab
 		RecordBufferUse(src);
 	}
 
+	void DX12TransferContext::CopyTextureToBuffer(const RHITextureToBufferCopy& copy) noexcept
+	{
+		GGLAB_ASSERT_MSG(
+			m_ExecutingInfo, "CopyTextureToBuffer must be called between Begin() and End().");
+		ID3D12GraphicsCommandList* commandList = m_CommandList ? m_CommandList->Get() : nullptr;
+		if (!m_ExecutingInfo || !commandList ||
+			!EncodeDX12TextureToBufferCopy(*m_Device, *commandList, copy))
+		{
+			return;
+		}
+		RecordTextureUse(copy.m_Source);
+		RecordBufferUse(copy.m_Destination);
+	}
+
 	RHIBufferOwner DX12TransferContext::CreateUploadBuffer(
 		uint64_t sizeInBytes, std::string_view owner) noexcept
 	{
