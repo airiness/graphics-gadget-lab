@@ -53,6 +53,7 @@ namespace gglab
 		}
 		bool IsReady() const noexcept { return m_State == LabRunState::Ready && m_ActiveSession; }
 		bool HasPendingSession() const noexcept { return m_PendingSession != nullptr; }
+		uint32_t GetWarmupFramesRemaining() const noexcept { return m_WarmupFramesRemaining; }
 		uint32_t GetRetiringSessionCount() const noexcept
 		{
 			return static_cast<uint32_t>(m_RetiringSessions.size());

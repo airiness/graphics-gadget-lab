@@ -486,6 +486,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureImageEncoding.cpp">
+      <Filter>Private\Graphics\Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\FrameCaptureService.cpp">
       <Filter>Private\Graphics\Capture</Filter>
     </ClCompile>
@@ -1863,6 +1866,9 @@
       <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureControlBase.h">
+      <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureImageEncoding.h">
       <Filter>Public\GGLabRuntime\Graphics\Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Capture\FrameCaptureTypes.h">

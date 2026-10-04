@@ -22,6 +22,6 @@ namespace gglab
 				return false;
 			}
 		}
-		return true;
+		return m_CaptureRoot.empty() || m_CaptureRoot.is_absolute();
 	}
 }

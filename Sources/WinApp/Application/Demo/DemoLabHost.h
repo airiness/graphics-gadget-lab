@@ -20,6 +20,8 @@ namespace gglab
 		void CommitPrepare() noexcept override;
 		void CancelPrepare() noexcept override;
 		std::optional<LoadingProgress> GetActiveLoadingProgress() const noexcept override;
+		void AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept override;
+		std::string GetCaptureContentId() const noexcept override;
 
 		void OnEnter() noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;

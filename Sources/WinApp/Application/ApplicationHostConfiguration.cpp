@@ -98,6 +98,7 @@ namespace gglab
 			.m_TextureDerivedDataRoot = derivedDataRoot / "Texture",
 			.m_EnvironmentAssetRoot = assetRoot / "Textures" / "Skybox",
 			.m_SettingsRoot = stateDirectory.empty() ? stateRoot : stateRoot / "Settings",
+			.m_CaptureRoot = stateRoot / "Captures",
 		};
 	}
 }

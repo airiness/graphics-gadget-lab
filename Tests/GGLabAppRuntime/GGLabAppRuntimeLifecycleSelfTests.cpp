@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "GGLabAppRuntime.h"
 #include "ApplicationFrameworkSelfTests.h"
+#include "FrameCaptureCoordinatorSelfTests.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -673,10 +674,13 @@ namespace gglab
 int main()
 {
 	gglab::ConsoleSelfTestReporter reporter;
-	return gglab::RunSelfTestSuite({
+	const bool lifecycleSucceeded = gglab::RunSelfTestSuite({
 		.m_Id = "app-runtime-lifecycle",
 		.m_Run = &gglab::RunLifecycleSelfTests,
-		}, reporter)
-		? 0
-		: 1;
+		}, reporter);
+	const bool frameCaptureSucceeded = gglab::RunSelfTestSuite({
+		.m_Id = "frame-capture-coordinator",
+		.m_Run = &gglab::RunFrameCaptureCoordinatorSelfTests,
+		}, reporter);
+	return lifecycleSucceeded && frameCaptureSucceeded ? 0 : 1;
 }

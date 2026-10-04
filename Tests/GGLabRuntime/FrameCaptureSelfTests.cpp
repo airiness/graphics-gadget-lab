@@ -1,9 +1,13 @@
 #include "FrameCaptureSelfTests.h"
 
+#include "GGLabRuntime/Core/Time.h"
+#include "GGLabRuntime/Graphics/Capture/FrameCaptureImageEncoding.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/Capture/FrameCaptureService.h"
+
+#include <DirectXTex.h>
 
 #include <algorithm>
 #include <array>
@@ -198,11 +202,11 @@ namespace gglab
 
 		void RunFootprintTests(SelfTestContext& context) noexcept
 		{
-			const RHITextureCopyFootprint small =
+			const RHITextureCopyFootprint narrow =
 				ComputeRHITextureCopyFootprint(RHIFormat::R8G8B8A8Unorm, 3, 2);
-			context.Check(small.IsValid() && small.m_BytesPerTexel == 4 &&
-				small.m_RowSizeInBytes == 12 && small.m_RowPitch == 256 &&
-				small.m_SizeInBytes == 512,
+			context.Check(narrow.IsValid() && narrow.m_BytesPerTexel == 4 &&
+				narrow.m_RowSizeInBytes == 12 && narrow.m_RowPitch == 256 &&
+				narrow.m_SizeInBytes == 512,
 				"Copy footprints align each row to the neutral row pitch");
 
 			const RHITextureCopyFootprint exact =
@@ -412,10 +416,68 @@ namespace gglab
 				shutdown[0].m_FrameSerial == 5 && device.GetLiveBufferCount() == 0,
 				"Shutdown fails submitted taps whose fence never completed and releases them");
 		}
+
+		void RunPngEncodingTests(SelfTestContext& context) noexcept
+		{
+			const FrameCaptureImage image{
+				.m_Format = RHIFormat::B8G8R8A8UnormSrgb,
+				.m_Width = 3,
+				.m_Height = 2,
+				.m_Pixels = { 0, 0, 255, 0, 0, 255, 0, 7, 255, 0, 0, 9, 1, 2, 3, 4, 40, 50, 60, 70,
+					200, 100, 50, 0 },
+			};
+			const std::optional<std::vector<uint8_t>> png = EncodeFrameCapturePng(image);
+			context.Check(png && png->size() > 8 && (*png)[1] == 'P' && (*png)[2] == 'N' &&
+				(*png)[3] == 'G', "Captured display images encode to PNG");
+			if (!png)
+			{
+				return;
+			}
+
+			// Encoding joined this thread to COM; decoding reuses that apartment.
+			DirectX::TexMetadata metadata{};
+			DirectX::ScratchImage decoded;
+			const HRESULT decodeResult = DirectX::LoadFromWICMemory(png->data(), png->size(),
+				DirectX::WIC_FLAGS_FORCE_RGB | DirectX::WIC_FLAGS_IGNORE_SRGB, &metadata, decoded);
+			bool pixelsMatch = SUCCEEDED(decodeResult) && metadata.width == 3 &&
+				metadata.height == 2 && metadata.format == DXGI_FORMAT_R8G8B8A8_UNORM;
+			const std::optional<std::vector<uint8_t>> expected = ConvertFrameCaptureToRgba8(image);
+			for (size_t row = 0; pixelsMatch && expected && row < 2; ++row)
+			{
+				const uint8_t* decodedRow = decoded.GetImage(0, 0, 0)->pixels +
+					row * decoded.GetImage(0, 0, 0)->rowPitch;
+				pixelsMatch = std::equal(decodedRow, decodedRow + 12, expected->data() + row * 12);
+			}
+			context.Check(pixelsMatch,
+				"PNG round trips preserve display bytes with opaque alpha and channel order");
+
+			FrameCaptureImage unsupported = image;
+			unsupported.m_Format = RHIFormat::R16G16B16A16Float;
+			context.Check(!EncodeFrameCapturePng(unsupported),
+				"Formats without an 8-bit display conversion are not encoded");
+		}
+
+		void RunFixedTimeStepTests(SelfTestContext& context) noexcept
+		{
+			Time time;
+			time.Initialize();
+			time.SetFixedDeltaTime(0.25);
+			time.Update();
+			time.Update();
+			context.Check(time.GetDeltaTime() == 0.25 && time.GetTotalTime() == 0.5 &&
+				time.GetFixedDeltaTime() == 0.25 && time.GetFrameCount() == 2,
+				"A fixed time step advances delta and total time independent of wall clock");
+			time.SetFixedDeltaTime(std::nullopt);
+			time.Update();
+			context.Check(!time.GetFixedDeltaTime() && time.GetDeltaTime() != 0.25,
+				"Clearing the fixed step returns to wall-clock time");
+		}
 	}
 
 	void RunFrameCaptureSelfTests(SelfTestContext& context) noexcept
 	{
+		RunPngEncodingTests(context);
+		RunFixedTimeStepTests(context);
 		RunFootprintTests(context);
 		RunConversionTests(context);
 		RunCompletionTests(context);

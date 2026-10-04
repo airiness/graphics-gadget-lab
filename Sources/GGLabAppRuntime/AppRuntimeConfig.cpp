@@ -1,5 +1,7 @@
 #include "AppRuntimeConfig.h"
 
+#include <cmath>
+
 namespace gglab
 {
 	bool AppRuntimeConfig::IsValid() const noexcept
@@ -19,6 +21,12 @@ namespace gglab
 			return false;
 		}
 		if (m_StartupDemoId.empty() || (m_StartupLabId && m_StartupLabId->empty()))
+		{
+			return false;
+		}
+		if (m_FixedDeltaTimeSeconds &&
+			(!std::isfinite(*m_FixedDeltaTimeSeconds) || *m_FixedDeltaTimeSeconds <= 0.0 ||
+				*m_FixedDeltaTimeSeconds > 1.0))
 		{
 			return false;
 		}

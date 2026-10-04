@@ -75,7 +75,7 @@ namespace gglab
 		context.Check(paths.IsValid() && paths.m_RuntimeRoot == runtimeRoot &&
 			paths.m_AssetRoot == runtimeRoot / "Assets" &&
 			paths.m_EnvironmentAssetRoot == runtimeRoot / "Assets" / "Textures" / "Skybox" &&
-			paths.m_SettingsRoot == runtimeRoot,
+			paths.m_SettingsRoot == runtimeRoot && paths.m_CaptureRoot == runtimeRoot / "Captures",
 			"Executable directory deterministically produces explicit content roots");
 		context.Check(paths.m_ShaderArtifactRoot == runtimeRoot / "ShaderArtifacts" &&
 			paths.m_IblDerivedDataRoot == runtimeRoot / "DerivedDataCache" / "IBL" &&
@@ -89,7 +89,8 @@ namespace gglab
 			isolatedPaths.m_AssetRoot == paths.m_AssetRoot &&
 			isolatedPaths.m_ShaderArtifactRoot == stateRoot / "ShaderArtifacts" &&
 			isolatedPaths.m_IblDerivedDataRoot == stateRoot / "DerivedDataCache" / "IBL" &&
-			isolatedPaths.m_SettingsRoot == stateRoot / "Settings",
+			isolatedPaths.m_SettingsRoot == stateRoot / "Settings" &&
+			isolatedPaths.m_CaptureRoot == stateRoot / "Captures",
 			"Explicit writable state leaves deployed input roots unchanged");
 		context.Check(!BuildRuntimePaths(executableDirectory, "relative/state").IsValid(),
 			"Host path translation rejects a relative state directory");

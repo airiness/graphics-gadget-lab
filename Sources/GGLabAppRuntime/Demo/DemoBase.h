@@ -1,9 +1,11 @@
 #pragma once
+#include "Capture/FrameCaptureReadiness.h"
 #include "Demo/DemoTypes.h"
 #include "LoadingProgress.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace gglab
@@ -35,6 +37,24 @@ namespace gglab
 		{
 			return std::nullopt;
 		}
+		// Appends the content-owned gates an after-ready frame capture waits for.
+		// The default reports the active loading progress as the "content" gate.
+		virtual void AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept
+		{
+			const std::optional<LoadingProgress> progress = GetActiveLoadingProgress();
+			if (!progress || progress->IsReady())
+			{
+				readiness.Add("content", FrameCaptureGateState::Ready);
+				return;
+			}
+			readiness.Add("content",
+				progress->HasFailed() ? FrameCaptureGateState::Failed
+				: FrameCaptureGateState::Pending,
+				progress->m_Stage);
+		}
+		// Persisted id of the content inside the Demo that captures identify, such
+		// as the active Lab. Empty when the Demo itself is the captured content.
+		virtual std::string GetCaptureContentId() const noexcept { return {}; }
 
 		virtual void OnEnter() noexcept {}
 		virtual void OnResize(uint32_t, uint32_t) noexcept {}

@@ -1,6 +1,9 @@
 #include "Application/Demo/DemoLabHost.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+#include <format>
+#include <string>
+
 namespace gglab
 {
 	DemoLabHost::DemoLabHost(const DemoCreateInfo& createInfo, const LabId& startupLab,
@@ -69,6 +72,40 @@ namespace gglab
 	std::optional<LoadingProgress> DemoLabHost::GetActiveLoadingProgress() const noexcept
 	{
 		return m_Runtime.GetLoadingProgress();
+	}
+
+	void DemoLabHost::AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept
+	{
+		DemoBase::AppendCaptureReadiness(readiness);
+		if (m_Runtime.HasPendingSession())
+		{
+			readiness.Add("lab", FrameCaptureGateState::Pending, "Switching Lab sessions.");
+			return;
+		}
+		switch (m_Runtime.GetState())
+		{
+		case LabRunState::Ready:
+			readiness.Add("lab", FrameCaptureGateState::Ready);
+			return;
+		case LabRunState::Failed:
+			readiness.Add(
+				"lab", FrameCaptureGateState::Failed, std::string(m_Runtime.GetLastError()));
+			return;
+		case LabRunState::WarmingUp:
+			readiness.Add("lab", FrameCaptureGateState::Pending,
+				std::format("Warming up, {} frames remaining.",
+					m_Runtime.GetWarmupFramesRemaining()));
+			return;
+		default:
+			readiness.Add("lab", FrameCaptureGateState::Pending, "Loading the Lab session.");
+			return;
+		}
+	}
+
+	std::string DemoLabHost::GetCaptureContentId() const noexcept
+	{
+		const LabSessionBase* session = m_Runtime.GetActiveSession();
+		return session ? std::string(session->GetDescriptor().m_Id.GetName()) : std::string{};
 	}
 
 	void DemoLabHost::OnEnter() noexcept
