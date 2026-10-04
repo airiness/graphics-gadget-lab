@@ -3029,8 +3029,13 @@ namespace gglab
 
 			bool validAttachments = true;
 			bool validBlend = true;
+			bool separateLighting = true;
+			constexpr RHIBindingLayoutHandle forwardPlusLayout{ 2, 1 };
 			for (const auto& key : pipelines.m_Keys)
 			{
+				// Transparent recipes read depth without EQUAL and never bind Forward+ light lists.
+				separateLighting &= (key.m_DepthPreset == DepthPreset::ReversedZReadOnly) ==
+					(key.m_BindingLayout != forwardPlusLayout);
 				const uint32_t count = key.m_Formats.m_RenderTargetCount;
 				validAttachments &= count >= 4 && count <= 6 &&
 					key.m_Formats.m_RenderTargetFormats[count - 3] == RHIFormat::R16G16B16A16Float &&
@@ -3043,6 +3048,8 @@ namespace gglab
 			}
 			context.Check(validAttachments && validBlend && pipelines.m_Keys.size() == 5,
 				"Prewarmed production recipes preserve diagnostic MRT formats, GTAO variants, depth-equal opaque shading and transparent coverage blending");
+			context.Check(separateLighting,
+				"Opaque recipes consume Forward+ light lists while transparent recipes keep an independent all-lights layout");
 
 			const uint32_t completedCalls = pipelines.m_ResolveCount;
 			context.Check(pipeline->PrewarmMaterialDiagnostics(services, variants).IsReady() &&
@@ -3076,17 +3083,6 @@ namespace gglab
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
-			context.Check(
-				ResolveForwardPBRLightingVariant(ForwardPBRPassKind::Opaque, false) ==
-				ForwardPBRLightingVariant::ForwardPlus &&
-				ResolveForwardPBRLightingVariant(ForwardPBRPassKind::Opaque, true) ==
-				ForwardPBRLightingVariant::ForwardPlusValidation &&
-				ResolveForwardPBRLightingVariant(ForwardPBRPassKind::Transparent, false) ==
-				ForwardPBRLightingVariant::AllLights &&
-				ResolveForwardPBRLightingVariant(ForwardPBRPassKind::Transparent, true) ==
-				ForwardPBRLightingVariant::AllLights,
-				"Opaque shading is always Forward+, optionally with an active HDR-diff record, while transparent shading remains all-lights");
-
 			const ForwardPBRFrameValidationInputs ready{
 				.m_PresentationAvailable = true,
 				.m_DisplayExtentMatchesPresentation = true,
@@ -3153,26 +3149,25 @@ namespace gglab
 			ForwardPBRShaderSet shaderSet{};
 			shaderSet.m_CoverageVertexShader = ShaderID{ 1 };
 			shaderSet.m_AllLightsShadingPixelShader = ShaderID{ 2 };
-			shaderSet.m_ForwardPlusShadingPixelShader = ShaderID{ 3 };
-			shaderSet.m_ForwardPlusGTAOContributionPixelShader = ShaderID{ 5 };
+			shaderSet.m_ForwardPlus.m_Shading = ShaderID{ 3 };
+			shaderSet.m_ForwardPlus.m_GTAOContribution = ShaderID{ 5 };
 			shaderSet.m_AlphaTestPixelShader = ShaderID{ 6 };
 			shaderSet.m_VelocityOpaquePixelShader = ShaderID{ 7 };
 			shaderSet.m_VelocityAlphaTestPixelShader = ShaderID{ 8 };
-			for (uint32_t index = 0; index < ForwardPBRShaderSet::ProductionMaterialDiagnosticVariantCount; ++index)
-			{
-				shaderSet.m_MaterialDiagnosticPixelShaders[index] = ShaderID{ 10 + index };
-			}
+			shaderSet.m_AllLightsMaterialDiagnosticsPixelShader = ShaderID{ 10 };
+			shaderSet.m_ForwardPlus.m_MaterialDiagnostics = ShaderID{ 11 };
+			shaderSet.m_ForwardPlus.m_GTAOContributionMaterialDiagnostics = ShaderID{ 12 };
 			const bool productionValid =
 				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid();
 			shaderSet.m_IncludesHdrDiffValidation = true;
 			const bool validationRequiresPrograms =
 				!shaderSet.IsValid() && !shaderSet.AreMaterialDiagnosticsValid();
-			shaderSet.m_ForwardPlusValidationPixelShader = ShaderID{ 20 };
-			shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader = ShaderID{ 21 };
-			shaderSet.m_MaterialDiagnosticPixelShaders[
-				ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex] = ShaderID{ 22 };
-			shaderSet.m_MaterialDiagnosticPixelShaders[
-				ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex + 1] = ShaderID{ 23 };
+			shaderSet.m_ForwardPlusValidation = {
+				.m_Shading = ShaderID{ 20 },
+				.m_GTAOContribution = ShaderID{ 21 },
+				.m_MaterialDiagnostics = ShaderID{ 22 },
+				.m_GTAOContributionMaterialDiagnostics = ShaderID{ 23 },
+			};
 			context.Check(productionValid && validationRequiresPrograms &&
 				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid(),
 				"Forward shader validity requires HDR-diff programs only for the Lab-composed validation recipe");

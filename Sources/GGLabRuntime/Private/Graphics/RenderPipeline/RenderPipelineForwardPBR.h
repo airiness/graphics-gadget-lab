@@ -136,7 +136,8 @@ namespace gglab
 		struct MaterialDiagnosticPrewarmVariant
 		{
 			uint64_t m_DrawVariantBits = 0;
-			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::AllLights;
+			// Opaque draws only; transparent prewarm has a single all-lights recipe.
+			bool m_HdrDiffValidation = false;
 			bool m_GTAOContribution = false;
 		};
 		std::vector<uint64_t> m_DiagnosticPrewarmDrawVariants;

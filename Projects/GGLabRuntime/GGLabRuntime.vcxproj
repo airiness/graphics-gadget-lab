@@ -177,7 +177,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassDebugDraw.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawSystem.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\DebugDraw\DebugDrawShapes.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassBloom.cpp" />
@@ -449,7 +451,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPBRShaderSet.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBLPreview.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassShadowMapPreview.h" />

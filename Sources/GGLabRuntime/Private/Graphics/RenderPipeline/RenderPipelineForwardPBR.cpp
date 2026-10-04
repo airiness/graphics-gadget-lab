@@ -73,11 +73,9 @@ namespace gglab
 				}
 				// Cover Forward+ opaque shading with and without GTAO output. HDR comparison
 				// PSOs exist only when this pipeline owns its readback service.
-				for (const ForwardPBRLightingVariant lighting : { ForwardPBRLightingVariant::ForwardPlus,
-					ForwardPBRLightingVariant::ForwardPlusValidation })
+				for (const bool hdrDiffValidation : { false, true })
 				{
-					if (lighting == ForwardPBRLightingVariant::ForwardPlusValidation &&
-						!m_ForwardPlusDebugReadback)
+					if (hdrDiffValidation && !m_ForwardPlusDebugReadback)
 					{
 						continue;
 					}
@@ -85,7 +83,7 @@ namespace gglab
 					{
 						m_DiagnosticPrewarmVariants.push_back({
 							.m_DrawVariantBits = variantBits,
-							.m_LightingVariant = lighting,
+							.m_HdrDiffValidation = hdrDiffValidation,
 							.m_GTAOContribution = contribution,
 						});
 					}
@@ -99,11 +97,11 @@ namespace gglab
 			const auto& variant = m_DiagnosticPrewarmVariants[m_DiagnosticPrewarmProgress.m_CompletedCount];
 			const bool transparent =
 				RenderQueueBuilder::DecodeVariantBucket(variant.m_DrawVariantBits) == RenderBucket::Transparent;
-			RenderPassForwardPBRBase& pass = transparent
-				? static_cast<RenderPassForwardPBRBase&>(m_ForwardTransparentPass)
-				: static_cast<RenderPassForwardPBRBase&>(m_ForwardOpaquePass);
-			if (pass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
-				variant.m_LightingVariant, variant.m_GTAOContribution))
+			const bool prewarmed = transparent
+				? m_ForwardTransparentPass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits)
+				: m_ForwardOpaquePass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
+					variant.m_HdrDiffValidation, variant.m_GTAOContribution);
+			if (prewarmed)
 			{
 				++m_DiagnosticPrewarmProgress.m_CompletedCount;
 			}
@@ -646,9 +644,9 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::ForwardCoverageVertex);
 			m_ForwardPBRShaderSet.m_AllLightsShadingPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsPixel);
-			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
+			m_ForwardPBRShaderSet.m_ForwardPlus.m_Shading =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusPixel);
-			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
+			m_ForwardPBRShaderSet.m_ForwardPlus.m_GTAOContribution =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOPixel);
 			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
 				shaderManager->LoadProgram(shader_programs::DepthPrepassAlphaTestPixel);
@@ -658,10 +656,10 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::DepthPrepassVelocityAlphaTestPixel);
 			if (m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation)
 			{
-				m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
+				m_ForwardPBRShaderSet.m_ForwardPlusValidation.m_Shading =
 					shaderManager->LoadProgram(
 						shader_programs::ForwardPBRForwardPlusValidationPixel);
-				m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
+				m_ForwardPBRShaderSet.m_ForwardPlusValidation.m_GTAOContribution =
 					shaderManager->LoadProgram(
 						shader_programs::ForwardPBRForwardPlusValidationGTAOPixel);
 			}
@@ -675,19 +673,19 @@ namespace gglab
 		}
 		if (materialDiagnostics && !m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid())
 		{
-			auto& diagnostics = m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders;
-			diagnostics[ForwardPBRShaderSet::AllLightsMaterialDiagnosticIndex] =
+			m_ForwardPBRShaderSet.m_AllLightsMaterialDiagnosticsPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsMaterialDiagnosticsPixel);
-			diagnostics[ForwardPBRShaderSet::ForwardPlusMaterialDiagnosticIndex] =
+			m_ForwardPBRShaderSet.m_ForwardPlus.m_MaterialDiagnostics =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel);
-			diagnostics[ForwardPBRShaderSet::ForwardPlusMaterialDiagnosticIndex + 1] =
+			m_ForwardPBRShaderSet.m_ForwardPlus.m_GTAOContributionMaterialDiagnostics =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel);
 			if (m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation)
 			{
-				diagnostics[ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex] =
-					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
-				diagnostics[ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex + 1] =
-					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
+				auto& validation = m_ForwardPBRShaderSet.m_ForwardPlusValidation;
+				validation.m_MaterialDiagnostics = shaderManager->LoadProgram(
+					shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
+				validation.m_GTAOContributionMaterialDiagnostics = shaderManager->LoadProgram(
+					shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
 			}
 			GGLAB_ASSERT_MSG(m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid(),
 				"Material diagnostic output requires every composed Forward shader variant.");

@@ -558,6 +558,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderMaterialFrameCache.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAerialPerspective.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
@@ -582,13 +585,16 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFinalColor.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.cpp">
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusCull.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardTransparent.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.cpp">
@@ -1205,6 +1211,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPlusValidationGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GTAOGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1233,9 +1242,6 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardOpaque.h">
-      <Filter>Private\Graphics\RenderPass</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPBRBase.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusCull.h">
