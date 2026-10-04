@@ -264,9 +264,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
@@ -274,6 +271,9 @@
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp">
+      <Filter>Application\SelfTest</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
@@ -590,10 +590,10 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTestCases.h">
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.h">
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">

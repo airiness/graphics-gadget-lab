@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAO.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 

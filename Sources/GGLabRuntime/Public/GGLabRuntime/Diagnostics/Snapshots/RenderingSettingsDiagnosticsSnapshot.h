@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/ViewRenderFeatureStatus.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 

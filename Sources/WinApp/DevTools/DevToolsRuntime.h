@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "DevTools/DevelopGui/DevelopGuiRegistry.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>

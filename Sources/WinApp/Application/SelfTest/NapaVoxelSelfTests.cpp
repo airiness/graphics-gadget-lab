@@ -1,9 +1,9 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTests.h"
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "Application/SelfTest/NapaVoxelSelfTests.h"
+#include "Application/SelfTest/NapaVoxelSelfTestCases.h"
 
 namespace gglab
 {
-	void RunNapaVoxelCoreSelfTests(SelfTestContext& context) noexcept
+	void RunNapaVoxelSelfTests(SelfTestContext& context) noexcept
 	{
 		RunNapaVoxelCommandSelfTests(context);
 		RunNapaVoxelGGLabAdapterSelfTests(context);

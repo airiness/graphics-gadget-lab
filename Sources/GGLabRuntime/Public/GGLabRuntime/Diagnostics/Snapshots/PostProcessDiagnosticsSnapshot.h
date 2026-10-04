@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessColorState.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 

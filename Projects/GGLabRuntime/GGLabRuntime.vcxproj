@@ -199,7 +199,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\DepthCoverageFramePlan.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\RenderPipelineForwardPlusFactory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPipeline\PostProcessPipeline.cpp" />
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\ViewRenderSettings.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\ViewRenderSettings.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\WorldSun.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Atmosphere.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\AtmosphereSystem.cpp" />
@@ -496,7 +496,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessOutput.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\PostProcess\PostProcessResolution.h" />
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\ViewRenderSettings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ViewRenderSettings.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ViewRenderFeatureStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderFrameBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Profiling\GpuProfiler.h" />

@@ -1,4 +1,4 @@
-#include "Application/SelfTest/NapaVoxelCoreSelfTestCases.h"
+#include "Application/SelfTest/NapaVoxelSelfTestCases.h"
 
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"

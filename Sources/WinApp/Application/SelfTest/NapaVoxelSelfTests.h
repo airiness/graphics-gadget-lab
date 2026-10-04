@@ -3,5 +3,5 @@
 
 namespace gglab
 {
-	void RunNapaVoxelCoreSelfTests(SelfTestContext& context) noexcept;
+	void RunNapaVoxelSelfTests(SelfTestContext& context) noexcept;
 }

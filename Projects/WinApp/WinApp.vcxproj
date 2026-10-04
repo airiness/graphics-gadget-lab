@@ -176,7 +176,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.cpp" />
+    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
@@ -283,8 +283,8 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTestCases.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCoreSelfTests.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h" />
+    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h" />

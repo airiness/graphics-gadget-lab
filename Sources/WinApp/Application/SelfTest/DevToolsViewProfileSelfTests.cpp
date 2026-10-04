@@ -5,7 +5,7 @@
 #include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
