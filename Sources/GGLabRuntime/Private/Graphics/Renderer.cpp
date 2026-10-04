@@ -74,11 +74,6 @@ namespace gglab
 		return m_EnvironmentLightingSystem.get();
 	}
 
-	AssetUploadControl* Renderer::GetAssetUploadControl() const noexcept
-	{
-		return m_AssetUploadControl;
-	}
-
 	bool Renderer::Initialize(const CreateInfo& createInfo) noexcept
 	{
 		if (createInfo.m_RHIContextFactory == nullptr)
@@ -114,7 +109,6 @@ namespace gglab
 				.m_TransferManager = GetTransferManager(),
 				});
 		m_AssetUploadScheduler = std::move(uploadSchedulerInstance.m_Scheduling);
-		m_AssetUploadControl = uploadSchedulerInstance.m_Control;
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
@@ -234,7 +228,6 @@ namespace gglab
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
-		m_AssetUploadControl = nullptr;
 
 		m_SceneCB.reset();
 		m_FrameBuilder.reset();

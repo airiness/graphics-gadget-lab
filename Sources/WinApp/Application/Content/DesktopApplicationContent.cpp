@@ -4,11 +4,8 @@
 #include "Application/Demo/StartDemo.h"
 #include "Application/Lab/Sessions/AlphaTestLabSession.h"
 #include "Application/Lab/Sessions/AtmosphereRangeLabSession.h"
-#include "Application/Lab/Sessions/AssetPublicationLabSession.h"
-#include "Application/Lab/Sessions/AssetResidencyLabSession.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
-#include "Application/Lab/Sessions/EnvironmentAssetLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
 #include "Application/Lab/Sessions/LightingContractLabSession.h"
@@ -112,9 +109,6 @@ namespace gglab
 			{ TemporalAALabSession::GetDescriptor(), &TemporalAALabSession::Create },
 			{ AlphaTestLabSession::GetDescriptor(), &AlphaTestLabSession::Create },
 			{ MathFoundationLabSession::GetDescriptor(), &MathFoundationLabSession::Create },
-			{ AssetPublicationLabSession::GetDescriptor(), &AssetPublicationLabSession::Create },
-			{ AssetResidencyLabSession::GetDescriptor(), &AssetResidencyLabSession::Create },
-			{ EnvironmentAssetLabSession::GetDescriptor(), &EnvironmentAssetLabSession::Create },
 			{ NapaVoxelLabSession::GetDescriptor(), &NapaVoxelLabSession::Create,
 				{ shader_programs::NapaVoxelVertex, shader_programs::NapaVoxelPixel } },
 		};

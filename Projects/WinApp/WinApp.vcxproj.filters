@@ -162,12 +162,6 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -175,9 +169,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.cpp">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
@@ -494,12 +485,6 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AlphaTestLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetPublicationLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AssetResidencyLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -507,9 +492,6 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\CullingLabSession.h">
-      <Filter>Application\Lab\Sessions</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\EnvironmentAssetLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Lab\Sessions\ForwardPlusLabSession.h">
