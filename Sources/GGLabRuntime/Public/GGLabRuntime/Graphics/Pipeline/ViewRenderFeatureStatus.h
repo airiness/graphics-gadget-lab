@@ -18,7 +18,6 @@ namespace gglab
 		None,
 		NotRequested,
 		FrameUnavailable,
-		PipelineUnavailable,
 		CoreCapabilityUnavailable,
 		NoOpaqueDraws,
 		DisplayViewIneligible,

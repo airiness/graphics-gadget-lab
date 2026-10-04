@@ -16,13 +16,13 @@ namespace gglab
 		Disabled,
 		Active,
 		CoreCapabilityUnavailable,
-		PipelineUnavailable,
 		NoOpaqueDraws,
 	};
 
-	// Frame validation guarantees the render scene and depth prepass before GTAO is planned.
+	// Frame validation guarantees the render scene, the depth prepass and, when the device
+	// supports GTAO, its prepared compute recipes before GTAO is planned.
 	[[nodiscard]] constexpr GTAOFrameStatus ResolveGTAOFrameStatus(bool enabled,
-		bool coreCapabilityAvailable, bool pipelineAvailable, bool hasOpaqueDraws) noexcept
+		bool coreCapabilityAvailable, bool hasOpaqueDraws) noexcept
 	{
 		if (!enabled)
 		{
@@ -31,10 +31,6 @@ namespace gglab
 		if (!coreCapabilityAvailable)
 		{
 			return GTAOFrameStatus::CoreCapabilityUnavailable;
-		}
-		if (!pipelineAvailable)
-		{
-			return GTAOFrameStatus::PipelineUnavailable;
 		}
 		return hasOpaqueDraws ? GTAOFrameStatus::Active : GTAOFrameStatus::NoOpaqueDraws;
 	}

@@ -3108,6 +3108,13 @@ namespace gglab
 			closureLost.m_TemporalResolveClosureValid = false;
 			ForwardPlusFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
 			closureUnusedWithoutTemporal.m_TemporalActive = false;
+			ForwardPlusFrameValidationInputs gtaoReady = ready;
+			gtaoReady.m_GTAOPipelineRequired = true;
+			gtaoReady.m_GTAOPipelineAvailable = true;
+			ForwardPlusFrameValidationInputs gtaoRecipesMissing = gtaoReady;
+			gtaoRecipesMissing.m_GTAOPipelineAvailable = false;
+			ForwardPlusFrameValidationInputs gtaoUnsupported = gtaoRecipesMissing;
+			gtaoUnsupported.m_GTAOPipelineRequired = false;
 			ForwardPlusFrameValidationInputs lightOverflow = ready;
 			lightOverflow.m_GlobalLightCount = ForwardPlusGlobalLightCapacity + 1;
 			const RenderFrameValidationResult lightFailure = ClassifyForwardPlusFrame(lightOverflow);
@@ -3123,13 +3130,16 @@ namespace gglab
 				classify(missingPresentation) == RenderFrameValidationStatus::ContractFailure &&
 				classify(sceneUnavailable) == RenderFrameValidationStatus::ContractFailure &&
 				classify(closureLost) == RenderFrameValidationStatus::ContractFailure &&
+				classify(gtaoReady) == RenderFrameValidationStatus::Ready &&
+				classify(gtaoUnsupported) == RenderFrameValidationStatus::Ready &&
+				classify(gtaoRecipesMissing) == RenderFrameValidationStatus::ContractFailure &&
 				lightFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				lightFailure.m_Detail == std::format("requested {}, limit {}",
 					ForwardPlusGlobalLightCapacity + 1, ForwardPlusGlobalLightCapacity) &&
 				coverageFailure.m_Status == RenderFrameValidationStatus::ContractFailure &&
 				coverageFailure.m_Detail == "Coverage variant 1 mismatch" &&
 				!coverageFailure.m_Reason.empty(),
-				"Frame validation skips only resize mismatches and fails with evidence instead of selecting another lighting path or topology");
+				"Frame validation skips only resize mismatches and fails with evidence instead of selecting another lighting path, topology or silently dropping enabled GTAO");
 
 			// Production composition must not depend on Lab-owned validation programs.
 			const auto productionDemand =
@@ -3925,17 +3935,15 @@ namespace gglab
 				"GTAO modulates material-occluded diffuse IBL without changing specular IBL visibility");
 
 			context.Check(
-				ResolveGTAOFrameStatus(false, false, false, false) ==
+				ResolveGTAOFrameStatus(false, false, false) ==
 				GTAOFrameStatus::Disabled &&
-				ResolveGTAOFrameStatus(true, false, false, false) ==
+				ResolveGTAOFrameStatus(true, false, false) ==
 				GTAOFrameStatus::CoreCapabilityUnavailable &&
-				ResolveGTAOFrameStatus(true, true, false, false) ==
-				GTAOFrameStatus::PipelineUnavailable &&
-				ResolveGTAOFrameStatus(true, true, true, false) ==
+				ResolveGTAOFrameStatus(true, true, false) ==
 				GTAOFrameStatus::NoOpaqueDraws &&
-				ResolveGTAOFrameStatus(true, true, true, true) ==
+				ResolveGTAOFrameStatus(true, true, true) ==
 				GTAOFrameStatus::Active,
-				"GTAO frame status preserves deterministic disabled, unavailable, idle, and active causes");
+				"GTAO frame status preserves deterministic disabled, unsupported, idle, and active causes");
 
 			ViewRenderProfile gtaoProfile{};
 			context.Check(gtaoProfile.m_Lighting.m_GTAO.m_Enabled,
@@ -8048,13 +8056,10 @@ namespace gglab
 				.m_HistoryColorTypedUavStore = true,
 				.m_HistoryDepthShaderResource = true,
 				.m_HistoryDepthTypedUavStore = true,
-				.m_VelocityProgramsAvailable = true,
-				.m_ResolveProgramAvailable = true,
-				.m_BindingLayoutAvailable = true,
 			};
 			context.Check(fullCapabilities.IsCoreAvailable() &&
 				!TemporalAACapabilityStatus{}.IsCoreAvailable(),
-				"Temporal AA core capability requires the complete texture, program, and binding closure");
+				"Temporal AA core capability requires the complete device texture support");
 
 			TemporalFramePlanResolveInfo resolveInfo{
 				.m_Settings = {.m_Enabled = true},
@@ -8116,11 +8121,16 @@ namespace gglab
 			RenderPipelineForwardPlus integratedExtensionPipeline({
 				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
 			});
+			TemporalFramePlanResolveInfo noDepthVelocityClaimInfo = resolveInfo;
+			noDepthVelocityClaimInfo.m_DepthVelocityPathAvailable = false;
+			const ResolvedTemporalFramePlan forwardWithoutClaimPlan =
+				forwardPipeline.ResolveTemporalFramePlan(noDepthVelocityClaimInfo);
 			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
 			integratedExtensionInfo.m_DepthVelocityPathAvailable = true;
 			const ResolvedTemporalFramePlan integratedExtensionPlan =
 				integratedExtensionPipeline.ResolveTemporalFramePlan(integratedExtensionInfo);
 			context.Check(forwardPlan.m_Active && forwardPlan.m_DepthVelocityPathAvailable &&
+				forwardWithoutClaimPlan.m_Active &&
 				forwardPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::PostTAA &&
 				forwardPlan.m_DisableReason == TemporalAADisableReason::None &&
@@ -8131,7 +8141,7 @@ namespace gglab
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),
-				"Renderer publishes temporal core capability as unavailable before pipeline closure");
+				"Renderer publishes temporal core capability as unavailable before initialization");
 
 			const ResolvedTemporalFramePlan viewPlan = ResolveTemporalFramePlan({
 				.m_Settings = enabledSettings.m_TemporalAA,

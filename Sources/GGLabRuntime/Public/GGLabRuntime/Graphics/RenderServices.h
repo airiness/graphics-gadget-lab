@@ -245,7 +245,6 @@ namespace gglab
 	public:
 		virtual ~RenderTemporalAccess() = default;
 
-		virtual void PublishTemporalAAResolvePipelineClosure(bool available) noexcept = 0;
 		virtual void InvalidateTemporalHistoryAfterResolveProgramChange() noexcept = 0;
 		[[nodiscard]] virtual TemporalHistoryManagerDiagnostics GetTemporalHistoryDiagnostics()
 			const = 0;

@@ -40,6 +40,9 @@ namespace gglab
 		uint32_t m_GlobalLightCount = 0;
 		bool m_DepthCoverageValid = false;
 		std::string_view m_DepthCoverageDiagnostic;
+		// GTAO is enabled and the device supports it, so its compute recipes must be prepared.
+		bool m_GTAOPipelineRequired = false;
+		bool m_GTAOPipelineAvailable = false;
 		bool m_TemporalActive = false;
 		bool m_TemporalResolveClosureValid = false;
 	};
@@ -47,8 +50,9 @@ namespace gglab
 	// The recipe always shades opaque draws with Forward+ after an EQUAL depth prepass.
 	// A display view built for another swap-chain extent is an expected resize state and
 	// skips the frame. Missing scene data, global lights beyond the Forward+ capacity,
-	// invalid depth coverage and a lost temporal resolve closure are contract failures;
-	// none of them selects another lighting path or frame topology.
+	// invalid depth coverage, unprepared GTAO recipes for an enabled and supported GTAO,
+	// and a lost temporal resolve closure are contract failures; none of them selects
+	// another lighting path or frame topology or silently drops a requested feature.
 	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPlusFrame(
 		const ForwardPlusFrameValidationInputs& inputs) noexcept;
 
@@ -82,7 +86,6 @@ namespace gglab
 		~RenderPipelineForwardPlus() override = default;
 
 		std::string_view GetName() const noexcept override { return "ForwardPlus"; }
-		void PrepareTemporalFramePlanning(const RenderServices& services) noexcept override;
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 

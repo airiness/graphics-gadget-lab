@@ -31,7 +31,6 @@ namespace gglab
 			case ViewRenderFeatureReason::None: return "";
 			case ViewRenderFeatureReason::NotRequested: return "Not requested";
 			case ViewRenderFeatureReason::FrameUnavailable: return "Current frame unavailable";
-			case ViewRenderFeatureReason::PipelineUnavailable: return "Pipeline unavailable";
 			case ViewRenderFeatureReason::CoreCapabilityUnavailable: return "Required capabilities unavailable";
 			case ViewRenderFeatureReason::NoOpaqueDraws: return "No opaque draws";
 			case ViewRenderFeatureReason::DisplayViewIneligible: return "Display view ineligible";

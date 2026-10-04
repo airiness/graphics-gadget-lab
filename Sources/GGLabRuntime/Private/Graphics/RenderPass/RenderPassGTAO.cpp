@@ -252,6 +252,11 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_IsInitialized, "GTAO must be prepared before graph construction.");
 		if (!m_IsAvailable)
 		{
+			// Frame validation fails an enabled, supported GTAO whose recipes failed to
+			// prepare, so an unavailable pass here is either unsupported or disabled.
+			GGLAB_ASSERT_MSG(!m_Capabilities.IsCoreAvailable() ||
+				!context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled,
+				"Enabled GTAO reached graph construction without prepared recipes.");
 			return;
 		}
 

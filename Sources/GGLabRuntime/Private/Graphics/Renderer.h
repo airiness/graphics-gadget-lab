@@ -197,10 +197,6 @@ namespace gglab
 			const noexcept override;
 		[[nodiscard]] TemporalHistoryManagerDiagnostics GetTemporalHistoryDiagnostics()
 			const override;
-		void PublishTemporalAAResolvePipelineClosure(bool available) noexcept override
-		{
-			m_TemporalAACapabilityStatus.m_ResolveProgramAvailable = available;
-		}
 
 		RHIBindingLayoutHandle GetCommonBindingLayout() const noexcept override
 		{

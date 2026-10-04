@@ -113,18 +113,13 @@ namespace gglab
 		return m_DiagnosticPrewarmProgress;
 	}
 
-	void RenderPipelineForwardPlus::PrepareTemporalFramePlanning(
-		const RenderServices& services) noexcept
-	{
-		m_TemporalAAPass.Prepare(services);
-		services.m_Temporal->PublishTemporalAAResolvePipelineClosure(
-			m_TemporalAAPass.ValidatePipelineClosure(services));
-	}
-
 	ResolvedTemporalFramePlan RenderPipelineForwardPlus::ResolveTemporalFramePlan(
 		TemporalFramePlanResolveInfo info) const noexcept
 	{
-		info.m_DepthVelocityPathAvailable = info.m_Capabilities.m_VelocityProgramsAvailable;
+		// The Forward shader set requires the depth-prepass velocity programs, so the
+		// recipe always provides the depth/velocity path. A lost resolve closure is a
+		// frame contract failure in ValidateRenderFrame, not a capability.
+		info.m_DepthVelocityPathAvailable = true;
 		const SceneExtensionTemporalParticipation participation = m_SceneExtension
 			? m_SceneExtension->GetTemporalParticipation()
 			: SceneExtensionTemporalParticipation::PostTAA;
@@ -567,6 +562,11 @@ namespace gglab
 				"The frame requires depth-prepass EQUAL coverage for every opaque draw.",
 				std::string(inputs.m_DepthCoverageDiagnostic));
 		}
+		if (inputs.m_GTAOPipelineRequired && !inputs.m_GTAOPipelineAvailable)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"GTAO is enabled but its compute pipeline recipes failed to prepare.");
+		}
 		if (inputs.m_TemporalActive && !inputs.m_TemporalResolveClosureValid)
 		{
 			return RenderFrameValidationResult::ContractFailure(
@@ -609,10 +609,10 @@ namespace gglab
 		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
 		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws
 			? ForwardPlusFrameStatus::Active : ForwardPlusFrameStatus::NoOpaqueDraws;
+		const bool gtaoEnabled = context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled;
+		const bool gtaoCoreAvailable = m_GTAOPass.GetCapabilityStatus().IsCoreAvailable();
 		plan.m_GTAOStatus = ResolveGTAOFrameStatus(
-			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled,
-			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
-			depthCoverage.m_HasDepthCoverageDraws);
+			gtaoEnabled, gtaoCoreAvailable, depthCoverage.m_HasDepthCoverageDraws);
 
 		RenderFrameValidationResult result = ClassifyForwardPlusFrame({
 			.m_PresentationAvailable = true,
@@ -622,6 +622,8 @@ namespace gglab
 				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()),
 			.m_DepthCoverageValid = depthCoverage.IsValid(),
 			.m_DepthCoverageDiagnostic = depthCoverage.m_Diagnostic,
+			.m_GTAOPipelineRequired = gtaoEnabled && gtaoCoreAvailable,
+			.m_GTAOPipelineAvailable = m_GTAOPass.IsAvailable(),
 			.m_TemporalActive = temporalActive,
 			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
 			});

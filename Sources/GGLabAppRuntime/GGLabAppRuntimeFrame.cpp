@@ -213,7 +213,6 @@ namespace gglab
 			(static_cast<uint64_t>(m_DemoManager->GetTemporalSessionSerial()) << 32) |
 			static_cast<uint64_t>(demo->GetTemporalSessionSerial());
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();
-		renderPipeline.PrepareTemporalFramePlanning(services);
 		const ResolvedTemporalFramePlan temporalFramePlan =
 			renderPipeline.ResolveTemporalFramePlan({
 				.m_Settings = displayViewSettings.m_TemporalAA,

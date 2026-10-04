@@ -187,8 +187,6 @@ namespace gglab
 				return { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			case GTAOFrameStatus::CoreCapabilityUnavailable:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::CoreCapabilityUnavailable };
-			case GTAOFrameStatus::PipelineUnavailable:
-				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
 			case GTAOFrameStatus::NoOpaqueDraws:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::NoOpaqueDraws };
 			}
