@@ -52,12 +52,9 @@ namespace gglab
 
 	struct ForwardPlusPerformanceReadback
 	{
-		uint64_t m_LegacyFrameSerial = 0;
 		uint64_t m_ForwardPlusFrameSerial = 0;
-		double m_LegacyOpaqueMilliseconds = 0.0;
 		double m_ForwardPlusCullMilliseconds = 0.0;
 		double m_ForwardPlusOpaqueMilliseconds = 0.0;
-		bool m_HasLegacySample = false;
 		bool m_HasForwardPlusSample = false;
 	};
 
@@ -118,7 +115,6 @@ namespace gglab
 			uint32_t height) noexcept;
 		void MarkGridScheduled(uint32_t bufferIndex, uint64_t frameSerial,
 			const ForwardPlusTileGrid& tileGrid) noexcept;
-		void RecordLegacyGpuTiming(uint64_t frameSerial, double opaqueMilliseconds) noexcept;
 		void RecordForwardPlusGpuTiming(uint64_t frameSerial, double cullMilliseconds,
 			double opaqueMilliseconds) noexcept;
 

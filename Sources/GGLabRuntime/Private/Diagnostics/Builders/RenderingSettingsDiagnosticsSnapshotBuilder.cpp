@@ -63,15 +63,9 @@ namespace gglab
 			if (forward)
 			{
 				snapshot.m_ForwardLighting = ResolveForwardLightingStatus(forward->m_Status);
-				snapshot.m_ActualLightingMode = forward->m_Status == ForwardPlusFrameStatus::Active
-					? ForwardLightingMode::ForwardPlus : ForwardLightingMode::Legacy;
 				if (forward->m_Status == ForwardPlusFrameStatus::Active)
 				{
 					snapshot.m_ForwardLighting = CheckResourceActivity(graph, forward->m_TileLightHeaders);
-					if (snapshot.m_ForwardLighting.m_State != ViewRenderFeatureState::Active)
-					{
-						snapshot.m_ActualLightingMode.reset();
-					}
 				}
 			}
 			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);
@@ -176,15 +170,8 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case ForwardPlusFrameStatus::Disabled:
 			case ForwardPlusFrameStatus::Active:
 				return { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
-			case ForwardPlusFrameStatus::GlobalLightCapacityExceeded:
-				return { ViewRenderFeatureState::Fallback, ViewRenderFeatureReason::GlobalLightCapacityExceeded };
-			case ForwardPlusFrameStatus::DepthCoverageUnavailable:
-				return { ViewRenderFeatureState::Fallback, ViewRenderFeatureReason::DepthCoverageUnavailable };
-			case ForwardPlusFrameStatus::RenderSceneUnavailable:
-				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RenderSceneUnavailable };
 			case ForwardPlusFrameStatus::NoOpaqueDraws:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::NoOpaqueDraws };
 			}
@@ -202,10 +189,6 @@ namespace gglab
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::CoreCapabilityUnavailable };
 			case GTAOFrameStatus::PipelineUnavailable:
 				return { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
-			case GTAOFrameStatus::RenderSceneUnavailable:
-				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RenderSceneUnavailable };
-			case GTAOFrameStatus::DepthCoverageUnavailable:
-				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::DepthCoverageUnavailable };
 			case GTAOFrameStatus::NoOpaqueDraws:
 				return { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::NoOpaqueDraws };
 			}

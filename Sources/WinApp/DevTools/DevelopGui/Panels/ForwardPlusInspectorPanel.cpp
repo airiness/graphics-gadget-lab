@@ -33,16 +33,8 @@ namespace gglab
 		{
 			switch (status)
 			{
-			case ForwardPlusFrameStatus::Disabled:
-				return "Disabled (Legacy requested)";
 			case ForwardPlusFrameStatus::Active:
 				return "Active";
-			case ForwardPlusFrameStatus::GlobalLightCapacityExceeded:
-				return "Legacy fallback: global-light capacity exceeded";
-			case ForwardPlusFrameStatus::DepthCoverageUnavailable:
-				return "Legacy fallback: depth coverage unavailable";
-			case ForwardPlusFrameStatus::RenderSceneUnavailable:
-				return "Legacy fallback: render scene unavailable";
 			case ForwardPlusFrameStatus::NoOpaqueDraws:
 				return "Idle: no opaque draws";
 			}
@@ -301,27 +293,19 @@ namespace gglab
 				ImGui::TextDisabled("HDR diff is disabled or awaiting a current-generation result.");
 			}
 
-			if (snapshot->m_PerformanceSamplePairAvailable)
+			if (snapshot->m_ForwardPlusGpuSampleAvailable)
 			{
 				const double forwardPlusTotal = snapshot->m_ForwardPlusCullGpuMilliseconds +
 					snapshot->m_ForwardPlusOpaqueGpuMilliseconds;
-				ImGui::Text("Legacy opaque %.3f ms | Forward+ cull + opaque %.3f + %.3f = %.3f ms",
-					snapshot->m_LegacyOpaqueGpuMilliseconds,
+				ImGui::Text("Forward+ cull + opaque %.3f + %.3f = %.3f ms",
 					snapshot->m_ForwardPlusCullGpuMilliseconds,
 					snapshot->m_ForwardPlusOpaqueGpuMilliseconds, forwardPlusTotal);
-				ImGui::TextColored(snapshot->m_LatestForwardPlusSampleLower
-					? ImVec4(0.35f, 0.9f, 0.45f, 1.0f)
-					: ImVec4(0.95f, 0.75f, 0.25f, 1.0f),
-					snapshot->m_LatestForwardPlusSampleLower
-					? "Latest Forward+ sample is lower"
-					: "Latest Forward+ sample is not lower");
 				ImGui::TextDisabled(
-					"Latest completed sample per mode; use a repeatable multi-frame capture to establish crossover.");
+					"Latest completed sample; use a repeatable multi-frame capture for comparisons.");
 			}
 			else
 			{
-				ImGui::TextDisabled(
-					"Capture Legacy, then Forward+ with HDR diff disabled, to compare performance.");
+				ImGui::TextDisabled("Disable HDR diff to capture Forward+ GPU timing.");
 			}
 		}
 	}

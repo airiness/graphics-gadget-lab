@@ -33,7 +33,6 @@ namespace gglab
 		};
 
 		const LabParameterId FixtureId("forward_plus.fixture");
-		const LabParameterId LightingModeId("forward_plus.lighting_mode");
 		const LabParameterId ValidateHdrDiffId("forward_plus.validate_hdr_diff");
 		const LabParameterId SelectedTileModeId("forward_plus.selected_tile");
 		const LabParameterId EnableCameraInputId("forward_plus.camera.enable_input");
@@ -61,30 +60,9 @@ namespace gglab
 		m_DebugReadback(std::move(debugReadback)), m_ViewportWidth(createInfo.m_WindowWidth),
 		m_ViewportHeight(createInfo.m_WindowHeight)
 	{
-		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_Mode =
-			ForwardLightingMode::ForwardPlus;
 		m_DebugReadback->SetHdrDiffRequested(true);
 
 		auto& parameters = GetMutableParameters();
-		GGLAB_UNUSED(parameters.Add({
-			.m_Id = LightingModeId,
-			.m_Name = "Lighting Mode",
-			.m_Group = "Forward+",
-			.m_Type = LabParameterType::Enum,
-			.m_Impact = LabChangeImpact::Immediate,
-			.m_DefaultValue = int32_t(ForwardLightingMode::ForwardPlus),
-			.m_EnumItems =
-				{
-					{
-						.m_Value = int32_t(ForwardLightingMode::Legacy),
-						.m_Name = "Legacy",
-					},
-					{
-						.m_Value = int32_t(ForwardLightingMode::ForwardPlus),
-						.m_Name = "Forward+",
-					},
-				},
-			}));
 		GGLAB_UNUSED(parameters.Add({
 			.m_Id = ValidateHdrDiffId,
 			.m_Name = "Validate HDR Diff",
@@ -240,16 +218,12 @@ namespace gglab
 
 	void ForwardPlusLabSession::ApplyImmediateParameters() noexcept
 	{
-		auto& forwardPlus = GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus;
-		const ForwardLightingMode mode = static_cast<ForwardLightingMode>(GetParameters().Get(
-			LightingModeId, int32_t(ForwardLightingMode::ForwardPlus)));
 		const bool validateHdrDiff = GetParameters().Get(ValidateHdrDiffId, true);
-		if (forwardPlus.m_Mode != mode || m_DebugReadback->IsHdrDiffRequested() != validateHdrDiff)
+		if (m_DebugReadback->IsHdrDiffRequested() != validateHdrDiff)
 		{
 			m_DebugReadback->InvalidateResults();
 			ArmGpuTimingCaptureWarmup();
 		}
-		forwardPlus.m_Mode = mode;
 		m_DebugReadback->SetHdrDiffRequested(validateHdrDiff);
 		m_EnableCameraInput = GetParameters().Get(EnableCameraInputId, false);
 		UpdateSelectedTile();
@@ -465,13 +439,9 @@ namespace gglab
 			}
 		}
 
-		const ForwardPlusSettings& settings = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
-		if (settings.m_Mode == ForwardLightingMode::Legacy && hasOpaqueSample)
-		{
-			m_DebugReadback->RecordLegacyGpuTiming(frame.m_FrameIndex, opaqueMilliseconds);
-		}
-		else if (settings.m_Mode == ForwardLightingMode::ForwardPlus &&
-			!m_DebugReadback->IsHdrDiffRequested() && hasCullSample && hasOpaqueSample)
+		// HDR-diff frames also render the all-lights reference, so only plain Forward+
+		// frames provide representative timing.
+		if (!m_DebugReadback->IsHdrDiffRequested() && hasCullSample && hasOpaqueSample)
 		{
 			m_DebugReadback->RecordForwardPlusGpuTiming(
 				frame.m_FrameIndex, cullMilliseconds, opaqueMilliseconds);
@@ -539,10 +509,7 @@ namespace gglab
 			? BuildForwardPlusGridMetrics(grid->m_TileGrid, grid->m_Headers, grid->m_DepthRanges)
 			: ForwardPlusGridMetrics{};
 		const ForwardPlusPerformanceReadback performance = m_DebugReadback->GetPerformance();
-		const ForwardPlusSettings& forwardPlus = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
-		const bool hdrDiffRequested =
-			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
-			m_DebugReadback->IsHdrDiffRequested();
+		const bool hdrDiffRequested = m_DebugReadback->IsHdrDiffRequested();
 		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
 		? m_Services.m_RenderServices.m_Presentation->GetDevice()
 		: nullptr;
@@ -664,13 +631,12 @@ namespace gglab
 					: "pending",
 			},
 			{
-				.m_Name = "Latest Legacy / Forward+ GPU sample",
-				.m_Value = performance.m_HasLegacySample && performance.m_HasForwardPlusSample
-					? std::format("{:.3f} / {:.3f} + {:.3f} ms",
-						performance.m_LegacyOpaqueMilliseconds,
+				.m_Name = "Latest Forward+ cull + opaque GPU sample",
+				.m_Value = performance.m_HasForwardPlusSample
+					? std::format("{:.3f} + {:.3f} ms",
 						performance.m_ForwardPlusCullMilliseconds,
 						performance.m_ForwardPlusOpaqueMilliseconds)
-					: "capture both modes",
+					: "disable HDR diff to capture",
 			},
 			{
 				.m_Name = "HDR max absolute error",

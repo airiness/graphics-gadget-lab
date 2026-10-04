@@ -8,7 +8,6 @@
 #include "GGLabRuntime/Graphics/ShadowSettings.h"
 
 #include <cstdint>
-#include <optional>
 
 namespace gglab
 {
@@ -27,7 +26,6 @@ namespace gglab
 		bool m_RuntimeAvailable = false;
 
 		ViewRenderFeatureStatus m_ForwardLighting{};
-		std::optional<ForwardLightingMode> m_ActualLightingMode;
 		ViewRenderFeatureStatus m_GTAO{};
 		bool m_GTAOUsesFormatFallback = false;
 		ViewRenderFeatureStatus m_TemporalAA{};

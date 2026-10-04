@@ -36,7 +36,6 @@ namespace gglab
 		SettingsOverride<TemporalAASettings> m_TemporalAA{};
 		SettingsOverride<GTAOSettings> m_GTAO{};
 		SettingsOverride<BloomSettings> m_Bloom{};
-		std::optional<ForwardLightingMode> m_ForwardLightingMode;
 		std::optional<bool> m_ScenePreExposure;
 
 		// Counts active blocks/scalars, including values equal to authoring settings.

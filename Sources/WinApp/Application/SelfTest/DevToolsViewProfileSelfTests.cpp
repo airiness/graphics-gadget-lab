@@ -26,7 +26,6 @@ namespace gglab
 			const auto& rightBloom = right.m_PostProcess.m_Bloom;
 			return left.m_TemporalAA == right.m_TemporalAA &&
 				left.m_EnableScenePreExposure == right.m_EnableScenePreExposure &&
-				left.m_Lighting.m_ForwardPlus.m_Mode == right.m_Lighting.m_ForwardPlus.m_Mode &&
 				left.m_Lighting.m_EnableAerialPerspective == right.m_Lighting.m_EnableAerialPerspective &&
 				leftGTAO.m_Enabled == rightGTAO.m_Enabled &&
 				leftGTAO.m_Radius == rightGTAO.m_Radius &&
@@ -113,8 +112,7 @@ namespace gglab
 			snapshot.m_RequestedProfile = snapshot.m_AuthoringProfile;
 			Camera camera(Camera::CreateInfo{});
 			snapshot.m_ResolvedSettings = ResolveViewRenderSettings(snapshot.m_RequestedProfile, camera);
-			snapshot.m_ForwardLighting = { ViewRenderFeatureState::Fallback, ViewRenderFeatureReason::DepthCoverageUnavailable };
-			snapshot.m_ActualLightingMode = ForwardLightingMode::Legacy;
+			snapshot.m_ForwardLighting = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::NoOpaqueDraws };
 			snapshot.m_GTAO = { ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::CoreCapabilityUnavailable };
 			snapshot.m_TemporalAA = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
 			snapshot.m_HistoryAvailable = true;
@@ -155,9 +153,9 @@ namespace gglab
 			GGLAB_UNUSED(draw());
 			const auto text = draw();
 			context.Check(text.find("Requested") != std::string::npos &&
-				text.find("Legacy Fallback") != std::string::npos && text.find("Depth coverage unavailable") != std::string::npos &&
+				text.find("Forward+") != std::string::npos && text.find("No opaque draws") != std::string::npos &&
 				text.find("Required capabilities unavailable") != std::string::npos && text.find("History: Valid") != std::string::npos,
-				"Rendering Settings presents requested controls, runtime fallback reasons and independent history");
+				"Rendering Settings presents requested controls, runtime inactivity reasons and independent history");
 			context.Check(diagnostics.m_SettingsReads == 2 && diagnostics.m_OtherReads == 0,
 				"The cockpit reads only the lightweight settings snapshot without Inspector or GPU services");
 			const ImGuiID windowId = ImGui::FindWindowByName("RenderingSettingsFixture")->ID;
@@ -317,14 +315,6 @@ namespace gglab
 			"Bloom overrides every tuning parameter while preserving tone mapping and other features");
 
 		overrides.ClearAll();
-		overrides.m_ForwardLightingMode = ForwardLightingMode::Legacy;
-		expectedProfile = originalAuthoringProfile;
-		expectedProfile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
-		context.Check(overrides.GetActiveCount() == 1 &&
-			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile),
-			"Lighting-path override changes only the lighting path");
-
-		overrides.ClearAll();
 		overrides.m_ScenePreExposure = false;
 		expectedProfile = originalAuthoringProfile;
 		expectedProfile.m_EnableScenePreExposure = false;
@@ -339,16 +329,14 @@ namespace gglab
 		overrides.m_GTAO.Activate(gtaoSettings);
 		overrides.m_TemporalAA.Activate(temporalSettings);
 		overrides.m_Bloom.Activate(bloomSettings);
-		overrides.m_ForwardLightingMode = ForwardLightingMode::Legacy;
 		expectedProfile = originalAuthoringProfile;
 		expectedProfile.m_Lighting.m_GTAO = gtaoSettings;
 		expectedProfile.m_TemporalAA = temporalSettings;
 		expectedProfile.m_PostProcess.m_Bloom = bloomSettings;
-		expectedProfile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
-		context.Check(overrides.GetActiveCount() == 5 &&
+		context.Check(overrides.GetActiveCount() == 4 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile) &&
 			ProfilesMatch(authoringProfile, originalAuthoringProfile),
-			"All five overrides compose, counting blocks once and explicit false values as active");
+			"All four overrides compose, counting blocks once and explicit false values as active");
 
 		// A different authoring source must not silently clear session overrides or
 		// re-seed the parameters of an already active settings block.
@@ -358,19 +346,19 @@ namespace gglab
 		nextAuthoringProfile.m_PostProcess.m_Bloom.m_Intensity = 0.4f;
 		nextAuthoringProfile.m_EnableScenePreExposure = false;
 		const ViewRenderProfile originalNextAuthoringProfile = nextAuthoringProfile;
-		context.Check(overrides.GetActiveCount() == 5 &&
+		context.Check(overrides.GetActiveCount() == 4 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile) &&
 			ProfilesMatch(nextAuthoringProfile, originalNextAuthoringProfile),
 			"DevTools session overrides survive authoring-profile switches without mutating either source");
 
 		overrides.m_GTAO.Reset();
 		expectedProfile.m_Lighting.m_GTAO = nextAuthoringProfile.m_Lighting.m_GTAO;
-		context.Check(overrides.GetActiveCount() == 4 &&
+		context.Check(overrides.GetActiveCount() == 3 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
 			"Resetting one block restores the current authoring source and preserves sibling overrides");
 		overrides.m_ScenePreExposure.reset();
 		expectedProfile.m_EnableScenePreExposure = false;
-		context.Check(overrides.GetActiveCount() == 3 &&
+		context.Check(overrides.GetActiveCount() == 2 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
 			"Resetting one scalar restores inheritance without clearing other overrides");
 

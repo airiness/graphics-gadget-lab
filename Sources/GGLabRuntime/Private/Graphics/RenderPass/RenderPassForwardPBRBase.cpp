@@ -89,9 +89,6 @@ namespace gglab
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
 			ForwardPlusTileGrid m_ForwardPlusTileGrid{};
 			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::AllLights;
-			bool m_UseDepthEqual = false;
-			bool m_ClearDepth = false;
-			float m_ClearDepthValue = 0.0f;
 			uint32_t m_ShadowMapSize = 0;
 			uint32_t m_ShadowSamplerIndex = 0;
 			uint32_t m_ShadowFlags = 0;
@@ -137,10 +134,30 @@ namespace gglab
 			return desc;
 		}
 
-		[[nodiscard]] size_t GetPreparedLightingVariantCount(
+		[[nodiscard]] size_t GetMaterialDiagnosticShaderIndex(
+			ForwardPBRLightingVariant lightingVariant, bool gtaoContribution) noexcept
+		{
+			switch (lightingVariant)
+			{
+			case ForwardPBRLightingVariant::AllLights:
+				GGLAB_ASSERT_MSG(!gtaoContribution,
+					"All-lights shading serves transparent draws, which never output GTAO contribution.");
+				return ForwardPBRShaderSet::AllLightsMaterialDiagnosticIndex;
+			case ForwardPBRLightingVariant::ForwardPlus:
+				return ForwardPBRShaderSet::ForwardPlusMaterialDiagnosticIndex + (gtaoContribution ? 1u : 0u);
+			case ForwardPBRLightingVariant::ForwardPlusValidation:
+				return ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex +
+					(gtaoContribution ? 1u : 0u);
+			case ForwardPBRLightingVariant::Count:
+				break;
+			}
+			GGLAB_UNREACHABLE("Unhandled Forward lighting variant.");
+		}
+
+		// Opaque recipes prepare Forward+ and, when composed, its HDR-diff validation variant.
+		[[nodiscard]] size_t GetPreparedOpaqueLightingVariantEnd(
 			const ForwardPBRShaderSet& shaderSet) noexcept
 		{
-			// The HDR-diff variant follows the production all-lights and Forward+ variants.
 			return static_cast<size_t>(shaderSet.m_IncludesHdrDiffValidation
 				? ForwardPBRLightingVariant::Count : ForwardPBRLightingVariant::ForwardPlusValidation);
 		}
@@ -160,8 +177,7 @@ namespace gglab
 		const auto* hdrDiffValidation = rg.GetBlackboard().TryGet<RGForwardPlusValidationResources>(
 			ForwardPlusValidationResourcesName);
 		const ForwardPBRLightingVariant lightingVariant = ResolveForwardPBRLightingVariant(
-			m_PassKind, context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Mode,
-			hdrDiffValidation && hdrDiffValidation->IsActive());
+			m_PassKind, hdrDiffValidation && hdrDiffValidation->IsActive());
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const bool gtaoContributionRequested = !transparent &&
@@ -260,16 +276,12 @@ namespace gglab
 				data.m_Rtv =
 					builder.CreateView<RHITextureViewType::RenderTarget>(data.m_SceneColor);
 				data.m_LightingVariant = lightingVariant;
-				const auto* forwardPlus = blackboard.TryGet<RGForwardPlusResources>(
-					ForwardPlusResourcesName);
-				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights &&
-					(!forwardPlus || !forwardPlus->IsValid()))
-				{
-					data.m_LightingVariant = ForwardPBRLightingVariant::AllLights;
-				}
-
 				if (data.m_LightingVariant != ForwardPBRLightingVariant::AllLights)
 				{
+					const auto* forwardPlus = blackboard.TryGet<RGForwardPlusResources>(
+						ForwardPlusResourcesName);
+					GGLAB_ASSERT_MSG(forwardPlus && forwardPlus->IsValid(),
+						"Opaque Forward shading requires this frame's culled Forward+ light lists.");
 					data.m_ForwardPlusTileGrid = forwardPlus->m_TileGrid;
 					data.m_TileHeaders = builder.Read(forwardPlus->m_TileLightHeaders,
 						RGBufferAccess::StructuredRead, RHIStage::PixelShader);
@@ -324,33 +336,17 @@ namespace gglab
 						"Forward must consume the frame-plan RenderQueue and its shared draw packets.");
 				}
 
-				if (!transparent)
-				{
-					data.m_UseDepthEqual = framePlan.UsesDepthPrepassEqual();
-					data.m_ClearDepth = framePlan.UsesForwardDepthWrite();
-					data.m_ClearDepthValue =
-						screen_space::GetDepthBackgroundValue(sceneDepth.m_Convention);
-					GGLAB_ASSERT_MSG(framePlan.RendersGeometry(),
-						"Opaque Forward pass must not be added for a rejected geometry frame.");
-				}
+				GGLAB_ASSERT_MSG(transparent ? framePlan.AddsForwardTransparentPass()
+					: framePlan.AddsForwardOpaquePass(),
+					"Forward passes are added only for validated frame plans with matching draws.");
 
-				if (transparent || data.m_UseDepthEqual)
-				{
-					data.m_Depth =
-						builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
-					RHITextureViewDesc readOnlyDsvDesc = sceneDepth.m_DsvDesc;
-					readOnlyDsvDesc.m_ReadOnlyDepth = true;
-					data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
-						data.m_Depth, readOnlyDsvDesc);
-				}
-				else
-				{
-					builder.ReadWriteInPlace(
-						sceneDepth.m_Texture, RGTextureAccess::DepthStencilWrite);
-					data.m_Depth = sceneDepth.m_Texture;
-					data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
-						data.m_Depth, sceneDepth.m_DsvDesc);
-				}
+				// The depth prepass owns depth writes; Forward shading only reads them.
+				data.m_Depth =
+					builder.Read(sceneDepth.m_Texture, RGTextureAccess::DepthStencilRead);
+				RHITextureViewDesc readOnlyDsvDesc = sceneDepth.m_DsvDesc;
+				readOnlyDsvDesc.m_ReadOnlyDepth = true;
+				data.m_Dsv = builder.CreateView<RHITextureViewType::DepthStencil>(
+					data.m_Depth, readOnlyDsvDesc);
 
 				data.m_ShadowSamplerIndex = services.m_Samplers->GetSamplerIndex(
 					SamplerPreset::ShadowCmpLinearClamp);
@@ -413,10 +409,6 @@ namespace gglab
 					graphicsContext->ClearColorAttachment(
 						(data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation ? 2u : 1u),
 						{ 0.0f, 0.0f, 0.0f, 1.0f });
-				}
-				if (data.m_ClearDepth)
-				{
-					graphicsContext->ClearDepthAttachment(data.m_ClearDepthValue);
 				}
 
 				const auto shadowSrv = data.m_ShadowSrv.IsValid()
@@ -490,7 +482,7 @@ namespace gglab
 				}
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(services,
 					renderQueue.m_DrawItems[firstDrawRange->m_Start].m_VariantBits,
-					data.m_UseDepthEqual, data.m_LightingVariant,
+					data.m_LightingVariant,
 					data.m_GTAOContributionOutputEnabled, data.m_MaterialDiagnostics));
 
 				GGLAB_ASSERT_NOT_NULL(data.m_RasterDomain);
@@ -575,7 +567,7 @@ namespace gglab
 					static_cast<uint32_t>(CommonRSRootParamIndex::PassConstants), passParameters);
 
 				DrawRenderQueue(graphicsContext, *contextPtr, services, displayViewId,
-					data.m_ExpectedRenderQueue, data.m_UseDepthEqual, data.m_LightingVariant,
+					data.m_ExpectedRenderQueue, data.m_LightingVariant,
 					data.m_GTAOContributionOutputEnabled, data.m_MaterialDiagnostics);
 			});
 	}
@@ -593,49 +585,41 @@ namespace gglab
 				return;
 			}
 
+			auto* rhiContext = services.m_Presentation->GetRHIContext();
+			GGLAB_ASSERT_NOT_NULL(rhiContext);
+			const bool opaque = m_PassKind == ForwardPBRPassKind::Opaque;
+
 			// Pipeline recipe
-			auto& allLightsKey =
-				m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::AllLights)][0];
-			allLightsKey.m_BindingLayout = services.m_Presentation->GetRHIContext()->GetPipelineSystem().CreateBindingLayout(
-				BuildForwardPBRBindingLayout(services, false));
-			GGLAB_ASSERT(allLightsKey.m_BindingLayout.IsValid());
-			allLightsKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
-			allLightsKey.m_VSId = shaderSet.m_CoverageVertexShader;
-			allLightsKey.m_PSId = shaderSet.m_AllLightsShadingPixelShader;
+			GraphicsPhysicalPipelineKey baseKey{};
+			baseKey.m_BindingLayout = rhiContext->GetPipelineSystem().CreateBindingLayout(
+				BuildForwardPBRBindingLayout(services, opaque));
+			GGLAB_ASSERT_MSG(baseKey.m_BindingLayout.IsValid(),
+				"Forward shading requires its pass-specific binding layout.");
+			baseKey.m_InputLayoutId = InputLayoutID::P3N3T2T2Tan4;
+			baseKey.m_VSId = shaderSet.m_CoverageVertexShader;
+			baseKey.m_PSId = opaque
+				? shaderSet.m_ForwardPlusShadingPixelShader : shaderSet.m_AllLightsShadingPixelShader;
 
-			allLightsKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
-			allLightsKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
-			allLightsKey.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
-			allLightsKey.m_Formats.m_RenderTargetCount = 1;
-			allLightsKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
-			allLightsKey.m_Formats.m_SampleCount = 1;
-			allLightsKey.m_Formats.m_SampleQuality = 0;
-			allLightsKey.m_RasterizerPreset = RasterizerPreset::Default;
-			allLightsKey.m_BlendPreset = BlendPreset::Default;
-			allLightsKey.m_DepthPreset = DepthPreset::ReversedZWrite;
+			baseKey.m_TopologyType = RHIPrimitiveTopologyType::Triangle;
+			baseKey.m_PrimitiveTopology = RHIPrimitiveTopology::TriangleList;
+			baseKey.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R16G16B16A16Float;
+			baseKey.m_Formats.m_RenderTargetCount = 1;
+			baseKey.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
+			baseKey.m_Formats.m_SampleCount = 1;
+			baseKey.m_Formats.m_SampleQuality = 0;
+			baseKey.m_RasterizerPreset = RasterizerPreset::Default;
+			baseKey.m_BlendPreset = BlendPreset::Default;
+			baseKey.m_DepthPreset = DepthPreset::ReversedZWrite;
+			m_BasePhysicalKeys[static_cast<size_t>(GetBaseLightingVariant())][0] = baseKey;
 
-			if (m_PassKind == ForwardPBRPassKind::Opaque)
+			if (opaque)
 			{
-				auto* rhiContext = services.m_Presentation->GetRHIContext();
-				GGLAB_ASSERT_NOT_NULL(rhiContext);
-				const RHIBindingLayoutHandle forwardPlusBindingLayout =
-					rhiContext->GetPipelineSystem().CreateBindingLayout(
-						BuildForwardPBRBindingLayout(services, true));
-				GGLAB_ASSERT_MSG(forwardPlusBindingLayout.IsValid(),
-					"Forward+ opaque shading requires its pass-specific binding layout.");
-
-				auto& forwardPlusKey = m_BasePhysicalKeys[
-					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus)][0];
-				forwardPlusKey = allLightsKey;
-				forwardPlusKey.m_BindingLayout = forwardPlusBindingLayout;
-				forwardPlusKey.m_PSId = shaderSet.m_ForwardPlusShadingPixelShader;
-
 				// Validation recipes exist only in pipelines composed for HDR-diff.
 				if (shaderSet.m_IncludesHdrDiffValidation)
 				{
 					auto& validationKey = m_BasePhysicalKeys[
 						static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlusValidation)][0];
-					validationKey = forwardPlusKey;
+					validationKey = baseKey;
 					validationKey.m_PSId = shaderSet.m_ForwardPlusValidationPixelShader;
 					validationKey.m_Formats.m_RenderTargetFormats[1] =
 						RHIFormat::R16G16B16A16Float;
@@ -643,16 +627,16 @@ namespace gglab
 				}
 
 				const ShaderID contributionShaders[] = {
-					shaderSet.m_AllLightsGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader,
 				};
-				for (size_t lightingIndex = 0; lightingIndex < GetPreparedLightingVariantCount(shaderSet);
-					++lightingIndex)
+				for (size_t lightingIndex = static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus);
+					lightingIndex < GetPreparedOpaqueLightingVariantEnd(shaderSet); ++lightingIndex)
 				{
 					auto& contributionKey = m_BasePhysicalKeys[lightingIndex][1];
 					contributionKey = m_BasePhysicalKeys[lightingIndex][0];
-					contributionKey.m_PSId = contributionShaders[lightingIndex];
+					contributionKey.m_PSId = contributionShaders[
+						lightingIndex - static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlus)];
 					const uint32_t targetIndex =
 						contributionKey.m_Formats.m_RenderTargetCount;
 					contributionKey.m_Formats.m_RenderTargetFormats[targetIndex] =
@@ -665,18 +649,20 @@ namespace gglab
 		}
 		if (!m_MaterialDiagnosticPipelineSlots && shaderSet.AreMaterialDiagnosticsValid())
 		{
-			const size_t lightingCount =
-				m_PassKind == ForwardPBRPassKind::Opaque ? GetPreparedLightingVariantCount(shaderSet) : 1;
+			const size_t lightingBegin = static_cast<size_t>(GetBaseLightingVariant());
+			const size_t lightingEnd = m_PassKind == ForwardPBRPassKind::Opaque
+				? GetPreparedOpaqueLightingVariantEnd(shaderSet) : lightingBegin + 1;
 			const size_t contributionCount =
 				m_PassKind == ForwardPBRPassKind::Opaque ? GTAOContributionVariantCount : 1;
-			for (size_t lighting = 0; lighting < lightingCount; ++lighting)
+			for (size_t lighting = lightingBegin; lighting < lightingEnd; ++lighting)
 			{
 				for (size_t contribution = 0; contribution < contributionCount; ++contribution)
 				{
 					auto& key = m_BasePhysicalKeys[lighting][contribution + GTAOContributionVariantCount];
 					key = m_BasePhysicalKeys[lighting][contribution];
 					key.m_PSId = shaderSet.m_MaterialDiagnosticPixelShaders[
-						lighting * GTAOContributionVariantCount + contribution];
+						GetMaterialDiagnosticShaderIndex(
+							static_cast<ForwardPBRLightingVariant>(lighting), contribution != 0)];
 					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] =
 						RHIFormat::R16G16B16A16Float;
 					key.m_Formats.m_RenderTargetFormats[key.m_Formats.m_RenderTargetCount++] = RHIFormat::R16Float;
@@ -691,8 +677,8 @@ namespace gglab
 
 	void RenderPassForwardPBRBase::DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 		const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
-		const RenderQueue* expectedRenderQueue, bool useDepthEqual,
-		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
+		const RenderQueue* expectedRenderQueue, ForwardPBRLightingVariant lightingVariant,
+		bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		GGLAB_ASSERT_NOT_NULL(graphicsContext);
 		const auto& renderQueue = context.GetRenderQueue(viewId);
@@ -707,7 +693,7 @@ namespace gglab
 		if (m_PassKind == ForwardPBRPassKind::Transparent)
 		{
 			DrawRange(graphicsContext, services, renderQueue,
-				ranges[utils::ToIndex(RenderBucket::Transparent)], false, expectedRenderQueue,
+				ranges[utils::ToIndex(RenderBucket::Transparent)], expectedRenderQueue,
 				lightingVariant, gtaoContributionOutputEnabled, materialDiagnostics);
 			return;
 		}
@@ -720,14 +706,14 @@ namespace gglab
 				continue;
 			}
 			DrawRange(
-				graphicsContext, services, renderQueue, range, useDepthEqual, expectedRenderQueue,
+				graphicsContext, services, renderQueue, range, expectedRenderQueue,
 				lightingVariant, gtaoContributionOutputEnabled, materialDiagnostics);
 		}
 	}
 
 	void RenderPassForwardPBRBase::DrawRange(RHIGraphicsCommandContext* graphicsContext,
 		const RenderServices& services, const RenderQueue& renderQueue, const DrawItemsRange& range,
-		bool useDepthEqual, const RenderQueue* expectedRenderQueue,
+		const RenderQueue* expectedRenderQueue,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		if (range.m_Count == 0)
@@ -759,7 +745,7 @@ namespace gglab
 			if (drawItem.m_VariantBits != lastVariantBits)
 			{
 				graphicsContext->SetPipeline(GetOrCreatePSOForVariant(
-					services, drawItem.m_VariantBits, useDepthEqual, lightingVariant,
+					services, drawItem.m_VariantBits, lightingVariant,
 					gtaoContributionOutputEnabled, materialDiagnostics));
 
 				lastVariantBits = drawItem.m_VariantBits;
@@ -786,15 +772,15 @@ namespace gglab
 	}
 
 	bool RenderPassForwardPBRBase::PrewarmMaterialDiagnosticVariant(
-		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
+		const RenderServices& services, uint64_t variantBits,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled) noexcept
 	{
-		return GetOrCreatePSOForVariant(services, variantBits, useDepthEqual,
+		return GetOrCreatePSOForVariant(services, variantBits,
 			lightingVariant, gtaoContributionOutputEnabled, true).IsValid();
 	}
 
 	RHIPipelineHandle RenderPassForwardPBRBase::GetOrCreatePSOForVariant(
-		const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
+		const RenderServices& services, uint64_t variantBits,
 		ForwardPBRLightingVariant lightingVariant, bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept
 	{
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
@@ -816,7 +802,7 @@ namespace gglab
 				m_BasePhysicalKeys[lightingVariantIndex][outputVariantIndex], variantBits),
 		};
 		auto [rasterizerPreset, depthPreset, blendPreset] =
-			GetPresetsFromVariantBits(variantBits, useDepthEqual);
+			GetPresetsFromVariantBits(variantBits);
 		description.m_PhysicalKey.m_RasterizerPreset = rasterizerPreset;
 		description.m_PhysicalKey.m_DepthPreset = depthPreset;
 		description.m_PhysicalKey.m_BlendPreset = materialDiagnostics && blendPreset == BlendPreset::AlphaBlend
@@ -869,9 +855,9 @@ namespace gglab
 		GGLAB_ASSERT((variantBits & ~RenderQueueBuilder::VariantMask) == 0);
 
 		GraphicsPhysicalPipelineKey physicalKey =
-			m_BasePhysicalKeys[static_cast<size_t>(ForwardPBRLightingVariant::AllLights)][0];
+			m_BasePhysicalKeys[static_cast<size_t>(GetBaseLightingVariant())][0];
 		auto [rasterizerPreset, depthPreset, blendPreset] =
-			GetPresetsFromVariantBits(variantBits, true);
+			GetPresetsFromVariantBits(variantBits);
 		physicalKey.m_RasterizerPreset = rasterizerPreset;
 		physicalKey.m_DepthPreset = depthPreset;
 		physicalKey.m_BlendPreset = blendPreset;
@@ -882,7 +868,7 @@ namespace gglab
 	}
 
 	std::tuple<RasterizerPreset, DepthPreset, BlendPreset> RenderPassForwardPBRBase::
-		GetPresetsFromVariantBits(uint64_t variantBits, bool useDepthEqual) const noexcept
+		GetPresetsFromVariantBits(uint64_t variantBits) const noexcept
 	{
 		const bool doubleSided = RenderQueueBuilder::DecodeVariantDoubleSided(variantBits);
 		const auto renderBucket = RenderQueueBuilder::DecodeVariantBucket(variantBits);
@@ -890,8 +876,7 @@ namespace gglab
 		RasterizerPreset rasterizerPreset =
 			doubleSided ? RasterizerPreset::TwoSided : RasterizerPreset::Default;
 		BlendPreset blendPreset = BlendPreset::Default;
-		DepthPreset depthPreset =
-			useDepthEqual ? DepthPreset::ReversedZEqualReadOnly : DepthPreset::ReversedZWrite;
+		DepthPreset depthPreset = DepthPreset::ReversedZEqualReadOnly;
 
 		if (renderBucket == RenderBucket::Transparent)
 		{
@@ -902,4 +887,9 @@ namespace gglab
 		return { rasterizerPreset, depthPreset, blendPreset };
 	}
 
+	ForwardPBRLightingVariant RenderPassForwardPBRBase::GetBaseLightingVariant() const noexcept
+	{
+		return m_PassKind == ForwardPBRPassKind::Opaque
+			? ForwardPBRLightingVariant::ForwardPlus : ForwardPBRLightingVariant::AllLights;
+	}
 }

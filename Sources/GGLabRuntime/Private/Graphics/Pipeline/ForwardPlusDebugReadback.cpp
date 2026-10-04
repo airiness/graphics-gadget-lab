@@ -396,15 +396,6 @@ namespace gglab
 		};
 	}
 
-	void ForwardPlusDebugReadback::RecordLegacyGpuTiming(
-		uint64_t frameSerial, double opaqueMilliseconds) noexcept
-	{
-		std::scoped_lock lock(m_ResultMutex);
-		m_Performance.m_LegacyFrameSerial = frameSerial;
-		m_Performance.m_LegacyOpaqueMilliseconds = opaqueMilliseconds;
-		m_Performance.m_HasLegacySample = true;
-	}
-
 	void ForwardPlusDebugReadback::RecordForwardPlusGpuTiming(uint64_t frameSerial,
 		double cullMilliseconds, double opaqueMilliseconds) noexcept
 	{

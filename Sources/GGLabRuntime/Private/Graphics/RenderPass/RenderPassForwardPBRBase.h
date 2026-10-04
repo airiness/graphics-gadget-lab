@@ -2,7 +2,6 @@
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 #include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
-#include "GGLabRuntime/Graphics/PostProcess/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 
 #include <array>
@@ -24,12 +23,13 @@ namespace gglab
 		Count,
 	};
 
-	// HDR-diff validation is active only when the pipeline composed the Lab-owned
-	// validation recipe and published an active validation record for this frame.
+	// Opaque shading always consumes Forward+ light lists; transparent shading evaluates
+	// all lights. HDR-diff validation is active only when the pipeline composed the
+	// Lab-owned validation recipe and published an active validation record for this frame.
 	[[nodiscard]] constexpr ForwardPBRLightingVariant ResolveForwardPBRLightingVariant(
-		ForwardPBRPassKind passKind, ForwardLightingMode mode, bool hdrDiffValidationActive) noexcept
+		ForwardPBRPassKind passKind, bool hdrDiffValidationActive) noexcept
 	{
-		if (passKind == ForwardPBRPassKind::Transparent || mode == ForwardLightingMode::Legacy)
+		if (passKind == ForwardPBRPassKind::Transparent)
 		{
 			return ForwardPBRLightingVariant::AllLights;
 		}
@@ -46,7 +46,7 @@ namespace gglab
 
 		void Prepare(const RenderServices& services, const ForwardPBRShaderSet& shaderSet) noexcept;
 		[[nodiscard]] bool PrewarmMaterialDiagnosticVariant(const RenderServices& services,
-			uint64_t variantBits, bool useDepthEqual, ForwardPBRLightingVariant lightingVariant,
+			uint64_t variantBits, ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled) noexcept;
 
 		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
@@ -69,23 +69,25 @@ namespace gglab
 	private:
 		void DrawRenderQueue(RHIGraphicsCommandContext* graphicsContext,
 			const RenderFrameContext& context, const RenderServices& services, RenderViewID viewId,
-			const RenderQueue* expectedRenderQueue, bool useDepthEqual,
-			ForwardPBRLightingVariant lightingVariant,
+			const RenderQueue* expectedRenderQueue, ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
 		void DrawRange(RHIGraphicsCommandContext* graphicsContext, const RenderServices& services,
-			const RenderQueue& renderQueue, const DrawItemsRange& range, bool useDepthEqual,
+			const RenderQueue& renderQueue, const DrawItemsRange& range,
 			const RenderQueue* expectedRenderQueue,
 			ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
 		RHIPipelineHandle GetOrCreatePSOForVariant(
-			const RenderServices& services, uint64_t variantBits, bool useDepthEqual,
+			const RenderServices& services, uint64_t variantBits,
 			ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled, bool materialDiagnostics) noexcept;
 
+		// Opaque draws test EQUAL against the depth prepass; transparent draws only read depth.
 		std::tuple<RasterizerPreset, DepthPreset, BlendPreset> GetPresetsFromVariantBits(
-			uint64_t variantBits, bool useDepthEqual) const noexcept;
+			uint64_t variantBits) const noexcept;
+
+		[[nodiscard]] ForwardPBRLightingVariant GetBaseLightingVariant() const noexcept;
 
 	private:
 		static constexpr size_t LightingVariantCount =

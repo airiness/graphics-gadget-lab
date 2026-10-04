@@ -317,7 +317,6 @@ namespace gglab
 				active.m_ResolvedSettings.m_PostProcess.m_Bloom.m_MaxLevels == 8,
 				"Settings snapshots copy authoring, raw requested and resolved inputs for the actual display view");
 			context.Check(active.m_ForwardLighting.m_State == ViewRenderFeatureState::Active &&
-				active.m_ActualLightingMode == ForwardLightingMode::ForwardPlus &&
 				active.m_GTAO.m_State == ViewRenderFeatureState::Active && active.m_GTAOUsesFormatFallback &&
 				active.m_TemporalAA.m_State == ViewRenderFeatureState::Active &&
 				active.m_Bloom.m_State == ViewRenderFeatureState::Active &&
@@ -388,19 +387,17 @@ namespace gglab
 
 			auto& forward = graph.GetBlackboard().Get<RGForwardPlusResources>(ForwardPlusResourcesName);
 			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
-			forward.m_Status = ForwardPlusFrameStatus::DepthCoverageUnavailable;
+			forward.m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
 			temporalPlan.m_Active = false;
 			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
 			temporalPlan.m_DisableReason = TemporalAADisableReason::DepthVelocityPathUnavailable;
 			const auto unavailable = BuildRenderingSettingsDiagnosticsSnapshot(frame);
-			context.Check(unavailable.m_RequestedProfile.m_Lighting.m_ForwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
-				unavailable.m_ActualLightingMode == ForwardLightingMode::Legacy &&
-				unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Fallback &&
-				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::DepthCoverageUnavailable &&
+			context.Check(unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Inactive &&
+				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::NoOpaqueDraws &&
 				unavailable.m_GTAO.m_Reason == ViewRenderFeatureReason::CoreCapabilityUnavailable &&
 				unavailable.m_TemporalAA.m_Reason == ViewRenderFeatureReason::DepthVelocityPathUnavailable,
-				"Runtime fallbacks and unavailable reasons preserve requested feature intent");
+				"Idle Forward+ and unavailable features report their reasons instead of activity");
 			auto& postProcess = graph.GetBlackboard().Get<RGPostProcessResources>(PostProcessResourcesName);
 			postProcess.m_BloomContributionEnabled = false;
 			graph.GetBlackboard().Create<RGViewTargetsTable>(ViewTargetsTableName)
@@ -436,7 +433,7 @@ namespace gglab
 			frame.m_RenderGraph = &culledGraph;
 			const auto culled = BuildRenderingSettingsDiagnosticsSnapshot(frame);
 			context.Check(culled.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
-				!culled.m_ActualLightingMode && culled.m_GTAO.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
+				culled.m_GTAO.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
 				culled.m_TemporalAA.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
 				culled.m_Bloom.m_Reason == ViewRenderFeatureReason::RenderGraphCulled,
 				"Created feature resources culled from the execution plan never appear active");
@@ -471,7 +468,8 @@ namespace gglab
 			diagnostics.BeginFrame({ .m_FrameSerial = 18 });
 			const auto* missing = diagnostics.GetSnapshot<RenderingSettingsDiagnosticsSnapshot>();
 			context.Check(missing && !missing->m_SettingsAvailable && !missing->m_RuntimeAvailable &&
-				missing->m_FrameSerial == 18 && !missing->m_ActualLightingMode && !missing->m_HistoryAvailable &&
+				missing->m_FrameSerial == 18 && !missing->m_HistoryAvailable &&
+				missing->m_ForwardLighting.m_State == ViewRenderFeatureState::Unavailable &&
 				missing->m_GTAO.m_State == ViewRenderFeatureState::Unavailable &&
 				missing->m_GTAO.m_Reason == ViewRenderFeatureReason::FrameUnavailable && retained.m_RuntimeAvailable,
 				"Missing-source recapture clears old settings activity without turning unknown state into OFF");

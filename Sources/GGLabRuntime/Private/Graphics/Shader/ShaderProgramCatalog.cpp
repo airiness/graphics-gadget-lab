@@ -10,13 +10,11 @@ namespace gglab::shader_programs
 			ForwardCoverageVertex,
 			ForwardPBRAllLightsPixel,
 			ForwardPBRForwardPlusPixel,
-			ForwardPBRAllLightsGTAOPixel,
 			ForwardPBRForwardPlusGTAOPixel,
 			DepthPrepassAlphaTestPixel,
 			DepthPrepassVelocityOpaquePixel,
 			DepthPrepassVelocityAlphaTestPixel,
 			ForwardPBRAllLightsMaterialDiagnosticsPixel,
-			ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel,
 			ForwardPBRForwardPlusMaterialDiagnosticsPixel,
 			ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel,
 		};

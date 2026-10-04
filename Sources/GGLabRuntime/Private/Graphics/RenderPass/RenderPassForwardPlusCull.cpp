@@ -184,7 +184,7 @@ namespace gglab
 				const auto& framePlan =
 					blackboard.Get<DepthCoverageFramePlan>(DepthCoverageFramePlanName);
 				GGLAB_ASSERT_MSG(
-					framePlan.UsesDepthPrepassEqual() && framePlan.m_HasDepthCoverageDraws,
+					framePlan.AddsForwardOpaquePass(),
 					"Forward+ requires a complete validated depth prepass.");
 				GGLAB_ASSERT_MSG(sceneDepth.m_Convention == DepthConvention::Reversed,
 					"Forward+ only supports Reversed-Z display depth.");

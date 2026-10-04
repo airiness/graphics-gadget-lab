@@ -22,6 +22,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -34,16 +35,20 @@ namespace gglab
 	struct ForwardPBRFrameValidationInputs
 	{
 		bool m_PresentationAvailable = false;
-		bool m_TemporalActive = false;
+		bool m_DisplayExtentMatchesPresentation = false;
 		bool m_RenderSceneReady = false;
-		bool m_TemporalResolveClosureValid = false;
-		bool m_DepthPrepassEqual = false;
+		uint32_t m_GlobalLightCount = 0;
+		bool m_DepthCoverageValid = false;
 		std::string_view m_DepthCoverageDiagnostic;
+		bool m_TemporalActive = false;
+		bool m_TemporalResolveClosureValid = false;
 	};
 
-	// An active temporal frame requires prepared scene data, its resolve closure and
-	// depth-prepass velocity coverage; violating any of them is a contract failure,
-	// never a skipped frame that is retried indefinitely.
+	// The recipe always shades opaque draws with Forward+ after an EQUAL depth prepass.
+	// A display view built for another swap-chain extent is an expected resize state and
+	// skips the frame. Missing scene data, global lights beyond the Forward+ capacity,
+	// invalid depth coverage and a lost temporal resolve closure are contract failures;
+	// none of them selects another lighting path or frame topology.
 	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPBRFrame(
 		const ForwardPBRFrameValidationInputs& inputs) noexcept;
 
@@ -97,7 +102,7 @@ namespace gglab
 		{
 			uint64_t m_FrameSerial = 0;
 			DepthCoverageFramePlan m_DepthCoverage{};
-			ForwardPlusFrameStatus m_ForwardPlusStatus = ForwardPlusFrameStatus::Disabled;
+			ForwardPlusFrameStatus m_ForwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
 			GTAOFrameStatus m_GTAOStatus = GTAOFrameStatus::Disabled;
 		};
 
@@ -132,7 +137,6 @@ namespace gglab
 		{
 			uint64_t m_DrawVariantBits = 0;
 			ForwardPBRLightingVariant m_LightingVariant = ForwardPBRLightingVariant::AllLights;
-			bool m_UseDepthEqual = false;
 			bool m_GTAOContribution = false;
 		};
 		std::vector<uint64_t> m_DiagnosticPrewarmDrawVariants;

@@ -23,7 +23,7 @@ namespace gglab
 
 	struct ForwardPlusDiagnosticsSnapshot
 	{
-		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::Disabled;
+		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 		ForwardPlusTileGrid m_TileGrid{};
 		uint64_t m_ReadbackFrameSerial = 0;
 		uint64_t m_ReadbackGeneration = 0;
@@ -66,7 +66,6 @@ namespace gglab
 		uint64_t m_GpuFrameIndex = 0;
 		double m_CurrentCullGpuMilliseconds = 0.0;
 		double m_CurrentOpaqueGpuMilliseconds = 0.0;
-		double m_LegacyOpaqueGpuMilliseconds = 0.0;
 		double m_ForwardPlusCullGpuMilliseconds = 0.0;
 		double m_ForwardPlusOpaqueGpuMilliseconds = 0.0;
 
@@ -77,8 +76,7 @@ namespace gglab
 		bool m_HdrDiffWithinTolerance = false;
 		bool m_GpuProfilerEnabled = false;
 		bool m_GpuTimingAvailable = false;
-		bool m_PerformanceSamplePairAvailable = false;
-		bool m_LatestForwardPlusSampleLower = false;
+		bool m_ForwardPlusGpuSampleAvailable = false;
 	};
 
 	template <> struct SnapshotTraits<ForwardPlusDiagnosticsSnapshot>

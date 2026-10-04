@@ -20,8 +20,10 @@
 
 #include <algorithm>
 #include <array>
+#include <format>
 #include <memory>
 #include <span>
+#include <string>
 
 namespace gglab
 {
@@ -69,21 +71,23 @@ namespace gglab
 					m_DiagnosticPrewarmVariants.push_back({ .m_DrawVariantBits = variantBits });
 					continue;
 				}
-				// Cover Lab-accessible lighting, GTAO output and depth-prepass settings.
-				// HDR comparison PSOs exist only when this pipeline owns its readback service.
-				for (uint32_t lighting = 0; lighting < (m_ForwardPlusDebugReadback ? 3u : 2u); ++lighting)
+				// Cover Forward+ opaque shading with and without GTAO output. HDR comparison
+				// PSOs exist only when this pipeline owns its readback service.
+				for (const ForwardPBRLightingVariant lighting : { ForwardPBRLightingVariant::ForwardPlus,
+					ForwardPBRLightingVariant::ForwardPlusValidation })
 				{
+					if (lighting == ForwardPBRLightingVariant::ForwardPlusValidation &&
+						!m_ForwardPlusDebugReadback)
+					{
+						continue;
+					}
 					for (const bool contribution : { false, true })
 					{
-						for (const bool depthEqual : { false, true })
-						{
-							m_DiagnosticPrewarmVariants.push_back({
-								.m_DrawVariantBits = variantBits,
-								.m_LightingVariant = static_cast<ForwardPBRLightingVariant>(lighting),
-								.m_UseDepthEqual = depthEqual,
-								.m_GTAOContribution = contribution,
-							});
-						}
+						m_DiagnosticPrewarmVariants.push_back({
+							.m_DrawVariantBits = variantBits,
+							.m_LightingVariant = lighting,
+							.m_GTAOContribution = contribution,
+						});
 					}
 				}
 			}
@@ -99,7 +103,7 @@ namespace gglab
 				? static_cast<RenderPassForwardPBRBase&>(m_ForwardTransparentPass)
 				: static_cast<RenderPassForwardPBRBase&>(m_ForwardOpaquePass);
 			if (pass.PrewarmMaterialDiagnosticVariant(services, variant.m_DrawVariantBits,
-				variant.m_UseDepthEqual, variant.m_LightingVariant, variant.m_GTAOContribution))
+				variant.m_LightingVariant, variant.m_GTAOContribution))
 			{
 				++m_DiagnosticPrewarmProgress.m_CompletedCount;
 			}
@@ -149,6 +153,8 @@ namespace gglab
 		}
 		const FramePlan framePlan = std::move(*m_FramePlan);
 		m_FramePlan.reset();
+		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
+			"A Ready ForwardPBR frame has prepared scene data and a valid depth coverage plan.");
 
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
@@ -212,17 +218,6 @@ namespace gglab
 		{
 			m_TemporalAAPass.Prepare(services);
 		}
-		if (depthCoverageFramePlan.UsesForwardDepthWrite())
-		{
-			GGLAB_LOG_GRAPHICS_WARN("Depth coverage frame uses Forward-write fallback: {}",
-				depthCoverageFramePlan.m_Diagnostic);
-		}
-		else if (!depthCoverageFramePlan.RendersGeometry())
-		{
-			GGLAB_LOG_GRAPHICS_ERROR("Depth coverage frame rejected scene geometry: {}",
-				depthCoverageFramePlan.m_Diagnostic);
-		}
-
 		m_AtmospherePass.AddPass(rg, context, services);
 		m_AtmospherePass.AddBakePass(rg, services);
 
@@ -453,41 +448,25 @@ namespace gglab
 		// Clear HDR color before background and scene geometry.
 		m_ClearViewTargetsPass.AddPass(rg, context, services);
 
-		if (depthCoverageFramePlan.UsesDepthPrepassEqual())
+		m_DepthPrepassPass.AddPass(rg, context, services);
+		if (forwardPlusActive)
 		{
-			m_DepthPrepassPass.AddPass(rg, context, services);
-			if (forwardPlusActive)
-			{
-				m_ForwardPlusCullPass.AddPass(rg, context, services);
-			}
-			if (gtaoActive)
-			{
-				m_GTAOPass.AddPass(rg, context, services);
-			}
-			m_SkyboxPass.AddPass(rg, context, services);
-			if (depthCoverageFramePlan.AddsForwardOpaquePass())
-			{
-				m_ForwardOpaquePass.AddPass(rg, context, services);
-				if (forwardPlusValidationEnabled)
-				{
-					m_ForwardPlusValidationPass.AddPass(rg, context, services);
-				}
-			}
+			m_ForwardPlusCullPass.AddPass(rg, context, services);
 		}
-		else if (depthCoverageFramePlan.UsesForwardDepthWrite())
+		if (gtaoActive)
 		{
-			if (depthCoverageFramePlan.AddsForwardOpaquePass())
-			{
-				m_ForwardOpaquePass.AddPass(rg, context, services);
-			}
-			m_SkyboxPass.AddPass(rg, context, services);
+			m_GTAOPass.AddPass(rg, context, services);
 		}
-		else
+		m_SkyboxPass.AddPass(rg, context, services);
+		if (depthCoverageFramePlan.AddsForwardOpaquePass())
 		{
-			// Preserve a defined background depth while rejecting unsafe
-			// scene draw packets for this frame.
-			m_DepthPrepassPass.AddPass(rg, context, services);
-			m_SkyboxPass.AddPass(rg, context, services);
+			GGLAB_ASSERT_MSG(forwardPlusActive,
+				"Opaque Forward shading requires the Forward+ cull of the same frame.");
+			m_ForwardOpaquePass.AddPass(rg, context, services);
+			if (forwardPlusValidationEnabled)
+			{
+				m_ForwardPlusValidationPass.AddPass(rg, context, services);
+			}
 		}
 
 		if (depthCoverageFramePlan.AddsForwardOpaquePass())
@@ -514,11 +493,7 @@ namespace gglab
 		// Depth-tested world-space debug geometry is part of HDR scene color.
 		m_DebugDrawScenePass.AddPass(rg, context, services);
 
-		if (context.IsRenderSceneReady())
-		{
-			// Final color requires View StructuredBuffer data.
-			m_PostProcessPipeline.AddPasses(rg, context, services);
-		}
+		m_PostProcessPipeline.AddPasses(rg, context, services);
 
 		// IBL Preview
 		m_IBLPreviewPass.AddPass(rg, context, services);
@@ -571,25 +546,33 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure(
 				"The presentation swap chain is unavailable after the frame began.");
 		}
-		if (!inputs.m_TemporalActive)
+		if (!inputs.m_DisplayExtentMatchesPresentation)
 		{
-			return RenderFrameValidationResult::Ready();
+			return RenderFrameValidationResult::Skip(
+				"The display view was built for a different swap-chain extent.");
 		}
 		if (!inputs.m_RenderSceneReady)
 		{
 			return RenderFrameValidationResult::ContractFailure(
-				"An active temporal frame requires prepared scene GPU data.");
+				"The frame requires prepared scene GPU data.");
 		}
-		if (!inputs.m_TemporalResolveClosureValid)
+		if (!IsForwardPlusGlobalLightCountSupported(inputs.m_GlobalLightCount))
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"The scene exceeds the Forward+ global-light capacity.",
+				std::format("requested {}, limit {}", inputs.m_GlobalLightCount,
+					ForwardPlusGlobalLightCapacity));
+		}
+		if (!inputs.m_DepthCoverageValid)
+		{
+			return RenderFrameValidationResult::ContractFailure(
+				"The frame requires depth-prepass EQUAL coverage for every opaque draw.",
+				std::string(inputs.m_DepthCoverageDiagnostic));
+		}
+		if (inputs.m_TemporalActive && !inputs.m_TemporalResolveClosureValid)
 		{
 			return RenderFrameValidationResult::ContractFailure(
 				"An active temporal frame requires its resolve pipeline closure.");
-		}
-		if (!inputs.m_DepthPrepassEqual)
-		{
-			return RenderFrameValidationResult::ContractFailure(
-				"An active temporal frame requires depth-prepass velocity coverage.",
-				std::string(inputs.m_DepthCoverageDiagnostic));
 		}
 		return RenderFrameValidationResult::Ready();
 	}
@@ -602,6 +585,12 @@ namespace gglab
 		if (!swapChain || !swapChain->IsValid())
 		{
 			return ClassifyForwardPBRFrame({ .m_PresentationAvailable = false });
+		}
+		const RenderView& displayView = context.GetDisplayRenderView();
+		if (displayView.m_Width != swapChain->GetBufferWidth() ||
+			displayView.m_Height != swapChain->GetBufferHeight())
+		{
+			return ClassifyForwardPBRFrame({ .m_PresentationAvailable = true });
 		}
 
 		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
@@ -620,46 +609,23 @@ namespace gglab
 				context, swapChain->GetBufferWidth(), swapChain->GetBufferHeight()),
 		};
 		const DepthCoverageFramePlan& depthCoverage = plan.m_DepthCoverage;
-		const bool sceneReady = context.IsRenderSceneReady();
-		const ForwardLightingMode lightingMode =
-			context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Mode;
-		if (lightingMode == ForwardLightingMode::ForwardPlus)
-		{
-			if (!IsForwardPlusGlobalLightCountSupported(
-				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size())))
-			{
-				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::GlobalLightCapacityExceeded;
-			}
-			else if (!sceneReady)
-			{
-				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::RenderSceneUnavailable;
-			}
-			else if (!depthCoverage.UsesDepthPrepassEqual())
-			{
-				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::DepthCoverageUnavailable;
-			}
-			else if (!depthCoverage.m_HasDepthCoverageDraws)
-			{
-				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::NoOpaqueDraws;
-			}
-			else
-			{
-				plan.m_ForwardPlusStatus = ForwardPlusFrameStatus::Active;
-			}
-		}
+		plan.m_ForwardPlusStatus = depthCoverage.m_HasDepthCoverageDraws
+			? ForwardPlusFrameStatus::Active : ForwardPlusFrameStatus::NoOpaqueDraws;
 		plan.m_GTAOStatus = ResolveGTAOFrameStatus(
 			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO.m_Enabled,
 			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
-			sceneReady, depthCoverage.UsesDepthPrepassEqual(),
 			depthCoverage.m_HasDepthCoverageDraws);
 
 		RenderFrameValidationResult result = ClassifyForwardPBRFrame({
 			.m_PresentationAvailable = true,
-			.m_TemporalActive = temporalActive,
-			.m_RenderSceneReady = sceneReady,
-			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
-			.m_DepthPrepassEqual = depthCoverage.UsesDepthPrepassEqual(),
+			.m_DisplayExtentMatchesPresentation = true,
+			.m_RenderSceneReady = context.IsRenderSceneReady(),
+			.m_GlobalLightCount =
+				static_cast<uint32_t>(context.m_RenderScene.m_GlobalLightIndices.size()),
+			.m_DepthCoverageValid = depthCoverage.IsValid(),
 			.m_DepthCoverageDiagnostic = depthCoverage.m_Diagnostic,
+			.m_TemporalActive = temporalActive,
+			.m_TemporalResolveClosureValid = temporalResolveClosureValid,
 			});
 		if (result.IsReady())
 		{
@@ -682,8 +648,6 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusPixel);
-			m_ForwardPBRShaderSet.m_AllLightsGTAOContributionPixelShader =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOPixel);
 			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
@@ -711,19 +675,18 @@ namespace gglab
 		}
 		if (materialDiagnostics && !m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid())
 		{
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[0] =
+			auto& diagnostics = m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders;
+			diagnostics[ForwardPBRShaderSet::AllLightsMaterialDiagnosticIndex] =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsMaterialDiagnosticsPixel);
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[1] =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel);
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[2] =
+			diagnostics[ForwardPBRShaderSet::ForwardPlusMaterialDiagnosticIndex] =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel);
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[3] =
+			diagnostics[ForwardPBRShaderSet::ForwardPlusMaterialDiagnosticIndex + 1] =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel);
 			if (m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation)
 			{
-				m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[4] =
+				diagnostics[ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex] =
 					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
-				m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[5] =
+				diagnostics[ForwardPBRShaderSet::ForwardPlusValidationMaterialDiagnosticIndex + 1] =
 					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
 			}
 			GGLAB_ASSERT_MSG(m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid(),

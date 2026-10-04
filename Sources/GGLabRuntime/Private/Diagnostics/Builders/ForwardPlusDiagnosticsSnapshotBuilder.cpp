@@ -99,20 +99,11 @@ namespace gglab
 
 		const uint64_t currentGeneration = debugReadback->GetCurrentGeneration();
 		const ForwardPlusPerformanceReadback performance = debugReadback->GetPerformance();
-		snapshot.m_LegacyOpaqueGpuMilliseconds = performance.m_LegacyOpaqueMilliseconds;
 		snapshot.m_ForwardPlusCullGpuMilliseconds =
 			performance.m_ForwardPlusCullMilliseconds;
 		snapshot.m_ForwardPlusOpaqueGpuMilliseconds =
 			performance.m_ForwardPlusOpaqueMilliseconds;
-		snapshot.m_PerformanceSamplePairAvailable =
-			performance.m_HasLegacySample && performance.m_HasForwardPlusSample;
-		if (snapshot.m_PerformanceSamplePairAvailable)
-		{
-			snapshot.m_LatestForwardPlusSampleLower =
-				performance.m_ForwardPlusCullMilliseconds +
-				performance.m_ForwardPlusOpaqueMilliseconds <
-				performance.m_LegacyOpaqueMilliseconds;
-		}
+		snapshot.m_ForwardPlusGpuSampleAvailable = performance.m_HasForwardPlusSample;
 
 		const ForwardPlusTileReadback selected = debugReadback->GetLatest();
 		if (selected.m_IsValid && IsForwardPlusReadbackGenerationCurrent(

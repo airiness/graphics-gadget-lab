@@ -1474,7 +1474,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 69;
+			constexpr size_t ExpectedRuntimeProgramCount = 67;
 			const std::string expectedProgramCountField =
 				std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({
@@ -1563,7 +1563,6 @@ namespace gglab
 				shader_programs::AerialPerspectiveBuildCompute,
 				shader_programs::AerialPerspectiveCompositeCompute,
 				shader_programs::ForwardPBRAllLightsMaterialDiagnosticsPixel,
-				shader_programs::ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel,
 				shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel,
 				shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel,
 				shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,

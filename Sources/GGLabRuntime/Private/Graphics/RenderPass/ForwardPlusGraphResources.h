@@ -16,7 +16,7 @@ namespace gglab
 		RGBufferId m_TileLightIndices{};
 		RGBufferId m_TileDepthRanges{};
 		ForwardPlusTileGrid m_TileGrid{};
-		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::Disabled;
+		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 		uint32_t m_LightBaseIndex = 0;
 		uint32_t m_LightTableCapacity = 0;
 		uint32_t m_DirectionalLightCount = 0;

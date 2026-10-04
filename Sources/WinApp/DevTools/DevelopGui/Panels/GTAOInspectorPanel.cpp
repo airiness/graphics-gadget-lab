@@ -33,10 +33,6 @@ namespace gglab
 				return "Unavailable: core texture capability";
 			case GTAOFrameStatus::PipelineUnavailable:
 				return "Unavailable: pipeline preparation";
-			case GTAOFrameStatus::RenderSceneUnavailable:
-				return "Idle: render scene unavailable";
-			case GTAOFrameStatus::DepthCoverageUnavailable:
-				return "Idle: depth-prepass coverage unavailable";
 			case GTAOFrameStatus::NoOpaqueDraws:
 				return "Idle: no opaque draws";
 			}

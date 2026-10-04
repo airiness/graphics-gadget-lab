@@ -7,16 +7,20 @@ namespace gglab
 {
 	struct ForwardPBRShaderSet
 	{
-		// Material diagnostic variants per lighting variant and GTAO contribution output.
-		static constexpr size_t MaterialDiagnosticVariantCount = 6;
-		// The first four variants serve the all-lights and Forward+ production recipes.
-		static constexpr size_t ProductionMaterialDiagnosticVariantCount = 4;
+		// Material diagnostic slots: all-lights transparent shading, then Forward+ opaque
+		// shading and its HDR-diff validation variant, each without and with GTAO contribution.
+		static constexpr size_t AllLightsMaterialDiagnosticIndex = 0;
+		static constexpr size_t ForwardPlusMaterialDiagnosticIndex = 1;
+		static constexpr size_t ForwardPlusValidationMaterialDiagnosticIndex = 3;
+		static constexpr size_t MaterialDiagnosticVariantCount = 5;
+		// The first three variants serve the production recipes.
+		static constexpr size_t ProductionMaterialDiagnosticVariantCount =
+			ForwardPlusValidationMaterialDiagnosticIndex;
 
 		ShaderID m_CoverageVertexShader{};
 		ShaderID m_AllLightsShadingPixelShader{};
 		ShaderID m_ForwardPlusShadingPixelShader{};
 		ShaderID m_ForwardPlusValidationPixelShader{};
-		ShaderID m_AllLightsGTAOContributionPixelShader{};
 		ShaderID m_ForwardPlusGTAOContributionPixelShader{};
 		ShaderID m_ForwardPlusValidationGTAOContributionPixelShader{};
 		std::array<ShaderID, MaterialDiagnosticVariantCount> m_MaterialDiagnosticPixelShaders{};
@@ -48,7 +52,6 @@ namespace gglab
 		{
 			return m_CoverageVertexShader.IsValid() && m_AllLightsShadingPixelShader.IsValid() &&
 				m_ForwardPlusShadingPixelShader.IsValid() &&
-				m_AllLightsGTAOContributionPixelShader.IsValid() &&
 				m_ForwardPlusGTAOContributionPixelShader.IsValid() &&
 				m_AlphaTestPixelShader.IsValid() && m_VelocityOpaquePixelShader.IsValid() &&
 				m_VelocityAlphaTestPixelShader.IsValid() &&

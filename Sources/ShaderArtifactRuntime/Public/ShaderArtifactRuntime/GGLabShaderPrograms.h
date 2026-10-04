@@ -11,16 +11,12 @@ namespace gglab::shader_programs
 		"gglab.shader.forward-pbr", "pixel.forward-plus", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation", ShaderStage::Pixel };
-	inline const ShaderProgramRef ForwardPBRAllLightsGTAOPixel{
-		"gglab.shader.forward-pbr", "pixel.all-lights-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusValidationGTAOPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus-validation-gtao", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRAllLightsMaterialDiagnosticsPixel{
 		"gglab.shader.forward-pbr", "pixel.all-lights.material-diagnostics", ShaderStage::Pixel };
-	inline const ShaderProgramRef ForwardPBRAllLightsGTAOMaterialDiagnosticsPixel{
-		"gglab.shader.forward-pbr", "pixel.all-lights-gtao.material-diagnostics", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusMaterialDiagnosticsPixel{
 		"gglab.shader.forward-pbr", "pixel.forward-plus.material-diagnostics", ShaderStage::Pixel };
 	inline const ShaderProgramRef ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel{

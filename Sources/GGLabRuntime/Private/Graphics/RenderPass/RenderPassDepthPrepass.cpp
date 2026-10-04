@@ -35,7 +35,6 @@ namespace gglab
 			const DepthCoverageRasterDomain* m_RasterDomain = nullptr;
 			const RenderQueue* m_ExpectedRenderQueue = nullptr;
 			float m_ClearDepth = 0.0f;
-			bool m_DrawCoverage = false;
 			bool m_OutputMotion = false;
 		};
 	}
@@ -68,7 +67,6 @@ namespace gglab
 				data.m_ClearDepth = screen_space::GetDepthBackgroundValue(sceneDepth.m_Convention);
 				data.m_RasterDomain = std::addressof(renderQueue.m_CoverageRasterDomain);
 				data.m_ExpectedRenderQueue = framePlan.m_SourceRenderQueue;
-				data.m_DrawCoverage = framePlan.UsesDepthPrepassEqual();
 				data.m_OutputMotion = contextPtr->GetTemporalFramePlan().m_Active;
 				if (data.m_OutputMotion)
 				{
@@ -83,16 +81,14 @@ namespace gglab
 						data.m_Motion);
 				}
 
-				GGLAB_ASSERT_MSG(
-					framePlan.UsesDepthPrepassEqual() ||
-					framePlan.m_ExecutionMode == DepthCoverageExecutionMode::SkipGeometry,
-					"Depth prepass can only execute the validated EQUAL path or a clear-only safety path.");
+				GGLAB_ASSERT_MSG(framePlan.IsValid(),
+					"Depth prepass requires a frame plan validated before graph construction.");
 				GGLAB_ASSERT_MSG(data.m_ExpectedRenderQueue == std::addressof(renderQueue),
 					"Depth prepass must consume the frame-plan RenderQueue.");
 				GGLAB_ASSERT_MSG(framePlan.m_RasterDomain == data.m_RasterDomain,
 					"Depth prepass must consume the frame-plan raster domain.");
 
-				if (!data.m_DrawCoverage || renderQueue.m_DrawItems.empty())
+				if (renderQueue.m_DrawItems.empty())
 				{
 					return;
 				}
@@ -139,11 +135,6 @@ namespace gglab
 					},
 				});
 				graphicsContext->ClearDepthAttachment(data.m_ClearDepth);
-
-				if (!data.m_DrawCoverage)
-				{
-					return;
-				}
 
 				const auto& renderQueue = contextPtr->GetRenderQueue(displayViewId);
 				if (renderQueue.m_DrawItems.empty())

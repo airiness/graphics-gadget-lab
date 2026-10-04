@@ -9,19 +9,17 @@ namespace gglab
 {
 	namespace
 	{
-		void RejectGeometry(DepthCoverageFramePlan& plan, std::string diagnostic)
+		void RejectPlan(DepthCoverageFramePlan& plan, std::string diagnostic)
 		{
-			plan.m_ExecutionMode = DepthCoverageExecutionMode::SkipGeometry;
+			plan.m_IsValid = false;
 			plan.m_Diagnostic = std::move(diagnostic);
 		}
-
 	}
 
 	DepthCoverageFramePlan BuildDepthCoverageFramePlan(
 		const DepthCoverageFramePlanBuildInfo& buildInfo)
 	{
 		DepthCoverageFramePlan plan{
-			.m_ExecutionMode = DepthCoverageExecutionMode::DepthPrepassEqual,
 			.m_SourceRenderQueue = buildInfo.m_RenderQueue,
 			.m_RasterDomain = buildInfo.m_RenderQueue
 								  ? std::addressof(buildInfo.m_RenderQueue->m_CoverageRasterDomain)
@@ -30,7 +28,7 @@ namespace gglab
 
 		if (!buildInfo.m_RenderQueue)
 		{
-			RejectGeometry(plan, "Depth coverage frame planning requires a RenderQueue.");
+			RejectPlan(plan, "Depth coverage frame planning requires a RenderQueue.");
 			return plan;
 		}
 
@@ -38,25 +36,24 @@ namespace gglab
 		const DepthCoverageRasterDomain& rasterDomain = renderQueue.m_CoverageRasterDomain;
 		if (buildInfo.m_DepthConvention != DepthConvention::Reversed)
 		{
-			RejectGeometry(
+			RejectPlan(
 				plan, "Depth coverage frame planning only supports the Reversed-Z Forward path.");
 			return plan;
 		}
 		if (renderQueue.m_ViewId != buildInfo.m_ExpectedViewId)
 		{
-			RejectGeometry(plan, "RenderQueue view does not match the display view.");
+			RejectPlan(plan, "RenderQueue view does not match the display view.");
 			return plan;
 		}
 		if (!rasterDomain.IsValid() ||
 			!rasterDomain.MatchesTargetExtent(buildInfo.m_TargetWidth, buildInfo.m_TargetHeight) ||
 			rasterDomain.m_DepthConvention != buildInfo.m_DepthConvention)
 		{
-			RejectGeometry(
+			RejectPlan(
 				plan, "Raster domain does not match the frame view, extent, or depth convention.");
 			return plan;
 		}
 
-		bool requiresForwardDepthWrite = false;
 		uint32_t expectedStart = 0;
 		for (size_t bucketIndex = 0; bucketIndex < utils::ToIndex(RenderBucket::Count);
 			++bucketIndex)
@@ -66,7 +63,7 @@ namespace gglab
 			if (range.m_Start != expectedStart || range.m_Start > renderQueue.m_DrawItems.size() ||
 				range.m_Count > renderQueue.m_DrawItems.size() - range.m_Start)
 			{
-				RejectGeometry(
+				RejectPlan(
 					plan, std::format("RenderQueue range {} is not a contiguous in-bounds range.",
 						bucketIndex));
 				return plan;
@@ -83,7 +80,7 @@ namespace gglab
 				const DrawItem& drawItem = renderQueue.m_DrawItems[drawItemIndex];
 				if ((drawItem.m_VariantBits & ~RenderQueueBuilder::VariantMask) != 0)
 				{
-					RejectGeometry(
+					RejectPlan(
 						plan, std::format("RenderQueue item {} has unsupported variant bits.",
 							drawItemIndex));
 					return plan;
@@ -91,14 +88,14 @@ namespace gglab
 				if (drawItem.m_Bucket != bucket ||
 					RenderQueueBuilder::DecodeVariantBucket(drawItem.m_VariantBits) != bucket)
 				{
-					RejectGeometry(
+					RejectPlan(
 						plan, std::format("RenderQueue item {} disagrees with bucket {}.",
 							drawItemIndex, bucketIndex));
 					return plan;
 				}
 				if (!drawItem.m_CoverageDrawPacket.IsValid())
 				{
-					RejectGeometry(
+					RejectPlan(
 						plan, std::format("RenderQueue item {} has an invalid draw packet.",
 							drawItemIndex));
 					return plan;
@@ -114,18 +111,13 @@ namespace gglab
 				const auto& forwardSignature = buildInfo.m_ForwardPipelineSignatures[variantIndex];
 				if (!prepassSignature || !forwardSignature)
 				{
-					requiresForwardDepthWrite = true;
-					if (plan.m_Diagnostic.empty())
-					{
-						plan.m_Diagnostic = std::format(
-							"Coverage variant {} did not publish both pipeline signatures.",
-							variantIndex);
-					}
-					continue;
+					RejectPlan(plan, std::format(
+						"Coverage variant {} did not publish both pipeline signatures.", variantIndex));
+					return plan;
 				}
 				if (!prepassSignature->IsValid() || !forwardSignature->IsValid())
 				{
-					RejectGeometry(plan,
+					RejectPlan(plan,
 						std::format("Coverage variant {} published an invalid pipeline signature.",
 							variantIndex));
 					return plan;
@@ -135,12 +127,9 @@ namespace gglab
 					CompareDepthCoveragePipelineSignatures(*prepassSignature, *forwardSignature);
 				if (!comparison.m_Matches)
 				{
-					requiresForwardDepthWrite = true;
-					if (plan.m_Diagnostic.empty())
-					{
-						plan.m_Diagnostic = std::format("Coverage variant {} mismatch: {}.",
-							variantIndex, comparison.m_Mismatch);
-					}
+					RejectPlan(plan, std::format("Coverage variant {} mismatch: {}.",
+						variantIndex, comparison.m_Mismatch));
+					return plan;
 				}
 			}
 			expectedStart += range.m_Count;
@@ -148,14 +137,10 @@ namespace gglab
 
 		if (expectedStart != renderQueue.m_DrawItems.size())
 		{
-			RejectGeometry(plan, "RenderQueue ranges do not cover every draw item exactly once.");
+			RejectPlan(plan, "RenderQueue ranges do not cover every draw item exactly once.");
 			return plan;
 		}
-		if (requiresForwardDepthWrite)
-		{
-			plan.m_ExecutionMode = DepthCoverageExecutionMode::ForwardDepthWrite;
-		}
-
+		plan.m_IsValid = true;
 		return plan;
 	}
 }
