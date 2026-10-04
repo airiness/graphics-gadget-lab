@@ -7,7 +7,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Asset/TextureDerivedDataAcceptance.h"
 #include "GGLabRuntime/Graphics/Asset/TextureLoader.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 
 namespace gglab
 {
@@ -202,7 +202,7 @@ namespace gglab
 
 	AssetResidencyLabSession::AssetResidencyLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPlus())
 	{
 	}
 

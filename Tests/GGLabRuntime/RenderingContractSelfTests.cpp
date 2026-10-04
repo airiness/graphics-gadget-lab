@@ -85,7 +85,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "GGLabRuntime/Graphics/ScreenSpace/ScreenSpaceTypes.h"
@@ -1226,9 +1226,9 @@ namespace gglab
 		{
 			static_assert(std::is_abstract_v<RenderPipelineSceneExtensionBase>);
 			static_assert(std::has_virtual_destructor_v<RenderPipelineSceneExtensionBase>);
-			static_assert(!std::is_copy_constructible_v<RenderPipelineForwardPBR::CreateInfo>);
+			static_assert(!std::is_copy_constructible_v<RenderPipelineForwardPlus::CreateInfo>);
 			static_assert(std::is_nothrow_move_constructible_v<
-				RenderPipelineForwardPBR::CreateInfo>);
+				RenderPipelineForwardPlus::CreateInfo>);
 
 			uint32_t addPassCount = 0;
 			uint32_t destructionCount = 0;
@@ -1319,21 +1319,21 @@ namespace gglab
 			auto debugReadback = std::make_shared<ForwardPlusDebugReadback>();
 			const long debugReadbackOwnerCount = debugReadback.use_count();
 			{
-				RenderPipelineForwardPBR pipeline(RenderPipelineForwardPBR::CreateInfo{
+				RenderPipelineForwardPlus pipeline(RenderPipelineForwardPlus::CreateInfo{
 					.m_ForwardPlusDebugReadback = debugReadback,
 					.m_SceneExtension = std::move(extension),
 					});
 				context.Check(extension == nullptr && destructionCount == 0 &&
 					debugReadback.use_count() > debugReadbackOwnerCount,
-					"ForwardPBR owns the optional extension alongside Forward+ diagnostics");
+					"The Forward+ pipeline owns the optional extension alongside Forward+ diagnostics");
 			}
 			context.Check(destructionCount == 1 &&
 				debugReadback.use_count() == debugReadbackOwnerCount,
-				"ForwardPBR retires optional extension and debug ownership with the pipeline");
+				"The Forward+ pipeline retires optional extension and debug ownership with the pipeline");
 
-			RenderPipelineForwardPBR defaultPipeline;
-			context.Check(defaultPipeline.GetName() == "ForwardPBR",
-				"ForwardPBR remains source-compatible without an optional extension");
+			RenderPipelineForwardPlus defaultPipeline;
+			context.Check(defaultPipeline.GetName() == "ForwardPlus",
+				"The Forward+ pipeline remains source-compatible without an optional extension");
 		}
 
 		void RunOverlayExtensionContractTests(SelfTestContext& context) noexcept
@@ -3013,7 +3013,7 @@ namespace gglab
 				variants[2] == RenderQueueBuilder::EncodeVariantBits(RenderBucket::Transparent, true),
 				"Material prewarm demand shares alpha and sidedness encoding with draw queue construction");
 
-			auto pipeline = std::make_unique<RenderPipelineForwardPBR>();
+			auto pipeline = std::make_unique<RenderPipelineForwardPlus>();
 			MaterialDiagnosticPrewarmProgress progress;
 			bool onePerTick = true;
 			for (uint32_t tick = 0; tick < 5; ++tick)
@@ -3057,7 +3057,7 @@ namespace gglab
 				"Completed diagnostic prewarm performs no additional PSO resolutions");
 
 			shaders.m_AllowValidationPrograms = true;
-			RenderPipelineForwardPBR validationPipeline(RenderPipelineForwardPBR::CreateInfo{
+			RenderPipelineForwardPlus validationPipeline(RenderPipelineForwardPlus::CreateInfo{
 				.m_ForwardPlusDebugReadback = std::make_shared<ForwardPlusDebugReadback>(),
 				});
 			MaterialDiagnosticPrewarmProgress validationProgress;
@@ -3083,39 +3083,39 @@ namespace gglab
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
-			const ForwardPBRFrameValidationInputs ready{
+			const ForwardPlusFrameValidationInputs ready{
 				.m_PresentationAvailable = true,
 				.m_DisplayExtentMatchesPresentation = true,
 				.m_RenderSceneReady = true,
 				.m_GlobalLightCount = ForwardPlusGlobalLightCapacity,
 				.m_DepthCoverageValid = true,
 			};
-			const auto classify = [](ForwardPBRFrameValidationInputs inputs)
+			const auto classify = [](ForwardPlusFrameValidationInputs inputs)
 				{
-					return ClassifyForwardPBRFrame(inputs).m_Status;
+					return ClassifyForwardPlusFrame(inputs).m_Status;
 				};
-			ForwardPBRFrameValidationInputs readyTemporal = ready;
+			ForwardPlusFrameValidationInputs readyTemporal = ready;
 			readyTemporal.m_TemporalActive = true;
 			readyTemporal.m_TemporalResolveClosureValid = true;
-			ForwardPBRFrameValidationInputs missingPresentation = ready;
+			ForwardPlusFrameValidationInputs missingPresentation = ready;
 			missingPresentation.m_PresentationAvailable = false;
-			ForwardPBRFrameValidationInputs resizing = ready;
+			ForwardPlusFrameValidationInputs resizing = ready;
 			resizing.m_DisplayExtentMatchesPresentation = false;
 			resizing.m_DepthCoverageValid = false;
-			ForwardPBRFrameValidationInputs sceneUnavailable = ready;
+			ForwardPlusFrameValidationInputs sceneUnavailable = ready;
 			sceneUnavailable.m_RenderSceneReady = false;
-			ForwardPBRFrameValidationInputs closureLost = readyTemporal;
+			ForwardPlusFrameValidationInputs closureLost = readyTemporal;
 			closureLost.m_TemporalResolveClosureValid = false;
-			ForwardPBRFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
+			ForwardPlusFrameValidationInputs closureUnusedWithoutTemporal = closureLost;
 			closureUnusedWithoutTemporal.m_TemporalActive = false;
-			ForwardPBRFrameValidationInputs lightOverflow = ready;
+			ForwardPlusFrameValidationInputs lightOverflow = ready;
 			lightOverflow.m_GlobalLightCount = ForwardPlusGlobalLightCapacity + 1;
-			const RenderFrameValidationResult lightFailure = ClassifyForwardPBRFrame(lightOverflow);
-			ForwardPBRFrameValidationInputs coverageMismatch = ready;
+			const RenderFrameValidationResult lightFailure = ClassifyForwardPlusFrame(lightOverflow);
+			ForwardPlusFrameValidationInputs coverageMismatch = ready;
 			coverageMismatch.m_DepthCoverageValid = false;
 			coverageMismatch.m_DepthCoverageDiagnostic = "Coverage variant 1 mismatch";
 			const RenderFrameValidationResult coverageFailure =
-				ClassifyForwardPBRFrame(coverageMismatch);
+				ClassifyForwardPlusFrame(coverageMismatch);
 			context.Check(classify(ready) == RenderFrameValidationStatus::Ready &&
 				classify(readyTemporal) == RenderFrameValidationStatus::Ready &&
 				classify(closureUnusedWithoutTemporal) == RenderFrameValidationStatus::Ready &&
@@ -8110,10 +8110,10 @@ namespace gglab
 				!IsTemporalAADisplayViewEligible(RenderViewID::Main, 0, 1080),
 				"Temporal AA eligibility is restricted to non-empty perspective display views");
 
-			RenderPipelineForwardPBR forwardPipeline;
+			RenderPipelineForwardPlus forwardPipeline;
 			const ResolvedTemporalFramePlan forwardPlan =
 				forwardPipeline.ResolveTemporalFramePlan(resolveInfo);
-			RenderPipelineForwardPBR integratedExtensionPipeline({
+			RenderPipelineForwardPlus integratedExtensionPipeline({
 				.m_SceneExtension = std::make_unique<IntegratedTemporalSceneExtension>(),
 			});
 			TemporalFramePlanResolveInfo integratedExtensionInfo = resolveInfo;
@@ -8127,7 +8127,7 @@ namespace gglab
 				!integratedExtensionPlan.m_Active &&
 				integratedExtensionPlan.m_SceneExtensionParticipation ==
 					SceneExtensionTemporalParticipation::TemporalUnsupported,
-				"ForwardPBR exposes its velocity path and rejects unsupported integrated extensions");
+				"The Forward+ pipeline exposes its velocity path and rejects unsupported integrated extensions");
 
 			Renderer renderer;
 			context.Check(!renderer.GetTemporalAACapabilityStatus().IsCoreAvailable(),

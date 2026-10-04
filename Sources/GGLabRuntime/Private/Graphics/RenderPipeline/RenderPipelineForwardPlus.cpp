@@ -1,4 +1,4 @@
-#include "Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -52,7 +52,7 @@ namespace gglab
 		};
 	}
 
-	MaterialDiagnosticPrewarmProgress RenderPipelineForwardPBR::PrewarmMaterialDiagnostics(
+	MaterialDiagnosticPrewarmProgress RenderPipelineForwardPlus::PrewarmMaterialDiagnostics(
 		const RenderServices& services, std::span<const uint64_t> drawVariants) noexcept
 	{
 		PrepareForwardPasses(services, true);
@@ -113,7 +113,7 @@ namespace gglab
 		return m_DiagnosticPrewarmProgress;
 	}
 
-	void RenderPipelineForwardPBR::PrepareTemporalFramePlanning(
+	void RenderPipelineForwardPlus::PrepareTemporalFramePlanning(
 		const RenderServices& services) noexcept
 	{
 		m_TemporalAAPass.Prepare(services);
@@ -121,7 +121,7 @@ namespace gglab
 			m_TemporalAAPass.ValidatePipelineClosure(services));
 	}
 
-	ResolvedTemporalFramePlan RenderPipelineForwardPBR::ResolveTemporalFramePlan(
+	ResolvedTemporalFramePlan RenderPipelineForwardPlus::ResolveTemporalFramePlan(
 		TemporalFramePlanResolveInfo info) const noexcept
 	{
 		info.m_DepthVelocityPathAvailable = info.m_Capabilities.m_VelocityProgramsAvailable;
@@ -137,22 +137,22 @@ namespace gglab
 		return gglab::ResolveTemporalFramePlan(info);
 	}
 
-	void RenderPipelineForwardPBR::BuildRenderGraph(
+	void RenderPipelineForwardPlus::BuildRenderGraph(
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
 		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
 
 		GGLAB_ASSERT_MSG(m_FramePlan && m_FramePlan->m_FrameSerial == context.m_FrameSerial,
-			"ForwardPBR graph construction requires a Ready validation of the same frame.");
+			"Forward+ graph construction requires a Ready validation of the same frame.");
 		if (!m_FramePlan || m_FramePlan->m_FrameSerial != context.m_FrameSerial)
 		{
-			GGLAB_UNREACHABLE("ForwardPBR graph construction has no validated frame plan.");
+			GGLAB_UNREACHABLE("Forward+ graph construction has no validated frame plan.");
 		}
 		const FramePlan framePlan = std::move(*m_FramePlan);
 		m_FramePlan.reset();
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
-			"A Ready ForwardPBR frame has prepared scene data and a valid depth coverage plan.");
+			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
@@ -536,8 +536,8 @@ namespace gglab
 			});
 	}
 
-	RenderFrameValidationResult ClassifyForwardPBRFrame(
-		const ForwardPBRFrameValidationInputs& inputs) noexcept
+	RenderFrameValidationResult ClassifyForwardPlusFrame(
+		const ForwardPlusFrameValidationInputs& inputs) noexcept
 	{
 		if (!inputs.m_PresentationAvailable)
 		{
@@ -575,20 +575,20 @@ namespace gglab
 		return RenderFrameValidationResult::Ready();
 	}
 
-	RenderFrameValidationResult RenderPipelineForwardPBR::ValidateRenderFrame(
+	RenderFrameValidationResult RenderPipelineForwardPlus::ValidateRenderFrame(
 		const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		m_FramePlan.reset();
 		const auto* swapChain = services.m_Presentation->GetSwapChain();
 		if (!swapChain || !swapChain->IsValid())
 		{
-			return ClassifyForwardPBRFrame({ .m_PresentationAvailable = false });
+			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = false });
 		}
 		const RenderView& displayView = context.GetDisplayRenderView();
 		if (displayView.m_Width != swapChain->GetBufferWidth() ||
 			displayView.m_Height != swapChain->GetBufferHeight())
 		{
-			return ClassifyForwardPBRFrame({ .m_PresentationAvailable = true });
+			return ClassifyForwardPlusFrame({ .m_PresentationAvailable = true });
 		}
 
 		PrepareForwardPasses(services, context.m_RenderScene.m_HasMaterialDiagnostics);
@@ -614,7 +614,7 @@ namespace gglab
 			m_GTAOPass.GetCapabilityStatus().IsCoreAvailable(), m_GTAOPass.IsAvailable(),
 			depthCoverage.m_HasDepthCoverageDraws);
 
-		RenderFrameValidationResult result = ClassifyForwardPBRFrame({
+		RenderFrameValidationResult result = ClassifyForwardPlusFrame({
 			.m_PresentationAvailable = true,
 			.m_DisplayExtentMatchesPresentation = true,
 			.m_RenderSceneReady = context.IsRenderSceneReady(),
@@ -632,7 +632,7 @@ namespace gglab
 		return result;
 	}
 
-	void RenderPipelineForwardPBR::PrepareForwardPasses(
+	void RenderPipelineForwardPlus::PrepareForwardPasses(
 		const RenderServices& services, bool materialDiagnostics) noexcept
 	{
 		auto* shaderManager = services.m_ShaderPrograms;
@@ -695,7 +695,7 @@ namespace gglab
 		m_ForwardTransparentPass.Prepare(services, m_ForwardPBRShaderSet);
 	}
 
-	DepthCoverageFramePlan RenderPipelineForwardPBR::BuildDepthCoverageFramePlanForFrame(
+	DepthCoverageFramePlan RenderPipelineForwardPlus::BuildDepthCoverageFramePlanForFrame(
 		const RenderFrameContext& context, uint32_t targetWidth, uint32_t targetHeight) const
 	{
 		const RenderViewID displayViewId = context.GetDisplayViewId();

@@ -10,7 +10,7 @@
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Graphics/Asset/AssetLoadProgress.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 
@@ -61,7 +61,7 @@ namespace gglab
 		}
 
 		// RenderPipeline
-		m_RenderPipeline = CreateRenderPipelineForwardPBR();
+		m_RenderPipeline = CreateRenderPipelineForwardPlus();
 	}
 
 	std::string_view DemoPlayground::GetName() const noexcept

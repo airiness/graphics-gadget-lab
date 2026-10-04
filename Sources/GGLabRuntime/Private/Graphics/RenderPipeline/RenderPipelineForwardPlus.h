@@ -31,8 +31,8 @@
 
 namespace gglab
 {
-	// Frame facts that decide whether the ForwardPBR recipe can record this frame.
-	struct ForwardPBRFrameValidationInputs
+	// Frame facts that decide whether the Forward+ recipe can record this frame.
+	struct ForwardPlusFrameValidationInputs
 	{
 		bool m_PresentationAvailable = false;
 		bool m_DisplayExtentMatchesPresentation = false;
@@ -49,10 +49,10 @@ namespace gglab
 	// skips the frame. Missing scene data, global lights beyond the Forward+ capacity,
 	// invalid depth coverage and a lost temporal resolve closure are contract failures;
 	// none of them selects another lighting path or frame topology.
-	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPBRFrame(
-		const ForwardPBRFrameValidationInputs& inputs) noexcept;
+	[[nodiscard]] RenderFrameValidationResult ClassifyForwardPlusFrame(
+		const ForwardPlusFrameValidationInputs& inputs) noexcept;
 
-	class RenderPipelineForwardPBR : public RenderPipelineBase
+	class RenderPipelineForwardPlus : public RenderPipelineBase
 	{
 	public:
 		struct CreateInfo
@@ -63,14 +63,14 @@ namespace gglab
 			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
 		};
 
-		explicit RenderPipelineForwardPBR(
+		explicit RenderPipelineForwardPlus(
 			std::shared_ptr<ForwardPlusDebugReadback> forwardPlusDebugReadback = {}) noexcept :
-			RenderPipelineForwardPBR(CreateInfo{
+			RenderPipelineForwardPlus(CreateInfo{
 				.m_ForwardPlusDebugReadback = std::move(forwardPlusDebugReadback),
 				})
 		{
 		}
-		explicit RenderPipelineForwardPBR(CreateInfo createInfo) noexcept :
+		explicit RenderPipelineForwardPlus(CreateInfo createInfo) noexcept :
 			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
 			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
@@ -79,9 +79,9 @@ namespace gglab
 			m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation =
 				m_ForwardPlusValidationPass.IsAvailable();
 		}
-		~RenderPipelineForwardPBR() override = default;
+		~RenderPipelineForwardPlus() override = default;
 
-		std::string_view GetName() const noexcept override { return "ForwardPBR"; }
+		std::string_view GetName() const noexcept override { return "ForwardPlus"; }
 		void PrepareTemporalFramePlanning(const RenderServices& services) noexcept override;
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;

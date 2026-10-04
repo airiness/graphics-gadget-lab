@@ -5,7 +5,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Camera.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 
 #include "GGLabRuntime/Graphics/Asset/AssetResourcePublication.h"
 
@@ -314,7 +314,7 @@ namespace gglab
 
 	AssetPublicationLabSession::AssetPublicationLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPlus())
 	{
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({

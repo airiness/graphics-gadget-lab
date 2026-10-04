@@ -9,7 +9,7 @@
 #include "GGLabRuntime/Graphics/Asset/ReservedTexture.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentTextureSource.h"
-#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPBR.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 
 namespace gglab
 {
@@ -53,7 +53,7 @@ namespace gglab
 
 	EnvironmentAssetLabSession::EnvironmentAssetLabSession(
 		const LabSessionCreateInfo& createInfo) noexcept :
-		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPBR())
+		LabSessionBase(GetDescriptor(), createInfo, CreateRenderPipelineForwardPlus())
 	{
 	}
 
