@@ -63,7 +63,7 @@ namespace gglab
 	{
 		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_Mode =
 			ForwardLightingMode::ForwardPlus;
-		GetMutableViewRenderProfile().m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
+		m_DebugReadback->SetHdrDiffRequested(true);
 
 		auto& parameters = GetMutableParameters();
 		GGLAB_UNUSED(parameters.Add({
@@ -244,14 +244,13 @@ namespace gglab
 		const ForwardLightingMode mode = static_cast<ForwardLightingMode>(GetParameters().Get(
 			LightingModeId, int32_t(ForwardLightingMode::ForwardPlus)));
 		const bool validateHdrDiff = GetParameters().Get(ValidateHdrDiffId, true);
-		if (forwardPlus.m_Mode != mode ||
-			forwardPlus.m_EnableHdrDiffValidation != validateHdrDiff)
+		if (forwardPlus.m_Mode != mode || m_DebugReadback->IsHdrDiffRequested() != validateHdrDiff)
 		{
 			m_DebugReadback->InvalidateResults();
 			ArmGpuTimingCaptureWarmup();
 		}
 		forwardPlus.m_Mode = mode;
-		forwardPlus.m_EnableHdrDiffValidation = validateHdrDiff;
+		m_DebugReadback->SetHdrDiffRequested(validateHdrDiff);
 		m_EnableCameraInput = GetParameters().Get(EnableCameraInputId, false);
 		UpdateSelectedTile();
 	}
@@ -472,7 +471,7 @@ namespace gglab
 			m_DebugReadback->RecordLegacyGpuTiming(frame.m_FrameIndex, opaqueMilliseconds);
 		}
 		else if (settings.m_Mode == ForwardLightingMode::ForwardPlus &&
-			!settings.m_EnableHdrDiffValidation && hasCullSample && hasOpaqueSample)
+			!m_DebugReadback->IsHdrDiffRequested() && hasCullSample && hasOpaqueSample)
 		{
 			m_DebugReadback->RecordForwardPlusGpuTiming(
 				frame.m_FrameIndex, cullMilliseconds, opaqueMilliseconds);
@@ -543,7 +542,7 @@ namespace gglab
 		const ForwardPlusSettings& forwardPlus = GetViewRenderProfile().m_Lighting.m_ForwardPlus;
 		const bool hdrDiffRequested =
 			forwardPlus.m_Mode == ForwardLightingMode::ForwardPlus &&
-			forwardPlus.m_EnableHdrDiffValidation;
+			m_DebugReadback->IsHdrDiffRequested();
 		const RHIDevice* device = m_Services.m_RenderServices.m_Presentation
 		? m_Services.m_RenderServices.m_Presentation->GetDevice()
 		: nullptr;

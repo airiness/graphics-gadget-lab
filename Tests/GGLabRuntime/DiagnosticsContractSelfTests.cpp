@@ -34,7 +34,6 @@
 #include "Graphics/Renderer.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
-#include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 #include "GGLabRuntime/Graphics/Camera.h"
@@ -234,9 +233,6 @@ namespace gglab
 					forward.m_Status = ForwardPlusFrameStatus::Active;
 					forward.m_TileLightHeaders = buffer("Settings.TileHeaders");
 					forward.m_TileLightIndices = buffer("Settings.TileIndices");
-					forward.m_HdrDiffStatus = { ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
-					blackboard.Create<RGForwardPlusValidationResources>(ForwardPlusValidationResourcesName)
-						.m_FrameMetrics = buffer("Settings.HdrDiff");
 					auto& gtao = blackboard.Create<RGGTAOResources>(GTAOResourcesName);
 					gtao.m_Status = GTAOFrameStatus::Active;
 					gtao.m_FinalAO = texture("Settings.AO");
@@ -260,7 +256,6 @@ namespace gglab
 			requested.m_Lighting.m_GTAO.m_Radius = 100.0f;
 			requested.m_PostProcess.m_Bloom.m_MaxLevels = 20;
 			requested.m_TemporalAA.m_Enabled = true;
-			requested.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
 			Camera camera(Camera::CreateInfo{});
 			ResolvedViewRenderSettings resolved = ResolveViewRenderSettings(requested, camera);
 			resolved.m_Exposure.m_PreExposure = 1.0f;
@@ -326,7 +321,6 @@ namespace gglab
 				active.m_GTAO.m_State == ViewRenderFeatureState::Active && active.m_GTAOUsesFormatFallback &&
 				active.m_TemporalAA.m_State == ViewRenderFeatureState::Active &&
 				active.m_Bloom.m_State == ViewRenderFeatureState::Active &&
-				active.m_HdrDiffValidation.m_State == ViewRenderFeatureState::Active &&
 				active.m_Shadows.m_State == ViewRenderFeatureState::Active,
 				"Settings activity comes from live compiled resources and existing feature decisions");
 			{
@@ -395,7 +389,6 @@ namespace gglab
 			auto& forward = graph.GetBlackboard().Get<RGForwardPlusResources>(ForwardPlusResourcesName);
 			auto& gtao = graph.GetBlackboard().Get<RGGTAOResources>(GTAOResourcesName);
 			forward.m_Status = ForwardPlusFrameStatus::DepthCoverageUnavailable;
-			forward.m_HdrDiffStatus = { ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive };
 			gtao.m_Status = GTAOFrameStatus::CoreCapabilityUnavailable;
 			temporalPlan.m_Active = false;
 			temporalPlan.m_Status = TemporalAAFrameStatus::Unavailable;
@@ -405,7 +398,6 @@ namespace gglab
 				unavailable.m_ActualLightingMode == ForwardLightingMode::Legacy &&
 				unavailable.m_ForwardLighting.m_State == ViewRenderFeatureState::Fallback &&
 				unavailable.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::DepthCoverageUnavailable &&
-				unavailable.m_HdrDiffValidation.m_Reason == ViewRenderFeatureReason::RequiredFeatureInactive &&
 				unavailable.m_GTAO.m_Reason == ViewRenderFeatureReason::CoreCapabilityUnavailable &&
 				unavailable.m_TemporalAA.m_Reason == ViewRenderFeatureReason::DepthVelocityPathUnavailable,
 				"Runtime fallbacks and unavailable reasons preserve requested feature intent");
@@ -446,8 +438,7 @@ namespace gglab
 			context.Check(culled.m_ForwardLighting.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
 				!culled.m_ActualLightingMode && culled.m_GTAO.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
 				culled.m_TemporalAA.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
-				culled.m_Bloom.m_Reason == ViewRenderFeatureReason::RenderGraphCulled &&
-				culled.m_HdrDiffValidation.m_Reason == ViewRenderFeatureReason::RenderGraphCulled,
+				culled.m_Bloom.m_Reason == ViewRenderFeatureReason::RenderGraphCulled,
 				"Created feature resources culled from the execution plan never appear active");
 			frame.m_DisplayViewId = RenderViewID::Unknown;
 			context.Check(!BuildRenderingSettingsDiagnosticsSnapshot(frame).m_RuntimeAvailable,

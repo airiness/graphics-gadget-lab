@@ -12,6 +12,8 @@ namespace gglab
 	// concrete pipeline and its pass roster stay Runtime-internal.
 	struct RenderPipelineForwardPBRCreateInfo
 	{
+		// Lab-owned Forward+ instrumentation. Supplying it composes tile readback and
+		// the HDR-diff validation recipe; production compositions leave it empty.
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
 	};

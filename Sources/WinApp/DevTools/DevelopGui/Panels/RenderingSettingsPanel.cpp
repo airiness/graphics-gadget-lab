@@ -291,13 +291,5 @@ namespace gglab
 			ImGui::EndTable();
 			ImGui::TextDisabled("Scene storage scale: %.6g", resolved.m_Exposure.m_PreExposure);
 		}
-		if (ImGui::CollapsingHeader("Advanced / Diagnostics") && BeginSettingsTable("DiagnosticSettings"))
-		{
-			DrawScalar("HDR Diff Validation", overrides ? &overrides->m_HdrDiffValidation : nullptr,
-				authoring.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, requested.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation,
-				resolved.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation, snapshot->m_HdrDiffValidation, context, ForwardInspector);
-			ImGui::EndTable();
-			ImGui::TextDisabled("Diagnostic readbacks add GPU work when enabled.");
-		}
 	}
 }

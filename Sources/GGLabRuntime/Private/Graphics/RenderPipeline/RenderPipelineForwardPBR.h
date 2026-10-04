@@ -31,6 +31,8 @@ namespace gglab
 	public:
 		struct CreateInfo
 		{
+			// Lab-owned Forward+ instrumentation. When present, the pipeline composes
+			// tile readback and the HDR-diff validation recipe.
 			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
 		};
@@ -48,8 +50,8 @@ namespace gglab
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
-			m_ForwardOpaquePass.SetHdrDiffValidationAvailable(
-				m_ForwardPlusDebugReadback != nullptr);
+			m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation =
+				m_ForwardPlusValidationPass.IsAvailable();
 		}
 		~RenderPipelineForwardPBR() override = default;
 

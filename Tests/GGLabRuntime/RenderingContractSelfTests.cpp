@@ -62,6 +62,7 @@
 #include "Graphics/RenderPass/RenderPassDepthPrepass.h"
 #include "Graphics/RenderPass/RenderPassDirectionalShadowMap.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
+#include "Graphics/RenderPass/ForwardPBRShaderSet.h"
 #include "Graphics/RenderPass/RenderPassForwardOpaque.h"
 #include "Graphics/RenderPass/RenderPassClearViewTargets.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
@@ -2898,11 +2899,23 @@ namespace gglab
 				ShaderID LoadProgram(const ShaderProgramRef& program) noexcept override
 				{
 					const auto demand = shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
-					const auto entry = std::ranges::find(demand, program);
-					return entry == demand.end() ? ShaderID{}
-						: ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
+					if (const auto entry = std::ranges::find(demand, program); entry != demand.end())
+					{
+						return ShaderID{ static_cast<uint32_t>(entry - demand.begin()) };
+					}
+					// Only the Lab-composed validation recipe may resolve HDR-diff programs.
+					const std::array validation{
+						shader_programs::ForwardPBRForwardPlusValidationPixel,
+						shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+						shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+						shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+					};
+					const auto entry = std::ranges::find(validation, program);
+					return !m_AllowValidationPrograms || entry == validation.end() ? ShaderID{}
+						: ShaderID{ static_cast<uint32_t>(demand.size() + (entry - validation.begin())) };
 				}
 				uint64_t GetGeneration(ShaderID) const noexcept override { return 1; }
+				bool m_AllowValidationPrograms = false;
 			} shaders;
 			class BindingAccess final : public RenderBindingLayoutAccess
 			{
@@ -3034,6 +3047,24 @@ namespace gglab
 			context.Check(pipeline->PrewarmMaterialDiagnostics(services, variants).IsReady() &&
 				pipelines.m_ResolveCount == completedCalls,
 				"Completed diagnostic prewarm performs no additional PSO resolutions");
+
+			shaders.m_AllowValidationPrograms = true;
+			RenderPipelineForwardPBR validationPipeline(RenderPipelineForwardPBR::CreateInfo{
+				.m_ForwardPlusDebugReadback = std::make_shared<ForwardPlusDebugReadback>(),
+				});
+			MaterialDiagnosticPrewarmProgress validationProgress;
+			for (uint32_t tick = 0; tick < 25; ++tick)
+			{
+				validationProgress = validationPipeline.PrewarmMaterialDiagnostics(services, variants);
+			}
+			context.Check(validationProgress.IsReady() && validationProgress.m_TotalCount == 25 &&
+				std::ranges::any_of(pipelines.m_Keys, [](const GraphicsPhysicalPipelineKey& key)
+					{
+						return key.m_Formats.m_RenderTargetCount == 6;
+					}),
+				"The Lab-composed validation recipe prewarms HDR-diff variants beside the production variants");
+			shaders.m_AllowValidationPrograms = false;
+
 			pipelines.m_FailResolve = true;
 			const std::array changedDemand{ variants[1] };
 			const auto failed = pipeline->PrewarmMaterialDiagnostics(services, changedDemand);
@@ -3044,28 +3075,64 @@ namespace gglab
 
 		void RunForwardPlusContractTests(SelfTestContext& context) noexcept
 		{
-			ForwardPlusSettings legacySettings{};
-			legacySettings.m_Mode = ForwardLightingMode::Legacy;
-			ForwardPlusSettings forwardPlusSettings{};
-			ForwardPlusSettings validationSettings{};
-			validationSettings.m_EnableHdrDiffValidation = true;
 			context.Check(
 				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, legacySettings, false) ==
+					ForwardPBRPassKind::Opaque, ForwardLightingMode::Legacy, false) ==
 				ForwardPBRLightingVariant::AllLights &&
 				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, forwardPlusSettings, false) ==
+					ForwardPBRPassKind::Opaque, ForwardLightingMode::Legacy, true) ==
+				ForwardPBRLightingVariant::AllLights &&
+				ResolveForwardPBRLightingVariant(
+					ForwardPBRPassKind::Opaque, ForwardLightingMode::ForwardPlus, false) ==
 				ForwardPBRLightingVariant::ForwardPlus &&
 				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, validationSettings, true) ==
+					ForwardPBRPassKind::Opaque, ForwardLightingMode::ForwardPlus, true) ==
 				ForwardPBRLightingVariant::ForwardPlusValidation &&
 				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Opaque, validationSettings, false) ==
-				ForwardPBRLightingVariant::ForwardPlus &&
-				ResolveForwardPBRLightingVariant(
-					ForwardPBRPassKind::Transparent, validationSettings, true) ==
+					ForwardPBRPassKind::Transparent, ForwardLightingMode::ForwardPlus, true) ==
 				ForwardPBRLightingVariant::AllLights,
-				"Opaque shading selects all-lights, Forward+, or HDR-diff variants while transparent shading remains all-lights");
+				"Opaque shading selects all-lights, Forward+, or an active HDR-diff record while transparent shading remains all-lights");
+
+			// Production composition must not depend on Lab-owned validation programs.
+			const auto productionDemand =
+				shader_programs::GetForwardPBRMaterialDiagnosticsShaderProgramDemand();
+			const std::array validationPrograms{
+				shader_programs::ForwardPBRForwardPlusValidationPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOPixel,
+				shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel,
+				shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel,
+			};
+			context.Check(std::ranges::none_of(validationPrograms, [&](const ShaderProgramRef& program)
+				{
+					return std::ranges::find(productionDemand, program) != productionDemand.end();
+				}),
+				"Production Forward shader demand excludes HDR-diff validation programs");
+
+			ForwardPBRShaderSet shaderSet{};
+			shaderSet.m_CoverageVertexShader = ShaderID{ 1 };
+			shaderSet.m_AllLightsShadingPixelShader = ShaderID{ 2 };
+			shaderSet.m_ForwardPlusShadingPixelShader = ShaderID{ 3 };
+			shaderSet.m_AllLightsGTAOContributionPixelShader = ShaderID{ 4 };
+			shaderSet.m_ForwardPlusGTAOContributionPixelShader = ShaderID{ 5 };
+			shaderSet.m_AlphaTestPixelShader = ShaderID{ 6 };
+			shaderSet.m_VelocityOpaquePixelShader = ShaderID{ 7 };
+			shaderSet.m_VelocityAlphaTestPixelShader = ShaderID{ 8 };
+			for (uint32_t index = 0; index < ForwardPBRShaderSet::ProductionMaterialDiagnosticVariantCount; ++index)
+			{
+				shaderSet.m_MaterialDiagnosticPixelShaders[index] = ShaderID{ 10 + index };
+			}
+			const bool productionValid =
+				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid();
+			shaderSet.m_IncludesHdrDiffValidation = true;
+			const bool validationRequiresPrograms =
+				!shaderSet.IsValid() && !shaderSet.AreMaterialDiagnosticsValid();
+			shaderSet.m_ForwardPlusValidationPixelShader = ShaderID{ 20 };
+			shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader = ShaderID{ 21 };
+			shaderSet.m_MaterialDiagnosticPixelShaders[4] = ShaderID{ 22 };
+			shaderSet.m_MaterialDiagnosticPixelShaders[5] = ShaderID{ 23 };
+			context.Check(productionValid && validationRequiresPrograms &&
+				shaderSet.IsValid() && shaderSet.AreMaterialDiagnosticsValid(),
+				"Forward shader validity requires HDR-diff programs only for the Lab-composed validation recipe");
 
 			const ForwardPlusHdrDiffReadback withinTolerance{
 				.m_MaxAbsoluteError = ForwardPlusHdrDiffAbsoluteTolerance,

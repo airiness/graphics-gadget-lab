@@ -3,10 +3,12 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineOverlayExtensionBase.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
+#include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
@@ -183,9 +185,6 @@ namespace gglab
 			}
 		}
 		const bool forwardPlusActive = forwardPlusStatus == ForwardPlusFrameStatus::Active;
-		const bool forwardPlusValidationEnabled =
-			forwardPlusActive && forwardPlusSettings.m_EnableHdrDiffValidation &&
-			m_ForwardPlusValidationPass.IsAvailable();
 		const GTAOSettings& gtaoSettings =
 			context.GetDisplayViewRenderSettings().m_Lighting.m_GTAO;
 		m_GTAOPass.Prepare(services);
@@ -208,13 +207,20 @@ namespace gglab
 		gtaoResources.m_Capabilities = m_GTAOPass.GetCapabilityStatus();
 		gtaoResources.m_ResolvedSettings = gtaoSettings;
 		forwardPlusResources.m_Status = forwardPlusStatus;
-		forwardPlusResources.m_HdrDiffStatus = !forwardPlusSettings.m_EnableHdrDiffValidation
-			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested }
-			: !forwardPlusActive
-			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
-			: forwardPlusValidationEnabled
-			? ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None }
-			: ViewRenderFeatureStatus{ ViewRenderFeatureState::Unavailable, ViewRenderFeatureReason::PipelineUnavailable };
+		// Only the Lab-composed validation recipe publishes HDR-diff state; the Lab's
+		// readback request selects whether an active Forward+ frame records it.
+		bool forwardPlusValidationEnabled = false;
+		if (m_ForwardPlusValidationPass.IsAvailable())
+		{
+			auto& validation = rg.GetBlackboard().Create<RGForwardPlusValidationResources>(
+				ForwardPlusValidationResourcesName);
+			validation.m_Status = !m_ForwardPlusDebugReadback->IsHdrDiffRequested()
+				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Disabled, ViewRenderFeatureReason::NotRequested }
+				: !forwardPlusActive
+				? ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::RequiredFeatureInactive }
+				: ViewRenderFeatureStatus{ ViewRenderFeatureState::Active, ViewRenderFeatureReason::None };
+			forwardPlusValidationEnabled = validation.IsActive();
+		}
 		forwardPlusResources.m_LightBaseIndex = context.m_RenderScene.m_LightBaseIndex;
 		forwardPlusResources.m_LightTableCapacity = context.m_RenderScene.m_LightCount;
 		forwardPlusResources.m_DirectionalLightCount =
@@ -641,22 +647,25 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusShadingPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusPixel);
-			m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
-				shaderManager->LoadProgram(
-					shader_programs::ForwardPBRForwardPlusValidationPixel);
 			m_ForwardPBRShaderSet.m_AllLightsGTAOContributionPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRAllLightsGTAOPixel);
 			m_ForwardPBRShaderSet.m_ForwardPlusGTAOContributionPixelShader =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOPixel);
-			m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
-				shaderManager->LoadProgram(
-					shader_programs::ForwardPBRForwardPlusValidationGTAOPixel);
 			m_ForwardPBRShaderSet.m_AlphaTestPixelShader =
 				shaderManager->LoadProgram(shader_programs::DepthPrepassAlphaTestPixel);
 			m_ForwardPBRShaderSet.m_VelocityOpaquePixelShader =
 				shaderManager->LoadProgram(shader_programs::DepthPrepassVelocityOpaquePixel);
 			m_ForwardPBRShaderSet.m_VelocityAlphaTestPixelShader =
 				shaderManager->LoadProgram(shader_programs::DepthPrepassVelocityAlphaTestPixel);
+			if (m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation)
+			{
+				m_ForwardPBRShaderSet.m_ForwardPlusValidationPixelShader =
+					shaderManager->LoadProgram(
+						shader_programs::ForwardPBRForwardPlusValidationPixel);
+				m_ForwardPBRShaderSet.m_ForwardPlusValidationGTAOContributionPixelShader =
+					shaderManager->LoadProgram(
+						shader_programs::ForwardPBRForwardPlusValidationGTAOPixel);
+			}
 		}
 
 		if (!m_ForwardPBRShaderSet.IsValid())
@@ -675,12 +684,15 @@ namespace gglab
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusMaterialDiagnosticsPixel);
 			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[3] =
 				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusGTAOMaterialDiagnosticsPixel);
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[4] =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
-			m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[5] =
-				shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
+			if (m_ForwardPBRShaderSet.m_IncludesHdrDiffValidation)
+			{
+				m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[4] =
+					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationMaterialDiagnosticsPixel);
+				m_ForwardPBRShaderSet.m_MaterialDiagnosticPixelShaders[5] =
+					shaderManager->LoadProgram(shader_programs::ForwardPBRForwardPlusValidationGTAOMaterialDiagnosticsPixel);
+			}
 			GGLAB_ASSERT_MSG(m_ForwardPBRShaderSet.AreMaterialDiagnosticsValid(),
-				"Material diagnostic output requires all shared Forward shader variants.");
+				"Material diagnostic output requires every composed Forward shader variant.");
 		}
 		m_DepthPrepassPass.Prepare(services, m_ForwardPBRShaderSet);
 		m_ForwardOpaquePass.Prepare(services, m_ForwardPBRShaderSet);

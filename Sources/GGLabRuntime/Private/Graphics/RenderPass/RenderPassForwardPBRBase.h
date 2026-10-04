@@ -24,16 +24,16 @@ namespace gglab
 		Count,
 	};
 
+	// HDR-diff validation is active only when the pipeline composed the Lab-owned
+	// validation recipe and published an active validation record for this frame.
 	[[nodiscard]] constexpr ForwardPBRLightingVariant ResolveForwardPBRLightingVariant(
-		ForwardPBRPassKind passKind, const ForwardPlusSettings& settings,
-		bool hdrDiffValidationAvailable) noexcept
+		ForwardPBRPassKind passKind, ForwardLightingMode mode, bool hdrDiffValidationActive) noexcept
 	{
-		if (passKind == ForwardPBRPassKind::Transparent ||
-			settings.m_Mode == ForwardLightingMode::Legacy)
+		if (passKind == ForwardPBRPassKind::Transparent || mode == ForwardLightingMode::Legacy)
 		{
 			return ForwardPBRLightingVariant::AllLights;
 		}
-		return settings.m_EnableHdrDiffValidation && hdrDiffValidationAvailable
+		return hdrDiffValidationActive
 			? ForwardPBRLightingVariant::ForwardPlusValidation
 			: ForwardPBRLightingVariant::ForwardPlus;
 	}
@@ -48,10 +48,6 @@ namespace gglab
 		[[nodiscard]] bool PrewarmMaterialDiagnosticVariant(const RenderServices& services,
 			uint64_t variantBits, bool useDepthEqual, ForwardPBRLightingVariant lightingVariant,
 			bool gtaoContributionOutputEnabled) noexcept;
-		void SetHdrDiffValidationAvailable(bool available) noexcept
-		{
-			m_HdrDiffValidationAvailable = available;
-		}
 
 		[[nodiscard]] static std::optional<DepthCoveragePipelineSignature>
 			BuildDepthCoveragePipelineSignatureForVariant(
@@ -104,7 +100,6 @@ namespace gglab
 			RenderQueueBuilder::VariantCount>, GTAOContributionVariantCount>, LightingVariantCount>;
 		PipelineSlotTable m_PipelineSlots{};
 		std::unique_ptr<PipelineSlotTable> m_MaterialDiagnosticPipelineSlots;
-		bool m_HdrDiffValidationAvailable = false;
 		bool m_IsInitialized = false;
 	};
 }

@@ -9,7 +9,6 @@
 #include "GGLabRuntime/Graphics/RenderViewTypes.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/ForwardPlusGraphResources.h"
-#include "Graphics/RenderPass/ForwardPlusValidationGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/TemporalAAGraphResources.h"
 
@@ -73,15 +72,6 @@ namespace gglab
 					{
 						snapshot.m_ActualLightingMode.reset();
 					}
-				}
-				snapshot.m_HdrDiffValidation = forward->m_HdrDiffStatus;
-				if (snapshot.m_HdrDiffValidation.m_State == ViewRenderFeatureState::Active)
-				{
-					const auto* validation = blackboard.TryGet<RGForwardPlusValidationResources>(
-						ForwardPlusValidationResourcesName);
-					snapshot.m_HdrDiffValidation = validation
-						? CheckResourceActivity(graph, validation->m_FrameMetrics)
-						: ViewRenderFeatureStatus{ ViewRenderFeatureState::Inactive, ViewRenderFeatureReason::ResourcesUnavailable };
 				}
 			}
 			const auto* gtao = blackboard.TryGet<RGGTAOResources>(GTAOResourcesName);

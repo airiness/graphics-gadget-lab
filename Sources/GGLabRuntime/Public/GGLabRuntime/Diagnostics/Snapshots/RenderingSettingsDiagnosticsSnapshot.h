@@ -35,7 +35,6 @@ namespace gglab
 		bool m_HistoryAvailable = false;
 		ViewRenderFeatureStatus m_Bloom{};
 		ViewRenderFeatureStatus m_ScenePreExposure{};
-		ViewRenderFeatureStatus m_HdrDiffValidation{};
 		ViewRenderFeatureStatus m_ToneMapping{};
 		ViewRenderFeatureStatus m_Shadows{};
 		DirectionalShadowSettings m_ShadowSettings = DisabledDirectionalShadowSettings();

@@ -42,7 +42,6 @@ namespace gglab
 	struct ForwardPlusSettings
 	{
 		ForwardLightingMode m_Mode = ForwardLightingMode::ForwardPlus;
-		bool m_EnableHdrDiffValidation = false;
 	};
 
 	enum class GTAOFinalAOFormatPreference : uint8_t

@@ -14,8 +14,7 @@ namespace gglab
 			static_cast<uint32_t>(m_GTAO.m_IsActive) +
 			static_cast<uint32_t>(m_Bloom.m_IsActive) +
 			static_cast<uint32_t>(m_ForwardLightingMode.has_value()) +
-			static_cast<uint32_t>(m_ScenePreExposure.has_value()) +
-			static_cast<uint32_t>(m_HdrDiffValidation.has_value());
+			static_cast<uint32_t>(m_ScenePreExposure.has_value());
 	}
 
 	void DevToolsRuntime::Reset() noexcept
@@ -34,9 +33,6 @@ namespace gglab
 		effectiveProfile.m_Lighting.m_ForwardPlus.m_Mode =
 			m_ViewRenderSettingsOverrides.m_ForwardLightingMode.value_or(
 				authoringProfile.m_Lighting.m_ForwardPlus.m_Mode);
-		effectiveProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation =
-			m_ViewRenderSettingsOverrides.m_HdrDiffValidation.value_or(
-				authoringProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation);
 		if (m_ViewRenderSettingsOverrides.m_TemporalAA.m_IsActive)
 		{
 			effectiveProfile.m_TemporalAA =

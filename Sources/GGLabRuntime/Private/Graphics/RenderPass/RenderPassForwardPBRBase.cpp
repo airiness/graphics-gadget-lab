@@ -136,6 +136,14 @@ namespace gglab
 			}
 			return desc;
 		}
+
+		[[nodiscard]] size_t GetPreparedLightingVariantCount(
+			const ForwardPBRShaderSet& shaderSet) noexcept
+		{
+			// The HDR-diff variant follows the production all-lights and Forward+ variants.
+			return static_cast<size_t>(shaderSet.m_IncludesHdrDiffValidation
+				? ForwardPBRLightingVariant::Count : ForwardPBRLightingVariant::ForwardPlusValidation);
+		}
 	}
 
 	void RenderPassForwardPBRBase::AddForwardPass(
@@ -149,9 +157,11 @@ namespace gglab
 
 		const RenderViewID displayViewId = context.GetDisplayViewId();
 		const bool transparent = m_PassKind == ForwardPBRPassKind::Transparent;
+		const auto* hdrDiffValidation = rg.GetBlackboard().TryGet<RGForwardPlusValidationResources>(
+			ForwardPlusValidationResourcesName);
 		const ForwardPBRLightingVariant lightingVariant = ResolveForwardPBRLightingVariant(
-			m_PassKind, context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus,
-			m_HdrDiffValidationAvailable);
+			m_PassKind, context.GetDisplayViewRenderSettings().m_Lighting.m_ForwardPlus.m_Mode,
+			hdrDiffValidation && hdrDiffValidation->IsActive());
 		auto* registry = services.m_Resources;
 		GGLAB_ASSERT_NOT_NULL(registry);
 		const bool gtaoContributionRequested = !transparent &&
@@ -270,8 +280,10 @@ namespace gglab
 				if (data.m_LightingVariant == ForwardPBRLightingVariant::ForwardPlusValidation)
 				{
 					RHITextureDesc referenceDesc = builder.GetTextureDesc(data.m_SceneColor);
-					auto& validation = blackboard.Create<RGForwardPlusValidationResources>(
+					auto& validation = blackboard.Get<RGForwardPlusValidationResources>(
 						ForwardPlusValidationResourcesName);
+					GGLAB_ASSERT_MSG(validation.IsActive() && !validation.IsValid(),
+						"The validation recipe publishes one active record per frame for one opaque reference.");
 					validation.m_AllLightsReferenceColor = builder.CreateTexture(
 						"ForwardPlus.AllLightsReferenceColor", referenceDesc);
 					builder.WriteInPlace(
@@ -618,20 +630,25 @@ namespace gglab
 				forwardPlusKey.m_BindingLayout = forwardPlusBindingLayout;
 				forwardPlusKey.m_PSId = shaderSet.m_ForwardPlusShadingPixelShader;
 
-				auto& validationKey = m_BasePhysicalKeys[
-					static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlusValidation)][0];
-				validationKey = forwardPlusKey;
-				validationKey.m_PSId = shaderSet.m_ForwardPlusValidationPixelShader;
-				validationKey.m_Formats.m_RenderTargetFormats[1] =
-					RHIFormat::R16G16B16A16Float;
-				validationKey.m_Formats.m_RenderTargetCount = 2;
+				// Validation recipes exist only in pipelines composed for HDR-diff.
+				if (shaderSet.m_IncludesHdrDiffValidation)
+				{
+					auto& validationKey = m_BasePhysicalKeys[
+						static_cast<size_t>(ForwardPBRLightingVariant::ForwardPlusValidation)][0];
+					validationKey = forwardPlusKey;
+					validationKey.m_PSId = shaderSet.m_ForwardPlusValidationPixelShader;
+					validationKey.m_Formats.m_RenderTargetFormats[1] =
+						RHIFormat::R16G16B16A16Float;
+					validationKey.m_Formats.m_RenderTargetCount = 2;
+				}
 
 				const ShaderID contributionShaders[] = {
 					shaderSet.m_AllLightsGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusGTAOContributionPixelShader,
 					shaderSet.m_ForwardPlusValidationGTAOContributionPixelShader,
 				};
-				for (size_t lightingIndex = 0; lightingIndex < LightingVariantCount; ++lightingIndex)
+				for (size_t lightingIndex = 0; lightingIndex < GetPreparedLightingVariantCount(shaderSet);
+					++lightingIndex)
 				{
 					auto& contributionKey = m_BasePhysicalKeys[lightingIndex][1];
 					contributionKey = m_BasePhysicalKeys[lightingIndex][0];
@@ -649,7 +666,7 @@ namespace gglab
 		if (!m_MaterialDiagnosticPipelineSlots && shaderSet.AreMaterialDiagnosticsValid())
 		{
 			const size_t lightingCount =
-				m_PassKind == ForwardPBRPassKind::Opaque ? LightingVariantCount : 1;
+				m_PassKind == ForwardPBRPassKind::Opaque ? GetPreparedLightingVariantCount(shaderSet) : 1;
 			const size_t contributionCount =
 				m_PassKind == ForwardPBRPassKind::Opaque ? GTAOContributionVariantCount : 1;
 			for (size_t lighting = 0; lighting < lightingCount; ++lighting)
@@ -791,6 +808,8 @@ namespace gglab
 			(materialDiagnostics ? GTAOContributionVariantCount : 0u);
 		GGLAB_ASSERT_MSG(!materialDiagnostics || m_MaterialDiagnosticPipelineSlots,
 			"Diagnostic MRT pipelines must be prepared before graph execution.");
+		GGLAB_ASSERT_MSG(m_BasePhysicalKeys[lightingVariantIndex][outputVariantIndex].m_PSId.IsValid(),
+			"Forward lighting variant was not composed into this pipeline.");
 		GraphicsPipelineDescription description{
 			.m_PhysicalKey = m_BasePhysicalKeys[lightingVariantIndex][outputVariantIndex],
 			.m_LogicalMetadata = BuildLogicalPipelineMetadataForVariant(

@@ -27,8 +27,6 @@ namespace gglab
 			return left.m_TemporalAA == right.m_TemporalAA &&
 				left.m_EnableScenePreExposure == right.m_EnableScenePreExposure &&
 				left.m_Lighting.m_ForwardPlus.m_Mode == right.m_Lighting.m_ForwardPlus.m_Mode &&
-				left.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation ==
-					right.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation &&
 				left.m_Lighting.m_EnableAerialPerspective == right.m_Lighting.m_EnableAerialPerspective &&
 				leftGTAO.m_Enabled == rightGTAO.m_Enabled &&
 				leftGTAO.m_Radius == rightGTAO.m_Radius &&
@@ -200,14 +198,11 @@ namespace gglab
 			context.Check(overrides.m_GTAO.m_Settings.m_Radius == 6.5f,
 				"A later edit seeds the new authoring profile rather than an old Inspector or frame block");
 			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "##Enabled")));
-			GGLAB_UNUSED(draw(ImHashStr("Advanced / Diagnostics", 0, windowId)));
-			GGLAB_UNUSED(draw(widget("DiagnosticSettings", "HDR Diff Validation", "##Enabled")));
-			context.Check(overrides.GetActiveCount() == 5 &&
-				overrides.m_ScenePreExposure == false && overrides.m_HdrDiffValidation == true,
-				"Cockpit scalar controls keep explicit false intent and independent diagnostic requests");
+			context.Check(overrides.GetActiveCount() == 4 && overrides.m_ScenePreExposure == false,
+				"Cockpit scalar controls keep explicit false intent");
 			GGLAB_UNUSED(draw(widget("PostProcessSettings", "Scene Pre-exposure", "Reset")));
-			context.Check(!overrides.m_ScenePreExposure && overrides.GetActiveCount() == 4 && overrides.m_HdrDiffValidation == true,
-				"A scalar row reset restores inheritance without clearing independently requested diagnostics");
+			context.Check(!overrides.m_ScenePreExposure && overrides.GetActiveCount() == 3,
+				"A scalar row reset restores inheritance without clearing sibling overrides");
 			GGLAB_UNUSED(draw(ImHashStr("Clear All Overrides", 0, windowId)));
 			context.Check(overrides.GetActiveCount() == 0 &&
 				ProfilesMatch(devTools.ResolveViewRenderProfile(snapshot.m_AuthoringProfile), snapshot.m_AuthoringProfile),
@@ -259,13 +254,12 @@ namespace gglab
 		authoringProfile.m_Lighting.m_GTAO.m_Radius = 0.75f;
 		authoringProfile.m_TemporalAA.m_Enabled = false;
 		authoringProfile.m_PostProcess.m_Bloom.m_Enabled = false;
-		authoringProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = true;
 		const ViewRenderProfile originalAuthoringProfile = authoringProfile;
 		DevToolsRuntime devTools;
 		auto& overrides = devTools.GetViewRenderSettingsOverrides();
 		context.Check(overrides.GetActiveCount() == 0 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), originalAuthoringProfile),
-			"A new DevTools session inherits every authoring setting, including diagnostics");
+			"A new DevTools session inherits every authoring setting");
 
 		overrides.m_GTAO.m_Settings.m_Radius = 9.0f;
 		overrides.m_TemporalAA.m_Settings.m_MaxHistoryFeedback = 0.5f;
@@ -328,15 +322,7 @@ namespace gglab
 		expectedProfile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
 		context.Check(overrides.GetActiveCount() == 1 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile),
-			"Lighting-path override preserves independently authored HDR diff intent");
-
-		overrides.ClearAll();
-		overrides.m_HdrDiffValidation = false;
-		expectedProfile = originalAuthoringProfile;
-		expectedProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = false;
-		context.Check(overrides.GetActiveCount() == 1 &&
-			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile),
-			"Explicitly disabling HDR diff counts as an override without changing the lighting path");
+			"Lighting-path override changes only the lighting path");
 
 		overrides.ClearAll();
 		overrides.m_ScenePreExposure = false;
@@ -354,17 +340,15 @@ namespace gglab
 		overrides.m_TemporalAA.Activate(temporalSettings);
 		overrides.m_Bloom.Activate(bloomSettings);
 		overrides.m_ForwardLightingMode = ForwardLightingMode::Legacy;
-		overrides.m_HdrDiffValidation = false;
 		expectedProfile = originalAuthoringProfile;
 		expectedProfile.m_Lighting.m_GTAO = gtaoSettings;
 		expectedProfile.m_TemporalAA = temporalSettings;
 		expectedProfile.m_PostProcess.m_Bloom = bloomSettings;
 		expectedProfile.m_Lighting.m_ForwardPlus.m_Mode = ForwardLightingMode::Legacy;
-		expectedProfile.m_Lighting.m_ForwardPlus.m_EnableHdrDiffValidation = false;
-		context.Check(overrides.GetActiveCount() == 6 &&
+		context.Check(overrides.GetActiveCount() == 5 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(authoringProfile), expectedProfile) &&
 			ProfilesMatch(authoringProfile, originalAuthoringProfile),
-			"All six overrides compose, counting blocks once and explicit false values as active");
+			"All five overrides compose, counting blocks once and explicit false values as active");
 
 		// A different authoring source must not silently clear session overrides or
 		// re-seed the parameters of an already active settings block.
@@ -374,26 +358,26 @@ namespace gglab
 		nextAuthoringProfile.m_PostProcess.m_Bloom.m_Intensity = 0.4f;
 		nextAuthoringProfile.m_EnableScenePreExposure = false;
 		const ViewRenderProfile originalNextAuthoringProfile = nextAuthoringProfile;
-		context.Check(overrides.GetActiveCount() == 6 &&
+		context.Check(overrides.GetActiveCount() == 5 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile) &&
 			ProfilesMatch(nextAuthoringProfile, originalNextAuthoringProfile),
 			"DevTools session overrides survive authoring-profile switches without mutating either source");
 
 		overrides.m_GTAO.Reset();
 		expectedProfile.m_Lighting.m_GTAO = nextAuthoringProfile.m_Lighting.m_GTAO;
-		context.Check(overrides.GetActiveCount() == 5 &&
+		context.Check(overrides.GetActiveCount() == 4 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
 			"Resetting one block restores the current authoring source and preserves sibling overrides");
 		overrides.m_ScenePreExposure.reset();
 		expectedProfile.m_EnableScenePreExposure = false;
-		context.Check(overrides.GetActiveCount() == 4 &&
+		context.Check(overrides.GetActiveCount() == 3 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), expectedProfile),
-			"Resetting one scalar restores inheritance without clearing diagnostic or other overrides");
+			"Resetting one scalar restores inheritance without clearing other overrides");
 
 		overrides.ClearAll();
 		context.Check(overrides.GetActiveCount() == 0 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), originalNextAuthoringProfile),
-			"Clear All restores every current authoring setting, including diagnostic intent");
+			"Clear All restores every current authoring setting");
 		nextAuthoringProfile.m_Lighting.m_GTAO.m_Radius = 3.0f;
 		nextAuthoringProfile.m_PostProcess.m_Bloom.m_Intensity = 0.6f;
 		nextAuthoringProfile.m_EnableScenePreExposure = true;
@@ -402,9 +386,8 @@ namespace gglab
 
 		overrides.m_Bloom.Activate(bloomSettings);
 		overrides.m_ScenePreExposure = false;
-		overrides.m_HdrDiffValidation = false;
 		DevToolsRuntime nextDevToolsSession;
-		context.Check(overrides.GetActiveCount() == 3 &&
+		context.Check(overrides.GetActiveCount() == 2 &&
 			nextDevToolsSession.GetViewRenderSettingsOverrides().GetActiveCount() == 0 &&
 			ProfilesMatch(nextDevToolsSession.ResolveViewRenderProfile(nextAuthoringProfile), nextAuthoringProfile),
 			"Session overrides are instance-owned and never inherited by a new DevTools session");
@@ -412,7 +395,7 @@ namespace gglab
 		context.Check(overrides.GetActiveCount() == 0 &&
 			ProfilesMatch(devTools.ResolveViewRenderProfile(nextAuthoringProfile), nextAuthoringProfile) &&
 			ProfilesMatch(authoringProfile, originalAuthoringProfile),
-			"DevTools reset clears rendering and diagnostic overrides without modifying authoring state");
+			"DevTools reset clears rendering overrides without modifying authoring state");
 		RunRenderingSettingsPanelChecks(context);
 	}
 }
